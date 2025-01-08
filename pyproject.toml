@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.6",
+    "requests>=2.32.3",
 ]
 
 [dependency-groups]
@@ -17,3 +18,6 @@ dev = [
 
 [tool.uv.sources]
 magic-the-battling = { workspace = true }
+
+[tool.ruff]
+line-length = 120
