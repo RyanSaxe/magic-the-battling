@@ -1,3 +1,5 @@
+from concurrent.futures import ThreadPoolExecutor
+
 import requests
 from pydantic import BaseModel
 
@@ -11,6 +13,14 @@ class Card(BaseModel):
     tokens: list["Card"] | None = None
     flip_image_url: str | None = None
     elo: float = 0.0
+
+    def __hash__(self):
+        return hash(
+            tuple(
+                tuple(self.name, self.image_url, self.flip_image_url, self.elo, self.id),
+                tuple(card.__hash__() for card in self.tokens) if self.tokens is not None else None,
+            )
+        )
 
 
 class Battler(BaseModel):
@@ -43,18 +53,17 @@ def scryfall_to_card(card_json: dict) -> Card:
         flip_image_url = card_json["card_faces"][1]["image_uris"]["normal"]
     else:
         flip_image_url = None
-
-    return Card(
-        name=card_json["name"],
-        image_url=image_url,
-        flip_image_url=flip_image_url,
-        tokens=[
-            scryfall_to_card(get_json(token))
-            for token in card_json.get("all_parts", [])
-            if token["component"] == "token"
-        ],
-        id=card_json["id"],
-    )
+    try:
+        return Card(
+            name=card_json["name"],
+            image_url=image_url,
+            flip_image_url=flip_image_url,
+            tokens=[],
+            id=card_json["id"],
+        )
+    except Exception as e:
+        print(e)
+        breakpoint()
 
 
 def cubecobra_to_card(card_json: dict) -> Card:
@@ -64,14 +73,18 @@ def cubecobra_to_card(card_json: dict) -> Card:
         tokens = None
     if tokens is not None:
         tokens = [scryfall_to_card(get_json(f"https://api.scryfall.com/cards/{token}")) for token in tokens]
-    return Card(
-        name=card_json["name_lower"],
-        image_url=card_json["image_normal"],
-        elo=card_json["elo"],
-        tokens=tokens,
-        flip_image_url=card_json.get("image_flip"),
-        id=card_json["id"],
-    )
+    try:
+        return Card(
+            name=card_json["name_lower"],
+            image_url=card_json["image_normal"],
+            elo=card_json["elo"],
+            tokens=tokens,
+            flip_image_url=card_json.get("image_flip"),
+            id=card_json["scryfall_id"],
+        )
+    except Exception as e:
+        print(e)
+        breakpoint()
 
 
 DEFAULT_VANGUARD_ID = "default_mtb_vanguards"
@@ -86,7 +99,11 @@ def get_cube_data(cube_id: str) -> list[Card]:
     data = response.json()
     cube = data["cards"]["mainboard"]
 
-    return [cubecobra_to_card(card_json) for card_json in cube]
+    # NOTE: should make sure this doesnt run into rate limits.
+    #       maybe I should create a card DB and only hit this if the card is not in the DB.
+    with ThreadPoolExecutor() as executor:
+        results = list(executor.map(cubecobra_to_card, cube))
+    return results
 
 
 def build_battler(
