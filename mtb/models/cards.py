@@ -1,3 +1,4 @@
+import random
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -21,12 +22,18 @@ class Card(BaseModel):
                 tuple(card.__hash__() for card in self.tokens) if self.tokens is not None else None,
             )
         )
-
+    
+# NOTE: is this necessary??
+class Upgrade(Card):
+    upgraded_card: str | None = None
 
 class Battler(BaseModel):
     cards: list[Card]
     upgrades: list[Card]
     vanguards: list[Card]
+
+    def shuffle(self) -> None:
+        random.shuffle(self.cards)
 
     @property
     def elo(self):
