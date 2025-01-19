@@ -60,17 +60,13 @@ def scryfall_to_card(card_json: dict) -> Card:
         flip_image_url = card_json["card_faces"][1]["image_uris"]["normal"]
     else:
         flip_image_url = None
-    try:
-        return Card(
-            name=card_json["name"],
-            image_url=image_url,
-            flip_image_url=flip_image_url,
-            tokens=[],
-            id=card_json["id"],
-        )
-    except Exception as e:
-        print(e)
-        breakpoint()
+    return Card(
+        name=card_json["name"],
+        image_url=image_url,
+        flip_image_url=flip_image_url,
+        tokens=[],
+        id=card_json["id"],
+    )
 
 
 def cubecobra_to_card(card_json: dict) -> Card:
@@ -79,19 +75,16 @@ def cubecobra_to_card(card_json: dict) -> Card:
     if tokens is not None and len(tokens) == 0:
         tokens = None
     if tokens is not None:
+        # NOTE: get_json is cached so this shouldn't be an issue for repeated tokens
         tokens = [scryfall_to_card(get_json(f"https://api.scryfall.com/cards/{token}")) for token in tokens]
-    try:
-        return Card(
-            name=card_json["name_lower"],
-            image_url=card_json["image_normal"],
-            elo=card_json["elo"],
-            tokens=tokens,
-            flip_image_url=card_json.get("image_flip"),
-            id=card_json["scryfall_id"],
-        )
-    except Exception as e:
-        print(e)
-        breakpoint()
+    return Card(
+        name=card_json["name_lower"],
+        image_url=card_json["image_normal"],
+        elo=card_json["elo"],
+        tokens=tokens,
+        flip_image_url=card_json.get("image_flip"),
+        id=card_json["scryfall_id"],
+    )
 
 
 DEFAULT_VANGUARD_ID = "default_mtb_vanguards"
@@ -106,8 +99,6 @@ def get_cube_data(cube_id: str) -> list[Card]:
     data = response.json()
     cube = data["cards"]["mainboard"]
 
-    # NOTE: should make sure this doesnt run into rate limits.
-    #       maybe I should create a card DB and only hit this if the card is not in the DB.
     with ThreadPoolExecutor() as executor:
         results = list(executor.map(cubecobra_to_card, cube))
     return results
@@ -115,13 +106,13 @@ def get_cube_data(cube_id: str) -> list[Card]:
 
 def build_battler(
     battler_id: str = DEFAULT_BATTLER_ID,
-    upgrades_id: str = DEFAULT_UPGRADES_ID,
-    vanguards_id: str = DEFAULT_VANGUARD_ID,
+    upgrades_id: str | None = None,
+    vanguards_id: str | None = None,
 ) -> Battler:
     battler = Battler(
         cards=get_cube_data(battler_id),
-        upgrades=[],  # get_cube_data(upgrades_id),
-        vanguards=[],  # =get_cube_data(vanguards_id),
+        upgrades=[] if upgrades_id is None else get_cube_data(upgrades_id),
+        vanguards=[] if vanguards_id is None else get_cube_data(vanguards_id),
     )
 
     return battler

@@ -15,12 +15,15 @@ class Player(BaseModel):
     poison: int = 0
     treasures: int = 0
 
+
 class RealPlayer(Player):
     battler: Battler
+
 
 # Fake Class for being able to play single player
 class FakePlayer(BaseModel):
     historic_game_id: str
+
 
 # TODO: abstract to let players have their own battlers
 # NOTE: possible commanders in the above TODO require extra refactoring later
@@ -30,9 +33,11 @@ class Game(BaseModel):
     round: int = 1
     stage: int = 3
 
+
 class Draft(BaseModel):
     player: RealPlayer
     pack: list[Card]
+
 
 class Zones(BaseModel):
     battlefield: list[Card]
@@ -42,13 +47,15 @@ class Zones(BaseModel):
     command_zone: list[Card]
     library: list[Card]
 
+
 class Battle(BaseModel):
     player: Player
     opponent: Player
     coin_flip: Player
     player_zones: Zones
     opponent_zones: Zones
-    
+
+
 def create_game(player_names: list[str], num_players: int) -> Game:
     if num_players < player_names:
         raise ValueError()
@@ -58,10 +65,11 @@ def create_game(player_names: list[str], num_players: int) -> Game:
 
     return Game(players=[Player(name=name) for name in player_names])
 
+
 PACKSIZE = 5
 
-def deal(game: Game, draft: Draft, roll: bool = False) -> Draft:
 
+def deal(game: Game, draft: Draft, roll: bool = False) -> Draft:
     if roll and draft.player.treasures == 0:
         # TODO: log/return something to tell player they cant roll
         return draft
@@ -74,7 +82,7 @@ def deal(game: Game, draft: Draft, roll: bool = False) -> Draft:
     game.battler.cards = game.battler.cards[PACKSIZE:]
     return draft
 
+
 # TODO: figure out if a battle is represented as the same instance of the URL
 #       with two players or two diff URLs mirroring with you/opponent
-# def cleanup(battle: Battle) -> 
-
+# def cleanup(battle: Battle) ->
