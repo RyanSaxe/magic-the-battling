@@ -1,59 +1,70 @@
 import random
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, PrivateAttr
 
-from mtb.utils import get_json
+from mtb.utils import get_json, stop_worker
 
 
 class Card(BaseModel):
     name: str
     image_url: str
     id: str
-    tokens: list["Card"] | None = None
+    type_line: str
+    tokens: tuple["Card", ...] = Field(default_factory=tuple)
     flip_image_url: str | None = None
     elo: float = 0.0
 
     def __hash__(self):
         return hash(
-            tuple(
-                tuple(self.name, self.image_url, self.flip_image_url, self.elo, self.id),
-                tuple(card.__hash__() for card in self.tokens) if self.tokens is not None else None,
+            (
+                self.name,
+                self.image_url,
+                self.id,
+                self.type_line,
+                tuple(hash(card) for card in self.tokens),
+                self.flip_image_url,
+                self.elo,
             )
         )
-    
-# NOTE: is this necessary??
-class Upgrade(Card):
-    upgraded_card: str | None = None
+
 
 class Battler(BaseModel):
     cards: list[Card]
     upgrades: list[Card]
     vanguards: list[Card]
 
+    # --- private, immutable-at-runtime ids/hashes ---
+    _initial_hash: int = PrivateAttr(default=0)
+    _id: int = PrivateAttr(default=0)
+
+    def model_post_init(self, __context) -> None:
+        """Capture the initial state *once* and derive a stable hash/id from it."""
+        snapshot = (tuple(self.cards), tuple(self.upgrades), tuple(self.vanguards))
+        self._initial_hash = hash(snapshot)  # process-salted; stable for this process
+        self._id = self._initial_hash
+
     def shuffle(self) -> None:
         random.shuffle(self.cards)
 
     @property
-    def elo(self):
+    def elo(self) -> float:
         return sum(card.elo for card in self.cards) / len(self.cards)
 
     @property
-    def id(self):
-        return hash(self)
+    def id(self) -> int:
+        # fixed after __init__/validation
+        return self._id
 
-    def __hash__(self):
-        return hash(
-            (
-                tuple(card.name for card in self.cards),
-                tuple(card.name for card in self.upgrades),
-                tuple(card.name for card in self.vanguards),
-            )
-        )
+    def __hash__(self) -> int:
+        # fixed after __init__/validation
+        return self._initial_hash
 
 
-def scryfall_to_card(card_json: dict) -> Card:
+def get_card_from_scryfall(card_id: str) -> Card:
+    card_json = get_json(f"https://api.scryfall.com/cards/{card_id}")
     image_url = card_json.get("image_uris", {}).get("normal")
     if image_url is None:
         image_url = card_json["card_faces"][0]["image_uris"]["normal"]
@@ -64,23 +75,22 @@ def scryfall_to_card(card_json: dict) -> Card:
         name=card_json["name"],
         image_url=image_url,
         flip_image_url=flip_image_url,
-        tokens=[],
+        type_line=card_json["type_line"],
         id=card_json["id"],
     )
 
 
 def cubecobra_to_card(card_json: dict) -> Card:
     card_json = card_json["details"]
-    tokens = card_json.get("tokens")
-    if tokens is not None and len(tokens) == 0:
-        tokens = None
-    if tokens is not None:
+    tokens = tuple(card_json.get("tokens", []))
+    if len(tokens) > 0:
         # NOTE: get_json is cached so this shouldn't be an issue for repeated tokens
-        tokens = [scryfall_to_card(get_json(f"https://api.scryfall.com/cards/{token}")) for token in tokens]
+        tokens = tuple(get_card_from_scryfall(token) for token in tokens)
     return Card(
         name=card_json["name_lower"],
         image_url=card_json["image_normal"],
         elo=card_json["elo"],
+        type_line=card_json["type"],
         tokens=tokens,
         flip_image_url=card_json.get("image_flip"),
         id=card_json["scryfall_id"],
@@ -109,15 +119,33 @@ def build_battler(
     upgrades_id: str | None = None,
     vanguards_id: str | None = None,
 ) -> Battler:
-    battler = Battler(
-        cards=get_cube_data(battler_id),
-        upgrades=[] if upgrades_id is None else get_cube_data(upgrades_id),
-        vanguards=[] if vanguards_id is None else get_cube_data(vanguards_id),
-    )
+    try:
+        cards = get_cube_data(battler_id)
 
-    return battler
+        vanguards = [card for card in cards if card.type_line.lower() == "vanguard"]
+        if vanguards_id is not None:
+            if len(vanguards) > 0:
+                warnings.warn("Vanguards found in battler. Replacing them with vanguards from the passed vanguard id.")
+            vanguards = get_cube_data(vanguards_id)
+
+        upgrades = [card for card in cards if card.type_line.lower() == "conspiracy"]
+        if upgrades_id is not None:
+            if len(upgrades) > 0:
+                warnings.warn("Upgrades found in battler. Replacing them with upgrades from the passed upgrades id.")
+            upgrades = get_cube_data(upgrades_id)
+
+        cards = [card for card in cards if card.type_line.lower() not in ("vanguard", "conspiracy")]
+    finally:
+        stop_worker()
+
+    return Battler(cards=cards, upgrades=upgrades, vanguards=vanguards)
 
 
 if __name__ == "__main__":
-    Battler = build_battler()
-    print(Battler)
+    # Example usage
+    battler = build_battler()
+    print(battler)
+    print(f"Elo: {battler.elo}")
+    print(f"ID: {battler.id}")
+    battler.shuffle()
+    print("Shuffled cards:", battler.cards)
