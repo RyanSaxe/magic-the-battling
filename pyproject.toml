@@ -1,24 +1,20 @@
 [project]
-name = "magic-the-battling"
+name = "mtb"
 version = "0.1.0"
-description = "Add your description here"
+description = "A FastAPI application for Magic: The Battling game"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "fastapi>=0.115.6",
-    "requests>=2.32.3",
-]
+dependencies = ["fastapi>=0.115.6", "requests>=2.32.3"]
 
 [dependency-groups]
-dev = [
-    "magic-the-battling",
-    "mtb>=0.1.0",
-    "pytest>=8.3.4",
-    "ruff>=0.8.6",
-]
+dev = ["pytest>=8.3.4", "ruff>=0.8.6"]
 
 [tool.uv.sources]
 magic-the-battling = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 120
