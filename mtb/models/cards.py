@@ -3,7 +3,7 @@ import warnings
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field
 
 from mtb.utils import get_json, stop_worker
 
@@ -16,19 +16,21 @@ class Card(BaseModel):
     tokens: tuple["Card", ...] = Field(default_factory=tuple)
     flip_image_url: str | None = None
     elo: float = 0.0
+    upgrades: list["Card"] = Field(default_factory=list)
 
-    def __hash__(self):
-        return hash(
-            (
-                self.name,
-                self.image_url,
-                self.id,
-                self.type_line,
-                tuple(hash(card) for card in self.tokens),
-                self.flip_image_url,
-                self.elo,
-            )
-        )
+    @property
+    def is_upgrade(self):
+        return self.type_line.lower() == "conspiracy"
+
+    @property
+    def is_vanguard(self):
+        return self.type_line.lower() == "vanguard"
+
+    def upgrade(self, upgrade: "Card"):
+        if not upgrade.is_upgrade:
+            raise ValueError(f"{upgrade.name} is not a conspiracy and hence cannot be an upgrade")
+        self.upgrades.append(upgrade)
+        upgrade.upgrades.append(self)
 
 
 class Battler(BaseModel):
@@ -36,31 +38,12 @@ class Battler(BaseModel):
     upgrades: list[Card]
     vanguards: list[Card]
 
-    # --- private, immutable-at-runtime ids/hashes ---
-    _initial_hash: int = PrivateAttr(default=0)
-    _id: int = PrivateAttr(default=0)
-
-    def model_post_init(self, __context) -> None:
-        """Capture the initial state *once* and derive a stable hash/id from it."""
-        snapshot = (tuple(self.cards), tuple(self.upgrades), tuple(self.vanguards))
-        self._initial_hash = hash(snapshot)  # process-salted; stable for this process
-        self._id = self._initial_hash
-
     def shuffle(self) -> None:
         random.shuffle(self.cards)
 
     @property
     def elo(self) -> float:
         return sum(card.elo for card in self.cards) / len(self.cards)
-
-    @property
-    def id(self) -> int:
-        # fixed after __init__/validation
-        return self._id
-
-    def __hash__(self) -> int:
-        # fixed after __init__/validation
-        return self._initial_hash
 
 
 def get_card_from_scryfall(card_id: str) -> Card:
@@ -146,6 +129,5 @@ if __name__ == "__main__":
     battler = build_battler()
     print(battler)
     print(f"Elo: {battler.elo}")
-    print(f"ID: {battler.id}")
     battler.shuffle()
     print("Shuffled cards:", battler.cards)

@@ -7,6 +7,8 @@ from mtb.models.cards import Battler, Card
 #       constructed variant of the game!
 class Player(BaseModel):
     name: str
+    battler: Battler
+    most_recently_revealed_cards: list[Card] = Field(default_factory=list)
     hand: list[Card] = Field(default_factory=list)
     sideboard: list[Card] = Field(default_factory=list)
     upgrades: list[Card] = Field(default_factory=list)
