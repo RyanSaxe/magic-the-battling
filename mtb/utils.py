@@ -1,5 +1,8 @@
 """
-utility module for safetly rate limiting a call to a HTTP API
+utility module for safetly rate limiting a call to a HTTP API when done in parallel
+
+NOTE: this was mostly written by GPT5, so be mindful of that
+TODO: given the note above, refactor and test this module
 """
 
 import threading
