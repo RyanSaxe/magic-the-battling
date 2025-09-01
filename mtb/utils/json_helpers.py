@@ -83,6 +83,12 @@ _thread = threading.Thread(target=_worker, name="http-worker", daemon=False)
 _thread.start()
 
 
+def stop_worker():
+    # None is not a valid URL, but this interface is used to signal the worker to stop
+    _request_q.put(None)  # type: ignore
+    _thread.join(timeout=5)
+
+
 def get_json(url: str) -> dict:
     # Fast path: cache hit
     with _lock:
@@ -98,8 +104,3 @@ def get_json(url: str) -> dict:
             _request_q.put((url, fut))
     # Wait outside the lock
     return fut.result()
-
-
-def stop_worker():
-    _request_q.put(None)  # type: ignore
-    _thread.join(timeout=5)
