@@ -41,9 +41,11 @@ class Battler(BaseModel):
         return sum(card.elo for card in self.cards) / len(self.cards)
 
 
-DEFAULT_VANGUARD_ID = "default_mtb_vanguards"
 DEFAULT_BATTLER_ID = "auto"
 DEFAULT_UPGRADES_ID = "default_mtb_upgrades"
+
+# TODO: actually add a lot of vanguards to the default cube
+DEFAULT_VANGUARD_ID = "default_mtb_vanguards"
 
 
 def build_battler(
@@ -51,23 +53,22 @@ def build_battler(
     upgrades_id: str | None = None,
     vanguards_id: str | None = None,
 ) -> Battler:
-    try:
-        cards = get_cube_data(battler_id)
+    from mtb.utils.cubecobra import get_cube_data
 
-        vanguards = [card for card in cards if card.type_line.lower() == "vanguard"]
-        if vanguards_id is not None:
-            if len(vanguards) > 0:
-                warnings.warn("Vanguards found in battler. Replacing them with vanguards from the passed vanguard id.")
-            vanguards = get_cube_data(vanguards_id)
+    cards = get_cube_data(battler_id)
 
-        upgrades = [card for card in cards if card.type_line.lower() == "conspiracy"]
-        if upgrades_id is not None:
-            if len(upgrades) > 0:
-                warnings.warn("Upgrades found in battler. Replacing them with upgrades from the passed upgrades id.")
-            upgrades = get_cube_data(upgrades_id)
+    vanguards = [card for card in cards if card.type_line.lower() == "vanguard"]
+    if vanguards_id is not None:
+        if len(vanguards) > 0:
+            warnings.warn("Vanguards found in battler. Replacing them with vanguards from the passed vanguard id.")
+        vanguards = get_cube_data(vanguards_id)
 
-        cards = [card for card in cards if card.type_line.lower() not in ("vanguard", "conspiracy")]
-    finally:
-        stop_worker()
+    upgrades = [card for card in cards if card.type_line.lower() == "conspiracy"]
+    if upgrades_id is not None:
+        if len(upgrades) > 0:
+            warnings.warn("Upgrades found in battler. Replacing them with upgrades from the passed upgrades id.")
+        upgrades = get_cube_data(upgrades_id)
+
+    cards = [card for card in cards if card.type_line.lower() not in ("vanguard", "conspiracy")]
 
     return Battler(cards=cards, upgrades=upgrades, vanguards=vanguards)
