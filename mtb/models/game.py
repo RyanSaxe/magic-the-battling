@@ -1,21 +1,44 @@
+import weakref
+from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field
 
 from mtb.models.cards import Battler, Card
+
+if TYPE_CHECKING:
+    from typing import Self
 
 
 # TODO: think if the abstraction should have Battler on player to adapt to the
 #       constructed variant of the game!
 class Player(BaseModel):
     name: str
-    battler: Battler
     most_recently_revealed_cards: list[Card] = Field(default_factory=list)
     hand: list[Card] = Field(default_factory=list)
     sideboard: list[Card] = Field(default_factory=list)
-    upgrades: list[Card] = Field(default_factory=list)
-    vanguard: Card | None = None
+
     vanquishers: int = 0
     poison: int = 0
     treasures: int = 0
+
+    # optional card variants
+    upgrades: list[Card] = Field(default_factory=list)
+    vanguard: Card | None = None
+
+    # NOTE: commander is not implemented yet
+    commander: Card | None = None
+    
+    model_config = {"arbitrary_types_allowed": True}
+    
+    # weak reference to parent game (not serialized)
+    game_ref: weakref.ref["Game"] | None = Field(default=None, exclude=True)
+    
+    @property
+    def game(self) -> "Game":
+        return self.game_ref()
+
+    @property
+    def starting_life(self) -> int:
+        return self.game.config.starting_life
 
 
 class RealPlayer(Player):
@@ -27,13 +50,25 @@ class FakePlayer(BaseModel):
     historic_game_id: str
 
 
-# TODO: abstract to let players have their own battlers
-# NOTE: possible commanders in the above TODO require extra refactoring later
+class Config(BaseModel):
+    pack_size: int = 5
+    starting_treasures: int = 1
+    starting_pool_size: int = 7
+    max_treasures: int = 5
+    num_rounds_per_stage: int = 3
+    poison_to_lose: int = 10
+    starting_life: int = 10
+
+
 class Game(BaseModel):
     players: list[Player]
-    battler: Battler
     round: int = 1
     stage: int = 3
+    config: Config = Field(default_factory=Config)
+    
+    def model_post_init(self, __context):
+        for player in self.players:
+            player.game_ref = weakref.ref(self)
 
 
 class Draft(BaseModel):
@@ -59,13 +94,15 @@ class Battle(BaseModel):
 
 
 def create_game(player_names: list[str], num_players: int) -> Game:
-    if num_players < player_names:
+    if num_players < len(player_names):
         raise ValueError()
-    if num_players > player_names:
+    if num_players > len(player_names):
         # TODO: add fake players from the DB
         raise NotImplementedError()
 
-    return Game(players=[Player(name=name) for name in player_names])
+    config = Config()
+    players = [Player(name=name, treasures=config.starting_treasures) for name in player_names]
+    return Game(players=players, config=config)
 
 
 PACKSIZE = 5
