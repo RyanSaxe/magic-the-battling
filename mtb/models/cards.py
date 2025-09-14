@@ -13,6 +13,10 @@ class Card(BaseModel):
     elo: float = 0.0
     upgrades: list["Card"] = Field(default_factory=list)
 
+    # vanguard specific properties
+    life_modifier: int | None = None
+    hand_modifier: int | None = None
+
     @property
     def is_upgrade(self):
         return self.type_line.lower() == "conspiracy"
