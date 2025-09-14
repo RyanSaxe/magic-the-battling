@@ -1,15 +1,9 @@
 import weakref
-from typing import TYPE_CHECKING
 from pydantic import BaseModel, Field
 
 from mtb.models.cards import Battler, Card
 
-if TYPE_CHECKING:
-    from typing import Self
 
-
-# TODO: think if the abstraction should have Battler on player to adapt to the
-#       constructed variant of the game!
 class Player(BaseModel):
     name: str
     most_recently_revealed_cards: list[Card] = Field(default_factory=list)
@@ -26,15 +20,20 @@ class Player(BaseModel):
 
     # NOTE: commander is not implemented yet
     commander: Card | None = None
-    
-    model_config = {"arbitrary_types_allowed": True}
-    
+
     # weak reference to parent game (not serialized)
+    # model_config is required to allow weakref types
+    model_config = {"arbitrary_types_allowed": True}
     game_ref: weakref.ref["Game"] | None = Field(default=None, exclude=True)
-    
+
     @property
     def game(self) -> "Game":
-        return self.game_ref()
+        if self.game_ref is None:
+            raise ValueError("Player is not associated with a game")
+        game = self.game_ref()
+        if game is None:
+            raise ValueError("Game reference is no longer valid")
+        return game
 
     @property
     def starting_life(self) -> int:
@@ -65,7 +64,8 @@ class Game(BaseModel):
     round: int = 1
     stage: int = 3
     config: Config = Field(default_factory=Config)
-    
+
+    # set a safe circular reference between players and game
     def model_post_init(self, __context):
         for player in self.players:
             player.game_ref = weakref.ref(self)
@@ -80,7 +80,10 @@ class Zones(BaseModel):
     battlefield: list[Card]
     graveyard: list[Card]
     exile: list[Card]
-    # these aren't directly used in the code probably?
+    hand: list[Card]
+    sideboard: list[Card]
+    upgrades: list[Card]
+    # these aren't directly used in the code yet?
     command_zone: list[Card]
     library: list[Card]
 
