@@ -5,12 +5,13 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background-color: #1a1a1a;
     color: #e0e0e0;
     min-height: 100vh;
 }
 
+/* Layout */
 #draft-page {
     display: grid;
     grid-template-areas:
@@ -38,17 +39,9 @@ body {
     font-size: 1.2rem;
 }
 
-#hand-container {
-    grid-area: hand;
-}
-
-#sideboard-container {
-    grid-area: sideboard;
-}
-
-#pack-container {
-    grid-area: pack;
-}
+#hand-container { grid-area: hand; }
+#sideboard-container { grid-area: sideboard; }
+#pack-container { grid-area: pack; }
 
 /* Card Layouts */
 .card-row {
@@ -80,7 +73,6 @@ body {
     transition: all 0.2s;
 }
 
-/* Smaller cards in sideboard */
 .card-grid .card-slot {
     width: 80px;
     height: 112px;
@@ -104,23 +96,11 @@ body {
     box-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
 }
 
-/* Card Image */
 .card-image {
     width: 100%;
     height: 100%;
     border-radius: 6px;
     object-fit: cover;
-}
-
-/* Handle image loading errors */
-.card-image[src=""],
-.card-image:not([src]),
-.card-image[src="undefined"] {
-    display: none;
-}
-
-.card-slot.filled .card-image {
-    background-color: #333;
 }
 
 /* Swap Button */
@@ -204,11 +184,6 @@ body {
 
 .apply-button:hover {
     background-color: #7B1FA2;
-}
-
-.apply-button:disabled {
-    background-color: #555;
-    cursor: not-allowed;
 }
 
 /* Treasures */
@@ -344,12 +319,11 @@ body {
     border-radius: 4px;
 }
 
-/* Responsive Design */
+/* Responsive */
 @media (max-width: 1200px) {
     #draft-page {
         grid-template-columns: 200px 1fr 250px;
     }
-
     .card-grid {
         grid-template-columns: repeat(5, 1fr);
     }

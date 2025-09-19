@@ -1,32 +1,24 @@
-// Card model
 class Card {
     constructor(data) {
         this.id = data.id;
         this.name = data.name;
         this.image_url = data.image_url;
         this.type_line = data.type_line;
-        this.flip_image_url = data.flip_image_url || null;
-        this.elo = data.elo || 0;
         this.upgrades = data.upgrades || [];
     }
 
     get isUpgrade() {
         return this.type_line.toLowerCase() === 'conspiracy';
     }
-
-    get isVanguard() {
-        return this.type_line.toLowerCase() === 'vanguard';
-    }
 }
 
-// Slot model - represents a container that can hold a card
 class Slot {
     constructor(zone, position, card = null) {
         this.id = `${zone}-${position}`;
-        this.zone = zone; // 'hand', 'pack', 'sideboard', 'upgrades'
+        this.zone = zone;
         this.position = position;
         this.card = card;
-        this.element = null; // DOM element reference
+        this.element = null;
     }
 
     get isEmpty() {
@@ -34,8 +26,6 @@ class Slot {
     }
 
     get isSwappable() {
-        // Upgrades zone cannot be swapped to/from
-        // Allow empty slots to receive cards
         return this.zone !== 'upgrades';
     }
 
@@ -69,7 +59,6 @@ class Slot {
             img.alt = this.card.name;
             img.className = 'card-image';
             img.onerror = function() {
-                // Fallback for broken images
                 this.style.display = 'none';
                 this.parentElement.style.backgroundColor = '#2a2a2a';
                 this.parentElement.innerHTML = `<div style="padding: 10px; text-align: center; color: #fff; font-size: 12px;">${img.alt}</div>`;
@@ -82,7 +71,6 @@ class Slot {
     }
 }
 
-// Player model
 class Player {
     constructor(data) {
         this.name = data.name;
@@ -93,7 +81,6 @@ class Player {
     }
 }
 
-// Draft State model
 class DraftState {
     constructor() {
         this.slots = {
@@ -109,56 +96,32 @@ class DraftState {
         this.applyingUpgrade = null;
     }
 
-    initializeSlots(handSize = 3, packSize = 5) {
-        // Initialize hand slots (3-7 cards)
+    initializeSlots() {
+        // Hand: 3-7 cards
         for (let i = 0; i < 7; i++) {
             this.slots.hand.push(new Slot('hand', i));
         }
 
-        // Initialize pack slots (5 cards)
-        for (let i = 0; i < packSize; i++) {
+        // Pack: 5 cards
+        for (let i = 0; i < 5; i++) {
             this.slots.pack.push(new Slot('pack', i));
         }
 
-        // Initialize sideboard slots (flexible grid)
-        for (let i = 0; i < 28; i++) { // 7 rows x 4 columns
+        // Sideboard: 28 slots (7x4 grid)
+        for (let i = 0; i < 28; i++) {
             this.slots.sideboard.push(new Slot('sideboard', i));
         }
 
-        // Initialize upgrade slots (flexible vertical list)
+        // Upgrades: 10 slots
         for (let i = 0; i < 10; i++) {
             this.slots.upgrades.push(new Slot('upgrades', i));
         }
     }
 
-    setHandCards(cards) {
+    setCards(zone, cards) {
         cards.forEach((card, i) => {
-            if (i < this.slots.hand.length) {
-                this.slots.hand[i].setCard(new Card(card));
-            }
-        });
-    }
-
-    setPackCards(cards) {
-        cards.forEach((card, i) => {
-            if (i < this.slots.pack.length) {
-                this.slots.pack[i].setCard(new Card(card));
-            }
-        });
-    }
-
-    setSideboardCards(cards) {
-        cards.forEach((card, i) => {
-            if (i < this.slots.sideboard.length) {
-                this.slots.sideboard[i].setCard(new Card(card));
-            }
-        });
-    }
-
-    setUpgrades(upgrades) {
-        upgrades.forEach((upgrade, i) => {
-            if (i < this.slots.upgrades.length) {
-                this.slots.upgrades[i].setCard(new Card(upgrade));
+            if (i < this.slots[zone].length) {
+                this.slots[zone][i].setCard(new Card(card));
             }
         });
     }
@@ -172,8 +135,6 @@ class DraftState {
         const slot1 = this.getSlotById(slot1Id);
         const slot2 = this.getSlotById(slot2Id);
 
-        // Allow swapping as long as both slots are swappable zones
-        // This allows moving cards to empty slots
         if (slot1 && slot2 && slot1.isSwappable && slot2.isSwappable) {
             slot1.swap(slot2);
             return true;
@@ -187,7 +148,6 @@ class DraftState {
 
         if (upgradeSlot && targetSlot && upgradeSlot.card?.isUpgrade && targetSlot.card) {
             targetSlot.card.upgrades.push(upgradeSlot.card);
-            // Upgrade is consumed, remove it
             upgradeSlot.setCard(null);
             return true;
         }
