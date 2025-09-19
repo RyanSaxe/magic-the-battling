@@ -4,9 +4,11 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import random
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+import uuid
 
 from mtb.models.cards import Card, build_battler
+from mtb.models.game import Player, Draft, Game, create_game
 
 app = FastAPI(title="Magic: The Battling Cube Simulator")
 
@@ -18,8 +20,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount React app build files (we'll need to build first)
-# app.mount("/static", StaticFiles(directory="frontend/react-frontend/dist"), name="static")
+# Mount frontend static files
+app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
 
 class CubeRequest(BaseModel):
     cube_id: str
@@ -49,6 +51,8 @@ class GameSession(BaseModel):
 
 # In-memory storage for game sessions (use Redis/DB in production)
 game_sessions: Dict[str, GameSession] = {}
+draft_sessions: Dict[str, Any] = {}  # Store draft states
+games: Dict[str, Game] = {}  # Store game states
 
 @app.get("/")
 async def read_root():
@@ -195,3 +199,212 @@ async def get_session(session_id: str):
     
     session = game_sessions[session_id]
     return session.dict()
+
+# Draft-specific endpoints
+class DraftInitRequest(BaseModel):
+    player_id: str
+    cube_id: str = "auto"
+
+class SwapRequest(BaseModel):
+    player_id: str
+    slot1_id: str
+    slot2_id: str
+
+class RollRequest(BaseModel):
+    player_id: str
+
+class ApplyUpgradeRequest(BaseModel):
+    player_id: str
+    upgrade_id: str
+    target_card_id: str
+
+@app.post("/api/draft/initialize")
+async def initialize_draft(request: DraftInitRequest):
+    try:
+        # Build battler
+        battler = build_battler(request.cube_id)
+
+        # Create player
+        player = Player(name=f"Player_{request.player_id}", treasures=1)
+
+        # Deal initial hand (3 cards)
+        hand_cards = battler.cards[:3]
+        battler.cards = battler.cards[3:]
+        player.hand = hand_cards
+
+        # Deal initial pack (5 cards)
+        pack_cards = battler.cards[:5]
+        battler.cards = battler.cards[5:]
+
+        # Create draft state
+        draft_state = {
+            "player_id": request.player_id,
+            "player": player.dict(),
+            "pack": [card.dict() for card in pack_cards],
+            "battler": battler,
+            "upgrades": [card.dict() for card in battler.upgrades[:2]],  # Give 2 upgrades to start
+            "vanguards": [card.dict() for card in battler.vanguards],
+        }
+
+        # Store draft state
+        draft_sessions[request.player_id] = draft_state
+
+        return {
+            "success": True,
+            "player": draft_state["player"],
+            "pack": draft_state["pack"],
+            "upgrades": draft_state["upgrades"],
+            "vanguards": draft_state["vanguards"],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to initialize draft: {str(e)}")
+
+@app.get("/api/draft/state/{player_id}")
+async def get_draft_state(player_id: str):
+    if player_id not in draft_sessions:
+        raise HTTPException(status_code=404, detail="Draft session not found")
+
+    draft_state = draft_sessions[player_id]
+    return {
+        "player": draft_state["player"],
+        "pack": draft_state["pack"],
+        "upgrades": draft_state["upgrades"],
+        "vanguards": draft_state.get("vanguards", []),
+    }
+
+@app.post("/api/draft/swap")
+async def swap_cards(request: SwapRequest):
+    if request.player_id not in draft_sessions:
+        raise HTTPException(status_code=404, detail="Draft session not found")
+
+    # Parse slot IDs (format: zone-position)
+    zone1, pos1 = request.slot1_id.split('-')
+    zone2, pos2 = request.slot2_id.split('-')
+    pos1, pos2 = int(pos1), int(pos2)
+
+    draft_state = draft_sessions[request.player_id]
+    player = draft_state["player"]
+
+    # Get card references based on zones
+    def get_card_from_zone(zone, position):
+        if zone == "hand":
+            return player["hand"][position] if position < len(player["hand"]) else None
+        elif zone == "pack":
+            return draft_state["pack"][position] if position < len(draft_state["pack"]) else None
+        elif zone == "sideboard":
+            return player["sideboard"][position] if position < len(player["sideboard"]) else None
+        return None
+
+    def set_card_in_zone(zone, position, card):
+        if zone == "hand":
+            if position < len(player["hand"]):
+                player["hand"][position] = card
+        elif zone == "pack":
+            if position < len(draft_state["pack"]):
+                draft_state["pack"][position] = card
+        elif zone == "sideboard":
+            if position < len(player["sideboard"]):
+                player["sideboard"][position] = card
+
+    # Perform swap
+    card1 = get_card_from_zone(zone1, pos1)
+    card2 = get_card_from_zone(zone2, pos2)
+
+    if card1 and card2:
+        set_card_in_zone(zone1, pos1, card2)
+        set_card_in_zone(zone2, pos2, card1)
+        return {"success": True, "message": "Cards swapped"}
+
+    return {"success": False, "message": "Invalid swap"}
+
+@app.post("/api/draft/roll")
+async def roll_pack(request: RollRequest):
+    if request.player_id not in draft_sessions:
+        raise HTTPException(status_code=404, detail="Draft session not found")
+
+    draft_state = draft_sessions[request.player_id]
+    player = draft_state["player"]
+
+    # Check treasures
+    if player["treasures"] <= 0:
+        raise HTTPException(status_code=400, detail="Not enough treasures")
+
+    # Deduct treasure
+    player["treasures"] -= 1
+
+    # Get new pack from battler
+    battler = draft_state["battler"]
+    battler.shuffle()
+
+    # Return old pack cards to battler
+    for card_dict in draft_state["pack"]:
+        # Convert dict back to Card object if needed
+        pass  # For now, we'll just replace with new cards
+
+    # Deal new pack
+    new_pack = battler.cards[:5]
+    battler.cards = battler.cards[5:]
+    draft_state["pack"] = [card.dict() for card in new_pack]
+
+    return {
+        "success": True,
+        "pack": draft_state["pack"],
+        "treasures_remaining": player["treasures"]
+    }
+
+@app.post("/api/draft/apply-upgrade")
+async def apply_upgrade(request: ApplyUpgradeRequest):
+    if request.player_id not in draft_sessions:
+        raise HTTPException(status_code=404, detail="Draft session not found")
+
+    draft_state = draft_sessions[request.player_id]
+
+    # Find the upgrade and target card
+    upgrade = None
+    for idx, up in enumerate(draft_state["upgrades"]):
+        if up["id"] == request.upgrade_id:
+            upgrade = up
+            # Remove the upgrade once applied
+            draft_state["upgrades"].pop(idx)
+            break
+
+    if not upgrade:
+        raise HTTPException(status_code=404, detail="Upgrade not found")
+
+    # Apply upgrade to target card (mark it somehow)
+    # This would need more complex logic to track which cards have which upgrades
+    return {
+        "success": True,
+        "message": f"Applied {upgrade['name']} to target card"
+    }
+
+@app.get("/api/game/{game_id}/players")
+async def get_players_info(game_id: str):
+    # For demo purposes, return mock player data
+    mock_players = [
+        {
+            "name": "Alice",
+            "poison": 2,
+            "treasures": 3,
+            "most_recently_revealed_cards": []
+        },
+        {
+            "name": "Bob",
+            "poison": 0,
+            "treasures": 1,
+            "most_recently_revealed_cards": []
+        },
+        {
+            "name": "Charlie",
+            "poison": 4,
+            "treasures": 2,
+            "most_recently_revealed_cards": []
+        },
+        {
+            "name": "Diana",
+            "poison": 1,
+            "treasures": 0,
+            "most_recently_revealed_cards": []
+        }
+    ]
+    return {"players": mock_players}
