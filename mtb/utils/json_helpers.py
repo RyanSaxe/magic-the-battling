@@ -5,6 +5,7 @@ NOTE: this was mostly written by GPT5, so be mindful of that
 TODO: given the note above, refactor and test this module
 """
 
+import atexit
 import threading
 import time
 import requests
@@ -79,17 +80,31 @@ def _worker():
             _request_q.task_done()
 
 
-_thread = threading.Thread(target=_worker, name="http-worker", daemon=False)
-_thread.start()
+_thread: threading.Thread | None = None
+
+
+def _ensure_worker_started():
+    global _thread
+    if _thread is None or not _thread.is_alive():
+        _thread = threading.Thread(target=_worker, name="http-worker", daemon=True)
+        _thread.start()
 
 
 def stop_worker():
     # None is not a valid URL, but this interface is used to signal the worker to stop
-    _request_q.put(None)  # type: ignore
-    _thread.join(timeout=5)
+    try:
+        _request_q.put(None)  # type: ignore
+    except Exception:
+        pass
+    if _thread is not None:
+        _thread.join(timeout=5)
+
+
+atexit.register(stop_worker)
 
 
 def get_json(url: str) -> dict:
+    _ensure_worker_started()
     # Fast path: cache hit
     with _lock:
         if url in _results:

@@ -19,8 +19,10 @@ def get_card_from_scryfall(card_id: str) -> Card:
     )
 
     if card.type_line == "Vanguard":
-        # NOTE: purposefully not using get with default 0 here to raise KeyError if missing
-        card.life_modifier = int(card_json["hand_modifier"])
-        card.hand_modifier = int(card_json["life_modifier"])
+        # Keep field mapping consistent with Scryfall's schema
+        # https://scryfall.com/docs/api/cards
+        # vanguard has `hand_modifier` and `life_modifier` fields directly on the card
+        card.hand_modifier = int(card_json["hand_modifier"])  # number of cards in hand
+        card.life_modifier = int(card_json["life_modifier"])  # starting life
 
     return card

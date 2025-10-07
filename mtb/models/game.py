@@ -64,6 +64,7 @@ class Game(BaseModel):
     round: int = 1
     stage: int = 3
     config: Config = Field(default_factory=Config)
+    battler: Battler | None = None
 
     # set a safe circular reference between players and game
     def model_post_init(self, __context):
@@ -108,10 +109,9 @@ def create_game(player_names: list[str], num_players: int) -> Game:
     return Game(players=players, config=config)
 
 
-PACKSIZE = 5
-
-
 def deal(game: Game, draft: Draft, roll: bool = False) -> Draft:
+    if game.battler is None:
+        raise ValueError("Game has no battler; cannot deal packs")
     if roll and draft.player.treasures == 0:
         # TODO: log/return something to tell player they cant roll
         return draft
@@ -120,8 +120,9 @@ def deal(game: Game, draft: Draft, roll: bool = False) -> Draft:
 
     game.battler.cards += draft.pack
     game.battler.shuffle()
-    draft.pack = game.battler.cards[:PACKSIZE]
-    game.battler.cards = game.battler.cards[PACKSIZE:]
+    size = game.config.pack_size
+    draft.pack = game.battler.cards[:size]
+    game.battler.cards = game.battler.cards[size:]
     return draft
 
 
