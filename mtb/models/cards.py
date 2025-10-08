@@ -1,5 +1,7 @@
 import random
 import warnings
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -11,7 +13,7 @@ class Card(BaseModel):
     tokens: tuple["Card", ...] = Field(default_factory=tuple)
     flip_image_url: str | None = None
     elo: float = 0.0
-    upgrades: list["Card"] = Field(default_factory=list)
+    upgrade_target: Optional["Card"] = None
 
     # vanguard specific properties
     life_modifier: int | None = None
@@ -28,8 +30,9 @@ class Card(BaseModel):
     def upgrade(self, upgrade: "Card"):
         if not upgrade.is_upgrade:
             raise ValueError(f"{upgrade.name} is not a conspiracy and hence cannot be an upgrade")
-        self.upgrades.append(upgrade)
-        upgrade.upgrades.append(self)
+        if upgrade.upgrade_target is not None and upgrade.upgrade_target is not self:
+            raise ValueError(f"{upgrade.name} is already linked to {upgrade.upgrade_target.name}")
+        upgrade.upgrade_target = self
 
 
 class Battler(BaseModel):
@@ -74,5 +77,7 @@ def build_battler(
         upgrades = get_cube_data(upgrades_id)
 
     cards = [card for card in cards if card.type_line.lower() not in ("vanguard", "conspiracy")]
+    if not cards:
+        raise ValueError(f"Cube '{battler_id}' contains no playable cards after filtering")
 
     return Battler(cards=cards, upgrades=upgrades, vanguards=vanguards)

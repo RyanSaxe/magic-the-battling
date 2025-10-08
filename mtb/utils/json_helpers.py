@@ -1,121 +1,139 @@
-"""
-utility module for safetly rate limiting a call to a HTTP API when done in parallel
-
-NOTE: this was mostly written by GPT5, so be mindful of that
-TODO: given the note above, refactor and test this module
-"""
+"""Async-friendly JSON fetching with caching, de-duplication, and rate limiting."""
 
 import atexit
+import asyncio
 import threading
 import time
-import requests
-import queue
-from concurrent.futures import Future
+from collections import OrderedDict
+from typing import Any, Coroutine, TypeVar
+
+import httpx
 
 # ----- Tunables -----
 _MIN_INTERVAL = 0.1  # seconds: minimum spacing between HTTP calls
-_TIMEOUT = (3.05, 10.0)  # (connect, read) seconds
+_TIMEOUT = httpx.Timeout(10.0, connect=3.05)
 _CACHE_MAX = 1024  # max entries to keep in memory
 
-# ----- State -----
-_request_q: queue.Queue[tuple[str, Future]] = queue.Queue()
-_session = requests.Session()
 
-_results: dict[str, dict] = {}  # url -> JSON
-_inflight: dict[str, Future] = {}  # url -> Future (dedupe)
-_order: list[str] = []  # simple LRU order (front=oldest)
-
-_lock = threading.RLock()
-_last_call = 0.0
-_stop = threading.Event()
+T = TypeVar("T")
 
 
-def _lru_record(url: str):
-    # maintain simple LRU with size cap
-    try:
-        _order.remove(url)
-    except ValueError:
-        pass
-    _order.append(url)
-    if len(_order) > _CACHE_MAX:
-        old = _order.pop(0)
-        _results.pop(old, None)
+class _AsyncRuntime:
+    def __init__(self) -> None:
+        self._loop = asyncio.new_event_loop()
+        self._started = threading.Event()
+        self._thread = threading.Thread(target=self._run_loop, name="json-runtime", daemon=True)
+        self._thread.start()
+        self._started.wait()
+
+    def _run_loop(self) -> None:
+        asyncio.set_event_loop(self._loop)
+        self._started.set()
+        self._loop.run_forever()
+
+    def run(self, coro: Coroutine[Any, Any, T]) -> T:
+        future = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        return future.result()
+
+    def stop(self) -> None:
+        def _stop_loop() -> None:
+            for task in asyncio.all_tasks(loop=self._loop):
+                task.cancel()
+            self._loop.stop()
+
+        self._loop.call_soon_threadsafe(_stop_loop)
+        self._thread.join(timeout=5)
+        self._loop.close()
 
 
-def _rate_limit_wait():
-    global _last_call
-    with _lock:
-        now = time.monotonic()
-        wait = _MIN_INTERVAL - (now - _last_call)
-        if wait > 0:
-            time.sleep(wait)
-        _last_call = time.monotonic()
+class _JsonService:
+    def __init__(self) -> None:
+        self._runtime = _AsyncRuntime()
+        self._client = httpx.AsyncClient(timeout=_TIMEOUT)
+        self._cache: OrderedDict[str, Any] = OrderedDict()
+        self._cache_max = _CACHE_MAX
+        self._lock = asyncio.Lock()
+        self._rate_lock = asyncio.Lock()
+        self._last_call = 0.0
+        self._inflight: dict[str, asyncio.Task[Any]] = {}
 
+    def get_json(self, url: str) -> Any:
+        return self._runtime.run(self._get_json(url))
 
-def _worker():
-    while not _stop.is_set():
-        item = _request_q.get()
+    async def _get_json(self, url: str) -> Any:
+        async with self._lock:
+            cached = self._cache.get(url)
+            if cached is not None:
+                self._cache.move_to_end(url)
+                return cached
+
+            task = self._inflight.get(url)
+            if task is None:
+                task = asyncio.create_task(self._fetch_and_store(url))
+                self._inflight[url] = task
+
+        return await task
+
+    async def _fetch_and_store(self, url: str) -> Any:
         try:
-            if item is None:
-                _stop.set()
-                return
-            url, fut = item
-            try:
-                _rate_limit_wait()
-                resp = _session.get(url, timeout=_TIMEOUT)
-                resp.raise_for_status()
-                data = resp.json()  # may raise
-                with _lock:
-                    _results[url] = data
-                    _lru_record(url)
-                    # Resolve *before* removing from inflight so waiters see result
-                    fut.set_result(data)
-                    _inflight.pop(url, None)
-            except Exception as e:
-                with _lock:
-                    # Propagate the same exception to all waiters and clear inflight
-                    fut.set_exception(e)
-                    _inflight.pop(url, None)
+            data = await self._rate_limited_fetch(url)
+        except Exception:
+            async with self._lock:
+                self._inflight.pop(url, None)
+            raise
+
+        async with self._lock:
+            self._cache[url] = data
+            self._cache.move_to_end(url)
+            if len(self._cache) > self._cache_max:
+                self._cache.popitem(last=False)
+            self._inflight.pop(url, None)
+        return data
+
+    async def _rate_limited_fetch(self, url: str) -> Any:
+        async with self._rate_lock:
+            now = time.monotonic()
+            wait = _MIN_INTERVAL - (now - self._last_call)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last_call = time.monotonic()
+
+        response = await self._client.get(url)
+        response.raise_for_status()
+        return response.json()
+
+    async def _close(self) -> None:
+        await self._client.aclose()
+
+    def shutdown(self) -> None:
+        try:
+            self._runtime.run(self._close())
         finally:
-            _request_q.task_done()
+            self._runtime.stop()
 
 
-_thread: threading.Thread | None = None
+_SERVICE: _JsonService | None = None
+_SERVICE_LOCK = threading.Lock()
 
 
-def _ensure_worker_started():
-    global _thread
-    if _thread is None or not _thread.is_alive():
-        _thread = threading.Thread(target=_worker, name="http-worker", daemon=True)
-        _thread.start()
+def _get_service() -> _JsonService:
+    global _SERVICE
+    with _SERVICE_LOCK:
+        if _SERVICE is None:
+            _SERVICE = _JsonService()
+        return _SERVICE
 
 
-def stop_worker():
-    # None is not a valid URL, but this interface is used to signal the worker to stop
-    try:
-        _request_q.put(None)  # type: ignore
-    except Exception:
-        pass
-    if _thread is not None:
-        _thread.join(timeout=5)
+def stop_worker() -> None:
+    global _SERVICE
+    with _SERVICE_LOCK:
+        if _SERVICE is not None:
+            _SERVICE.shutdown()
+            _SERVICE = None
 
 
 atexit.register(stop_worker)
 
 
-def get_json(url: str) -> dict:
-    _ensure_worker_started()
-    # Fast path: cache hit
-    with _lock:
-        if url in _results:
-            _lru_record(url)
-            return _results[url]
-        # In-flight: return existing future
-        if url in _inflight:
-            fut = _inflight[url]
-        else:
-            fut = Future()
-            _inflight[url] = fut
-            _request_q.put((url, fut))
-    # Wait outside the lock
-    return fut.result()
+def get_json(url: str) -> Any:
+    return _get_service().get_json(url)
