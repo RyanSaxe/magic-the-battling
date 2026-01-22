@@ -1,17 +1,6 @@
 from mtb.models.cards import Battler
 from mtb.models.game import create_game, set_battler
-from mtb.phases import (
-    end_battle,
-    end_draft_for_player,
-    end_reward_for_player,
-    move_card,
-    start_battle,
-    start_draft,
-    start_reward,
-    submit_build,
-    submit_result,
-    take,
-)
+from mtb.phases import battle, build, draft, reward
 
 
 def test_full_round_flow_round_1(card_factory, upgrade_factory):
@@ -31,25 +20,25 @@ def test_full_round_flow_round_1(card_factory, upgrade_factory):
 
     # Move some cards to hand for build
     for _ in range(3):
-        move_card(alice, alice.sideboard[0], "sideboard", "hand")
-        move_card(bob, bob.sideboard[0], "sideboard", "hand")
+        build.move_card(alice, alice.sideboard[0], "sideboard", "hand")
+        build.move_card(bob, bob.sideboard[0], "sideboard", "hand")
 
-    submit_build(game, alice, ["Plains", "Island", "Mountain"])
-    submit_build(game, bob, ["Forest", "Swamp", "Mountain"])
+    build.submit(game, alice, ["Plains", "Island", "Mountain"])
+    build.submit(game, bob, ["Forest", "Swamp", "Mountain"])
     assert alice.phase == "battle"
     assert bob.phase == "battle"
 
-    battle = start_battle(game, alice, bob)
-    submit_result(battle, alice, "Alice")
-    submit_result(battle, bob, "Alice")
-    result = end_battle(game, battle)
+    b = battle.start(game, alice, bob)
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
+    result = battle.end(game, b)
     assert alice.phase == "reward"
     assert bob.phase == "reward"
     assert result.winner is alice
 
-    start_reward(game, result.winner, result.loser)
-    end_reward_for_player(game, alice)
-    end_reward_for_player(game, bob)
+    reward.start(game, result.winner, result.loser)
+    reward.end_for_player(game, alice)
+    reward.end_for_player(game, bob)
 
     # After round 1 reward, we go to draft for round 2
     assert alice.phase == "draft"
@@ -74,31 +63,31 @@ def test_full_round_flow_round_2(card_factory, upgrade_factory):
     bob.phase = "draft"
 
     # Now test the draft → build → battle → reward flow
-    start_draft(game)
+    draft.start(game)
 
-    take(game, alice, game.draft_state.current_packs["Alice"][0], "hand")
-    take(game, bob, game.draft_state.current_packs["Bob"][0], "hand")
+    draft.take(game, alice, game.draft_state.current_packs["Alice"][0], "hand")
+    draft.take(game, bob, game.draft_state.current_packs["Bob"][0], "hand")
 
-    end_draft_for_player(game, alice)
-    end_draft_for_player(game, bob)
+    draft.end_for_player(game, alice)
+    draft.end_for_player(game, bob)
     assert alice.phase == "build"
     assert bob.phase == "build"
 
-    submit_build(game, alice, ["Plains", "Island", "Mountain"])
-    submit_build(game, bob, ["Forest", "Swamp", "Mountain"])
+    build.submit(game, alice, ["Plains", "Island", "Mountain"])
+    build.submit(game, bob, ["Forest", "Swamp", "Mountain"])
     assert alice.phase == "battle"
     assert bob.phase == "battle"
 
-    battle = start_battle(game, alice, bob)
-    submit_result(battle, alice, "Alice")
-    submit_result(battle, bob, "Alice")
-    result = end_battle(game, battle)
+    b = battle.start(game, alice, bob)
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
+    result = battle.end(game, b)
     assert alice.phase == "reward"
     assert bob.phase == "reward"
 
-    start_reward(game, result.winner, result.loser)
-    end_reward_for_player(game, alice)
-    end_reward_for_player(game, bob)
+    reward.start(game, result.winner, result.loser)
+    reward.end_for_player(game, alice)
+    reward.end_for_player(game, bob)
     assert alice.phase == "draft"
     assert bob.phase == "draft"
     assert alice.round == 3

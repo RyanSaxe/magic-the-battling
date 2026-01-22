@@ -48,7 +48,7 @@ def apply_upgrade_to_card(player: Player, upgrade: Card, target: Card) -> None:
     upgrade.upgrade_target = target
 
 
-def start_reward(game: Game, winner: Player, loser: Player) -> None:
+def start(game: Game, winner: Player, loser: Player) -> None:
     if winner.phase != "reward":
         raise ValueError("Winner is not in reward phase")
     if loser.phase != "reward":
@@ -67,7 +67,7 @@ def start_reward(game: Game, winner: Player, loser: Player) -> None:
         award_random_card(game, loser)
 
 
-def end_reward_for_player(game: Game, player: Player, upgrade_choice: Card | None = None) -> None:
+def end_for_player(game: Game, player: Player, upgrade_choice: Card | None = None) -> None:
     if player.phase != "reward":
         raise ValueError("Player is not in reward phase")
 

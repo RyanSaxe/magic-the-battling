@@ -1,18 +1,7 @@
 import pytest
 
 from mtb.models.game import create_game
-from mtb.phases import (
-    can_start_pairing,
-    end_battle,
-    find_opponent,
-    get_result,
-    is_in_active_battle,
-    move_zone,
-    results_agreed,
-    start_battle,
-    submit_result,
-    weighted_random_opponent,
-)
+from mtb.phases import battle
 
 
 def _setup_battle_ready(game, alice, bob):
@@ -29,13 +18,13 @@ def test_can_start_pairing():
 
     alice.phase = "build"
     bob.phase = "battle"
-    assert not can_start_pairing(game, 1, 1)
+    assert not battle.can_start_pairing(game, 1, 1)
 
     alice.phase = "battle"
-    assert can_start_pairing(game, 1, 1)
+    assert battle.can_start_pairing(game, 1, 1)
 
     alice.round = 2
-    assert not can_start_pairing(game, 1, 1)
+    assert not battle.can_start_pairing(game, 1, 1)
 
 
 def test_find_opponent_returns_candidate():
@@ -44,7 +33,7 @@ def test_find_opponent_returns_candidate():
     alice.phase = "battle"
     bob.phase = "battle"
 
-    opponent = find_opponent(game, alice)
+    opponent = battle.find_opponent(game, alice)
 
     assert opponent is bob
 
@@ -55,7 +44,7 @@ def test_find_opponent_returns_none_when_not_all_ready():
     alice.phase = "battle"
     bob.phase = "build"
 
-    opponent = find_opponent(game, alice)
+    opponent = battle.find_opponent(game, alice)
 
     assert opponent is None
 
@@ -67,7 +56,7 @@ def test_weighted_random_opponent_reduces_last_opponent_weight():
 
     counts = {"Bob": 0, "Charlie": 0}
     for _ in range(1000):
-        opponent = weighted_random_opponent(alice, [bob, charlie])
+        opponent = battle.weighted_random_opponent(alice, [bob, charlie])
         counts[opponent.name] += 1
 
     assert counts["Charlie"] > counts["Bob"] * 5
@@ -81,16 +70,16 @@ def test_start_battle_creates_zones(card_factory):
     alice.sideboard = [card_factory("a3")]
     alice.treasures = 2
 
-    battle = start_battle(game, alice, bob)
+    b = battle.start(game, alice, bob)
 
-    assert battle.player is alice
-    assert battle.opponent is bob
-    assert battle.coin_flip in (alice, bob)
-    assert len(battle.player_zones.battlefield) == 3
-    assert len(battle.player_zones.hand) == 2
-    assert len(battle.player_zones.sideboard) == 1
-    assert battle.player_zones.treasures == 2
-    assert battle in game.active_battles
+    assert b.player is alice
+    assert b.opponent is bob
+    assert b.coin_flip in (alice, bob)
+    assert len(b.player_zones.battlefield) == 3
+    assert len(b.player_zones.hand) == 2
+    assert len(b.player_zones.sideboard) == 1
+    assert b.player_zones.treasures == 2
+    assert b in game.active_battles
     assert alice.last_opponent_name == "Bob"
     assert bob.last_opponent_name == "Alice"
 
@@ -102,7 +91,7 @@ def test_start_battle_wrong_phase_raises():
     bob.phase = "battle"
 
     with pytest.raises(ValueError, match="not in battle phase"):
-        start_battle(game, alice, bob)
+        battle.start(game, alice, bob)
 
 
 def test_start_battle_not_all_ready_raises():
@@ -115,7 +104,7 @@ def test_start_battle_not_all_ready_raises():
     bob.chosen_basics = ["Island", "Island", "Island"]
 
     with pytest.raises(ValueError, match="not all players are ready"):
-        start_battle(game, alice, bob)
+        battle.start(game, alice, bob)
 
 
 def test_is_in_active_battle():
@@ -123,12 +112,12 @@ def test_is_in_active_battle():
     alice, bob = game.players
     _setup_battle_ready(game, alice, bob)
 
-    assert not is_in_active_battle(game, alice)
+    assert not battle.is_in_active_battle(game, alice)
 
-    start_battle(game, alice, bob)
+    battle.start(game, alice, bob)
 
-    assert is_in_active_battle(game, alice)
-    assert is_in_active_battle(game, bob)
+    assert battle.is_in_active_battle(game, alice)
+    assert battle.is_in_active_battle(game, bob)
 
 
 def test_move_zone_moves_card(card_factory):
@@ -138,11 +127,11 @@ def test_move_zone_moves_card(card_factory):
     card = card_factory("test")
     alice.sideboard = [card]
 
-    battle = start_battle(game, alice, bob)
-    move_zone(battle, alice, card, "sideboard", "hand")
+    b = battle.start(game, alice, bob)
+    battle.move_zone(b, alice, card, "sideboard", "hand")
 
-    assert card not in battle.player_zones.sideboard
-    assert card in battle.player_zones.hand
+    assert card not in b.player_zones.sideboard
+    assert card in b.player_zones.hand
 
 
 def test_move_zone_card_not_in_zone_raises(card_factory):
@@ -150,10 +139,10 @@ def test_move_zone_card_not_in_zone_raises(card_factory):
     alice, bob = game.players
     _setup_battle_ready(game, alice, bob)
 
-    battle = start_battle(game, alice, bob)
+    b = battle.start(game, alice, bob)
 
     with pytest.raises(ValueError, match="not in"):
-        move_zone(battle, alice, card_factory("missing"), "hand", "battlefield")
+        battle.move_zone(b, alice, card_factory("missing"), "hand", "battlefield")
 
 
 def test_submit_result_records_winner():
@@ -161,10 +150,10 @@ def test_submit_result_records_winner():
     alice, bob = game.players
     _setup_battle_ready(game, alice, bob)
 
-    battle = start_battle(game, alice, bob)
-    submit_result(battle, alice, "Alice")
+    b = battle.start(game, alice, bob)
+    battle.submit_result(b, alice, "Alice")
 
-    assert battle.result_submissions["Alice"] == "Alice"
+    assert b.result_submissions["Alice"] == "Alice"
 
 
 def test_results_agreed_when_both_match():
@@ -172,12 +161,12 @@ def test_results_agreed_when_both_match():
     alice, bob = game.players
     _setup_battle_ready(game, alice, bob)
 
-    battle = start_battle(game, alice, bob)
-    submit_result(battle, alice, "Alice")
-    submit_result(battle, bob, "Alice")
+    b = battle.start(game, alice, bob)
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
 
-    assert results_agreed(battle)
-    result = get_result(battle)
+    assert battle.results_agreed(b)
+    result = battle.get_result(b)
     assert result is not None
     assert result.winner is alice
     assert result.loser is bob
@@ -189,11 +178,11 @@ def test_results_not_agreed_when_different():
     alice, bob = game.players
     _setup_battle_ready(game, alice, bob)
 
-    battle = start_battle(game, alice, bob)
-    submit_result(battle, alice, "Alice")
-    submit_result(battle, bob, "Bob")
+    b = battle.start(game, alice, bob)
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Bob")
 
-    assert not results_agreed(battle)
+    assert not battle.results_agreed(b)
 
 
 def test_end_battle_caps_treasures_and_transitions():
@@ -202,13 +191,13 @@ def test_end_battle_caps_treasures_and_transitions():
     _setup_battle_ready(game, alice, bob)
     alice.treasures = 10
 
-    battle = start_battle(game, alice, bob)
-    battle.player_zones.treasures = 10
-    battle.opponent_zones.treasures = 3
-    submit_result(battle, alice, "Alice")
-    submit_result(battle, bob, "Alice")
+    b = battle.start(game, alice, bob)
+    b.player_zones.treasures = 10
+    b.opponent_zones.treasures = 3
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
 
-    result = end_battle(game, battle)
+    result = battle.end(game, b)
 
     assert result.winner is alice
     assert result.loser is bob
@@ -216,7 +205,7 @@ def test_end_battle_caps_treasures_and_transitions():
     assert bob.treasures == 3
     assert alice.phase == "reward"
     assert bob.phase == "reward"
-    assert battle not in game.active_battles
+    assert b not in game.active_battles
 
 
 def test_end_battle_tracks_revealed_cards(card_factory):
@@ -227,12 +216,12 @@ def test_end_battle_tracks_revealed_cards(card_factory):
     creature = card_factory("Creature", "Creature")
     alice.hand = [creature]
 
-    battle = start_battle(game, alice, bob)
-    move_zone(battle, alice, creature, "hand", "battlefield")
-    submit_result(battle, alice, "Alice")
-    submit_result(battle, bob, "Alice")
+    b = battle.start(game, alice, bob)
+    battle.move_zone(b, alice, creature, "hand", "battlefield")
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
 
-    end_battle(game, battle)
+    battle.end(game, b)
 
     assert creature in alice.most_recently_revealed_cards
 
@@ -242,11 +231,11 @@ def test_end_battle_not_agreed_raises():
     alice, bob = game.players
     _setup_battle_ready(game, alice, bob)
 
-    battle = start_battle(game, alice, bob)
-    submit_result(battle, alice, "Alice")
+    b = battle.start(game, alice, bob)
+    battle.submit_result(b, alice, "Alice")
 
     with pytest.raises(ValueError, match="not agreed"):
-        end_battle(game, battle)
+        battle.end(game, b)
 
 
 def test_end_battle_returns_cards_to_sideboard(card_factory):
@@ -259,10 +248,10 @@ def test_end_battle_returns_cards_to_sideboard(card_factory):
     alice.hand = [hand_card]
     alice.sideboard = [sideboard_card]
 
-    battle = start_battle(game, alice, bob)
-    submit_result(battle, alice, "Alice")
-    submit_result(battle, bob, "Alice")
-    end_battle(game, battle)
+    b = battle.start(game, alice, bob)
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
+    battle.end(game, b)
 
     assert alice.hand == []
     assert hand_card in alice.sideboard

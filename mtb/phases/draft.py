@@ -1,11 +1,11 @@
 import random
 
 from mtb.models.cards import Card
-from mtb.models.game import Game, Player
+from mtb.models.game import DraftState, Game, Player
 from mtb.models.types import CardDestination
 
 
-def start_draft(game: Game) -> None:
+def start(game: Game) -> None:
     if game.battler is None:
         raise ValueError("Game has no battler; cannot start draft")
     if game.draft_state is not None:
@@ -18,9 +18,6 @@ def start_draft(game: Game) -> None:
     packs = [cards[i : i + pack_size] for i in range(0, len(cards), pack_size)]
 
     game.battler.cards = []
-
-    from mtb.models.game import DraftState
-
     game.draft_state = DraftState(packs=packs)
 
     for player in game.players:
@@ -100,7 +97,7 @@ def take(game: Game, player: Player, pack_card: Card, destination: CardDestinati
     player_collection.append(pack_card)
 
 
-def end_draft_for_player(game: Game, player: Player) -> None:
+def end_for_player(game: Game, player: Player) -> None:
     if player.phase != "draft":
         raise ValueError("Player is not in draft phase")
     if game.draft_state is None:

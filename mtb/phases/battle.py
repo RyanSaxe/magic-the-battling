@@ -97,7 +97,7 @@ def weighted_random_opponent(player: Player, candidates: list[Player]) -> Player
     return random.choices(candidates, weights=weights, k=1)[0]
 
 
-def start_battle(game: Game, player: Player, opponent: Player) -> Battle:
+def start(game: Game, player: Player, opponent: Player) -> Battle:
     if player.phase != "battle":
         raise ValueError("Player is not in battle phase")
     if opponent.phase != "battle":
@@ -190,7 +190,7 @@ def _sync_zones_to_player(zones: Zones, player: Player, max_treasures: int) -> N
     player.treasures = min(zones.treasures, max_treasures)
 
 
-def end_battle(game: Game, battle: Battle) -> BattleResult:
+def end(game: Game, battle: Battle) -> BattleResult:
     if battle.player.phase != "battle":
         raise ValueError("Player is not in battle phase")
     if battle.opponent.phase != "battle":

@@ -18,7 +18,7 @@ def move_card(player: Player, card: Card, source: BuildSource, destination: Buil
     destination_collection.append(card)
 
 
-def submit_build(game: Game, player: Player, basics: list[str]) -> None:
+def submit(game: Game, player: Player, basics: list[str]) -> None:
     if player.phase != "build":
         raise ValueError("Player is not in build phase")
 
