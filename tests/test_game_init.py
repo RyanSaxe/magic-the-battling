@@ -14,7 +14,7 @@ def test_create_game_exact_players(card_factory):
 
 
 def test_create_game_too_many_names():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="cannot be less than"):
         create_game(["Alice", "Bob"], num_players=1)
 
 

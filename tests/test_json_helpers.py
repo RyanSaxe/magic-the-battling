@@ -3,12 +3,13 @@ import json
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import ClassVar
 
 import pytest
 
 
 class _JsonHandler(BaseHTTPRequestHandler):
-    request_times: list[float] = []
+    request_times: ClassVar[list[float]] = []
 
     def do_GET(self):
         self.__class__.request_times.append(time.time())
@@ -19,11 +20,11 @@ class _JsonHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def log_message(self, format: str, *args):  # noqa: A003 - match BaseHTTPRequestHandler signature
+    def log_message(self, format: str, *args):
         return
 
 
-@pytest.fixture()
+@pytest.fixture
 def json_endpoint():
     _JsonHandler.request_times = []
     server = ThreadingHTTPServer(("127.0.0.1", 0), _JsonHandler)
@@ -37,10 +38,10 @@ def json_endpoint():
         thread.join(timeout=2)
 
 
-@pytest.fixture()
+@pytest.fixture
 def json_helpers_module():
     # imported inside fixture to allow module reload for isolated tests
-    from mtb.utils import json_helpers as module  # noqa: E402
+    from mtb.utils import json_helpers as module
 
     try:
         module.stop_worker()

@@ -1,11 +1,12 @@
 """Async-friendly JSON fetching with caching, de-duplication, and rate limiting."""
 
-import atexit
 import asyncio
+import atexit
 import threading
 import time
 from collections import OrderedDict
-from typing import Any, Coroutine, TypeVar
+from collections.abc import Coroutine
+from typing import Any, TypeVar
 
 import httpx
 

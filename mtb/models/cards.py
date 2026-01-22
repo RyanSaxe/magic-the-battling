@@ -63,20 +63,26 @@ def build_battler(
     vanguards_id: str | None = None,
 ) -> Battler:
     # imported here to avoid circular import
-    from mtb.utils.cubecobra import get_cube_data  # noqa: E402, PLC0415
+    from mtb.utils.cubecobra import get_cube_data
 
     cards = get_cube_data(battler_id)
 
     vanguards = [card for card in cards if card.type_line.lower() == VANGUARD_TYPE]
     if vanguards_id is not None:
         if len(vanguards) > 0:
-            warnings.warn("Vanguards found in battler. Replacing them with vanguards from the passed vanguard id.")
+            warnings.warn(
+                "Vanguards found in battler. Replacing them with vanguards from the passed vanguard id.",
+                stacklevel=2,
+            )
         vanguards = get_cube_data(vanguards_id)
 
     upgrades = [card for card in cards if card.type_line.lower() == UPGRADE_TYPE]
     if upgrades_id is not None:
         if len(upgrades) > 0:
-            warnings.warn("Upgrades found in battler. Replacing them with upgrades from the passed upgrades id.")
+            warnings.warn(
+                "Upgrades found in battler. Replacing them with upgrades from the passed upgrades id.",
+                stacklevel=2,
+            )
         upgrades = get_cube_data(upgrades_id)
 
     cards = [card for card in cards if card.type_line.lower() not in (VANGUARD_TYPE, UPGRADE_TYPE)]

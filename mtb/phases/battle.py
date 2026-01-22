@@ -35,10 +35,7 @@ def _create_zones_for_player(player: Player) -> Zones:
 
 
 def is_in_active_battle(game: Game, player: Player) -> bool:
-    for battle in game.active_battles:
-        if player.name in (battle.player.name, battle.opponent.name):
-            return True
-    return False
+    return any(player.name in (battle.player.name, battle.opponent.name) for battle in game.active_battles)
 
 
 def can_start_pairing(game: Game, round_num: int, stage: int) -> bool:
@@ -173,7 +170,7 @@ def get_result(battle: Battle) -> BattleResult | None:
     if not results_agreed(battle):
         return None
 
-    winner_name = list(battle.result_submissions.values())[0]
+    winner_name = next(iter(battle.result_submissions.values()))
 
     if winner_name not in (battle.player.name, battle.opponent.name):
         return BattleResult(winner=None, loser=None, is_draw=True)

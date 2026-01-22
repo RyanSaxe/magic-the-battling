@@ -1,7 +1,8 @@
-from mtb.models.cards import Card
-from mtb.utils.scryfall import get_card_from_scryfall
-from mtb.utils.json_helpers import get_json
 from concurrent.futures import ThreadPoolExecutor
+
+from mtb.models.cards import Card
+from mtb.utils.json_helpers import get_json
+from mtb.utils.scryfall import get_card_from_scryfall
 
 
 def get_cube_data(cube_id: str) -> list[Card]:

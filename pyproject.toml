@@ -28,4 +28,35 @@ build-backend = "hatchling.build"
 line-length = 120
 
 [tool.ruff.lint]
-extend-select = ["E402"]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "UP",     # pyupgrade
+    "SIM",    # flake8-simplify
+    "C4",     # flake8-comprehensions
+    "PIE",    # flake8-pie
+    "RUF",    # ruff-specific
+    "PL",     # pylint
+    "PERF",   # perflint
+    "A",      # flake8-builtins
+    "PT",     # flake8-pytest-style
+    "FURB",   # refurb
+    "N",      # pep8-naming
+]
+ignore = [
+    "PLR0913",  # too many arguments - not always avoidable
+    "PLR2004",  # magic value comparison - too noisy
+    "PLR0911",  # too many return statements - match statements need many
+    "PLW0603",  # global statement - sometimes needed for singletons
+    "RUF022",   # __all__ not sorted - we organize by category with comments
+    "SIM105",   # contextlib.suppress - try/except/pass is clearer
+    "SIM108",   # ternary operator - can hurt readability
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "N802",   # HTTP handler methods like do_GET are standard
+    "A002",   # shadowing builtins in test overrides is fine
+]
