@@ -108,6 +108,7 @@ class Zones(BaseModel):
     command_zone: list[Card] = Field(default_factory=list)
     library: list[Card] = Field(default_factory=list)
     treasures: int = 0
+    submitted_cards: list[Card] = Field(default_factory=list)
 
 
 class Battle(BaseModel):

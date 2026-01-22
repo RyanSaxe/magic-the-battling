@@ -20,12 +20,14 @@ def _create_zones_for_player(player: "Player") -> "Zones":
     from mtb.models.game import Zones
 
     basics = [_create_basic_land(name) for name in player.chosen_basics]
+    submitted = player.hand + player.sideboard
     return Zones(
         battlefield=basics,
         hand=player.hand.copy(),
         sideboard=player.sideboard.copy(),
         upgrades=player.upgrades.copy(),
         treasures=player.treasures,
+        submitted_cards=submitted,
     )
 
 
@@ -182,9 +184,11 @@ def get_loser(battle: "Battle") -> "Player | None":
     return battle.player
 
 
-def _cleanup_player_treasures(zones: "Zones", player: "Player", max_treasures: int) -> None:
-    kept_treasures = min(zones.treasures, max_treasures)
-    player.treasures = kept_treasures
+def _sync_zones_to_player(zones: "Zones", player: "Player", max_treasures: int) -> None:
+    player.hand = []
+    player.sideboard = list(zones.submitted_cards)
+    player.upgrades = list(zones.upgrades)
+    player.treasures = min(zones.treasures, max_treasures)
 
 
 def _collect_revealed_cards(zones: "Zones") -> list[Card]:
@@ -212,8 +216,8 @@ def end_battle(game: "Game", battle: "Battle") -> tuple["Player", "Player"]:
     winner = get_winner(battle)
     loser = get_loser(battle)
 
-    _cleanup_player_treasures(battle.player_zones, battle.player, game.config.max_treasures)
-    _cleanup_player_treasures(battle.opponent_zones, battle.opponent, game.config.max_treasures)
+    _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
+    _sync_zones_to_player(battle.opponent_zones, battle.opponent, game.config.max_treasures)
 
     _track_revealed_cards(battle, battle.player, battle.opponent)
 

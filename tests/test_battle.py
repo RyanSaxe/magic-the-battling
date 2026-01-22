@@ -245,3 +245,23 @@ def test_end_battle_not_agreed_raises():
 
     with pytest.raises(ValueError, match="not agreed"):
         end_battle(game, battle)
+
+
+def test_end_battle_returns_cards_to_sideboard(card_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    _setup_battle_ready(game, alice, bob)
+
+    hand_card = card_factory("hand_card")
+    sideboard_card = card_factory("sideboard_card")
+    alice.hand = [hand_card]
+    alice.sideboard = [sideboard_card]
+
+    battle = start_battle(game, alice, bob)
+    submit_result(battle, alice, "Alice")
+    submit_result(battle, bob, "Alice")
+    end_battle(game, battle)
+
+    assert alice.hand == []
+    assert hand_card in alice.sideboard
+    assert sideboard_card in alice.sideboard
