@@ -4,6 +4,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from mtb.models.types import UPGRADE_TYPE, VANGUARD_TYPE
+
 
 class Card(BaseModel):
     name: str
@@ -21,11 +23,11 @@ class Card(BaseModel):
 
     @property
     def is_upgrade(self):
-        return self.type_line.lower() == "conspiracy"
+        return self.type_line.lower() == UPGRADE_TYPE
 
     @property
     def is_vanguard(self):
-        return self.type_line.lower() == "vanguard"
+        return self.type_line.lower() == VANGUARD_TYPE
 
     def upgrade(self, upgrade: "Card"):
         if not upgrade.is_upgrade:
@@ -65,19 +67,19 @@ def build_battler(
 
     cards = get_cube_data(battler_id)
 
-    vanguards = [card for card in cards if card.type_line.lower() == "vanguard"]
+    vanguards = [card for card in cards if card.type_line.lower() == VANGUARD_TYPE]
     if vanguards_id is not None:
         if len(vanguards) > 0:
             warnings.warn("Vanguards found in battler. Replacing them with vanguards from the passed vanguard id.")
         vanguards = get_cube_data(vanguards_id)
 
-    upgrades = [card for card in cards if card.type_line.lower() == "conspiracy"]
+    upgrades = [card for card in cards if card.type_line.lower() == UPGRADE_TYPE]
     if upgrades_id is not None:
         if len(upgrades) > 0:
             warnings.warn("Upgrades found in battler. Replacing them with upgrades from the passed upgrades id.")
         upgrades = get_cube_data(upgrades_id)
 
-    cards = [card for card in cards if card.type_line.lower() not in ("vanguard", "conspiracy")]
+    cards = [card for card in cards if card.type_line.lower() not in (VANGUARD_TYPE, UPGRADE_TYPE)]
     if not cards:
         raise ValueError(f"Cube '{battler_id}' contains no playable cards after filtering")
 
