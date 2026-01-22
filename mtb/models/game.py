@@ -62,15 +62,6 @@ class Player(BaseModel):
         return self.game.config.starting_stage + self.vanquishers
 
 
-class RealPlayer(Player):
-    battler: Battler
-
-
-# Fake Class for being able to play single player
-class FakePlayer(BaseModel):
-    historic_game_id: str
-
-
 class Config(BaseModel):
     pack_size: int = 5
     starting_treasures: int = 1
