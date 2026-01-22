@@ -55,4 +55,4 @@ def test_set_battler_deals_starting_pool(card_factory):
     pool_size = game.config.starting_pool_size
     assert len(game.players[0].sideboard) == pool_size
     assert len(game.players[1].sideboard) == pool_size
-    assert len(game.battler.cards) == 30 - (2 * pool_size)
+    assert len(game.get_battler().cards) == 30 - (2 * pool_size)

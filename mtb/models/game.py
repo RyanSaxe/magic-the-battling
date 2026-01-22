@@ -88,6 +88,16 @@ class Game(BaseModel):
         for player in self.players:
             player.game_ref = weakref.ref(self)
 
+    def get_draft_state(self) -> DraftState:
+        if self.draft_state is None:
+            raise RuntimeError("Draft state not initialized - call draft.start() first")
+        return self.draft_state
+
+    def get_battler(self) -> Battler:
+        if self.battler is None:
+            raise RuntimeError("Battler not initialized - call set_battler() first")
+        return self.battler
+
 
 class Zones(BaseModel):
     battlefield: list[Card] = Field(default_factory=list)
