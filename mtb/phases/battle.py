@@ -1,10 +1,8 @@
 import random
 
 from mtb.models.cards import Card
+from mtb.models.game import Battle, Game, Player, Zones
 from mtb.models.types import ZoneName
-
-if False:  # TYPE_CHECKING
-    from mtb.models.game import Battle, Game, Player, Zones
 
 
 def _create_basic_land(name: str) -> Card:
@@ -16,9 +14,7 @@ def _create_basic_land(name: str) -> Card:
     )
 
 
-def _create_zones_for_player(player: "Player") -> "Zones":
-    from mtb.models.game import Zones
-
+def _create_zones_for_player(player: Player) -> Zones:
     basics = [_create_basic_land(name) for name in player.chosen_basics]
     submitted = player.hand + player.sideboard
     return Zones(
@@ -31,14 +27,14 @@ def _create_zones_for_player(player: "Player") -> "Zones":
     )
 
 
-def is_in_active_battle(game: "Game", player: "Player") -> bool:
+def is_in_active_battle(game: Game, player: Player) -> bool:
     for battle in game.active_battles:
         if player.name in (battle.player.name, battle.opponent.name):
             return True
     return False
 
 
-def can_start_pairing(game: "Game", round_num: int, stage: int) -> bool:
+def can_start_pairing(game: Game, round_num: int, stage: int) -> bool:
     for player in game.players:
         if player.round != round_num or player.stage != stage:
             return False
@@ -47,7 +43,7 @@ def can_start_pairing(game: "Game", round_num: int, stage: int) -> bool:
     return True
 
 
-def get_pairing_candidates(game: "Game", player: "Player") -> list["Player"]:
+def get_pairing_candidates(game: Game, player: Player) -> list[Player]:
     return [
         p
         for p in game.players
@@ -59,7 +55,7 @@ def get_pairing_candidates(game: "Game", player: "Player") -> list["Player"]:
     ]
 
 
-def find_opponent(game: "Game", player: "Player") -> "Player | None":
+def find_opponent(game: Game, player: Player) -> Player | None:
     if not can_start_pairing(game, player.round, player.stage):
         return None
 
@@ -73,7 +69,7 @@ def find_opponent(game: "Game", player: "Player") -> "Player | None":
     return weighted_random_opponent(player, candidates)
 
 
-def weighted_random_opponent(player: "Player", candidates: list["Player"]) -> "Player":
+def weighted_random_opponent(player: Player, candidates: list[Player]) -> Player:
     if len(candidates) == 1:
         return candidates[0]
 
@@ -94,9 +90,7 @@ def weighted_random_opponent(player: "Player", candidates: list["Player"]) -> "P
     return random.choices(candidates, weights=weights, k=1)[0]
 
 
-def start_battle(game: "Game", player: "Player", opponent: "Player") -> "Battle":
-    from mtb.models.game import Battle
-
+def start_battle(game: Game, player: Player, opponent: Player) -> Battle:
     if player.phase != "battle":
         raise ValueError("Player is not in battle phase")
     if opponent.phase != "battle":
@@ -104,7 +98,11 @@ def start_battle(game: "Game", player: "Player", opponent: "Player") -> "Battle"
     if not can_start_pairing(game, player.round, player.stage):
         raise ValueError("Cannot start pairing yet - not all players are ready")
 
-    coin_flip = random.choice([player, opponent])
+    # player with higher poison goes first
+    if player.poison > opponent.poison:
+        coin_flip = player
+    else:
+        coin_flip = random.choice([player, opponent])
 
     battle = Battle(
         player=player,
@@ -122,7 +120,7 @@ def start_battle(game: "Game", player: "Player", opponent: "Player") -> "Battle"
     return battle
 
 
-def get_zones_for_player(battle: "Battle", player: "Player") -> "Zones":
+def get_zones_for_player(battle: Battle, player: Player) -> Zones:
     if player.name == battle.player.name:
         return battle.player_zones
     elif player.name == battle.opponent.name:
@@ -131,7 +129,7 @@ def get_zones_for_player(battle: "Battle", player: "Player") -> "Zones":
         raise ValueError("Player is not in this battle")
 
 
-def move_zone(battle: "Battle", player: "Player", card: Card, from_zone: ZoneName, to_zone: ZoneName) -> None:
+def move_zone(battle: Battle, player: Player, card: Card, from_zone: ZoneName, to_zone: ZoneName) -> None:
     if from_zone == to_zone:
         return
 
@@ -146,7 +144,7 @@ def move_zone(battle: "Battle", player: "Player", card: Card, from_zone: ZoneNam
     destination.append(card)
 
 
-def submit_result(battle: "Battle", player: "Player", winner_name: str) -> None:
+def submit_result(battle: Battle, player: Player, winner_name: str) -> None:
     if player.name not in (battle.player.name, battle.opponent.name):
         raise ValueError("Player is not in this battle")
 
@@ -156,7 +154,7 @@ def submit_result(battle: "Battle", player: "Player", winner_name: str) -> None:
     battle.result_submissions[player.name] = winner_name
 
 
-def results_agreed(battle: "Battle") -> bool:
+def results_agreed(battle: Battle) -> bool:
     if len(battle.result_submissions) != 2:
         return False
 
@@ -164,7 +162,7 @@ def results_agreed(battle: "Battle") -> bool:
     return results[0] == results[1]
 
 
-def get_winner(battle: "Battle") -> "Player | None":
+def get_winner(battle: Battle) -> Player | None:
     if not results_agreed(battle):
         return None
 
@@ -174,7 +172,7 @@ def get_winner(battle: "Battle") -> "Player | None":
     return battle.opponent
 
 
-def get_loser(battle: "Battle") -> "Player | None":
+def get_loser(battle: Battle) -> Player | None:
     winner = get_winner(battle)
     if winner is None:
         return None
@@ -184,14 +182,14 @@ def get_loser(battle: "Battle") -> "Player | None":
     return battle.player
 
 
-def _sync_zones_to_player(zones: "Zones", player: "Player", max_treasures: int) -> None:
+def _sync_zones_to_player(zones: Zones, player: Player, max_treasures: int) -> None:
     player.hand = []
     player.sideboard = list(zones.submitted_cards)
     player.upgrades = list(zones.upgrades)
     player.treasures = min(zones.treasures, max_treasures)
 
 
-def _collect_revealed_cards(zones: "Zones") -> list[Card]:
+def _collect_revealed_cards(zones: Zones) -> list[Card]:
     revealed: list[Card] = []
     revealed.extend(zones.battlefield)
     revealed.extend(zones.graveyard)
@@ -199,12 +197,12 @@ def _collect_revealed_cards(zones: "Zones") -> list[Card]:
     return [c for c in revealed if not c.type_line.startswith("Basic Land")]
 
 
-def _track_revealed_cards(battle: "Battle", player: "Player", opponent: "Player") -> None:
+def _track_revealed_cards(battle: Battle, player: Player, opponent: Player) -> None:
     player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
     opponent.most_recently_revealed_cards = _collect_revealed_cards(battle.opponent_zones)
 
 
-def end_battle(game: "Game", battle: "Battle") -> tuple["Player", "Player"]:
+def end_battle(game: Game, battle: Battle) -> tuple[Player, Player]:
     if battle.player.phase != "battle":
         raise ValueError("Player is not in battle phase")
     if battle.opponent.phase != "battle":

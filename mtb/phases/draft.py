@@ -1,13 +1,11 @@
 import random
 
 from mtb.models.cards import Card
+from mtb.models.game import Game, Player
 from mtb.models.types import CardDestination
 
-if False:  # TYPE_CHECKING
-    from mtb.models.game import Game, Player
 
-
-def start_draft(game: "Game") -> None:
+def start_draft(game: Game) -> None:
     if game.battler is None:
         raise ValueError("Game has no battler; cannot start draft")
     if game.draft_state is not None:
@@ -29,7 +27,7 @@ def start_draft(game: "Game") -> None:
         deal_pack(game, player)
 
 
-def deal_pack(game: "Game", player: "Player") -> list[Card] | None:
+def deal_pack(game: Game, player: Player) -> list[Card] | None:
     if game.draft_state is None:
         raise ValueError("No draft in progress")
 
@@ -41,7 +39,7 @@ def deal_pack(game: "Game", player: "Player") -> list[Card] | None:
     return pack
 
 
-def roll(game: "Game", player: "Player") -> list[Card] | None:
+def roll(game: Game, player: Player) -> list[Card] | None:
     if game.draft_state is None:
         raise ValueError("No draft in progress")
 
@@ -59,8 +57,8 @@ def roll(game: "Game", player: "Player") -> list[Card] | None:
 
 
 def swap(
-    game: "Game",
-    player: "Player",
+    game: Game,
+    player: Player,
     pack_card: Card,
     player_card: Card,
     destination: CardDestination,
@@ -86,7 +84,7 @@ def swap(
     player_collection.append(pack_card)
 
 
-def take(game: "Game", player: "Player", pack_card: Card, destination: CardDestination) -> None:
+def take(game: Game, player: Player, pack_card: Card, destination: CardDestination) -> None:
     if game.draft_state is None:
         raise ValueError("No draft in progress")
 
@@ -102,7 +100,7 @@ def take(game: "Game", player: "Player", pack_card: Card, destination: CardDesti
     player_collection.append(pack_card)
 
 
-def end_draft_for_player(game: "Game", player: "Player") -> None:
+def end_draft_for_player(game: Game, player: Player) -> None:
     if player.phase != "draft":
         raise ValueError("Player is not in draft phase")
     if game.draft_state is None:
@@ -118,7 +116,7 @@ def end_draft_for_player(game: "Game", player: "Player") -> None:
         _cleanup_draft(game)
 
 
-def _cleanup_draft(game: "Game") -> None:
+def _cleanup_draft(game: Game) -> None:
     if game.draft_state is None:
         return
 

@@ -1,30 +1,28 @@
 import random
 
 from mtb.models.cards import Card
-
-if False:  # TYPE_CHECKING
-    from mtb.models.game import Game, Player
+from mtb.models.game import Game, Player
 
 
-def is_stage_increasing(player: "Player") -> bool:
+def is_stage_increasing(player: Player) -> bool:
     return player.round % player.game.config.num_rounds_per_stage == 0
 
 
-def count_applied_upgrades(player: "Player") -> int:
+def count_applied_upgrades(player: Player) -> int:
     return sum(1 for u in player.upgrades if u.upgrade_target is not None)
 
 
-def apply_poison(winner: "Player", loser: "Player") -> int:
+def apply_poison(winner: Player, loser: Player) -> int:
     poison = 1 + count_applied_upgrades(winner)
     loser.poison += poison
     return poison
 
 
-def award_treasure(player: "Player") -> None:
+def award_treasure(player: Player) -> None:
     player.treasures += 1
 
 
-def award_random_card(game: "Game", player: "Player") -> Card | None:
+def award_random_card(game: Game, player: Player) -> Card | None:
     if game.battler is None or not game.battler.cards:
         return None
 
@@ -34,18 +32,18 @@ def award_random_card(game: "Game", player: "Player") -> Card | None:
     return card
 
 
-def award_vanquisher(player: "Player") -> None:
+def award_vanquisher(player: Player) -> None:
     player.vanquishers += 1
 
 
-def pick_upgrade(game: "Game", player: "Player", upgrade: Card) -> None:
+def pick_upgrade(game: Game, player: Player, upgrade: Card) -> None:
     if upgrade not in game.available_upgrades:
         raise ValueError("Upgrade not available in this game")
 
     player.upgrades.append(upgrade.model_copy())
 
 
-def apply_upgrade_to_card(player: "Player", upgrade: Card, target: Card) -> None:
+def apply_upgrade_to_card(player: Player, upgrade: Card, target: Card) -> None:
     if upgrade not in player.upgrades:
         raise ValueError("Player does not have this upgrade")
 
@@ -58,7 +56,7 @@ def apply_upgrade_to_card(player: "Player", upgrade: Card, target: Card) -> None
     upgrade.upgrade_target = target
 
 
-def start_reward(game: "Game", winner: "Player", loser: "Player") -> None:
+def start_reward(game: Game, winner: Player, loser: Player) -> None:
     if winner.phase != "reward":
         raise ValueError("Winner is not in reward phase")
     if loser.phase != "reward":
@@ -77,7 +75,7 @@ def start_reward(game: "Game", winner: "Player", loser: "Player") -> None:
         award_random_card(game, loser)
 
 
-def end_reward_for_player(game: "Game", player: "Player", upgrade_choice: Card | None = None) -> None:
+def end_reward_for_player(game: Game, player: Player, upgrade_choice: Card | None = None) -> None:
     if player.phase != "reward":
         raise ValueError("Player is not in reward phase")
 

@@ -120,14 +120,15 @@ class Battle(BaseModel):
     result_submissions: dict[str, str] = Field(default_factory=dict)
 
 
-def create_game(player_names: list[str], num_players: int) -> Game:
+def create_game(player_names: list[str], num_players: int, config: Config | None = None) -> Game:
     if num_players < len(player_names):
-        raise ValueError()
+        raise ValueError("Number of players cannot be less than the number of provided player names")
     if num_players > len(player_names):
         # TODO: add fake players from the DB
-        raise NotImplementedError()
+        raise NotImplementedError("Filling in with fake players is not implemented yet")
 
-    config = Config()
+    if config is None:
+        config = Config()
     players = [Player(name=name, treasures=config.starting_treasures) for name in player_names]
     return Game(players=players, config=config)
 

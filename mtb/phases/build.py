@@ -1,13 +1,11 @@
 from mtb.models.cards import Card
+from mtb.models.game import Game, Player
 from mtb.models.types import BuildSource
-
-if False:  # TYPE_CHECKING
-    from mtb.models.game import Game, Player
 
 VALID_BASICS = frozenset(["Plains", "Island", "Swamp", "Mountain", "Forest"])
 
 
-def move_card(player: "Player", card: Card, source: BuildSource, destination: BuildSource) -> None:
+def move_card(player: Player, card: Card, source: BuildSource, destination: BuildSource) -> None:
     if source == destination:
         return
 
@@ -20,7 +18,7 @@ def move_card(player: "Player", card: Card, source: BuildSource, destination: Bu
     destination_collection.append(card)
 
 
-def submit_build(game: "Game", player: "Player", basics: list[str]) -> None:
+def submit_build(game: Game, player: Player, basics: list[str]) -> None:
     if player.phase != "build":
         raise ValueError("Player is not in build phase")
 
