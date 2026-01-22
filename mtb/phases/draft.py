@@ -5,6 +5,16 @@ from mtb.models.game import DraftState, Game, Player
 from mtb.models.types import CardDestination
 
 
+def _get_player_collection(player: Player, destination: CardDestination) -> list[Card]:
+    match destination:
+        case "hand":
+            return player.hand
+        case "sideboard":
+            return player.sideboard
+        case "upgrades":
+            return player.upgrades
+
+
 def start(game: Game) -> None:
     if game.battler is None:
         raise ValueError("Game has no battler; cannot start draft")
@@ -70,7 +80,7 @@ def swap(
     if pack_card not in current_pack:
         raise ValueError("Card not in player's current pack")
 
-    player_collection = getattr(player, destination)
+    player_collection = _get_player_collection(player, destination)
     if player_card not in player_collection:
         raise ValueError(f"Card not in player's {destination}")
 
@@ -93,7 +103,7 @@ def take(game: Game, player: Player, pack_card: Card, destination: CardDestinati
         raise ValueError("Card not in player's current pack")
 
     current_pack.remove(pack_card)
-    player_collection = getattr(player, destination)
+    player_collection = _get_player_collection(player, destination)
     player_collection.append(pack_card)
 
 

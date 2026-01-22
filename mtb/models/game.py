@@ -4,7 +4,7 @@ import weakref
 from pydantic import BaseModel, Field
 
 from mtb.models.cards import Battler, Card
-from mtb.models.types import Phase
+from mtb.models.types import Phase, ZoneName
 
 
 class DraftState(BaseModel):
@@ -100,6 +100,25 @@ class Zones(BaseModel):
     library: list[Card] = Field(default_factory=list)
     treasures: int = 0
     submitted_cards: list[Card] = Field(default_factory=list)
+
+    def get_zone(self, zone_name: ZoneName) -> list[Card]:
+        match zone_name:
+            case "battlefield":
+                return self.battlefield
+            case "graveyard":
+                return self.graveyard
+            case "exile":
+                return self.exile
+            case "hand":
+                return self.hand
+            case "sideboard":
+                return self.sideboard
+            case "upgrades":
+                return self.upgrades
+            case "command_zone":
+                return self.command_zone
+            case "library":
+                return self.library
 
 
 class Battle(BaseModel):

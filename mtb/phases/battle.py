@@ -142,12 +142,12 @@ def move_zone(battle: Battle, player: Player, card: Card, from_zone: ZoneName, t
 
     zones = get_zones_for_player(battle, player)
 
-    source = getattr(zones, from_zone)
+    source = zones.get_zone(from_zone)
     if card not in source:
         raise ValueError(f"Card not in {from_zone}")
 
     source.remove(card)
-    destination = getattr(zones, to_zone)
+    destination = zones.get_zone(to_zone)
     destination.append(card)
 
 
