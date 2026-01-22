@@ -6,8 +6,6 @@ from mtb.phases import (
     apply_poison,
     apply_upgrade_to_card,
     award_random_card,
-    award_treasure,
-    award_vanquisher,
     count_applied_upgrades,
     end_reward_for_player,
     is_stage_increasing,
@@ -64,16 +62,6 @@ def test_apply_poison(card_factory, upgrade_factory):
     assert bob.poison == 2
 
 
-def test_award_treasure():
-    game = create_game(["Alice"], num_players=1)
-    player = game.players[0]
-    player.treasures = 3
-
-    award_treasure(player)
-
-    assert player.treasures == 4
-
-
 def test_award_random_card(card_factory):
     game = create_game(["Alice"], num_players=1)
     cards = [card_factory(f"c{i}") for i in range(5)]
@@ -86,16 +74,6 @@ def test_award_random_card(card_factory):
     assert card in player.sideboard
     assert card not in game.battler.cards
     assert len(game.battler.cards) == 4
-
-
-def test_award_vanquisher():
-    game = create_game(["Alice"], num_players=1)
-    player = game.players[0]
-    player.vanquishers = 1
-
-    award_vanquisher(player)
-
-    assert player.vanquishers == 2
 
 
 def test_pick_upgrade(upgrade_factory):

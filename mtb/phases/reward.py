@@ -18,10 +18,6 @@ def apply_poison(winner: Player, loser: Player) -> int:
     return poison
 
 
-def award_treasure(player: Player) -> None:
-    player.treasures += 1
-
-
 def award_random_card(game: Game, player: Player) -> Card | None:
     if game.battler is None or not game.battler.cards:
         return None
@@ -30,10 +26,6 @@ def award_random_card(game: Game, player: Player) -> Card | None:
     game.battler.cards.remove(card)
     player.sideboard.append(card)
     return card
-
-
-def award_vanquisher(player: Player) -> None:
-    player.vanquishers += 1
 
 
 def pick_upgrade(game: Game, player: Player, upgrade: Card) -> None:
@@ -64,12 +56,12 @@ def start_reward(game: Game, winner: Player, loser: Player) -> None:
 
     apply_poison(winner, loser)
 
-    award_treasure(winner)
-    award_treasure(loser)
+    winner.treasures += 1
+    loser.treasures += 1
 
     if is_stage_increasing(winner):
-        award_vanquisher(winner)
-        award_vanquisher(loser)
+        winner.vanquishers += 1
+        loser.vanquishers += 1
     else:
         award_random_card(game, winner)
         award_random_card(game, loser)
