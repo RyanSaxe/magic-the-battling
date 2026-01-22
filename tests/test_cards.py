@@ -1,6 +1,6 @@
 import pytest
 
-from mtb.models.cards import Battler, Card, build_battler
+from mtb.models.cards import Card, build_battler
 
 
 def _card(name: str, type_line: str, **kwargs) -> Card:
