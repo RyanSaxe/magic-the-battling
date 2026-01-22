@@ -1,33 +1,29 @@
 import pytest
 
-from mtb.models.cards import Card, build_battler
+from mtb.models.cards import build_battler
 
 
-def _card(name: str, type_line: str, **kwargs) -> Card:
-    return Card(name=name, image_url="image", id=name, type_line=type_line, **kwargs)
-
-
-def test_card_upgrade_links_target():
-    base = _card("base", "creature")
-    upgrade = _card("upgrade", "conspiracy")
+def test_card_upgrade_links_target(card_factory):
+    base = card_factory("base", "creature")
+    upgrade = card_factory("upgrade", "conspiracy")
 
     base.upgrade(upgrade)
 
     assert upgrade.upgrade_target is base
 
 
-def test_card_upgrade_rejects_non_conspiracy():
-    base = _card("base", "creature")
-    non_upgrade = _card("non", "artifact")
+def test_card_upgrade_rejects_non_conspiracy(card_factory):
+    base = card_factory("base", "creature")
+    non_upgrade = card_factory("non", "artifact")
 
     with pytest.raises(ValueError):
         base.upgrade(non_upgrade)
 
 
-def test_card_upgrade_rejects_already_linked_upgrade():
-    base = _card("base", "creature")
-    other = _card("other", "creature")
-    upgrade = _card("upgrade", "conspiracy")
+def test_card_upgrade_rejects_already_linked_upgrade(card_factory):
+    base = card_factory("base", "creature")
+    other = card_factory("other", "creature")
+    upgrade = card_factory("upgrade", "conspiracy")
 
     base.upgrade(upgrade)
 
@@ -35,12 +31,12 @@ def test_card_upgrade_rejects_already_linked_upgrade():
         other.upgrade(upgrade)
 
 
-def test_build_battler_filters_and_assigns(monkeypatch):
+def test_build_battler_filters_and_assigns(monkeypatch, card_factory):
     cards = [
-        _card("main1", "creature"),
-        _card("main2", "artifact"),
-        _card("upgrade1", "conspiracy"),
-        _card("vanguard1", "vanguard"),
+        card_factory("main1", "creature"),
+        card_factory("main2", "artifact"),
+        card_factory("upgrade1", "conspiracy"),
+        card_factory("vanguard1", "vanguard"),
     ]
 
     def fake_get_cube_data(identifier: str):  # noqa: ARG001
@@ -55,10 +51,10 @@ def test_build_battler_filters_and_assigns(monkeypatch):
     assert battler.vanguards == [cards[3]]
 
 
-def test_build_battler_raises_when_no_main_cards(monkeypatch):
+def test_build_battler_raises_when_no_main_cards(monkeypatch, card_factory):
     cards = [
-        _card("upgrade1", "conspiracy"),
-        _card("vanguard1", "vanguard"),
+        card_factory("upgrade1", "conspiracy"),
+        card_factory("vanguard1", "vanguard"),
     ]
 
     def fake_get_cube_data(identifier: str):  # noqa: ARG001
