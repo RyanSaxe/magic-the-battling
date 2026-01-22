@@ -1,10 +1,10 @@
 from mtb.phases.battle import (
+    BattleResult,
     can_start_pairing,
     end_battle,
     find_opponent,
-    get_loser,
     get_pairing_candidates,
-    get_winner,
+    get_result,
     get_zones_for_player,
     is_in_active_battle,
     move_zone,
@@ -46,6 +46,7 @@ __all__ = [
     "move_card",
     "submit_build",
     # battle
+    "BattleResult",
     "is_in_active_battle",
     "can_start_pairing",
     "get_pairing_candidates",
@@ -56,8 +57,7 @@ __all__ = [
     "move_zone",
     "submit_result",
     "results_agreed",
-    "get_winner",
-    "get_loser",
+    "get_result",
     "end_battle",
     # reward
     "is_stage_increasing",

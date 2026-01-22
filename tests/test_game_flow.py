@@ -42,12 +42,12 @@ def test_full_round_flow_round_1(card_factory, upgrade_factory):
     battle = start_battle(game, alice, bob)
     submit_result(battle, alice, "Alice")
     submit_result(battle, bob, "Alice")
-    winner, loser = end_battle(game, battle)
+    result = end_battle(game, battle)
     assert alice.phase == "reward"
     assert bob.phase == "reward"
-    assert winner is alice
+    assert result.winner is alice
 
-    start_reward(game, winner, loser)
+    start_reward(game, result.winner, result.loser)
     end_reward_for_player(game, alice)
     end_reward_for_player(game, bob)
 
@@ -92,11 +92,11 @@ def test_full_round_flow_round_2(card_factory, upgrade_factory):
     battle = start_battle(game, alice, bob)
     submit_result(battle, alice, "Alice")
     submit_result(battle, bob, "Alice")
-    winner, loser = end_battle(game, battle)
+    result = end_battle(game, battle)
     assert alice.phase == "reward"
     assert bob.phase == "reward"
 
-    start_reward(game, winner, loser)
+    start_reward(game, result.winner, result.loser)
     end_reward_for_player(game, alice)
     end_reward_for_player(game, bob)
     assert alice.phase == "draft"

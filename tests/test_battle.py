@@ -5,8 +5,7 @@ from mtb.phases import (
     can_start_pairing,
     end_battle,
     find_opponent,
-    get_loser,
-    get_winner,
+    get_result,
     is_in_active_battle,
     move_zone,
     results_agreed,
@@ -178,8 +177,11 @@ def test_results_agreed_when_both_match():
     submit_result(battle, bob, "Alice")
 
     assert results_agreed(battle)
-    assert get_winner(battle) is alice
-    assert get_loser(battle) is bob
+    result = get_result(battle)
+    assert result is not None
+    assert result.winner is alice
+    assert result.loser is bob
+    assert not result.is_draw
 
 
 def test_results_not_agreed_when_different():
@@ -206,10 +208,10 @@ def test_end_battle_caps_treasures_and_transitions():
     submit_result(battle, alice, "Alice")
     submit_result(battle, bob, "Alice")
 
-    winner, loser = end_battle(game, battle)
+    result = end_battle(game, battle)
 
-    assert winner is alice
-    assert loser is bob
+    assert result.winner is alice
+    assert result.loser is bob
     assert alice.treasures == game.config.max_treasures
     assert bob.treasures == 3
     assert alice.phase == "reward"

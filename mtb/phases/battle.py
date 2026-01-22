@@ -1,8 +1,15 @@
 import random
+from typing import NamedTuple
 
 from mtb.models.cards import Card
 from mtb.models.game import Battle, Game, Player, Zones
 from mtb.models.types import ZoneName
+
+
+class BattleResult(NamedTuple):
+    winner: Player | None
+    loser: Player | None
+    is_draw: bool
 
 
 def _create_basic_land(name: str) -> Card:
@@ -162,24 +169,18 @@ def results_agreed(battle: Battle) -> bool:
     return results[0] == results[1]
 
 
-def get_winner(battle: Battle) -> Player | None:
+def get_result(battle: Battle) -> BattleResult | None:
     if not results_agreed(battle):
         return None
 
     winner_name = list(battle.result_submissions.values())[0]
+
+    if winner_name not in (battle.player.name, battle.opponent.name):
+        return BattleResult(winner=None, loser=None, is_draw=True)
+
     if winner_name == battle.player.name:
-        return battle.player
-    return battle.opponent
-
-
-def get_loser(battle: Battle) -> Player | None:
-    winner = get_winner(battle)
-    if winner is None:
-        return None
-
-    if winner.name == battle.player.name:
-        return battle.opponent
-    return battle.player
+        return BattleResult(battle.player, battle.opponent, is_draw=False)
+    return BattleResult(battle.opponent, battle.player, is_draw=False)
 
 
 def _sync_zones_to_player(zones: Zones, player: Player, max_treasures: int) -> None:
@@ -189,17 +190,15 @@ def _sync_zones_to_player(zones: Zones, player: Player, max_treasures: int) -> N
     player.treasures = min(zones.treasures, max_treasures)
 
 
-def end_battle(game: Game, battle: Battle) -> tuple[Player, Player]:
+def end_battle(game: Game, battle: Battle) -> BattleResult:
     if battle.player.phase != "battle":
         raise ValueError("Player is not in battle phase")
     if battle.opponent.phase != "battle":
         raise ValueError("Opponent is not in battle phase")
 
-    if not results_agreed(battle):
+    result = get_result(battle)
+    if result is None:
         raise ValueError("Players have not agreed on the result")
-
-    winner = get_winner(battle)
-    loser = get_loser(battle)
 
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
     _sync_zones_to_player(battle.opponent_zones, battle.opponent, game.config.max_treasures)
@@ -214,4 +213,4 @@ def end_battle(game: Game, battle: Battle) -> tuple[Player, Player]:
     if battle in game.active_battles:
         game.active_battles.remove(battle)
 
-    return winner, loser
+    return result
