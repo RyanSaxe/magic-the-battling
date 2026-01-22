@@ -189,19 +189,6 @@ def _sync_zones_to_player(zones: Zones, player: Player, max_treasures: int) -> N
     player.treasures = min(zones.treasures, max_treasures)
 
 
-def _collect_revealed_cards(zones: Zones) -> list[Card]:
-    revealed: list[Card] = []
-    revealed.extend(zones.battlefield)
-    revealed.extend(zones.graveyard)
-    revealed.extend(zones.exile)
-    return [c for c in revealed if not c.type_line.startswith("Basic Land")]
-
-
-def _track_revealed_cards(battle: Battle, player: Player, opponent: Player) -> None:
-    player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
-    opponent.most_recently_revealed_cards = _collect_revealed_cards(battle.opponent_zones)
-
-
 def end_battle(game: Game, battle: Battle) -> tuple[Player, Player]:
     if battle.player.phase != "battle":
         raise ValueError("Player is not in battle phase")
@@ -217,7 +204,9 @@ def end_battle(game: Game, battle: Battle) -> tuple[Player, Player]:
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
     _sync_zones_to_player(battle.opponent_zones, battle.opponent, game.config.max_treasures)
 
-    _track_revealed_cards(battle, battle.player, battle.opponent)
+    for player, zones in [(battle.player, battle.player_zones), (battle.opponent, battle.opponent_zones)]:
+        revealed = zones.battlefield + zones.graveyard + zones.exile
+        player.most_recently_revealed_cards = [c for c in revealed if not c.type_line.startswith("Basic Land")]
 
     battle.player.phase = "reward"
     battle.opponent.phase = "reward"
