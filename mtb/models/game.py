@@ -29,6 +29,10 @@ class Player(BaseModel):
     stage: int = 1
     last_opponent_name: str | None = None
 
+    # ghost (elimination) state
+    is_ghost: bool = False
+    time_of_death: int | None = None
+
     # optional card variants
     upgrades: list[Card] = Field(default_factory=list)
     vanguard: Card | None = None
@@ -82,6 +86,7 @@ class Game(BaseModel):
     available_upgrades: list[Card] = Field(default_factory=list)
     draft_state: DraftState | None = None
     active_battles: list["Battle"] = Field(default_factory=list)
+    most_recent_ghost: Player | None = None
 
     # set a safe circular reference between players and game
     def model_post_init(self, __context):

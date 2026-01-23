@@ -49,22 +49,21 @@ def apply_upgrade_to_card(player: Player, upgrade: Card, target: Card) -> None:
 
 
 def start(game: Game, winner: Player, loser: Player) -> None:
-    if winner.phase != "reward":
+    if not winner.is_ghost and winner.phase != "reward":
         raise ValueError("Winner is not in reward phase")
-    if loser.phase != "reward":
+    if not loser.is_ghost and loser.phase != "reward":
         raise ValueError("Loser is not in reward phase")
 
     apply_poison(winner, loser)
 
-    winner.treasures += 1
-    loser.treasures += 1
-
-    if is_stage_increasing(winner):
-        winner.vanquishers += 1
-        loser.vanquishers += 1
-    else:
-        award_random_card(game, winner)
-        award_random_card(game, loser)
+    for player in (winner, loser):
+        if player.is_ghost:
+            continue
+        player.treasures += 1
+        if is_stage_increasing(player):
+            player.vanquishers += 1
+        else:
+            award_random_card(game, player)
 
 
 def end_for_player(game: Game, player: Player, upgrade_choice: Card | None = None) -> None:

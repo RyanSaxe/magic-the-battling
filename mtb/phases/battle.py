@@ -38,8 +38,13 @@ def is_in_active_battle(game: Game, player: Player) -> bool:
     return any(player.name in (battle.player.name, battle.opponent.name) for battle in game.active_battles)
 
 
+def get_live_players(game: Game) -> list[Player]:
+    return [p for p in game.players if not p.is_ghost]
+
+
 def can_start_pairing(game: Game, round_num: int, stage: int) -> bool:
-    for player in game.players:
+    live_players = get_live_players(game)
+    for player in live_players:
         if player.round != round_num or player.stage != stage:
             return False
         if player.phase != "battle":
@@ -52,6 +57,7 @@ def get_pairing_candidates(game: Game, player: Player) -> list[Player]:
         p
         for p in game.players
         if p.name != player.name
+        and not p.is_ghost
         and p.phase == "battle"
         and p.round == player.round
         and p.stage == player.stage
@@ -68,6 +74,10 @@ def find_opponent(game: Game, player: Player) -> Player | None:
 
     candidates = get_pairing_candidates(game, player)
     if not candidates:
+        live_players = get_live_players(game)
+        unpaired_live = [p for p in live_players if not is_in_active_battle(game, p)]
+        if len(unpaired_live) == 1 and game.most_recent_ghost is not None:
+            return game.most_recent_ghost
         return None
 
     return weighted_random_opponent(player, candidates)
@@ -94,13 +104,14 @@ def weighted_random_opponent(player: Player, candidates: list[Player]) -> Player
     return random.choices(candidates, weights=weights, k=1)[0]
 
 
-def start(game: Game, player: Player, opponent: Player) -> Battle:
-    if player.phase != "battle":
-        raise ValueError("Player is not in battle phase")
-    if opponent.phase != "battle":
-        raise ValueError("Opponent is not in battle phase")
-    if not can_start_pairing(game, player.round, player.stage):
-        raise ValueError("Cannot start pairing yet - not all players are ready")
+def start(game: Game, player: Player, opponent: Player, is_sudden_death: bool = False) -> Battle:
+    if not is_sudden_death:
+        if player.phase != "battle":
+            raise ValueError("Player is not in battle phase")
+        if not opponent.is_ghost and opponent.phase != "battle":
+            raise ValueError("Opponent is not in battle phase")
+        if not opponent.is_ghost and not can_start_pairing(game, player.round, player.stage):
+            raise ValueError("Cannot start pairing yet - not all players are ready")
 
     # player with higher poison goes first
     if player.poison > opponent.poison:
