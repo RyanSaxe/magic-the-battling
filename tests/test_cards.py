@@ -4,8 +4,8 @@ from mtb.models.cards import build_battler
 
 
 def test_card_upgrade_links_target(card_factory):
-    base = card_factory("base", "creature")
-    upgrade = card_factory("upgrade", "conspiracy")
+    base = card_factory("base", "Creature")
+    upgrade = card_factory("upgrade", "Conspiracy")
 
     base.upgrade(upgrade)
 
@@ -13,17 +13,17 @@ def test_card_upgrade_links_target(card_factory):
 
 
 def test_card_upgrade_rejects_non_conspiracy(card_factory):
-    base = card_factory("base", "creature")
-    non_upgrade = card_factory("non", "artifact")
+    base = card_factory("base", "Creature")
+    non_upgrade = card_factory("non", "Artifact")
 
     with pytest.raises(ValueError, match="not a conspiracy"):
         base.upgrade(non_upgrade)
 
 
 def test_card_upgrade_rejects_already_linked_upgrade(card_factory):
-    base = card_factory("base", "creature")
-    other = card_factory("other", "creature")
-    upgrade = card_factory("upgrade", "conspiracy")
+    base = card_factory("base", "Creature")
+    other = card_factory("other", "Creature")
+    upgrade = card_factory("upgrade", "Conspiracy")
 
     base.upgrade(upgrade)
 

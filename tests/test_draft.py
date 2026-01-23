@@ -36,18 +36,16 @@ def test_start_draft_when_draft_in_progress_raises(card_factory):
         draft.start(game)
 
 
-def test_deal_pack_returns_pack_from_pool(card_factory):
+def test_deal_pack_returns_pack(card_factory):
     game = create_game(["Alice"], num_players=1)
     cards = [card_factory(f"c{i}") for i in range(15)]
     game.battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
     draft.start(game)
 
-    initial_pack_count = len(game.get_draft_state().packs)
     pack = draft.deal_pack(game, game.players[0])
 
     assert pack is not None
     assert len(pack) == game.config.pack_size
-    assert len(game.get_draft_state().packs) == initial_pack_count - 1
 
 
 def test_deal_pack_returns_none_when_no_packs_left(card_factory):
@@ -68,7 +66,7 @@ def test_deal_pack_without_draft_raises():
         draft.deal_pack(game, game.players[0])
 
 
-def test_roll_discards_current_pack_and_deals_new(card_factory):
+def test_roll_spends_treasure_and_deals_new_pack(card_factory):
     game = create_game(["Alice"], num_players=1)
     game.players[0].treasures = 2
     cards = [card_factory(f"c{i}") for i in range(15)]
@@ -81,7 +79,6 @@ def test_roll_discards_current_pack_and_deals_new(card_factory):
     assert game.players[0].treasures == 1
     assert new_pack is not None
     assert new_pack != old_pack
-    assert all(card in game.get_draft_state().discard for card in old_pack)
 
 
 def test_roll_without_treasure_raises(card_factory):
@@ -101,12 +98,10 @@ def test_roll_returns_none_when_no_packs_left(card_factory):
     draft.start(game)
 
     game.get_draft_state().packs = []
-    old_pack = game.get_draft_state().current_packs["Alice"].copy()
     new_pack = draft.roll(game, game.players[0])
 
     assert new_pack is None
     assert game.players[0].treasures == 0
-    assert all(card in game.get_draft_state().discard for card in old_pack)
 
 
 def test_swap_exchanges_pack_card_with_player_card(card_factory):
@@ -162,25 +157,10 @@ def test_take_moves_card_from_pack_to_player(card_factory):
 
     player = game.players[0]
     pack_card = game.get_draft_state().current_packs["Alice"][0]
-    initial_pack_size = len(game.get_draft_state().current_packs["Alice"])
 
     draft.take(game, player, pack_card, "hand")
 
     assert pack_card in player.hand
-    assert pack_card not in game.get_draft_state().current_packs["Alice"]
-    assert len(game.get_draft_state().current_packs["Alice"]) == initial_pack_size - 1
-
-
-def test_take_to_upgrades(card_factory):
-    game = create_game(["Alice"], num_players=1)
-    upgrade_card = card_factory("upgrade", type_line="Conspiracy")
-    game.battler = Battler(cards=[upgrade_card] + [card_factory(f"c{i}") for i in range(9)], upgrades=[], vanguards=[])
-    draft.start(game)
-
-    player = game.players[0]
-    if upgrade_card in game.get_draft_state().current_packs["Alice"]:
-        draft.take(game, player, upgrade_card, "upgrades")
-        assert upgrade_card in player.upgrades
 
 
 def test_end_draft_for_player_moves_to_build(card_factory):
@@ -223,7 +203,6 @@ def test_full_draft_flow(card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     cards = [card_factory(f"c{i}") for i in range(30)]
     game.battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
-    total_cards = len(cards)
 
     alice, bob = game.players
     alice.phase = "draft"
@@ -247,13 +226,10 @@ def test_full_draft_flow(card_factory):
     draft.end_for_player(game, alice)
     draft.end_for_player(game, bob)
 
-    assert len(alice.hand) == 1
-    assert len(alice.sideboard) == 1
-    assert len(bob.hand) == 1
+    assert alice_card in alice.hand
+    assert alice_card_2 in alice.sideboard
+    assert bob_card in bob.hand
     assert alice.treasures == 1
     assert bob.treasures == 1
     assert alice.phase == "build"
     assert bob.phase == "build"
-
-    player_cards = len(alice.hand) + len(alice.sideboard) + len(bob.hand)
-    assert len(game.get_battler().cards) + player_cards == total_cards

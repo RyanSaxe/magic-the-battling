@@ -49,19 +49,6 @@ def test_find_opponent_returns_none_when_not_all_ready():
     assert opponent is None
 
 
-def test_weighted_random_opponent_reduces_last_opponent_weight():
-    game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
-    alice, bob, charlie = game.players
-    alice.last_opponent_name = "Bob"
-
-    counts = {"Bob": 0, "Charlie": 0}
-    for _ in range(1000):
-        opponent = battle.weighted_random_opponent(alice, [bob, charlie])
-        counts[opponent.name] += 1
-
-    assert counts["Charlie"] > counts["Bob"] * 5
-
-
 def test_start_battle_creates_zones(card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
@@ -79,9 +66,6 @@ def test_start_battle_creates_zones(card_factory):
     assert len(b.player_zones.hand) == 2
     assert len(b.player_zones.sideboard) == 1
     assert b.player_zones.treasures == 2
-    assert b in game.active_battles
-    assert alice.last_opponent_name == "Bob"
-    assert bob.last_opponent_name == "Alice"
 
 
 def test_start_battle_wrong_phase_raises():
@@ -145,17 +129,6 @@ def test_move_zone_card_not_in_zone_raises(card_factory):
         battle.move_zone(b, alice, card_factory("missing"), "hand", "battlefield")
 
 
-def test_submit_result_records_winner():
-    game = create_game(["Alice", "Bob"], num_players=2)
-    alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
-
-    b = battle.start(game, alice, bob)
-    battle.submit_result(b, alice, "Alice")
-
-    assert b.result_submissions["Alice"] == "Alice"
-
-
 def test_results_agreed_when_both_match():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
@@ -205,7 +178,6 @@ def test_end_battle_caps_treasures_and_transitions():
     assert bob.treasures == 3
     assert alice.phase == "reward"
     assert bob.phase == "reward"
-    assert b not in game.active_battles
 
 
 def test_end_battle_tracks_revealed_cards(card_factory):

@@ -4,7 +4,7 @@ from mtb.models.cards import Battler
 from mtb.models.game import create_game, set_battler
 
 
-def test_create_game_exact_players(card_factory):
+def test_create_game_exact_players():
     names = ["Alice", "Bob"]
     game = create_game(names, num_players=2)
 
