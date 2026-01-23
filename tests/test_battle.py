@@ -228,3 +228,36 @@ def test_end_battle_returns_cards_to_sideboard(card_factory):
     assert alice.hand == []
     assert hand_card in alice.sideboard
     assert sideboard_card in alice.sideboard
+
+
+def test_submit_result_accepts_draw():
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    _setup_battle_ready(game, alice, bob)
+
+    b = battle.start(game, alice, bob)
+    battle.submit_result(b, alice, battle.DRAW_RESULT)
+    battle.submit_result(b, bob, battle.DRAW_RESULT)
+
+    assert battle.results_agreed(b)
+    result = battle.get_result(b)
+    assert result is not None
+    assert result.is_draw
+    assert result.winner is None
+    assert result.loser is None
+
+
+def test_end_battle_with_draw_transitions_to_reward():
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    _setup_battle_ready(game, alice, bob)
+
+    b = battle.start(game, alice, bob)
+    battle.submit_result(b, alice, battle.DRAW_RESULT)
+    battle.submit_result(b, bob, battle.DRAW_RESULT)
+
+    result = battle.end(game, b)
+
+    assert result.is_draw
+    assert alice.phase == "reward"
+    assert bob.phase == "reward"

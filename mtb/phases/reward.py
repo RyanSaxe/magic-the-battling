@@ -48,7 +48,36 @@ def apply_upgrade_to_card(player: Player, upgrade: Card, target: Card) -> None:
     upgrade.upgrade_target = target
 
 
-def start(game: Game, winner: Player, loser: Player) -> None:
+def start(game: Game, winner: Player | None, loser: Player | None, is_draw: bool = False) -> None:
+    if is_draw:
+        if winner is None or loser is None:
+            raise ValueError("Both players must be provided for a draw")
+        _start_draw(game, winner, loser)
+    else:
+        if winner is None or loser is None:
+            raise ValueError("Winner and loser must be provided")
+        _start_with_result(game, winner, loser)
+
+
+def _start_draw(game: Game, player1: Player, player2: Player) -> None:
+    for player in (player1, player2):
+        if not player.is_ghost and player.phase != "reward":
+            raise ValueError(f"{player.name} is not in reward phase")
+
+    other = {player1.name: player2, player2.name: player1}
+    for player in (player1, player2):
+        if player.is_ghost:
+            continue
+        poison = 1 + count_applied_upgrades(other[player.name])
+        player.poison += poison
+        player.treasures += 1
+        if is_stage_increasing(player):
+            player.vanquishers += 1
+        else:
+            award_random_card(game, player)
+
+
+def _start_with_result(game: Game, winner: Player, loser: Player) -> None:
     if not winner.is_ghost and winner.phase != "reward":
         raise ValueError("Winner is not in reward phase")
     if not loser.is_ghost and loser.phase != "reward":

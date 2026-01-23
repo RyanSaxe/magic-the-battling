@@ -159,12 +159,15 @@ def move_zone(battle: Battle, player: Player, card: Card, from_zone: ZoneName, t
     destination.append(card)
 
 
+DRAW_RESULT = "draw"
+
+
 def submit_result(battle: Battle, player: Player, winner_name: str) -> None:
     if player.name not in (battle.player.name, battle.opponent.name):
         raise ValueError("Player is not in this battle")
 
-    if winner_name not in (battle.player.name, battle.opponent.name):
-        raise ValueError("Winner must be one of the players in the battle")
+    if winner_name != DRAW_RESULT and winner_name not in (battle.player.name, battle.opponent.name):
+        raise ValueError("Winner must be one of the players in the battle or 'draw'")
 
     battle.result_submissions[player.name] = winner_name
 
@@ -183,7 +186,7 @@ def get_result(battle: Battle) -> BattleResult | None:
 
     winner_name = next(iter(battle.result_submissions.values()))
 
-    if winner_name not in (battle.player.name, battle.opponent.name):
+    if winner_name == DRAW_RESULT:
         return BattleResult(winner=None, loser=None, is_draw=True)
 
     if winner_name == battle.player.name:

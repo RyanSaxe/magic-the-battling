@@ -190,3 +190,29 @@ def test_end_reward_for_player_stage_increase_missing_choice_raises():
 
     with pytest.raises(ValueError, match="Must provide upgrade choice"):
         reward.end_for_player(game, player)
+
+
+def test_start_reward_draw_applies_poison_to_both(card_factory, upgrade_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    cards = [card_factory(f"c{i}") for i in range(10)]
+    game.battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
+    alice, bob = game.players
+    alice.phase = "reward"
+    bob.phase = "reward"
+    alice.round = 1
+    bob.round = 1
+    alice.treasures = 2
+    bob.treasures = 1
+
+    u1 = upgrade_factory("u1")
+    u1.upgrade_target = card_factory("target")
+    alice.upgrades = [u1]
+
+    reward.start(game, alice, bob, is_draw=True)
+
+    assert alice.poison == 1
+    assert bob.poison == 2
+    assert alice.treasures == 3
+    assert bob.treasures == 2
+    assert len(alice.sideboard) == 1
+    assert len(bob.sideboard) == 1
