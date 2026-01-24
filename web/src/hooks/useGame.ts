@@ -9,10 +9,6 @@ export function useGame(gameId: string | null, sessionId: string | null) {
     send('start_game')
   }, [send])
 
-  const draftTake = useCallback((cardId: string, destination: CardDestination) => {
-    send('draft_take', { card_id: cardId, destination })
-  }, [send])
-
   const draftSwap = useCallback((packCardId: string, playerCardId: string, destination: CardDestination) => {
     send('draft_swap', { pack_card_id: packCardId, player_card_id: playerCardId, destination })
   }, [send])
@@ -60,7 +56,6 @@ export function useGame(gameId: string | null, sessionId: string | null) {
     error,
     actions: {
       startGame,
-      draftTake,
       draftSwap,
       draftRoll,
       draftDone,

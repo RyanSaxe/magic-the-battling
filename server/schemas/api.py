@@ -48,6 +48,7 @@ class PlayerView(BaseModel):
     time_of_death: int | None
     hand_count: int
     sideboard_count: int
+    hand_size: int
     upgrades: list[Card]
     vanguard: Card | None
     chosen_basics: list[str]
@@ -87,12 +88,6 @@ class LobbyStateResponse(BaseModel):
     players: list[LobbyPlayer]
     can_start: bool
     is_started: bool
-
-
-class DraftTakeAction(BaseModel):
-    action: str = "take"
-    card_id: str
-    destination: CardDestination
 
 
 class DraftSwapAction(BaseModel):

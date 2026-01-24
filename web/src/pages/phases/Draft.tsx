@@ -1,12 +1,10 @@
 import { useState } from 'react'
-import { Card } from '../../components/Card'
-import { CardZone } from '../../components/CardZone'
+import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 
 interface DraftPhaseProps {
   gameState: GameState
   actions: {
-    draftTake: (cardId: string, destination: CardDestination) => void
     draftSwap: (packCardId: string, playerCardId: string, destination: CardDestination) => void
     draftRoll: () => void
     draftDone: () => void
@@ -38,13 +36,6 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
     }
   }
 
-  const handleTake = () => {
-    if (selectedPackCard) {
-      actions.draftTake(selectedPackCard.id, destination)
-      setSelectedPackCard(null)
-    }
-  }
-
   const handleSwap = () => {
     if (selectedPackCard && selectedPlayerCard) {
       actions.draftSwap(selectedPackCard.id, selectedPlayerCard.id, destination)
@@ -60,102 +51,138 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="bg-gray-800 rounded-lg p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-white">Current Pack</h2>
-          <div className="flex items-center gap-4">
-            <span className="text-yellow-400">
-              Treasures: {self_player.treasures}
-            </span>
-            <button
-              onClick={handleRoll}
-              disabled={self_player.treasures <= 0 || currentPack.length === 0}
-              className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 text-white px-4 py-2 rounded"
-            >
-              Roll (Cost: 1)
-            </button>
+    <div className="flex flex-col h-full gap-4 p-4">
+      {/* Header with treasures */}
+      <div className="flex justify-between items-center">
+        <span className="phase-badge draft">Draft</span>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-amber-400 text-lg">💎</span>
+            <span className="text-white font-medium">{self_player.treasures}</span>
           </div>
+          <button
+            onClick={handleRoll}
+            disabled={self_player.treasures <= 0 || currentPack.length === 0}
+            className="btn btn-secondary text-sm"
+          >
+            Roll Pack (💎1)
+          </button>
         </div>
+      </div>
 
+      {/* Current pack */}
+      <div className="flex-1 flex flex-col items-center justify-center">
         {currentPack.length === 0 ? (
-          <p className="text-gray-400">No pack available</p>
+          <div className="text-gray-400">No pack available</div>
         ) : (
-          <div className="flex gap-4 justify-center">
-            {currentPack.map((card) => (
-              <Card
-                key={card.id}
-                card={card}
-                onClick={() => handlePackCardClick(card)}
-                selected={selectedPackCard?.id === card.id}
-                size="lg"
-              />
-            ))}
-          </div>
+          <>
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-4">
+              Current Pack
+            </div>
+            <div className="flex gap-4 justify-center flex-wrap">
+              {currentPack.map((card) => (
+                <Card
+                  key={card.id}
+                  card={card}
+                  onClick={() => handlePackCardClick(card)}
+                  selected={selectedPackCard?.id === card.id}
+                  size="lg"
+                />
+              ))}
+            </div>
+          </>
         )}
       </div>
 
+      {/* Action panel - requires both pack card AND player card selection */}
       {selectedPackCard && (
-        <div className="bg-gray-800 rounded-lg p-4">
-          <div className="flex items-center gap-4 mb-4">
-            <span className="text-white">Destination:</span>
-            <select
-              value={destination}
-              onChange={(e) => setDestination(e.target.value as CardDestination)}
-              className="bg-gray-700 text-white rounded px-3 py-2"
-            >
-              <option value="hand">Hand</option>
-              <option value="sideboard">Sideboard</option>
-              <option value="upgrades">Upgrades</option>
-            </select>
-          </div>
-
-          <div className="flex gap-4">
-            <button
-              onClick={handleTake}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
-            >
-              Take Card
-            </button>
-            {selectedPlayerCard && (
-              <button
-                onClick={handleSwap}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+        <div className="bg-black/40 rounded-lg p-4">
+          <div className="flex items-center justify-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-400 text-sm">Send to:</span>
+              <select
+                value={destination}
+                onChange={(e) => setDestination(e.target.value as CardDestination)}
+                className="bg-gray-700 text-white rounded px-3 py-1.5 text-sm"
               >
-                Swap with Selected
+                <option value="hand">Hand</option>
+                <option value="sideboard">Sideboard</option>
+                <option value="upgrades">Upgrades</option>
+              </select>
+            </div>
+            {selectedPlayerCard ? (
+              <button onClick={handleSwap} className="btn btn-primary">
+                Swap Cards
               </button>
+            ) : (
+              <span className="text-amber-400 text-sm">
+                Select a card from your collection to swap
+              </span>
             )}
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <CardZone
-          title="Hand"
-          cards={self_player.hand}
-          onCardClick={handlePlayerCardClick}
-          selectedCardId={selectedPlayerCard?.id}
-        />
-        <CardZone
-          title="Sideboard"
-          cards={self_player.sideboard}
-          onCardClick={handlePlayerCardClick}
-          selectedCardId={selectedPlayerCard?.id}
-        />
+      {/* Your cards */}
+      <div className="grid grid-cols-3 gap-4 max-h-[300px] overflow-auto">
+        {/* Hand */}
+        <div className="bg-blue-950/30 rounded-lg p-3">
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+            Hand ({self_player.hand.length})
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {self_player.hand.map((card) => (
+              <Card
+                key={card.id}
+                card={card}
+                onClick={() => handlePlayerCardClick(card)}
+                selected={selectedPlayerCard?.id === card.id}
+                size="sm"
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Sideboard */}
+        <div className="bg-purple-950/30 rounded-lg p-3">
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+            Sideboard ({self_player.sideboard.length})
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {self_player.sideboard.map((card) => (
+              <Card
+                key={card.id}
+                card={card}
+                onClick={() => handlePlayerCardClick(card)}
+                selected={selectedPlayerCard?.id === card.id}
+                size="sm"
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Upgrades */}
+        <div className="bg-amber-950/30 rounded-lg p-3">
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+            Upgrades ({self_player.upgrades.length})
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {self_player.upgrades.map((card) => (
+              <Card
+                key={card.id}
+                card={card}
+                onClick={() => handlePlayerCardClick(card)}
+                selected={selectedPlayerCard?.id === card.id}
+                size="sm"
+              />
+            ))}
+          </div>
+        </div>
       </div>
 
-      <CardZone
-        title="Upgrades"
-        cards={self_player.upgrades}
-        onCardClick={handlePlayerCardClick}
-        selectedCardId={selectedPlayerCard?.id}
-      />
-
+      {/* Done button */}
       <div className="flex justify-center">
-        <button
-          onClick={actions.draftDone}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded font-medium"
-        >
+        <button onClick={actions.draftDone} className="btn btn-primary px-8 py-3">
           Done Drafting
         </button>
       </div>

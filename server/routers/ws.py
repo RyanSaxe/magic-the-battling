@@ -136,8 +136,6 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
     success = False
 
     match action:
-        case "draft_take":
-            success = game_manager.handle_draft_take(game, player, payload["card_id"], payload["destination"])
         case "draft_swap":
             success = game_manager.handle_draft_swap(
                 game, player, payload["pack_card_id"], payload["player_card_id"], payload["destination"]

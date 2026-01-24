@@ -65,8 +65,13 @@ def test_full_round_flow_round_2(card_factory, upgrade_factory):
     # Now test the draft → build → battle → reward flow
     draft.start(game)
 
-    draft.take(game, alice, game.get_draft_state().current_packs["Alice"][0], "hand")
-    draft.take(game, bob, game.get_draft_state().current_packs["Bob"][0], "hand")
+    alice_swap_card = alice.sideboard[0]
+    alice_pack_card = game.get_draft_state().current_packs["Alice"][0]
+    draft.swap(game, alice, alice_pack_card, alice_swap_card, "sideboard")
+
+    bob_swap_card = bob.sideboard[0]
+    bob_pack_card = game.get_draft_state().current_packs["Bob"][0]
+    draft.swap(game, bob, bob_pack_card, bob_swap_card, "sideboard")
 
     draft.end_for_player(game, alice)
     draft.end_for_player(game, bob)

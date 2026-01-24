@@ -60,7 +60,10 @@ def roll(game: Game, player: Player) -> list[Card] | None:
     game.draft_state.discard.extend(current_pack)
     player.treasures -= 1
 
-    return deal_pack(game, player)
+    new_pack = deal_pack(game, player)
+    if new_pack is None:
+        game.draft_state.current_packs.pop(player.name, None)
+    return new_pack
 
 
 def swap(
@@ -88,22 +91,6 @@ def swap(
     current_pack.append(player_card)
 
     player_collection.remove(player_card)
-    player_collection.append(pack_card)
-
-
-def take(game: Game, player: Player, pack_card: Card, destination: CardDestination) -> None:
-    if game.draft_state is None:
-        raise ValueError("No draft in progress")
-
-    current_pack = game.draft_state.current_packs.get(player.name)
-    if current_pack is None:
-        raise ValueError("Player has no current pack")
-
-    if pack_card not in current_pack:
-        raise ValueError("Card not in player's current pack")
-
-    current_pack.remove(pack_card)
-    player_collection = _get_player_collection(player, destination)
     player_collection.append(pack_card)
 
 

@@ -194,6 +194,7 @@ class GameManager:
                 time_of_death=player.time_of_death,
                 hand_count=len(player.hand),
                 sideboard_count=len(player.sideboard),
+                hand_size=player.hand_size,
                 upgrades=player.upgrades,
                 vanguard=player.vanguard,
                 chosen_basics=player.chosen_basics,
@@ -232,6 +233,7 @@ class GameManager:
             time_of_death=player.time_of_death,
             hand_count=len(player.hand),
             sideboard_count=len(player.sideboard),
+            hand_size=player.hand_size,
             upgrades=player.upgrades,
             vanguard=player.vanguard,
             chosen_basics=player.chosen_basics,
@@ -263,18 +265,6 @@ class GameManager:
             opponent_zones=hidden_opponent,
             result_submissions=b.result_submissions,
         )
-
-    def handle_draft_take(self, game: Game, player: Player, card_id: str, destination: CardDestination) -> bool:
-        current_pack = game.get_draft_state().current_packs.get(player.name)
-        if not current_pack:
-            return False
-
-        card = next((c for c in current_pack if c.id == card_id), None)
-        if not card:
-            return False
-
-        draft.take(game, player, card, destination)
-        return True
 
     def handle_draft_swap(
         self, game: Game, player: Player, pack_card_id: str, player_card_id: str, destination: CardDestination

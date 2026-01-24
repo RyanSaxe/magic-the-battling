@@ -13,7 +13,7 @@ from mtb.phases.battle import (
     weighted_random_opponent,
 )
 from mtb.phases.build import VALID_BASICS, move_card
-from mtb.phases.draft import deal_pack, roll, swap, take
+from mtb.phases.draft import deal_pack, roll, swap
 from mtb.phases.reward import (
     apply_poison,
     apply_upgrade_to_card,
@@ -33,7 +33,6 @@ __all__ = [
     "deal_pack",
     "roll",
     "swap",
-    "take",
     # build helpers
     "VALID_BASICS",
     "move_card",

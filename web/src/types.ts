@@ -41,6 +41,7 @@ export interface PlayerView {
   time_of_death: number | null
   hand_count: number
   sideboard_count: number
+  hand_size: number
   upgrades: Card[]
   vanguard: Card | null
   chosen_basics: string[]

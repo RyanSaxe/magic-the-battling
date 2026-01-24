@@ -150,19 +150,6 @@ def test_swap_card_not_in_pack_raises(card_factory):
         draft.swap(game, player, card_factory("not_in_pack"), card_factory("player_card"), "hand")
 
 
-def test_take_moves_card_from_pack_to_player(card_factory):
-    game = create_game(["Alice"], num_players=1)
-    game.battler = Battler(cards=[card_factory(f"c{i}") for i in range(10)], upgrades=[], vanguards=[])
-    draft.start(game)
-
-    player = game.players[0]
-    pack_card = game.get_draft_state().current_packs["Alice"][0]
-
-    draft.take(game, player, pack_card, "hand")
-
-    assert pack_card in player.hand
-
-
 def test_end_draft_for_player_moves_to_build(card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     cards = [card_factory(f"c{i}") for i in range(25)]
@@ -174,8 +161,10 @@ def test_end_draft_for_player_moves_to_build(card_factory):
 
     draft.start(game)
 
-    taken_card = game.get_draft_state().current_packs["Alice"][0]
-    draft.take(game, alice, taken_card, "hand")
+    alice_card = card_factory("alice_card")
+    alice.hand.append(alice_card)
+    pack_card = game.get_draft_state().current_packs["Alice"][0]
+    draft.swap(game, alice, pack_card, alice_card, "hand")
 
     draft.end_for_player(game, alice)
 
@@ -213,22 +202,28 @@ def test_full_draft_flow(card_factory):
     alice.treasures = 2
     bob.treasures = 1
 
-    alice_card = game.get_draft_state().current_packs["Alice"][0]
-    draft.take(game, alice, alice_card, "hand")
+    alice_swap_card_1 = card_factory("alice_swap_1")
+    alice.hand.append(alice_swap_card_1)
+    alice_pack_card = game.get_draft_state().current_packs["Alice"][0]
+    draft.swap(game, alice, alice_pack_card, alice_swap_card_1, "hand")
 
     draft.roll(game, alice)
-    alice_card_2 = game.get_draft_state().current_packs["Alice"][0]
-    draft.take(game, alice, alice_card_2, "sideboard")
+    alice_swap_card_2 = card_factory("alice_swap_2")
+    alice.sideboard.append(alice_swap_card_2)
+    alice_pack_card_2 = game.get_draft_state().current_packs["Alice"][0]
+    draft.swap(game, alice, alice_pack_card_2, alice_swap_card_2, "sideboard")
 
-    bob_card = game.get_draft_state().current_packs["Bob"][0]
-    draft.take(game, bob, bob_card, "hand")
+    bob_swap_card = card_factory("bob_swap")
+    bob.hand.append(bob_swap_card)
+    bob_pack_card = game.get_draft_state().current_packs["Bob"][0]
+    draft.swap(game, bob, bob_pack_card, bob_swap_card, "hand")
 
     draft.end_for_player(game, alice)
     draft.end_for_player(game, bob)
 
-    assert alice_card in alice.hand
-    assert alice_card_2 in alice.sideboard
-    assert bob_card in bob.hand
+    assert alice_pack_card in alice.hand
+    assert alice_pack_card_2 in alice.sideboard
+    assert bob_pack_card in bob.hand
     assert alice.treasures == 1
     assert bob.treasures == 1
     assert alice.phase == "build"
