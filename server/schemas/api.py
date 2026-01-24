@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
 from mtb.models.cards import Card
-from mtb.models.game import Zones
+from mtb.models.game import LastBattleResult, Zones
 from mtb.models.types import BuildSource, CardDestination, Phase, ZoneName
 
 
@@ -59,6 +59,7 @@ class SelfPlayerView(PlayerView):
     hand: list[Card]
     sideboard: list[Card]
     current_pack: list[Card] | None = None
+    last_battle_result: LastBattleResult | None = None
 
 
 class BattleView(BaseModel):

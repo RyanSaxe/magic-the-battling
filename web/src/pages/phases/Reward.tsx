@@ -17,6 +17,7 @@ export function RewardPhase({ gameState, actions }: RewardPhaseProps) {
   const [selectedStageUpgrade, setSelectedStageUpgrade] = useState<CardType | null>(null)
 
   const { self_player, available_upgrades } = gameState
+  const { last_battle_result } = self_player
   const isStageIncreasing = self_player.is_stage_increasing
 
   const unappliedUpgrades = self_player.upgrades.filter((u) => !u.upgrade_target)
@@ -52,22 +53,59 @@ export function RewardPhase({ gameState, actions }: RewardPhaseProps) {
 
   const allCards = [...self_player.hand, ...self_player.sideboard]
 
+  const isWinner = last_battle_result?.winner_name === self_player.name
+
   return (
-    <div className="flex flex-col h-full gap-4 p-4">
-      {/* Header with stats */}
-      <div className="flex justify-between items-center">
-        <span className="phase-badge reward">Rewards</span>
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <span className="text-purple-400">☠</span>
-            <span className="text-white">{self_player.poison}</span>
+    <div className="flex flex-col h-full gap-4 p-4 overflow-auto">
+      {/* Battle Results */}
+      {last_battle_result && (
+        <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-lg p-6 text-center">
+          <div className="text-gray-400 text-sm uppercase tracking-wide mb-2">
+            Battle vs {last_battle_result.opponent_name}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-amber-400">💎</span>
-            <span className="text-white">{self_player.treasures}</span>
+          {last_battle_result.is_draw ? (
+            <div className="text-2xl font-bold text-yellow-400">Draw</div>
+          ) : isWinner ? (
+            <div className="text-2xl font-bold text-green-400">Victory!</div>
+          ) : (
+            <div className="text-2xl font-bold text-red-400">Defeat</div>
+          )}
+          {last_battle_result.poison_dealt > 0 && isWinner && (
+            <div className="text-purple-400 mt-2">
+              Dealt {last_battle_result.poison_dealt} poison damage
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Resources Earned */}
+      {last_battle_result && (
+        <div className="bg-gray-800/50 rounded-lg p-4">
+          <div className="text-gray-400 text-sm uppercase tracking-wide mb-3">
+            Rewards Earned
+          </div>
+          <div className="flex flex-wrap gap-4 justify-center">
+            {last_battle_result.treasures_gained > 0 && (
+              <div className="flex items-center gap-2 bg-amber-950/50 rounded-lg px-4 py-2">
+                <span className="text-amber-400 text-xl">+{last_battle_result.treasures_gained}</span>
+                <span className="text-gray-300">Treasure</span>
+              </div>
+            )}
+            {last_battle_result.vanquisher_gained && (
+              <div className="flex items-center gap-2 bg-purple-950/50 rounded-lg px-4 py-2">
+                <span className="text-purple-400 text-xl">+1</span>
+                <span className="text-gray-300">Hand Size</span>
+              </div>
+            )}
+            {last_battle_result.card_gained && (
+              <div className="flex items-center gap-2 bg-blue-950/50 rounded-lg px-4 py-2">
+                <span className="text-blue-400">New Card:</span>
+                <span className="text-white">{last_battle_result.card_gained}</span>
+              </div>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* Stage upgrade selection (required at stage boundaries) */}
       {isStageIncreasing && available_upgrades.length > 0 && (
@@ -76,18 +114,17 @@ export function RewardPhase({ gameState, actions }: RewardPhaseProps) {
           <p className="text-gray-400 text-sm mb-4">
             Select an upgrade to claim as your vanquisher reward:
           </p>
-          <div className="flex gap-6 justify-center flex-wrap">
+          <div className="flex gap-4 justify-center flex-wrap">
             {available_upgrades.map((upgrade) => (
-              <div key={upgrade.id} className="flex flex-col items-center gap-2">
-                <Card
-                  card={upgrade}
-                  size="lg"
-                  selected={selectedStageUpgrade?.id === upgrade.id}
-                  onClick={() => setSelectedStageUpgrade(
-                    selectedStageUpgrade?.id === upgrade.id ? null : upgrade
-                  )}
-                />
-              </div>
+              <Card
+                key={upgrade.id}
+                card={upgrade}
+                size="lg"
+                selected={selectedStageUpgrade?.id === upgrade.id}
+                onClick={() => setSelectedStageUpgrade(
+                  selectedStageUpgrade?.id === upgrade.id ? null : upgrade
+                )}
+              />
             ))}
           </div>
         </div>
@@ -96,11 +133,11 @@ export function RewardPhase({ gameState, actions }: RewardPhaseProps) {
       {/* Pick upgrade section (for non-stage-increasing rounds) */}
       {!isStageIncreasing && available_upgrades.length > 0 && (
         <div className="bg-amber-950/30 rounded-lg p-4">
-          <h3 className="text-white font-medium mb-4">Pick an Upgrade</h3>
-          <div className="flex gap-6 justify-center flex-wrap">
+          <h3 className="text-white font-medium mb-4">Available Upgrades</h3>
+          <div className="flex gap-4 justify-center flex-wrap">
             {available_upgrades.map((upgrade) => (
               <div key={upgrade.id} className="flex flex-col items-center gap-2">
-                <Card card={upgrade} size="lg" />
+                <Card card={upgrade} size="md" />
                 <button
                   onClick={() => handlePickUpgrade(upgrade)}
                   className="btn btn-primary text-sm"
@@ -158,33 +195,8 @@ export function RewardPhase({ gameState, actions }: RewardPhaseProps) {
         </div>
       )}
 
-      {/* Your cards */}
-      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
-        <div className="bg-blue-950/30 rounded-lg p-3 overflow-auto">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-            Hand ({self_player.hand.length})
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {self_player.hand.map((card) => (
-              <Card key={card.id} card={card} size="sm" />
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-purple-950/30 rounded-lg p-3 overflow-auto">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-            Sideboard ({self_player.sideboard.length})
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {self_player.sideboard.map((card) => (
-              <Card key={card.id} card={card} size="sm" />
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* Continue button */}
-      <div className="flex justify-center">
+      <div className="flex justify-center mt-auto pt-4">
         <button
           onClick={() => actions.rewardDone(selectedStageUpgrade?.id)}
           disabled={isStageIncreasing && !selectedStageUpgrade}

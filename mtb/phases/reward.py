@@ -1,7 +1,7 @@
 import random
 
 from mtb.models.cards import Card
-from mtb.models.game import Game, Player
+from mtb.models.game import Game, LastBattleResult, Player
 
 
 def is_stage_increasing(player: Player) -> bool:
@@ -68,13 +68,27 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
     for player in (player1, player2):
         if player.is_ghost:
             continue
-        poison = 1 + count_applied_upgrades(other[player.name])
+        opponent = other[player.name]
+        poison = 1 + count_applied_upgrades(opponent)
         player.poison += poison
         player.treasures += 1
-        if is_stage_increasing(player):
+        vanquisher_gained = is_stage_increasing(player)
+        card_gained = None
+        if vanquisher_gained:
             player.vanquishers += 1
         else:
-            award_random_card(game, player)
+            card = award_random_card(game, player)
+            card_gained = card.name if card else None
+
+        player.last_battle_result = LastBattleResult(
+            opponent_name=opponent.name,
+            winner_name=None,
+            is_draw=True,
+            poison_dealt=poison,
+            treasures_gained=1,
+            card_gained=card_gained,
+            vanquisher_gained=vanquisher_gained,
+        )
 
 
 def _start_with_result(game: Game, winner: Player, loser: Player) -> None:
@@ -83,16 +97,33 @@ def _start_with_result(game: Game, winner: Player, loser: Player) -> None:
     if not loser.is_ghost and loser.phase != "reward":
         raise ValueError("Loser is not in reward phase")
 
-    apply_poison(winner, loser)
+    poison_dealt = apply_poison(winner, loser)
 
     for player in (winner, loser):
         if player.is_ghost:
             continue
+
+        is_winner = player.name == winner.name
+        opponent = loser if is_winner else winner
+
         player.treasures += 1
-        if is_stage_increasing(player):
+        vanquisher_gained = is_stage_increasing(player)
+        card_gained = None
+        if vanquisher_gained:
             player.vanquishers += 1
         else:
-            award_random_card(game, player)
+            card = award_random_card(game, player)
+            card_gained = card.name if card else None
+
+        player.last_battle_result = LastBattleResult(
+            opponent_name=opponent.name,
+            winner_name=winner.name,
+            is_draw=False,
+            poison_dealt=poison_dealt if is_winner else 0,
+            treasures_gained=1,
+            card_gained=card_gained,
+            vanquisher_gained=vanquisher_gained,
+        )
 
 
 def end_for_player(game: Game, player: Player, upgrade_choice: Card | None = None) -> None:

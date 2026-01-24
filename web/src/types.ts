@@ -48,10 +48,21 @@ export interface PlayerView {
   chosen_basics: string[]
 }
 
+export interface LastBattleResult {
+  opponent_name: string
+  winner_name: string | null
+  is_draw: boolean
+  poison_dealt: number
+  treasures_gained: number
+  card_gained: string | null
+  vanquisher_gained: boolean
+}
+
 export interface SelfPlayerView extends PlayerView {
   hand: Card[]
   sideboard: Card[]
   current_pack: Card[] | null
+  last_battle_result: LastBattleResult | null
 }
 
 export interface BattleView {

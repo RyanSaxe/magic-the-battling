@@ -13,6 +13,16 @@ class DraftState(BaseModel):
     current_packs: dict[str, list[Card]] = Field(default_factory=dict)
 
 
+class LastBattleResult(BaseModel):
+    opponent_name: str
+    winner_name: str | None
+    is_draw: bool = False
+    poison_dealt: int = 0
+    treasures_gained: int = 0
+    card_gained: str | None = None
+    vanquisher_gained: bool = False
+
+
 class Player(BaseModel):
     name: str
     most_recently_revealed_cards: list[Card] = Field(default_factory=list)
@@ -28,6 +38,7 @@ class Player(BaseModel):
     round: int = 1
     stage: int = 1
     last_opponent_name: str | None = None
+    last_battle_result: "LastBattleResult | None" = None
 
     # ghost (elimination) state
     is_ghost: bool = False

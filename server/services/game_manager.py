@@ -202,6 +202,7 @@ class GameManager:
                 hand=player.hand,
                 sideboard=player.sideboard,
                 current_pack=current_pack,
+                last_battle_result=player.last_battle_result,
             ),
             available_upgrades=game.available_upgrades,
             current_battle=current_battle,
