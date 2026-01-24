@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { GameDndProvider, useDndActions, DraggableCard, DroppableZone } from '../../dnd'
+import { ManaSymbol } from '../../components/icons'
+import { BASIC_LANDS } from '../../constants/assets'
 
 interface BuildPhaseProps {
   gameState: GameState
@@ -9,14 +11,6 @@ interface BuildPhaseProps {
     buildSubmit: (basics: string[]) => void
   }
 }
-
-const BASIC_LANDS = [
-  { name: 'Plains', symbol: 'W', color: 'bg-amber-100 text-amber-900' },
-  { name: 'Island', symbol: 'U', color: 'bg-blue-400 text-blue-900' },
-  { name: 'Swamp', symbol: 'B', color: 'bg-gray-800 text-gray-200' },
-  { name: 'Mountain', symbol: 'R', color: 'bg-red-500 text-red-100' },
-  { name: 'Forest', symbol: 'G', color: 'bg-green-500 text-green-100' },
-]
 
 export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
   const [selectedBasics, setSelectedBasics] = useState<string[]>(
@@ -151,16 +145,15 @@ export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
               {selectedBasics.length} / {numBasicsNeeded}
             </span>
           </div>
-          <div className="flex justify-center gap-3">
-            {BASIC_LANDS.map(({ name, symbol, color }) => {
+          <div className="flex justify-center gap-4">
+            {BASIC_LANDS.map(({ name, symbol }) => {
               const count = countBasic(name)
               return (
-                <div key={name} className="flex flex-col items-center gap-1">
-                  <div
-                    className={`w-12 h-12 rounded-full ${color} flex items-center justify-center text-xl font-bold shadow-lg`}
-                  >
-                    {symbol}
+                <div key={name} className="flex flex-col items-center gap-2">
+                  <div className="w-12 h-12 flex items-center justify-center bg-gray-800 rounded-lg shadow-lg">
+                    <ManaSymbol symbol={symbol} size="lg" />
                   </div>
+                  <span className="text-gray-400 text-xs">{name}</span>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => removeBasic(name)}

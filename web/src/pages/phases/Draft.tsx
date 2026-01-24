@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Card } from '../../components/card'
+import { TreasureIcon } from '../../components/icons'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 
 interface DraftPhaseProps {
@@ -57,15 +58,15 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
         <span className="phase-badge draft">Draft</span>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-amber-400 text-lg">💎</span>
+            <TreasureIcon size="lg" />
             <span className="text-white font-medium">{self_player.treasures}</span>
           </div>
           <button
             onClick={handleRoll}
             disabled={self_player.treasures <= 0 || currentPack.length === 0}
-            className="btn btn-secondary text-sm"
+            className="btn btn-secondary text-sm flex items-center gap-1"
           >
-            Roll Pack (💎1)
+            Roll Pack (<TreasureIcon size="sm" />1)
           </button>
         </div>
       </div>
