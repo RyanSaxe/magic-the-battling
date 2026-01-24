@@ -13,7 +13,7 @@ export interface Card {
   type_line: string
   tokens: Card[]
   elo: number | null
-  upgrade_target: string | null
+  upgrade_target: Card | null
 }
 
 export interface Zones {
@@ -46,6 +46,7 @@ export interface PlayerView {
   upgrades: Card[]
   vanguard: Card | null
   chosen_basics: string[]
+  most_recently_revealed_cards: Card[]
 }
 
 export interface LastBattleResult {
@@ -53,8 +54,9 @@ export interface LastBattleResult {
   winner_name: string | null
   is_draw: boolean
   poison_dealt: number
+  poison_taken: number
   treasures_gained: number
-  card_gained: string | null
+  card_gained: Card | null
   vanquisher_gained: boolean
 }
 

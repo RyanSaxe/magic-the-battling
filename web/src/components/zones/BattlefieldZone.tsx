@@ -1,7 +1,9 @@
 import type { Card as CardType, ZoneName } from '../../types'
 import { DraggableCard, DroppableZone } from '../../dnd'
 
-const isLand = (card: CardType) => card.type_line.toLowerCase().includes('land')
+const isLandOrTreasure = (card: CardType) =>
+  card.type_line.toLowerCase().includes('land') ||
+  card.type_line.toLowerCase().includes('treasure')
 
 interface BattlefieldZoneProps {
   cards: CardType[]
@@ -28,8 +30,8 @@ export function BattlefieldZone({
   label,
   separateLands = false,
 }: BattlefieldZoneProps) {
-  const lands = separateLands ? cards.filter(isLand) : []
-  const permanents = separateLands ? cards.filter((c) => !isLand(c)) : cards
+  const lands = separateLands ? cards.filter(isLandOrTreasure) : []
+  const permanents = separateLands ? cards.filter((c) => !isLandOrTreasure(c)) : cards
 
   const renderCard = (card: CardType) => (
     <DraggableCard
@@ -59,7 +61,7 @@ export function BattlefieldZone({
       )}
       <div className="flex flex-col gap-2 min-h-[120px]">
         {/* Permanents (non-lands) */}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex justify-center flex-wrap gap-3">
           {permanents.length === 0 && lands.length === 0 ? (
             <div className="text-gray-500 text-sm opacity-50">
               {isOpponent ? "Opponent's battlefield" : 'Drag cards here'}
@@ -70,7 +72,7 @@ export function BattlefieldZone({
         </div>
         {/* Lands (separate row if enabled) */}
         {separateLands && lands.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-700/50">
+          <div className="flex justify-center flex-wrap gap-2 pt-2 border-t border-gray-700/50">
             {lands.map(renderCard)}
           </div>
         )}

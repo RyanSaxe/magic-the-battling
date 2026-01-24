@@ -133,40 +133,44 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
         await connection_manager.send_error(websocket, "Player not found in game")
         return
 
-    success = False
+    result: bool | str | None = False
 
     match action:
         case "draft_swap":
-            success = game_manager.handle_draft_swap(
+            result = game_manager.handle_draft_swap(
                 game, player, payload["pack_card_id"], payload["player_card_id"], payload["destination"]
             )
         case "draft_roll":
-            success = game_manager.handle_draft_roll(game, player)
+            result = game_manager.handle_draft_roll(game, player)
         case "draft_done":
-            success = game_manager.handle_draft_done(game, player)
+            result = game_manager.handle_draft_done(game, player)
         case "build_move":
-            success = game_manager.handle_build_move(
+            result = game_manager.handle_build_move(
                 player, payload["card_id"], payload["source"], payload["destination"]
             )
         case "build_submit":
-            success = game_manager.handle_build_submit(game, player, payload["basics"])
+            result = game_manager.handle_build_submit(game, player, payload["basics"])
+        case "build_apply_upgrade":
+            result = game_manager.handle_build_apply_upgrade(player, payload["upgrade_id"], payload["target_card_id"])
         case "battle_move":
-            success = game_manager.handle_battle_move(
+            result = game_manager.handle_battle_move(
                 game, player, payload["card_id"], payload["from_zone"], payload["to_zone"]
             )
         case "battle_submit_result":
-            success = game_manager.handle_battle_submit_result(game, player, payload["result"])
+            result = game_manager.handle_battle_submit_result(game, player, payload["result"])
         case "reward_pick_upgrade":
-            success = game_manager.handle_reward_pick_upgrade(game, player, payload["upgrade_id"])
+            result = game_manager.handle_reward_pick_upgrade(game, player, payload["upgrade_id"])
         case "reward_apply_upgrade":
-            success = game_manager.handle_reward_apply_upgrade(player, payload["upgrade_id"], payload["target_card_id"])
+            result = game_manager.handle_reward_apply_upgrade(player, payload["upgrade_id"], payload["target_card_id"])
         case "reward_done":
-            success = game_manager.handle_reward_done(game, player, payload.get("upgrade_id"))
+            result = game_manager.handle_reward_done(game, player, payload.get("upgrade_id"))
         case _:
             await connection_manager.send_error(websocket, f"Unknown action: {action}")
             return
 
-    if success:
+    if result is True or result is None:
         await connection_manager.broadcast_game_state(game_id)
+    elif isinstance(result, str):
+        await connection_manager.send_error(websocket, result)
     else:
         await connection_manager.send_error(websocket, f"Failed to execute action: {action}")

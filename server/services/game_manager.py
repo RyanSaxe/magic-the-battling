@@ -1,12 +1,16 @@
 import secrets
 from dataclasses import dataclass, field
 
-from mtb.models.cards import Battler, Card
-from mtb.models.game import Battle, Game, Player, Zones, create_game, set_battler
+from mtb.models.cards import (
+    DEFAULT_UPGRADES_ID,
+    DEFAULT_VANGUARD_ID,
+    Battler,
+    build_battler,
+)
+from mtb.models.game import Battle, Config, Game, Player, Zones, create_game, set_battler
 from mtb.models.types import BuildSource, CardDestination, ZoneName
 from mtb.phases import battle, build, draft, reward
 from mtb.phases.elimination import get_live_players, process_eliminations
-from mtb.utils.cubecobra import get_cube_data
 from server.schemas.api import (
     BattleView,
     GameStateResponse,
@@ -25,6 +29,8 @@ class PendingGame:
     player_names: list[str] = field(default_factory=list)
     player_ids: list[str] = field(default_factory=list)
     is_started: bool = False
+    use_upgrades: bool = True
+    use_vanguards: bool = False
 
 
 class GameManager:
@@ -35,7 +41,14 @@ class GameManager:
         self._player_id_to_name: dict[str, str] = {}
         self._join_code_to_game: dict[str, str] = {}
 
-    def create_game(self, player_name: str, player_id: str, cube_id: str = "auto") -> PendingGame:
+    def create_game(
+        self,
+        player_name: str,
+        player_id: str,
+        cube_id: str = "auto",
+        use_upgrades: bool = True,
+        use_vanguards: bool = False,
+    ) -> PendingGame:
         game_id = secrets.token_urlsafe(8)
         join_code = secrets.token_urlsafe(4).upper()[:6]
 
@@ -45,6 +58,8 @@ class GameManager:
             cube_id=cube_id,
             player_names=[player_name],
             player_ids=[player_id],
+            use_upgrades=use_upgrades,
+            use_vanguards=use_vanguards,
         )
         self._pending_games[game_id] = pending
         self._join_code_to_game[join_code] = game_id
@@ -79,30 +94,22 @@ class GameManager:
 
         pending.is_started = True
 
-        game = create_game(pending.player_names, len(pending.player_names))
-        battler = self._load_battler(pending.cube_id)
+        config = Config(
+            use_upgrades=pending.use_upgrades,
+            use_vanguards=pending.use_vanguards,
+        )
+        game = create_game(pending.player_names, len(pending.player_names), config)
+        battler = self._load_battler(pending.cube_id, pending.use_upgrades, pending.use_vanguards)
         set_battler(game, battler)
 
         self._active_games[game_id] = game
 
         return game
 
-    def _load_battler(self, cube_id: str) -> Battler:
-        cards = get_cube_data(cube_id)
-
-        main_cards: list[Card] = []
-        upgrades: list[Card] = []
-        vanguards: list[Card] = []
-
-        for card in cards:
-            if card.is_upgrade:
-                upgrades.append(card)
-            elif card.is_vanguard:
-                vanguards.append(card)
-            else:
-                main_cards.append(card)
-
-        return Battler(cards=main_cards, upgrades=upgrades, vanguards=vanguards)
+    def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
+        upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
+        vanguards_id = DEFAULT_VANGUARD_ID if use_vanguards else None
+        return build_battler(cube_id, upgrades_id, vanguards_id)
 
     def get_game(self, game_id: str) -> Game | None:
         return self._active_games.get(game_id)
@@ -240,6 +247,7 @@ class GameManager:
             upgrades=player.upgrades,
             vanguard=player.vanguard,
             chosen_basics=player.chosen_basics,
+            most_recently_revealed_cards=player.most_recently_revealed_cards,
         )
 
     def _make_battle_view(self, b: Battle, player: Player) -> BattleView:
@@ -313,13 +321,26 @@ class GameManager:
         build.move_card(player, card, source, destination)
         return True
 
-    def handle_build_submit(self, game: Game, player: Player, basics: list[str]) -> bool:
+    def handle_build_submit(self, game: Game, player: Player, basics: list[str]) -> str | None:
         try:
             build.submit(game, player, basics)
             self._try_start_battles(game)
-            return True
-        except ValueError:
+            return None
+        except ValueError as e:
+            return str(e)
+
+    def handle_build_apply_upgrade(self, player: Player, upgrade_id: str, target_card_id: str) -> bool:
+        upgrade = next((u for u in player.upgrades if u.id == upgrade_id and u.upgrade_target is None), None)
+        if not upgrade:
             return False
+
+        all_cards = player.hand + player.sideboard
+        target = next((c for c in all_cards if c.id == target_card_id), None)
+        if not target:
+            return False
+
+        build.apply_upgrade_to_card(player, upgrade, target)
+        return True
 
     def _try_start_battles(self, game: Game) -> None:
         live_players = get_live_players(game)
@@ -368,12 +389,10 @@ class GameManager:
         result = battle.get_result(b)
         battle.end(game, b)
 
-        if result == "draw":
+        if result.is_draw:
             reward.start(game, b.player, b.opponent, is_draw=True)
-        elif result == b.player.name:
-            reward.start(game, b.player, b.opponent)
         else:
-            reward.start(game, b.opponent, b.player)
+            reward.start(game, result.winner, result.loser)
 
     def handle_reward_pick_upgrade(self, game: Game, player: Player, upgrade_id: str) -> bool:
         upgrade = next((u for u in game.available_upgrades if u.id == upgrade_id), None)
@@ -395,9 +414,9 @@ class GameManager:
         reward.apply_upgrade_to_card(player, upgrade, target)
         return True
 
-    def handle_reward_done(self, game: Game, player: Player, upgrade_id: str | None = None) -> bool:
+    def handle_reward_done(self, game: Game, player: Player, upgrade_id: str | None = None) -> str | None:
         if player.phase != "reward":
-            return False
+            return "Player is not in reward phase"
 
         upgrade = None
         if upgrade_id:
@@ -405,15 +424,15 @@ class GameManager:
 
         try:
             reward.end_for_player(game, player, upgrade)
-        except ValueError:
-            return False
+        except ValueError as e:
+            return str(e)
 
         process_eliminations(game, player.round)
 
         if player.phase == "draft" and game.draft_state is None:
             draft.start(game)
 
-        return True
+        return None
 
 
 game_manager = GameManager()

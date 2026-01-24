@@ -176,14 +176,15 @@ def test_end_reward_for_player_stage_increase(upgrade_factory):
 
     reward.end_for_player(game, player, upgrade)
 
-    assert player.round == 4
+    assert player.round == 1
     assert player.stage == 2
     assert len(player.upgrades) == 1
 
 
-def test_end_reward_for_player_stage_increase_missing_choice_raises():
+def test_end_reward_for_player_stage_increase_missing_choice_raises(upgrade_factory):
     game = create_game(["Alice"], num_players=1)
     game.config.num_rounds_per_stage = 3
+    game.available_upgrades = [upgrade_factory("u1")]
     player = game.players[0]
     player.phase = "reward"
     player.round = 3
@@ -216,3 +217,53 @@ def test_start_reward_draw_applies_poison_to_both(card_factory, upgrade_factory)
     assert bob.treasures == 2
     assert len(alice.sideboard) == 1
     assert len(bob.sideboard) == 1
+
+
+def test_end_reward_for_player_stage_increase_no_upgrade_when_disabled():
+    """When use_upgrades=False, stage can increase without picking an upgrade."""
+    game = create_game(["Alice"], num_players=1)
+    game.config.num_rounds_per_stage = 3
+    game.config.use_upgrades = False
+    player = game.players[0]
+    player.phase = "reward"
+    player.round = 3
+    player.stage = 1
+
+    reward.end_for_player(game, player)
+
+    assert player.round == 1
+    assert player.stage == 2
+    assert len(player.upgrades) == 0
+
+
+def test_fibonacci_damage_formula():
+    """Test fibonacci damage calculation: fib(hand_size - 2)."""
+    game = create_game(["Alice", "Bob"], num_players=2)
+    game.config.use_upgrades = False
+    alice, bob = game.players
+    alice.phase = "reward"
+    bob.phase = "reward"
+
+    alice.vanquishers = 0
+    reward.apply_poison(alice, bob)
+    assert bob.poison == 1
+
+    bob.poison = 0
+    alice.vanquishers = 1
+    reward.apply_poison(alice, bob)
+    assert bob.poison == 1
+
+    bob.poison = 0
+    alice.vanquishers = 2
+    reward.apply_poison(alice, bob)
+    assert bob.poison == 2
+
+    bob.poison = 0
+    alice.vanquishers = 3
+    reward.apply_poison(alice, bob)
+    assert bob.poison == 3
+
+    bob.poison = 0
+    alice.vanquishers = 4
+    reward.apply_poison(alice, bob)
+    assert bob.poison == 5

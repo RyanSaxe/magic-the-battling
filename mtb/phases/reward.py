@@ -12,8 +12,24 @@ def count_applied_upgrades(player: Player) -> int:
     return sum(1 for u in player.upgrades if u.upgrade_target is not None)
 
 
+def _fibonacci(n: int) -> int:
+    if n <= 1:
+        return 1
+    a, b = 1, 1
+    for _ in range(n - 1):
+        a, b = b, a + b
+    return a
+
+
+def calculate_damage(player: Player) -> int:
+    if player.game.config.use_upgrades:
+        return 1 + count_applied_upgrades(player)
+    else:
+        return _fibonacci(player.hand_size - 2)
+
+
 def apply_poison(winner: Player, loser: Player) -> int:
-    poison = 1 + count_applied_upgrades(winner)
+    poison = calculate_damage(winner)
     loser.poison += poison
     return poison
 
@@ -69,7 +85,7 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
         if player.is_ghost:
             continue
         opponent = other[player.name]
-        poison = 1 + count_applied_upgrades(opponent)
+        poison = calculate_damage(opponent)
         player.poison += poison
         player.treasures += 1
         vanquisher_gained = is_stage_increasing(player)
@@ -77,14 +93,14 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
         if vanquisher_gained:
             player.vanquishers += 1
         else:
-            card = award_random_card(game, player)
-            card_gained = card.name if card else None
+            card_gained = award_random_card(game, player)
 
         player.last_battle_result = LastBattleResult(
             opponent_name=opponent.name,
             winner_name=None,
             is_draw=True,
-            poison_dealt=poison,
+            poison_dealt=0,
+            poison_taken=poison,
             treasures_gained=1,
             card_gained=card_gained,
             vanquisher_gained=vanquisher_gained,
@@ -112,14 +128,14 @@ def _start_with_result(game: Game, winner: Player, loser: Player) -> None:
         if vanquisher_gained:
             player.vanquishers += 1
         else:
-            card = award_random_card(game, player)
-            card_gained = card.name if card else None
+            card_gained = award_random_card(game, player)
 
         player.last_battle_result = LastBattleResult(
             opponent_name=opponent.name,
             winner_name=winner.name,
             is_draw=False,
             poison_dealt=poison_dealt if is_winner else 0,
+            poison_taken=0 if is_winner else poison_dealt,
             treasures_gained=1,
             card_gained=card_gained,
             vanquisher_gained=vanquisher_gained,
@@ -131,11 +147,13 @@ def end_for_player(game: Game, player: Player, upgrade_choice: Card | None = Non
         raise ValueError("Player is not in reward phase")
 
     if is_stage_increasing(player):
-        if upgrade_choice is None:
-            raise ValueError("Must provide upgrade choice when stage is increasing")
-        pick_upgrade(game, player, upgrade_choice)
+        if game.config.use_upgrades and len(game.available_upgrades) > 0:
+            if upgrade_choice is None:
+                raise ValueError("Must provide upgrade choice when stage is increasing")
+            pick_upgrade(game, player, upgrade_choice)
         player.stage += 1
-
-    player.round += 1
+        player.round = 1
+    else:
+        player.round += 1
     player.phase = "draft"
     player.chosen_basics = []

@@ -29,6 +29,10 @@ export function useGame(gameId: string | null, sessionId: string | null) {
     send('build_submit', { basics })
   }, [send])
 
+  const buildApplyUpgrade = useCallback((upgradeId: string, targetCardId: string) => {
+    send('build_apply_upgrade', { upgrade_id: upgradeId, target_card_id: targetCardId })
+  }, [send])
+
   const battleMove = useCallback((cardId: string, fromZone: ZoneName, toZone: ZoneName) => {
     send('battle_move', { card_id: cardId, from_zone: fromZone, to_zone: toZone })
   }, [send])
@@ -61,6 +65,7 @@ export function useGame(gameId: string | null, sessionId: string | null) {
       draftDone,
       buildMove,
       buildSubmit,
+      buildApplyUpgrade,
       battleMove,
       battleSubmitResult,
       rewardPickUpgrade,

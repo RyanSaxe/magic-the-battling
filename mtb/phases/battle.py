@@ -1,9 +1,21 @@
 import random
 from typing import NamedTuple
+from uuid import uuid4
 
 from mtb.models.cards import Card
 from mtb.models.game import Battle, Game, Player, Zones
 from mtb.models.types import ZoneName
+
+BASIC_LAND_IMAGES = {
+    "Plains": "https://cards.scryfall.io/large/front/1/d/1d7dba1c-a702-43c0-8fca-e47bbad4a00f.jpg",
+    "Island": "https://cards.scryfall.io/large/front/0/c/0c4eaecf-dd4c-45ab-9b50-2abe987d35d4.jpg",
+    "Swamp": "https://cards.scryfall.io/large/front/8/3/8365ab45-6d78-47ad-a6ed-282069b0fabc.jpg",
+    "Mountain": "https://cards.scryfall.io/large/front/4/2/42232ea6-e31d-46a6-9f94-b2ad2416d79b.jpg",
+    "Forest": "https://cards.scryfall.io/large/front/1/9/19e71532-3f79-4fec-974f-b0e85c7fe701.jpg",
+    "Wastes": "https://cards.scryfall.io/large/front/6/4/643d0ee1-016c-4ea8-b469-3599ae7532e6.jpg",
+}
+
+TREASURE_TOKEN_IMAGE = "https://cards.scryfall.io/large/front/f/a/fa8bbe0c-3813-4e3f-9bcf-cffe4fed6341.jpg"
 
 
 class BattleResult(NamedTuple):
@@ -15,17 +27,27 @@ class BattleResult(NamedTuple):
 def _create_basic_land(name: str) -> Card:
     return Card(
         name=name,
-        image_url=f"basic/{name.lower()}.jpg",
+        image_url=BASIC_LAND_IMAGES.get(name, f"basic/{name.lower()}.jpg"),
         id=f"basic-{name.lower()}",
         type_line="Basic Land",
     )
 
 
+def _create_treasure_token() -> Card:
+    return Card(
+        name="Treasure",
+        image_url=TREASURE_TOKEN_IMAGE,
+        id=f"treasure-{uuid4().hex[:8]}",
+        type_line="Token Artifact — Treasure",
+    )
+
+
 def _create_zones_for_player(player: Player) -> Zones:
     basics = [_create_basic_land(name) for name in player.chosen_basics]
+    treasures = [_create_treasure_token() for _ in range(player.treasures)]
     submitted = player.hand + player.sideboard
     return Zones(
-        battlefield=basics,
+        battlefield=basics + treasures,
         hand=player.hand.copy(),
         sideboard=player.sideboard.copy(),
         upgrades=player.upgrades.copy(),
@@ -119,6 +141,11 @@ def start(game: Game, player: Player, opponent: Player, is_sudden_death: bool = 
     else:
         coin_flip = random.choice([player, opponent])
 
+    for p in (player, opponent):
+        if not p.is_ghost:
+            p.previous_hand_ids = [c.id for c in p.hand]
+            p.previous_basics = p.chosen_basics.copy()
+
     battle = Battle(
         player=player,
         opponent=opponent,
@@ -198,7 +225,8 @@ def _sync_zones_to_player(zones: Zones, player: Player, max_treasures: int) -> N
     player.hand = []
     player.sideboard = list(zones.submitted_cards)
     player.upgrades = list(zones.upgrades)
-    player.treasures = min(zones.treasures, max_treasures)
+    treasure_count = sum(1 for c in zones.battlefield if "Treasure" in c.type_line)
+    player.treasures = min(treasure_count, max_treasures)
 
 
 def end(game: Game, battle: Battle) -> BattleResult:

@@ -1,3 +1,5 @@
+import { CARD_BACK_IMAGE } from '../../constants/assets'
+
 interface CardBackProps {
   size?: 'sm' | 'md' | 'lg'
   tapped?: boolean
@@ -37,7 +39,7 @@ export function CardBack({
       onClick={onClick}
     >
       <img
-        src="/assets/card-back.svg"
+        src={CARD_BACK_IMAGE}
         alt="Card back"
         className="w-full h-full object-cover"
         draggable={false}

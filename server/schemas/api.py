@@ -8,6 +8,8 @@ from mtb.models.types import BuildSource, CardDestination, Phase, ZoneName
 class CreateGameRequest(BaseModel):
     player_name: str
     cube_id: str = "auto"
+    use_upgrades: bool = True
+    use_vanguards: bool = False
 
 
 class CreateGameResponse(BaseModel):
@@ -53,6 +55,7 @@ class PlayerView(BaseModel):
     upgrades: list[Card]
     vanguard: Card | None
     chosen_basics: list[str]
+    most_recently_revealed_cards: list[Card] = []
 
 
 class SelfPlayerView(PlayerView):

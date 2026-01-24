@@ -13,7 +13,9 @@ interface CardProps {
   counters?: Record<string, number>
   glow?: 'none' | 'gold' | 'green' | 'red'
   dragging?: boolean
+  disabled?: boolean
   className?: string
+  showUpgradeTarget?: boolean
 }
 
 const sizeStyles = {
@@ -40,11 +42,14 @@ export function Card({
   counters,
   glow = 'none',
   dragging = false,
+  disabled = false,
   className = '',
+  showUpgradeTarget = false,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
+  const [showTargetModal, setShowTargetModal] = useState(false)
 
   if (faceDown) {
     return (
@@ -65,7 +70,8 @@ export function Card({
 
   const baseClasses = [
     'card',
-    'relative rounded-lg overflow-hidden cursor-pointer',
+    'relative rounded-lg overflow-hidden',
+    disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
     selected && 'selected',
     tapped && 'tapped',
     dragging && 'dragging',
@@ -85,8 +91,8 @@ export function Card({
         height: dimensions.height,
         boxShadow,
       }}
-      onClick={onClick}
-      onDoubleClick={onDoubleClick}
+      onClick={disabled ? undefined : onClick}
+      onDoubleClick={disabled ? undefined : onDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -130,6 +136,42 @@ export function Card({
             </div>
           ))}
         </div>
+      )}
+      {showUpgradeTarget && card.upgrade_target && (
+        <>
+          <button
+            className="absolute bottom-0 left-0 right-0 bg-purple-900/90 text-white text-xs py-1 px-1 truncate hover:bg-purple-800/90 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowTargetModal(true)
+            }}
+          >
+            → {card.upgrade_target.name}
+          </button>
+          {showTargetModal && (
+            <div
+              className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowTargetModal(false)
+              }}
+            >
+              <div className="relative" onClick={(e) => e.stopPropagation()}>
+                <img
+                  src={card.upgrade_target.image_url}
+                  alt={card.upgrade_target.name}
+                  className="max-h-[80vh] rounded-lg shadow-2xl"
+                />
+                <button
+                  className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/80"
+                  onClick={() => setShowTargetModal(false)}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   )

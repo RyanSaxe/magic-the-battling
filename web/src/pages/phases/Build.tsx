@@ -1,14 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { GameDndProvider, useDndActions, DraggableCard, DroppableZone } from '../../dnd'
-import { ManaSymbol } from '../../components/icons'
-import { BASIC_LANDS } from '../../constants/assets'
+import { Card } from '../../components/card'
+import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
 
 interface BuildPhaseProps {
   gameState: GameState
   actions: {
     buildMove: (cardId: string, source: BuildSource, destination: BuildSource) => void
     buildSubmit: (basics: string[]) => void
+    buildApplyUpgrade: (upgradeId: string, targetCardId: string) => void
   }
 }
 
@@ -20,6 +21,14 @@ export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
     card: CardType
     source: BuildSource
   } | null>(null)
+  const [isMounted, setIsMounted] = useState(false)
+  const [selectedUpgrade, setSelectedUpgrade] = useState<CardType | null>(null)
+  const [selectedTarget, setSelectedTarget] = useState<CardType | null>(null)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsMounted(true), 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   const { handleCardMove, getValidDropZones } = useDndActions({
     phase: 'build',
@@ -59,8 +68,36 @@ export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
     }
   }
 
+  const unappliedUpgrades = self_player.upgrades.filter((u) => !u.upgrade_target)
+  const allCards = [...self_player.hand, ...self_player.sideboard]
+
+  const handleSelectUpgrade = (upgrade: CardType) => {
+    if (selectedUpgrade?.id === upgrade.id) {
+      setSelectedUpgrade(null)
+    } else {
+      setSelectedUpgrade(upgrade)
+    }
+    setSelectedTarget(null)
+  }
+
+  const handleSelectTarget = (card: CardType) => {
+    if (selectedTarget?.id === card.id) {
+      setSelectedTarget(null)
+    } else {
+      setSelectedTarget(card)
+    }
+  }
+
+  const handleApplyUpgrade = () => {
+    if (selectedUpgrade && selectedTarget) {
+      actions.buildApplyUpgrade(selectedUpgrade.id, selectedTarget.id)
+      setSelectedUpgrade(null)
+      setSelectedTarget(null)
+    }
+  }
+
   return (
-    <GameDndProvider onCardMove={handleCardMove} validDropZones={getValidDropZones}>
+    <GameDndProvider key={isMounted ? 'mounted' : 'initial'} onCardMove={handleCardMove} validDropZones={getValidDropZones}>
       <div className="flex flex-col h-full gap-4 p-4">
         {/* Header */}
         <div className="text-center">
@@ -137,6 +174,51 @@ export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
           </DroppableZone>
         </div>
 
+        {/* Apply upgrades section */}
+        {unappliedUpgrades.length > 0 && (
+          <div className="bg-purple-950/30 rounded-lg p-4">
+            <h3 className="text-white font-medium mb-3">Apply Upgrades</h3>
+            <div className="flex gap-3 flex-wrap mb-4">
+              {unappliedUpgrades.map((upgrade) => (
+                <Card
+                  key={upgrade.id}
+                  card={upgrade}
+                  onClick={() => handleSelectUpgrade(upgrade)}
+                  selected={selectedUpgrade?.id === upgrade.id}
+                  size="sm"
+                />
+              ))}
+            </div>
+
+            {selectedUpgrade && (
+              <div className="border-t border-gray-700 pt-4 mt-4">
+                <p className="text-gray-400 mb-3 text-sm">
+                  Select a card to apply <span className="text-white">{selectedUpgrade.name}</span> to:
+                </p>
+                <div className="flex gap-2 flex-wrap max-h-[200px] overflow-auto">
+                  {allCards.map((card) => (
+                    <Card
+                      key={card.id}
+                      card={card}
+                      onClick={() => handleSelectTarget(card)}
+                      selected={selectedTarget?.id === card.id}
+                      size="sm"
+                    />
+                  ))}
+                </div>
+                {selectedTarget && (
+                  <button
+                    onClick={handleApplyUpgrade}
+                    className="btn btn-primary mt-4"
+                  >
+                    Apply to {selectedTarget.name}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Basic lands selector */}
         <div className="bg-black/30 rounded-lg p-4">
           <div className="flex justify-between items-center mb-3">
@@ -146,13 +228,15 @@ export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
             </span>
           </div>
           <div className="flex justify-center gap-4">
-            {BASIC_LANDS.map(({ name, symbol }) => {
+            {BASIC_LANDS.map(({ name }) => {
               const count = countBasic(name)
               return (
                 <div key={name} className="flex flex-col items-center gap-2">
-                  <div className="w-12 h-12 flex items-center justify-center bg-gray-800 rounded-lg shadow-lg">
-                    <ManaSymbol symbol={symbol} size="lg" />
-                  </div>
+                  <img
+                    src={BASIC_LAND_IMAGES[name]}
+                    alt={name}
+                    className="w-16 h-22 rounded object-cover shadow-lg"
+                  />
                   <span className="text-gray-400 text-xs">{name}</span>
                   <div className="flex items-center gap-1">
                     <button

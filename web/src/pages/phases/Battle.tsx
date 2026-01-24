@@ -4,7 +4,9 @@ import { GameDndProvider, useDndActions } from '../../dnd'
 import { HandZone, BattlefieldZone, PileZone } from '../../components/zones'
 import { Card, CardBack } from '../../components/card'
 
-const isLand = (card: CardType) => card.type_line.toLowerCase().includes('land')
+const isLandOrTreasure = (card: CardType) =>
+  card.type_line.toLowerCase().includes('land') ||
+  card.type_line.toLowerCase().includes('treasure')
 
 interface BattlePhaseProps {
   gameState: GameState
@@ -20,6 +22,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
     zone: ZoneName
   } | null>(null)
   const [tappedCards, setTappedCards] = useState<Set<string>>(new Set())
+  const [isChangingResult, setIsChangingResult] = useState(false)
 
   const { handleCardMove, getValidDropZones } = useDndActions({
     phase: 'battle',
@@ -41,8 +44,11 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
 
   const { your_zones, opponent_zones, opponent_name, coin_flip_name, opponent_hand_count, result_submissions } = current_battle
 
-  const opponentLands = opponent_zones.battlefield.filter(isLand)
-  const opponentPermanents = opponent_zones.battlefield.filter((c) => !isLand(c))
+  const opponentLands = opponent_zones.battlefield.filter(isLandOrTreasure)
+  const opponentPermanents = opponent_zones.battlefield.filter((c) => !isLandOrTreasure(c))
+
+  const yourAppliedUpgrades = your_zones.upgrades.filter((u) => u.upgrade_target)
+  const opponentAppliedUpgrades = opponent_zones.upgrades.filter((u) => u.upgrade_target)
 
   const handleCardClick = (card: CardType, zone: ZoneName) => {
     if (selectedCard?.card.id === card.id) {
@@ -87,7 +93,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
               {opponent_name}'s Hand ({opponent_hand_count})
             </div>
-            <div className="flex gap-1 overflow-x-auto">
+            <div className="flex justify-center gap-1 overflow-x-auto">
               {Array.from({ length: opponent_hand_count }).map((_, i) => (
                 <CardBack key={i} size="sm" />
               ))}
@@ -103,7 +109,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
             </div>
             <div className="flex flex-col gap-2 p-4 pt-8 min-h-[150px]">
               {/* Opponent's permanents (non-lands) */}
-              <div className="flex flex-wrap gap-2">
+              <div className="flex justify-center flex-wrap gap-2">
                 {opponentPermanents.length === 0 && opponentLands.length === 0 ? (
                   <div className="text-gray-500 text-sm">Empty battlefield</div>
                 ) : (
@@ -114,7 +120,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               </div>
               {/* Opponent's lands */}
               {opponentLands.length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-2 border-t border-gray-700/50">
+                <div className="flex justify-center flex-wrap gap-1 pt-2 border-t border-gray-700/50">
                   {opponentLands.map((card) => (
                     <Card key={card.id} card={card} size="sm" />
                   ))}
@@ -135,6 +141,20 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               />
             </div>
           </div>
+
+          {/* Opponent's applied upgrades */}
+          {opponentAppliedUpgrades.length > 0 && (
+            <div className="px-4 py-2 bg-purple-950/30 border-t border-purple-800/30">
+              <div className="text-xs text-purple-400 uppercase tracking-wide mb-2">
+                Opponent Upgrades ({opponentAppliedUpgrades.length})
+              </div>
+              <div className="flex gap-2 flex-wrap justify-center">
+                {opponentAppliedUpgrades.map((upgrade) => (
+                  <Card key={upgrade.id} card={upgrade} size="sm" showUpgradeTarget />
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Center divider */}
           <div className="border-t border-dashed border-gray-600/50 mx-4" />
@@ -168,6 +188,20 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
           </div>
         </div>
 
+        {/* Your applied upgrades */}
+        {yourAppliedUpgrades.length > 0 && (
+          <div className="px-4 py-2 bg-purple-950/30 border-t border-purple-800/30">
+            <div className="text-xs text-purple-400 uppercase tracking-wide mb-2">
+              Your Upgrades ({yourAppliedUpgrades.length})
+            </div>
+            <div className="flex gap-2 flex-wrap justify-center">
+              {yourAppliedUpgrades.map((upgrade) => (
+                <Card key={upgrade.id} card={upgrade} size="sm" showUpgradeTarget />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Your hand */}
         <HandZone
           cards={your_zones.hand}
@@ -177,37 +211,87 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
 
         {/* Result submission */}
         <div className="px-4 pb-4">
-          {mySubmission && (
-            <div className="mb-3 text-sm text-gray-400 text-center">
-              You reported: <span className="text-white">{mySubmission}</span>
-              {opponentSubmission && mySubmission !== opponentSubmission && (
-                <span className="text-red-400 ml-2">
-                  (Conflict: opponent says {opponentSubmission})
-                </span>
+          {mySubmission && !isChangingResult ? (
+            <div className="text-center">
+              {opponentSubmission && mySubmission !== opponentSubmission ? (
+                <div className="mb-3">
+                  <div className="text-red-400 mb-2">
+                    Results don't match!
+                  </div>
+                  <div className="text-sm text-gray-400">
+                    You: <span className="text-white">{mySubmission === self_player.name ? 'I Won' : mySubmission === 'draw' ? 'Draw' : 'Opponent Won'}</span>
+                    <span className="mx-2">vs</span>
+                    Opponent: <span className="text-white">{opponentSubmission === opponent_name ? 'I Won' : opponentSubmission === 'draw' ? 'Draw' : 'Opponent Won'}</span>
+                  </div>
+                  <button
+                    onClick={() => setIsChangingResult(true)}
+                    className="btn btn-secondary mt-3"
+                  >
+                    Change Your Selection
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-black/40 rounded-lg p-4">
+                  <div className="text-amber-400 mb-2">
+                    Waiting for opponent...
+                  </div>
+                  <div className="text-sm text-gray-400 mb-3">
+                    You reported: <span className="text-white">
+                      {mySubmission === self_player.name ? 'I Won' : mySubmission === 'draw' ? 'Draw' : 'Opponent Won'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setIsChangingResult(true)}
+                    className="btn btn-secondary"
+                  >
+                    Change Selection
+                  </button>
+                </div>
               )}
             </div>
+          ) : (
+            <div>
+              {isChangingResult && (
+                <div className="text-center mb-3">
+                  <button
+                    onClick={() => setIsChangingResult(false)}
+                    className="text-gray-400 text-sm hover:text-white"
+                  >
+                    ← Cancel change
+                  </button>
+                </div>
+              )}
+              <div className="flex justify-center gap-3">
+                <button
+                  onClick={() => {
+                    actions.battleSubmitResult(self_player.name)
+                    setIsChangingResult(false)
+                  }}
+                  className="btn btn-primary"
+                >
+                  I Won
+                </button>
+                <button
+                  onClick={() => {
+                    actions.battleSubmitResult('draw')
+                    setIsChangingResult(false)
+                  }}
+                  className="btn btn-secondary"
+                >
+                  Draw
+                </button>
+                <button
+                  onClick={() => {
+                    actions.battleSubmitResult(opponent_name)
+                    setIsChangingResult(false)
+                  }}
+                  className="btn btn-danger"
+                >
+                  Opponent Won
+                </button>
+              </div>
+            </div>
           )}
-
-          <div className="flex justify-center gap-3">
-            <button
-              onClick={() => actions.battleSubmitResult(self_player.name)}
-              className="btn btn-primary"
-            >
-              I Won
-            </button>
-            <button
-              onClick={() => actions.battleSubmitResult('draw')}
-              className="btn btn-secondary"
-            >
-              Draw
-            </button>
-            <button
-              onClick={() => actions.battleSubmitResult(opponent_name)}
-              className="btn btn-danger"
-            >
-              Opponent Won
-            </button>
-          </div>
         </div>
       </div>
     </GameDndProvider>

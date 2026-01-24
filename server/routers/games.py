@@ -23,6 +23,8 @@ def create_game(request: CreateGameRequest):
         player_name=request.player_name,
         player_id=session.player_id,
         cube_id=request.cube_id,
+        use_upgrades=request.use_upgrades,
+        use_vanguards=request.use_vanguards,
     )
     session_manager.update_game_id(session.session_id, pending.game_id)
 

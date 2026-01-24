@@ -2,7 +2,7 @@ from mtb.models.cards import Card
 from mtb.models.game import Game, Player
 from mtb.models.types import BuildSource
 
-VALID_BASICS = frozenset(["Plains", "Island", "Swamp", "Mountain", "Forest"])
+VALID_BASICS = frozenset(["Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes"])
 
 
 def _get_build_collection(player: Player, zone: BuildSource) -> list[Card]:
@@ -38,3 +38,26 @@ def submit(game: Game, player: Player, basics: list[str]) -> None:
 
     player.chosen_basics = basics
     player.phase = "battle"
+
+
+def apply_previous_defaults(player: Player) -> None:
+    """Move cards from previous hand to current hand, set previous basics."""
+    for card_id in player.previous_hand_ids:
+        card = next((c for c in player.sideboard if c.id == card_id), None)
+        if card:
+            player.sideboard.remove(card)
+            player.hand.append(card)
+    player.chosen_basics = player.previous_basics.copy()
+
+
+def apply_upgrade_to_card(player: Player, upgrade: Card, target: Card) -> None:
+    if upgrade not in player.upgrades:
+        raise ValueError("Player does not have this upgrade")
+
+    if upgrade.upgrade_target is not None:
+        raise ValueError("Upgrade has already been applied")
+
+    if target not in player.hand and target not in player.sideboard:
+        raise ValueError("Target card not in player's hand or sideboard")
+
+    upgrade.upgrade_target = target

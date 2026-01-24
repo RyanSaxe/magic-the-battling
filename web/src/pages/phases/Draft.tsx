@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Card } from '../../components/card'
-import { TreasureIcon } from '../../components/icons'
+import { TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 
 interface DraftPhaseProps {
@@ -15,10 +15,10 @@ interface DraftPhaseProps {
 export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   const [selectedPackCard, setSelectedPackCard] = useState<CardType | null>(null)
   const [selectedPlayerCard, setSelectedPlayerCard] = useState<CardType | null>(null)
-  const [destination, setDestination] = useState<CardDestination>('hand')
 
   const { self_player } = gameState
   const currentPack = self_player.current_pack ?? []
+  const cardPool = [...self_player.hand, ...self_player.sideboard]
 
   const handlePackCardClick = (card: CardType) => {
     if (selectedPackCard?.id === card.id) {
@@ -30,6 +30,8 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   }
 
   const handlePlayerCardClick = (card: CardType) => {
+    if (!selectedPackCard) return
+
     if (selectedPlayerCard?.id === card.id) {
       setSelectedPlayerCard(null)
     } else {
@@ -39,6 +41,8 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
 
   const handleSwap = () => {
     if (selectedPackCard && selectedPlayerCard) {
+      const isInHand = self_player.hand.some(c => c.id === selectedPlayerCard.id)
+      const destination: CardDestination = isInHand ? 'hand' : 'sideboard'
       actions.draftSwap(selectedPackCard.id, selectedPlayerCard.id, destination)
       setSelectedPackCard(null)
       setSelectedPlayerCard(null)
@@ -58,7 +62,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
         <span className="phase-badge draft">Draft</span>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <TreasureIcon size="lg" />
+            <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="w-8 h-10 rounded object-cover" />
             <span className="text-white font-medium">{self_player.treasures}</span>
           </div>
           <button
@@ -66,7 +70,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
             disabled={self_player.treasures <= 0 || currentPack.length === 0}
             className="btn btn-secondary text-sm flex items-center gap-1"
           >
-            Roll Pack (<TreasureIcon size="sm" />1)
+            Roll Pack (1 Treasure)
           </button>
         </div>
       </div>
@@ -78,7 +82,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
         ) : (
           <>
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-4">
-              Current Pack
+              Current Pack - Select a card to swap
             </div>
             <div className="flex gap-4 justify-center flex-wrap">
               {currentPack.map((card) => (
@@ -95,88 +99,81 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
         )}
       </div>
 
-      {/* Action panel - requires both pack card AND player card selection */}
-      {selectedPackCard && (
-        <div className="bg-black/40 rounded-lg p-4">
-          <div className="flex items-center justify-center gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-400 text-sm">Send to:</span>
-              <select
-                value={destination}
-                onChange={(e) => setDestination(e.target.value as CardDestination)}
-                className="bg-gray-700 text-white rounded px-3 py-1.5 text-sm"
-              >
-                <option value="hand">Hand</option>
-                <option value="sideboard">Sideboard</option>
-                <option value="upgrades">Upgrades</option>
-              </select>
-            </div>
-            {selectedPlayerCard ? (
-              <button onClick={handleSwap} className="btn btn-primary">
-                Swap Cards
-              </button>
-            ) : (
-              <span className="text-amber-400 text-sm">
-                Select a card from your collection to swap
-              </span>
-            )}
-          </div>
+      {/* Swap instruction */}
+      {selectedPackCard && !selectedPlayerCard && (
+        <div className="bg-amber-900/40 rounded-lg p-3 text-center">
+          <span className="text-amber-400 text-sm">
+            Select a card from your pool to swap with "{selectedPackCard.name}"
+          </span>
         </div>
       )}
 
-      {/* Your cards */}
-      <div className="grid grid-cols-3 gap-4 max-h-[300px] overflow-auto">
-        {/* Hand */}
-        <div className="bg-blue-950/30 rounded-lg p-3">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-            Hand ({self_player.hand.length})
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {self_player.hand.map((card) => (
-              <Card
-                key={card.id}
-                card={card}
-                onClick={() => handlePlayerCardClick(card)}
-                selected={selectedPlayerCard?.id === card.id}
-                size="sm"
-              />
-            ))}
-          </div>
+      {/* Swap confirmation */}
+      {selectedPackCard && selectedPlayerCard && (
+        <div className="bg-green-900/40 rounded-lg p-3 flex items-center justify-center gap-4">
+          <span className="text-green-400 text-sm">
+            Swap "{selectedPackCard.name}" for "{selectedPlayerCard.name}"
+          </span>
+          <button onClick={handleSwap} className="btn btn-primary">
+            Confirm Swap
+          </button>
+          <button
+            onClick={() => {
+              setSelectedPackCard(null)
+              setSelectedPlayerCard(null)
+            }}
+            className="btn btn-secondary"
+          >
+            Cancel
+          </button>
         </div>
+      )}
 
-        {/* Sideboard */}
-        <div className="bg-purple-950/30 rounded-lg p-3">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-            Sideboard ({self_player.sideboard.length})
+      {/* Main content area: Upgrades on left, Card Pool on right */}
+      <div className="flex gap-4 max-h-[300px]">
+        {/* Upgrades (read-only display) */}
+        {self_player.upgrades.length > 0 && (
+          <div className="bg-amber-950/30 rounded-lg p-3 w-48 flex-shrink-0">
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+              Your Upgrades
+            </div>
+            <div className="flex flex-col gap-2 overflow-auto">
+              {self_player.upgrades.map((card) => (
+                <Card
+                  key={card.id}
+                  card={card}
+                  size="sm"
+                />
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-1">
-            {self_player.sideboard.map((card) => (
-              <Card
-                key={card.id}
-                card={card}
-                onClick={() => handlePlayerCardClick(card)}
-                selected={selectedPlayerCard?.id === card.id}
-                size="sm"
-              />
-            ))}
-          </div>
-        </div>
+        )}
 
-        {/* Upgrades */}
-        <div className="bg-amber-950/30 rounded-lg p-3">
+        {/* Card Pool (hand + sideboard combined) */}
+        <div className="bg-slate-800/50 rounded-lg p-3 flex-1 overflow-auto">
           <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-            Upgrades ({self_player.upgrades.length})
+            Your Pool ({cardPool.length} cards)
           </div>
-          <div className="flex flex-wrap gap-1">
-            {self_player.upgrades.map((card) => (
-              <Card
-                key={card.id}
-                card={card}
-                onClick={() => handlePlayerCardClick(card)}
-                selected={selectedPlayerCard?.id === card.id}
-                size="sm"
-              />
-            ))}
+          <div className="flex flex-wrap gap-2">
+            {cardPool.map((card) => {
+              const isInHand = self_player.hand.some(c => c.id === card.id)
+              return (
+                <div key={card.id} className="relative">
+                  <Card
+                    card={card}
+                    onClick={() => handlePlayerCardClick(card)}
+                    selected={selectedPlayerCard?.id === card.id}
+                    size="sm"
+                    disabled={!selectedPackCard}
+                  />
+                  <div className={`absolute -top-1 -right-1 text-[10px] px-1 rounded ${
+                    isInHand ? 'bg-blue-600' : 'bg-purple-600'
+                  }`}>
+                    {isInHand ? 'H' : 'S'}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>

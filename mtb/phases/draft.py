@@ -3,6 +3,7 @@ import random
 from mtb.models.cards import Card
 from mtb.models.game import DraftState, Game, Player
 from mtb.models.types import CardDestination
+from mtb.phases import build
 
 
 def _get_player_collection(player: Player, destination: CardDestination) -> list[Card]:
@@ -25,6 +26,8 @@ def start(game: Game) -> None:
     random.shuffle(cards)
 
     pack_size = game.config.pack_size
+    num_full_packs = len(cards) // pack_size
+    cards = cards[: num_full_packs * pack_size]
     packs = [cards[i : i + pack_size] for i in range(0, len(cards), pack_size)]
 
     game.battler.cards = []
@@ -105,6 +108,8 @@ def end_for_player(game: Game, player: Player) -> None:
         game.draft_state.discard.extend(current_pack)
 
     player.phase = "build"
+    if player.round > 1:
+        build.apply_previous_defaults(player)
 
     if not game.draft_state.current_packs:
         _cleanup_draft(game)

@@ -1,5 +1,5 @@
 import type { PlayerView, Phase } from '../types'
-import { PoisonIcon, TreasureIcon } from './icons'
+import { PoisonIcon, MoneyBagIcon } from './icons'
 
 interface PlayerListProps {
   players: PlayerView[]
@@ -16,13 +16,13 @@ const phaseBadgeClass: Record<Phase, string> = {
 
 export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
   return (
-    <div>
+    <div className="relative">
       <h3 className="text-white font-medium mb-3">Players</h3>
       <div className="space-y-2">
         {players.map((player) => (
           <div
             key={player.name}
-            className={`p-3 rounded-lg ${
+            className={`p-3 rounded-lg transition-colors ${
               player.name === currentPlayerName
                 ? 'bg-amber-900/30 border border-amber-700/50'
                 : 'bg-black/30'
@@ -44,10 +44,10 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 <PoisonIcon size="sm" /> {player.poison}
               </span>
               <span className="flex items-center gap-1 text-amber-400" title="Treasures">
-                <TreasureIcon size="sm" /> {player.treasures}
+                <MoneyBagIcon size="sm" /> {player.treasures}
               </span>
               <span className="text-gray-500">
-                R{player.round}/S{player.stage}
+                Stage {player.stage} R{player.round}
               </span>
             </div>
             {player.is_ghost && (

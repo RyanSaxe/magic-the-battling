@@ -18,8 +18,9 @@ class LastBattleResult(BaseModel):
     winner_name: str | None
     is_draw: bool = False
     poison_dealt: int = 0
+    poison_taken: int = 0
     treasures_gained: int = 0
-    card_gained: str | None = None
+    card_gained: Card | None = None
     vanquisher_gained: bool = False
 
 
@@ -53,6 +54,10 @@ class Player(BaseModel):
 
     # basics chosen during build phase (e.g., ["Plains", "Island", "Mountain"])
     chosen_basics: list[str] = Field(default_factory=list)
+
+    # previous configuration for auto-populating build phase
+    previous_hand_ids: list[str] = Field(default_factory=list)
+    previous_basics: list[str] = Field(default_factory=list)
 
     # weak reference to parent game (not serialized)
     # model_config is required to allow weakref types
@@ -88,6 +93,8 @@ class Config(BaseModel):
     max_available_upgrades: int = 4
     poison_to_lose: int = 10
     starting_life: int = 10
+    use_upgrades: bool = True
+    use_vanguards: bool = False
 
 
 class Game(BaseModel):

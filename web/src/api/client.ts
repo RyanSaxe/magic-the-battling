@@ -2,11 +2,25 @@ import type { CreateGameResponse, JoinGameResponse } from '../types'
 
 const API_BASE = '/api'
 
-export async function createGame(playerName: string, cubeId: string = 'auto'): Promise<CreateGameResponse> {
+export interface GameOptions {
+  cubeId?: string
+  useUpgrades?: boolean
+  useVanguards?: boolean
+}
+
+export async function createGame(
+  playerName: string,
+  options: GameOptions = {}
+): Promise<CreateGameResponse> {
   const response = await fetch(`${API_BASE}/games`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ player_name: playerName, cube_id: cubeId }),
+    body: JSON.stringify({
+      player_name: playerName,
+      cube_id: options.cubeId ?? 'auto',
+      use_upgrades: options.useUpgrades ?? true,
+      use_vanguards: options.useVanguards ?? false,
+    }),
   })
   if (!response.ok) {
     throw new Error('Failed to create game')

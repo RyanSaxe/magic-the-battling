@@ -9,6 +9,8 @@ export function Home() {
 
   const [playerName, setPlayerName] = useState('')
   const [cubeId, setCubeId] = useState('auto')
+  const [useUpgrades, setUseUpgrades] = useState(true)
+  const [useVanguards, setUseVanguards] = useState(false)
   const [joinCode, setJoinCode] = useState('')
   const [isJoining, setIsJoining] = useState(false)
   const [error, setError] = useState('')
@@ -24,7 +26,11 @@ export function Home() {
     setError('')
 
     try {
-      const response = await createGame(playerName, cubeId || 'auto')
+      const response = await createGame(playerName, {
+        cubeId: cubeId || 'auto',
+        useUpgrades,
+        useVanguards,
+      })
       saveSession(response.session_id, response.player_id)
       navigate(`/game/${response.game_id}/lobby`)
     } catch {
@@ -87,18 +93,57 @@ export function Home() {
           </div>
 
           {!isJoining && (
-            <div>
-              <label className="block text-gray-300 mb-1">
-                Cube ID <span className="text-gray-500">(optional)</span>
-              </label>
-              <input
-                type="text"
-                value={cubeId}
-                onChange={(e) => setCubeId(e.target.value)}
-                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                placeholder="auto"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-gray-300 mb-1">
+                  Cube ID <span className="text-gray-500">(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={cubeId}
+                  onChange={(e) => setCubeId(e.target.value)}
+                  className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  placeholder="auto"
+                />
+              </div>
+
+              <div className="space-y-3 pt-2 border-t border-gray-700">
+                <div className="text-sm text-gray-400 uppercase tracking-wide">
+                  Game Options
+                </div>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useUpgrades}
+                    onChange={(e) => setUseUpgrades(e.target.checked)}
+                    className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
+                  />
+                  <div>
+                    <div className="text-white">Use Upgrades</div>
+                    <div className="text-gray-500 text-sm">
+                      Gain upgrades at stage boundaries to increase damage
+                    </div>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer opacity-50">
+                  <input
+                    type="checkbox"
+                    checked={useVanguards}
+                    onChange={(e) => setUseVanguards(e.target.checked)}
+                    disabled
+                    className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
+                  />
+                  <div>
+                    <div className="text-white">Use Vanguards</div>
+                    <div className="text-gray-500 text-sm">
+                      Choose a vanguard at game start (coming soon)
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </>
           )}
 
           {isJoining && (

@@ -56,7 +56,12 @@ def test_start_battle_creates_zones(card_factory):
     assert b.player is alice
     assert b.opponent is bob
     assert b.coin_flip in (alice, bob)
-    assert len(b.player_zones.battlefield) == 3
+    # 3 lands + 2 treasures = 5 cards on battlefield
+    assert len(b.player_zones.battlefield) == 5
+    lands = [c for c in b.player_zones.battlefield if "Land" in c.type_line]
+    treasures = [c for c in b.player_zones.battlefield if "Treasure" in c.type_line]
+    assert len(lands) == 3
+    assert len(treasures) == 2
     assert len(b.player_zones.hand) == 2
     assert len(b.player_zones.sideboard) == 1
     assert b.player_zones.treasures == 2
@@ -163,10 +168,9 @@ def test_end_battle_caps_treasures_and_transitions():
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
     setup_battle_ready(bob, ["Island", "Island", "Island"])
     alice.treasures = 10
+    bob.treasures = 3
 
     b = battle.start(game, alice, bob)
-    b.player_zones.treasures = 10
-    b.opponent_zones.treasures = 3
     battle.submit_result(b, alice, "Alice")
     battle.submit_result(b, bob, "Alice")
 
@@ -174,7 +178,9 @@ def test_end_battle_caps_treasures_and_transitions():
 
     assert result.winner is alice
     assert result.loser is bob
+    # alice had 10 treasures, capped to max_treasures (5)
     assert alice.treasures == game.config.max_treasures
+    # bob had 3 treasures, all still on battlefield
     assert bob.treasures == 3
     assert alice.phase == "reward"
     assert bob.phase == "reward"

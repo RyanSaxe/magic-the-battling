@@ -230,3 +230,40 @@ def test_full_draft_flow(card_factory):
     assert bob.treasures == 1
     assert alice.phase == "build"
     assert bob.phase == "build"
+
+
+def test_start_draft_discards_remainder_cards(card_factory):
+    """All packs must have exactly pack_size cards - remainders are discarded."""
+    game = create_game(["Alice", "Bob"], num_players=2)
+    pack_size = game.config.pack_size
+    # 23 cards with pack_size=5 should create 4 packs (20 cards), discarding 3
+    cards = [card_factory(f"c{i}") for i in range(23)]
+    game.battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
+
+    draft.start(game)
+
+    all_packs = [
+        *game.get_draft_state().packs,
+        game.get_draft_state().current_packs["Alice"],
+        game.get_draft_state().current_packs["Bob"],
+    ]
+    for pack in all_packs:
+        assert len(pack) == pack_size
+
+
+def test_start_draft_all_packs_correct_size(card_factory):
+    """Every pack created during draft has exactly config.pack_size cards."""
+    game = create_game(["Alice", "Bob"], num_players=2)
+    pack_size = game.config.pack_size
+    # 27 cards: 5 full packs = 25 cards, 2 remainder discarded
+    cards = [card_factory(f"c{i}") for i in range(27)]
+    game.battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
+
+    draft.start(game)
+
+    # 2 packs dealt to players, 3 remaining
+    assert len(game.get_draft_state().packs) == 3
+    for pack in game.get_draft_state().packs:
+        assert len(pack) == pack_size
+    assert len(game.get_draft_state().current_packs["Alice"]) == pack_size
+    assert len(game.get_draft_state().current_packs["Bob"]) == pack_size

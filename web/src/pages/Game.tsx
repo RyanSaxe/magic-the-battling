@@ -130,7 +130,7 @@ export function Game() {
         </h1>
         <div className="flex items-center gap-4">
           <div className="text-sm text-gray-300">
-            Round {gameState.self_player.round} / Stage {gameState.self_player.stage}
+            Stage {gameState.self_player.hand_size} • Round {gameState.self_player.round}
           </div>
           <span className={`phase-badge ${phaseBadgeClass}`}>
             {currentPhase}

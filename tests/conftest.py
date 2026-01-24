@@ -47,13 +47,18 @@ def reset_singletons():
 
 
 @pytest.fixture
-def mock_cube_data(card_factory, monkeypatch):
+def mock_cube_data(card_factory, upgrade_factory, monkeypatch):
     """Mock cubecobra to avoid network calls."""
+    from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID
 
     def _mock(cube_id: str):
+        if cube_id == DEFAULT_UPGRADES_ID:
+            return [upgrade_factory(f"upgrade{i}") for i in range(8)]
+        if cube_id == DEFAULT_VANGUARD_ID:
+            return []
         return [card_factory(f"card{i}") for i in range(45)]
 
-    monkeypatch.setattr("server.services.game_manager.get_cube_data", _mock)
+    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", _mock)
 
 
 @pytest.fixture
