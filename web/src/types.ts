@@ -59,6 +59,7 @@ export interface BattleView {
   coin_flip_name: string
   your_zones: Zones
   opponent_zones: Zones
+  opponent_hand_count: number
   result_submissions: Record<string, string>
 }
 

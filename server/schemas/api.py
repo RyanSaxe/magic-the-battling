@@ -66,6 +66,7 @@ class BattleView(BaseModel):
     coin_flip_name: str
     your_zones: Zones
     opponent_zones: Zones
+    opponent_hand_count: int
     result_submissions: dict[str, str]
 
 

@@ -265,6 +265,7 @@ class GameManager:
             coin_flip_name=b.coin_flip.name,
             your_zones=your_zones,
             opponent_zones=hidden_opponent,
+            opponent_hand_count=len(opponent_zones.hand),
             result_submissions=b.result_submissions,
         )
 
