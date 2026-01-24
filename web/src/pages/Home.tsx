@@ -59,14 +59,17 @@ export function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="bg-gray-800 rounded-lg p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-white text-center mb-8">
+    <div className="game-table flex items-center justify-center p-4">
+      <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-md">
+        <h1 className="text-3xl font-bold text-white text-center mb-2">
           Magic: The Battling
         </h1>
+        <p className="text-gray-400 text-center text-sm mb-8">
+          Draft, build, battle
+        </p>
 
         {error && (
-          <div className="bg-red-900 text-red-200 p-3 rounded mb-4">
+          <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
             {error}
           </div>
         )}
@@ -78,7 +81,7 @@ export function Home() {
               type="text"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
-              className="w-full bg-gray-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
               placeholder="Enter your name"
             />
           </div>
@@ -92,7 +95,7 @@ export function Home() {
                 type="text"
                 value={cubeId}
                 onChange={(e) => setCubeId(e.target.value)}
-                className="w-full bg-gray-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 placeholder="auto"
               />
             </div>
@@ -105,7 +108,7 @@ export function Home() {
                 type="text"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                className="w-full bg-gray-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500 uppercase font-mono"
                 placeholder="ABC123"
               />
             </div>
@@ -117,13 +120,13 @@ export function Home() {
                 <button
                   onClick={handleCreateGame}
                   disabled={loading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-medium py-2 px-4 rounded transition-colors"
+                  className="btn btn-primary flex-1 py-2"
                 >
                   {loading ? 'Creating...' : 'Create Game'}
                 </button>
                 <button
                   onClick={() => setIsJoining(true)}
-                  className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-medium py-2 px-4 rounded transition-colors"
+                  className="btn btn-secondary flex-1 py-2"
                 >
                   Join Game
                 </button>
@@ -133,13 +136,13 @@ export function Home() {
                 <button
                   onClick={handleJoinGame}
                   disabled={loading}
-                  className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-medium py-2 px-4 rounded transition-colors"
+                  className="btn btn-primary flex-1 py-2"
                 >
                   {loading ? 'Joining...' : 'Join'}
                 </button>
                 <button
                   onClick={() => setIsJoining(false)}
-                  className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-medium py-2 px-4 rounded transition-colors"
+                  className="btn btn-secondary flex-1 py-2"
                 >
                   Back
                 </button>

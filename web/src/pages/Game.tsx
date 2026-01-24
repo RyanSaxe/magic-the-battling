@@ -43,14 +43,14 @@ export function Game() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <div className="bg-gray-800 rounded-lg p-8 w-full max-w-md">
+      <div className="game-table flex items-center justify-center p-4">
+        <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-md">
           <h1 className="text-2xl font-bold text-white text-center mb-6">
             Rejoin Game
           </h1>
 
           {rejoinError && (
-            <div className="bg-red-900 text-red-200 p-3 rounded mb-4">
+            <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
               {rejoinError}
             </div>
           )}
@@ -62,7 +62,7 @@ export function Game() {
                 type="text"
                 value={rejoinName}
                 onChange={(e) => setRejoinName(e.target.value)}
-                className="w-full bg-gray-700 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
                 placeholder="Enter your name exactly as before"
               />
             </div>
@@ -70,14 +70,14 @@ export function Game() {
             <button
               onClick={handleRejoin}
               disabled={rejoinLoading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-medium py-2 px-4 rounded transition-colors"
+              className="btn btn-primary w-full py-2"
             >
               {rejoinLoading ? 'Rejoining...' : 'Rejoin Game'}
             </button>
 
             <button
               onClick={() => navigate('/')}
-              className="w-full bg-gray-600 hover:bg-gray-500 text-white font-medium py-2 px-4 rounded transition-colors"
+              className="btn btn-secondary w-full py-2"
             >
               Back to Home
             </button>
@@ -89,7 +89,7 @@ export function Game() {
 
   if (!isConnected) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="game-table flex items-center justify-center">
         <div className="text-white">Connecting...</div>
       </div>
     )
@@ -97,7 +97,7 @@ export function Game() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="game-table flex items-center justify-center">
         <div className="text-red-400">{error}</div>
       </div>
     )
@@ -105,7 +105,7 @@ export function Game() {
 
   if (!gameState) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+      <div className="game-table flex items-center justify-center">
         <div className="text-white">Loading game...</div>
       </div>
     )
@@ -113,51 +113,64 @@ export function Game() {
 
   const currentPhase = gameState.self_player.phase
 
-  return (
-    <div className="min-h-screen bg-gray-900 p-4">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-white">
-            Magic: The Battling
-          </h1>
-          <div className="flex items-center gap-4 text-white">
-            <span>Round {gameState.self_player.round}</span>
-            <span>Stage {gameState.self_player.stage}</span>
-            <span className="capitalize bg-blue-600 px-2 py-1 rounded">
-              {currentPhase}
-            </span>
-          </div>
-        </div>
+  const phaseBadgeClass = {
+    draft: 'draft',
+    build: 'build',
+    battle: 'battle',
+    reward: 'reward',
+    eliminated: 'battle',
+  }[currentPhase] || 'draft'
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-3">
-            {currentPhase === 'draft' && (
-              <DraftPhase gameState={gameState} actions={actions} />
-            )}
-            {currentPhase === 'build' && (
-              <BuildPhase gameState={gameState} actions={actions} />
-            )}
-            {currentPhase === 'battle' && (
-              <BattlePhase gameState={gameState} actions={actions} />
-            )}
-            {currentPhase === 'reward' && (
-              <RewardPhase gameState={gameState} actions={actions} />
-            )}
-            {currentPhase === 'eliminated' && (
-              <div className="bg-gray-800 rounded-lg p-8 text-center">
+  return (
+    <div className="game-table flex flex-col">
+      {/* Header */}
+      <header className="flex justify-between items-center px-4 py-3 bg-black/30">
+        <h1 className="text-xl font-bold text-white">
+          Magic: The Battling
+        </h1>
+        <div className="flex items-center gap-4">
+          <div className="text-sm text-gray-300">
+            Round {gameState.self_player.round} / Stage {gameState.self_player.stage}
+          </div>
+          <span className={`phase-badge ${phaseBadgeClass}`}>
+            {currentPhase}
+          </span>
+        </div>
+      </header>
+
+      {/* Main content */}
+      <div className="flex-1 flex min-h-0">
+        {/* Game area */}
+        <main className="flex-1 flex flex-col min-h-0">
+          {currentPhase === 'draft' && (
+            <DraftPhase gameState={gameState} actions={actions} />
+          )}
+          {currentPhase === 'build' && (
+            <BuildPhase gameState={gameState} actions={actions} />
+          )}
+          {currentPhase === 'battle' && (
+            <BattlePhase gameState={gameState} actions={actions} />
+          )}
+          {currentPhase === 'reward' && (
+            <RewardPhase gameState={gameState} actions={actions} />
+          )}
+          {currentPhase === 'eliminated' && (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-center">
                 <h2 className="text-2xl text-red-400 mb-4">Eliminated</h2>
                 <p className="text-gray-400">You have been eliminated from the game.</p>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </main>
 
-          <div>
-            <PlayerList
-              players={gameState.players}
-              currentPlayerName={gameState.self_player.name}
-            />
-          </div>
-        </div>
+        {/* Sidebar */}
+        <aside className="w-64 bg-black/30 p-4 overflow-auto">
+          <PlayerList
+            players={gameState.players}
+            currentPlayerName={gameState.self_player.name}
+          />
+        </aside>
       </div>
     </div>
   )

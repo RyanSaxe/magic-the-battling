@@ -1,4 +1,4 @@
-import { Card } from './Card'
+import { Card } from './card'
 import type { Card as CardType } from '../types'
 
 interface CardZoneProps {

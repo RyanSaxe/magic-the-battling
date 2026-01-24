@@ -1,10 +1,7 @@
+from conftest import setup_battle_ready
+
 from mtb.models.game import create_game
 from mtb.phases import battle, elimination
-
-
-def _setup_battle_ready(player):
-    player.phase = "battle"
-    player.chosen_basics = ["Plains", "Island", "Mountain"]
 
 
 class TestGhostMechanics:
@@ -32,8 +29,8 @@ class TestGhostMechanics:
         alice.is_ghost = True
         alice.phase = "eliminated"
 
-        _setup_battle_ready(bob)
-        _setup_battle_ready(charlie)
+        setup_battle_ready(bob)
+        setup_battle_ready(charlie)
 
         candidates = battle.get_pairing_candidates(game, bob)
 
@@ -59,8 +56,8 @@ class TestGhostMechanics:
         alice.phase = "eliminated"
         game.most_recent_ghost = alice
 
-        _setup_battle_ready(bob)
-        _setup_battle_ready(charlie)
+        setup_battle_ready(bob)
+        setup_battle_ready(charlie)
 
         battle.start(game, bob, charlie)
 
@@ -81,8 +78,8 @@ class TestGhostMechanics:
         alice.phase = "eliminated"
         game.most_recent_ghost = alice
 
-        _setup_battle_ready(bob)
-        _setup_battle_ready(charlie)
+        setup_battle_ready(bob)
+        setup_battle_ready(charlie)
 
         battle.start(game, bob, charlie)
 
@@ -97,7 +94,7 @@ class TestGhostMechanics:
         bob.phase = "eliminated"
         game.most_recent_ghost = bob
 
-        _setup_battle_ready(alice)
+        setup_battle_ready(alice)
         bob.chosen_basics = ["Plains", "Island", "Mountain"]
 
         b = battle.start(game, alice, bob)
@@ -244,7 +241,7 @@ class TestFinale:
 
     def test_eliminate_player_sets_all_fields(self):
         game = create_game(["Alice", "Bob"], num_players=2)
-        alice, bob = game.players
+        alice, _bob = game.players
 
         elimination.eliminate_player(game, alice, round_num=7)
 

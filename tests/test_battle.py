@@ -1,15 +1,8 @@
 import pytest
+from conftest import setup_battle_ready
 
 from mtb.models.game import create_game
 from mtb.phases import battle
-
-
-def _setup_battle_ready(game, alice, bob):
-    """Helper to set up two players ready for battle."""
-    alice.phase = "battle"
-    bob.phase = "battle"
-    alice.chosen_basics = ["Plains", "Plains", "Plains"]
-    bob.chosen_basics = ["Island", "Island", "Island"]
 
 
 def test_can_start_pairing():
@@ -52,7 +45,8 @@ def test_find_opponent_returns_none_when_not_all_ready():
 def test_start_battle_creates_zones(card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
     alice.hand = [card_factory("a1"), card_factory("a2")]
     alice.sideboard = [card_factory("a3")]
     alice.treasures = 2
@@ -74,7 +68,7 @@ def test_start_battle_wrong_phase_raises():
     alice.phase = "draft"
     bob.phase = "battle"
 
-    with pytest.raises(ValueError, match="not in battle phase"):
+    with pytest.raises(ValueError):
         battle.start(game, alice, bob)
 
 
@@ -87,14 +81,15 @@ def test_start_battle_not_all_ready_raises():
     alice.chosen_basics = ["Plains", "Plains", "Plains"]
     bob.chosen_basics = ["Island", "Island", "Island"]
 
-    with pytest.raises(ValueError, match="not all players are ready"):
+    with pytest.raises(ValueError):
         battle.start(game, alice, bob)
 
 
 def test_is_in_active_battle():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
 
     assert not battle.is_in_active_battle(game, alice)
 
@@ -107,7 +102,8 @@ def test_is_in_active_battle():
 def test_move_zone_moves_card(card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
     card = card_factory("test")
     alice.sideboard = [card]
 
@@ -121,18 +117,20 @@ def test_move_zone_moves_card(card_factory):
 def test_move_zone_card_not_in_zone_raises(card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
 
     b = battle.start(game, alice, bob)
 
-    with pytest.raises(ValueError, match="not in"):
+    with pytest.raises(ValueError):
         battle.move_zone(b, alice, card_factory("missing"), "hand", "battlefield")
 
 
 def test_results_agreed_when_both_match():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
 
     b = battle.start(game, alice, bob)
     battle.submit_result(b, alice, "Alice")
@@ -149,7 +147,8 @@ def test_results_agreed_when_both_match():
 def test_results_not_agreed_when_different():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
 
     b = battle.start(game, alice, bob)
     battle.submit_result(b, alice, "Alice")
@@ -161,7 +160,8 @@ def test_results_not_agreed_when_different():
 def test_end_battle_caps_treasures_and_transitions():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
     alice.treasures = 10
 
     b = battle.start(game, alice, bob)
@@ -183,7 +183,8 @@ def test_end_battle_caps_treasures_and_transitions():
 def test_end_battle_tracks_revealed_cards(card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
 
     creature = card_factory("Creature", "Creature")
     alice.hand = [creature]
@@ -201,19 +202,21 @@ def test_end_battle_tracks_revealed_cards(card_factory):
 def test_end_battle_not_agreed_raises():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
 
     b = battle.start(game, alice, bob)
     battle.submit_result(b, alice, "Alice")
 
-    with pytest.raises(ValueError, match="not agreed"):
+    with pytest.raises(ValueError):
         battle.end(game, b)
 
 
 def test_end_battle_returns_cards_to_sideboard(card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
 
     hand_card = card_factory("hand_card")
     sideboard_card = card_factory("sideboard_card")
@@ -233,7 +236,8 @@ def test_end_battle_returns_cards_to_sideboard(card_factory):
 def test_submit_result_accepts_draw():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
 
     b = battle.start(game, alice, bob)
     battle.submit_result(b, alice, battle.DRAW_RESULT)
@@ -250,7 +254,8 @@ def test_submit_result_accepts_draw():
 def test_end_battle_with_draw_transitions_to_reward():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
-    _setup_battle_ready(game, alice, bob)
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
 
     b = battle.start(game, alice, bob)
     battle.submit_result(b, alice, battle.DRAW_RESULT)

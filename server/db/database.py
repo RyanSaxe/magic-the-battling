@@ -3,6 +3,8 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from server.db.models import Base
+
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
@@ -21,6 +23,4 @@ def get_db():
 
 
 def init_db():
-    from server.db.models import Base
-
     Base.metadata.create_all(bind=engine)

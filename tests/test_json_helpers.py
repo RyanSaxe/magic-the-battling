@@ -40,7 +40,6 @@ def json_endpoint():
 
 @pytest.fixture
 def json_helpers_module():
-    # imported inside fixture to allow module reload for isolated tests
     from mtb.utils import json_helpers as module
 
     try:

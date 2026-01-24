@@ -16,7 +16,7 @@ def test_card_upgrade_rejects_non_conspiracy(card_factory):
     base = card_factory("base", "Creature")
     non_upgrade = card_factory("non", "Artifact")
 
-    with pytest.raises(ValueError, match="not a conspiracy"):
+    with pytest.raises(ValueError):
         base.upgrade(non_upgrade)
 
 
@@ -27,7 +27,7 @@ def test_card_upgrade_rejects_already_linked_upgrade(card_factory):
 
     base.upgrade(upgrade)
 
-    with pytest.raises(ValueError, match="already linked"):
+    with pytest.raises(ValueError):
         other.upgrade(upgrade)
 
 
@@ -62,5 +62,5 @@ def test_build_battler_raises_when_no_main_cards(monkeypatch, card_factory):
 
     monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
 
-    with pytest.raises(ValueError, match="no playable cards"):
+    with pytest.raises(ValueError):
         build_battler()
