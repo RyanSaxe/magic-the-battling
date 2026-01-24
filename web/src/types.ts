@@ -42,6 +42,7 @@ export interface PlayerView {
   hand_count: number
   sideboard_count: number
   hand_size: number
+  is_stage_increasing: boolean
   upgrades: Card[]
   vanguard: Card | null
   chosen_basics: string[]

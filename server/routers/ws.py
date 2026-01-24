@@ -161,7 +161,7 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
         case "reward_apply_upgrade":
             success = game_manager.handle_reward_apply_upgrade(player, payload["upgrade_id"], payload["target_card_id"])
         case "reward_done":
-            success = game_manager.handle_reward_done(game, player)
+            success = game_manager.handle_reward_done(game, player, payload.get("upgrade_id"))
         case _:
             await connection_manager.send_error(websocket, f"Unknown action: {action}")
             return

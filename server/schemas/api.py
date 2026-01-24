@@ -49,6 +49,7 @@ class PlayerView(BaseModel):
     hand_count: int
     sideboard_count: int
     hand_size: int
+    is_stage_increasing: bool
     upgrades: list[Card]
     vanguard: Card | None
     chosen_basics: list[str]

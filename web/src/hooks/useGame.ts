@@ -45,8 +45,8 @@ export function useGame(gameId: string | null, sessionId: string | null) {
     send('reward_apply_upgrade', { upgrade_id: upgradeId, target_card_id: targetCardId })
   }, [send])
 
-  const rewardDone = useCallback(() => {
-    send('reward_done')
+  const rewardDone = useCallback((upgradeId?: string) => {
+    send('reward_done', upgradeId ? { upgrade_id: upgradeId } : {})
   }, [send])
 
   return {

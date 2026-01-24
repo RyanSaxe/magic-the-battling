@@ -195,6 +195,7 @@ class GameManager:
                 hand_count=len(player.hand),
                 sideboard_count=len(player.sideboard),
                 hand_size=player.hand_size,
+                is_stage_increasing=reward.is_stage_increasing(player),
                 upgrades=player.upgrades,
                 vanguard=player.vanguard,
                 chosen_basics=player.chosen_basics,
@@ -234,6 +235,7 @@ class GameManager:
             hand_count=len(player.hand),
             sideboard_count=len(player.sideboard),
             hand_size=player.hand_size,
+            is_stage_increasing=reward.is_stage_increasing(player),
             upgrades=player.upgrades,
             vanguard=player.vanguard,
             chosen_basics=player.chosen_basics,
@@ -391,11 +393,19 @@ class GameManager:
         reward.apply_upgrade_to_card(player, upgrade, target)
         return True
 
-    def handle_reward_done(self, game: Game, player: Player) -> bool:
+    def handle_reward_done(self, game: Game, player: Player, upgrade_id: str | None = None) -> bool:
         if player.phase != "reward":
             return False
 
-        reward.end_for_player(game, player)
+        upgrade = None
+        if upgrade_id:
+            upgrade = next((u for u in game.available_upgrades if u.id == upgrade_id), None)
+
+        try:
+            reward.end_for_player(game, player, upgrade)
+        except ValueError:
+            return False
+
         process_eliminations(game, player.round)
 
         if player.phase == "draft" and game.draft_state is None:
