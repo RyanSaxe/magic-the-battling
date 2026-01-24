@@ -24,6 +24,7 @@ def cubecobra_to_card(card_json: dict) -> Card:
     return Card(
         name=card_json["name_lower"],
         image_url=card_json["image_normal"],
+        png_url=card_json.get("image_large"),
         elo=card_json["elo"],
         type_line=card_json["type"],
         tokens=tokens,

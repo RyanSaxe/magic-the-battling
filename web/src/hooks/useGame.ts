@@ -1,0 +1,76 @@
+import { useCallback } from 'react'
+import { useWebSocket } from './useWebSocket'
+import type { CardDestination, BuildSource, ZoneName } from '../types'
+
+export function useGame(gameId: string | null, sessionId: string | null) {
+  const { isConnected, gameState, lobbyState, error, send } = useWebSocket(gameId, sessionId)
+
+  const startGame = useCallback(() => {
+    send('start_game')
+  }, [send])
+
+  const draftTake = useCallback((cardId: string, destination: CardDestination) => {
+    send('draft_take', { card_id: cardId, destination })
+  }, [send])
+
+  const draftSwap = useCallback((packCardId: string, playerCardId: string, destination: CardDestination) => {
+    send('draft_swap', { pack_card_id: packCardId, player_card_id: playerCardId, destination })
+  }, [send])
+
+  const draftRoll = useCallback(() => {
+    send('draft_roll')
+  }, [send])
+
+  const draftDone = useCallback(() => {
+    send('draft_done')
+  }, [send])
+
+  const buildMove = useCallback((cardId: string, source: BuildSource, destination: BuildSource) => {
+    send('build_move', { card_id: cardId, source, destination })
+  }, [send])
+
+  const buildSubmit = useCallback((basics: string[]) => {
+    send('build_submit', { basics })
+  }, [send])
+
+  const battleMove = useCallback((cardId: string, fromZone: ZoneName, toZone: ZoneName) => {
+    send('battle_move', { card_id: cardId, from_zone: fromZone, to_zone: toZone })
+  }, [send])
+
+  const battleSubmitResult = useCallback((result: string) => {
+    send('battle_submit_result', { result })
+  }, [send])
+
+  const rewardPickUpgrade = useCallback((upgradeId: string) => {
+    send('reward_pick_upgrade', { upgrade_id: upgradeId })
+  }, [send])
+
+  const rewardApplyUpgrade = useCallback((upgradeId: string, targetCardId: string) => {
+    send('reward_apply_upgrade', { upgrade_id: upgradeId, target_card_id: targetCardId })
+  }, [send])
+
+  const rewardDone = useCallback(() => {
+    send('reward_done')
+  }, [send])
+
+  return {
+    isConnected,
+    gameState,
+    lobbyState,
+    error,
+    actions: {
+      startGame,
+      draftTake,
+      draftSwap,
+      draftRoll,
+      draftDone,
+      buildMove,
+      buildSubmit,
+      battleMove,
+      battleSubmitResult,
+      rewardPickUpgrade,
+      rewardApplyUpgrade,
+      rewardDone,
+    },
+  }
+}

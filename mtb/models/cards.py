@@ -14,6 +14,8 @@ class Card(BaseModel):
     type_line: str
     tokens: tuple["Card", ...] = Field(default_factory=tuple)
     flip_image_url: str | None = None
+    png_url: str | None = None
+    flip_png_url: str | None = None
     elo: float = 0.0
     upgrade_target: Optional["Card"] = None
 

@@ -14,3 +14,17 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd web && npm run lint'
+        language: system
+        files: ^web/src/.*\.(ts|tsx)$
+        pass_filenames: false
+
+      - id: typecheck-web
+        name: typecheck-web
+        entry: bash -c 'cd web && npm run typecheck'
+        language: system
+        files: ^web/src/.*\.(ts|tsx)$
+        pass_filenames: false
