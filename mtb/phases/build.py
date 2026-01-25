@@ -84,7 +84,6 @@ def submit(game: Game, player: Player, basics: list[str]) -> None:
 
 
 def populate_hand(player: Player) -> None:
-    """Populate hand with previous battle cards, then fill remaining slots by ELO."""
     player.populate_hand()
 
 

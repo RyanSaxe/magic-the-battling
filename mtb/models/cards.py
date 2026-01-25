@@ -1,6 +1,5 @@
 import random
 import warnings
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,21 +16,21 @@ class Card(BaseModel):
     png_url: str | None = None
     flip_png_url: str | None = None
     elo: float = 0.0
-    upgrade_target: Optional["Card"] = None
+    upgrade_target: "Card | None" = None
 
     # vanguard specific properties
     life_modifier: int | None = None
     hand_modifier: int | None = None
 
     @property
-    def is_upgrade(self):
+    def is_upgrade(self) -> bool:
         return self.type_line.lower() == UPGRADE_TYPE
 
     @property
-    def is_vanguard(self):
+    def is_vanguard(self) -> bool:
         return self.type_line.lower() == VANGUARD_TYPE
 
-    def upgrade(self, upgrade: "Card"):
+    def upgrade(self, upgrade: "Card") -> None:
         if not upgrade.is_upgrade:
             raise ValueError(f"{upgrade.name} is not a conspiracy and hence cannot be an upgrade")
         if upgrade.upgrade_target is not None and upgrade.upgrade_target is not self:

@@ -1,5 +1,6 @@
 import random
 import weakref
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -201,7 +202,7 @@ class Game(BaseModel):
     most_recent_ghost: Player | None = None
     fake_players: list[FakePlayer] = Field(default_factory=list)
 
-    def model_post_init(self, __context):
+    def model_post_init(self, _context: Any) -> None:
         for player in self.players:
             player.game_ref = weakref.ref(self)
 
