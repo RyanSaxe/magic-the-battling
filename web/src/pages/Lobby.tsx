@@ -117,9 +117,7 @@ export function Lobby() {
         )}
 
         {lobbyState && (() => {
-          const currentPlayer = lobbyState.players.find(p =>
-            session?.playerId && lobbyState.players.some(lp => lp.name === p.name)
-          ) ?? lobbyState.players[lobbyState.players.length - 1]
+          const currentPlayer = lobbyState.players.find(p => p.player_id === session?.playerId)
           const isHost = currentPlayer?.is_host ?? false
           const isReady = currentPlayer?.is_ready ?? false
           const botSlots = lobbyState.target_player_count - lobbyState.players.length

@@ -309,6 +309,7 @@ class GameManager:
             player_id = pending.player_ids[i]
             players.append(
                 LobbyPlayer(
+                    player_id=player_id,
                     name=name,
                     is_ready=pending.player_ready.get(player_id, False),
                     is_host=player_id == pending.host_player_id,

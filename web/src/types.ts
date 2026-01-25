@@ -87,6 +87,7 @@ export interface GameState {
 }
 
 export interface LobbyPlayer {
+  player_id: string
   name: string
   is_ready: boolean
   is_host: boolean

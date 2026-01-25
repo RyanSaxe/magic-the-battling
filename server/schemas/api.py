@@ -86,6 +86,7 @@ class GameStateResponse(BaseModel):
 
 
 class LobbyPlayer(BaseModel):
+    player_id: str
     name: str
     is_ready: bool = False
     is_host: bool = False
