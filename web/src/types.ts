@@ -1,5 +1,5 @@
 export type Phase = 'draft' | 'build' | 'battle' | 'reward' | 'eliminated' | 'winner' | 'game_over'
-export type LastResult = 'win' | 'loss'
+export type LastResult = 'win' | 'loss' | 'draw'
 export type CubeLoadingStatus = 'loading' | 'ready' | 'error'
 export type ZoneName = 'battlefield' | 'graveyard' | 'exile' | 'hand' | 'sideboard' | 'upgrades' | 'command_zone' | 'library'
 export type CardStateAction = 'tap' | 'untap' | 'flip' | 'face_down' | 'counter' | 'attach' | 'detach' | 'spawn'

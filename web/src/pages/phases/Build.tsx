@@ -8,7 +8,6 @@ interface BuildPhaseProps {
   actions: {
     buildMove: (cardId: string, source: BuildSource, destination: BuildSource) => void
     buildSwap: (cardAId: string, sourceA: BuildSource, cardBId: string, sourceB: BuildSource) => void
-    buildSubmit: (basics: string[]) => void
     buildReady: (basics: string[]) => void
     buildUnready: () => void
     buildApplyUpgrade: (upgradeId: string, targetCardId: string) => void

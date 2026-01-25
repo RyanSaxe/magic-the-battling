@@ -73,6 +73,8 @@ class FakePlayer(BaseModel):
     snapshots: dict[str, StaticOpponent] = Field(default_factory=dict)
     is_eliminated: bool = False
     poison: int = 0
+    round: int = 1
+    stage: int = 1
 
     def get_opponent_for_round(self, stage: int, round_num: int) -> StaticOpponent | None:
         key = f"{stage}_{round_num}"

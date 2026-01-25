@@ -74,13 +74,30 @@ def unready(player: Player) -> None:
 
 
 def all_ready(game: Game) -> bool:
+    """Check if all live players are synchronized and ready for battle.
+
+    Returns True only when:
+    - No active battles in progress (ghosts/bots mid-battle)
+    - ALL live players are in build phase
+    - ALL live players are at the same round and stage
+    - ALL live players have build_ready=True
+    """
+    if game.active_battles:
+        return False
+
     live_players = get_live_players(game)
-    return all(p.build_ready for p in live_players if p.phase == "build")
+    if not live_players:
+        return False
 
-
-def submit(game: Game, player: Player, basics: list[str]) -> None:
-    set_ready(game, player, basics)
-    player.phase = "battle"
+    first = live_players[0]
+    for p in live_players:
+        if p.phase != "build":
+            return False
+        if p.round != first.round or p.stage != first.stage:
+            return False
+        if not p.build_ready:
+            return False
+    return True
 
 
 def populate_hand(player: Player) -> None:
@@ -94,7 +111,6 @@ __all__ = [
     "set_ready",
     "unready",
     "all_ready",
-    "submit",
     "populate_hand",
     "apply_upgrade_to_card",
 ]

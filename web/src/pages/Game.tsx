@@ -456,11 +456,23 @@ function GameContent() {
               )}
               {currentPhase === 'eliminated' && (
                 <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
+                  <div className="text-center max-w-md">
                     <h2 className="text-2xl text-red-400 mb-4">Eliminated</h2>
-                    <p className="text-gray-400">
-                      You have been eliminated from the game.
+                    <p className="text-gray-300 mb-4">
+                      You are now <span className="text-amber-400 font-semibold">The Ghost</span>.
                     </p>
+                    <div className="text-gray-400 text-sm space-y-2 text-left bg-black/30 p-4 rounded-lg">
+                      <p>Your deck is frozen exactly as it was when you died:</p>
+                      <ul className="list-disc list-inside ml-2 space-y-1">
+                        <li>Same hand, sideboard, and treasures</li>
+                        <li>No rewards or changes between battles</li>
+                        <li>You play the same deck repeatedly</li>
+                      </ul>
+                      <p className="mt-3">
+                        You will continue battling until there is an even number of players,
+                        or until another player is eliminated and becomes the new ghost.
+                      </p>
+                    </div>
                   </div>
                 </div>
               )}

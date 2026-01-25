@@ -2,7 +2,7 @@ from collections import defaultdict
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from server.db.database import SessionLocal
+import server.db.database as db
 from server.services.game_manager import game_manager
 from server.services.session_manager import session_manager
 
@@ -14,7 +14,6 @@ ACTION_REQUIRED_PHASES: dict[str, str] = {
     "draft_done": "draft",
     "build_move": "build",
     "build_swap": "build",
-    "build_submit": "build",
     "build_ready": "build",
     "build_unready": "build",
     "build_apply_upgrade": "build",
@@ -178,11 +177,11 @@ async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_
             await connection_manager.send_error(websocket, error or "Cannot start game")
             return True
 
-        db = SessionLocal()
+        db_session = db.SessionLocal()
         try:
-            result = await game_manager.start_game_async(game_id, db)
+            result = await game_manager.start_game_async(game_id, db_session)
         finally:
-            db.close()
+            db_session.close()
 
         if result:
             await connection_manager.broadcast_game_state(game_id)
@@ -213,14 +212,12 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
                 payload["card_b_id"],
                 payload["source_b"],
             )
-        case "build_submit":
-            return game_manager.handle_build_submit(game, player, payload["basics"])
         case "build_ready":
-            db = SessionLocal()
+            db_session = db.SessionLocal()
             try:
-                return game_manager.handle_build_ready(game, player, payload["basics"], game_id, db)
+                return game_manager.handle_build_ready(game, player, payload["basics"], game_id, db_session)
             finally:
-                db.close()
+                db_session.close()
         case "build_unready":
             return game_manager.handle_build_unready(player)
         case "build_apply_upgrade":
@@ -242,11 +239,11 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
         case "reward_apply_upgrade":
             return game_manager.handle_reward_apply_upgrade(player, payload["upgrade_id"], payload["target_card_id"])
         case "reward_done":
-            db = SessionLocal()
+            db_session = db.SessionLocal()
             try:
-                return game_manager.handle_reward_done(game, player, payload.get("upgrade_id"), game_id, db)
+                return game_manager.handle_reward_done(game, player, payload.get("upgrade_id"), game_id, db_session)
             finally:
-                db.close()
+                db_session.close()
         case _:
             return False
 

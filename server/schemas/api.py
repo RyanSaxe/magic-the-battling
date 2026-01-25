@@ -6,7 +6,7 @@ from mtb.models.cards import Card
 from mtb.models.game import LastBattleResult, Zones
 from mtb.models.types import BuildSource, CardDestination, Phase, ZoneName
 
-LastResult = Literal["win", "loss"]
+LastResult = Literal["win", "loss", "draw"]
 CubeLoadingStatus = Literal["loading", "ready", "error"]
 
 

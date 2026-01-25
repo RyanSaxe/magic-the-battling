@@ -17,6 +17,13 @@ function ResultBadge({ result }: { result: LastResult | null }) {
       </span>
     )
   }
+  if (result === 'draw') {
+    return (
+      <span className="text-[10px] font-bold text-yellow-400 bg-yellow-900/50 py-0.5 px-2 rounded">
+        D
+      </span>
+    )
+  }
   return (
     <span className="text-[10px] font-bold text-red-400 bg-red-900/50 py-0.5 px-2 rounded">
       L

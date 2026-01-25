@@ -97,16 +97,50 @@ def get_available_fake_players(game: Game) -> list[FakePlayer]:
     return available
 
 
-def resolve_bot_vs_bot(game: Game, bot1: FakePlayer, bot2: FakePlayer) -> None:
-    """Auto-resolve bot vs bot battle as draw. Both take poison."""
-    snap1 = bot1.get_opponent_for_round(game.stage, game.round)
-    snap2 = bot2.get_opponent_for_round(game.stage, game.round)
+def resolve_bot_vs_bot(bot1: FakePlayer, bot2: FakePlayer, stage: int, round_num: int) -> None:
+    """Auto-resolve bot vs bot battle with random outcome."""
+    snap1 = bot1.get_opponent_for_round(stage, round_num)
+    snap2 = bot2.get_opponent_for_round(stage, round_num)
 
-    if snap1 and snap2:
-        dmg1 = 1 + sum(1 for u in snap1.upgrades if u.upgrade_target)
-        dmg2 = 1 + sum(1 for u in snap2.upgrades if u.upgrade_target)
+    if not snap1 or not snap2:
+        return
+
+    dmg1 = 1 + sum(1 for u in snap1.upgrades if u.upgrade_target)
+    dmg2 = 1 + sum(1 for u in snap2.upgrades if u.upgrade_target)
+
+    outcome = random.choice(["bot1_wins", "bot2_wins", "draw"])
+    if outcome == "bot1_wins":
+        bot2.poison += dmg1
+    elif outcome == "bot2_wins":
+        bot1.poison += dmg2
+    else:
         bot1.poison += dmg2
         bot2.poison += dmg1
+
+
+def resolve_unpaired_bot_battles(
+    game: Game, paired_bot_names: set[str], stage: int, round_num: int, num_rounds_per_stage: int
+) -> None:
+    """Pair and resolve battles between bots that weren't paired with live players."""
+    unpaired_bots = [fp for fp in game.fake_players if not fp.is_eliminated and fp.name not in paired_bot_names]
+
+    while len(unpaired_bots) >= 2:
+        bot1 = unpaired_bots.pop(0)
+        bot2 = unpaired_bots.pop(0)
+        resolve_bot_vs_bot(bot1, bot2, stage, round_num)
+
+    for fp in game.fake_players:
+        if not fp.is_eliminated and fp.name not in paired_bot_names:
+            _advance_bot_round(fp, num_rounds_per_stage)
+
+
+def _advance_bot_round(bot: FakePlayer, num_rounds_per_stage: int) -> None:
+    """Advance a bot's round/stage counters."""
+    if bot.round >= num_rounds_per_stage:
+        bot.stage += 1
+        bot.round = 1
+    else:
+        bot.round += 1
 
 
 def find_opponent(game: Game, player: Player) -> Player | StaticOpponent | None:
@@ -470,7 +504,7 @@ def update_card_state(
 def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult:
     if battle.player.phase != "battle":
         raise ValueError("Player is not in battle phase")
-    if opponent.phase != "battle":
+    if not opponent.is_ghost and opponent.phase != "battle":
         raise ValueError("Opponent is not in battle phase")
 
     result = get_result(battle)
@@ -478,16 +512,19 @@ def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult
         raise ValueError("Players have not agreed on the result")
 
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
-    _sync_zones_to_player(battle.opponent_zones, opponent, game.config.max_treasures)
+    if not opponent.is_ghost:
+        _sync_zones_to_player(battle.opponent_zones, opponent, game.config.max_treasures)
 
     revealed = battle.player_zones.battlefield + battle.player_zones.graveyard + battle.player_zones.exile
     battle.player.most_recently_revealed_cards = [c for c in revealed if _is_revealed_card(c)]
 
-    opp_revealed = battle.opponent_zones.battlefield + battle.opponent_zones.graveyard + battle.opponent_zones.exile
-    opponent.most_recently_revealed_cards = [c for c in opp_revealed if _is_revealed_card(c)]
+    if not opponent.is_ghost:
+        opp_revealed = battle.opponent_zones.battlefield + battle.opponent_zones.graveyard + battle.opponent_zones.exile
+        opponent.most_recently_revealed_cards = [c for c in opp_revealed if _is_revealed_card(c)]
 
     battle.player.phase = "reward"
-    opponent.phase = "reward"
+    if not opponent.is_ghost:
+        opponent.phase = "reward"
 
     if battle in game.active_battles:
         game.active_battles.remove(battle)

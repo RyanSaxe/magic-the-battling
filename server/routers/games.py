@@ -2,7 +2,7 @@ import json
 
 from fastapi import APIRouter, HTTPException
 
-from server.db.database import SessionLocal
+import server.db.database as db
 from server.db.models import GameRecord, PlayerGameHistory
 from server.schemas.api import (
     BotAvailabilityResponse,
@@ -148,13 +148,13 @@ def start_game(game_id: str):
 @router.get("/bots/available", response_model=BotAvailabilityResponse)
 def check_bot_availability(use_upgrades: bool = True, use_vanguards: bool = False):
     """Check if bots are available for a given game configuration."""
-    db = SessionLocal()
+    db_session = db.SessionLocal()
     try:
-        query = db.query(PlayerGameHistory).join(GameRecord, PlayerGameHistory.game_id == GameRecord.id)
+        query = db_session.query(PlayerGameHistory).join(GameRecord, PlayerGameHistory.game_id == GameRecord.id)
 
         matching_histories = []
         for history in query.filter(PlayerGameHistory.max_stage >= 5).all():
-            game_record = db.query(GameRecord).filter(GameRecord.id == history.game_id).first()
+            game_record = db_session.query(GameRecord).filter(GameRecord.id == history.game_id).first()
             if game_record and game_record.config_json:
                 config = json.loads(game_record.config_json)
                 if config.get("use_upgrades") == use_upgrades and config.get("use_vanguards") == use_vanguards:
@@ -163,7 +163,7 @@ def check_bot_availability(use_upgrades: bool = True, use_vanguards: bool = Fals
         count = len(matching_histories)
         return BotAvailabilityResponse(available=count > 0, count=count)
     finally:
-        db.close()
+        db_session.close()
 
 
 @router.get("/{game_id}", response_model=GameStateResponse)

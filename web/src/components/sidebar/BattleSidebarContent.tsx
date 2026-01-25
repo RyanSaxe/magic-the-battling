@@ -169,7 +169,7 @@ export function BattleSidebarContent({
   const opponentPoison = currentBattle.opponent_poison
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Opponent section - top */}
       <div className="p-3 border-b border-gray-700">
         <PlayerSection

@@ -596,7 +596,9 @@ class GameManager:
         result = player.last_battle_result
         if result is None:
             return None
-        if result.is_draw or result.winner_name != player.name:
+        if result.is_draw:
+            return "draw"
+        if result.winner_name != player.name:
             return "loss"
         return "win"
 
@@ -808,16 +810,13 @@ class GameManager:
         except ValueError as e:
             return str(e)
 
-    def handle_build_submit(self, game: Game, player: Player, basics: list[str]) -> str | None:
-        try:
-            build.submit(game, player, basics)
-            self._try_start_battles(game)
-            return None
-        except ValueError as e:
-            return str(e)
-
     def _start_all_battles(self, game: Game, game_id: str | None = None, db: Session | None = None) -> None:
         live_players = get_live_players(game)
+        if not live_players:
+            return
+
+        stage = live_players[0].stage
+        round_num = live_players[0].round
 
         for player in live_players:
             player.phase = "battle"
@@ -829,6 +828,7 @@ class GameManager:
                 self._record_snapshot(db, game_id, player, battler_elo)
 
         paired: set[str] = set()
+        paired_bot_names: set[str] = set()
         for player in live_players:
             if player.name in paired:
                 continue
@@ -837,29 +837,16 @@ class GameManager:
                 battle.start(game, player, opponent)
                 paired.add(player.name)
                 paired.add(opponent.name)
+                if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
+                    for fp in game.fake_players:
+                        if fp.player_history_id == opponent.source_player_history_id:
+                            paired_bot_names.add(fp.name)
+                            break
+
+        battle.resolve_unpaired_bot_battles(game, paired_bot_names, stage, round_num, game.config.num_rounds_per_stage)
 
     def handle_build_apply_upgrade(self, player: Player, upgrade_id: str, target_card_id: str) -> bool:
         return self._apply_upgrade(player, upgrade_id, target_card_id)
-
-    def _try_start_battles(self, game: Game) -> None:
-        live_players = get_live_players(game)
-        battle_ready = [p for p in live_players if p.phase == "battle"]
-
-        if len(battle_ready) < 2:
-            return
-
-        if not battle.can_start_pairing(game, battle_ready[0].round, battle_ready[0].stage):
-            return
-
-        paired = set()
-        for p in battle_ready:
-            if p.name in paired:
-                continue
-            opponent = battle.find_opponent(game, p)
-            if opponent and opponent.name not in paired:
-                battle.start(game, p, opponent)
-                paired.add(p.name)
-                paired.add(opponent.name)
 
     def handle_battle_move(
         self, game: Game, player: Player, card_id: str, from_zone: ZoneName, to_zone: ZoneName
@@ -967,6 +954,8 @@ class GameManager:
         if player.phase != "reward":
             return "Player is not in reward phase"
 
+        opponent_name = player.last_opponent_name
+
         upgrade = None
         if upgrade_id:
             upgrade = next((u for u in game.available_upgrades if u.id == upgrade_id), None)
@@ -975,6 +964,8 @@ class GameManager:
             reward.end_for_player(game, player, upgrade)
         except ValueError as e:
             return str(e)
+
+        self._advance_bot_if_needed(game, opponent_name)
 
         process_eliminations(game, player.round)
         process_bot_eliminations(game)
@@ -988,6 +979,21 @@ class GameManager:
             draft.start(game)
 
         return None
+
+    def _advance_bot_if_needed(self, game: Game, opponent_name: str | None) -> None:
+        """Advance a bot's round/stage if the opponent was a bot."""
+        if not opponent_name:
+            return
+
+        for fp in game.fake_players:
+            if fp.name == opponent_name and not fp.is_eliminated:
+                num_rounds = game.config.num_rounds_per_stage
+                if fp.round >= num_rounds:
+                    fp.stage += 1
+                    fp.round = 1
+                else:
+                    fp.round += 1
+                break
 
 
 game_manager = GameManager()

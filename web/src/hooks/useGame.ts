@@ -38,10 +38,6 @@ export function useGame(gameId: string | null, sessionId: string | null) {
     send('build_swap', { card_a_id: cardAId, source_a: sourceA, card_b_id: cardBId, source_b: sourceB })
   }, [send])
 
-  const buildSubmit = useCallback((basics: string[]) => {
-    send('build_submit', { basics })
-  }, [send])
-
   const buildReady = useCallback((basics: string[]) => {
     send('build_ready', { basics })
   }, [send])
@@ -99,7 +95,6 @@ export function useGame(gameId: string | null, sessionId: string | null) {
       draftDone,
       buildMove,
       buildSwap,
-      buildSubmit,
       buildReady,
       buildUnready,
       buildApplyUpgrade,
