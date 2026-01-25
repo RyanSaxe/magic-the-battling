@@ -8,6 +8,25 @@ from server.services.session_manager import session_manager
 
 router = APIRouter()
 
+ACTION_REQUIRED_PHASES: dict[str, str] = {
+    "draft_swap": "draft",
+    "draft_roll": "draft",
+    "draft_done": "draft",
+    "build_move": "build",
+    "build_swap": "build",
+    "build_submit": "build",
+    "build_ready": "build",
+    "build_unready": "build",
+    "build_apply_upgrade": "build",
+    "battle_move": "battle",
+    "battle_submit_result": "battle",
+    "battle_update_card_state": "battle",
+    "battle_update_life": "battle",
+    "reward_pick_upgrade": "reward",
+    "reward_apply_upgrade": "reward",
+    "reward_done": "reward",
+}
+
 
 class ConnectionManager:
     def __init__(self):
@@ -111,6 +130,16 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, session_id: str
         await connection_manager.broadcast_lobby_state(game_id)
 
 
+def _validate_action_phase(action: str, player) -> str | None:
+    """Returns error message if action invalid for player's phase, None if valid."""
+    required_phase = ACTION_REQUIRED_PHASES.get(action)
+    if required_phase is None:
+        return None
+    if player.phase != required_phase:
+        return f"Cannot {action}: player is in {player.phase} phase, requires {required_phase}"
+    return None
+
+
 async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_id: str, websocket: WebSocket) -> bool:
     if action == "set_ready":
         is_ready = payload.get("is_ready", True)
@@ -210,6 +239,11 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
     player = game_manager.get_player(game, player_id)
     if not player:
         await connection_manager.send_error(websocket, "Player not found in game")
+        return
+
+    phase_error = _validate_action_phase(action, player)
+    if phase_error:
+        await connection_manager.send_error(websocket, phase_error)
         return
 
     result = _dispatch_game_action(action, payload, game, player, game_id)
