@@ -3,12 +3,13 @@ import type { Card, PlayerView } from '../types'
 
 export interface ContextStripState {
   previewCard: Card | null
+  previewUpgradeTarget: Card | null
   revealedPlayer: PlayerView | null
 }
 
 export interface ContextStripContextValue {
   state: ContextStripState
-  setPreviewCard: (card: Card | null) => void
+  setPreviewCard: (card: Card | null, upgradeTarget?: Card | null) => void
   setRevealedPlayer: (player: PlayerView | null) => void
 }
 

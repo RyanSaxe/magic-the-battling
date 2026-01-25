@@ -49,7 +49,7 @@ function ZoneModal({
           <div className="flex flex-wrap gap-2">
             {cards.map((card) =>
               isOpponent ? (
-                <Card key={card.id} card={card} size="sm" enablePreview={false} />
+                <Card key={card.id} card={card} size="sm" />
               ) : (
                 <DraggableCard key={card.id} card={card} zone={zone} size="sm" />
               )
@@ -102,7 +102,7 @@ export function DroppableZoneDisplay({
               <div className="flex gap-0.5">
                 {displayedCards.map((card) =>
                   isOpponent ? (
-                    <Card key={card.id} card={card} size="xs" enablePreview={false} />
+                    <Card key={card.id} card={card} size="xs" />
                   ) : (
                     <DraggableCard key={card.id} card={card} zone={zone} size="xs" />
                   )

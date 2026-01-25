@@ -208,6 +208,18 @@ class GameManager:
             except TimeoutError:
                 pass
 
+        if pending.battler_error:
+            return None
+
+        if not pending.battler:
+            loop = asyncio.get_running_loop()
+            try:
+                pending.battler = await loop.run_in_executor(
+                    None, self._load_battler, pending.cube_id, pending.use_upgrades, pending.use_vanguards
+                )
+            except Exception:
+                return None
+
         pending.is_started = True
 
         config = Config(
@@ -215,12 +227,7 @@ class GameManager:
             use_vanguards=pending.use_vanguards,
         )
         game = create_game(pending.player_names, len(pending.player_names), config)
-
-        battler = (
-            pending.battler
-            if pending.battler
-            else self._load_battler(pending.cube_id, pending.use_upgrades, pending.use_vanguards)
-        )
+        battler = pending.battler
         set_battler(game, battler)
 
         if db is not None:
@@ -329,6 +336,15 @@ class GameManager:
         except RuntimeError:
             pending.battler_loading = False
 
+    def _ensure_unique_name(self, name: str, existing_names: set[str]) -> str:
+        """Return a unique version of the name, adding suffix if needed."""
+        if name not in existing_names:
+            return name
+        counter = 2
+        while f"{name} ({counter})" in existing_names:
+            counter += 1
+        return f"{name} ({counter})"
+
     def _find_historical_players(
         self,
         db: Session,
@@ -376,19 +392,21 @@ class GameManager:
 
         return result
 
-    def _load_fake_player(self, db: Session, history: PlayerGameHistory) -> FakePlayer:
+    def _load_fake_player(self, db: Session, history: PlayerGameHistory, existing_names: set[str]) -> FakePlayer:
         snapshots_dict: dict[str, StaticOpponent] = {}
         player_name = cast(str, history.player_name)
         history_id = cast(int, history.id)
 
+        bot_name = self._ensure_unique_name(f"{player_name} (Bot)", existing_names)
+
         for snapshot in history.snapshots:
             key = f"{snapshot.stage}_{snapshot.round}"
             snapshot_data = BattleSnapshotData.model_validate_json(snapshot.full_state_json)
-            static_opp = StaticOpponent.from_snapshot(snapshot_data, player_name, history_id)
+            static_opp = StaticOpponent.from_snapshot(snapshot_data, bot_name, history_id)
             snapshots_dict[key] = static_opp
 
         return FakePlayer(
-            name=f"{player_name} (Bot)",
+            name=bot_name,
             player_history_id=history_id,
             snapshots=snapshots_dict,
         )
@@ -454,9 +472,13 @@ class GameManager:
         if count <= 0:
             return
 
+        existing_names = {p.name for p in game.players}
+        existing_names.update(fp.name for fp in game.fake_players)
+
         histories = self._find_historical_players(db, target_elo, count, [], use_upgrades, use_vanguards, cube_id)
         for history in histories:
-            fake_player = self._load_fake_player(db, history)
+            fake_player = self._load_fake_player(db, history, existing_names)
+            existing_names.add(fake_player.name)
             game.fake_players.append(fake_player)
 
     def get_game(self, game_id: str) -> Game | None:
@@ -541,9 +563,9 @@ class GameManager:
             )
 
         all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
-        bot_count = self._count_available_bots(pending)
         num_bots_needed = pending.target_player_count - len(pending.player_names)
-        has_enough_bots = bot_count is not None and bot_count >= num_bots_needed
+        bot_count = self._count_available_bots(pending) if num_bots_needed > 0 else 0
+        has_enough_bots = num_bots_needed <= 0 or (bot_count is not None and bot_count >= num_bots_needed)
         can_start = pending.target_player_count >= 2 and all_ready and has_enough_bots
 
         return LobbyStateResponse(
@@ -576,7 +598,7 @@ class GameManager:
         current_battle = None
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
-                current_battle = self._make_battle_view(b, player)
+                current_battle = self._make_battle_view(b, player, game)
                 break
 
         all_players = [self._make_player_view(p, player) for p in game.players]
@@ -718,7 +740,15 @@ class GameManager:
             most_recently_revealed_cards=[],
         )
 
-    def _make_battle_view(self, b: Battle, player: Player) -> BattleView:
+    def _get_opponent_poison(self, opponent: StaticOpponent | Player, game: Game) -> int:
+        """Get poison for an opponent, looking up FakePlayer for StaticOpponents."""
+        if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
+            for fp in game.fake_players:
+                if fp.player_history_id == opponent.source_player_history_id:
+                    return fp.poison
+        return opponent.poison
+
+    def _make_battle_view(self, b: Battle, player: Player, game: Game) -> BattleView:
         is_player = b.player.name == player.name
         your_zones = b.player_zones if is_player else b.opponent_zones
         opponent_zones = b.opponent_zones if is_player else b.player_zones
@@ -746,8 +776,8 @@ class GameManager:
             spawned_tokens=opponent_zones.spawned_tokens,
         )
 
-        your_poison = b.player.poison if is_player else b.opponent.poison
-        opponent_poison = b.opponent.poison if is_player else b.player.poison
+        your_poison = b.player.poison if is_player else self._get_opponent_poison(b.opponent, game)
+        opponent_poison = self._get_opponent_poison(b.opponent, game) if is_player else b.player.poison
         your_life = b.player_life if is_player else b.opponent_life
         opponent_life = b.opponent_life if is_player else b.player_life
 

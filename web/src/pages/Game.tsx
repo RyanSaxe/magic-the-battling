@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useSession } from '../hooks/useSession'
 import { useGame } from '../hooks/useGame'
@@ -11,74 +11,59 @@ import { Sidebar } from '../components/sidebar'
 import { BattleSidebarContent } from '../components/sidebar/BattleSidebarContent'
 import { RewardSidebarContent } from '../components/sidebar/RewardSidebarContent'
 import { ContextStripProvider, useContextStrip } from '../contexts'
-import { CardPreviewContext, Card } from '../components/card'
+import { CardPreviewContext } from '../components/card'
 import { GameDndProvider, useDndActions } from '../dnd'
-import type { Card as CardType, PlayerView } from '../types'
+import type { Card as CardType } from '../types'
 
-function CardPreview({ card }: { card: CardType }) {
-  return (
-    <div className="p-3">
-      <img
-        src={card.png_url ?? card.image_url}
-        alt={card.name}
-        className="w-full rounded-lg shadow-lg"
-      />
-      <div className="mt-2">
-        <div className="text-white font-medium text-sm">{card.name}</div>
-        <div className="text-gray-400 text-xs">{card.type_line}</div>
-      </div>
-    </div>
-  )
-}
-
-function RevealedCards({ player }: { player: PlayerView }) {
-  const cards = player.most_recently_revealed_cards
-
-  if (cards.length === 0) {
-    return (
-      <div className="p-3 text-center">
-        <div className="text-gray-400 text-sm">
-          {player.name} has no revealed cards
-        </div>
-      </div>
-    )
-  }
+function CardPreviewModal({
+  card,
+  upgradeTarget,
+  onClose,
+}: {
+  card: CardType
+  upgradeTarget: CardType | null
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
 
   return (
-    <div className="p-3">
-      <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-        {player.name}'s Revealed Cards
-      </div>
-      <div className="flex flex-col gap-2">
-        {cards.map((card) => (
-          <Card key={card.id} card={card} size="sm" enablePreview={false} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function UpgradesDisplay({ upgrades }: { upgrades: CardType[] }) {
-  const appliedUpgrades = upgrades.filter((u) => u.upgrade_target)
-  const unappliedUpgrades = upgrades.filter((u) => !u.upgrade_target)
-
-  return (
-    <div className="p-3">
-      <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-        Your Upgrades ({upgrades.length})
-      </div>
-      <div className="flex flex-col gap-2">
-        {appliedUpgrades.map((upgrade) => (
-          <Card key={upgrade.id} card={upgrade} size="sm" showUpgradeTarget enablePreview={false} />
-        ))}
-        {unappliedUpgrades.map((upgrade) => (
-          <div key={upgrade.id} className="relative opacity-60">
-            <Card card={upgrade} size="sm" enablePreview={false} />
-            <div className="absolute bottom-0 left-0 right-0 text-center text-[10px] text-gray-400 bg-black/60 rounded-b px-1">
-              Not applied
-            </div>
-          </div>
-        ))}
+    <div
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="relative flex gap-4 items-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={card.png_url ?? card.image_url}
+          alt={card.name}
+          className="max-h-[80vh] rounded-lg shadow-2xl"
+        />
+        {upgradeTarget && (
+          <>
+            <div className="text-white text-2xl font-bold">→</div>
+            <img
+              src={upgradeTarget.png_url ?? upgradeTarget.image_url}
+              alt={upgradeTarget.name}
+              className="max-h-[80vh] rounded-lg shadow-2xl"
+            />
+          </>
+        )}
+        <button
+          className="absolute -top-4 -right-4 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/80"
+          onClick={onClose}
+        >
+          ×
+        </button>
       </div>
     </div>
   )
@@ -363,19 +348,6 @@ function GameContent() {
     }
   }
 
-  const renderPreviewContent = (): ReactNode => {
-    if (state.previewCard) {
-      return <CardPreview card={state.previewCard} />
-    }
-    if (state.revealedPlayer) {
-      return <RevealedCards player={state.revealedPlayer} />
-    }
-    if (self_player.upgrades.length > 0 && currentPhase !== 'battle') {
-      return <UpgradesDisplay upgrades={self_player.upgrades} />
-    }
-    return null
-  }
-
   const renderPhaseContent = (): ReactNode => {
     if (currentPhase === 'battle' && current_battle) {
       return (
@@ -428,7 +400,6 @@ function GameContent() {
                 players={gameState.players}
                 currentPlayerName={self_player.name}
                 phaseContent={renderPhaseContent()}
-                previewContent={renderPreviewContent()}
               />
             </div>
           </GameDndProvider>
@@ -513,11 +484,17 @@ function GameContent() {
               players={gameState.players}
               currentPlayerName={self_player.name}
               phaseContent={renderPhaseContent()}
-              previewContent={renderPreviewContent()}
             />
           </div>
         )}
       </div>
+      {state.previewCard && (
+        <CardPreviewModal
+          card={state.previewCard}
+          upgradeTarget={state.previewUpgradeTarget}
+          onClose={() => setPreviewCard(null)}
+        />
+      )}
     </CardPreviewContext.Provider>
   )
 }

@@ -11,8 +11,9 @@ RUN apt-get update && apt-get install -y curl && \
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-# Copy dependency files
+# Copy dependency files and package source
 COPY pyproject.toml uv.lock README.md ./
+COPY mtb/ ./mtb/
 COPY web/package.json web/package-lock.json ./web/
 
 # Install Python dependencies
@@ -24,7 +25,6 @@ RUN cd web && npm ci && npm run build
 
 # Copy the rest of the application
 COPY server/ ./server/
-COPY mtb/ ./mtb/
 
 # Create data directory for SQLite
 RUN mkdir -p /data
