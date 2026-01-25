@@ -88,7 +88,25 @@ def get_pairing_candidates(game: Game, player: Player) -> list[Player]:
 
 def get_available_fake_players(game: Game) -> list[FakePlayer]:
     in_battle_names = {b.opponent.name for b in game.active_battles if isinstance(b.opponent, StaticOpponent)}
-    return [fp for fp in game.fake_players if fp.name not in in_battle_names and not fp.is_eliminated]
+    available = []
+    for fp in game.fake_players:
+        if fp.name in in_battle_names:
+            continue
+        if not fp.is_eliminated or (game.most_recent_ghost_bot and fp.name == game.most_recent_ghost_bot.name):
+            available.append(fp)
+    return available
+
+
+def resolve_bot_vs_bot(game: Game, bot1: FakePlayer, bot2: FakePlayer) -> None:
+    """Auto-resolve bot vs bot battle as draw. Both take poison."""
+    snap1 = bot1.get_opponent_for_round(game.stage, game.round)
+    snap2 = bot2.get_opponent_for_round(game.stage, game.round)
+
+    if snap1 and snap2:
+        dmg1 = 1 + sum(1 for u in snap1.upgrades if u.upgrade_target)
+        dmg2 = 1 + sum(1 for u in snap2.upgrades if u.upgrade_target)
+        bot1.poison += dmg2
+        bot2.poison += dmg1
 
 
 def find_opponent(game: Game, player: Player) -> Player | StaticOpponent | None:
@@ -111,8 +129,13 @@ def find_opponent(game: Game, player: Player) -> Player | StaticOpponent | None:
 
     live_players = get_live_players(game)
     unpaired_live = [p for p in live_players if not is_in_active_battle(game, p)]
-    if len(unpaired_live) == 1 and game.most_recent_ghost is not None:
-        return game.most_recent_ghost
+    if len(unpaired_live) == 1:
+        if game.most_recent_ghost is not None:
+            return game.most_recent_ghost
+        if game.most_recent_ghost_bot is not None:
+            static_opp = game.most_recent_ghost_bot.get_opponent_for_round(player.stage, player.round)
+            if static_opp:
+                return static_opp
 
     return None
 

@@ -113,6 +113,13 @@ def _calculate_static_opponent_damage(opponent: StaticOpponent) -> int:
     return 1 + applied_upgrades
 
 
+def _apply_bot_poison(game: Game, opponent: StaticOpponent, poison: int) -> None:
+    for fake in game.fake_players:
+        if fake.player_history_id == opponent.source_player_history_id:
+            fake.poison += poison
+            break
+
+
 def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result: BattleResult) -> None:
     if player.phase != "reward":
         raise ValueError("Player is not in reward phase")
@@ -125,9 +132,11 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
 
     if player_won:
         poison_dealt = calculate_damage(player)
+        _apply_bot_poison(game, opponent, poison_dealt)
     elif is_draw:
         poison_taken = _calculate_static_opponent_damage(opponent)
         player.poison += poison_taken
+        _apply_bot_poison(game, opponent, calculate_damage(player))
     else:
         poison_taken = _calculate_static_opponent_damage(opponent)
         player.poison += poison_taken
