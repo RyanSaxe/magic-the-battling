@@ -618,9 +618,14 @@ class GameManager:
                 break
 
         probabilities = get_pairing_probabilities(game, player)
+        most_recent_ghost_name = game.most_recent_ghost.name if game.most_recent_ghost else None
+        most_recent_ghost_bot_name = game.most_recent_ghost_bot.name if game.most_recent_ghost_bot else None
 
-        all_players = [self._make_player_view(p, player, probabilities) for p in game.players]
-        all_players.extend(self._make_fake_player_view(fp, player, probabilities) for fp in game.fake_players)
+        all_players = [self._make_player_view(p, player, probabilities, most_recent_ghost_name) for p in game.players]
+        all_players.extend(
+            self._make_fake_player_view(fp, player, probabilities, most_recent_ghost_bot_name)
+            for fp in game.fake_players
+        )
 
         return GameStateResponse(
             game_id=game_id,
@@ -678,7 +683,13 @@ class GameManager:
             return "loss"
         return "win"
 
-    def _make_player_view(self, player: Player, viewer: Player, probabilities: dict[str, float]) -> PlayerView:
+    def _make_player_view(
+        self,
+        player: Player,
+        viewer: Player,
+        probabilities: dict[str, float],
+        most_recent_ghost_name: str | None = None,
+    ) -> PlayerView:
         return PlayerView(
             name=player.name,
             treasures=player.treasures,
@@ -700,6 +711,7 @@ class GameManager:
             most_recently_revealed_cards=player.most_recently_revealed_cards,
             last_result=self._get_last_result(player),
             pairing_probability=probabilities.get(player.name),
+            is_most_recent_ghost=player.name == most_recent_ghost_name,
         )
 
     def _get_prior_snapshot_key(self, stage: int, round_num: int, num_rounds: int = 3) -> str | None:
@@ -711,7 +723,13 @@ class GameManager:
         else:
             return None
 
-    def _make_fake_player_view(self, fake: FakePlayer, viewer: Player, probabilities: dict[str, float]) -> PlayerView:
+    def _make_fake_player_view(
+        self,
+        fake: FakePlayer,
+        viewer: Player,
+        probabilities: dict[str, float],
+        most_recent_ghost_bot_name: str | None = None,
+    ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
         prior_key = self._get_prior_snapshot_key(viewer.stage, viewer.round)
         prior_snapshot = fake.snapshots.get(prior_key) if prior_key else None
@@ -738,6 +756,7 @@ class GameManager:
                 chosen_basics=snapshot.chosen_basics,
                 most_recently_revealed_cards=revealed_cards,
                 pairing_probability=probabilities.get(fake.name),
+                is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
             )
         return PlayerView(
             name=fake.name,
@@ -759,6 +778,7 @@ class GameManager:
             chosen_basics=[],
             most_recently_revealed_cards=[],
             pairing_probability=probabilities.get(fake.name),
+            is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
         )
 
     def _get_opponent_poison(self, opponent: StaticOpponent | Player, game: Game) -> int:

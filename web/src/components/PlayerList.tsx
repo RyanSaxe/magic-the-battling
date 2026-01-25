@@ -1,5 +1,5 @@
 import type { PlayerView, LastResult } from '../types'
-import { PoisonIcon, MoneyBagIcon } from './icons'
+import { PoisonIcon, MoneyBagIcon, GhostIcon, BotIcon } from './icons'
 import { useContextStrip } from '../contexts'
 
 interface PlayerListProps {
@@ -86,9 +86,8 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 {player.name === currentPlayerName && (
                   <span className="text-xs text-amber-400">(You)</span>
                 )}
-                {player.is_bot && (
-                  <span className="text-[10px] text-cyan-400 bg-cyan-900/50 px-1 rounded">BOT</span>
-                )}
+                {player.is_bot && !player.is_ghost && <BotIcon size="sm" />}
+                {player.is_most_recent_ghost && <GhostIcon size="sm" />}
               </div>
               <ResultBadge result={player.last_result} />
             </div>
@@ -108,9 +107,9 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 {player.hand_size}-{player.round} @ {player.phase}
               </span>
             </div>
-            {player.is_ghost && (
+            {player.is_ghost && !player.is_most_recent_ghost && (
               <div className="text-xs text-red-400 mt-1">
-                {player.is_bot ? 'Bot Eliminated' : 'Eliminated'}
+                Eliminated
               </div>
             )}
           </div>

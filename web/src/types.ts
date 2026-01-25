@@ -59,6 +59,7 @@ export interface PlayerView {
   most_recently_revealed_cards: Card[]
   last_result: LastResult | null
   pairing_probability: number | null
+  is_most_recent_ghost: boolean
 }
 
 export interface LastBattleResult {
