@@ -31,25 +31,54 @@ function ResultBadge({ result }: { result: LastResult | null }) {
   )
 }
 
+function PairingProbability({ probability }: { probability: number | null }) {
+  if (probability === null) {
+    return (
+      <span className="text-[10px] text-gray-500">
+        ??%
+      </span>
+    )
+  }
+  const pct = Math.round(probability * 100)
+  return (
+    <span className="text-[10px] text-blue-400">
+      {pct}%
+    </span>
+  )
+}
+
 export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
-  const { setRevealedPlayer } = useContextStrip()
+  const { state, setRevealedPlayer } = useContextStrip()
+
+  const handlePlayerClick = (player: PlayerView) => {
+    if (state.revealedPlayer?.name === player.name) {
+      setRevealedPlayer(null)
+    } else {
+      setRevealedPlayer(player)
+    }
+  }
 
   return (
     <div className="relative">
       <h3 className="text-white font-medium mb-3">Players</h3>
       <div className="space-y-2">
-        {players.map((player) => (
+        {players.map((player) => {
+          const isSelected = state.revealedPlayer?.name === player.name
+          return (
           <div
             key={player.name}
             className={`p-3 rounded-lg transition-colors cursor-pointer hover:bg-gray-800/50 ${
+              isSelected
+                ? 'ring-2 ring-blue-500'
+                : ''
+            } ${
               player.name === currentPlayerName
                 ? 'bg-amber-900/30 border border-amber-700/50'
                 : player.is_bot
                   ? 'bg-cyan-900/20 border border-cyan-800/30'
                   : 'bg-black/30'
             } ${player.is_ghost ? 'opacity-50' : ''}`}
-            onMouseEnter={() => setRevealedPlayer(player)}
-            onMouseLeave={() => setRevealedPlayer(null)}
+            onClick={() => handlePlayerClick(player)}
           >
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
@@ -61,7 +90,12 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                   <span className="text-[10px] text-cyan-400 bg-cyan-900/50 px-1 rounded">BOT</span>
                 )}
               </div>
-              <ResultBadge result={player.last_result} />
+              <div className="flex items-center gap-2">
+                {player.name !== currentPlayerName && !player.is_ghost && (
+                  <PairingProbability probability={player.pairing_probability} />
+                )}
+                <ResultBadge result={player.last_result} />
+              </div>
             </div>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1 text-purple-400" title="Poison">
@@ -85,7 +119,7 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
               </div>
             )}
           </div>
-        ))}
+        )})}
       </div>
     </div>
   )

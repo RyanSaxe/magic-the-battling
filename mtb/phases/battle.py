@@ -8,6 +8,8 @@ from mtb.models.game import Battle, FakePlayer, Game, Player, StaticOpponent, Zo
 from mtb.models.types import ZoneName
 from mtb.phases.elimination import get_live_players
 
+PairingCandidate = Player | StaticOpponent
+
 BASIC_LAND_IMAGES = {
     "Plains": "https://cards.scryfall.io/large/front/1/d/1d7dba1c-a702-43c0-8fca-e47bbad4a00f.jpg",
     "Island": "https://cards.scryfall.io/large/front/0/c/0c4eaecf-dd4c-45ab-9b50-2abe987d35d4.jpg",
@@ -86,11 +88,57 @@ def get_pairing_candidates(game: Game, player: Player) -> list[Player]:
     ]
 
 
+def _is_opponent_in_active_battle(game: Game, opponent_name: str) -> bool:
+    return any(
+        (isinstance(b.opponent, StaticOpponent) and b.opponent.name == opponent_name)
+        or (isinstance(b.opponent, Player) and b.opponent.name == opponent_name)
+        for b in game.active_battles
+    )
+
+
+def get_all_pairing_candidates(game: Game, player: Player) -> list[PairingCandidate]:
+    candidates: list[PairingCandidate] = [
+        p
+        for p in game.players
+        if p.name != player.name
+        and not p.is_ghost
+        and p.phase == "battle"
+        and p.round == player.round
+        and p.stage == player.stage
+        and not is_in_active_battle(game, p)
+    ]
+
+    for fp in game.fake_players:
+        if fp.is_eliminated:
+            continue
+        if _is_opponent_in_active_battle(game, fp.name):
+            continue
+        static_opp = fp.get_opponent_for_round(player.stage, player.round)
+        if static_opp:
+            candidates.append(static_opp)
+
+    if game.most_recent_ghost is not None:
+        ghost = game.most_recent_ghost
+        if ghost.name != player.name and not _is_opponent_in_active_battle(game, ghost.name):
+            candidates.append(ghost)
+
+    if game.most_recent_ghost_bot is not None:
+        ghost_bot = game.most_recent_ghost_bot
+        if not _is_opponent_in_active_battle(game, ghost_bot.name):
+            static_opp = ghost_bot.get_opponent_for_round(player.stage, player.round)
+            if static_opp:
+                candidates.append(static_opp)
+
+    return candidates
+
+
 def get_available_fake_players(game: Game) -> list[FakePlayer]:
     in_battle_names = {b.opponent.name for b in game.active_battles if isinstance(b.opponent, StaticOpponent)}
     available = []
     for fp in game.fake_players:
         if fp.name in in_battle_names:
+            continue
+        if not fp.snapshots:
             continue
         if not fp.is_eliminated or (game.most_recent_ghost_bot and fp.name == game.most_recent_ghost_bot.name):
             available.append(fp)
@@ -143,44 +191,36 @@ def _advance_bot_round(bot: FakePlayer, num_rounds_per_stage: int) -> None:
         bot.round += 1
 
 
-def find_opponent(game: Game, player: Player) -> Player | StaticOpponent | None:
+def get_viable_candidates(player: Player, all_candidates: list[PairingCandidate]) -> list[PairingCandidate]:
+    if len(all_candidates) <= 3:
+        return all_candidates
+
+    seed = hash((player.name, player.round, player.stage))
+    rng = random.Random(seed)
+    return rng.sample(all_candidates, 3)
+
+
+def find_opponent(game: Game, player: Player) -> PairingCandidate | None:
     if not can_start_pairing(game, player.round, player.stage):
         return None
 
     if is_in_active_battle(game, player):
         return None
 
-    candidates = get_pairing_candidates(game, player)
-    if candidates:
-        return weighted_random_opponent(player, candidates)
+    all_candidates = get_all_pairing_candidates(game, player)
+    if not all_candidates:
+        return None
 
-    available_fakes = get_available_fake_players(game)
-    if available_fakes:
-        fake = random.choice(available_fakes)
-        static_opp = fake.get_opponent_for_round(player.stage, player.round)
-        if static_opp:
-            return static_opp
-
-    live_players = get_live_players(game)
-    unpaired_live = [p for p in live_players if not is_in_active_battle(game, p)]
-    if len(unpaired_live) == 1:
-        if game.most_recent_ghost is not None:
-            return game.most_recent_ghost
-        if game.most_recent_ghost_bot is not None:
-            static_opp = game.most_recent_ghost_bot.get_opponent_for_round(player.stage, player.round)
-            if static_opp:
-                return static_opp
-
-    return None
+    viable = get_viable_candidates(player, all_candidates)
+    return weighted_random_opponent(player, viable)
 
 
-def weighted_random_opponent(player: Player, candidates: list[Player]) -> Player:
+def _compute_weights(player: Player, candidates: list[PairingCandidate]) -> list[float]:
     if len(candidates) == 1:
-        return candidates[0]
+        return [1.0]
 
     weights: list[float] = []
     last_opponent = player.last_opponent_name
-
     has_last_opponent = any(c.name == last_opponent for c in candidates)
 
     for candidate in candidates:
@@ -192,7 +232,58 @@ def weighted_random_opponent(player: Player, candidates: list[Player]) -> Player
         else:
             weights.append(1.0 / len(candidates))
 
+    return weights
+
+
+def weighted_random_opponent(player: Player, candidates: list[PairingCandidate]) -> PairingCandidate:
+    if len(candidates) == 1:
+        return candidates[0]
+
+    weights = _compute_weights(player, candidates)
     return random.choices(candidates, weights=weights, k=1)[0]
+
+
+def get_potential_pairing_candidates(game: Game, player: Player) -> list[PairingCandidate]:
+    """Get candidates based on round/stage match only, ignoring phase requirements."""
+    candidates: list[PairingCandidate] = [
+        p
+        for p in game.players
+        if p.name != player.name and not p.is_ghost and p.round == player.round and p.stage == player.stage
+    ]
+
+    for fp in game.fake_players:
+        if fp.is_eliminated:
+            continue
+        static_opp = fp.get_opponent_for_round(player.stage, player.round)
+        if static_opp:
+            candidates.append(static_opp)
+
+    if game.most_recent_ghost is not None:
+        ghost = game.most_recent_ghost
+        if ghost.name != player.name:
+            candidates.append(ghost)
+
+    if game.most_recent_ghost_bot is not None:
+        ghost_bot = game.most_recent_ghost_bot
+        static_opp = ghost_bot.get_opponent_for_round(player.stage, player.round)
+        if static_opp:
+            candidates.append(static_opp)
+
+    return candidates
+
+
+def get_pairing_probabilities(game: Game, player: Player) -> dict[str, float]:
+    if is_in_active_battle(game, player):
+        return {}
+
+    all_candidates = get_potential_pairing_candidates(game, player)
+    if not all_candidates:
+        return {}
+
+    viable = get_viable_candidates(player, all_candidates)
+    weights = _compute_weights(player, viable)
+
+    return {candidate.name: weight for candidate, weight in zip(viable, weights, strict=True)}
 
 
 def _create_zones_for_static_opponent(opponent: StaticOpponent) -> Zones:

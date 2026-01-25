@@ -58,6 +58,7 @@ export interface PlayerView {
   chosen_basics: string[]
   most_recently_revealed_cards: Card[]
   last_result: LastResult | null
+  pairing_probability: number | null
 }
 
 export interface LastBattleResult {

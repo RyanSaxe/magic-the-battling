@@ -64,6 +64,7 @@ class PlayerView(BaseModel):
     chosen_basics: list[str]
     most_recently_revealed_cards: list[Card] = []
     last_result: LastResult | None = None
+    pairing_probability: float | None = None
 
 
 class SelfPlayerView(PlayerView):

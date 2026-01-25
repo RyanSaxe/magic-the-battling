@@ -398,7 +398,7 @@ function GameContent() {
               </main>
               <Sidebar
                 players={gameState.players}
-                currentPlayerName={self_player.name}
+                currentPlayer={self_player}
                 phaseContent={renderPhaseContent()}
               />
             </div>
@@ -482,7 +482,7 @@ function GameContent() {
             </main>
             <Sidebar
               players={gameState.players}
-              currentPlayerName={self_player.name}
+              currentPlayer={self_player}
               phaseContent={renderPhaseContent()}
             />
           </div>

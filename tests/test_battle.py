@@ -1,7 +1,7 @@
 import pytest
 from conftest import setup_battle_ready
 
-from mtb.models.game import create_game
+from mtb.models.game import FakePlayer, StaticOpponent, create_game
 from mtb.phases import battle
 
 
@@ -272,3 +272,186 @@ def test_end_battle_with_draw_transitions_to_reward():
     assert result.is_draw
     assert alice.phase == "reward"
     assert bob.phase == "reward"
+
+
+class TestPairingProbabilities:
+    def test_get_pairing_probabilities_single_candidate(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        probs = battle.get_pairing_probabilities(game, alice)
+
+        assert probs == {"Bob": 1.0}
+
+    def test_get_pairing_probabilities_three_candidates(self):
+        game = create_game(["Alice", "Bob", "Charlie", "Diana"], num_players=4)
+        alice, _bob, _charlie, _diana = game.players
+        for p in game.players:
+            setup_battle_ready(p)
+
+        probs = battle.get_pairing_probabilities(game, alice)
+
+        assert len(probs) == 3
+        assert alice.name not in probs
+        total = sum(probs.values())
+        assert abs(total - 1.0) < 0.001
+
+    def test_get_pairing_probabilities_prior_opponent_weighted_down(self):
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, _bob, _charlie = game.players
+        alice.last_opponent_name = "Bob"
+        for p in game.players:
+            setup_battle_ready(p)
+
+        probs = battle.get_pairing_probabilities(game, alice)
+
+        assert probs["Bob"] == pytest.approx(0.1)
+        assert probs["Charlie"] == pytest.approx(0.9)
+
+    def test_get_pairing_probabilities_works_across_phases(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        alice.phase = "battle"
+        bob.phase = "build"
+
+        probs = battle.get_pairing_probabilities(game, alice)
+
+        assert probs == {"Bob": 1.0}
+
+    def test_get_pairing_probabilities_returns_empty_when_in_active_battle(self):
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, _charlie = game.players
+        for p in game.players:
+            setup_battle_ready(p)
+
+        battle.start(game, alice, bob)
+        probs = battle.get_pairing_probabilities(game, alice)
+
+        assert probs == {}
+
+
+class TestUnifiedPairingCandidates:
+    def test_get_all_pairing_candidates_includes_live_players(self):
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, _bob, _charlie = game.players
+        for p in game.players:
+            setup_battle_ready(p)
+
+        candidates = battle.get_all_pairing_candidates(game, alice)
+
+        names = {c.name for c in candidates}
+        assert names == {"Bob", "Charlie"}
+
+    def test_get_all_pairing_candidates_excludes_players_in_active_battle(self):
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, charlie = game.players
+        for p in game.players:
+            setup_battle_ready(p)
+
+        battle.start(game, bob, charlie)
+        candidates = battle.get_all_pairing_candidates(game, alice)
+
+        assert len(candidates) == 0
+
+    def test_get_all_pairing_candidates_includes_fake_players(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        fake = FakePlayer(name="Bot1", player_history_id=1)
+        snapshot = StaticOpponent(
+            name="Bot1",
+            hand=[card_factory("card1")],
+            chosen_basics=["Plains", "Island", "Mountain"],
+        )
+        fake.snapshots["1_1"] = snapshot
+        game.fake_players.append(fake)
+
+        candidates = battle.get_all_pairing_candidates(game, alice)
+
+        assert len(candidates) == 1
+        assert isinstance(candidates[0], StaticOpponent)
+        assert candidates[0].name == "Bot1"
+
+    def test_get_all_pairing_candidates_includes_ghost(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        bob.is_ghost = True
+        bob.phase = "eliminated"
+        game.most_recent_ghost = bob
+
+        candidates = battle.get_all_pairing_candidates(game, alice)
+
+        assert len(candidates) == 1
+        assert candidates[0] is bob
+
+    def test_get_all_pairing_candidates_excludes_self_as_ghost(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        alice.is_ghost = True
+        alice.phase = "eliminated"
+        game.most_recent_ghost = alice
+        setup_battle_ready(bob)
+
+        candidates = battle.get_all_pairing_candidates(game, alice)
+
+        assert alice not in candidates
+
+
+class TestViableCandidates:
+    def test_get_viable_candidates_returns_all_when_three_or_fewer(self):
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, _bob, _charlie = game.players
+        for p in game.players:
+            setup_battle_ready(p)
+
+        candidates = battle.get_all_pairing_candidates(game, alice)
+        viable = battle.get_viable_candidates(alice, candidates)
+
+        assert len(viable) == 2
+        assert {c.name for c in viable} == {"Bob", "Charlie"}
+
+    def test_get_viable_candidates_samples_three_when_more_than_three(self):
+        game = create_game(["Alice", "Bob", "Charlie", "Diana", "Eve"], num_players=5)
+        for p in game.players:
+            setup_battle_ready(p)
+
+        alice = game.players[0]
+        candidates = battle.get_all_pairing_candidates(game, alice)
+        viable = battle.get_viable_candidates(alice, candidates)
+
+        assert len(viable) == 3
+        for v in viable:
+            assert v.name != "Alice"
+
+    def test_get_viable_candidates_is_deterministic(self):
+        game = create_game(["Alice", "Bob", "Charlie", "Diana", "Eve"], num_players=5)
+        for p in game.players:
+            setup_battle_ready(p)
+
+        alice = game.players[0]
+        candidates = battle.get_all_pairing_candidates(game, alice)
+
+        viable1 = battle.get_viable_candidates(alice, candidates)
+        viable2 = battle.get_viable_candidates(alice, candidates)
+
+        assert [c.name for c in viable1] == [c.name for c in viable2]
+
+    def test_get_viable_candidates_changes_with_round(self):
+        game = create_game(["Alice", "Bob", "Charlie", "Diana", "Eve"], num_players=5)
+        for p in game.players:
+            setup_battle_ready(p)
+
+        alice = game.players[0]
+        candidates = battle.get_all_pairing_candidates(game, alice)
+        viable_round1 = battle.get_viable_candidates(alice, candidates)
+
+        alice.round = 2
+        viable_round2 = battle.get_viable_candidates(alice, candidates)
+
+        names1 = {c.name for c in viable_round1}
+        names2 = {c.name for c in viable_round2}
+        assert names1 != names2 or names1 == names2

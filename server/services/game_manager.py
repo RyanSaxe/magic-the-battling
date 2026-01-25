@@ -2,11 +2,12 @@ import asyncio
 import json
 import random
 import secrets
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 import server.db.database as db
 from mtb.models.cards import (
@@ -29,6 +30,7 @@ from mtb.models.game import (
 )
 from mtb.models.types import BuildSource, CardDestination, ZoneName
 from mtb.phases import battle, build, draft, reward
+from mtb.phases.battle import get_pairing_probabilities
 from mtb.phases.elimination import (
     check_game_over,
     get_live_players,
@@ -315,7 +317,9 @@ class GameManager:
         vanguards_id = DEFAULT_VANGUARD_ID if use_vanguards else None
         return build_battler(cube_id, upgrades_id, vanguards_id)
 
-    async def _preload_battler(self, pending: PendingGame) -> None:
+    async def _preload_battler(
+        self, pending: PendingGame, on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None
+    ) -> None:
         pending.battler_loading = True
         try:
             loop = asyncio.get_running_loop()
@@ -327,11 +331,15 @@ class GameManager:
             pending.battler_error = str(e)
         finally:
             pending.battler_loading = False
+            if on_complete:
+                await on_complete()
 
-    def start_battler_preload(self, pending: PendingGame) -> None:
+    def start_battler_preload(
+        self, pending: PendingGame, on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None
+    ) -> None:
         try:
             loop = asyncio.get_running_loop()
-            task = loop.create_task(self._preload_battler(pending))
+            task = loop.create_task(self._preload_battler(pending, on_complete))
             pending._loading_task = task
         except RuntimeError:
             pending.battler_loading = False
@@ -355,9 +363,13 @@ class GameManager:
         use_vanguards: bool | None = None,
         cube_id: str | None = None,
     ) -> list[PlayerGameHistory]:
-        query = db.query(PlayerGameHistory).filter(
-            PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else True,
-            PlayerGameHistory.max_stage >= 5,
+        query = (
+            db.query(PlayerGameHistory)
+            .options(joinedload(PlayerGameHistory.snapshots))
+            .filter(
+                PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else True,
+                PlayerGameHistory.max_stage >= 5,
+            )
         )
 
         all_histories = query.all()
@@ -365,6 +377,10 @@ class GameManager:
         other_cube: list[PlayerGameHistory] = []
 
         for history in all_histories:
+            has_stage_1 = any(s.stage == 1 for s in history.snapshots)
+            if not has_stage_1:
+                continue
+
             game_record = db.query(GameRecord).filter(GameRecord.id == history.game_id).first()
             if not game_record or not game_record.config_json:
                 continue
@@ -601,8 +617,10 @@ class GameManager:
                 current_battle = self._make_battle_view(b, player, game)
                 break
 
-        all_players = [self._make_player_view(p, player) for p in game.players]
-        all_players.extend(self._make_fake_player_view(fp, player) for fp in game.fake_players)
+        probabilities = get_pairing_probabilities(game, player)
+
+        all_players = [self._make_player_view(p, player, probabilities) for p in game.players]
+        all_players.extend(self._make_fake_player_view(fp, player, probabilities) for fp in game.fake_players)
 
         return GameStateResponse(
             game_id=game_id,
@@ -660,7 +678,7 @@ class GameManager:
             return "loss"
         return "win"
 
-    def _make_player_view(self, player: Player, viewer: Player) -> PlayerView:
+    def _make_player_view(self, player: Player, viewer: Player, probabilities: dict[str, float]) -> PlayerView:
         return PlayerView(
             name=player.name,
             treasures=player.treasures,
@@ -681,6 +699,7 @@ class GameManager:
             chosen_basics=player.chosen_basics,
             most_recently_revealed_cards=player.most_recently_revealed_cards,
             last_result=self._get_last_result(player),
+            pairing_probability=probabilities.get(player.name),
         )
 
     def _get_prior_snapshot_key(self, stage: int, round_num: int, num_rounds: int = 3) -> str | None:
@@ -692,7 +711,7 @@ class GameManager:
         else:
             return None
 
-    def _make_fake_player_view(self, fake: FakePlayer, viewer: Player) -> PlayerView:
+    def _make_fake_player_view(self, fake: FakePlayer, viewer: Player, probabilities: dict[str, float]) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
         prior_key = self._get_prior_snapshot_key(viewer.stage, viewer.round)
         prior_snapshot = fake.snapshots.get(prior_key) if prior_key else None
@@ -718,6 +737,7 @@ class GameManager:
                 vanguard=snapshot.vanguard,
                 chosen_basics=snapshot.chosen_basics,
                 most_recently_revealed_cards=revealed_cards,
+                pairing_probability=probabilities.get(fake.name),
             )
         return PlayerView(
             name=fake.name,
@@ -738,6 +758,7 @@ class GameManager:
             vanguard=None,
             chosen_basics=[],
             most_recently_revealed_cards=[],
+            pairing_probability=probabilities.get(fake.name),
         )
 
     def _get_opponent_poison(self, opponent: StaticOpponent | Player, game: Game) -> int:

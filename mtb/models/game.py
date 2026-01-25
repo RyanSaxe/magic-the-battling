@@ -93,6 +93,8 @@ class FakePlayer(BaseModel):
 
         if best_key:
             return self.snapshots[best_key]
+        if available_keys:
+            return self.snapshots[available_keys[0]]
         return None
 
 
