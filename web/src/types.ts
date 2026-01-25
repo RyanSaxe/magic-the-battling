@@ -119,6 +119,7 @@ export interface LobbyState {
   target_player_count: number
   cube_loading_status: CubeLoadingStatus
   cube_loading_error: string | null
+  available_bot_count: number | null
 }
 
 export interface CreateGameResponse {

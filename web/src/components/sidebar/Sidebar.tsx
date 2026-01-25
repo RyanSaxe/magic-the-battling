@@ -6,10 +6,9 @@ interface SidebarProps {
   players: PlayerView[]
   currentPlayerName: string
   phaseContent?: ReactNode
-  previewContent?: ReactNode
 }
 
-export function Sidebar({ players, currentPlayerName, phaseContent, previewContent }: SidebarProps) {
+export function Sidebar({ players, currentPlayerName, phaseContent }: SidebarProps) {
   return (
     <aside className="w-64 bg-black/30 flex flex-col overflow-hidden">
       {phaseContent ? (
@@ -19,11 +18,6 @@ export function Sidebar({ players, currentPlayerName, phaseContent, previewConte
       ) : (
         <div className="p-4 overflow-auto flex-shrink-0">
           <PlayerList players={players} currentPlayerName={currentPlayerName} />
-        </div>
-      )}
-      {previewContent && (
-        <div className="border-t border-gray-700/50 overflow-auto flex-1">
-          {previewContent}
         </div>
       )}
     </aside>

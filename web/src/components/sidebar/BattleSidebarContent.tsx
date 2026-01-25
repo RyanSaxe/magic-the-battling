@@ -114,12 +114,7 @@ function PlayerSection({
       {isOpponent && appliedUpgrades.length > 0 && (
         <div className="flex gap-1 flex-wrap">
           {appliedUpgrades.map((upgrade) => (
-            <Card
-              key={upgrade.id}
-              card={upgrade}
-              size="xs"
-              showUpgradeTarget
-            />
+            <Card key={upgrade.id} card={upgrade} size="xs" />
           ))}
         </div>
       )}
@@ -142,12 +137,7 @@ function PlayerSection({
       {!isOpponent && appliedUpgrades.length > 0 && (
         <div className="flex gap-1 flex-wrap">
           {appliedUpgrades.map((upgrade) => (
-            <Card
-              key={upgrade.id}
-              card={upgrade}
-              size="xs"
-              showUpgradeTarget
-            />
+            <Card key={upgrade.id} card={upgrade} size="xs" />
           ))}
         </div>
       )}

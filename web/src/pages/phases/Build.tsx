@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { Card } from '../../components/card'
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
@@ -30,20 +30,23 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
 
   const [selectedCard, setSelectedCard] = useState<CardWithIndex | null>(null)
   const [selectedUpgrade, setSelectedUpgrade] = useState<CardType | null>(null)
+  const hasUserInteracted = useRef(false)
 
   useEffect(() => {
-    if (self_player.chosen_basics?.length && selectedBasics.length === 0) {
+    if (!hasUserInteracted.current && self_player.chosen_basics?.length && selectedBasics.length === 0) {
       onBasicsChange([...self_player.chosen_basics])
     }
   }, [self_player.chosen_basics, selectedBasics.length, onBasicsChange])
 
   const addBasic = (name: string) => {
+    hasUserInteracted.current = true
     if (selectedBasics.length < 3) {
       onBasicsChange([...selectedBasics, name])
     }
   }
 
   const removeBasic = (name: string) => {
+    hasUserInteracted.current = true
     const idx = selectedBasics.indexOf(name)
     if (idx !== -1) {
       onBasicsChange([...selectedBasics.slice(0, idx), ...selectedBasics.slice(idx + 1)])

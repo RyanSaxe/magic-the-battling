@@ -123,6 +123,8 @@ export function Lobby() {
           const isReady = currentPlayer?.is_ready ?? false
           const botSlots = lobbyState.target_player_count - lobbyState.players.length
           const allReady = lobbyState.players.every(p => p.is_ready)
+          const availableBots = lobbyState.available_bot_count
+          const hasEnoughBots = availableBots !== null && availableBots >= botSlots
 
           return (
             <>
@@ -173,17 +175,27 @@ export function Lobby() {
                       </div>
                     </div>
                   ))}
-                  {botSlots > 0 && Array.from({ length: botSlots }).map((_, i) => (
-                    <div
-                      key={`bot-${i}`}
-                      className="bg-black/20 p-3 rounded-lg flex items-center justify-between border border-dashed border-gray-700"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-gray-700" />
-                        <span className="text-gray-500 italic">Bot {i + 1}</span>
+                  {botSlots > 0 && Array.from({ length: botSlots }).map((_, i) => {
+                    const botAvailable = availableBots !== null && i < availableBots
+                    return (
+                      <div
+                        key={`bot-${i}`}
+                        className={`bg-black/20 p-3 rounded-lg flex items-center justify-between border border-dashed ${
+                          botAvailable ? 'border-cyan-700' : 'border-red-700/50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${botAvailable ? 'bg-cyan-600' : 'bg-red-700/50'}`} />
+                          <span className={`italic ${botAvailable ? 'text-cyan-500' : 'text-red-400/70'}`}>
+                            Bot {i + 1}
+                          </span>
+                        </div>
+                        {!botAvailable && (
+                          <span className="text-red-400/70 text-xs">No bot available</span>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 
@@ -233,6 +245,10 @@ export function Lobby() {
                         ? 'Need at least 2 players'
                         : !allReady
                         ? 'Waiting for all players to ready'
+                        : availableBots === null
+                        ? 'Loading bot availability...'
+                        : !hasEnoughBots
+                        ? `Need ${botSlots - availableBots} more bot${botSlots - availableBots > 1 ? 's' : ''} (or more players)`
                         : 'Start Game'}
                     </button>
                   </>

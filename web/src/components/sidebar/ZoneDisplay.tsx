@@ -40,7 +40,7 @@ function ZoneModal({
         ) : (
           <div className="flex flex-wrap gap-2">
             {cards.map((card) => (
-              <Card key={card.id} card={card} size="sm" enablePreview={false} />
+              <Card key={card.id} card={card} size="sm" />
             ))}
           </div>
         )}
@@ -76,7 +76,7 @@ export function ZoneDisplay({ title, cards, maxThumbnails = 3 }: ZoneDisplayProp
           <div className="flex flex-col items-center gap-0.5">
             <div className="flex gap-0.5">
               {displayedCards.map((card) => (
-                <Card key={card.id} card={card} size="xs" enablePreview={false} />
+                <Card key={card.id} card={card} size="xs" />
               ))}
             </div>
             {remainingCount > 0 && (

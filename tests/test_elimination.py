@@ -1,7 +1,12 @@
+from unittest.mock import MagicMock
+
 from conftest import setup_battle_ready
 
-from mtb.models.game import create_game
-from mtb.phases import battle, elimination
+from mtb.models.cards import Card
+from mtb.models.game import BattleSnapshotData, FakePlayer, StaticOpponent, create_game
+from mtb.phases import battle, elimination, reward
+from server.db.models import PlayerGameHistory
+from server.services.game_manager import GameManager
 
 
 class TestGhostMechanics:
@@ -249,3 +254,222 @@ class TestFinale:
         assert alice.time_of_death == 7
         assert alice.phase == "eliminated"
         assert game.most_recent_ghost is alice
+
+
+class TestBotBattleFlow:
+    """Tests for full battle flow against bots."""
+
+    def test_player_loses_to_bot_takes_poison(self):
+        """When player loses to bot, player should take poison and bot should not."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        alice.phase = "battle"
+        alice.chosen_basics = ["Plains", "Island", "Mountain"]
+        alice.hand = [Card(name="Test", image_url="test", id="test", type_line="Creature")]
+
+        snapshot = BattleSnapshotData(
+            hand=[Card(name="BotCard", image_url="bot", id="bot", type_line="Creature")],
+            vanguard=None,
+            basic_lands=["Forest", "Swamp", "Mountain"],
+            applied_upgrades=[],
+            treasures=1,
+        )
+        static_opp = StaticOpponent.from_snapshot(snapshot, "BotPlayer", 1)
+        bot = FakePlayer(
+            name="BotPlayer (Bot)",
+            player_history_id=1,
+            snapshots={"1_1": static_opp},
+        )
+        game.fake_players.append(bot)
+
+        b = battle.start(game, alice, static_opp)
+
+        battle.submit_result(b, alice, static_opp.name)
+        assert battle.results_agreed(b)
+
+        result = battle.end(game, b)
+        assert result.winner is None
+        assert result.loser is alice
+
+        initial_alice_poison = alice.poison
+        initial_bot_poison = bot.poison
+
+        reward.start_vs_static(game, alice, static_opp, result)
+
+        assert alice.poison > initial_alice_poison
+        assert bot.poison == initial_bot_poison
+        assert alice.last_battle_result.winner_name == static_opp.name
+
+    def test_player_wins_against_bot_bot_takes_poison(self):
+        """When player wins against bot, bot should take poison."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        alice.phase = "battle"
+        alice.chosen_basics = ["Plains", "Island", "Mountain"]
+        alice.hand = [Card(name="Test", image_url="test", id="test", type_line="Creature")]
+
+        snapshot = BattleSnapshotData(
+            hand=[Card(name="BotCard", image_url="bot", id="bot", type_line="Creature")],
+            vanguard=None,
+            basic_lands=["Forest", "Swamp", "Mountain"],
+            applied_upgrades=[],
+            treasures=1,
+        )
+        static_opp = StaticOpponent.from_snapshot(snapshot, "BotPlayer", 1)
+        bot = FakePlayer(
+            name="BotPlayer (Bot)",
+            player_history_id=1,
+            snapshots={"1_1": static_opp},
+        )
+        game.fake_players.append(bot)
+
+        b = battle.start(game, alice, static_opp)
+
+        battle.submit_result(b, alice, alice.name)
+        assert battle.results_agreed(b)
+
+        result = battle.end(game, b)
+        assert result.winner is alice
+        assert result.loser is None
+
+        initial_alice_poison = alice.poison
+        initial_bot_poison = bot.poison
+
+        reward.start_vs_static(game, alice, static_opp, result)
+
+        assert alice.poison == initial_alice_poison
+        assert bot.poison > initial_bot_poison
+        assert alice.last_battle_result.winner_name == alice.name
+
+
+class TestUniquePlayerNames:
+    """Tests for unique player name handling."""
+
+    def test_bot_names_are_made_unique_when_colliding_with_player(self):
+        """When historical player name matches human player, bot name should be unique."""
+        manager = GameManager()
+        game = create_game(["Ryan"], num_players=1)
+
+        mock_history = MagicMock(spec=PlayerGameHistory)
+        mock_history.player_name = "Ryan"
+        mock_history.id = 1
+        mock_history.snapshots = []
+
+        existing_names = {p.name for p in game.players}
+        fake_player = manager._load_fake_player(MagicMock(), mock_history, existing_names)
+
+        assert fake_player.name != "Ryan"
+        assert fake_player.name == "Ryan (Bot)"
+        assert fake_player.name not in existing_names
+
+    def test_multiple_bots_with_same_historical_name_get_unique_names(self):
+        """When multiple bots are based on same historical player, names should be unique."""
+        manager = GameManager()
+        game = create_game(["Alice"], num_players=1)
+
+        existing_names = {p.name for p in game.players}
+
+        for i in range(3):
+            mock_history = MagicMock(spec=PlayerGameHistory)
+            mock_history.player_name = "Bob"
+            mock_history.id = i + 1
+            mock_history.snapshots = []
+
+            fake_player = manager._load_fake_player(MagicMock(), mock_history, existing_names)
+            existing_names.add(fake_player.name)
+            game.fake_players.append(fake_player)
+
+        names = [fp.name for fp in game.fake_players]
+        assert len(names) == len(set(names))
+        assert "Bob (Bot)" in names
+        assert "Bob (Bot) (2)" in names
+        assert "Bob (Bot) (3)" in names
+
+    def test_human_named_like_bot_still_gets_unique_bot_name(self):
+        """When human is named 'Ryan (Bot)', a bot from Ryan still gets unique name."""
+        manager = GameManager()
+        game = create_game(["Ryan (Bot)"], num_players=1)
+
+        mock_history = MagicMock(spec=PlayerGameHistory)
+        mock_history.player_name = "Ryan"
+        mock_history.id = 1
+        mock_history.snapshots = []
+
+        existing_names = {p.name for p in game.players}
+        fake_player = manager._load_fake_player(MagicMock(), mock_history, existing_names)
+
+        assert fake_player.name != "Ryan (Bot)"
+        assert fake_player.name == "Ryan (Bot) (2)"
+
+
+class TestBotGameOver:
+    """Tests for game over conditions when playing against bots."""
+
+    def test_game_continues_when_human_and_bot_both_alive(self):
+        """When 1 human and 1 bot are both alive, game should continue."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+
+        bot = FakePlayer(name="Bot", player_history_id=1, snapshots={})
+        game.fake_players.append(bot)
+
+        alice.poison = 5
+        bot.poison = 3
+
+        winner, is_game_over = elimination.check_game_over(game)
+
+        assert is_game_over is False
+        assert winner is None
+
+    def test_human_wins_when_bot_eliminated(self):
+        """When the only bot is eliminated, the human wins."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+
+        bot = FakePlayer(name="Bot", player_history_id=1, snapshots={}, is_eliminated=True)
+        game.fake_players.append(bot)
+
+        winner, is_game_over = elimination.check_game_over(game)
+
+        assert is_game_over is True
+        assert winner is alice
+
+    def test_game_over_no_winner_when_human_eliminated(self):
+        """When the human is eliminated (becomes ghost), game ends with no winner."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+
+        bot = FakePlayer(name="Bot", player_history_id=1, snapshots={})
+        game.fake_players.append(bot)
+
+        alice.is_ghost = True
+        alice.poison = 10
+
+        winner, is_game_over = elimination.check_game_over(game)
+
+        assert is_game_over is True
+        assert winner is None
+
+    def test_bot_elimination_via_poison(self):
+        """Bot should be eliminated when poison >= threshold."""
+        game = create_game(["Alice"], num_players=1)
+
+        bot = FakePlayer(name="Bot", player_history_id=1, snapshots={}, poison=10)
+        game.fake_players.append(bot)
+
+        eliminated = elimination.process_bot_eliminations(game)
+
+        assert len(eliminated) == 1
+        assert bot.is_eliminated is True
+
+    def test_bot_not_eliminated_below_threshold(self):
+        """Bot should not be eliminated when poison < threshold."""
+        game = create_game(["Alice"], num_players=1)
+
+        bot = FakePlayer(name="Bot", player_history_id=1, snapshots={}, poison=9)
+        game.fake_players.append(bot)
+
+        eliminated = elimination.process_bot_eliminations(game)
+
+        assert len(eliminated) == 0
+        assert bot.is_eliminated is False
