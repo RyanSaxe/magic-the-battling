@@ -349,11 +349,14 @@ class GameManager:
                 current_battle = self._make_battle_view(b, player)
                 break
 
+        all_players = [self._make_player_view(p, player) for p in game.players]
+        all_players.extend(self._make_fake_player_view(fp, player) for fp in game.fake_players)
+
         return GameStateResponse(
             game_id=game_id,
             phase=phase,
             starting_life=game.config.starting_life,
-            players=[self._make_player_view(p, player) for p in game.players],
+            players=all_players,
             self_player=SelfPlayerView(
                 name=player.name,
                 treasures=player.treasures,
@@ -405,6 +408,7 @@ class GameManager:
             stage=player.stage,
             vanquishers=player.vanquishers,
             is_ghost=player.is_ghost,
+            is_bot=False,
             time_of_death=player.time_of_death,
             hand_count=len(player.hand),
             sideboard_count=len(player.sideboard),
@@ -414,6 +418,50 @@ class GameManager:
             vanguard=player.vanguard,
             chosen_basics=player.chosen_basics,
             most_recently_revealed_cards=player.most_recently_revealed_cards,
+        )
+
+    def _make_fake_player_view(self, fake: FakePlayer, viewer: Player) -> PlayerView:
+        snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
+        if snapshot:
+            return PlayerView(
+                name=fake.name,
+                treasures=snapshot.treasures,
+                poison=snapshot.poison,
+                phase="battle",
+                round=viewer.round,
+                stage=viewer.stage,
+                vanquishers=0,
+                is_ghost=fake.is_eliminated,
+                is_bot=True,
+                time_of_death=None,
+                hand_count=len(snapshot.hand),
+                sideboard_count=len(snapshot.sideboard),
+                hand_size=len(snapshot.hand),
+                is_stage_increasing=False,
+                upgrades=snapshot.upgrades,
+                vanguard=snapshot.vanguard,
+                chosen_basics=snapshot.chosen_basics,
+                most_recently_revealed_cards=snapshot.hand if snapshot.hand_revealed else [],
+            )
+        return PlayerView(
+            name=fake.name,
+            treasures=0,
+            poison=0,
+            phase="battle",
+            round=viewer.round,
+            stage=viewer.stage,
+            vanquishers=0,
+            is_ghost=fake.is_eliminated,
+            is_bot=True,
+            time_of_death=None,
+            hand_count=0,
+            sideboard_count=0,
+            hand_size=0,
+            is_stage_increasing=False,
+            upgrades=[],
+            vanguard=None,
+            chosen_basics=[],
+            most_recently_revealed_cards=[],
         )
 
     def _make_battle_view(self, b: Battle, player: Player) -> BattleView:

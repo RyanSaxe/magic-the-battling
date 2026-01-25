@@ -45,6 +45,7 @@ export interface PlayerView {
   stage: number
   vanquishers: number
   is_ghost: boolean
+  is_bot: boolean
   time_of_death: number | null
   hand_count: number
   sideboard_count: number

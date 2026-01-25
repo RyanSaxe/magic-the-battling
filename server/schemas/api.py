@@ -48,6 +48,7 @@ class PlayerView(BaseModel):
     stage: int
     vanquishers: int
     is_ghost: bool
+    is_bot: bool = False
     time_of_death: int | None
     hand_count: int
     sideboard_count: int

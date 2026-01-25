@@ -28,7 +28,9 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
             className={`p-3 rounded-lg transition-colors cursor-pointer hover:bg-gray-800/50 ${
               player.name === currentPlayerName
                 ? 'bg-amber-900/30 border border-amber-700/50'
-                : 'bg-black/30'
+                : player.is_bot
+                  ? 'bg-cyan-900/20 border border-cyan-800/30'
+                  : 'bg-black/30'
             } ${player.is_ghost ? 'opacity-50' : ''}`}
             onMouseEnter={() => setRevealedPlayer(player)}
             onMouseLeave={() => setRevealedPlayer(null)}
@@ -38,6 +40,9 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 <span className="text-white font-medium">{player.name}</span>
                 {player.name === currentPlayerName && (
                   <span className="text-xs text-amber-400">(You)</span>
+                )}
+                {player.is_bot && (
+                  <span className="text-[10px] text-cyan-400 bg-cyan-900/50 px-1 rounded">BOT</span>
                 )}
               </div>
               <span
@@ -57,7 +62,11 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 Stage {player.stage} R{player.round}
               </span>
             </div>
-            {player.is_ghost && <div className="text-xs text-red-400 mt-1">Eliminated</div>}
+            {player.is_ghost && (
+              <div className="text-xs text-red-400 mt-1">
+                {player.is_bot ? 'Bot Eliminated' : 'Eliminated'}
+              </div>
+            )}
             {player.most_recently_revealed_cards.length > 0 && (
               <div className="text-xs text-gray-500 mt-1">
                 {player.most_recently_revealed_cards.length} revealed card(s)
