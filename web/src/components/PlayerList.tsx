@@ -90,20 +90,20 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                   <span className="text-[10px] text-cyan-400 bg-cyan-900/50 px-1 rounded">BOT</span>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <ResultBadge result={player.last_result} />
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-4">
+                <span className="flex items-center gap-1 text-purple-400" title="Poison">
+                  <PoisonIcon size="sm" /> {player.poison}
+                </span>
+                <span className="flex items-center gap-1 text-amber-400" title="Treasures">
+                  <MoneyBagIcon size="sm" /> {player.treasures}
+                </span>
                 {player.name !== currentPlayerName && !player.is_ghost && (
                   <PairingProbability probability={player.pairing_probability} />
                 )}
-                <ResultBadge result={player.last_result} />
               </div>
-            </div>
-            <div className="flex items-center gap-4 text-xs">
-              <span className="flex items-center gap-1 text-purple-400" title="Poison">
-                <PoisonIcon size="sm" /> {player.poison}
-              </span>
-              <span className="flex items-center gap-1 text-amber-400" title="Treasures">
-                <MoneyBagIcon size="sm" /> {player.treasures}
-              </span>
               <span className="text-gray-500">
                 {player.hand_size}-{player.round} @ {player.phase}
               </span>
@@ -111,11 +111,6 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
             {player.is_ghost && (
               <div className="text-xs text-red-400 mt-1">
                 {player.is_bot ? 'Bot Eliminated' : 'Eliminated'}
-              </div>
-            )}
-            {player.most_recently_revealed_cards.length > 0 && (
-              <div className="text-xs text-gray-500 mt-1">
-                {player.most_recently_revealed_cards.length} revealed card(s)
               </div>
             )}
           </div>
