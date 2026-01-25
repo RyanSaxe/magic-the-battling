@@ -218,6 +218,8 @@ function GameContent() {
     battle: 'battle',
     reward: 'reward',
     eliminated: 'battle',
+    winner: 'reward',
+    game_over: 'battle',
   }[currentPhase] || 'draft'
 
   const { self_player, current_battle } = gameState
@@ -459,6 +461,38 @@ function GameContent() {
                     <p className="text-gray-400">
                       You have been eliminated from the game.
                     </p>
+                  </div>
+                </div>
+              )}
+              {currentPhase === 'winner' && (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <h2 className="text-3xl text-amber-400 mb-4">Victory!</h2>
+                    <p className="text-gray-300 mb-6">
+                      Congratulations! You won the game!
+                    </p>
+                    <button
+                      onClick={() => navigate('/')}
+                      className="btn btn-primary"
+                    >
+                      Return Home
+                    </button>
+                  </div>
+                </div>
+              )}
+              {currentPhase === 'game_over' && (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <h2 className="text-3xl text-red-400 mb-4">Game Over</h2>
+                    <p className="text-gray-300 mb-6">
+                      You were eliminated from the game.
+                    </p>
+                    <button
+                      onClick={() => navigate('/')}
+                      className="btn btn-primary"
+                    >
+                      Return Home
+                    </button>
                   </div>
                 </div>
               )}
