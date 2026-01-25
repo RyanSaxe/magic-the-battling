@@ -486,6 +486,26 @@ class GameManager:
         build.move_card(player, card, source, destination)
         return True
 
+    def handle_build_swap(
+        self,
+        player: Player,
+        card_a_id: str,
+        source_a: BuildSource,
+        card_b_id: str,
+        source_b: BuildSource,
+    ) -> bool:
+        list_a = player.hand if source_a == "hand" else player.sideboard
+        list_b = player.hand if source_b == "hand" else player.sideboard
+
+        card_a = next((c for c in list_a if c.id == card_a_id), None)
+        card_b = next((c for c in list_b if c.id == card_b_id), None)
+
+        if not card_a or not card_b:
+            return False
+
+        build.swap_card(player, card_a, source_a, card_b, source_b)
+        return True
+
     def handle_build_ready(
         self, game: Game, player: Player, basics: list[str], game_id: str | None = None, db: Session | None = None
     ) -> str | None:
@@ -578,6 +598,19 @@ class GameManager:
                 if battle.results_agreed(b):
                     self._end_battle(game, b)
                 return True
+        return False
+
+    def handle_battle_update_card_state(
+        self,
+        game: Game,
+        player: Player,
+        action_type: str,
+        card_id: str,
+        data: dict | None = None,
+    ) -> bool:
+        for b in game.active_battles:
+            if player.name in (b.player.name, b.opponent.name):
+                return battle.update_card_state(b, player, action_type, card_id, data)
         return False
 
     def _end_battle(self, game: Game, b: Battle) -> None:

@@ -9,9 +9,11 @@ interface DraggableCardProps {
   zone: ZoneName
   onClick?: () => void
   onDoubleClick?: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
   selected?: boolean
   size?: 'sm' | 'md' | 'lg'
   tapped?: boolean
+  faceDown?: boolean
   counters?: Record<string, number>
   glow?: 'none' | 'gold' | 'green' | 'red'
   disabled?: boolean
@@ -22,9 +24,11 @@ export function DraggableCard({
   zone,
   onClick,
   onDoubleClick,
+  onContextMenu,
   selected,
   size = 'md',
   tapped,
+  faceDown,
   counters,
   glow,
   disabled = false,
@@ -49,6 +53,10 @@ export function DraggableCard({
       style={style}
       {...listeners}
       {...attributes}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu?.(e)
+      }}
     >
       <Card
         card={card}
@@ -57,6 +65,7 @@ export function DraggableCard({
         selected={selected}
         size={size}
         tapped={tapped}
+        faceDown={faceDown}
         counters={counters}
         glow={glow}
         dragging={isDragging}

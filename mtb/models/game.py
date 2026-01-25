@@ -228,6 +228,13 @@ class Zones(BaseModel):
     treasures: int = 0
     submitted_cards: list[Card] = Field(default_factory=list)
 
+    tapped_card_ids: list[str] = Field(default_factory=list)
+    flipped_card_ids: list[str] = Field(default_factory=list)
+    face_down_card_ids: list[str] = Field(default_factory=list)
+    counters: dict[str, dict[str, int]] = Field(default_factory=dict)
+    attachments: dict[str, list[str]] = Field(default_factory=dict)
+    spawned_tokens: list[Card] = Field(default_factory=list)
+
     def get_zone(self, zone_name: ZoneName) -> list[Card]:
         match zone_name:
             case "battlefield":

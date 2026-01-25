@@ -1,18 +1,25 @@
 import { useState } from 'react'
-import type { GameState, Card as CardType, ZoneName } from '../../types'
+import type { GameState, Card as CardType, ZoneName, CardStateAction } from '../../types'
 import { GameDndProvider, useDndActions } from '../../dnd'
 import { HandZone, BattlefieldZone } from '../../components/zones'
-import { Card, CardBack } from '../../components/card'
+import { Card, CardBack, CardActionMenu } from '../../components/card'
 
 const isLandOrTreasure = (card: CardType) =>
   card.type_line.toLowerCase().includes('land') ||
   card.type_line.toLowerCase().includes('treasure')
+
+interface ContextMenuState {
+  card: CardType
+  zone: ZoneName
+  position: { x: number; y: number }
+}
 
 interface BattlePhaseProps {
   gameState: GameState
   actions: {
     battleMove: (cardId: string, fromZone: ZoneName, toZone: ZoneName) => void
     battleSubmitResult: (result: string) => void
+    battleUpdateCardState: (actionType: CardStateAction, cardId: string, data?: Record<string, unknown>) => void
   }
 }
 
@@ -21,7 +28,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
     card: CardType
     zone: ZoneName
   } | null>(null)
-  const [tappedCards, setTappedCards] = useState<Set<string>>(new Set())
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [isChangingResult, setIsChangingResult] = useState(false)
 
   const { handleCardMove, getValidDropZones } = useDndActions({
@@ -44,6 +51,15 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
 
   const { your_zones, opponent_zones, opponent_name, coin_flip_name, opponent_hand_count, result_submissions } = current_battle
 
+  const tappedCardIds = new Set(your_zones.tapped_card_ids || [])
+  const faceDownCardIds = new Set(your_zones.face_down_card_ids || [])
+  const counters = your_zones.counters || {}
+  const attachments = your_zones.attachments || {}
+
+  const opponentTappedIds = new Set(opponent_zones.tapped_card_ids || [])
+  const opponentFaceDownIds = new Set(opponent_zones.face_down_card_ids || [])
+  const opponentCounters = opponent_zones.counters || {}
+
   const opponentLands = opponent_zones.battlefield.filter(isLandOrTreasure)
   const opponentPermanents = opponent_zones.battlefield.filter((c) => !isLandOrTreasure(c))
 
@@ -56,15 +72,31 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   }
 
   const handleCardDoubleClick = (card: CardType) => {
-    setTappedCards((prev) => {
-      const next = new Set(prev)
-      if (next.has(card.id)) {
-        next.delete(card.id)
-      } else {
-        next.add(card.id)
-      }
-      return next
+    const isTapped = tappedCardIds.has(card.id)
+    actions.battleUpdateCardState(isTapped ? 'untap' : 'tap', card.id)
+  }
+
+  const handleContextMenu = (e: React.MouseEvent, card: CardType, zone: ZoneName) => {
+    e.preventDefault()
+    setContextMenu({
+      card,
+      zone,
+      position: { x: e.clientX, y: e.clientY },
     })
+  }
+
+  const handleContextMenuAction = (action: CardStateAction, data?: Record<string, unknown>) => {
+    if (!contextMenu) return
+    actions.battleUpdateCardState(action, contextMenu.card.id, data)
+  }
+
+  const handleContextMenuMove = (toZone: ZoneName) => {
+    if (!contextMenu) return
+    actions.battleMove(contextMenu.card.id, contextMenu.zone, toZone)
+  }
+
+  const isCardAttached = (cardId: string): boolean => {
+    return Object.values(attachments).some(children => children.includes(cardId))
   }
 
   const mySubmission = result_submissions[self_player.name]
@@ -112,7 +144,14 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
                   <div className="text-gray-500 text-sm">Empty battlefield</div>
                 ) : (
                   opponentPermanents.map((card) => (
-                    <Card key={card.id} card={card} size="sm" />
+                    <Card
+                      key={card.id}
+                      card={card}
+                      size="sm"
+                      tapped={opponentTappedIds.has(card.id)}
+                      faceDown={opponentFaceDownIds.has(card.id)}
+                      counters={opponentCounters[card.id]}
+                    />
                   ))
                 )}
               </div>
@@ -120,7 +159,14 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               {opponentLands.length > 0 && (
                 <div className="flex justify-center flex-wrap gap-1 pt-2 border-t border-gray-700/50">
                   {opponentLands.map((card) => (
-                    <Card key={card.id} card={card} size="sm" />
+                    <Card
+                      key={card.id}
+                      card={card}
+                      size="sm"
+                      tapped={opponentTappedIds.has(card.id)}
+                      faceDown={opponentFaceDownIds.has(card.id)}
+                      counters={opponentCounters[card.id]}
+                    />
                   ))}
                 </div>
               )}
@@ -137,7 +183,11 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               selectedCardId={selectedCard?.card.id}
               onCardClick={(card) => handleCardClick(card, 'battlefield')}
               onCardDoubleClick={handleCardDoubleClick}
-              tappedCardIds={tappedCards}
+              onCardContextMenu={(e, card) => handleContextMenu(e, card, 'battlefield')}
+              tappedCardIds={tappedCardIds}
+              faceDownCardIds={faceDownCardIds}
+              counters={counters}
+              attachments={attachments}
               label="Your Battlefield"
               separateLands
             />
@@ -150,6 +200,24 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
           selectedCardId={selectedCard?.card.id}
           onCardClick={(card) => handleCardClick(card, 'hand')}
         />
+
+        {/* Context menu */}
+        {contextMenu && (
+          <CardActionMenu
+            card={contextMenu.card}
+            position={contextMenu.position}
+            zone={contextMenu.zone}
+            isTapped={tappedCardIds.has(contextMenu.card.id)}
+            isFlipped={false}
+            isFaceDown={faceDownCardIds.has(contextMenu.card.id)}
+            counters={counters[contextMenu.card.id] || {}}
+            isAttached={isCardAttached(contextMenu.card.id)}
+            battlefieldCards={your_zones.battlefield}
+            onAction={handleContextMenuAction}
+            onMove={handleContextMenuMove}
+            onClose={() => setContextMenu(null)}
+          />
+        )}
 
         {/* Result submission */}
         <div className="px-4 pb-4">

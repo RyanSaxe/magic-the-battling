@@ -153,6 +153,14 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
             return game_manager.handle_draft_done(game, player)
         case "build_move":
             return game_manager.handle_build_move(player, payload["card_id"], payload["source"], payload["destination"])
+        case "build_swap":
+            return game_manager.handle_build_swap(
+                player,
+                payload["card_a_id"],
+                payload["source_a"],
+                payload["card_b_id"],
+                payload["source_b"],
+            )
         case "build_submit":
             return game_manager.handle_build_submit(game, player, payload["basics"])
         case "build_ready":
@@ -171,6 +179,10 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
             )
         case "battle_submit_result":
             return game_manager.handle_battle_submit_result(game, player, payload["result"])
+        case "battle_update_card_state":
+            return game_manager.handle_battle_update_card_state(
+                game, player, payload["action_type"], payload["card_id"], payload.get("data")
+            )
         case "reward_pick_upgrade":
             return game_manager.handle_reward_pick_upgrade(game, player, payload["upgrade_id"])
         case "reward_apply_upgrade":

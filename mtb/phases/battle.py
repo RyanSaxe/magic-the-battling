@@ -1,4 +1,5 @@
 import random
+from collections.abc import Callable
 from typing import NamedTuple, TypeGuard, cast
 from uuid import uuid4
 
@@ -333,6 +334,110 @@ def _end_vs_static(game: Game, battle: Battle, opponent: StaticOpponent) -> Batt
 
 def _is_revealed_card(card: Card) -> bool:
     return not card.type_line.startswith("Basic Land") and not card.type_line.startswith("Token")
+
+
+def _handle_tap(zones: Zones, card_id: str, _data: dict) -> bool:
+    if card_id not in zones.tapped_card_ids:
+        zones.tapped_card_ids.append(card_id)
+    return True
+
+
+def _handle_untap(zones: Zones, card_id: str, _data: dict) -> bool:
+    if card_id in zones.tapped_card_ids:
+        zones.tapped_card_ids.remove(card_id)
+    return True
+
+
+def _handle_toggle(attr: str) -> "CardStateHandler":
+    def handler(zones: Zones, card_id: str, _data: dict) -> bool:
+        id_list = getattr(zones, attr)
+        if card_id in id_list:
+            id_list.remove(card_id)
+        else:
+            id_list.append(card_id)
+        return True
+
+    return handler
+
+
+def _handle_counter(zones: Zones, card_id: str, data: dict) -> bool:
+    counter_type = data.get("counter_type", "+1/+1")
+    delta = data.get("delta", 1)
+    if card_id not in zones.counters:
+        zones.counters[card_id] = {}
+    current = zones.counters[card_id].get(counter_type, 0)
+    new_count = max(0, current + delta)
+    if new_count == 0:
+        zones.counters[card_id].pop(counter_type, None)
+        if not zones.counters[card_id]:
+            zones.counters.pop(card_id, None)
+    else:
+        zones.counters[card_id][counter_type] = new_count
+    return True
+
+
+def _handle_attach(zones: Zones, card_id: str, data: dict) -> bool:
+    parent_id = data.get("parent_id")
+    if not parent_id:
+        return False
+    if parent_id not in zones.attachments:
+        zones.attachments[parent_id] = []
+    if card_id not in zones.attachments[parent_id]:
+        zones.attachments[parent_id].append(card_id)
+    return True
+
+
+def _handle_detach(zones: Zones, card_id: str, _data: dict) -> bool:
+    for parent_id, children in list(zones.attachments.items()):
+        if card_id in children:
+            children.remove(card_id)
+            if not children:
+                zones.attachments.pop(parent_id, None)
+            break
+    return True
+
+
+def _handle_spawn(zones: Zones, _card_id: str, data: dict) -> bool:
+    token_data = data.get("token")
+    if not token_data:
+        return False
+    token = Card(
+        id=f"token-{uuid4().hex[:8]}",
+        name=token_data.get("name", "Token"),
+        image_url=token_data.get("image_url", ""),
+        type_line=token_data.get("type_line", "Token Creature"),
+    )
+    zones.spawned_tokens.append(token)
+    zones.battlefield.append(token)
+    return True
+
+
+CardStateHandler = Callable[[Zones, str, dict], bool]
+
+_CARD_STATE_HANDLERS: dict[str, CardStateHandler] = {
+    "tap": _handle_tap,
+    "untap": _handle_untap,
+    "flip": _handle_toggle("flipped_card_ids"),
+    "face_down": _handle_toggle("face_down_card_ids"),
+    "counter": _handle_counter,
+    "attach": _handle_attach,
+    "detach": _handle_detach,
+    "spawn": _handle_spawn,
+}
+
+
+def update_card_state(
+    battle: Battle,
+    player: Player,
+    action_type: str,
+    card_id: str,
+    data: dict | None = None,
+) -> bool:
+    zones = get_zones_for_player(battle, player)
+    handler = _CARD_STATE_HANDLERS.get(action_type)
+    if not handler:
+        return False
+    return handler(zones, card_id, data or {})
 
 
 def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult:

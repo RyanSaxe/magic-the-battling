@@ -1,5 +1,6 @@
 export type Phase = 'draft' | 'build' | 'battle' | 'reward' | 'eliminated'
 export type ZoneName = 'battlefield' | 'graveyard' | 'exile' | 'hand' | 'sideboard' | 'upgrades' | 'command_zone' | 'library'
+export type CardStateAction = 'tap' | 'untap' | 'flip' | 'face_down' | 'counter' | 'attach' | 'detach' | 'spawn'
 export type CardDestination = 'hand' | 'sideboard' | 'upgrades'
 export type BuildSource = 'hand' | 'sideboard'
 
@@ -27,6 +28,12 @@ export interface Zones {
   library: Card[]
   treasures: number
   submitted_cards: Card[]
+  tapped_card_ids: string[]
+  flipped_card_ids: string[]
+  face_down_card_ids: string[]
+  counters: Record<string, Record<string, number>>
+  attachments: Record<string, string[]>
+  spawned_tokens: Card[]
 }
 
 export interface PlayerView {

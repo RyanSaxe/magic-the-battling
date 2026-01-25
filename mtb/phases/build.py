@@ -24,6 +24,31 @@ def move_card(player: Player, card: Card, source: BuildSource, destination: Buil
     destination_collection.append(card)
 
 
+def swap_card(
+    player: Player,
+    card_a: Card,
+    source_a: BuildSource,
+    card_b: Card,
+    source_b: BuildSource,
+) -> None:
+    if source_a == source_b:
+        raise ValueError("Cannot swap cards within the same zone")
+
+    collection_a = _get_build_collection(player, source_a)
+    collection_b = _get_build_collection(player, source_b)
+
+    if card_a not in collection_a:
+        raise ValueError(f"Card not in player's {source_a}")
+    if card_b not in collection_b:
+        raise ValueError(f"Card not in player's {source_b}")
+
+    idx_a = collection_a.index(card_a)
+    idx_b = collection_b.index(card_b)
+
+    collection_a[idx_a] = card_b
+    collection_b[idx_b] = card_a
+
+
 def set_ready(game: Game, player: Player, basics: list[str]) -> None:
     if player.phase != "build":
         raise ValueError("Player is not in build phase")
@@ -66,6 +91,7 @@ def populate_hand(player: Player) -> None:
 __all__ = [
     "VALID_BASICS",
     "move_card",
+    "swap_card",
     "set_ready",
     "unready",
     "all_ready",

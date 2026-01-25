@@ -1,5 +1,6 @@
 import type { Card as CardType, ZoneName } from '../../types'
 import { DraggableCard, DroppableZone } from '../../dnd'
+import { AttachedCardStack } from '../card'
 
 const isLandOrTreasure = (card: CardType) =>
   card.type_line.toLowerCase().includes('land') ||
@@ -10,7 +11,11 @@ interface BattlefieldZoneProps {
   selectedCardId?: string
   onCardClick?: (card: CardType) => void
   onCardDoubleClick?: (card: CardType) => void
+  onCardContextMenu?: (e: React.MouseEvent, card: CardType) => void
   tappedCardIds?: Set<string>
+  faceDownCardIds?: Set<string>
+  counters?: Record<string, Record<string, number>>
+  attachments?: Record<string, string[]>
   validFromZones?: ZoneName[]
   draggable?: boolean
   isOpponent?: boolean
@@ -23,29 +28,77 @@ export function BattlefieldZone({
   selectedCardId,
   onCardClick,
   onCardDoubleClick,
+  onCardContextMenu,
   tappedCardIds = new Set(),
+  faceDownCardIds = new Set(),
+  counters = {},
+  attachments = {},
   validFromZones = ['hand', 'graveyard', 'exile'],
   draggable = true,
   isOpponent = false,
   label,
   separateLands = false,
 }: BattlefieldZoneProps) {
-  const lands = separateLands ? cards.filter(isLandOrTreasure) : []
-  const permanents = separateLands ? cards.filter((c) => !isLandOrTreasure(c)) : cards
+  const attachedCardIds = new Set(Object.values(attachments).flat())
+  const topLevelCards = cards.filter(c => !attachedCardIds.has(c.id))
 
-  const renderCard = (card: CardType) => (
-    <DraggableCard
-      key={card.id}
-      card={card}
-      zone="battlefield"
-      size="md"
-      selected={card.id === selectedCardId}
-      tapped={tappedCardIds.has(card.id)}
-      onClick={() => onCardClick?.(card)}
-      onDoubleClick={() => onCardDoubleClick?.(card)}
-      disabled={!draggable || isOpponent}
-    />
-  )
+  const lands = separateLands ? topLevelCards.filter(isLandOrTreasure) : []
+  const permanents = separateLands ? topLevelCards.filter((c) => !isLandOrTreasure(c)) : topLevelCards
+
+  const getAttachedCards = (parentId: string): CardType[] => {
+    const childIds = attachments[parentId] || []
+    return childIds.map(id => cards.find(c => c.id === id)).filter((c): c is CardType => !!c)
+  }
+
+  const renderCard = (card: CardType) => {
+    const attachedCards = getAttachedCards(card.id)
+
+    if (attachedCards.length > 0) {
+      return (
+        <AttachedCardStack
+          key={card.id}
+          parentCard={card}
+          attachedCards={attachedCards}
+          size="md"
+          parentTapped={tappedCardIds.has(card.id)}
+          parentFaceDown={faceDownCardIds.has(card.id)}
+          parentCounters={counters[card.id]}
+          attachedTappedIds={tappedCardIds}
+          attachedFaceDownIds={faceDownCardIds}
+          attachedCounters={counters}
+          selectedCardId={selectedCardId}
+          onCardClick={onCardClick}
+          onCardDoubleClick={onCardDoubleClick}
+          onCardContextMenu={onCardContextMenu}
+        />
+      )
+    }
+
+    return (
+      <div
+        key={card.id}
+        onContextMenu={(e) => {
+          if (!isOpponent) {
+            e.preventDefault()
+            onCardContextMenu?.(e, card)
+          }
+        }}
+      >
+        <DraggableCard
+          card={card}
+          zone="battlefield"
+          size="md"
+          selected={card.id === selectedCardId}
+          tapped={tappedCardIds.has(card.id)}
+          faceDown={faceDownCardIds.has(card.id)}
+          counters={counters[card.id]}
+          onClick={() => onCardClick?.(card)}
+          onDoubleClick={() => onCardDoubleClick?.(card)}
+          disabled={!draggable || isOpponent}
+        />
+      </div>
+    )
+  }
 
   return (
     <DroppableZone

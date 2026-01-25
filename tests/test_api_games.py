@@ -78,13 +78,21 @@ class TestStartGame:
         assert response.status_code == 200
         assert response.json()["success"] is True
 
-    def test_start_without_enough_players_returns_400(self, client):
+    def test_start_solo_adds_bots(self, client):
+        from server.services.game_manager import game_manager
+
         create = client.post("/api/games", json={"player_name": "Alice", "cube_id": "test"})
         game_id = create.json()["game_id"]
 
         response = client.post(f"/api/games/{game_id}/start")
 
-        assert response.status_code == 400
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+
+        game = game_manager.get_game(game_id)
+        assert game is not None
+        assert len(game.players) == 1
+        assert len(game.fake_players) == 3
 
     def test_start_nonexistent_game_returns_404(self, client):
         response = client.post("/api/games/nonexistent/start")

@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useWebSocket } from './useWebSocket'
-import type { CardDestination, BuildSource, ZoneName } from '../types'
+import type { CardDestination, BuildSource, ZoneName, CardStateAction } from '../types'
 
 export function useGame(gameId: string | null, sessionId: string | null) {
   const { isConnected, gameState, lobbyState, error, send } = useWebSocket(gameId, sessionId)
@@ -29,6 +29,15 @@ export function useGame(gameId: string | null, sessionId: string | null) {
     send('build_move', { card_id: cardId, source, destination })
   }, [send])
 
+  const buildSwap = useCallback((
+    cardAId: string,
+    sourceA: BuildSource,
+    cardBId: string,
+    sourceB: BuildSource,
+  ) => {
+    send('build_swap', { card_a_id: cardAId, source_a: sourceA, card_b_id: cardBId, source_b: sourceB })
+  }, [send])
+
   const buildSubmit = useCallback((basics: string[]) => {
     send('build_submit', { basics })
   }, [send])
@@ -51,6 +60,14 @@ export function useGame(gameId: string | null, sessionId: string | null) {
 
   const battleSubmitResult = useCallback((result: string) => {
     send('battle_submit_result', { result })
+  }, [send])
+
+  const battleUpdateCardState = useCallback((
+    actionType: CardStateAction,
+    cardId: string,
+    data?: Record<string, unknown>
+  ) => {
+    send('battle_update_card_state', { action_type: actionType, card_id: cardId, data })
   }, [send])
 
   const rewardPickUpgrade = useCallback((upgradeId: string) => {
@@ -77,12 +94,14 @@ export function useGame(gameId: string | null, sessionId: string | null) {
       draftRoll,
       draftDone,
       buildMove,
+      buildSwap,
       buildSubmit,
       buildReady,
       buildUnready,
       buildApplyUpgrade,
       battleMove,
       battleSubmitResult,
+      battleUpdateCardState,
       rewardPickUpgrade,
       rewardApplyUpgrade,
       rewardDone,

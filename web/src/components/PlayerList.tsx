@@ -1,5 +1,6 @@
 import type { PlayerView, Phase } from '../types'
 import { PoisonIcon, MoneyBagIcon } from './icons'
+import { useContextStrip } from '../contexts'
 
 interface PlayerListProps {
   players: PlayerView[]
@@ -15,6 +16,8 @@ const phaseBadgeClass: Record<Phase, string> = {
 }
 
 export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
+  const { setRevealedPlayer } = useContextStrip()
+
   return (
     <div className="relative">
       <h3 className="text-white font-medium mb-3">Players</h3>
@@ -22,11 +25,13 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
         {players.map((player) => (
           <div
             key={player.name}
-            className={`p-3 rounded-lg transition-colors ${
+            className={`p-3 rounded-lg transition-colors cursor-pointer hover:bg-gray-800/50 ${
               player.name === currentPlayerName
                 ? 'bg-amber-900/30 border border-amber-700/50'
                 : 'bg-black/30'
             } ${player.is_ghost ? 'opacity-50' : ''}`}
+            onMouseEnter={() => setRevealedPlayer(player)}
+            onMouseLeave={() => setRevealedPlayer(null)}
           >
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
@@ -35,7 +40,9 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                   <span className="text-xs text-amber-400">(You)</span>
                 )}
               </div>
-              <span className={`phase-badge ${phaseBadgeClass[player.phase]} text-[10px] py-0.5 px-2`}>
+              <span
+                className={`phase-badge ${phaseBadgeClass[player.phase]} text-[10px] py-0.5 px-2`}
+              >
                 {player.phase}
               </span>
             </div>
@@ -50,8 +57,11 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 Stage {player.stage} R{player.round}
               </span>
             </div>
-            {player.is_ghost && (
-              <div className="text-xs text-red-400 mt-1">Eliminated</div>
+            {player.is_ghost && <div className="text-xs text-red-400 mt-1">Eliminated</div>}
+            {player.most_recently_revealed_cards.length > 0 && (
+              <div className="text-xs text-gray-500 mt-1">
+                {player.most_recently_revealed_cards.length} revealed card(s)
+              </div>
             )}
           </div>
         ))}

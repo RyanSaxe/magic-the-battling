@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useContext } from 'react'
 import type { Card as CardType } from '../../types'
 import { CardBack } from './CardBack'
+import { CardPreviewContext } from './CardPreviewContext'
 
 interface CardProps {
   card: CardType
@@ -16,6 +17,7 @@ interface CardProps {
   disabled?: boolean
   className?: string
   showUpgradeTarget?: boolean
+  enablePreview?: boolean
 }
 
 const sizeStyles = {
@@ -45,11 +47,14 @@ export function Card({
   disabled = false,
   className = '',
   showUpgradeTarget = false,
+  enablePreview = false,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
   const [showTargetModal, setShowTargetModal] = useState(false)
+
+  const previewContext = useContext(CardPreviewContext)
 
   if (faceDown) {
     return (
@@ -94,7 +99,12 @@ export function Card({
       onClick={disabled ? undefined : onClick}
       onDoubleClick={disabled ? undefined : onDoubleClick}
       onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseLeave={() => {
+        setIsHovered(false)
+        if (enablePreview && previewContext) {
+          previewContext.setPreviewCard(null)
+        }
+      }}
     >
       {isLoading && (
         <div className="skeleton absolute inset-0 flex items-center justify-center bg-gray-800">
@@ -118,6 +128,30 @@ export function Card({
           }}
         >
           Flip
+        </button>
+      )}
+      {enablePreview && previewContext && isHovered && (
+        <button
+          className="absolute top-1 left-1 bg-black/60 rounded p-1 text-white hover:bg-black/80 transition-colors"
+          onClick={(e) => {
+            e.stopPropagation()
+            previewContext.setPreviewCard(card)
+          }}
+          title="Preview card"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
+            />
+          </svg>
         </button>
       )}
       {card.tokens.length > 0 && (

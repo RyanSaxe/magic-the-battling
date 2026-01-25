@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Card } from '../../components/card'
 import { THE_VANQUISHER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import type { GameState, Card as CardType } from '../../types'
@@ -8,8 +9,6 @@ interface RewardPhaseProps {
     rewardPickUpgrade: (upgradeId: string) => void
     rewardDone: (upgradeId?: string) => void
   }
-  selectedUpgradeId: string | null
-  onSelectUpgrade: (upgradeId: string | null) => void
 }
 
 function RewardCard({
@@ -36,11 +35,9 @@ function RewardCard({
   )
 }
 
-export function RewardPhase({
-  gameState,
-  selectedUpgradeId,
-  onSelectUpgrade,
-}: RewardPhaseProps) {
+export function RewardPhase({ gameState, actions }: RewardPhaseProps) {
+  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(null)
+
   const { self_player, available_upgrades } = gameState
   const { last_battle_result } = self_player
   const isStageIncreasing = self_player.is_stage_increasing
@@ -49,11 +46,24 @@ export function RewardPhase({
 
   const handleUpgradeClick = (upgrade: CardType) => {
     if (selectedUpgradeId === upgrade.id) {
-      onSelectUpgrade(null)
+      setSelectedUpgradeId(null)
     } else {
-      onSelectUpgrade(upgrade.id)
+      setSelectedUpgradeId(upgrade.id)
     }
   }
+
+  const handleContinue = () => {
+    actions.rewardDone(selectedUpgradeId ?? undefined)
+    setSelectedUpgradeId(null)
+  }
+
+  const needsUpgrade = isStageIncreasing && available_upgrades.length > 0
+  const canContinue = !needsUpgrade || !!selectedUpgradeId
+  const buttonLabel = needsUpgrade
+    ? selectedUpgradeId
+      ? 'Claim Upgrade & Continue'
+      : 'Select an Upgrade Above'
+    : 'Continue to Next Round'
 
   return (
     <div className="flex flex-col h-full gap-6 p-4 overflow-auto">
@@ -78,9 +88,7 @@ export function RewardPhase({
                 </span>
               )}
               {last_battle_result.poison_taken > 0 && (
-                <span className="text-red-400">
-                  Took {last_battle_result.poison_taken} poison
-                </span>
+                <span className="text-red-400">Took {last_battle_result.poison_taken} poison</span>
               )}
             </div>
           )}
@@ -90,9 +98,7 @@ export function RewardPhase({
       {/* Rewards - shown as big cards */}
       {last_battle_result && (
         <div className="flex-1 flex flex-col items-center justify-center">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-6">
-            Your Rewards
-          </div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-6">Your Rewards</div>
           <div className="flex gap-8 justify-center flex-wrap">
             {last_battle_result.treasures_gained > 0 && (
               <RewardCard
@@ -112,18 +118,14 @@ export function RewardPhase({
                 <Card card={last_battle_result.card_gained} size="lg" />
                 <div className="text-center">
                   <div className="text-white font-medium">New Card</div>
-                  <div className="text-gray-400 text-sm">
-                    {last_battle_result.card_gained.name}
-                  </div>
+                  <div className="text-gray-400 text-sm">{last_battle_result.card_gained.name}</div>
                 </div>
               </div>
             )}
             {!last_battle_result.treasures_gained &&
               !last_battle_result.vanquisher_gained &&
               !last_battle_result.card_gained && (
-                <div className="text-gray-500 text-center">
-                  No rewards this round
-                </div>
+                <div className="text-gray-500 text-center">No rewards this round</div>
               )}
           </div>
         </div>
@@ -134,9 +136,7 @@ export function RewardPhase({
         <div className="bg-amber-950/30 rounded-lg p-6 border-2 border-amber-500">
           <div className="text-center mb-6">
             <h3 className="text-xl font-bold text-amber-400 mb-2">Stage Complete!</h3>
-            <p className="text-gray-400">
-              Select an upgrade to claim as your vanquisher reward
-            </p>
+            <p className="text-gray-400">Select an upgrade to claim as your vanquisher reward</p>
           </div>
           <div className="flex gap-6 justify-center flex-wrap">
             {available_upgrades.map((upgrade) => (
@@ -151,6 +151,17 @@ export function RewardPhase({
           </div>
         </div>
       )}
+
+      {/* Continue button */}
+      <div className="flex justify-center">
+        <button
+          onClick={handleContinue}
+          disabled={!canContinue}
+          className="btn btn-primary px-8 py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {buttonLabel}
+        </button>
+      </div>
     </div>
   )
 }

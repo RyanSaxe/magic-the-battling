@@ -90,11 +90,11 @@ def swap(
     if player_card not in player_collection:
         raise ValueError(f"Card not in player's {destination}")
 
-    current_pack.remove(pack_card)
-    current_pack.append(player_card)
+    pack_idx = current_pack.index(pack_card)
+    player_idx = player_collection.index(player_card)
 
-    player_collection.remove(player_card)
-    player_collection.append(pack_card)
+    current_pack[pack_idx] = player_card
+    player_collection[player_idx] = pack_card
 
 
 def end_for_player(game: Game, player: Player) -> None:
