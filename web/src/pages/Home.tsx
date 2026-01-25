@@ -11,6 +11,7 @@ export function Home() {
   const [cubeId, setCubeId] = useState('auto')
   const [useUpgrades, setUseUpgrades] = useState(true)
   const [useVanguards, setUseVanguards] = useState(false)
+  const [targetPlayerCount, setTargetPlayerCount] = useState(4)
   const [joinCode, setJoinCode] = useState('')
   const [isJoining, setIsJoining] = useState(false)
   const [error, setError] = useState('')
@@ -30,6 +31,7 @@ export function Home() {
         cubeId: cubeId || 'auto',
         useUpgrades,
         useVanguards,
+        targetPlayerCount,
       })
       saveSession(response.session_id, response.player_id)
       navigate(`/game/${response.game_id}/lobby`)
@@ -110,6 +112,28 @@ export function Home() {
               <div className="space-y-3 pt-2 border-t border-gray-700">
                 <div className="text-sm text-gray-400 uppercase tracking-wide">
                   Game Options
+                </div>
+
+                <div>
+                  <label className="block text-white mb-2">Target Players</label>
+                  <div className="flex gap-2">
+                    {[2, 4, 6, 8].map((count) => (
+                      <button
+                        key={count}
+                        onClick={() => setTargetPlayerCount(count)}
+                        className={`px-4 py-2 rounded font-medium transition-colors ${
+                          targetPlayerCount === count
+                            ? 'bg-amber-500 text-black'
+                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                      >
+                        {count}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-gray-500 text-sm mt-1">
+                    Bots will fill remaining slots
+                  </p>
                 </div>
 
                 <label className="flex items-center gap-3 cursor-pointer">

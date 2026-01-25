@@ -10,7 +10,7 @@ def main():
     project_root = Path(__file__).parent.parent
     web_dir = project_root / "web"
 
-    # Create processes in their own process groups so we can kill them cleanly
+    # start_new_session creates process groups so we can cleanly kill child processes
     backend = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "server.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
         cwd=project_root,

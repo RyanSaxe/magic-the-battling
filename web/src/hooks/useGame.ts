@@ -9,6 +9,10 @@ export function useGame(gameId: string | null, sessionId: string | null) {
     send('start_game')
   }, [send])
 
+  const setReady = useCallback((isReady: boolean) => {
+    send('set_ready', { is_ready: isReady })
+  }, [send])
+
   const draftSwap = useCallback((packCardId: string, playerCardId: string, destination: CardDestination) => {
     send('draft_swap', { pack_card_id: packCardId, player_card_id: playerCardId, destination })
   }, [send])
@@ -27,6 +31,14 @@ export function useGame(gameId: string | null, sessionId: string | null) {
 
   const buildSubmit = useCallback((basics: string[]) => {
     send('build_submit', { basics })
+  }, [send])
+
+  const buildReady = useCallback((basics: string[]) => {
+    send('build_ready', { basics })
+  }, [send])
+
+  const buildUnready = useCallback(() => {
+    send('build_unready')
   }, [send])
 
   const buildApplyUpgrade = useCallback((upgradeId: string, targetCardId: string) => {
@@ -60,11 +72,14 @@ export function useGame(gameId: string | null, sessionId: string | null) {
     error,
     actions: {
       startGame,
+      setReady,
       draftSwap,
       draftRoll,
       draftDone,
       buildMove,
       buildSubmit,
+      buildReady,
+      buildUnready,
       buildApplyUpgrade,
       battleMove,
       battleSubmitResult,

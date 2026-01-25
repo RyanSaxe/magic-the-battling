@@ -116,53 +116,121 @@ export function Lobby() {
           </div>
         )}
 
-        {lobbyState && (
-          <>
-            <div className="bg-black/40 rounded-lg p-4 mb-6 text-center">
-              <p className="text-gray-400 text-sm mb-2">Share this code</p>
-              <div className="flex items-center justify-center gap-3">
-                <span className="text-3xl font-mono font-bold text-amber-400 tracking-wider">
-                  {lobbyState.join_code}
-                </span>
-                <button
-                  onClick={copyJoinCode}
-                  className="btn btn-secondary text-sm py-1"
-                >
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
-              </div>
-            </div>
+        {lobbyState && (() => {
+          const currentPlayer = lobbyState.players.find(p =>
+            session?.playerId && lobbyState.players.some(lp => lp.name === p.name)
+          ) ?? lobbyState.players[lobbyState.players.length - 1]
+          const isHost = currentPlayer?.is_host ?? false
+          const isReady = currentPlayer?.is_ready ?? false
+          const botSlots = lobbyState.target_player_count - lobbyState.players.length
+          const allReady = lobbyState.players.every(p => p.is_ready)
 
-            <div className="mb-6">
-              <h2 className="text-white font-medium mb-3">
-                Players ({lobbyState.players.length})
-              </h2>
-              <div className="space-y-2">
-                {lobbyState.players.map((player, index) => (
-                  <div
-                    key={player.name}
-                    className="bg-black/30 p-3 rounded-lg flex items-center justify-between"
+          return (
+            <>
+              <div className="bg-black/40 rounded-lg p-4 mb-6 text-center">
+                <p className="text-gray-400 text-sm mb-2">Share this code</p>
+                <div className="flex items-center justify-center gap-3">
+                  <span className="text-3xl font-mono font-bold text-amber-400 tracking-wider">
+                    {lobbyState.join_code}
+                  </span>
+                  <button
+                    onClick={copyJoinCode}
+                    className="btn btn-secondary text-sm py-1"
                   >
-                    <span className="text-white">{player.name}</span>
-                    {index === 0 && (
-                      <span className="text-amber-400 text-sm">Host</span>
-                    )}
-                  </div>
-                ))}
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <p className="text-gray-500 text-sm mt-2">
+                  Target: {lobbyState.target_player_count} players
+                  {botSlots > 0 && ` (${botSlots} bot slot${botSlots > 1 ? 's' : ''})`}
+                </p>
               </div>
-            </div>
 
-            <button
-              onClick={actions.startGame}
-              disabled={!lobbyState.can_start}
-              className="btn btn-primary w-full py-3"
-            >
-              {lobbyState.can_start
-                ? 'Start Game'
-                : `Waiting for ${2 - lobbyState.players.length} more player(s)`}
-            </button>
-          </>
-        )}
+              <div className="mb-6">
+                <h2 className="text-white font-medium mb-3">
+                  Players ({lobbyState.players.length}/{lobbyState.target_player_count})
+                </h2>
+                <div className="space-y-2">
+                  {lobbyState.players.map((player) => (
+                    <div
+                      key={player.name}
+                      className="bg-black/30 p-3 rounded-lg flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            player.is_ready ? 'bg-green-500' : 'bg-gray-500'
+                          }`}
+                        />
+                        <span className="text-white">{player.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {player.is_host && (
+                          <span className="text-amber-400 text-sm">Host</span>
+                        )}
+                        <span className={`text-sm ${player.is_ready ? 'text-green-400' : 'text-gray-500'}`}>
+                          {player.is_ready ? 'Ready' : 'Not Ready'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                  {botSlots > 0 && Array.from({ length: botSlots }).map((_, i) => (
+                    <div
+                      key={`bot-${i}`}
+                      className="bg-black/20 p-3 rounded-lg flex items-center justify-between border border-dashed border-gray-700"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-gray-700" />
+                        <span className="text-gray-500 italic">Bot {i + 1}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {!isHost && (
+                  <button
+                    onClick={() => actions.setReady(!isReady)}
+                    className={`w-full py-3 rounded font-medium transition-colors ${
+                      isReady
+                        ? 'bg-gray-600 text-white hover:bg-gray-500'
+                        : 'bg-green-600 text-white hover:bg-green-500'
+                    }`}
+                  >
+                    {isReady ? 'Unready' : 'Ready'}
+                  </button>
+                )}
+
+                {isHost && (
+                  <>
+                    <button
+                      onClick={() => actions.setReady(!isReady)}
+                      className={`w-full py-3 rounded font-medium transition-colors ${
+                        isReady
+                          ? 'bg-gray-600 text-white hover:bg-gray-500'
+                          : 'bg-green-600 text-white hover:bg-green-500'
+                      }`}
+                    >
+                      {isReady ? 'Unready' : 'Ready'}
+                    </button>
+                    <button
+                      onClick={actions.startGame}
+                      disabled={!lobbyState.can_start}
+                      className="btn btn-primary w-full py-3"
+                    >
+                      {lobbyState.players.length < 2
+                        ? `Waiting for ${2 - lobbyState.players.length} more player(s)`
+                        : !allReady
+                        ? 'Waiting for all players to ready'
+                        : 'Start Game'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
+          )
+        })()}
       </div>
     </div>
   )

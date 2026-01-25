@@ -7,6 +7,91 @@ from mtb.models.cards import Battler, Card
 from mtb.models.types import Phase, ZoneName
 
 
+class StaticOpponent(BaseModel):
+    """Frozen opponent state representing either a ghost or historical player."""
+
+    name: str
+    hand: list[Card]
+    sideboard: list[Card] = Field(default_factory=list)
+    upgrades: list[Card] = Field(default_factory=list)
+    vanguard: Card | None = None
+    chosen_basics: list[str] = Field(default_factory=list)
+    treasures: int = 0
+    poison: int = 0
+    hand_revealed: bool = False
+    is_ghost: bool = True
+    source_player_history_id: int | None = None
+
+    @classmethod
+    def from_player(cls, player: "Player", hand_revealed: bool = False) -> "StaticOpponent":
+        return cls(
+            name=player.name,
+            hand=player.hand.copy(),
+            sideboard=player.sideboard.copy(),
+            upgrades=player.upgrades.copy(),
+            vanguard=player.vanguard,
+            chosen_basics=player.chosen_basics.copy(),
+            treasures=player.treasures,
+            poison=player.poison,
+            hand_revealed=hand_revealed,
+            is_ghost=True,
+        )
+
+    @classmethod
+    def from_snapshot(cls, snapshot: "BattleSnapshotData", player_name: str, history_id: int) -> "StaticOpponent":
+        return cls(
+            name=player_name,
+            hand=snapshot.hand,
+            sideboard=[],
+            upgrades=snapshot.applied_upgrades,
+            vanguard=snapshot.vanguard,
+            chosen_basics=snapshot.basic_lands,
+            treasures=snapshot.treasures,
+            poison=0,
+            hand_revealed=True,
+            is_ghost=False,
+            source_player_history_id=history_id,
+        )
+
+
+class BattleSnapshotData(BaseModel):
+    """Data structure for snapshot serialization/deserialization."""
+
+    hand: list[Card]
+    vanguard: Card | None
+    basic_lands: list[str]
+    applied_upgrades: list[Card]
+    treasures: int
+
+
+class FakePlayer(BaseModel):
+    """Tracks a historical player across rounds in the current game."""
+
+    name: str
+    player_history_id: int
+    snapshots: dict[str, StaticOpponent] = Field(default_factory=dict)
+    is_eliminated: bool = False
+
+    def get_opponent_for_round(self, stage: int, round_num: int) -> StaticOpponent | None:
+        key = f"{stage}_{round_num}"
+        if key in self.snapshots:
+            return self.snapshots[key]
+
+        available_keys = sorted(self.snapshots.keys())
+        target = (stage, round_num)
+        best_key = None
+        for k in available_keys:
+            s, r = map(int, k.split("_"))
+            if (s, r) <= target:
+                best_key = k
+            else:
+                break
+
+        if best_key:
+            return self.snapshots[best_key]
+        return None
+
+
 class DraftState(BaseModel):
     packs: list[list[Card]]
     discard: list[Card] = Field(default_factory=list)
@@ -34,32 +119,24 @@ class Player(BaseModel):
     poison: int = 0
     treasures: int = 0
 
-    # per-player progression
     phase: Phase = "build"
     round: int = 1
     stage: int = 1
     last_opponent_name: str | None = None
     last_battle_result: "LastBattleResult | None" = None
 
-    # ghost (elimination) state
     is_ghost: bool = False
     time_of_death: int | None = None
 
-    # optional card variants
     upgrades: list[Card] = Field(default_factory=list)
     vanguard: Card | None = None
 
-    # NOTE: commander is not implemented yet
     commander: Card | None = None
-
-    # basics chosen during build phase (e.g., ["Plains", "Island", "Mountain"])
     chosen_basics: list[str] = Field(default_factory=list)
-
-    # previous configuration for auto-populating build phase
     previous_hand_ids: list[str] = Field(default_factory=list)
     previous_basics: list[str] = Field(default_factory=list)
+    build_ready: bool = False
 
-    # weak reference to parent game (not serialized)
     # model_config is required to allow weakref types
     model_config = {"arbitrary_types_allowed": True}
     game_ref: weakref.ref["Game"] | None = Field(default=None, exclude=True)
@@ -105,8 +182,8 @@ class Game(BaseModel):
     draft_state: DraftState | None = None
     active_battles: list["Battle"] = Field(default_factory=list)
     most_recent_ghost: Player | None = None
+    fake_players: list[FakePlayer] = Field(default_factory=list)
 
-    # set a safe circular reference between players and game
     def model_post_init(self, __context):
         for player in self.players:
             player.game_ref = weakref.ref(self)
@@ -156,8 +233,8 @@ class Zones(BaseModel):
 
 class Battle(BaseModel):
     player: Player
-    opponent: Player
-    coin_flip: Player
+    opponent: Player | StaticOpponent
+    coin_flip_name: str
     player_zones: Zones
     opponent_zones: Zones
     result_submissions: dict[str, str] = Field(default_factory=dict)

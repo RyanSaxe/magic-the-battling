@@ -65,6 +65,7 @@ export interface SelfPlayerView extends PlayerView {
   sideboard: Card[]
   current_pack: Card[] | null
   last_battle_result: LastBattleResult | null
+  build_ready: boolean
 }
 
 export interface BattleView {
@@ -88,6 +89,7 @@ export interface GameState {
 export interface LobbyPlayer {
   name: string
   is_ready: boolean
+  is_host: boolean
 }
 
 export interface LobbyState {
@@ -96,6 +98,7 @@ export interface LobbyState {
   players: LobbyPlayer[]
   can_start: boolean
   is_started: boolean
+  target_player_count: number
 }
 
 export interface CreateGameResponse {

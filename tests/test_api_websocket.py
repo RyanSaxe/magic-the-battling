@@ -80,6 +80,14 @@ class TestGameWebSocket:
                 ws_alice.receive_json()
                 ws_bob.receive_json()
 
+                ws_alice.send_json({"action": "set_ready", "payload": {"is_ready": True}})
+                ws_alice.receive_json()
+                ws_bob.receive_json()
+
+                ws_bob.send_json({"action": "set_ready", "payload": {"is_ready": True}})
+                ws_alice.receive_json()
+                ws_bob.receive_json()
+
                 ws_alice.send_json({"action": "start_game", "payload": {}})
 
                 msg_alice = ws_alice.receive_json()

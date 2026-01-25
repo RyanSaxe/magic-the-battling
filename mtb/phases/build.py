@@ -1,6 +1,8 @@
 from mtb.models.cards import Card
 from mtb.models.game import Game, Player
 from mtb.models.types import BuildSource
+from mtb.phases.elimination import get_live_players
+from mtb.phases.reward import apply_upgrade_to_card
 
 VALID_BASICS = frozenset(["Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes"])
 
@@ -22,7 +24,7 @@ def move_card(player: Player, card: Card, source: BuildSource, destination: Buil
     destination_collection.append(card)
 
 
-def submit(game: Game, player: Player, basics: list[str]) -> None:
+def set_ready(game: Game, player: Player, basics: list[str]) -> None:
     if player.phase != "build":
         raise ValueError("Player is not in build phase")
 
@@ -37,6 +39,22 @@ def submit(game: Game, player: Player, basics: list[str]) -> None:
         raise ValueError(f"Hand size exceeds maximum of {player.hand_size}")
 
     player.chosen_basics = basics
+    player.build_ready = True
+
+
+def unready(player: Player) -> None:
+    if player.phase != "build":
+        raise ValueError("Player is not in build phase")
+    player.build_ready = False
+
+
+def all_ready(game: Game) -> bool:
+    live_players = get_live_players(game)
+    return all(p.build_ready for p in live_players if p.phase == "build")
+
+
+def submit(game: Game, player: Player, basics: list[str]) -> None:
+    set_ready(game, player, basics)
     player.phase = "battle"
 
 
@@ -50,14 +68,13 @@ def apply_previous_defaults(player: Player) -> None:
     player.chosen_basics = player.previous_basics.copy()
 
 
-def apply_upgrade_to_card(player: Player, upgrade: Card, target: Card) -> None:
-    if upgrade not in player.upgrades:
-        raise ValueError("Player does not have this upgrade")
-
-    if upgrade.upgrade_target is not None:
-        raise ValueError("Upgrade has already been applied")
-
-    if target not in player.hand and target not in player.sideboard:
-        raise ValueError("Target card not in player's hand or sideboard")
-
-    upgrade.upgrade_target = target
+__all__ = [
+    "VALID_BASICS",
+    "move_card",
+    "set_ready",
+    "unready",
+    "all_ready",
+    "submit",
+    "apply_previous_defaults",
+    "apply_upgrade_to_card",
+]

@@ -1,7 +1,8 @@
 import random
 
 from mtb.models.cards import Card
-from mtb.models.game import Game, LastBattleResult, Player
+from mtb.models.game import Game, LastBattleResult, Player, StaticOpponent
+from mtb.phases.battle import BattleResult
 
 
 def is_stage_increasing(player: Player) -> bool:
@@ -105,6 +106,58 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
             card_gained=card_gained,
             vanquisher_gained=vanquisher_gained,
         )
+
+
+def _calculate_static_opponent_damage(opponent: StaticOpponent) -> int:
+    applied_upgrades = sum(1 for u in opponent.upgrades if u.upgrade_target is not None)
+    return 1 + applied_upgrades
+
+
+def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result: BattleResult) -> None:
+    if player.phase != "reward":
+        raise ValueError("Player is not in reward phase")
+
+    player_won = result.winner is not None and result.winner.name == player.name
+    is_draw = result.is_draw
+
+    poison_dealt = 0
+    poison_taken = 0
+
+    if player_won:
+        poison_dealt = calculate_damage(player)
+    elif is_draw:
+        poison_taken = _calculate_static_opponent_damage(opponent)
+        player.poison += poison_taken
+    else:
+        poison_taken = _calculate_static_opponent_damage(opponent)
+        player.poison += poison_taken
+
+    player.treasures += 1
+    vanquisher_gained = is_stage_increasing(player)
+    card_gained = None
+    if vanquisher_gained:
+        player.vanquishers += 1
+    else:
+        card_gained = award_random_card(game, player)
+
+    winner_name: str | None
+    if player_won:
+        winner_name = player.name
+    elif is_draw:
+        winner_name = None
+    else:
+        winner_name = opponent.name
+
+    player.last_battle_result = LastBattleResult(
+        opponent_name=opponent.name,
+        winner_name=winner_name,
+        is_draw=is_draw,
+        poison_dealt=poison_dealt,
+        poison_taken=poison_taken,
+        treasures_gained=1,
+        card_gained=card_gained,
+        vanquisher_gained=vanquisher_gained,
+    )
 
 
 def _start_with_result(game: Game, winner: Player, loser: Player) -> None:

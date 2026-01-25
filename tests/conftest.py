@@ -69,7 +69,10 @@ def client(reset_singletons, mock_cube_data):
 @pytest.fixture
 def game_with_players(client):
     """Create game with 2 players, return credentials."""
-    r1 = client.post("/api/games", json={"player_name": "Alice", "cube_id": "test"})
+    r1 = client.post(
+        "/api/games",
+        json={"player_name": "Alice", "cube_id": "test", "target_player_count": 2},
+    )
     d1 = r1.json()
     r2 = client.post("/api/games/join", json={"join_code": d1["join_code"], "player_name": "Bob"})
     d2 = r2.json()

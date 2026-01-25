@@ -55,7 +55,7 @@ def test_start_battle_creates_zones(card_factory):
 
     assert b.player is alice
     assert b.opponent is bob
-    assert b.coin_flip in (alice, bob)
+    assert b.coin_flip_name in (alice.name, bob.name)
     # 3 lands + 2 treasures = 5 cards on battlefield
     assert len(b.player_zones.battlefield) == 5
     lands = [c for c in b.player_zones.battlefield if "Land" in c.type_line]

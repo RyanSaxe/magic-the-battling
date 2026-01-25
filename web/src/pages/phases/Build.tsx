@@ -9,6 +9,8 @@ interface BuildPhaseProps {
   actions: {
     buildMove: (cardId: string, source: BuildSource, destination: BuildSource) => void
     buildSubmit: (basics: string[]) => void
+    buildReady: (basics: string[]) => void
+    buildUnready: () => void
     buildApplyUpgrade: (upgradeId: string, targetCardId: string) => void
   }
 }
@@ -62,11 +64,17 @@ export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
     }
   }
 
-  const handleSubmit = () => {
+  const handleReady = () => {
     if (selectedBasics.length === numBasicsNeeded) {
-      actions.buildSubmit(selectedBasics)
+      actions.buildReady(selectedBasics)
     }
   }
+
+  const handleUnready = () => {
+    actions.buildUnready()
+  }
+
+  const isReady = self_player.build_ready
 
   const unappliedUpgrades = self_player.upgrades.filter((u) => !u.upgrade_target)
   const allCards = [...self_player.hand, ...self_player.sideboard]
@@ -261,15 +269,34 @@ export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
           </div>
         </div>
 
-        {/* Submit button */}
-        <div className="flex justify-center">
-          <button
-            onClick={handleSubmit}
-            disabled={selectedBasics.length !== numBasicsNeeded}
-            className="btn btn-primary px-8 py-3 text-lg"
-          >
-            Submit Deck
-          </button>
+        {/* Ready/Submit button */}
+        <div className="flex flex-col items-center gap-2">
+          {isReady ? (
+            <>
+              <div className="text-amber-400 text-lg font-medium">
+                Waiting for other players...
+              </div>
+              <button
+                onClick={handleUnready}
+                className="btn bg-gray-600 hover:bg-gray-500 text-white px-8 py-3"
+              >
+                Unready
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={handleReady}
+              disabled={selectedBasics.length !== numBasicsNeeded || self_player.hand.length > maxHandSize}
+              className="btn btn-primary px-8 py-3 text-lg"
+            >
+              Ready
+            </button>
+          )}
+          {self_player.hand.length > maxHandSize && !isReady && (
+            <div className="text-red-400 text-sm">
+              Hand size exceeds limit. Move {self_player.hand.length - maxHandSize} card(s) to sideboard.
+            </div>
+          )}
         </div>
       </div>
     </GameDndProvider>

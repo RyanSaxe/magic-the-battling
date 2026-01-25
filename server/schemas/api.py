@@ -10,6 +10,7 @@ class CreateGameRequest(BaseModel):
     cube_id: str = "auto"
     use_upgrades: bool = True
     use_vanguards: bool = False
+    target_player_count: int = 4
 
 
 class CreateGameResponse(BaseModel):
@@ -63,6 +64,7 @@ class SelfPlayerView(PlayerView):
     sideboard: list[Card]
     current_pack: list[Card] | None = None
     last_battle_result: LastBattleResult | None = None
+    build_ready: bool = False
 
 
 class BattleView(BaseModel):
@@ -86,6 +88,7 @@ class GameStateResponse(BaseModel):
 class LobbyPlayer(BaseModel):
     name: str
     is_ready: bool = False
+    is_host: bool = False
 
 
 class LobbyStateResponse(BaseModel):
@@ -94,6 +97,7 @@ class LobbyStateResponse(BaseModel):
     players: list[LobbyPlayer]
     can_start: bool
     is_started: bool
+    target_player_count: int = 4
 
 
 class DraftSwapAction(BaseModel):

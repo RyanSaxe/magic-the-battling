@@ -1,10 +1,11 @@
 import random
-from typing import NamedTuple
+from typing import NamedTuple, TypeGuard, cast
 from uuid import uuid4
 
 from mtb.models.cards import Card
-from mtb.models.game import Battle, Game, Player, Zones
+from mtb.models.game import Battle, FakePlayer, Game, Player, StaticOpponent, Zones
 from mtb.models.types import ZoneName
+from mtb.phases.elimination import get_live_players
 
 BASIC_LAND_IMAGES = {
     "Plains": "https://cards.scryfall.io/large/front/1/d/1d7dba1c-a702-43c0-8fca-e47bbad4a00f.jpg",
@@ -16,6 +17,7 @@ BASIC_LAND_IMAGES = {
 }
 
 TREASURE_TOKEN_IMAGE = "https://cards.scryfall.io/large/front/f/a/fa8bbe0c-3813-4e3f-9bcf-cffe4fed6341.jpg"
+REPEAT_OPPONENT_WEIGHT = 0.1
 
 
 class BattleResult(NamedTuple):
@@ -60,10 +62,6 @@ def is_in_active_battle(game: Game, player: Player) -> bool:
     return any(player.name in (battle.player.name, battle.opponent.name) for battle in game.active_battles)
 
 
-def get_live_players(game: Game) -> list[Player]:
-    return [p for p in game.players if not p.is_ghost]
-
-
 def can_start_pairing(game: Game, round_num: int, stage: int) -> bool:
     live_players = get_live_players(game)
     for player in live_players:
@@ -87,7 +85,12 @@ def get_pairing_candidates(game: Game, player: Player) -> list[Player]:
     ]
 
 
-def find_opponent(game: Game, player: Player) -> Player | None:
+def get_available_fake_players(game: Game) -> list[FakePlayer]:
+    in_battle_names = {b.opponent.name for b in game.active_battles if isinstance(b.opponent, StaticOpponent)}
+    return [fp for fp in game.fake_players if fp.name not in in_battle_names and not fp.is_eliminated]
+
+
+def find_opponent(game: Game, player: Player) -> Player | StaticOpponent | None:
     if not can_start_pairing(game, player.round, player.stage):
         return None
 
@@ -95,14 +98,22 @@ def find_opponent(game: Game, player: Player) -> Player | None:
         return None
 
     candidates = get_pairing_candidates(game, player)
-    if not candidates:
-        live_players = get_live_players(game)
-        unpaired_live = [p for p in live_players if not is_in_active_battle(game, p)]
-        if len(unpaired_live) == 1 and game.most_recent_ghost is not None:
-            return game.most_recent_ghost
-        return None
+    if candidates:
+        return weighted_random_opponent(player, candidates)
 
-    return weighted_random_opponent(player, candidates)
+    available_fakes = get_available_fake_players(game)
+    if available_fakes:
+        fake = random.choice(available_fakes)
+        static_opp = fake.get_opponent_for_round(player.stage, player.round)
+        if static_opp:
+            return static_opp
+
+    live_players = get_live_players(game)
+    unpaired_live = [p for p in live_players if not is_in_active_battle(game, p)]
+    if len(unpaired_live) == 1 and game.most_recent_ghost is not None:
+        return game.most_recent_ghost
+
+    return None
 
 
 def weighted_random_opponent(player: Player, candidates: list[Player]) -> Player:
@@ -116,9 +127,9 @@ def weighted_random_opponent(player: Player, candidates: list[Player]) -> Player
 
     for candidate in candidates:
         if candidate.name == last_opponent:
-            weights.append(0.1)
+            weights.append(REPEAT_OPPONENT_WEIGHT)
         elif has_last_opponent:
-            equal_share = 0.9 / (len(candidates) - 1)
+            equal_share = (1.0 - REPEAT_OPPONENT_WEIGHT) / (len(candidates) - 1)
             weights.append(equal_share)
         else:
             weights.append(1.0 / len(candidates))
@@ -126,7 +137,58 @@ def weighted_random_opponent(player: Player, candidates: list[Player]) -> Player
     return random.choices(candidates, weights=weights, k=1)[0]
 
 
-def start(game: Game, player: Player, opponent: Player, is_sudden_death: bool = False) -> Battle:
+def _create_zones_for_static_opponent(opponent: StaticOpponent) -> Zones:
+    basics = [_create_basic_land(name) for name in opponent.chosen_basics]
+    treasures = [_create_treasure_token() for _ in range(opponent.treasures)]
+    submitted = opponent.hand + opponent.sideboard
+    return Zones(
+        battlefield=basics + treasures,
+        hand=opponent.hand.copy(),
+        sideboard=opponent.sideboard.copy(),
+        upgrades=opponent.upgrades.copy(),
+        treasures=opponent.treasures,
+        submitted_cards=submitted,
+    )
+
+
+def _is_static_opponent(opponent: Player | StaticOpponent) -> TypeGuard[StaticOpponent]:
+    return isinstance(opponent, StaticOpponent)
+
+
+def start(game: Game, player: Player, opponent: Player | StaticOpponent, is_sudden_death: bool = False) -> Battle:
+    if _is_static_opponent(opponent):
+        return _start_vs_static(game, player, opponent, is_sudden_death)
+    return _start_vs_player(game, player, cast(Player, opponent), is_sudden_death)
+
+
+def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_sudden_death: bool) -> Battle:
+    if not is_sudden_death and player.phase != "battle":
+        raise ValueError("Player is not in battle phase")
+
+    opponent_poison = opponent.poison
+    if player.poison > opponent_poison:
+        coin_flip_name = player.name
+    else:
+        coin_flip_name = random.choice([player.name, opponent.name])
+
+    player.previous_hand_ids = [c.id for c in player.hand]
+    player.previous_basics = player.chosen_basics.copy()
+
+    battle = Battle(
+        player=player,
+        opponent=opponent,
+        coin_flip_name=coin_flip_name,
+        player_zones=_create_zones_for_player(player),
+        opponent_zones=_create_zones_for_static_opponent(opponent),
+    )
+
+    game.active_battles.append(battle)
+    player.last_opponent_name = opponent.name
+
+    return battle
+
+
+def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_death: bool) -> Battle:
     if not is_sudden_death:
         if player.phase != "battle":
             raise ValueError("Player is not in battle phase")
@@ -135,27 +197,28 @@ def start(game: Game, player: Player, opponent: Player, is_sudden_death: bool = 
         if not opponent.is_ghost and not can_start_pairing(game, player.round, player.stage):
             raise ValueError("Cannot start pairing yet - not all players are ready")
 
-    # player with higher poison goes first
-    if player.poison > opponent.poison:
-        coin_flip = player
+    opponent_poison = opponent.poison
+    if player.poison > opponent_poison:
+        coin_flip_name = player.name
     else:
-        coin_flip = random.choice([player, opponent])
+        coin_flip_name = random.choice([player.name, opponent.name])
 
-    for p in (player, opponent):
-        if not p.is_ghost:
-            p.previous_hand_ids = [c.id for c in p.hand]
-            p.previous_basics = p.chosen_basics.copy()
+    player.previous_hand_ids = [c.id for c in player.hand]
+    player.previous_basics = player.chosen_basics.copy()
+
+    if not opponent.is_ghost:
+        opponent.previous_hand_ids = [c.id for c in opponent.hand]
+        opponent.previous_basics = opponent.chosen_basics.copy()
 
     battle = Battle(
         player=player,
         opponent=opponent,
-        coin_flip=coin_flip,
+        coin_flip_name=coin_flip_name,
         player_zones=_create_zones_for_player(player),
         opponent_zones=_create_zones_for_player(opponent),
     )
 
     game.active_battles.append(battle)
-
     player.last_opponent_name = opponent.name
     opponent.last_opponent_name = player.name
 
@@ -198,10 +261,19 @@ def submit_result(battle: Battle, player: Player, winner_name: str) -> None:
 
     battle.result_submissions[player.name] = winner_name
 
+    if _is_static_opponent(battle.opponent):
+        battle.result_submissions[battle.opponent.name] = winner_name
+
 
 def results_agreed(battle: Battle) -> bool:
-    if len(battle.result_submissions) != 2:
+    is_static = _is_static_opponent(battle.opponent)
+    required_count = 1 if is_static else 2
+
+    if len(battle.result_submissions) < required_count:
         return False
+
+    if is_static:
+        return True
 
     results = list(battle.result_submissions.values())
     return results[0] == results[1]
@@ -217,8 +289,11 @@ def get_result(battle: Battle) -> BattleResult | None:
         return BattleResult(winner=None, loser=None, is_draw=True)
 
     if winner_name == battle.player.name:
-        return BattleResult(battle.player, battle.opponent, is_draw=False)
-    return BattleResult(battle.opponent, battle.player, is_draw=False)
+        loser = None if _is_static_opponent(battle.opponent) else cast(Player, battle.opponent)
+        return BattleResult(battle.player, loser, is_draw=False)
+
+    winner = None if _is_static_opponent(battle.opponent) else cast(Player, battle.opponent)
+    return BattleResult(winner, battle.player, is_draw=False)
 
 
 def _sync_zones_to_player(zones: Zones, player: Player, max_treasures: int) -> None:
@@ -230,9 +305,40 @@ def _sync_zones_to_player(zones: Zones, player: Player, max_treasures: int) -> N
 
 
 def end(game: Game, battle: Battle) -> BattleResult:
+    if _is_static_opponent(battle.opponent):
+        return _end_vs_static(game, battle, battle.opponent)
+    return _end_vs_player(game, battle, cast(Player, battle.opponent))
+
+
+def _end_vs_static(game: Game, battle: Battle, opponent: StaticOpponent) -> BattleResult:
     if battle.player.phase != "battle":
         raise ValueError("Player is not in battle phase")
-    if battle.opponent.phase != "battle":
+
+    result = get_result(battle)
+    if result is None:
+        raise ValueError("Players have not agreed on the result")
+
+    _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
+
+    revealed = battle.player_zones.battlefield + battle.player_zones.graveyard + battle.player_zones.exile
+    battle.player.most_recently_revealed_cards = [c for c in revealed if _is_revealed_card(c)]
+
+    battle.player.phase = "reward"
+
+    if battle in game.active_battles:
+        game.active_battles.remove(battle)
+
+    return result
+
+
+def _is_revealed_card(card: Card) -> bool:
+    return not card.type_line.startswith("Basic Land") and not card.type_line.startswith("Token")
+
+
+def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult:
+    if battle.player.phase != "battle":
+        raise ValueError("Player is not in battle phase")
+    if opponent.phase != "battle":
         raise ValueError("Opponent is not in battle phase")
 
     result = get_result(battle)
@@ -240,14 +346,16 @@ def end(game: Game, battle: Battle) -> BattleResult:
         raise ValueError("Players have not agreed on the result")
 
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
-    _sync_zones_to_player(battle.opponent_zones, battle.opponent, game.config.max_treasures)
+    _sync_zones_to_player(battle.opponent_zones, opponent, game.config.max_treasures)
 
-    for player, zones in [(battle.player, battle.player_zones), (battle.opponent, battle.opponent_zones)]:
-        revealed = zones.battlefield + zones.graveyard + zones.exile
-        player.most_recently_revealed_cards = [c for c in revealed if not c.type_line.startswith("Basic Land")]
+    revealed = battle.player_zones.battlefield + battle.player_zones.graveyard + battle.player_zones.exile
+    battle.player.most_recently_revealed_cards = [c for c in revealed if _is_revealed_card(c)]
+
+    opp_revealed = battle.opponent_zones.battlefield + battle.opponent_zones.graveyard + battle.opponent_zones.exile
+    opponent.most_recently_revealed_cards = [c for c in opp_revealed if _is_revealed_card(c)]
 
     battle.player.phase = "reward"
-    battle.opponent.phase = "reward"
+    opponent.phase = "reward"
 
     if battle in game.active_battles:
         game.active_battles.remove(battle)

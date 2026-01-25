@@ -6,6 +6,7 @@ export interface GameOptions {
   cubeId?: string
   useUpgrades?: boolean
   useVanguards?: boolean
+  targetPlayerCount?: number
 }
 
 export async function createGame(
@@ -20,6 +21,7 @@ export async function createGame(
       cube_id: options.cubeId ?? 'auto',
       use_upgrades: options.useUpgrades ?? true,
       use_vanguards: options.useVanguards ?? false,
+      target_player_count: options.targetPlayerCount ?? 4,
     }),
   })
   if (!response.ok) {
