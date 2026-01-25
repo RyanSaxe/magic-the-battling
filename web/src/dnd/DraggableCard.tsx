@@ -1,0 +1,75 @@
+import { useDraggable } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
+import type { Card as CardType, ZoneName } from '../types'
+import { Card } from '../components/card'
+import type { DragData } from './types'
+
+interface DraggableCardProps {
+  card: CardType
+  zone: ZoneName
+  onClick?: () => void
+  onDoubleClick?: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
+  selected?: boolean
+  size?: 'xs' | 'sm' | 'md' | 'lg'
+  tapped?: boolean
+  faceDown?: boolean
+  counters?: Record<string, number>
+  glow?: 'none' | 'gold' | 'green' | 'red'
+  disabled?: boolean
+}
+
+export function DraggableCard({
+  card,
+  zone,
+  onClick,
+  onDoubleClick,
+  onContextMenu,
+  selected,
+  size = 'md',
+  tapped,
+  faceDown,
+  counters,
+  glow,
+  disabled = false,
+}: DraggableCardProps) {
+  const dragData: DragData = { card, fromZone: zone }
+
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `${zone}-${card.id}`,
+    data: dragData,
+    disabled,
+  })
+
+  const style = transform
+    ? {
+        transform: CSS.Translate.toString(transform),
+      }
+    : undefined
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu?.(e)
+      }}
+    >
+      <Card
+        card={card}
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        selected={selected}
+        size={size}
+        tapped={tapped}
+        faceDown={faceDown}
+        counters={counters}
+        glow={glow}
+        dragging={isDragging}
+      />
+    </div>
+  )
+}

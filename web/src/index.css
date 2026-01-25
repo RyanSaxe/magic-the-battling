@@ -1,0 +1,272 @@
+@import "tailwindcss";
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+
+  /* Magic-themed color palette */
+  --color-gold: #d4af37;
+  --color-gold-dark: #a88b3d;
+  --color-gold-glow: rgba(212, 175, 55, 0.6);
+
+  /* Mana colors */
+  --mana-white: #f8f6e3;
+  --mana-blue: #0e68ab;
+  --mana-black: #150b00;
+  --mana-red: #d3202a;
+  --mana-green: #00733e;
+
+  /* Table/playmat */
+  --table-dark: #0f2d1a;
+  --table-felt: #1a4d2e;
+  --table-felt-light: #234d32;
+
+  /* Zone backgrounds */
+  --zone-battlefield: rgba(34, 77, 50, 0.3);
+  --zone-graveyard: rgba(75, 45, 45, 0.4);
+  --zone-exile: rgba(88, 28, 135, 0.3);
+  --zone-hand: rgba(30, 58, 95, 0.3);
+
+  /* Card dimensions */
+  --card-width-sm: 80px;
+  --card-height-sm: 112px;
+  --card-width-md: 130px;
+  --card-height-md: 182px;
+  --card-width-lg: 200px;
+  --card-height-lg: 280px;
+
+  /* Transitions */
+  --transition-fast: 150ms ease-out;
+  --transition-normal: 200ms ease-out;
+  --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--table-dark);
+}
+
+/* Game table background - classic felt */
+.game-table {
+  background-color: var(--table-felt);
+  background-image:
+    radial-gradient(ellipse at center, var(--table-felt-light) 0%, var(--table-felt) 50%, var(--table-dark) 100%);
+  min-height: 100vh;
+}
+
+/* Card base styles */
+.card {
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+
+.card.tapped {
+  transform: rotate(90deg);
+  transition: transform var(--transition-spring);
+}
+
+
+.card.selected {
+  box-shadow: 0 0 20px var(--color-gold-glow);
+  outline: 2px solid var(--color-gold);
+}
+
+.card.dragging {
+  opacity: 0.5;
+  transform: scale(1.05);
+}
+
+/* Card on table has shadow for depth */
+.card-on-table {
+  box-shadow:
+    2px 4px 8px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Zone styles */
+.zone {
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+  border: 2px dashed transparent;
+  border-radius: 8px;
+}
+
+.zone.drop-valid {
+  box-shadow: inset 0 0 30px rgba(34, 197, 94, 0.3);
+  border-color: rgba(34, 197, 94, 0.6);
+  background-color: rgba(34, 197, 94, 0.1);
+}
+
+.zone.drop-invalid {
+  box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.3);
+  border-color: rgba(239, 68, 68, 0.6);
+}
+
+/* Battlefield - open area */
+.battlefield {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  min-height: 200px;
+}
+
+/* Zone piles (graveyard, exile) */
+.zone-pile {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  padding: 4px;
+  transition: transform var(--transition-normal);
+}
+
+.zone-pile:hover {
+  transform: scale(1.02);
+}
+
+/* Hand zone - horizontal row */
+.hand-zone {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.4), transparent);
+}
+
+.hand-zone .card {
+  margin-left: -40px;
+  transition: transform var(--transition-normal), margin var(--transition-fast);
+}
+
+.hand-zone .card:first-child {
+  margin-left: 0;
+}
+
+.hand-zone .card:hover {
+  transform: translateY(-20px);
+  z-index: 10;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.hand-zone .card:hover + .card {
+  margin-left: 0;
+}
+
+/* Counter badges */
+.counter-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-gold);
+}
+
+/* Loading skeleton shimmer */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.1) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Phase badges */
+.phase-badge {
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.phase-badge.draft {
+  background: rgba(147, 51, 234, 0.3);
+  color: #c084fc;
+}
+
+.phase-badge.build {
+  background: rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+}
+
+.phase-badge.battle {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.phase-badge.reward {
+  background: rgba(212, 175, 55, 0.3);
+  color: var(--color-gold);
+}
+
+/* Button improvements */
+.btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  border: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-gold-dark) 100%);
+  color: #1a1a1a;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--mana-red) 0%, #a61a22 100%);
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(211, 32, 42, 0.4);
+}
+
+/* Drag overlay */
+.drag-overlay {
+  cursor: grabbing;
+  transform: rotate(5deg) scale(1.05);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}

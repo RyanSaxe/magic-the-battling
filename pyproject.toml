@@ -4,13 +4,29 @@ version = "0.1.0"
 description = "A FastAPI application for Magic: The Battling game"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.115.6", "requests>=2.32.3"]
+dependencies = [
+    "fastapi>=0.115.6",
+    "uvicorn[standard]>=0.35.0",
+    "pydantic>=2.7",
+    "httpx>=0.28.1",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "python-multipart>=0.0.9",
+]
 
 [dependency-groups]
-dev = ["pytest>=8.3.4", "ruff>=0.8.6"]
+dev = [
+    "pytest-cov>=7.0.0",
+    "pytest>=8.3.4",
+]
 
-[tool.uv.sources]
-magic-the-battling = { workspace = true }
+[tool.coverage.run]
+relative_files = true
+
+
+
+[project.scripts]
+dev = "server.dev:main"
 
 [build-system]
 requires = ["hatchling"]
@@ -18,3 +34,38 @@ build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "UP",     # pyupgrade
+    "SIM",    # flake8-simplify
+    "C4",     # flake8-comprehensions
+    "PIE",    # flake8-pie
+    "RUF",    # ruff-specific
+    "PL",     # pylint
+    "PERF",   # perflint
+    "A",      # flake8-builtins
+    "PT",     # flake8-pytest-style
+    "FURB",   # refurb
+    "N",      # pep8-naming
+]
+ignore = [
+    "PLR0913",  # too many arguments - not always avoidable
+    "PLR2004",  # magic value comparison - too noisy
+    "PLR0911",  # too many return statements - match statements need many
+    "PLW0603",  # global statement - sometimes needed for singletons
+    "RUF022",   # __all__ not sorted - we organize by category with comments
+    "SIM105",   # contextlib.suppress - try/except/pass is clearer
+    "SIM108",   # ternary operator - can hurt readability
+    "PT011",    # pytest.raises too broad - exception type is sufficient
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    "N802",   # HTTP handler methods like do_GET are standard
+    "A002",   # shadowing builtins in test overrides is fine
+]

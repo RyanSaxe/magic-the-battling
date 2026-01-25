@@ -1,11 +1,9 @@
 import random
 import warnings
-from concurrent.futures import ThreadPoolExecutor
 
-import requests
 from pydantic import BaseModel, Field
 
-from mtb.utils import get_json, stop_worker
+from mtb.models.types import UPGRADE_TYPE, VANGUARD_TYPE
 
 
 class Card(BaseModel):
@@ -15,22 +13,29 @@ class Card(BaseModel):
     type_line: str
     tokens: tuple["Card", ...] = Field(default_factory=tuple)
     flip_image_url: str | None = None
+    png_url: str | None = None
+    flip_png_url: str | None = None
     elo: float = 0.0
-    upgrades: list["Card"] = Field(default_factory=list)
+    upgrade_target: "Card | None" = None
+
+    # vanguard specific properties
+    life_modifier: int | None = None
+    hand_modifier: int | None = None
 
     @property
-    def is_upgrade(self):
-        return self.type_line.lower() == "conspiracy"
+    def is_upgrade(self) -> bool:
+        return self.type_line.lower() == UPGRADE_TYPE
 
     @property
-    def is_vanguard(self):
-        return self.type_line.lower() == "vanguard"
+    def is_vanguard(self) -> bool:
+        return self.type_line.lower() == VANGUARD_TYPE
 
-    def upgrade(self, upgrade: "Card"):
+    def upgrade(self, upgrade: "Card") -> None:
         if not upgrade.is_upgrade:
             raise ValueError(f"{upgrade.name} is not a conspiracy and hence cannot be an upgrade")
-        self.upgrades.append(upgrade)
-        upgrade.upgrades.append(self)
+        if upgrade.upgrade_target is not None and upgrade.upgrade_target is not self:
+            raise ValueError(f"{upgrade.name} is already linked to {upgrade.upgrade_target.name}")
+        upgrade.upgrade_target = self
 
 
 class Battler(BaseModel):
@@ -46,55 +51,11 @@ class Battler(BaseModel):
         return sum(card.elo for card in self.cards) / len(self.cards)
 
 
-def get_card_from_scryfall(card_id: str) -> Card:
-    card_json = get_json(f"https://api.scryfall.com/cards/{card_id}")
-    image_url = card_json.get("image_uris", {}).get("normal")
-    if image_url is None:
-        image_url = card_json["card_faces"][0]["image_uris"]["normal"]
-        flip_image_url = card_json["card_faces"][1]["image_uris"]["normal"]
-    else:
-        flip_image_url = None
-    return Card(
-        name=card_json["name"],
-        image_url=image_url,
-        flip_image_url=flip_image_url,
-        type_line=card_json["type_line"],
-        id=card_json["id"],
-    )
-
-
-def cubecobra_to_card(card_json: dict) -> Card:
-    card_json = card_json["details"]
-    tokens = tuple(card_json.get("tokens", []))
-    if len(tokens) > 0:
-        # NOTE: get_json is cached so this shouldn't be an issue for repeated tokens
-        tokens = tuple(get_card_from_scryfall(token) for token in tokens)
-    return Card(
-        name=card_json["name_lower"],
-        image_url=card_json["image_normal"],
-        elo=card_json["elo"],
-        type_line=card_json["type"],
-        tokens=tokens,
-        flip_image_url=card_json.get("image_flip"),
-        id=card_json["scryfall_id"],
-    )
-
-
-DEFAULT_VANGUARD_ID = "default_mtb_vanguards"
 DEFAULT_BATTLER_ID = "auto"
 DEFAULT_UPGRADES_ID = "default_mtb_upgrades"
 
-
-def get_cube_data(cube_id: str) -> list[Card]:
-    url = f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
-
-    response = requests.get(url)
-    data = response.json()
-    cube = data["cards"]["mainboard"]
-
-    with ThreadPoolExecutor() as executor:
-        results = list(executor.map(cubecobra_to_card, cube))
-    return results
+# TODO: actually add a lot of vanguards to the default cube
+DEFAULT_VANGUARD_ID = "default_mtb_vanguards"
 
 
 def build_battler(
@@ -102,32 +63,30 @@ def build_battler(
     upgrades_id: str | None = None,
     vanguards_id: str | None = None,
 ) -> Battler:
-    try:
-        cards = get_cube_data(battler_id)
+    from mtb.utils.cubecobra import get_cube_data  # noqa: PLC0415 (circular import)
 
-        vanguards = [card for card in cards if card.type_line.lower() == "vanguard"]
-        if vanguards_id is not None:
-            if len(vanguards) > 0:
-                warnings.warn("Vanguards found in battler. Replacing them with vanguards from the passed vanguard id.")
-            vanguards = get_cube_data(vanguards_id)
+    cards = get_cube_data(battler_id)
 
-        upgrades = [card for card in cards if card.type_line.lower() == "conspiracy"]
-        if upgrades_id is not None:
-            if len(upgrades) > 0:
-                warnings.warn("Upgrades found in battler. Replacing them with upgrades from the passed upgrades id.")
-            upgrades = get_cube_data(upgrades_id)
+    vanguards = [card for card in cards if card.type_line.lower() == VANGUARD_TYPE]
+    if vanguards_id is not None:
+        if len(vanguards) > 0:
+            warnings.warn(
+                "Vanguards found in battler. Replacing them with vanguards from the passed vanguard id.",
+                stacklevel=2,
+            )
+        vanguards = get_cube_data(vanguards_id)
 
-        cards = [card for card in cards if card.type_line.lower() not in ("vanguard", "conspiracy")]
-    finally:
-        stop_worker()
+    upgrades = [card for card in cards if card.type_line.lower() == UPGRADE_TYPE]
+    if upgrades_id is not None:
+        if len(upgrades) > 0:
+            warnings.warn(
+                "Upgrades found in battler. Replacing them with upgrades from the passed upgrades id.",
+                stacklevel=2,
+            )
+        upgrades = get_cube_data(upgrades_id)
+
+    cards = [card for card in cards if card.type_line.lower() not in (VANGUARD_TYPE, UPGRADE_TYPE)]
+    if not cards:
+        raise ValueError(f"Cube '{battler_id}' contains no playable cards after filtering")
 
     return Battler(cards=cards, upgrades=upgrades, vanguards=vanguards)
-
-
-if __name__ == "__main__":
-    # Example usage
-    battler = build_battler()
-    print(battler)
-    print(f"Elo: {battler.elo}")
-    battler.shuffle()
-    print("Shuffled cards:", battler.cards)
