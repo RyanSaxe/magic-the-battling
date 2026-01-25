@@ -63,7 +63,7 @@ def build_battler(
     upgrades_id: str | None = None,
     vanguards_id: str | None = None,
 ) -> Battler:
-    from mtb.utils.cubecobra import get_cube_data
+    from mtb.utils.cubecobra import get_cube_data  # noqa: PLC0415 (circular import)
 
     cards = get_cube_data(battler_id)
 

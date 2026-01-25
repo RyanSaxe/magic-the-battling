@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 import server.routers.ws as ws_module
 import server.services.game_manager as gm_module
 import server.services.session_manager as sm_module
-from mtb.models.cards import Card
+from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
 from mtb.models.game import Player
 from server.main import app
 from server.routers.ws import ConnectionManager
@@ -49,7 +49,6 @@ def reset_singletons():
 @pytest.fixture
 def mock_cube_data(card_factory, upgrade_factory, monkeypatch):
     """Mock cubecobra to avoid network calls."""
-    from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID
 
     def _mock(cube_id: str):
         if cube_id == DEFAULT_UPGRADES_ID:
