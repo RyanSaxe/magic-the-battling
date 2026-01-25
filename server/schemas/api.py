@@ -114,6 +114,7 @@ class LobbyStateResponse(BaseModel):
     target_player_count: int = 4
     cube_loading_status: CubeLoadingStatus = "loading"
     cube_loading_error: str | None = None
+    available_bot_count: int | None = None
 
 
 class DraftSwapAction(BaseModel):
@@ -184,8 +185,3 @@ class WebSocketMessage(BaseModel):
 class ErrorResponse(BaseModel):
     error: str
     detail: str | None = None
-
-
-class BotAvailabilityResponse(BaseModel):
-    available: bool
-    count: int

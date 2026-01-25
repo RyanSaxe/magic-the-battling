@@ -8,6 +8,7 @@ from typing import cast
 
 from sqlalchemy.orm import Session
 
+import server.db.database as db
 from mtb.models.cards import (
     DEFAULT_UPGRADES_ID,
     DEFAULT_VANGUARD_ID,
@@ -189,7 +190,7 @@ class GameManager:
             if num_fakes_needed > 0:
                 target_elo = battler.elo if battler.elo else 1200.0
                 self.load_fake_players_for_game(
-                    db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards
+                    db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards, pending.cube_id
                 )
 
         self._active_games[game_id] = game
@@ -239,7 +240,7 @@ class GameManager:
             if num_fakes_needed > 0:
                 target_elo = battler.elo if battler.elo else 1200.0
                 self.load_fake_players_for_game(
-                    db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards
+                    db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards, pending.cube_id
                 )
 
         self._active_games[game_id] = game
@@ -336,6 +337,7 @@ class GameManager:
         exclude_ids: list[int],
         use_upgrades: bool | None = None,
         use_vanguards: bool | None = None,
+        cube_id: str | None = None,
     ) -> list[PlayerGameHistory]:
         query = db.query(PlayerGameHistory).filter(
             PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else True,
@@ -343,7 +345,9 @@ class GameManager:
         )
 
         all_histories = query.all()
-        matching = []
+        same_cube: list[PlayerGameHistory] = []
+        other_cube: list[PlayerGameHistory] = []
+
         for history in all_histories:
             game_record = db.query(GameRecord).filter(GameRecord.id == history.game_id).first()
             if not game_record or not game_record.config_json:
@@ -353,14 +357,24 @@ class GameManager:
                 continue
             if use_vanguards is not None and config.get("use_vanguards") != use_vanguards:
                 continue
-            matching.append(history)
+
+            if cube_id and config.get("cube_id") == cube_id:
+                same_cube.append(history)
+            else:
+                other_cube.append(history)
 
         if target_elo:
-            matching.sort(key=lambda h: abs(cast(float, h.battler_elo) - target_elo))
+            same_cube.sort(key=lambda h: abs(cast(float, h.battler_elo) - target_elo))
+            other_cube.sort(key=lambda h: abs(cast(float, h.battler_elo) - target_elo))
         else:
-            random.shuffle(matching)
+            random.shuffle(same_cube)
+            random.shuffle(other_cube)
 
-        return matching[:count]
+        result = same_cube[:count]
+        if len(result) < count:
+            result.extend(other_cube[: count - len(result)])
+
+        return result
 
     def _load_fake_player(self, db: Session, history: PlayerGameHistory) -> FakePlayer:
         snapshots_dict: dict[str, StaticOpponent] = {}
@@ -389,20 +403,20 @@ class GameManager:
             .first()
         )
 
+        stage = player.hand_size
+
         if not history:
             history = PlayerGameHistory(
                 game_id=game_id,
                 player_name=player.name,
                 battler_elo=battler_elo,
-                max_stage=player.stage,
+                max_stage=stage,
                 max_round=player.round,
             )
             db.add(history)
             db.flush()
-        elif player.stage > history.max_stage or (
-            player.stage == history.max_stage and player.round > history.max_round
-        ):
-            history.max_stage = player.stage
+        elif stage > history.max_stage or (stage == history.max_stage and player.round > history.max_round):
+            history.max_stage = stage
             history.max_round = player.round
 
         snapshot_data = BattleSnapshotData(
@@ -415,7 +429,7 @@ class GameManager:
 
         snapshot = BattleSnapshot(
             player_history_id=history.id,
-            stage=player.stage,
+            stage=stage,
             round=player.round,
             hand_json=json.dumps([c.model_dump() for c in player.hand]),
             vanguard_json=player.vanguard.model_dump_json() if player.vanguard else None,
@@ -435,11 +449,12 @@ class GameManager:
         target_elo: float,
         use_upgrades: bool | None = None,
         use_vanguards: bool | None = None,
+        cube_id: str | None = None,
     ) -> None:
         if count <= 0:
             return
 
-        histories = self._find_historical_players(db, target_elo, count, [], use_upgrades, use_vanguards)
+        histories = self._find_historical_players(db, target_elo, count, [], use_upgrades, use_vanguards, cube_id)
         for history in histories:
             fake_player = self._load_fake_player(db, history)
             game.fake_players.append(fake_player)
@@ -491,6 +506,23 @@ class GameManager:
             return "ready"
         return "loading"
 
+    def _count_available_bots(self, pending: PendingGame) -> int | None:
+        if pending.battler is None:
+            return None
+
+        db_session = db.SessionLocal()
+        try:
+            target_elo = pending.battler.elo if pending.battler.elo else 1200.0
+            num_needed = pending.target_player_count - len(pending.player_names)
+            if num_needed <= 0:
+                return 0
+            histories = self._find_historical_players(
+                db_session, target_elo, num_needed, [], pending.use_upgrades, pending.use_vanguards, pending.cube_id
+            )
+            return len(histories)
+        finally:
+            db_session.close()
+
     def get_lobby_state(self, game_id: str) -> LobbyStateResponse | None:
         pending = self._pending_games.get(game_id)
         if not pending:
@@ -509,7 +541,10 @@ class GameManager:
             )
 
         all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
-        can_start = pending.target_player_count >= 2 and all_ready
+        bot_count = self._count_available_bots(pending)
+        num_bots_needed = pending.target_player_count - len(pending.player_names)
+        has_enough_bots = bot_count is not None and bot_count >= num_bots_needed
+        can_start = pending.target_player_count >= 2 and all_ready and has_enough_bots
 
         return LobbyStateResponse(
             game_id=game_id,
@@ -520,6 +555,7 @@ class GameManager:
             target_player_count=pending.target_player_count,
             cube_loading_status=self._get_cube_loading_status(pending),
             cube_loading_error=pending.battler_error,
+            available_bot_count=bot_count,
         )
 
     def get_game_state(self, game_id: str, player_id: str) -> GameStateResponse | None:
