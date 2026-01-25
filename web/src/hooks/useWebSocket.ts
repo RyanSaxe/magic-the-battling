@@ -19,9 +19,13 @@ export function useWebSocket(gameId: string | null, sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<number | null>(null)
   const reconnectAttempts = useRef(0)
+  const isClosingRef = useRef(false)
 
   useEffect(() => {
     if (!gameId || !sessionId) return
+
+    isClosingRef.current = false
+    reconnectAttempts.current = 0
 
     const connect = () => {
       if (!gameId || !sessionId) return
@@ -50,9 +54,11 @@ export function useWebSocket(gameId: string | null, sessionId: string | null) {
         setState(s => ({ ...s, isConnected: false }))
         wsRef.current = null
 
-        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000)
-        reconnectAttempts.current++
-        reconnectTimeoutRef.current = window.setTimeout(connect, delay)
+        if (!isClosingRef.current) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000)
+          reconnectAttempts.current++
+          reconnectTimeoutRef.current = window.setTimeout(connect, delay)
+        }
       }
 
       ws.onerror = () => {
@@ -65,6 +71,7 @@ export function useWebSocket(gameId: string | null, sessionId: string | null) {
     connect()
 
     return () => {
+      isClosingRef.current = true
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
       }

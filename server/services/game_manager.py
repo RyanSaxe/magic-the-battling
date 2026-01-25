@@ -484,6 +484,12 @@ class GameManager:
             library=[],
             treasures=opponent_zones.treasures,
             submitted_cards=[],
+            tapped_card_ids=opponent_zones.tapped_card_ids,
+            flipped_card_ids=opponent_zones.flipped_card_ids,
+            face_down_card_ids=opponent_zones.face_down_card_ids,
+            counters=opponent_zones.counters,
+            attachments=opponent_zones.attachments,
+            spawned_tokens=opponent_zones.spawned_tokens,
         )
 
         your_poison = b.player.poison if is_player else b.opponent.poison
