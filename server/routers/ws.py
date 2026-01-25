@@ -2,11 +2,29 @@ from collections import defaultdict
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from server.db.database import SessionLocal
+import server.db.database as db
 from server.services.game_manager import game_manager
 from server.services.session_manager import session_manager
 
 router = APIRouter()
+
+ACTION_REQUIRED_PHASES: dict[str, str] = {
+    "draft_swap": "draft",
+    "draft_roll": "draft",
+    "draft_done": "draft",
+    "build_move": "build",
+    "build_swap": "build",
+    "build_ready": "build",
+    "build_unready": "build",
+    "build_apply_upgrade": "build",
+    "battle_move": "battle",
+    "battle_submit_result": "battle",
+    "battle_update_card_state": "battle",
+    "battle_update_life": "battle",
+    "reward_pick_upgrade": "reward",
+    "reward_apply_upgrade": "reward",
+    "reward_done": "reward",
+}
 
 
 class ConnectionManager:
@@ -67,6 +85,29 @@ class ConnectionManager:
             }
         )
 
+    async def broadcast_game_over(self, game_id: str, winner_name: str | None):
+        if game_id not in self._connections:
+            return
+
+        for player_id, websocket in list(self._connections[game_id].items()):
+            state = game_manager.get_game_state(game_id, player_id)
+            if state:
+                try:
+                    await websocket.send_json(
+                        {
+                            "type": "game_over",
+                            "payload": {"winner_name": winner_name},
+                        }
+                    )
+                    await websocket.send_json(
+                        {
+                            "type": "game_state",
+                            "payload": state.model_dump(),
+                        }
+                    )
+                except Exception:
+                    self.disconnect(game_id, player_id)
+
 
 connection_manager = ConnectionManager()
 
@@ -111,6 +152,16 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, session_id: str
         await connection_manager.broadcast_lobby_state(game_id)
 
 
+def _validate_action_phase(action: str, player) -> str | None:
+    """Returns error message if action invalid for player's phase, None if valid."""
+    required_phase = ACTION_REQUIRED_PHASES.get(action)
+    if required_phase is None:
+        return None
+    if player.phase != required_phase:
+        return f"Cannot {action}: player is in {player.phase} phase, requires {required_phase}"
+    return None
+
+
 async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_id: str, websocket: WebSocket) -> bool:
     if action == "set_ready":
         is_ready = payload.get("is_ready", True)
@@ -126,11 +177,11 @@ async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_
             await connection_manager.send_error(websocket, error or "Cannot start game")
             return True
 
-        db = SessionLocal()
+        db_session = db.SessionLocal()
         try:
-            result = game_manager.start_game(game_id, db)
+            result = await game_manager.start_game_async(game_id, db_session)
         finally:
-            db.close()
+            db_session.close()
 
         if result:
             await connection_manager.broadcast_game_state(game_id)
@@ -161,14 +212,12 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
                 payload["card_b_id"],
                 payload["source_b"],
             )
-        case "build_submit":
-            return game_manager.handle_build_submit(game, player, payload["basics"])
         case "build_ready":
-            db = SessionLocal()
+            db_session = db.SessionLocal()
             try:
-                return game_manager.handle_build_ready(game, player, payload["basics"], game_id, db)
+                return game_manager.handle_build_ready(game, player, payload["basics"], game_id, db_session)
             finally:
-                db.close()
+                db_session.close()
         case "build_unready":
             return game_manager.handle_build_unready(player)
         case "build_apply_upgrade":
@@ -190,7 +239,11 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
         case "reward_apply_upgrade":
             return game_manager.handle_reward_apply_upgrade(player, payload["upgrade_id"], payload["target_card_id"])
         case "reward_done":
-            return game_manager.handle_reward_done(game, player, payload.get("upgrade_id"))
+            db_session = db.SessionLocal()
+            try:
+                return game_manager.handle_reward_done(game, player, payload.get("upgrade_id"), game_id, db_session)
+            finally:
+                db_session.close()
         case _:
             return False
 
@@ -212,10 +265,19 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
         await connection_manager.send_error(websocket, "Player not found in game")
         return
 
+    phase_error = _validate_action_phase(action, player)
+    if phase_error:
+        await connection_manager.send_error(websocket, phase_error)
+        return
+
     result = _dispatch_game_action(action, payload, game, player, game_id)
 
     if result is False:
         await connection_manager.send_error(websocket, f"Unknown action: {action}")
+    elif result == "game_over":
+        winners = [p for p in game.players if p.phase == "winner"]
+        winner_name = winners[0].name if winners else None
+        await connection_manager.broadcast_game_over(game_id, winner_name)
     elif result is True or result is None:
         await connection_manager.broadcast_game_state(game_id)
     elif isinstance(result, str):

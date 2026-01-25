@@ -72,6 +72,9 @@ class FakePlayer(BaseModel):
     player_history_id: int
     snapshots: dict[str, StaticOpponent] = Field(default_factory=dict)
     is_eliminated: bool = False
+    poison: int = 0
+    round: int = 1
+    stage: int = 1
 
     def get_opponent_for_round(self, stage: int, round_num: int) -> StaticOpponent | None:
         key = f"{stage}_{round_num}"
@@ -200,7 +203,10 @@ class Game(BaseModel):
     draft_state: DraftState | None = None
     active_battles: list["Battle"] = Field(default_factory=list)
     most_recent_ghost: Player | None = None
+    most_recent_ghost_bot: FakePlayer | None = None
     fake_players: list[FakePlayer] = Field(default_factory=list)
+    stage: int = 3
+    round: int = 1
 
     def model_post_init(self, _context: Any) -> None:
         for player in self.players:

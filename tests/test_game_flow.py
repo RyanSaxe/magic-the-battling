@@ -22,10 +22,11 @@ def test_full_round_flow_round_1(card_factory, upgrade_factory):
     assert len(bob.hand) == hand_size
     assert len(bob.sideboard) == pool_size - hand_size
 
-    build.submit(game, alice, ["Plains", "Island", "Mountain"])
-    build.submit(game, bob, ["Forest", "Swamp", "Mountain"])
-    assert alice.phase == "battle"
-    assert bob.phase == "battle"
+    build.set_ready(game, alice, ["Plains", "Island", "Mountain"])
+    build.set_ready(game, bob, ["Forest", "Swamp", "Mountain"])
+    assert build.all_ready(game)
+    alice.phase = "battle"
+    bob.phase = "battle"
 
     b = battle.start(game, alice, bob)
     battle.submit_result(b, alice, "Alice")
@@ -77,10 +78,11 @@ def test_full_round_flow_round_2(card_factory, upgrade_factory):
     assert alice.phase == "build"
     assert bob.phase == "build"
 
-    build.submit(game, alice, ["Plains", "Island", "Mountain"])
-    build.submit(game, bob, ["Forest", "Swamp", "Mountain"])
-    assert alice.phase == "battle"
-    assert bob.phase == "battle"
+    build.set_ready(game, alice, ["Plains", "Island", "Mountain"])
+    build.set_ready(game, bob, ["Forest", "Swamp", "Mountain"])
+    assert build.all_ready(game)
+    alice.phase = "battle"
+    bob.phase = "battle"
 
     b = battle.start(game, alice, bob)
     battle.submit_result(b, alice, "Alice")

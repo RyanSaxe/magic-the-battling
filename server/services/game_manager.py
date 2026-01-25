@@ -1,9 +1,11 @@
+import asyncio
 import json
+import random
 import secrets
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import cast
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from mtb.models.cards import (
@@ -26,11 +28,18 @@ from mtb.models.game import (
 )
 from mtb.models.types import BuildSource, CardDestination, ZoneName
 from mtb.phases import battle, build, draft, reward
-from mtb.phases.elimination import get_live_players, process_eliminations
-from server.db.models import BattleSnapshot, PlayerGameHistory
+from mtb.phases.elimination import (
+    check_game_over,
+    get_live_players,
+    process_bot_eliminations,
+    process_eliminations,
+)
+from server.db.models import BattleSnapshot, GameRecord, PlayerGameHistory
 from server.schemas.api import (
     BattleView,
+    CubeLoadingStatus,
     GameStateResponse,
+    LastResult,
     LobbyPlayer,
     LobbyStateResponse,
     PlayerView,
@@ -51,6 +60,10 @@ class PendingGame:
     use_vanguards: bool = False
     target_player_count: int = 4
     player_ready: dict[str, bool] = field(default_factory=dict)
+    battler: Battler | None = None
+    battler_loading: bool = False
+    battler_error: str | None = None
+    _loading_task: asyncio.Task | None = field(default=None, repr=False)
 
 
 class GameManager:
@@ -60,6 +73,7 @@ class GameManager:
         self._player_to_game: dict[str, str] = {}
         self._player_id_to_name: dict[str, str] = {}
         self._join_code_to_game: dict[str, str] = {}
+        self._cleanup_tasks: dict[str, asyncio.Task] = {}
 
     def create_game(
         self,
@@ -159,31 +173,194 @@ class GameManager:
         set_battler(game, battler)
 
         if db is not None:
+            config_data = {
+                "use_upgrades": pending.use_upgrades,
+                "use_vanguards": pending.use_vanguards,
+                "cube_id": pending.cube_id,
+            }
+            game_record = GameRecord(
+                id=game_id,
+                config_json=json.dumps(config_data),
+            )
+            db.add(game_record)
+            db.commit()
+
             num_fakes_needed = pending.target_player_count - len(pending.player_names)
             if num_fakes_needed > 0:
                 target_elo = battler.elo if battler.elo else 1200.0
-                self.load_fake_players_for_game(db, game, num_fakes_needed, target_elo)
+                self.load_fake_players_for_game(
+                    db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards
+                )
 
         self._active_games[game_id] = game
 
         return game
+
+    async def start_game_async(self, game_id: str, db: Session | None = None) -> Game | None:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.target_player_count < 2:
+            return None
+
+        if pending._loading_task and not pending._loading_task.done():
+            try:
+                await asyncio.wait_for(pending._loading_task, timeout=30.0)
+            except TimeoutError:
+                pass
+
+        pending.is_started = True
+
+        config = Config(
+            use_upgrades=pending.use_upgrades,
+            use_vanguards=pending.use_vanguards,
+        )
+        game = create_game(pending.player_names, len(pending.player_names), config)
+
+        battler = (
+            pending.battler
+            if pending.battler
+            else self._load_battler(pending.cube_id, pending.use_upgrades, pending.use_vanguards)
+        )
+        set_battler(game, battler)
+
+        if db is not None:
+            config_data = {
+                "use_upgrades": pending.use_upgrades,
+                "use_vanguards": pending.use_vanguards,
+                "cube_id": pending.cube_id,
+            }
+            game_record = GameRecord(
+                id=game_id,
+                config_json=json.dumps(config_data),
+            )
+            db.add(game_record)
+            db.commit()
+
+            num_fakes_needed = pending.target_player_count - len(pending.player_names)
+            if num_fakes_needed > 0:
+                target_elo = battler.elo if battler.elo else 1200.0
+                self.load_fake_players_for_game(
+                    db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards
+                )
+
+        self._active_games[game_id] = game
+
+        return game
+
+    def complete_game(self, game_id: str, winner: Player | None, db: Session | None = None) -> None:
+        """Complete a game - set phases, persist final state, schedule cleanup."""
+        game = self._active_games.get(game_id)
+        if not game:
+            return
+
+        for player in game.players:
+            if winner and player.name == winner.name:
+                player.phase = "winner"
+            elif not player.is_ghost:
+                player.phase = "game_over"
+
+        if db is not None:
+            game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
+            if game_record:
+                game_record.ended_at = datetime.now(UTC)
+                if winner:
+                    game_record.winner_player_id = winner.name
+                db.commit()
+
+        self._schedule_cleanup(game_id)
+
+    def _schedule_cleanup(self, game_id: str, delay: float = 300.0) -> None:
+        """Schedule async cleanup after delay seconds (default 5 min)."""
+        if game_id in self._cleanup_tasks:
+            self._cleanup_tasks[game_id].cancel()
+
+        async def cleanup_after_delay():
+            await asyncio.sleep(delay)
+            self._cleanup_game(game_id)
+
+        try:
+            loop = asyncio.get_event_loop()
+            task = loop.create_task(cleanup_after_delay())
+            self._cleanup_tasks[game_id] = task
+        except RuntimeError:
+            pass
+
+    def _cleanup_game(self, game_id: str) -> None:
+        """Remove game from memory."""
+        pending = self._pending_games.get(game_id)
+        if pending:
+            if pending._loading_task and not pending._loading_task.done():
+                pending._loading_task.cancel()
+            self._join_code_to_game.pop(pending.join_code, None)
+
+        self._active_games.pop(game_id, None)
+        self._pending_games.pop(game_id, None)
+
+        players_to_remove = [pid for pid, gid in self._player_to_game.items() if gid == game_id]
+        for pid in players_to_remove:
+            self._player_to_game.pop(pid, None)
+            self._player_id_to_name.pop(pid, None)
+
+        self._cleanup_tasks.pop(game_id, None)
 
     def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
         vanguards_id = DEFAULT_VANGUARD_ID if use_vanguards else None
         return build_battler(cube_id, upgrades_id, vanguards_id)
 
+    async def _preload_battler(self, pending: PendingGame) -> None:
+        pending.battler_loading = True
+        try:
+            loop = asyncio.get_running_loop()
+            battler = await loop.run_in_executor(
+                None, self._load_battler, pending.cube_id, pending.use_upgrades, pending.use_vanguards
+            )
+            pending.battler = battler
+        except Exception as e:
+            pending.battler_error = str(e)
+        finally:
+            pending.battler_loading = False
+
+    def start_battler_preload(self, pending: PendingGame) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(self._preload_battler(pending))
+            pending._loading_task = task
+        except RuntimeError:
+            pending.battler_loading = False
+
     def _find_historical_players(
-        self, db: Session, target_elo: float, count: int, exclude_ids: list[int]
+        self,
+        db: Session,
+        target_elo: float,
+        count: int,
+        exclude_ids: list[int],
+        use_upgrades: bool | None = None,
+        use_vanguards: bool | None = None,
     ) -> list[PlayerGameHistory]:
-        query = db.query(PlayerGameHistory).filter(PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else True)
+        query = db.query(PlayerGameHistory).filter(
+            PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else True,
+            PlayerGameHistory.max_stage >= 5,
+        )
+
+        all_histories = query.all()
+        matching = []
+        for history in all_histories:
+            game_record = db.query(GameRecord).filter(GameRecord.id == history.game_id).first()
+            if not game_record or not game_record.config_json:
+                continue
+            config = json.loads(game_record.config_json)
+            if use_upgrades is not None and config.get("use_upgrades") != use_upgrades:
+                continue
+            if use_vanguards is not None and config.get("use_vanguards") != use_vanguards:
+                continue
+            matching.append(history)
 
         if target_elo:
-            query = query.order_by(func.abs(PlayerGameHistory.battler_elo - target_elo))
+            matching.sort(key=lambda h: abs(cast(float, h.battler_elo) - target_elo))
         else:
-            query = query.order_by(func.random())
+            random.shuffle(matching)
 
-        return query.limit(count).all()
+        return matching[:count]
 
     def _load_fake_player(self, db: Session, history: PlayerGameHistory) -> FakePlayer:
         snapshots_dict: dict[str, StaticOpponent] = {}
@@ -250,11 +427,19 @@ class GameManager:
         db.add(snapshot)
         db.commit()
 
-    def load_fake_players_for_game(self, db: Session, game: Game, count: int, target_elo: float) -> None:
+    def load_fake_players_for_game(
+        self,
+        db: Session,
+        game: Game,
+        count: int,
+        target_elo: float,
+        use_upgrades: bool | None = None,
+        use_vanguards: bool | None = None,
+    ) -> None:
         if count <= 0:
             return
 
-        histories = self._find_historical_players(db, target_elo, count, [])
+        histories = self._find_historical_players(db, target_elo, count, [], use_upgrades, use_vanguards)
         for history in histories:
             fake_player = self._load_fake_player(db, history)
             game.fake_players.append(fake_player)
@@ -299,6 +484,13 @@ class GameManager:
         self._player_id_to_name[player_id] = player_name
         return True
 
+    def _get_cube_loading_status(self, pending: PendingGame) -> CubeLoadingStatus:
+        if pending.battler_error:
+            return "error"
+        if pending.battler is not None:
+            return "ready"
+        return "loading"
+
     def get_lobby_state(self, game_id: str) -> LobbyStateResponse | None:
         pending = self._pending_games.get(game_id)
         if not pending:
@@ -326,6 +518,8 @@ class GameManager:
             can_start=can_start,
             is_started=pending.is_started,
             target_player_count=pending.target_player_count,
+            cube_loading_status=self._get_cube_loading_status(pending),
+            cube_loading_error=pending.battler_error,
         )
 
     def get_game_state(self, game_id: str, player_id: str) -> GameStateResponse | None:
@@ -398,6 +592,16 @@ class GameManager:
             return "draft"
         return "unknown"
 
+    def _get_last_result(self, player: Player) -> LastResult | None:
+        result = player.last_battle_result
+        if result is None:
+            return None
+        if result.is_draw:
+            return "draw"
+        if result.winner_name != player.name:
+            return "loss"
+        return "win"
+
     def _make_player_view(self, player: Player, viewer: Player) -> PlayerView:
         return PlayerView(
             name=player.name,
@@ -418,15 +622,29 @@ class GameManager:
             vanguard=player.vanguard,
             chosen_basics=player.chosen_basics,
             most_recently_revealed_cards=player.most_recently_revealed_cards,
+            last_result=self._get_last_result(player),
         )
+
+    def _get_prior_snapshot_key(self, stage: int, round_num: int, num_rounds: int = 3) -> str | None:
+        """Get the key for the previous stage-round pair."""
+        if round_num > 1:
+            return f"{stage}_{round_num - 1}"
+        elif stage > 3:
+            return f"{stage - 1}_{num_rounds}"
+        else:
+            return None
 
     def _make_fake_player_view(self, fake: FakePlayer, viewer: Player) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
+        prior_key = self._get_prior_snapshot_key(viewer.stage, viewer.round)
+        prior_snapshot = fake.snapshots.get(prior_key) if prior_key else None
+        revealed_cards = prior_snapshot.hand if prior_snapshot else []
+
         if snapshot:
             return PlayerView(
                 name=fake.name,
                 treasures=snapshot.treasures,
-                poison=snapshot.poison,
+                poison=fake.poison,
                 phase="battle",
                 round=viewer.round,
                 stage=viewer.stage,
@@ -441,7 +659,7 @@ class GameManager:
                 upgrades=snapshot.upgrades,
                 vanguard=snapshot.vanguard,
                 chosen_basics=snapshot.chosen_basics,
-                most_recently_revealed_cards=snapshot.hand if snapshot.hand_revealed else [],
+                most_recently_revealed_cards=revealed_cards,
             )
         return PlayerView(
             name=fake.name,
@@ -592,16 +810,13 @@ class GameManager:
         except ValueError as e:
             return str(e)
 
-    def handle_build_submit(self, game: Game, player: Player, basics: list[str]) -> str | None:
-        try:
-            build.submit(game, player, basics)
-            self._try_start_battles(game)
-            return None
-        except ValueError as e:
-            return str(e)
-
     def _start_all_battles(self, game: Game, game_id: str | None = None, db: Session | None = None) -> None:
         live_players = get_live_players(game)
+        if not live_players:
+            return
+
+        stage = live_players[0].stage
+        round_num = live_players[0].round
 
         for player in live_players:
             player.phase = "battle"
@@ -613,6 +828,7 @@ class GameManager:
                 self._record_snapshot(db, game_id, player, battler_elo)
 
         paired: set[str] = set()
+        paired_bot_names: set[str] = set()
         for player in live_players:
             if player.name in paired:
                 continue
@@ -621,29 +837,16 @@ class GameManager:
                 battle.start(game, player, opponent)
                 paired.add(player.name)
                 paired.add(opponent.name)
+                if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
+                    for fp in game.fake_players:
+                        if fp.player_history_id == opponent.source_player_history_id:
+                            paired_bot_names.add(fp.name)
+                            break
+
+        battle.resolve_unpaired_bot_battles(game, paired_bot_names, stage, round_num, game.config.num_rounds_per_stage)
 
     def handle_build_apply_upgrade(self, player: Player, upgrade_id: str, target_card_id: str) -> bool:
         return self._apply_upgrade(player, upgrade_id, target_card_id)
-
-    def _try_start_battles(self, game: Game) -> None:
-        live_players = get_live_players(game)
-        battle_ready = [p for p in live_players if p.phase == "battle"]
-
-        if len(battle_ready) < 2:
-            return
-
-        if not battle.can_start_pairing(game, battle_ready[0].round, battle_ready[0].stage):
-            return
-
-        paired = set()
-        for p in battle_ready:
-            if p.name in paired:
-                continue
-            opponent = battle.find_opponent(game, p)
-            if opponent and opponent.name not in paired:
-                battle.start(game, p, opponent)
-                paired.add(p.name)
-                paired.add(opponent.name)
 
     def handle_battle_move(
         self, game: Game, player: Player, card_id: str, from_zone: ZoneName, to_zone: ZoneName
@@ -740,9 +943,18 @@ class GameManager:
         reward.apply_upgrade_to_card(player, upgrade, target)
         return True
 
-    def handle_reward_done(self, game: Game, player: Player, upgrade_id: str | None = None) -> str | None:
+    def handle_reward_done(
+        self,
+        game: Game,
+        player: Player,
+        upgrade_id: str | None = None,
+        game_id: str | None = None,
+        db: Session | None = None,
+    ) -> str | None:
         if player.phase != "reward":
             return "Player is not in reward phase"
+
+        opponent_name = player.last_opponent_name
 
         upgrade = None
         if upgrade_id:
@@ -753,12 +965,35 @@ class GameManager:
         except ValueError as e:
             return str(e)
 
+        self._advance_bot_if_needed(game, opponent_name)
+
         process_eliminations(game, player.round)
+        process_bot_eliminations(game)
+
+        winner, is_game_over = check_game_over(game)
+        if is_game_over:
+            self.complete_game(game_id or "", winner, db)
+            return "game_over"
 
         if player.phase == "draft" and game.draft_state is None:
             draft.start(game)
 
         return None
+
+    def _advance_bot_if_needed(self, game: Game, opponent_name: str | None) -> None:
+        """Advance a bot's round/stage if the opponent was a bot."""
+        if not opponent_name:
+            return
+
+        for fp in game.fake_players:
+            if fp.name == opponent_name and not fp.is_eliminated:
+                num_rounds = game.config.num_rounds_per_stage
+                if fp.round >= num_rounds:
+                    fp.stage += 1
+                    fp.round = 1
+                else:
+                    fp.round += 1
+                break
 
 
 game_manager = GameManager()

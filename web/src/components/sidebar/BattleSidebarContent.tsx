@@ -169,7 +169,7 @@ export function BattleSidebarContent({
   const opponentPoison = currentBattle.opponent_poison
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col">
       {/* Opponent section - top */}
       <div className="p-3 border-b border-gray-700">
         <PlayerSection
@@ -181,8 +181,8 @@ export function BattleSidebarContent({
         />
       </div>
 
-      {/* Life counters - vertically centered */}
-      <div className="flex-1 flex items-center justify-center">
+      {/* Life counters */}
+      <div className="flex items-center justify-center">
         <div className="p-3 bg-black/40 w-full">
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center">

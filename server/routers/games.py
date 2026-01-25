@@ -1,6 +1,11 @@
+import json
+
 from fastapi import APIRouter, HTTPException
 
+import server.db.database as db
+from server.db.models import GameRecord, PlayerGameHistory
 from server.schemas.api import (
+    BotAvailabilityResponse,
     CreateGameRequest,
     CreateGameResponse,
     GameStateResponse,
@@ -17,7 +22,7 @@ router = APIRouter(prefix="/api/games", tags=["games"])
 
 
 @router.post("", response_model=CreateGameResponse)
-def create_game(request: CreateGameRequest):
+async def create_game(request: CreateGameRequest):
     session = session_manager.create_session()
     pending = game_manager.create_game(
         player_name=request.player_name,
@@ -28,6 +33,8 @@ def create_game(request: CreateGameRequest):
         target_player_count=request.target_player_count,
     )
     session_manager.update_game_id(session.session_id, pending.game_id)
+
+    game_manager.start_battler_preload(pending)
 
     return CreateGameResponse(
         game_id=pending.game_id,
@@ -136,6 +143,27 @@ def start_game(game_id: str):
         raise HTTPException(status_code=500, detail="Failed to start game")
 
     return StartGameResponse(success=True)
+
+
+@router.get("/bots/available", response_model=BotAvailabilityResponse)
+def check_bot_availability(use_upgrades: bool = True, use_vanguards: bool = False):
+    """Check if bots are available for a given game configuration."""
+    db_session = db.SessionLocal()
+    try:
+        query = db_session.query(PlayerGameHistory).join(GameRecord, PlayerGameHistory.game_id == GameRecord.id)
+
+        matching_histories = []
+        for history in query.filter(PlayerGameHistory.max_stage >= 5).all():
+            game_record = db_session.query(GameRecord).filter(GameRecord.id == history.game_id).first()
+            if game_record and game_record.config_json:
+                config = json.loads(game_record.config_json)
+                if config.get("use_upgrades") == use_upgrades and config.get("use_vanguards") == use_vanguards:
+                    matching_histories.append(history)
+
+        count = len(matching_histories)
+        return BotAvailabilityResponse(available=count > 0, count=count)
+    finally:
+        db_session.close()
 
 
 @router.get("/{game_id}", response_model=GameStateResponse)

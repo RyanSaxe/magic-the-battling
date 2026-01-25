@@ -1,8 +1,12 @@
-from mtb.models.game import Game, Player
+from mtb.models.game import FakePlayer, Game, Player
 
 
 def get_live_players(game: Game) -> list[Player]:
     return [p for p in game.players if not p.is_ghost]
+
+
+def get_live_bots(game: Game) -> list[FakePlayer]:
+    return [f for f in game.fake_players if not f.is_eliminated]
 
 
 def get_would_be_dead(game: Game) -> list[Player]:
@@ -14,6 +18,7 @@ def eliminate_player(game: Game, player: Player, round_num: int) -> None:
     player.time_of_death = round_num
     player.phase = "eliminated"
     game.most_recent_ghost = player
+    game.most_recent_ghost_bot = None
 
 
 def needs_sudden_death(game: Game) -> bool:
@@ -54,3 +59,36 @@ def process_eliminations(game: Game, round_num: int) -> list[Player]:
         eliminated.append(player)
 
     return eliminated
+
+
+def process_bot_eliminations(game: Game) -> list[FakePlayer]:
+    """Eliminate bots at or above poison threshold."""
+    eliminated: list[FakePlayer] = []
+    for fake in game.fake_players:
+        if not fake.is_eliminated and fake.poison >= game.config.poison_to_lose:
+            fake.is_eliminated = True
+            eliminated.append(fake)
+            game.most_recent_ghost = None
+            game.most_recent_ghost_bot = fake
+    return eliminated
+
+
+def check_game_over(game: Game) -> tuple[Player | None, bool]:
+    """
+    Check if game is over. Returns (winner, is_game_over).
+
+    Game over conditions:
+    - 0 humans alive -> game over, no winner (None, True)
+    - 1 human alive + 0 bots alive -> human wins (winner, True)
+    - 2+ humans alive -> game continues (None, False)
+    - 1 human alive + bots still alive -> game continues (None, False)
+    """
+    live_humans = get_live_players(game)
+    live_bots = get_live_bots(game)
+
+    if len(live_humans) == 0:
+        return (None, True)
+    elif len(live_humans) == 1 and len(live_bots) == 0:
+        return (live_humans[0], True)
+    else:
+        return (None, False)

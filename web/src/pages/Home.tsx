@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createGame, joinGame } from '../api/client'
+import { createGame, joinGame, checkBotAvailability } from '../api/client'
 import { useSession } from '../hooks/useSession'
 
 export function Home() {
@@ -16,6 +16,15 @@ export function Home() {
   const [isJoining, setIsJoining] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [botCount, setBotCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!isJoining) {
+      checkBotAvailability(useUpgrades, useVanguards)
+        .then((result) => setBotCount(result.count))
+        .catch(() => setBotCount(null))
+    }
+  }, [useUpgrades, useVanguards, isJoining])
 
   const handleCreateGame = async () => {
     if (!playerName.trim()) {
@@ -133,6 +142,11 @@ export function Home() {
                   </div>
                   <p className="text-gray-500 text-sm mt-1">
                     Bots will fill remaining slots
+                    {botCount !== null && (
+                      <span className={botCount > 0 ? 'text-green-400' : 'text-amber-400'}>
+                        {' '}({botCount} bot{botCount !== 1 ? 's' : ''} available for this config)
+                      </span>
+                    )}
                   </p>
                 </div>
 

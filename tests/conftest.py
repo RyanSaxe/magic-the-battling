@@ -1,11 +1,16 @@
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
+import server.db.database as db_module
 import server.routers.ws as ws_module
 import server.services.game_manager as gm_module
 import server.services.session_manager as sm_module
 from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
 from mtb.models.game import Player
+from server.db.models import Base
 from server.main import app
 from server.routers.ws import ConnectionManager
 from server.services.game_manager import GameManager
@@ -61,7 +66,25 @@ def mock_cube_data(card_factory, upgrade_factory, monkeypatch):
 
 
 @pytest.fixture
-def client(reset_singletons, mock_cube_data):
+def test_db():
+    """Create an in-memory SQLite database for testing."""
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    testing_session_local = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+    db_module.engine = engine
+    db_module.SessionLocal = testing_session_local
+
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture
+def client(reset_singletons, mock_cube_data, test_db):
     return TestClient(app)
 
 

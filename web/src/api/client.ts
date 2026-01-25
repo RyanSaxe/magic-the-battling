@@ -62,3 +62,23 @@ export async function rejoinGame(gameId: string, playerName: string): Promise<Jo
   }
   return response.json()
 }
+
+export interface BotAvailabilityResponse {
+  available: boolean
+  count: number
+}
+
+export async function checkBotAvailability(
+  useUpgrades: boolean,
+  useVanguards: boolean
+): Promise<BotAvailabilityResponse> {
+  const params = new URLSearchParams({
+    use_upgrades: String(useUpgrades),
+    use_vanguards: String(useVanguards),
+  })
+  const response = await fetch(`${API_BASE}/games/bots/available?${params}`)
+  if (!response.ok) {
+    throw new Error('Failed to check bot availability')
+  }
+  return response.json()
+}

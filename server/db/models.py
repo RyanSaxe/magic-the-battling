@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 
@@ -20,6 +20,7 @@ class GameRecord(Base):
     ended_at = Column(DateTime, nullable=True)
     final_state_json = Column(Text, nullable=True)
     winner_player_id = Column(String, nullable=True)
+    config_json = Column(Text, nullable=True)
 
     players = relationship("GamePlayerRecord", back_populates="game")
 
@@ -32,6 +33,7 @@ class GamePlayerRecord(Base):
     player_name = Column(String, nullable=False)
     final_poison = Column(Integer, default=0)
     placement = Column(Integer, nullable=True)
+    is_bot = Column(Boolean, default=False)
 
     game = relationship("GameRecord", back_populates="players")
 
