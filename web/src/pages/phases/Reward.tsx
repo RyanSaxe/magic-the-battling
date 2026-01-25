@@ -135,6 +135,18 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
               />
             ))}
           </div>
+
+          {/* Pool reference panel */}
+          <div className="mt-6 pt-4 border-t border-amber-500/30">
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-3 text-center">
+              Your Pool ({self_player.hand.length + self_player.sideboard.length} cards)
+            </div>
+            <div className="flex flex-wrap gap-1 justify-center max-h-[200px] overflow-auto">
+              {[...self_player.hand, ...self_player.sideboard].map((card) => (
+                <Card key={card.id} card={card} size="sm" />
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

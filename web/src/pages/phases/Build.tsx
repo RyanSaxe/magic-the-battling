@@ -161,7 +161,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                   <img
                     src={BASIC_LAND_IMAGES[name]}
                     alt={name}
-                    className="w-10 h-14 rounded object-cover shadow-lg"
+                    className="rounded object-cover shadow-lg"
+                    style={{ width: 60, height: 84 }}
                     title={name}
                   />
                   <div className="flex flex-col gap-0.5">
@@ -206,7 +207,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
               All cards are in your hand
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 justify-center max-w-[1100px] mx-auto">
               {self_player.sideboard.map((card, index) => (
                 <Card
                   key={card.id}

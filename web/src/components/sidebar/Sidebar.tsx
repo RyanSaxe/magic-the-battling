@@ -12,12 +12,13 @@ interface SidebarProps {
 export function Sidebar({ players, currentPlayerName, phaseContent, previewContent }: SidebarProps) {
   return (
     <aside className="w-64 bg-black/30 flex flex-col overflow-hidden">
-      <div className="p-4 overflow-auto flex-shrink-0">
-        <PlayerList players={players} currentPlayerName={currentPlayerName} />
-      </div>
-      {phaseContent && (
-        <div className="border-t border-gray-700/50 overflow-auto">
+      {phaseContent ? (
+        <div className="overflow-auto flex-shrink-0">
           {phaseContent}
+        </div>
+      ) : (
+        <div className="p-4 overflow-auto flex-shrink-0">
+          <PlayerList players={players} currentPlayerName={currentPlayerName} />
         </div>
       )}
       {previewContent && (

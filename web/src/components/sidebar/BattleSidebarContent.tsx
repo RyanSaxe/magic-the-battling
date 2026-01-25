@@ -258,25 +258,10 @@ export function BattleSidebarContent({
       </div>
 
       {/* Opponent zones */}
-      <div className="space-y-2">
-        <ZoneCounts
-          zones={opponent_zones}
-          label={opponent_name}
-          onGraveyardClick={() =>
-            setZoneModal({
-              title: `${opponent_name}'s Graveyard`,
-              cards: opponent_zones.graveyard,
-            })
-          }
-          onExileClick={() =>
-            setZoneModal({
-              title: `${opponent_name}'s Exile`,
-              cards: opponent_zones.exile,
-            })
-          }
-        />
+      <div className="flex gap-2">
+        {/* Left: Applied upgrades */}
         {opponentAppliedUpgrades.length > 0 && (
-          <div className="flex gap-1 flex-wrap">
+          <div className="flex flex-col gap-1 flex-shrink-0">
             {opponentAppliedUpgrades.map((upgrade) => (
               <Card
                 key={upgrade.id}
@@ -288,6 +273,25 @@ export function BattleSidebarContent({
             ))}
           </div>
         )}
+        {/* Right: Zone counts */}
+        <div className="flex-1">
+          <ZoneCounts
+            zones={opponent_zones}
+            label={opponent_name}
+            onGraveyardClick={() =>
+              setZoneModal({
+                title: `${opponent_name}'s Graveyard`,
+                cards: opponent_zones.graveyard,
+              })
+            }
+            onExileClick={() =>
+              setZoneModal({
+                title: `${opponent_name}'s Exile`,
+                cards: opponent_zones.exile,
+              })
+            }
+          />
+        </div>
       </div>
 
       {/* Zone modal */}

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useSession } from '../hooks/useSession'
 import { useGame } from '../hooks/useGame'
@@ -108,6 +108,13 @@ function GameContent() {
   // Battle sidebar life tracking state
   const [yourLife, setYourLife] = useState(20)
   const [opponentLife, setOpponentLife] = useState(20)
+
+  useEffect(() => {
+    if (gameState?.current_battle) {
+      setYourLife(gameState.starting_life)
+      setOpponentLife(gameState.starting_life)
+    }
+  }, [gameState?.current_battle?.opponent_name])
 
   const handleRejoin = async () => {
     if (!rejoinName.trim() || !gameId) {

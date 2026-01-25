@@ -87,6 +87,7 @@ export interface BattleView {
 export interface GameState {
   game_id: string
   phase: string
+  starting_life: number
   players: PlayerView[]
   self_player: SelfPlayerView
   available_upgrades: Card[]

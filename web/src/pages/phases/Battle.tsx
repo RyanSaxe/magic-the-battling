@@ -134,6 +134,21 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               {opponent_name}
             </div>
             <div className="flex flex-col gap-2 p-4 pt-8 min-h-[150px]">
+              {/* Opponent's lands (at top, behind their creatures from our perspective) */}
+              {opponentLands.length > 0 && (
+                <div className="flex justify-center flex-wrap gap-1 pb-2 border-b border-gray-700/50">
+                  {opponentLands.map((card) => (
+                    <Card
+                      key={card.id}
+                      card={card}
+                      size="sm"
+                      tapped={opponentTappedIds.has(card.id)}
+                      faceDown={opponentFaceDownIds.has(card.id)}
+                      counters={opponentCounters[card.id]}
+                    />
+                  ))}
+                </div>
+              )}
               {/* Opponent's permanents (non-lands) */}
               <div className="flex justify-center flex-wrap gap-2">
                 {opponentPermanents.length === 0 && opponentLands.length === 0 ? (
@@ -151,21 +166,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
                   ))
                 )}
               </div>
-              {/* Opponent's lands */}
-              {opponentLands.length > 0 && (
-                <div className="flex justify-center flex-wrap gap-1 pt-2 border-t border-gray-700/50">
-                  {opponentLands.map((card) => (
-                    <Card
-                      key={card.id}
-                      card={card}
-                      size="sm"
-                      tapped={opponentTappedIds.has(card.id)}
-                      faceDown={opponentFaceDownIds.has(card.id)}
-                      counters={opponentCounters[card.id]}
-                    />
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 

@@ -79,6 +79,7 @@ class BattleView(BaseModel):
 class GameStateResponse(BaseModel):
     game_id: str
     phase: str
+    starting_life: int
     players: list[PlayerView]
     self_player: SelfPlayerView
     available_upgrades: list[Card]

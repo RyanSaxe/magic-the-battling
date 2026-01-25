@@ -352,6 +352,7 @@ class GameManager:
         return GameStateResponse(
             game_id=game_id,
             phase=phase,
+            starting_life=game.config.starting_life,
             players=[self._make_player_view(p, player) for p in game.players],
             self_player=SelfPlayerView(
                 name=player.name,
