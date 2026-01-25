@@ -31,7 +31,7 @@ def _create_basic_land(name: str) -> Card:
     return Card(
         name=name,
         image_url=BASIC_LAND_IMAGES.get(name, f"basic/{name.lower()}.jpg"),
-        id=f"basic-{name.lower()}",
+        id=f"basic-{name.lower()}-{uuid4().hex[:8]}",
         type_line="Basic Land",
     )
 
