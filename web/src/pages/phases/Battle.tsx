@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { GameState, Card as CardType, ZoneName, CardStateAction } from '../../types'
-import { GameDndProvider, useDndActions } from '../../dnd'
+import { DraggableCard } from '../../dnd'
 import { HandZone, BattlefieldZone } from '../../components/zones'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
 
@@ -30,11 +30,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   } | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [showSideboard, setShowSideboard] = useState(false)
-
-  const { handleCardMove, getValidDropZones } = useDndActions({
-    phase: 'battle',
-    battleMove: actions.battleMove,
-  })
 
   const { current_battle } = gameState
 
@@ -101,8 +96,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   }
 
   return (
-    <GameDndProvider onCardMove={handleCardMove} validDropZones={getValidDropZones}>
-      <div className="flex flex-col h-full gap-2">
+    <div className="flex flex-col h-full gap-2">
         {/* Opponent's hand */}
         {opponent_hand_count > 0 && (
           <div className="px-4 py-2 bg-black/30">
@@ -228,7 +222,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               </div>
               <div className="flex flex-wrap gap-2">
                 {sideboard.map((card) => (
-                  <Card key={card.id} card={card} size="sm" />
+                  <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" />
                 ))}
               </div>
             </div>
@@ -253,6 +247,5 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
           />
         )}
       </div>
-    </GameDndProvider>
   )
 }

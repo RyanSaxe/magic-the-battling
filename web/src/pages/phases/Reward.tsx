@@ -41,8 +41,6 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
   const { last_battle_result } = self_player
   const isStageIncreasing = self_player.is_stage_increasing
 
-  const isWinner = last_battle_result?.winner_name === self_player.name
-
   const handleUpgradeClick = (upgrade: CardType) => {
     if (selectedUpgradeId === upgrade.id) {
       onUpgradeSelect(null)
@@ -53,34 +51,6 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
 
   return (
     <div className="flex flex-col h-full gap-6 p-4 overflow-auto">
-      {/* Battle Results Header */}
-      {last_battle_result && (
-        <div className="text-center">
-          <div className="text-gray-400 text-sm uppercase tracking-wide mb-2">
-            Battle vs {last_battle_result.opponent_name}
-          </div>
-          {last_battle_result.is_draw ? (
-            <div className="text-3xl font-bold text-yellow-400">Draw</div>
-          ) : isWinner ? (
-            <div className="text-3xl font-bold text-green-400">Victory!</div>
-          ) : (
-            <div className="text-3xl font-bold text-red-400">Defeat</div>
-          )}
-          {(last_battle_result.poison_dealt > 0 || last_battle_result.poison_taken > 0) && (
-            <div className="flex justify-center gap-6 mt-2 text-sm">
-              {last_battle_result.poison_dealt > 0 && (
-                <span className="text-purple-400">
-                  Dealt {last_battle_result.poison_dealt} poison
-                </span>
-              )}
-              {last_battle_result.poison_taken > 0 && (
-                <span className="text-red-400">Took {last_battle_result.poison_taken} poison</span>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Rewards - shown as big cards */}
       {last_battle_result && (
         <div className="flex-1 flex flex-col items-center justify-center">

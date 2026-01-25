@@ -15,7 +15,7 @@ const BATTLE_VALID_ZONES: Record<ZoneName, ZoneName[]> = {
   battlefield: ['hand', 'graveyard', 'exile'],
   graveyard: ['hand', 'battlefield', 'exile'],
   exile: ['hand', 'battlefield', 'graveyard'],
-  sideboard: [],
+  sideboard: ['hand'],
   upgrades: [],
   command_zone: [],
   library: [],

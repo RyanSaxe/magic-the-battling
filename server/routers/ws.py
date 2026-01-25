@@ -183,6 +183,8 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
             return game_manager.handle_battle_update_card_state(
                 game, player, payload["action_type"], payload["card_id"], payload.get("data")
             )
+        case "battle_update_life":
+            return game_manager.handle_battle_update_life(game, player, payload["target"], payload["life"])
         case "reward_pick_upgrade":
             return game_manager.handle_reward_pick_upgrade(game, player, payload["upgrade_id"])
         case "reward_apply_upgrade":

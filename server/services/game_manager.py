@@ -494,6 +494,8 @@ class GameManager:
 
         your_poison = b.player.poison if is_player else b.opponent.poison
         opponent_poison = b.opponent.poison if is_player else b.player.poison
+        your_life = b.player_life if is_player else b.opponent_life
+        opponent_life = b.opponent_life if is_player else b.player_life
 
         return BattleView(
             opponent_name=opponent_name,
@@ -505,6 +507,8 @@ class GameManager:
             your_poison=your_poison,
             opponent_poison=opponent_poison,
             opponent_hand_revealed=hand_revealed,
+            your_life=your_life,
+            opponent_life=opponent_life,
         )
 
     def handle_draft_swap(
@@ -646,6 +650,16 @@ class GameManager:
     ) -> bool:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
+                # Handle sideboard -> hand moves (Wish/Companion support)
+                if from_zone == "sideboard" and to_zone == "hand":
+                    card = next((c for c in player.sideboard if c.id == card_id), None)
+                    if not card:
+                        return False
+                    player.sideboard.remove(card)
+                    zones = battle.get_zones_for_player(b, player)
+                    zones.hand.append(card)
+                    return True
+
                 zones = battle.get_zones_for_player(b, player)
                 from_list = zones.get_zone(from_zone)
                 card = next((c for c in from_list if c.id == card_id), None)
@@ -661,6 +675,22 @@ class GameManager:
                 battle.submit_result(b, player, result)
                 if battle.results_agreed(b):
                     self._end_battle(game, b)
+                return True
+        return False
+
+    def handle_battle_update_life(self, game: Game, player: Player, target: str, life: int) -> bool:
+        for b in game.active_battles:
+            if player.name in (b.player.name, b.opponent.name):
+                is_player_side = player.name == b.player.name
+                if target == "you":
+                    if is_player_side:
+                        b.player_life = life
+                    else:
+                        b.opponent_life = life
+                elif is_player_side:
+                    b.opponent_life = life
+                else:
+                    b.player_life = life
                 return True
         return False
 

@@ -78,6 +78,8 @@ class BattleView(BaseModel):
     your_poison: int
     opponent_poison: int
     opponent_hand_revealed: bool = False
+    your_life: int = 20
+    opponent_life: int = 20
 
 
 class GameStateResponse(BaseModel):
@@ -143,6 +145,12 @@ class BattleMoveAction(BaseModel):
 class BattleSubmitResultAction(BaseModel):
     action: str = "submit_result"
     result: str
+
+
+class BattleUpdateLifeAction(BaseModel):
+    action: str = "update_life"
+    target: str  # "you" or "opponent"
+    life: int
 
 
 class RewardPickUpgradeAction(BaseModel):

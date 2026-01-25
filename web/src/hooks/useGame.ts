@@ -70,6 +70,10 @@ export function useGame(gameId: string | null, sessionId: string | null) {
     send('battle_update_card_state', { action_type: actionType, card_id: cardId, data })
   }, [send])
 
+  const battleUpdateLife = useCallback((target: 'you' | 'opponent', life: number) => {
+    send('battle_update_life', { target, life })
+  }, [send])
+
   const rewardPickUpgrade = useCallback((upgradeId: string) => {
     send('reward_pick_upgrade', { upgrade_id: upgradeId })
   }, [send])
@@ -102,6 +106,7 @@ export function useGame(gameId: string | null, sessionId: string | null) {
       battleMove,
       battleSubmitResult,
       battleUpdateCardState,
+      battleUpdateLife,
       rewardPickUpgrade,
       rewardApplyUpgrade,
       rewardDone,

@@ -14,7 +14,7 @@ export function HandZone({
   cards,
   selectedCardId,
   onCardClick,
-  validFromZones = ['battlefield', 'graveyard', 'exile'],
+  validFromZones = ['battlefield', 'graveyard', 'exile', 'sideboard'],
   draggable = true,
   zone = 'hand',
 }: HandZoneProps) {

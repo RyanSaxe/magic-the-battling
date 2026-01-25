@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { BattleView, Card as CardType, Zones } from '../../types'
 import { Card } from '../card'
-import { ZoneDisplay } from './ZoneDisplay'
+import { DroppableZoneDisplay } from './DroppableZoneDisplay'
 import { POISON_COUNTER_IMAGE } from '../../constants/assets'
 
 interface BattleSidebarContentProps {
@@ -124,10 +124,20 @@ function PlayerSection({
         </div>
       )}
 
-      <div className="flex gap-2 justify-center">
-        <ZoneDisplay title="GY" cards={zones.graveyard} />
-        <ZoneDisplay title="Exile" cards={zones.exile} />
-      </div>
+      <DroppableZoneDisplay
+        title="Graveyard"
+        zone="graveyard"
+        cards={zones.graveyard}
+        validFromZones={['hand', 'battlefield', 'exile']}
+        isOpponent={isOpponent}
+      />
+      <DroppableZoneDisplay
+        title="Exile"
+        zone="exile"
+        cards={zones.exile}
+        validFromZones={['hand', 'battlefield', 'graveyard']}
+        isOpponent={isOpponent}
+      />
 
       {!isOpponent && appliedUpgrades.length > 0 && (
         <div className="flex gap-1 flex-wrap">
@@ -171,29 +181,31 @@ export function BattleSidebarContent({
         />
       </div>
 
-      {/* Life counters - center */}
-      <div className="p-3 bg-black/40">
-        <div className="grid grid-cols-2 gap-3">
-          <div className="text-center">
-            <div className="text-xs text-gray-400 uppercase mb-1">{opponent_name}</div>
-            <div className="flex justify-center">
-              <LifeCounter life={opponentLife} onChange={onOpponentLifeChange} />
+      {/* Life counters - vertically centered */}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="p-3 bg-black/40 w-full">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="text-center">
+              <div className="text-xs text-gray-400 uppercase mb-1">{opponent_name}</div>
+              <div className="flex justify-center">
+                <LifeCounter life={opponentLife} onChange={onOpponentLifeChange} />
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-xs text-gray-400 uppercase mb-1">You</div>
+              <div className="flex justify-center">
+                <LifeCounter life={yourLife} onChange={onYourLifeChange} />
+              </div>
             </div>
           </div>
-          <div className="text-center">
-            <div className="text-xs text-gray-400 uppercase mb-1">You</div>
-            <div className="flex justify-center">
-              <LifeCounter life={yourLife} onChange={onYourLifeChange} />
-            </div>
+          <div className="text-center text-xs text-gray-500 mt-2">
+            <span className="text-amber-400">{coin_flip_name}</span> goes first
           </div>
-        </div>
-        <div className="text-center text-xs text-gray-500 mt-2">
-          <span className="text-amber-400">{coin_flip_name}</span> goes first
         </div>
       </div>
 
-      {/* Your section - bottom, flex-1 to push down */}
-      <div className="p-3 flex-1 flex flex-col justify-end">
+      {/* Your section - bottom */}
+      <div className="p-3 border-t border-gray-700">
         <PlayerSection
           name="You"
           poison={yourPoison}

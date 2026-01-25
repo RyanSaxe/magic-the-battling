@@ -119,7 +119,7 @@ export function BattlefieldZone({
         <div className="flex justify-center flex-wrap gap-3">
           {permanents.length === 0 && lands.length === 0 ? (
             <div className="text-gray-500 text-sm opacity-50">
-              {isOpponent ? "Opponent's battlefield" : 'Drag cards here'}
+              {isOpponent ? "Opponent's battlefield" : 'Empty battlefield'}
             </div>
           ) : (
             permanents.map(renderCard)

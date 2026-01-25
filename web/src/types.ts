@@ -86,6 +86,8 @@ export interface BattleView {
   your_poison: number
   opponent_poison: number
   opponent_hand_revealed: boolean
+  your_life: number
+  opponent_life: number
 }
 
 export interface GameState {

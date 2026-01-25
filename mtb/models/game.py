@@ -262,6 +262,8 @@ class Battle(BaseModel):
     player_zones: Zones
     opponent_zones: Zones
     result_submissions: dict[str, str] = Field(default_factory=dict)
+    player_life: int = 20
+    opponent_life: int = 20
 
 
 def create_game(player_names: list[str], num_players: int, config: Config | None = None) -> Game:

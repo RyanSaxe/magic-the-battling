@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useSession } from '../hooks/useSession'
 import { useGame } from '../hooks/useGame'
@@ -9,8 +9,10 @@ import { BattlePhase } from './phases/Battle'
 import { RewardPhase } from './phases/Reward'
 import { Sidebar } from '../components/sidebar'
 import { BattleSidebarContent } from '../components/sidebar/BattleSidebarContent'
+import { RewardSidebarContent } from '../components/sidebar/RewardSidebarContent'
 import { ContextStripProvider, useContextStrip } from '../contexts'
 import { CardPreviewContext, Card } from '../components/card'
+import { GameDndProvider, useDndActions } from '../dnd'
 import type { Card as CardType, PlayerView } from '../types'
 
 function CardPreview({ card }: { card: CardType }) {
@@ -105,16 +107,19 @@ function GameContent() {
   // Lifted state from Battle phase
   const [isChangingResult, setIsChangingResult] = useState(false)
 
-  // Battle sidebar life tracking state
-  const [yourLife, setYourLife] = useState(20)
-  const [opponentLife, setOpponentLife] = useState(20)
+  // DnD setup for battle phase
+  const { handleCardMove, getValidDropZones } = useDndActions({
+    phase: gameState?.self_player?.phase ?? 'draft',
+    battleMove: actions.battleMove,
+  })
 
-  useEffect(() => {
-    if (gameState?.current_battle) {
-      setYourLife(gameState.starting_life)
-      setOpponentLife(gameState.starting_life)
-    }
-  }, [gameState?.current_battle?.opponent_name])
+  const handleYourLifeChange = (life: number) => {
+    actions.battleUpdateLife('you', life)
+  }
+
+  const handleOpponentLifeChange = (life: number) => {
+    actions.battleUpdateLife('opponent', life)
+  }
 
   const handleRejoin = async () => {
     if (!rejoinName.trim() || !gameId) {
@@ -375,10 +380,19 @@ function GameContent() {
         <BattleSidebarContent
           currentBattle={current_battle}
           selfUpgrades={self_player.upgrades}
-          yourLife={yourLife}
-          opponentLife={opponentLife}
-          onYourLifeChange={setYourLife}
-          onOpponentLifeChange={setOpponentLife}
+          yourLife={current_battle.your_life}
+          opponentLife={current_battle.opponent_life}
+          onYourLifeChange={handleYourLifeChange}
+          onOpponentLifeChange={handleOpponentLifeChange}
+        />
+      )
+    }
+    if (currentPhase === 'reward' && self_player.last_battle_result) {
+      return (
+        <RewardSidebarContent
+          lastBattleResult={self_player.last_battle_result}
+          playerName={self_player.name}
+          players={gameState.players}
         />
       )
     }
@@ -402,51 +416,61 @@ function GameContent() {
         </header>
 
         {/* Main content */}
-        <div className="flex-1 flex min-h-0">
-          {/* Game area */}
-          <main className="flex-1 flex flex-col min-h-0">
-            {currentPhase === 'draft' && (
-              <DraftPhase gameState={gameState} actions={actions} />
-            )}
-            {currentPhase === 'build' && (
-              <BuildPhase
-                gameState={gameState}
-                actions={actions}
-                selectedBasics={selectedBasics}
-                onBasicsChange={setSelectedBasics}
+        {currentPhase === 'battle' ? (
+          <GameDndProvider onCardMove={handleCardMove} validDropZones={getValidDropZones}>
+            <div className="flex-1 flex min-h-0">
+              <main className="flex-1 flex flex-col min-h-0">
+                <BattlePhase gameState={gameState} actions={actions} />
+              </main>
+              <Sidebar
+                players={gameState.players}
+                currentPlayerName={self_player.name}
+                phaseContent={renderPhaseContent()}
+                previewContent={renderPreviewContent()}
               />
-            )}
-            {currentPhase === 'battle' && (
-              <BattlePhase gameState={gameState} actions={actions} />
-            )}
-            {currentPhase === 'reward' && (
-              <RewardPhase
-                gameState={gameState}
-                actions={actions}
-                selectedUpgradeId={selectedUpgradeId}
-                onUpgradeSelect={setSelectedUpgradeId}
-              />
-            )}
-            {currentPhase === 'eliminated' && (
-              <div className="flex-1 flex items-center justify-center">
-                <div className="text-center">
-                  <h2 className="text-2xl text-red-400 mb-4">Eliminated</h2>
-                  <p className="text-gray-400">
-                    You have been eliminated from the game.
-                  </p>
+            </div>
+          </GameDndProvider>
+        ) : (
+          <div className="flex-1 flex min-h-0">
+            <main className="flex-1 flex flex-col min-h-0">
+              {currentPhase === 'draft' && (
+                <DraftPhase gameState={gameState} actions={actions} />
+              )}
+              {currentPhase === 'build' && (
+                <BuildPhase
+                  gameState={gameState}
+                  actions={actions}
+                  selectedBasics={selectedBasics}
+                  onBasicsChange={setSelectedBasics}
+                />
+              )}
+              {currentPhase === 'reward' && (
+                <RewardPhase
+                  gameState={gameState}
+                  actions={actions}
+                  selectedUpgradeId={selectedUpgradeId}
+                  onUpgradeSelect={setSelectedUpgradeId}
+                />
+              )}
+              {currentPhase === 'eliminated' && (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <h2 className="text-2xl text-red-400 mb-4">Eliminated</h2>
+                    <p className="text-gray-400">
+                      You have been eliminated from the game.
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
-          </main>
-
-          {/* Sidebar */}
-          <Sidebar
-            players={gameState.players}
-            currentPlayerName={self_player.name}
-            phaseContent={renderPhaseContent()}
-            previewContent={renderPreviewContent()}
-          />
-        </div>
+              )}
+            </main>
+            <Sidebar
+              players={gameState.players}
+              currentPlayerName={self_player.name}
+              phaseContent={renderPhaseContent()}
+              previewContent={renderPreviewContent()}
+            />
+          </div>
+        )}
       </div>
     </CardPreviewContext.Provider>
   )
