@@ -17,6 +17,7 @@ export function Lobby() {
   const [rejoinError, setRejoinError] = useState('')
   const [rejoinLoading, setRejoinLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [startingGame, setStartingGame] = useState(false)
 
   useEffect(() => {
     if (gameState) {
@@ -213,12 +214,23 @@ export function Lobby() {
                       {isReady ? 'Unready' : 'Ready'}
                     </button>
                     <button
-                      onClick={actions.startGame}
-                      disabled={!lobbyState.can_start}
+                      onClick={() => {
+                        setStartingGame(true)
+                        actions.startGame()
+                      }}
+                      disabled={!lobbyState.can_start || startingGame}
                       className="btn btn-primary w-full py-3"
                     >
-                      {lobbyState.players.length < 2
-                        ? `Waiting for ${2 - lobbyState.players.length} more player(s)`
+                      {startingGame ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Starting...
+                        </span>
+                      ) : lobbyState.target_player_count < 2
+                        ? 'Need at least 2 players'
                         : !allReady
                         ? 'Waiting for all players to ready'
                         : 'Start Game'}

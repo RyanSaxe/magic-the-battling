@@ -134,7 +134,7 @@ class GameManager:
         if player_id != pending.host_player_id:
             return False, "Only the host can start the game"
 
-        if len(pending.player_names) < 2:
+        if pending.target_player_count < 2:
             return False, "Need at least 2 players"
 
         all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
@@ -145,7 +145,7 @@ class GameManager:
 
     def start_game(self, game_id: str, db: Session | None = None) -> Game | None:
         pending = self._pending_games.get(game_id)
-        if not pending or len(pending.player_names) < 2:
+        if not pending or pending.target_player_count < 2:
             return None
 
         pending.is_started = True
@@ -317,7 +317,7 @@ class GameManager:
             )
 
         all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
-        can_start = len(pending.player_names) >= 2 and all_ready
+        can_start = pending.target_player_count >= 2 and all_ready
 
         return LobbyStateResponse(
             game_id=game_id,

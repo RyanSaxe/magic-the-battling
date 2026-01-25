@@ -128,7 +128,7 @@ def start_game(game_id: str):
     if pending.is_started:
         raise HTTPException(status_code=400, detail="Game has already started")
 
-    if len(pending.player_names) < 2:
+    if pending.target_player_count < 2:
         raise HTTPException(status_code=400, detail="Need at least 2 players to start")
 
     game = game_manager.start_game(game_id)
