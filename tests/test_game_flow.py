@@ -12,16 +12,15 @@ def test_full_round_flow_round_1(card_factory, upgrade_factory):
 
     alice, bob = game.players
 
-    # Round 1 starts in build phase (players already have starting pool)
+    # Round 1 starts in build phase with hand pre-populated by ELO
     assert alice.phase == "build"
     assert alice.round == 1
-    assert len(alice.sideboard) == game.config.starting_pool_size
-    assert len(bob.sideboard) == game.config.starting_pool_size
-
-    # Move some cards to hand for build
-    for _ in range(3):
-        build.move_card(alice, alice.sideboard[0], "sideboard", "hand")
-        build.move_card(bob, bob.sideboard[0], "sideboard", "hand")
+    hand_size = game.config.starting_stage
+    pool_size = game.config.starting_pool_size
+    assert len(alice.hand) == hand_size
+    assert len(alice.sideboard) == pool_size - hand_size
+    assert len(bob.hand) == hand_size
+    assert len(bob.sideboard) == pool_size - hand_size
 
     build.submit(game, alice, ["Plains", "Island", "Mountain"])
     build.submit(game, bob, ["Forest", "Swamp", "Mountain"])

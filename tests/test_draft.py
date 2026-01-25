@@ -220,10 +220,27 @@ def test_full_draft_flow(card_factory):
     bob_pack_card = game.get_draft_state().current_packs["Bob"][0]
     draft.swap(game, bob, bob_pack_card, bob_swap_card, "hand")
 
+    # Add more cards with varying ELO to test hand population
+    # hand_size is 3, so top 3 by ELO should end up in hand
+    high_elo = card_factory("high_elo")
+    high_elo.elo = 100.0
+    mid_elo = card_factory("mid_elo")
+    mid_elo.elo = 50.0
+    low_elo = card_factory("low_elo")
+    low_elo.elo = 10.0
+    alice_pack_card.elo = 80.0
+    alice_pack_card_2.elo = 5.0
+    alice.sideboard.extend([high_elo, mid_elo, low_elo])
+
     draft.end_for_player(game, alice)
     draft.end_for_player(game, bob)
 
+    # Highest ELO cards should be in hand (high_elo=100, alice_pack_card=80, mid_elo=50)
+    assert high_elo in alice.hand
     assert alice_pack_card in alice.hand
+    assert mid_elo in alice.hand
+    # Lower ELO cards should be in sideboard
+    assert low_elo in alice.sideboard
     assert alice_pack_card_2 in alice.sideboard
     assert bob_pack_card in bob.hand
     assert alice.treasures == 1

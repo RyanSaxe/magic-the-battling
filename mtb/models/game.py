@@ -158,6 +158,23 @@ class Player(BaseModel):
     def hand_size(self) -> int:
         return self.game.config.starting_stage + self.vanquishers
 
+    def populate_hand(self) -> None:
+        """Populate hand with previous battle cards, then fill remaining slots by ELO."""
+        for card_id in self.previous_hand_ids:
+            card = next((c for c in self.sideboard if c.id == card_id), None)
+            if card:
+                self.sideboard.remove(card)
+                self.hand.append(card)
+
+        slots_to_fill = self.hand_size - len(self.hand)
+        if slots_to_fill > 0 and self.sideboard:
+            by_elo = sorted(self.sideboard, key=lambda c: c.elo, reverse=True)
+            for card in by_elo[:slots_to_fill]:
+                self.sideboard.remove(card)
+                self.hand.append(card)
+
+        self.chosen_basics = self.previous_basics.copy()
+
 
 class Config(BaseModel):
     pack_size: int = 5
@@ -277,5 +294,6 @@ def _deal_starting_pool(game: Game) -> None:
         player_cards = cards[:pool_size]
         cards = cards[pool_size:]
         player.sideboard.extend(player_cards)
+        player.populate_hand()
 
     game.battler.cards = cards

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { GameState, Card as CardType, ZoneName } from '../../types'
 import { GameDndProvider, useDndActions } from '../../dnd'
-import { HandZone, BattlefieldZone, PileZone } from '../../components/zones'
+import { HandZone, BattlefieldZone } from '../../components/zones'
 import { Card, CardBack } from '../../components/card'
 
 const isLandOrTreasure = (card: CardType) =>
@@ -46,9 +46,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
 
   const opponentLands = opponent_zones.battlefield.filter(isLandOrTreasure)
   const opponentPermanents = opponent_zones.battlefield.filter((c) => !isLandOrTreasure(c))
-
-  const yourAppliedUpgrades = your_zones.upgrades.filter((u) => u.upgrade_target)
-  const opponentAppliedUpgrades = opponent_zones.upgrades.filter((u) => u.upgrade_target)
 
   const handleCardClick = (card: CardType, zone: ZoneName) => {
     if (selectedCard?.card.id === card.id) {
@@ -101,8 +98,9 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
           </div>
         )}
 
-        {/* Opponent's battlefield */}
+        {/* Battlefields */}
         <div className="flex-1 flex flex-col">
+          {/* Opponent's battlefield */}
           <div className="relative flex-1 battlefield opacity-80">
             <div className="absolute top-2 left-2 text-xs text-gray-400 uppercase tracking-wide">
               {opponent_name}
@@ -127,34 +125,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
                 </div>
               )}
             </div>
-            {/* Opponent's piles */}
-            <div className="absolute bottom-2 right-2 flex gap-2">
-              <PileZone
-                zone="graveyard"
-                cards={opponent_zones.graveyard}
-                isOpponent
-              />
-              <PileZone
-                zone="exile"
-                cards={opponent_zones.exile}
-                isOpponent
-              />
-            </div>
           </div>
-
-          {/* Opponent's applied upgrades */}
-          {opponentAppliedUpgrades.length > 0 && (
-            <div className="px-4 py-2 bg-purple-950/30 border-t border-purple-800/30">
-              <div className="text-xs text-purple-400 uppercase tracking-wide mb-2">
-                Opponent Upgrades ({opponentAppliedUpgrades.length})
-              </div>
-              <div className="flex gap-2 flex-wrap justify-center">
-                {opponentAppliedUpgrades.map((upgrade) => (
-                  <Card key={upgrade.id} card={upgrade} size="sm" showUpgradeTarget />
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Center divider */}
           <div className="border-t border-dashed border-gray-600/50 mx-4" />
@@ -170,37 +141,8 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               label="Your Battlefield"
               separateLands
             />
-            {/* Your piles */}
-            <div className="absolute bottom-2 right-2 flex gap-2">
-              <PileZone
-                zone="graveyard"
-                cards={your_zones.graveyard}
-                selectedCardId={selectedCard?.card.id}
-                onCardClick={(card) => handleCardClick(card, 'graveyard')}
-              />
-              <PileZone
-                zone="exile"
-                cards={your_zones.exile}
-                selectedCardId={selectedCard?.card.id}
-                onCardClick={(card) => handleCardClick(card, 'exile')}
-              />
-            </div>
           </div>
         </div>
-
-        {/* Your applied upgrades */}
-        {yourAppliedUpgrades.length > 0 && (
-          <div className="px-4 py-2 bg-purple-950/30 border-t border-purple-800/30">
-            <div className="text-xs text-purple-400 uppercase tracking-wide mb-2">
-              Your Upgrades ({yourAppliedUpgrades.length})
-            </div>
-            <div className="flex gap-2 flex-wrap justify-center">
-              {yourAppliedUpgrades.map((upgrade) => (
-                <Card key={upgrade.id} card={upgrade} size="sm" showUpgradeTarget />
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Your hand */}
         <HandZone

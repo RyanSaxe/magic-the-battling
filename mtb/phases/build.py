@@ -58,14 +58,9 @@ def submit(game: Game, player: Player, basics: list[str]) -> None:
     player.phase = "battle"
 
 
-def apply_previous_defaults(player: Player) -> None:
-    """Move cards from previous hand to current hand, set previous basics."""
-    for card_id in player.previous_hand_ids:
-        card = next((c for c in player.sideboard if c.id == card_id), None)
-        if card:
-            player.sideboard.remove(card)
-            player.hand.append(card)
-    player.chosen_basics = player.previous_basics.copy()
+def populate_hand(player: Player) -> None:
+    """Populate hand with previous battle cards, then fill remaining slots by ELO."""
+    player.populate_hand()
 
 
 __all__ = [
@@ -75,6 +70,6 @@ __all__ = [
     "unready",
     "all_ready",
     "submit",
-    "apply_previous_defaults",
+    "populate_hand",
     "apply_upgrade_to_card",
 ]

@@ -108,8 +108,7 @@ def end_for_player(game: Game, player: Player) -> None:
         game.draft_state.discard.extend(current_pack)
 
     player.phase = "build"
-    if player.round > 1:
-        build.apply_previous_defaults(player)
+    build.populate_hand(player)
 
     if not game.draft_state.current_packs:
         _cleanup_draft(game)
