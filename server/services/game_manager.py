@@ -422,11 +422,14 @@ class GameManager:
         opponent_zones = b.opponent_zones if is_player else b.player_zones
         opponent_name = b.opponent.name if is_player else b.player.name
 
+        opponent_obj = b.opponent if is_player else b.player
+        hand_revealed = isinstance(opponent_obj, StaticOpponent) and opponent_obj.hand_revealed
+
         hidden_opponent = Zones(
             battlefield=opponent_zones.battlefield,
             graveyard=opponent_zones.graveyard,
             exile=opponent_zones.exile,
-            hand=[],
+            hand=opponent_zones.hand if hand_revealed else [],
             sideboard=[],
             upgrades=opponent_zones.upgrades,
             command_zone=opponent_zones.command_zone,
@@ -435,6 +438,9 @@ class GameManager:
             submitted_cards=[],
         )
 
+        your_poison = b.player.poison if is_player else b.opponent.poison
+        opponent_poison = b.opponent.poison if is_player else b.player.poison
+
         return BattleView(
             opponent_name=opponent_name,
             coin_flip_name=b.coin_flip_name,
@@ -442,6 +448,9 @@ class GameManager:
             opponent_zones=hidden_opponent,
             opponent_hand_count=len(opponent_zones.hand),
             result_submissions=b.result_submissions,
+            your_poison=your_poison,
+            opponent_poison=opponent_poison,
+            opponent_hand_revealed=hand_revealed,
         )
 
     def handle_draft_swap(

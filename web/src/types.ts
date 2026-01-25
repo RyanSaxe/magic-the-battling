@@ -82,6 +82,9 @@ export interface BattleView {
   opponent_zones: Zones
   opponent_hand_count: number
   result_submissions: Record<string, string>
+  your_poison: number
+  opponent_poison: number
+  opponent_hand_revealed: boolean
 }
 
 export interface GameState {

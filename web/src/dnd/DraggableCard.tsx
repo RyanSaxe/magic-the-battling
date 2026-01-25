@@ -11,7 +11,7 @@ interface DraggableCardProps {
   onDoubleClick?: () => void
   onContextMenu?: (e: React.MouseEvent) => void
   selected?: boolean
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   tapped?: boolean
   faceDown?: boolean
   counters?: Record<string, number>

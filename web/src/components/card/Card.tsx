@@ -8,7 +8,7 @@ interface CardProps {
   onClick?: () => void
   onDoubleClick?: () => void
   selected?: boolean
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   tapped?: boolean
   faceDown?: boolean
   counters?: Record<string, number>
@@ -21,6 +21,7 @@ interface CardProps {
 }
 
 const sizeStyles = {
+  xs: { width: 50, height: 70 },
   sm: { width: 80, height: 112 },
   md: { width: 130, height: 182 },
   lg: { width: 200, height: 280 },

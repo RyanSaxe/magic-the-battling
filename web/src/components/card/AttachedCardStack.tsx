@@ -4,7 +4,7 @@ import { Card } from './Card'
 interface AttachedCardStackProps {
   parentCard: CardType
   attachedCards: CardType[]
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   parentTapped?: boolean
   parentFaceDown?: boolean
   parentCounters?: Record<string, number>

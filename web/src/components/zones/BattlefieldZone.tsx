@@ -21,6 +21,7 @@ interface BattlefieldZoneProps {
   isOpponent?: boolean
   label?: string
   separateLands?: boolean
+  cardSize?: 'xs' | 'sm' | 'md' | 'lg'
 }
 
 export function BattlefieldZone({
@@ -38,6 +39,7 @@ export function BattlefieldZone({
   isOpponent = false,
   label,
   separateLands = false,
+  cardSize = 'sm',
 }: BattlefieldZoneProps) {
   const attachedCardIds = new Set(Object.values(attachments).flat())
   const topLevelCards = cards.filter(c => !attachedCardIds.has(c.id))
@@ -59,7 +61,7 @@ export function BattlefieldZone({
           key={card.id}
           parentCard={card}
           attachedCards={attachedCards}
-          size="md"
+          size={cardSize}
           parentTapped={tappedCardIds.has(card.id)}
           parentFaceDown={faceDownCardIds.has(card.id)}
           parentCounters={counters[card.id]}
@@ -87,7 +89,7 @@ export function BattlefieldZone({
         <DraggableCard
           card={card}
           zone="battlefield"
-          size="md"
+          size={cardSize}
           selected={card.id === selectedCardId}
           tapped={tappedCardIds.has(card.id)}
           faceDown={faceDownCardIds.has(card.id)}
@@ -123,10 +125,16 @@ export function BattlefieldZone({
             permanents.map(renderCard)
           )}
         </div>
-        {/* Lands (separate row if enabled) */}
-        {separateLands && lands.length > 0 && (
-          <div className="flex justify-center flex-wrap gap-2 pt-2 border-t border-gray-700/50">
-            {lands.map(renderCard)}
+        {/* Lands (separate row if enabled, always visible) */}
+        {separateLands && (
+          <div className="flex justify-center flex-wrap gap-2 pt-2 border-t border-gray-700/50 min-h-[50px]">
+            {lands.length > 0 ? (
+              lands.map(renderCard)
+            ) : (
+              <div className="text-gray-600 text-xs border border-dashed border-gray-700 rounded px-3 py-2">
+                Lands
+              </div>
+            )}
           </div>
         )}
       </div>

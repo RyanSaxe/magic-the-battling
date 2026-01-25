@@ -29,6 +29,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
     zone: ZoneName
   } | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [showSideboard, setShowSideboard] = useState(false)
 
   const { handleCardMove, getValidDropZones } = useDndActions({
     phase: 'battle',
@@ -48,7 +49,8 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
     )
   }
 
-  const { your_zones, opponent_zones, opponent_name, coin_flip_name, opponent_hand_count } = current_battle
+  const { your_zones, opponent_zones, opponent_name, opponent_hand_count, opponent_hand_revealed } = current_battle
+  const sideboard = gameState.self_player.sideboard
 
   const tappedCardIds = new Set(your_zones.tapped_card_ids || [])
   const faceDownCardIds = new Set(your_zones.face_down_card_ids || [])
@@ -101,27 +103,21 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   return (
     <GameDndProvider onCardMove={handleCardMove} validDropZones={getValidDropZones}>
       <div className="flex flex-col h-full gap-2">
-        {/* Header */}
-        <div className="flex justify-between items-center px-4 py-2">
-          <div className="text-lg text-white">
-            vs <span className="font-medium">{opponent_name}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-400">First:</span>
-            <span className="text-amber-400 font-medium">{coin_flip_name}</span>
-          </div>
-        </div>
-
-        {/* Opponent's hand (card backs) */}
+        {/* Opponent's hand */}
         {opponent_hand_count > 0 && (
           <div className="px-4 py-2 bg-black/30">
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
               {opponent_name}'s Hand ({opponent_hand_count})
+              {opponent_hand_revealed && <span className="text-amber-400 ml-2">(Revealed)</span>}
             </div>
             <div className="flex justify-center gap-1 overflow-x-auto">
-              {Array.from({ length: opponent_hand_count }).map((_, i) => (
-                <CardBack key={i} size="sm" />
-              ))}
+              {opponent_hand_revealed
+                ? opponent_zones.hand.map((card) => (
+                    <Card key={card.id} card={card} size="sm" />
+                  ))
+                : Array.from({ length: opponent_hand_count }).map((_, i) => (
+                    <CardBack key={i} size="sm" />
+                  ))}
             </div>
           </div>
         )}
@@ -134,10 +130,10 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               {opponent_name}
             </div>
             <div className="flex flex-col gap-2 p-4 pt-8 min-h-[150px]">
-              {/* Opponent's lands (at top, behind their creatures from our perspective) */}
-              {opponentLands.length > 0 && (
-                <div className="flex justify-center flex-wrap gap-1 pb-2 border-b border-gray-700/50">
-                  {opponentLands.map((card) => (
+              {/* Opponent's lands (at top, always visible) */}
+              <div className="flex justify-center flex-wrap gap-1 pb-2 border-b border-gray-700/50 min-h-[50px]">
+                {opponentLands.length > 0 ? (
+                  opponentLands.map((card) => (
                     <Card
                       key={card.id}
                       card={card}
@@ -146,13 +142,17 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
                       faceDown={opponentFaceDownIds.has(card.id)}
                       counters={opponentCounters[card.id]}
                     />
-                  ))}
-                </div>
-              )}
+                  ))
+                ) : (
+                  <div className="text-gray-600 text-xs border border-dashed border-gray-700 rounded px-3 py-2">
+                    Lands
+                  </div>
+                )}
+              </div>
               {/* Opponent's permanents (non-lands) */}
               <div className="flex justify-center flex-wrap gap-2">
-                {opponentPermanents.length === 0 && opponentLands.length === 0 ? (
-                  <div className="text-gray-500 text-sm">Empty battlefield</div>
+                {opponentPermanents.length === 0 ? (
+                  <div className="text-gray-500 text-sm opacity-50">Empty battlefield</div>
                 ) : (
                   opponentPermanents.map((card) => (
                     <Card
@@ -190,12 +190,50 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
           </div>
         </div>
 
-        {/* Your hand */}
-        <HandZone
-          cards={your_zones.hand}
-          selectedCardId={selectedCard?.card.id}
-          onCardClick={(card) => handleCardClick(card, 'hand')}
-        />
+        {/* Your hand with sideboard toggle */}
+        <div className="relative">
+          <HandZone
+            cards={your_zones.hand}
+            selectedCardId={selectedCard?.card.id}
+            onCardClick={(card) => handleCardClick(card, 'hand')}
+          />
+          {sideboard.length > 0 && (
+            <button
+              onClick={() => setShowSideboard(true)}
+              className="absolute top-2 right-4 text-xs bg-purple-600 hover:bg-purple-500 px-2 py-1 rounded"
+            >
+              Sideboard ({sideboard.length})
+            </button>
+          )}
+        </div>
+
+        {/* Sideboard modal */}
+        {showSideboard && (
+          <div
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+            onClick={() => setShowSideboard(false)}
+          >
+            <div
+              className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-white font-medium">Your Sideboard ({sideboard.length})</h3>
+                <button
+                  onClick={() => setShowSideboard(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {sideboard.map((card) => (
+                  <Card key={card.id} card={card} size="sm" />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Context menu */}
         {contextMenu && (

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { BattleView, Card as CardType } from '../../types'
+import type { BattleView, Card as CardType, Zones } from '../../types'
 import { Card } from '../card'
+import { ZoneDisplay } from './ZoneDisplay'
 import { POISON_COUNTER_IMAGE } from '../../constants/assets'
 
 interface BattleSidebarContentProps {
@@ -15,11 +16,9 @@ interface BattleSidebarContentProps {
 function LifeCounter({
   life,
   onChange,
-  label,
 }: {
   life: number
   onChange: (life: number) => void
-  label: string
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [inputValue, setInputValue] = useState(life.toString())
@@ -45,116 +44,103 @@ function LifeCounter({
   }
 
   return (
-    <div className="flex flex-col items-center">
-      <div className="text-[10px] text-gray-400 uppercase mb-1">{label}</div>
-      <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => onChange(life - 1)}
+        className="w-6 h-6 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
+      >
+        -
+      </button>
+      {isEditing ? (
+        <input
+          type="number"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          className="w-10 h-6 text-center bg-gray-800 text-white text-sm rounded border border-gray-600 focus:outline-none focus:border-amber-500"
+          autoFocus
+        />
+      ) : (
         <button
-          onClick={() => onChange(life - 1)}
-          className="w-6 h-6 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
+          onClick={() => {
+            setInputValue(life.toString())
+            setIsEditing(true)
+          }}
+          className="w-10 h-6 text-center bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
         >
-          -
+          {life}
         </button>
-        {isEditing ? (
-          <input
-            type="number"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onBlur={handleBlur}
-            onKeyDown={handleKeyDown}
-            className="w-10 h-6 text-center bg-gray-800 text-white text-sm rounded border border-gray-600 focus:outline-none focus:border-amber-500"
-            autoFocus
-          />
-        ) : (
-          <button
-            onClick={() => {
-              setInputValue(life.toString())
-              setIsEditing(true)
-            }}
-            className="w-10 h-6 text-center bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
-          >
-            {life}
-          </button>
-        )}
-        <button
-          onClick={() => onChange(life + 1)}
-          className="w-6 h-6 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
-        >
-          +
-        </button>
-      </div>
+      )}
+      <button
+        onClick={() => onChange(life + 1)}
+        className="w-6 h-6 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
+      >
+        +
+      </button>
     </div>
   )
 }
 
-function ZoneCounts({
+function PlayerSection({
+  name,
+  poison,
   zones,
-  label,
-  onGraveyardClick,
-  onExileClick,
+  upgrades,
+  isOpponent = false,
 }: {
-  zones: { graveyard: CardType[]; exile: CardType[] }
-  label: string
-  onGraveyardClick: () => void
-  onExileClick: () => void
+  name: string
+  poison: number
+  zones: Zones
+  upgrades: CardType[]
+  isOpponent?: boolean
 }) {
-  return (
-    <div className="flex items-center gap-3 text-xs">
-      <span className="text-gray-500">{label}:</span>
-      <button
-        onClick={onGraveyardClick}
-        disabled={zones.graveyard.length === 0}
-        className="text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        GY: {zones.graveyard.length}
-      </button>
-      <button
-        onClick={onExileClick}
-        disabled={zones.exile.length === 0}
-        className="text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        Exile: {zones.exile.length}
-      </button>
-    </div>
-  )
-}
+  const appliedUpgrades = upgrades.filter((u) => u.upgrade_target)
 
-function ZoneModal({
-  title,
-  cards,
-  onClose,
-}: {
-  title: string
-  cards: CardType[]
-  onClose: () => void
-}) {
   return (
-    <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-      onClick={onClose}
-    >
-      <div
-        className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-white font-medium">{title}</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white"
-          >
-            ✕
-          </button>
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-sm text-white font-medium">{name}</span>
+        <div className="flex items-center gap-1">
+          <img
+            src={POISON_COUNTER_IMAGE}
+            alt="Poison"
+            className="w-5 h-5 rounded object-cover"
+          />
+          <span className="text-purple-400 text-sm font-medium">{poison}</span>
         </div>
-        {cards.length === 0 ? (
-          <div className="text-gray-500 text-center py-4">No cards</div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {cards.map((card) => (
-              <Card key={card.id} card={card} size="sm" enablePreview={false} />
-            ))}
-          </div>
-        )}
       </div>
+
+      {isOpponent && appliedUpgrades.length > 0 && (
+        <div className="flex gap-1 flex-wrap">
+          {appliedUpgrades.map((upgrade) => (
+            <Card
+              key={upgrade.id}
+              card={upgrade}
+              size="xs"
+              showUpgradeTarget
+            />
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2 justify-center">
+        <ZoneDisplay title="GY" cards={zones.graveyard} />
+        <ZoneDisplay title="Exile" cards={zones.exile} />
+      </div>
+
+      {!isOpponent && appliedUpgrades.length > 0 && (
+        <div className="flex gap-1 flex-wrap">
+          {appliedUpgrades.map((upgrade) => (
+            <Card
+              key={upgrade.id}
+              card={upgrade}
+              size="xs"
+              showUpgradeTarget
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -167,141 +153,54 @@ export function BattleSidebarContent({
   onYourLifeChange,
   onOpponentLifeChange,
 }: BattleSidebarContentProps) {
-  const [zoneModal, setZoneModal] = useState<{
-    title: string
-    cards: CardType[]
-  } | null>(null)
-
   const { opponent_name, coin_flip_name, your_zones, opponent_zones } = currentBattle
 
-  const yourPoison = your_zones.counters?.poison?.['poison'] ?? 0
-  const opponentPoison = opponent_zones.counters?.poison?.['poison'] ?? 0
-
-  const yourAppliedUpgrades = selfUpgrades.filter((u) => u.upgrade_target)
-  const opponentAppliedUpgrades = opponent_zones.upgrades.filter((u) => u.upgrade_target)
+  const yourPoison = currentBattle.your_poison
+  const opponentPoison = currentBattle.opponent_poison
 
   return (
-    <div className="p-3 space-y-4">
-      {/* Battle info header */}
-      <div className="text-center">
-        <div className="text-sm text-gray-400">vs {opponent_name}</div>
-        <div className="text-xs text-gray-500">
-          First: <span className="text-amber-400">{coin_flip_name}</span>
+    <div className="flex flex-col h-full">
+      {/* Opponent section - top */}
+      <div className="p-3 border-b border-gray-700">
+        <PlayerSection
+          name={opponent_name}
+          poison={opponentPoison}
+          zones={opponent_zones}
+          upgrades={opponent_zones.upgrades}
+          isOpponent
+        />
+      </div>
+
+      {/* Life counters - center */}
+      <div className="p-3 bg-black/40">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center">
+            <div className="text-xs text-gray-400 uppercase mb-1">{opponent_name}</div>
+            <div className="flex justify-center">
+              <LifeCounter life={opponentLife} onChange={onOpponentLifeChange} />
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-gray-400 uppercase mb-1">You</div>
+            <div className="flex justify-center">
+              <LifeCounter life={yourLife} onChange={onYourLifeChange} />
+            </div>
+          </div>
+        </div>
+        <div className="text-center text-xs text-gray-500 mt-2">
+          <span className="text-amber-400">{coin_flip_name}</span> goes first
         </div>
       </div>
 
-      {/* Life totals and poison */}
-      <div className="bg-black/30 rounded-lg p-3">
-        <div className="grid grid-cols-2 gap-4">
-          {/* You */}
-          <div className="text-center">
-            <div className="text-xs text-gray-400 uppercase mb-2">You</div>
-            <div className="flex items-center justify-center gap-1 mb-2">
-              <img
-                src={POISON_COUNTER_IMAGE}
-                alt="Poison"
-                className="w-6 h-6 rounded object-cover"
-              />
-              <span className="text-purple-400 font-medium">{yourPoison}</span>
-            </div>
-            <LifeCounter
-              life={yourLife}
-              onChange={onYourLifeChange}
-              label="Life"
-            />
-          </div>
-          {/* Opponent */}
-          <div className="text-center">
-            <div className="text-xs text-gray-400 uppercase mb-2">{opponent_name}</div>
-            <div className="flex items-center justify-center gap-1 mb-2">
-              <img
-                src={POISON_COUNTER_IMAGE}
-                alt="Poison"
-                className="w-6 h-6 rounded object-cover"
-              />
-              <span className="text-purple-400 font-medium">{opponentPoison}</span>
-            </div>
-            <LifeCounter
-              life={opponentLife}
-              onChange={onOpponentLifeChange}
-              label="Life"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Your zones */}
-      <div className="space-y-2">
-        <ZoneCounts
+      {/* Your section - bottom, flex-1 to push down */}
+      <div className="p-3 flex-1 flex flex-col justify-end">
+        <PlayerSection
+          name="You"
+          poison={yourPoison}
           zones={your_zones}
-          label="Your"
-          onGraveyardClick={() =>
-            setZoneModal({ title: 'Your Graveyard', cards: your_zones.graveyard })
-          }
-          onExileClick={() =>
-            setZoneModal({ title: 'Your Exile', cards: your_zones.exile })
-          }
+          upgrades={selfUpgrades}
         />
-        {yourAppliedUpgrades.length > 0 && (
-          <div className="flex gap-1 flex-wrap">
-            {yourAppliedUpgrades.map((upgrade) => (
-              <Card
-                key={upgrade.id}
-                card={upgrade}
-                size="sm"
-                showUpgradeTarget
-                enablePreview={false}
-              />
-            ))}
-          </div>
-        )}
       </div>
-
-      {/* Opponent zones */}
-      <div className="flex gap-2">
-        {/* Left: Applied upgrades */}
-        {opponentAppliedUpgrades.length > 0 && (
-          <div className="flex flex-col gap-1 flex-shrink-0">
-            {opponentAppliedUpgrades.map((upgrade) => (
-              <Card
-                key={upgrade.id}
-                card={upgrade}
-                size="sm"
-                showUpgradeTarget
-                enablePreview={false}
-              />
-            ))}
-          </div>
-        )}
-        {/* Right: Zone counts */}
-        <div className="flex-1">
-          <ZoneCounts
-            zones={opponent_zones}
-            label={opponent_name}
-            onGraveyardClick={() =>
-              setZoneModal({
-                title: `${opponent_name}'s Graveyard`,
-                cards: opponent_zones.graveyard,
-              })
-            }
-            onExileClick={() =>
-              setZoneModal({
-                title: `${opponent_name}'s Exile`,
-                cards: opponent_zones.exile,
-              })
-            }
-          />
-        </div>
-      </div>
-
-      {/* Zone modal */}
-      {zoneModal && (
-        <ZoneModal
-          title={zoneModal.title}
-          cards={zoneModal.cards}
-          onClose={() => setZoneModal(null)}
-        />
-      )}
     </div>
   )
 }

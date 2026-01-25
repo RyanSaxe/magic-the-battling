@@ -1,13 +1,14 @@
 import { CARD_BACK_IMAGE } from '../../constants/assets'
 
 interface CardBackProps {
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'xs' | 'sm' | 'md' | 'lg'
   tapped?: boolean
   onClick?: () => void
   className?: string
 }
 
 const sizeStyles = {
+  xs: { width: 50, height: 70 },
   sm: { width: 80, height: 112 },
   md: { width: 130, height: 182 },
   lg: { width: 200, height: 280 },

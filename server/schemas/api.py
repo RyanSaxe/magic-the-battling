@@ -74,6 +74,9 @@ class BattleView(BaseModel):
     opponent_zones: Zones
     opponent_hand_count: int
     result_submissions: dict[str, str]
+    your_poison: int
+    opponent_poison: int
+    opponent_hand_revealed: bool = False
 
 
 class GameStateResponse(BaseModel):
