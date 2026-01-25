@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useSession } from '../hooks/useSession'
 import { useGame } from '../hooks/useGame'
@@ -8,9 +8,79 @@ import { BuildPhase } from './phases/Build'
 import { BattlePhase } from './phases/Battle'
 import { RewardPhase } from './phases/Reward'
 import { Sidebar } from '../components/sidebar'
-import { ContextStrip } from '../components/ContextStrip'
+import { BattleSidebarContent } from '../components/sidebar/BattleSidebarContent'
 import { ContextStripProvider, useContextStrip } from '../contexts'
-import { CardPreviewContext } from '../components/card'
+import { CardPreviewContext, Card } from '../components/card'
+import type { Card as CardType, PlayerView } from '../types'
+
+function CardPreview({ card }: { card: CardType }) {
+  return (
+    <div className="p-3">
+      <img
+        src={card.png_url ?? card.image_url}
+        alt={card.name}
+        className="w-full rounded-lg shadow-lg"
+      />
+      <div className="mt-2">
+        <div className="text-white font-medium text-sm">{card.name}</div>
+        <div className="text-gray-400 text-xs">{card.type_line}</div>
+      </div>
+    </div>
+  )
+}
+
+function RevealedCards({ player }: { player: PlayerView }) {
+  const cards = player.most_recently_revealed_cards
+
+  if (cards.length === 0) {
+    return (
+      <div className="p-3 text-center">
+        <div className="text-gray-400 text-sm">
+          {player.name} has no revealed cards
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-3">
+      <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+        {player.name}'s Revealed Cards
+      </div>
+      <div className="flex flex-col gap-2">
+        {cards.map((card) => (
+          <Card key={card.id} card={card} size="sm" enablePreview={false} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function UpgradesDisplay({ upgrades }: { upgrades: CardType[] }) {
+  const appliedUpgrades = upgrades.filter((u) => u.upgrade_target)
+  const unappliedUpgrades = upgrades.filter((u) => !u.upgrade_target)
+
+  return (
+    <div className="p-3">
+      <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+        Your Upgrades ({upgrades.length})
+      </div>
+      <div className="flex flex-col gap-2">
+        {appliedUpgrades.map((upgrade) => (
+          <Card key={upgrade.id} card={upgrade} size="sm" showUpgradeTarget enablePreview={false} />
+        ))}
+        {unappliedUpgrades.map((upgrade) => (
+          <div key={upgrade.id} className="relative opacity-60">
+            <Card card={upgrade} size="sm" enablePreview={false} />
+            <div className="absolute bottom-0 left-0 right-0 text-center text-[10px] text-gray-400 bg-black/60 rounded-b px-1">
+              Not applied
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>()
@@ -20,11 +90,24 @@ function GameContent() {
     gameId ?? null,
     session?.sessionId ?? null
   )
-  const { setPreviewCard } = useContextStrip()
+  const { state, setPreviewCard } = useContextStrip()
 
   const [rejoinName, setRejoinName] = useState('')
   const [rejoinError, setRejoinError] = useState('')
   const [rejoinLoading, setRejoinLoading] = useState(false)
+
+  // Lifted state from Build phase
+  const [selectedBasics, setSelectedBasics] = useState<string[]>([])
+
+  // Lifted state from Reward phase
+  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(null)
+
+  // Lifted state from Battle phase
+  const [isChangingResult, setIsChangingResult] = useState(false)
+
+  // Battle sidebar life tracking state
+  const [yourLife, setYourLife] = useState(20)
+  const [opponentLife, setOpponentLife] = useState(20)
 
   const handleRejoin = async () => {
     if (!rejoinName.trim() || !gameId) {
@@ -125,84 +208,236 @@ function GameContent() {
     eliminated: 'battle',
   }[currentPhase] || 'draft'
 
-  const renderActionButtons = () => {
+  const { self_player, current_battle } = gameState
+  const maxHandSize = self_player.hand_size
+  const handExceedsLimit = self_player.hand.length > maxHandSize
+  const basicsComplete = selectedBasics.length === 3
+  const canReady = basicsComplete && !handExceedsLimit
+
+  const isStageIncreasing = self_player.is_stage_increasing
+  const needsUpgrade = isStageIncreasing && gameState.available_upgrades.length > 0
+  const canContinue = !needsUpgrade || !!selectedUpgradeId
+
+  const handleContinue = () => {
+    actions.rewardDone(selectedUpgradeId ?? undefined)
+    setSelectedUpgradeId(null)
+  }
+
+  const renderActionButtons = (): ReactNode => {
     switch (currentPhase) {
       case 'draft':
         return (
-          <div className="space-y-2">
+          <>
             <button
               onClick={actions.draftRoll}
               disabled={
-                gameState.self_player.treasures <= 0 ||
-                (gameState.self_player.current_pack?.length ?? 0) === 0
+                self_player.treasures <= 0 ||
+                (self_player.current_pack?.length ?? 0) === 0
               }
-              className="btn btn-secondary w-full"
+              className="btn btn-secondary"
             >
-              Roll Pack ({gameState.self_player.treasures} 💰)
+              Roll Pack ({self_player.treasures} 💰)
             </button>
-            <button onClick={actions.draftDone} className="btn btn-primary w-full">
+            <button onClick={actions.draftDone} className="btn btn-primary">
               Done Drafting
             </button>
-          </div>
+          </>
         )
+      case 'build':
+        if (self_player.build_ready) {
+          return (
+            <>
+              <span className="text-amber-400 text-sm">Waiting...</span>
+              <button
+                onClick={actions.buildUnready}
+                className="btn bg-gray-600 hover:bg-gray-500 text-white"
+              >
+                Unready
+              </button>
+            </>
+          )
+        }
+        return (
+          <button
+            onClick={() => actions.buildReady(selectedBasics)}
+            disabled={!canReady}
+            className="btn btn-primary"
+          >
+            Ready {!basicsComplete && '(select 3 basics)'}
+          </button>
+        )
+      case 'battle': {
+        if (!current_battle) return null
+        const { opponent_name, result_submissions } = current_battle
+        const mySubmission = result_submissions[self_player.name]
+        const opponentSubmission = result_submissions[opponent_name]
+
+        if (mySubmission && !isChangingResult) {
+          const resultsConflict = opponentSubmission && mySubmission !== opponentSubmission
+          return (
+            <>
+              <span className={`text-sm ${resultsConflict ? 'text-red-400' : 'text-amber-400'}`}>
+                {resultsConflict ? 'Results conflict!' : 'Waiting...'}
+              </span>
+              <button
+                onClick={() => setIsChangingResult(true)}
+                className="btn btn-secondary"
+              >
+                Change
+              </button>
+            </>
+          )
+        }
+        return (
+          <>
+            {isChangingResult && (
+              <button
+                onClick={() => setIsChangingResult(false)}
+                className="text-gray-400 text-sm hover:text-white"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              onClick={() => {
+                actions.battleSubmitResult(self_player.name)
+                setIsChangingResult(false)
+              }}
+              className="btn btn-primary"
+            >
+              I Won
+            </button>
+            <button
+              onClick={() => {
+                actions.battleSubmitResult('draw')
+                setIsChangingResult(false)
+              }}
+              className="btn btn-secondary"
+            >
+              Draw
+            </button>
+            <button
+              onClick={() => {
+                actions.battleSubmitResult(opponent_name)
+                setIsChangingResult(false)
+              }}
+              className="btn btn-danger"
+            >
+              Opponent Won
+            </button>
+          </>
+        )
+      }
+      case 'reward': {
+        const buttonLabel = needsUpgrade
+          ? selectedUpgradeId
+            ? 'Claim & Continue'
+            : 'Select Upgrade'
+          : 'Continue'
+        return (
+          <button
+            onClick={handleContinue}
+            disabled={!canContinue}
+            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {buttonLabel}
+          </button>
+        )
+      }
       default:
         return null
     }
   }
 
+  const renderPreviewContent = (): ReactNode => {
+    if (state.previewCard) {
+      return <CardPreview card={state.previewCard} />
+    }
+    if (state.revealedPlayer) {
+      return <RevealedCards player={state.revealedPlayer} />
+    }
+    if (self_player.upgrades.length > 0 && currentPhase !== 'battle') {
+      return <UpgradesDisplay upgrades={self_player.upgrades} />
+    }
+    return null
+  }
+
+  const renderPhaseContent = (): ReactNode => {
+    if (currentPhase === 'battle' && current_battle) {
+      return (
+        <BattleSidebarContent
+          currentBattle={current_battle}
+          selfUpgrades={self_player.upgrades}
+          yourLife={yourLife}
+          opponentLife={opponentLife}
+          onYourLifeChange={setYourLife}
+          onOpponentLifeChange={setOpponentLife}
+        />
+      )
+    }
+    return null
+  }
+
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
       <div className="game-table flex flex-col">
-        {/* Header */}
-        <header className="flex justify-between items-center px-4 py-3 bg-black/30">
-          <h1 className="text-xl font-bold text-white">Magic: The Battling</h1>
-          <div className="flex items-center gap-4">
+        {/* Header - Action Bar */}
+        <header className="flex justify-between items-center px-4 py-2 bg-black/30">
+          <div className="flex items-center gap-3">
             <div className="text-sm text-gray-300">
-              Stage {gameState.self_player.hand_size} • Round{' '}
-              {gameState.self_player.round}
+              Stage {self_player.hand_size} • Round {self_player.round}
             </div>
             <span className={`phase-badge ${phaseBadgeClass}`}>{currentPhase}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {renderActionButtons()}
           </div>
         </header>
 
         {/* Main content */}
         <div className="flex-1 flex min-h-0">
-          {/* Game area with context strip */}
-          <div className="flex-1 flex flex-col min-h-0">
-            <main className="flex-1 flex flex-col min-h-0">
-              {currentPhase === 'draft' && (
-                <DraftPhase gameState={gameState} actions={actions} />
-              )}
-              {currentPhase === 'build' && (
-                <BuildPhase gameState={gameState} actions={actions} />
-              )}
-              {currentPhase === 'battle' && (
-                <BattlePhase gameState={gameState} actions={actions} />
-              )}
-              {currentPhase === 'reward' && (
-                <RewardPhase gameState={gameState} actions={actions} />
-              )}
-              {currentPhase === 'eliminated' && (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <h2 className="text-2xl text-red-400 mb-4">Eliminated</h2>
-                    <p className="text-gray-400">
-                      You have been eliminated from the game.
-                    </p>
-                  </div>
+          {/* Game area */}
+          <main className="flex-1 flex flex-col min-h-0">
+            {currentPhase === 'draft' && (
+              <DraftPhase gameState={gameState} actions={actions} />
+            )}
+            {currentPhase === 'build' && (
+              <BuildPhase
+                gameState={gameState}
+                actions={actions}
+                selectedBasics={selectedBasics}
+                onBasicsChange={setSelectedBasics}
+              />
+            )}
+            {currentPhase === 'battle' && (
+              <BattlePhase gameState={gameState} actions={actions} />
+            )}
+            {currentPhase === 'reward' && (
+              <RewardPhase
+                gameState={gameState}
+                actions={actions}
+                selectedUpgradeId={selectedUpgradeId}
+                onUpgradeSelect={setSelectedUpgradeId}
+              />
+            )}
+            {currentPhase === 'eliminated' && (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <h2 className="text-2xl text-red-400 mb-4">Eliminated</h2>
+                  <p className="text-gray-400">
+                    You have been eliminated from the game.
+                  </p>
                 </div>
-              )}
-            </main>
-
-            {/* Context Strip */}
-            <ContextStrip upgrades={gameState.self_player.upgrades} />
-          </div>
+              </div>
+            )}
+          </main>
 
           {/* Sidebar */}
           <Sidebar
             players={gameState.players}
-            currentPlayerName={gameState.self_player.name}
-            actionButtons={renderActionButtons()}
+            currentPlayerName={self_player.name}
+            phaseContent={renderPhaseContent()}
+            previewContent={renderPreviewContent()}
           />
         </div>
       </div>

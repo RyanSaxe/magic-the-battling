@@ -47,7 +47,7 @@ export function Card({
   disabled = false,
   className = '',
   showUpgradeTarget = false,
-  enablePreview = false,
+  enablePreview = true,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)

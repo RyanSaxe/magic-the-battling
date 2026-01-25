@@ -29,14 +29,13 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
     zone: ZoneName
   } | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
-  const [isChangingResult, setIsChangingResult] = useState(false)
 
   const { handleCardMove, getValidDropZones } = useDndActions({
     phase: 'battle',
     battleMove: actions.battleMove,
   })
 
-  const { self_player, current_battle } = gameState
+  const { current_battle } = gameState
 
   if (!current_battle) {
     return (
@@ -49,7 +48,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
     )
   }
 
-  const { your_zones, opponent_zones, opponent_name, coin_flip_name, opponent_hand_count, result_submissions } = current_battle
+  const { your_zones, opponent_zones, opponent_name, coin_flip_name, opponent_hand_count } = current_battle
 
   const tappedCardIds = new Set(your_zones.tapped_card_ids || [])
   const faceDownCardIds = new Set(your_zones.face_down_card_ids || [])
@@ -98,9 +97,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   const isCardAttached = (cardId: string): boolean => {
     return Object.values(attachments).some(children => children.includes(cardId))
   }
-
-  const mySubmission = result_submissions[self_player.name]
-  const opponentSubmission = result_submissions[opponent_name]
 
   return (
     <GameDndProvider onCardMove={handleCardMove} validDropZones={getValidDropZones}>
@@ -218,91 +214,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
             onClose={() => setContextMenu(null)}
           />
         )}
-
-        {/* Result submission */}
-        <div className="px-4 pb-4">
-          {mySubmission && !isChangingResult ? (
-            <div className="text-center">
-              {opponentSubmission && mySubmission !== opponentSubmission ? (
-                <div className="mb-3">
-                  <div className="text-red-400 mb-2">
-                    Results don't match!
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    You: <span className="text-white">{mySubmission === self_player.name ? 'I Won' : mySubmission === 'draw' ? 'Draw' : 'Opponent Won'}</span>
-                    <span className="mx-2">vs</span>
-                    Opponent: <span className="text-white">{opponentSubmission === opponent_name ? 'I Won' : opponentSubmission === 'draw' ? 'Draw' : 'Opponent Won'}</span>
-                  </div>
-                  <button
-                    onClick={() => setIsChangingResult(true)}
-                    className="btn btn-secondary mt-3"
-                  >
-                    Change Your Selection
-                  </button>
-                </div>
-              ) : (
-                <div className="bg-black/40 rounded-lg p-4">
-                  <div className="text-amber-400 mb-2">
-                    Waiting for opponent...
-                  </div>
-                  <div className="text-sm text-gray-400 mb-3">
-                    You reported: <span className="text-white">
-                      {mySubmission === self_player.name ? 'I Won' : mySubmission === 'draw' ? 'Draw' : 'Opponent Won'}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setIsChangingResult(true)}
-                    className="btn btn-secondary"
-                  >
-                    Change Selection
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div>
-              {isChangingResult && (
-                <div className="text-center mb-3">
-                  <button
-                    onClick={() => setIsChangingResult(false)}
-                    className="text-gray-400 text-sm hover:text-white"
-                  >
-                    ← Cancel change
-                  </button>
-                </div>
-              )}
-              <div className="flex justify-center gap-3">
-                <button
-                  onClick={() => {
-                    actions.battleSubmitResult(self_player.name)
-                    setIsChangingResult(false)
-                  }}
-                  className="btn btn-primary"
-                >
-                  I Won
-                </button>
-                <button
-                  onClick={() => {
-                    actions.battleSubmitResult('draw')
-                    setIsChangingResult(false)
-                  }}
-                  className="btn btn-secondary"
-                >
-                  Draw
-                </button>
-                <button
-                  onClick={() => {
-                    actions.battleSubmitResult(opponent_name)
-                    setIsChangingResult(false)
-                  }}
-                  className="btn btn-danger"
-                >
-                  Opponent Won
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
     </GameDndProvider>
   )

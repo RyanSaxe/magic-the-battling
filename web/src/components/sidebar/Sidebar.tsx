@@ -5,19 +5,24 @@ import { PlayerList } from '../PlayerList'
 interface SidebarProps {
   players: PlayerView[]
   currentPlayerName: string
-  actionButtons?: ReactNode
+  phaseContent?: ReactNode
+  previewContent?: ReactNode
 }
 
-export function Sidebar({ players, currentPlayerName, actionButtons }: SidebarProps) {
+export function Sidebar({ players, currentPlayerName, phaseContent, previewContent }: SidebarProps) {
   return (
     <aside className="w-64 bg-black/30 flex flex-col overflow-hidden">
       <div className="p-4 overflow-auto flex-shrink-0">
         <PlayerList players={players} currentPlayerName={currentPlayerName} />
       </div>
-      {actionButtons && (
-        <div className="p-4 pt-0 border-t border-gray-700/50">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-3">Actions</div>
-          {actionButtons}
+      {phaseContent && (
+        <div className="border-t border-gray-700/50 overflow-auto">
+          {phaseContent}
+        </div>
+      )}
+      {previewContent && (
+        <div className="border-t border-gray-700/50 overflow-auto flex-1">
+          {previewContent}
         </div>
       )}
     </aside>

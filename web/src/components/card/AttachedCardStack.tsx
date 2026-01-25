@@ -6,11 +6,9 @@ interface AttachedCardStackProps {
   attachedCards: CardType[]
   size?: 'sm' | 'md' | 'lg'
   parentTapped?: boolean
-  parentFlipped?: boolean
   parentFaceDown?: boolean
   parentCounters?: Record<string, number>
   attachedTappedIds?: Set<string>
-  attachedFlippedIds?: Set<string>
   attachedFaceDownIds?: Set<string>
   attachedCounters?: Record<string, Record<string, number>>
   selectedCardId?: string
@@ -26,11 +24,9 @@ export function AttachedCardStack({
   attachedCards,
   size = 'md',
   parentTapped = false,
-  _parentFlipped = false,
   parentFaceDown = false,
   parentCounters,
   attachedTappedIds = new Set(),
-  _attachedFlippedIds = new Set(),
   attachedFaceDownIds = new Set(),
   attachedCounters = {},
   selectedCardId,

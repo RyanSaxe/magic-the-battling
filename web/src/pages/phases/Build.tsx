@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { Card } from '../../components/card'
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
@@ -13,6 +13,8 @@ interface BuildPhaseProps {
     buildUnready: () => void
     buildApplyUpgrade: (upgradeId: string, targetCardId: string) => void
   }
+  selectedBasics: string[]
+  onBasicsChange: (basics: string[]) => void
 }
 
 type SelectionZone = 'hand' | 'sideboard'
@@ -23,26 +25,29 @@ interface CardWithIndex {
   zone: SelectionZone
 }
 
-export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
+export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange }: BuildPhaseProps) {
   const { self_player } = gameState
   const maxHandSize = self_player.hand_size
 
   const [selectedCard, setSelectedCard] = useState<CardWithIndex | null>(null)
   const [selectedUpgrade, setSelectedUpgrade] = useState<CardType | null>(null)
-  const [selectedBasics, setSelectedBasics] = useState<string[]>(
-    () => self_player.chosen_basics?.length ? [...self_player.chosen_basics] : []
-  )
+
+  useEffect(() => {
+    if (self_player.chosen_basics?.length && selectedBasics.length === 0) {
+      onBasicsChange([...self_player.chosen_basics])
+    }
+  }, [self_player.chosen_basics, selectedBasics.length, onBasicsChange])
 
   const addBasic = (name: string) => {
     if (selectedBasics.length < 3) {
-      setSelectedBasics([...selectedBasics, name])
+      onBasicsChange([...selectedBasics, name])
     }
   }
 
   const removeBasic = (name: string) => {
     const idx = selectedBasics.indexOf(name)
     if (idx !== -1) {
-      setSelectedBasics([...selectedBasics.slice(0, idx), ...selectedBasics.slice(idx + 1)])
+      onBasicsChange([...selectedBasics.slice(0, idx), ...selectedBasics.slice(idx + 1)])
     }
   }
 
@@ -88,8 +93,6 @@ export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
 
   const unappliedUpgrades = self_player.upgrades.filter((u) => !u.upgrade_target)
   const handExceedsLimit = self_player.hand.length > maxHandSize
-  const basicsComplete = selectedBasics.length === 3
-  const canReady = basicsComplete && !handExceedsLimit
 
   return (
     <div className="flex flex-col h-full gap-4 p-4">
@@ -143,8 +146,55 @@ export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
         </div>
       )}
 
-      {/* Pool, Upgrades, and Basics side by side */}
-      <div className="flex gap-4 max-h-[280px]">
+      {/* Basic lands - horizontal row */}
+      <div className="bg-slate-800/50 rounded-lg p-3">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 uppercase tracking-wide">Basic Lands</span>
+            <span className="text-xs text-gray-400">({selectedBasics.length}/3)</span>
+          </div>
+          <div className="flex gap-3 flex-1 justify-center">
+            {BASIC_LANDS.map(({ name }) => {
+              const count = countBasic(name)
+              return (
+                <div key={name} className="flex items-center gap-1">
+                  <img
+                    src={BASIC_LAND_IMAGES[name]}
+                    alt={name}
+                    className="w-10 h-14 rounded object-cover shadow-lg"
+                    title={name}
+                  />
+                  <div className="flex flex-col gap-0.5">
+                    <button
+                      onClick={() => addBasic(name)}
+                      disabled={selectedBasics.length >= 3}
+                      className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
+                    >
+                      +
+                    </button>
+                    <span className="text-white text-xs w-5 text-center">{count}</span>
+                    <button
+                      onClick={() => removeBasic(name)}
+                      disabled={count === 0}
+                      className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
+                    >
+                      -
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          {handExceedsLimit && !self_player.build_ready && (
+            <div className="text-red-400 text-xs">
+              Hand exceeds limit ({self_player.hand.length}/{maxHandSize})
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Pool and Upgrades side by side */}
+      <div className="flex gap-4 max-h-[240px]">
         {/* Pool (sideboard) */}
         <div className="bg-slate-800/50 rounded-lg p-3 flex-1 overflow-auto">
           <div className="flex justify-between items-center mb-2">
@@ -190,75 +240,6 @@ export function BuildPhase({ gameState, actions }: BuildPhaseProps) {
             </div>
           </div>
         )}
-
-        {/* Basic lands selection */}
-        <div className="bg-slate-800/50 rounded-lg p-3 w-64 flex-shrink-0">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs text-gray-400 uppercase tracking-wide">Basic Lands</span>
-            <span className="text-xs text-gray-400">{selectedBasics.length}/3</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {BASIC_LANDS.map(({ name }) => {
-              const count = countBasic(name)
-              return (
-                <div key={name} className="flex flex-col items-center">
-                  <img
-                    src={BASIC_LAND_IMAGES[name]}
-                    alt={name}
-                    className="w-12 h-16 rounded object-cover shadow-lg"
-                  />
-                  <div className="flex items-center gap-1 mt-1">
-                    <button
-                      onClick={() => removeBasic(name)}
-                      disabled={count === 0}
-                      className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
-                    >
-                      -
-                    </button>
-                    <span className="text-white text-xs w-3 text-center">{count}</span>
-                    <button
-                      onClick={() => addBasic(name)}
-                      disabled={selectedBasics.length >= 3}
-                      className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Ready/Unready buttons */}
-          <div className="mt-4 space-y-2">
-            {self_player.build_ready ? (
-              <>
-                <div className="text-amber-400 text-sm text-center py-2">
-                  Waiting for others...
-                </div>
-                <button
-                  onClick={actions.buildUnready}
-                  className="btn bg-gray-600 hover:bg-gray-500 text-white w-full"
-                >
-                  Unready
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => actions.buildReady(selectedBasics)}
-                disabled={!canReady}
-                className="btn btn-primary w-full"
-              >
-                Ready
-              </button>
-            )}
-            {handExceedsLimit && !self_player.build_ready && (
-              <div className="text-red-400 text-xs text-center">
-                Hand size exceeds limit ({self_player.hand.length}/{maxHandSize})
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   )

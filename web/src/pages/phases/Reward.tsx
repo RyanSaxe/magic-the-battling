@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { Card } from '../../components/card'
 import { THE_VANQUISHER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import type { GameState, Card as CardType } from '../../types'
@@ -9,6 +8,8 @@ interface RewardPhaseProps {
     rewardPickUpgrade: (upgradeId: string) => void
     rewardDone: (upgradeId?: string) => void
   }
+  selectedUpgradeId: string | null
+  onUpgradeSelect: (upgradeId: string | null) => void
 }
 
 function RewardCard({
@@ -35,9 +36,7 @@ function RewardCard({
   )
 }
 
-export function RewardPhase({ gameState, actions }: RewardPhaseProps) {
-  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(null)
-
+export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: RewardPhaseProps) {
   const { self_player, available_upgrades } = gameState
   const { last_battle_result } = self_player
   const isStageIncreasing = self_player.is_stage_increasing
@@ -46,24 +45,11 @@ export function RewardPhase({ gameState, actions }: RewardPhaseProps) {
 
   const handleUpgradeClick = (upgrade: CardType) => {
     if (selectedUpgradeId === upgrade.id) {
-      setSelectedUpgradeId(null)
+      onUpgradeSelect(null)
     } else {
-      setSelectedUpgradeId(upgrade.id)
+      onUpgradeSelect(upgrade.id)
     }
   }
-
-  const handleContinue = () => {
-    actions.rewardDone(selectedUpgradeId ?? undefined)
-    setSelectedUpgradeId(null)
-  }
-
-  const needsUpgrade = isStageIncreasing && available_upgrades.length > 0
-  const canContinue = !needsUpgrade || !!selectedUpgradeId
-  const buttonLabel = needsUpgrade
-    ? selectedUpgradeId
-      ? 'Claim Upgrade & Continue'
-      : 'Select an Upgrade Above'
-    : 'Continue to Next Round'
 
   return (
     <div className="flex flex-col h-full gap-6 p-4 overflow-auto">
@@ -151,17 +137,6 @@ export function RewardPhase({ gameState, actions }: RewardPhaseProps) {
           </div>
         </div>
       )}
-
-      {/* Continue button */}
-      <div className="flex justify-center">
-        <button
-          onClick={handleContinue}
-          disabled={!canContinue}
-          className="btn btn-primary px-8 py-3 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {buttonLabel}
-        </button>
-      </div>
     </div>
   )
 }
