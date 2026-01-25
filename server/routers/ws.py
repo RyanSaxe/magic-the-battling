@@ -86,6 +86,29 @@ class ConnectionManager:
             }
         )
 
+    async def broadcast_game_over(self, game_id: str, winner_name: str | None):
+        if game_id not in self._connections:
+            return
+
+        for player_id, websocket in list(self._connections[game_id].items()):
+            state = game_manager.get_game_state(game_id, player_id)
+            if state:
+                try:
+                    await websocket.send_json(
+                        {
+                            "type": "game_over",
+                            "payload": {"winner_name": winner_name},
+                        }
+                    )
+                    await websocket.send_json(
+                        {
+                            "type": "game_state",
+                            "payload": state.model_dump(),
+                        }
+                    )
+                except Exception:
+                    self.disconnect(game_id, player_id)
+
 
 connection_manager = ConnectionManager()
 
@@ -157,7 +180,7 @@ async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_
 
         db = SessionLocal()
         try:
-            result = game_manager.start_game(game_id, db)
+            result = await game_manager.start_game_async(game_id, db)
         finally:
             db.close()
 
@@ -219,7 +242,11 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
         case "reward_apply_upgrade":
             return game_manager.handle_reward_apply_upgrade(player, payload["upgrade_id"], payload["target_card_id"])
         case "reward_done":
-            return game_manager.handle_reward_done(game, player, payload.get("upgrade_id"))
+            db = SessionLocal()
+            try:
+                return game_manager.handle_reward_done(game, player, payload.get("upgrade_id"), game_id, db)
+            finally:
+                db.close()
         case _:
             return False
 
@@ -250,6 +277,10 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
 
     if result is False:
         await connection_manager.send_error(websocket, f"Unknown action: {action}")
+    elif result == "game_over":
+        winners = [p for p in game.players if p.phase == "winner"]
+        winner_name = winners[0].name if winners else None
+        await connection_manager.broadcast_game_over(game_id, winner_name)
     elif result is True or result is None:
         await connection_manager.broadcast_game_state(game_id)
     elif isinstance(result, str):

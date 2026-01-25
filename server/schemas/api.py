@@ -7,6 +7,7 @@ from mtb.models.game import LastBattleResult, Zones
 from mtb.models.types import BuildSource, CardDestination, Phase, ZoneName
 
 LastResult = Literal["win", "loss"]
+CubeLoadingStatus = Literal["loading", "ready", "error"]
 
 
 class CreateGameRequest(BaseModel):
@@ -111,6 +112,8 @@ class LobbyStateResponse(BaseModel):
     can_start: bool
     is_started: bool
     target_player_count: int = 4
+    cube_loading_status: CubeLoadingStatus = "loading"
+    cube_loading_error: str | None = None
 
 
 class DraftSwapAction(BaseModel):
@@ -181,3 +184,8 @@ class WebSocketMessage(BaseModel):
 class ErrorResponse(BaseModel):
     error: str
     detail: str | None = None
+
+
+class BotAvailabilityResponse(BaseModel):
+    available: bool
+    count: int
