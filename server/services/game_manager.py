@@ -33,9 +33,13 @@ from mtb.phases import battle, build, draft, reward
 from mtb.phases.battle import get_pairing_probabilities
 from mtb.phases.elimination import (
     check_game_over,
+    eliminate_player,
     get_live_players,
+    get_sudden_death_fighters,
+    needs_sudden_death,
     process_bot_eliminations,
-    process_eliminations,
+    setup_sudden_death_battle,
+    would_be_dead_ready_for_elimination,
 )
 from server.db.models import BattleSnapshot, GameRecord, PlayerGameHistory
 from server.schemas.api import (
@@ -667,6 +671,8 @@ class GameManager:
             return "battle"
         if "reward" in phases:
             return "reward"
+        if "awaiting_elimination" in phases:
+            return "awaiting_elimination"
         if "build" in phases:
             return "build"
         if "draft" in phases:
@@ -1074,16 +1080,39 @@ class GameManager:
 
         self._advance_bot_if_needed(game, opponent_name)
 
-        process_eliminations(game, player.round)
-        process_bot_eliminations(game)
+        player_at_lethal = player.poison >= game.config.poison_to_lose
 
-        winner, is_game_over = check_game_over(game)
-        if is_game_over:
-            self.complete_game(game_id or "", winner, db)
-            return "game_over"
+        if not player_at_lethal:
+            process_bot_eliminations(game)
+            winner, is_game_over = check_game_over(game)
+            if is_game_over:
+                self.complete_game(game_id or "", winner, db)
+                return "game_over"
+            if player.phase == "draft" and game.draft_state is None:
+                draft.start(game)
+            return None
 
-        if player.phase == "draft" and game.draft_state is None:
-            draft.start(game)
+        if not needs_sudden_death(game):
+            eliminate_player(game, player, player.round)
+            process_bot_eliminations(game)
+            winner, is_game_over = check_game_over(game)
+            if is_game_over:
+                self.complete_game(game_id or "", winner, db)
+                return "game_over"
+            return None
+
+        if not would_be_dead_ready_for_elimination(game):
+            player.phase = "awaiting_elimination"
+            return None
+
+        fighters = get_sudden_death_fighters(game)
+        if fighters:
+            p1, p2 = fighters
+            setup_sudden_death_battle(game, p1, p2)
+            p1.phase = "battle"
+            p2.phase = "battle"
+            battle.start(game, p1, p2, is_sudden_death=True)
+            return "sudden_death"
 
         return None
 

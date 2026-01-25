@@ -1,6 +1,6 @@
 from typing import Literal
 
-Phase = Literal["draft", "build", "battle", "reward", "eliminated", "winner", "game_over"]
+Phase = Literal["draft", "build", "battle", "reward", "awaiting_elimination", "eliminated", "winner", "game_over"]
 ZoneName = Literal["battlefield", "graveyard", "exile", "hand", "sideboard", "upgrades", "command_zone", "library"]
 CardDestination = Literal["hand", "sideboard", "upgrades"]
 BuildSource = Literal["hand", "sideboard"]

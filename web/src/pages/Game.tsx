@@ -202,6 +202,7 @@ function GameContent() {
     build: 'build',
     battle: 'battle',
     reward: 'reward',
+    awaiting_elimination: 'reward',
     eliminated: 'battle',
     winner: 'reward',
     game_over: 'battle',
@@ -424,6 +425,14 @@ function GameContent() {
                   selectedUpgradeId={selectedUpgradeId}
                   onUpgradeSelect={setSelectedUpgradeId}
                 />
+              )}
+              {currentPhase === 'awaiting_elimination' && (
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <h2 className="text-2xl text-amber-400 mb-4">Sudden Death Pending</h2>
+                    <p className="text-gray-300 mb-4">Waiting for other battles to finish...</p>
+                  </div>
+                </div>
               )}
               {currentPhase === 'eliminated' && (
                 <div className="flex-1 flex items-center justify-center">
