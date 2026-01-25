@@ -31,6 +31,7 @@ from server.db.models import BattleSnapshot, PlayerGameHistory
 from server.schemas.api import (
     BattleView,
     GameStateResponse,
+    LastResult,
     LobbyPlayer,
     LobbyStateResponse,
     PlayerView,
@@ -398,6 +399,14 @@ class GameManager:
             return "draft"
         return "unknown"
 
+    def _get_last_result(self, player: Player) -> LastResult | None:
+        result = player.last_battle_result
+        if result is None:
+            return None
+        if result.is_draw or result.winner_name != player.name:
+            return "loss"
+        return "win"
+
     def _make_player_view(self, player: Player, viewer: Player) -> PlayerView:
         return PlayerView(
             name=player.name,
@@ -418,6 +427,7 @@ class GameManager:
             vanguard=player.vanguard,
             chosen_basics=player.chosen_basics,
             most_recently_revealed_cards=player.most_recently_revealed_cards,
+            last_result=self._get_last_result(player),
         )
 
     def _make_fake_player_view(self, fake: FakePlayer, viewer: Player) -> PlayerView:

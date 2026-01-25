@@ -1,8 +1,12 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from mtb.models.cards import Card
 from mtb.models.game import LastBattleResult, Zones
 from mtb.models.types import BuildSource, CardDestination, Phase, ZoneName
+
+LastResult = Literal["win", "loss"]
 
 
 class CreateGameRequest(BaseModel):
@@ -58,6 +62,7 @@ class PlayerView(BaseModel):
     vanguard: Card | None
     chosen_basics: list[str]
     most_recently_revealed_cards: list[Card] = []
+    last_result: LastResult | None = None
 
 
 class SelfPlayerView(PlayerView):

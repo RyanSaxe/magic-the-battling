@@ -1,4 +1,5 @@
 export type Phase = 'draft' | 'build' | 'battle' | 'reward' | 'eliminated'
+export type LastResult = 'win' | 'loss'
 export type ZoneName = 'battlefield' | 'graveyard' | 'exile' | 'hand' | 'sideboard' | 'upgrades' | 'command_zone' | 'library'
 export type CardStateAction = 'tap' | 'untap' | 'flip' | 'face_down' | 'counter' | 'attach' | 'detach' | 'spawn'
 export type CardDestination = 'hand' | 'sideboard' | 'upgrades'
@@ -55,6 +56,7 @@ export interface PlayerView {
   vanguard: Card | null
   chosen_basics: string[]
   most_recently_revealed_cards: Card[]
+  last_result: LastResult | null
 }
 
 export interface LastBattleResult {

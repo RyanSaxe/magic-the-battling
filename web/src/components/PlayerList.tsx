@@ -1,4 +1,4 @@
-import type { PlayerView, Phase } from '../types'
+import type { PlayerView, LastResult } from '../types'
 import { PoisonIcon, MoneyBagIcon } from './icons'
 import { useContextStrip } from '../contexts'
 
@@ -7,12 +7,21 @@ interface PlayerListProps {
   currentPlayerName?: string
 }
 
-const phaseBadgeClass: Record<Phase, string> = {
-  draft: 'draft',
-  build: 'build',
-  battle: 'battle',
-  reward: 'reward',
-  eliminated: 'battle',
+function ResultBadge({ result }: { result: LastResult | null }) {
+  if (result === null) return null
+
+  if (result === 'win') {
+    return (
+      <span className="text-[10px] font-bold text-green-400 bg-green-900/50 py-0.5 px-2 rounded">
+        W
+      </span>
+    )
+  }
+  return (
+    <span className="text-[10px] font-bold text-red-400 bg-red-900/50 py-0.5 px-2 rounded">
+      L
+    </span>
+  )
 }
 
 export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
@@ -45,11 +54,7 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                   <span className="text-[10px] text-cyan-400 bg-cyan-900/50 px-1 rounded">BOT</span>
                 )}
               </div>
-              <span
-                className={`phase-badge ${phaseBadgeClass[player.phase]} text-[10px] py-0.5 px-2`}
-              >
-                {player.phase}
-              </span>
+              <ResultBadge result={player.last_result} />
             </div>
             <div className="flex items-center gap-4 text-xs">
               <span className="flex items-center gap-1 text-purple-400" title="Poison">
@@ -59,7 +64,7 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 <MoneyBagIcon size="sm" /> {player.treasures}
               </span>
               <span className="text-gray-500">
-                Stage {player.stage} R{player.round}
+                {player.hand_size}-{player.round} @ {player.phase}
               </span>
             </div>
             {player.is_ghost && (
