@@ -86,17 +86,6 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
         )}
       </div>
 
-      {/* Swap instruction */}
-      {selectedCard && (
-        <div className="bg-amber-900/40 rounded-lg p-3 text-center">
-          <span className="text-amber-400 text-sm">
-            {selectedCard.zone === 'pack'
-              ? `Click a card from your pool to swap with "${selectedCard.card.name}"`
-              : `Click a card from the pack to swap with "${selectedCard.card.name}"`}
-          </span>
-        </div>
-      )}
-
       {/* Pool */}
       <div className="bg-slate-800/50 rounded-lg p-3 max-h-[280px] overflow-auto">
         <div className="flex justify-between items-center mb-2">
@@ -119,13 +108,11 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
                     selected={selectedCard?.card.id === card.id}
                     size="md"
                   />
-                  <div
-                    className={`absolute -top-1 -right-1 text-[10px] px-1 rounded ${
-                      isInHand ? 'bg-blue-600' : 'bg-purple-600'
-                    }`}
-                  >
-                    {isInHand ? 'H' : 'S'}
-                  </div>
+                  {isInHand && (
+                    <div className="absolute -top-1 -right-1 text-[10px] px-1 rounded bg-blue-600">
+                      H
+                    </div>
+                  )}
                 </div>
               )
             })}
