@@ -51,7 +51,7 @@ class TestGhostMechanics:
         bob.phase = "battle"
         charlie.phase = "battle"
 
-        assert battle.can_start_pairing(game, 1, 1) is True
+        assert battle.can_start_pairing(game, 1, game.config.starting_stage) is True
 
     def test_ghost_pairs_when_odd_live_players(self):
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
@@ -278,7 +278,7 @@ class TestBotBattleFlow:
         bot = FakePlayer(
             name="BotPlayer (Bot)",
             player_history_id=1,
-            snapshots={"1_1": static_opp},
+            snapshots={"3_1": static_opp},
         )
         game.fake_players.append(bot)
 
@@ -319,7 +319,7 @@ class TestBotBattleFlow:
         bot = FakePlayer(
             name="BotPlayer (Bot)",
             player_history_id=1,
-            snapshots={"1_1": static_opp},
+            snapshots={"3_1": static_opp},
         )
         game.fake_players.append(bot)
 

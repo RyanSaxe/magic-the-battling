@@ -77,7 +77,7 @@ class FakePlayer(BaseModel):
     is_eliminated: bool = False
     poison: int = 0
     round: int = 1
-    stage: int = 1
+    stage: int = 3
     last_battle_result: "LastBattleResult | None" = None
 
     def get_opponent_for_round(self, stage: int, round_num: int) -> StaticOpponent | None:
@@ -131,7 +131,7 @@ class Player(BaseModel):
 
     phase: Phase = "build"
     round: int = 1
-    stage: int = 1
+    stage: int = 3
     last_opponent_name: str | None = None
     last_battle_result: "LastBattleResult | None" = None
 
@@ -290,7 +290,9 @@ def create_game(player_names: list[str], num_players: int, config: Config | None
 
     if config is None:
         config = Config()
-    players = [Player(name=name, treasures=config.starting_treasures) for name in player_names]
+    players = [
+        Player(name=name, treasures=config.starting_treasures, stage=config.starting_stage) for name in player_names
+    ]
     return Game(players=players, config=config)
 
 

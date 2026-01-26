@@ -382,7 +382,7 @@ function GameContent() {
         <header className="flex justify-between items-center px-4 py-2 bg-black/30">
           <div className="flex items-center gap-3">
             <div className="text-sm text-gray-300">
-              Stage {self_player.hand_size} • Round {self_player.round}
+              Stage {self_player.stage} • Round {self_player.round}
             </div>
             <span className={`phase-badge ${phaseBadgeClass}`}>{currentPhase}</span>
           </div>

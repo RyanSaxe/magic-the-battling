@@ -113,7 +113,7 @@ def get_all_pairing_candidates(game: Game, player: Player) -> list[PairingCandid
             continue
         if _is_opponent_in_active_battle(game, fp.name):
             continue
-        static_opp = fp.get_opponent_for_round(player.hand_size, player.round)
+        static_opp = fp.get_opponent_for_round(player.stage, player.round)
         if static_opp:
             candidates.append(static_opp)
 
@@ -125,7 +125,7 @@ def get_all_pairing_candidates(game: Game, player: Player) -> list[PairingCandid
     if game.most_recent_ghost_bot is not None:
         ghost_bot = game.most_recent_ghost_bot
         if not _is_opponent_in_active_battle(game, ghost_bot.name):
-            static_opp = ghost_bot.get_opponent_for_round(player.hand_size, player.round)
+            static_opp = ghost_bot.get_opponent_for_round(player.stage, player.round)
             if static_opp:
                 candidates.append(static_opp)
 
@@ -264,7 +264,7 @@ def get_potential_pairing_candidates(game: Game, player: Player) -> list[Pairing
     for fp in game.fake_players:
         if fp.is_eliminated:
             continue
-        static_opp = fp.get_opponent_for_round(player.hand_size, player.round)
+        static_opp = fp.get_opponent_for_round(player.stage, player.round)
         if static_opp:
             candidates.append(static_opp)
 
@@ -275,7 +275,7 @@ def get_potential_pairing_candidates(game: Game, player: Player) -> list[Pairing
 
     if game.most_recent_ghost_bot is not None:
         ghost_bot = game.most_recent_ghost_bot
-        static_opp = ghost_bot.get_opponent_for_round(player.hand_size, player.round)
+        static_opp = ghost_bot.get_opponent_for_round(player.stage, player.round)
         if static_opp:
             candidates.append(static_opp)
 

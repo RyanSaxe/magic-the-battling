@@ -8,16 +8,17 @@ from mtb.phases import battle
 def test_can_start_pairing():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
+    starting_stage = game.config.starting_stage
 
     alice.phase = "build"
     bob.phase = "battle"
-    assert not battle.can_start_pairing(game, 1, 1)
+    assert not battle.can_start_pairing(game, 1, starting_stage)
 
     alice.phase = "battle"
-    assert battle.can_start_pairing(game, 1, 1)
+    assert battle.can_start_pairing(game, 1, starting_stage)
 
     alice.round = 2
-    assert not battle.can_start_pairing(game, 1, 1)
+    assert not battle.can_start_pairing(game, 1, starting_stage)
 
 
 def test_find_opponent_returns_candidate():
@@ -442,7 +443,7 @@ class TestUnifiedPairingCandidates:
             hand=[card_factory("card1")],
             chosen_basics=["Plains", "Island", "Mountain"],
         )
-        fake.snapshots[f"{alice.hand_size}_1"] = snapshot
+        fake.snapshots[f"{alice.stage}_1"] = snapshot
         game.fake_players.append(fake)
 
         candidates = battle.get_all_pairing_candidates(game, alice)
@@ -476,12 +477,11 @@ class TestUnifiedPairingCandidates:
 
         assert alice not in candidates
 
-    def test_fake_player_snapshot_uses_hand_size_not_stage(self, card_factory):
-        """Regression test: snapshots should be keyed by hand_size, not player.stage.
+    def test_fake_player_snapshot_uses_stage_for_lookup(self, card_factory):
+        """Snapshots are keyed by stage and round, not hand_size.
 
-        Snapshots are stored in the database with keys like "3_1", "4_1" (hand_size-based)
-        not "1_1", "2_1" (stage-based). The lookup must use hand_size to retrieve the
-        correct snapshot as the game progresses.
+        Snapshots are stored in the database with keys like "3_1", "4_1" (stage-based).
+        The lookup uses player.stage, so advancing stage changes which snapshot is used.
         """
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
@@ -505,7 +505,7 @@ class TestUnifiedPairingCandidates:
         candidates = battle.get_all_pairing_candidates(game, alice)
         assert candidates[0].hand[0].name == "early_card"
 
-        alice.vanquishers = 1
+        alice.stage = 4
         candidates = battle.get_all_pairing_candidates(game, alice)
         assert candidates[0].hand[0].name == "later_card"
 

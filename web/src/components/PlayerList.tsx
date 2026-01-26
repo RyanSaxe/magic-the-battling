@@ -104,7 +104,7 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 )}
               </div>
               <span className="text-gray-500">
-                {player.hand_size}-{player.round} @ {player.phase}
+                {player.stage}-{player.round} @ {player.phase}
               </span>
             </div>
             {player.is_ghost && !player.is_most_recent_ghost && (

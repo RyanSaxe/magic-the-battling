@@ -441,7 +441,7 @@ class GameManager:
             .first()
         )
 
-        stage = player.hand_size
+        stage = player.stage
 
         if not history:
             history = PlayerGameHistory(
@@ -492,7 +492,7 @@ class GameManager:
         if not history:
             return
 
-        stage = player.hand_size
+        stage = player.stage
         snapshot = (
             db.query(BattleSnapshot)
             .filter(
@@ -781,8 +781,8 @@ class GameManager:
         probabilities: dict[str, float],
         most_recent_ghost_bot_name: str | None = None,
     ) -> PlayerView:
-        snapshot = fake.get_opponent_for_round(viewer.hand_size, viewer.round)
-        prior_key = self._get_prior_snapshot_key(viewer.hand_size, viewer.round)
+        snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
+        prior_key = self._get_prior_snapshot_key(viewer.stage, viewer.round)
         prior_snapshot = fake.snapshots.get(prior_key) if prior_key else None
         revealed_cards = prior_snapshot.hand if prior_snapshot else []
 
@@ -978,7 +978,7 @@ class GameManager:
         if not live_players:
             return
 
-        stage = live_players[0].hand_size
+        stage = live_players[0].stage
         round_num = live_players[0].round
 
         for player in live_players:
