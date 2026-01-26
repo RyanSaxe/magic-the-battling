@@ -1,14 +1,23 @@
 import type { ReactNode } from 'react'
 import type { PlayerView } from '../../types'
 import { PlayerList } from '../PlayerList'
+import { ZoneDisplay } from './ZoneDisplay'
+import { useContextStrip } from '../../contexts'
 
 interface SidebarProps {
   players: PlayerView[]
-  currentPlayerName: string
+  currentPlayer: PlayerView
   phaseContent?: ReactNode
 }
 
-export function Sidebar({ players, currentPlayerName, phaseContent }: SidebarProps) {
+export function Sidebar({ players, currentPlayer, phaseContent }: SidebarProps) {
+  const { state } = useContextStrip()
+  const displayPlayer = state.revealedPlayer ?? currentPlayer
+
+  const appliedUpgrades = displayPlayer.upgrades.filter(u => u.upgrade_target !== null)
+  const nonAppliedUpgrades = currentPlayer.upgrades.filter(u => u.upgrade_target === null)
+  const isViewingSelf = displayPlayer.name === currentPlayer.name
+
   return (
     <aside className="w-64 bg-black/30 flex flex-col overflow-hidden">
       {phaseContent ? (
@@ -16,8 +25,23 @@ export function Sidebar({ players, currentPlayerName, phaseContent }: SidebarPro
           {phaseContent}
         </div>
       ) : (
-        <div className="p-4 overflow-auto flex-shrink-0">
-          <PlayerList players={players} currentPlayerName={currentPlayerName} />
+        <div className="p-4 overflow-auto flex-1 flex flex-col gap-4">
+          <PlayerList players={players} currentPlayerName={currentPlayer.name} />
+          <div className="border-t border-gray-700 pt-4">
+            <h3 className="text-white font-medium mb-3">
+              {displayPlayer.name === currentPlayer.name ? 'Your Cards' : `${displayPlayer.name}'s Cards`}
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              <ZoneDisplay title="Upgrades" cards={appliedUpgrades} maxThumbnails={4} />
+              <ZoneDisplay title="Revealed" cards={displayPlayer.most_recently_revealed_cards} maxThumbnails={4} />
+              {isViewingSelf && nonAppliedUpgrades.length > 0 && (
+                <ZoneDisplay title="Pending Upgrades" cards={nonAppliedUpgrades} maxThumbnails={4} />
+              )}
+            </div>
+            {appliedUpgrades.length === 0 && displayPlayer.most_recently_revealed_cards.length === 0 && (
+              <div className="text-gray-500 text-sm">No cards to display</div>
+            )}
+          </div>
         </div>
       )}
     </aside>

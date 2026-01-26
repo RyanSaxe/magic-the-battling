@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 from conftest import setup_battle_ready
 
 from mtb.models.cards import Card
-from mtb.models.game import BattleSnapshotData, FakePlayer, StaticOpponent, create_game
+from mtb.models.game import BattleSnapshotData, DraftState, FakePlayer, StaticOpponent, create_game
 from mtb.phases import battle, elimination, reward
 from server.db.models import PlayerGameHistory
 from server.services.game_manager import GameManager
@@ -473,3 +473,182 @@ class TestBotGameOver:
 
         assert len(eliminated) == 0
         assert bot.is_eliminated is False
+
+
+class TestWouldBeDeadReadyForElimination:
+    def test_returns_true_when_no_would_be_dead(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        alice.poison = 5
+        bob.poison = 3
+
+        assert elimination.would_be_dead_ready_for_elimination(game) is True
+
+    def test_returns_true_when_all_would_be_dead_in_draft(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        alice.poison = 10
+        bob.poison = 10
+        alice.phase = "draft"
+        bob.phase = "draft"
+
+        assert elimination.would_be_dead_ready_for_elimination(game) is True
+
+    def test_returns_true_when_all_would_be_dead_in_awaiting_elimination(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        alice.poison = 10
+        bob.poison = 10
+        alice.phase = "awaiting_elimination"
+        bob.phase = "awaiting_elimination"
+
+        assert elimination.would_be_dead_ready_for_elimination(game) is True
+
+    def test_returns_false_when_some_in_reward(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        alice.poison = 10
+        bob.poison = 10
+        alice.phase = "draft"
+        bob.phase = "reward"
+
+        assert elimination.would_be_dead_ready_for_elimination(game) is False
+
+    def test_returns_false_when_some_in_battle(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        alice.poison = 10
+        bob.poison = 10
+        alice.phase = "draft"
+        bob.phase = "battle"
+
+        assert elimination.would_be_dead_ready_for_elimination(game) is False
+
+
+class TestEliminationFlow:
+    def test_survivor_goes_directly_to_draft(self):
+        """A player not at lethal poison should go to draft after reward."""
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, charlie = game.players
+        alice.poison = 5
+        bob.poison = 3
+        charlie.poison = 10
+        alice.phase = "reward"
+        bob.phase = "battle"
+        charlie.phase = "battle"
+        game.draft_state = DraftState(packs=[])
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+        manager._player_id_to_name["alice_id"] = "Alice"
+        manager._player_to_game["alice_id"] = "test"
+
+        result = manager.handle_reward_done(game, alice)
+
+        assert result is None
+        assert alice.phase == "draft"
+
+    def test_single_lethal_player_eliminated_immediately(self):
+        """When only one player is at lethal and there are survivors, eliminate immediately."""
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, charlie = game.players
+        alice.poison = 10
+        bob.poison = 3
+        charlie.poison = 5
+        alice.phase = "reward"
+        bob.phase = "draft"
+        charlie.phase = "draft"
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+        manager._player_id_to_name["alice_id"] = "Alice"
+        manager._player_to_game["alice_id"] = "test"
+
+        result = manager.handle_reward_done(game, alice)
+
+        assert result is None
+        assert alice.is_ghost is True
+        assert alice.phase == "eliminated"
+
+    def test_awaiting_elimination_when_one_lethal_finishes_first(self):
+        """When sudden death needed but other lethal player still in battle/reward, wait."""
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, charlie = game.players
+        alice.poison = 10
+        bob.poison = 10
+        charlie.poison = 5
+        alice.phase = "reward"
+        bob.phase = "battle"
+        charlie.phase = "draft"
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+        manager._player_id_to_name["alice_id"] = "Alice"
+        manager._player_to_game["alice_id"] = "test"
+
+        result = manager.handle_reward_done(game, alice)
+
+        assert result is None
+        assert alice.phase == "awaiting_elimination"
+        assert alice.is_ghost is False
+
+    def test_sudden_death_triggered_when_both_lethal_ready(self):
+        """When both lethal players have finished reward, start sudden death."""
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, charlie = game.players
+        alice.poison = 10
+        bob.poison = 11
+        charlie.poison = 5
+        alice.phase = "awaiting_elimination"
+        bob.phase = "reward"
+        charlie.phase = "draft"
+        alice.chosen_basics = ["Plains", "Island", "Mountain"]
+        bob.chosen_basics = ["Forest", "Swamp", "Mountain"]
+        alice.hand = [Card(name="Test1", image_url="test", id="t1", type_line="Creature")]
+        bob.hand = [Card(name="Test2", image_url="test", id="t2", type_line="Creature")]
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+        manager._player_id_to_name["bob_id"] = "Bob"
+        manager._player_to_game["bob_id"] = "test"
+
+        result = manager.handle_reward_done(game, bob)
+
+        assert result == "sudden_death"
+        assert alice.phase == "battle"
+        assert bob.phase == "battle"
+        assert alice.poison == 9
+        assert bob.poison == 9
+        assert len(game.active_battles) == 1
+
+    def test_three_player_sudden_death_lowest_gets_bye(self):
+        """When 3 players would die, lowest poison gets bye, other two fight."""
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, charlie = game.players
+        alice.poison = 10  # lowest - gets bye
+        bob.poison = 11
+        charlie.poison = 12
+        alice.phase = "awaiting_elimination"
+        bob.phase = "awaiting_elimination"
+        charlie.phase = "reward"
+        alice.chosen_basics = ["Plains", "Island", "Mountain"]
+        bob.chosen_basics = ["Forest", "Swamp", "Mountain"]
+        charlie.chosen_basics = ["Mountain", "Mountain", "Mountain"]
+        alice.hand = [Card(name="Test1", image_url="test", id="t1", type_line="Creature")]
+        bob.hand = [Card(name="Test2", image_url="test", id="t2", type_line="Creature")]
+        charlie.hand = [Card(name="Test3", image_url="test", id="t3", type_line="Creature")]
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+        manager._player_id_to_name["charlie_id"] = "Charlie"
+        manager._player_to_game["charlie_id"] = "test"
+
+        result = manager.handle_reward_done(game, charlie)
+
+        assert result == "sudden_death"
+        assert bob.phase == "battle"
+        assert charlie.phase == "battle"
+        assert alice.phase == "awaiting_elimination"
+        assert len(game.active_battles) == 1
+        battle_players = {game.active_battles[0].player.name, game.active_battles[0].opponent.name}
+        assert battle_players == {"Bob", "Charlie"}

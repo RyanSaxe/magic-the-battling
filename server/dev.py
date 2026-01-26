@@ -1,3 +1,4 @@
+import argparse
 import os
 import signal
 import subprocess
@@ -7,12 +8,20 @@ from pathlib import Path
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Run dev servers")
+    parser.add_argument("-r", "--reload", action="store_true", help="Enable auto-reload on code changes")
+    args = parser.parse_args()
+
     project_root = Path(__file__).parent.parent
     web_dir = project_root / "web"
 
+    uvicorn_cmd = [sys.executable, "-m", "uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    if args.reload:
+        uvicorn_cmd.append("--reload")
+
     # start_new_session creates process groups so we can cleanly kill child processes
     backend = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "server.main:app", "--reload", "--host", "0.0.0.0", "--port", "8000"],
+        uvicorn_cmd,
         cwd=project_root,
         start_new_session=True,
     )

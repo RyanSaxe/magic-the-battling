@@ -21,6 +21,14 @@ def eliminate_player(game: Game, player: Player, round_num: int) -> None:
     game.most_recent_ghost_bot = None
 
 
+def would_be_dead_ready_for_elimination(game: Game) -> bool:
+    """Check if all would-be-dead players have finished reward (not in battle/reward phase)."""
+    would_die = get_would_be_dead(game)
+    if not would_die:
+        return True
+    return all(p.phase in ("draft", "awaiting_elimination") for p in would_die)
+
+
 def needs_sudden_death(game: Game) -> bool:
     would_die = get_would_be_dead(game)
     live = get_live_players(game)

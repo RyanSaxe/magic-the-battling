@@ -2,11 +2,12 @@ import asyncio
 import json
 import random
 import secrets
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import cast
+from typing import Any, cast
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 import server.db.database as db
 from mtb.models.cards import (
@@ -29,11 +30,16 @@ from mtb.models.game import (
 )
 from mtb.models.types import BuildSource, CardDestination, ZoneName
 from mtb.phases import battle, build, draft, reward
+from mtb.phases.battle import get_pairing_probabilities
 from mtb.phases.elimination import (
     check_game_over,
+    eliminate_player,
     get_live_players,
+    get_sudden_death_fighters,
+    needs_sudden_death,
     process_bot_eliminations,
-    process_eliminations,
+    setup_sudden_death_battle,
+    would_be_dead_ready_for_elimination,
 )
 from server.db.models import BattleSnapshot, GameRecord, PlayerGameHistory
 from server.schemas.api import (
@@ -315,7 +321,9 @@ class GameManager:
         vanguards_id = DEFAULT_VANGUARD_ID if use_vanguards else None
         return build_battler(cube_id, upgrades_id, vanguards_id)
 
-    async def _preload_battler(self, pending: PendingGame) -> None:
+    async def _preload_battler(
+        self, pending: PendingGame, on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None
+    ) -> None:
         pending.battler_loading = True
         try:
             loop = asyncio.get_running_loop()
@@ -327,11 +335,15 @@ class GameManager:
             pending.battler_error = str(e)
         finally:
             pending.battler_loading = False
+            if on_complete:
+                await on_complete()
 
-    def start_battler_preload(self, pending: PendingGame) -> None:
+    def start_battler_preload(
+        self, pending: PendingGame, on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None
+    ) -> None:
         try:
             loop = asyncio.get_running_loop()
-            task = loop.create_task(self._preload_battler(pending))
+            task = loop.create_task(self._preload_battler(pending, on_complete))
             pending._loading_task = task
         except RuntimeError:
             pending.battler_loading = False
@@ -355,9 +367,13 @@ class GameManager:
         use_vanguards: bool | None = None,
         cube_id: str | None = None,
     ) -> list[PlayerGameHistory]:
-        query = db.query(PlayerGameHistory).filter(
-            PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else True,
-            PlayerGameHistory.max_stage >= 5,
+        query = (
+            db.query(PlayerGameHistory)
+            .options(joinedload(PlayerGameHistory.snapshots))
+            .filter(
+                PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else True,
+                PlayerGameHistory.max_stage >= 5,
+            )
         )
 
         all_histories = query.all()
@@ -365,6 +381,10 @@ class GameManager:
         other_cube: list[PlayerGameHistory] = []
 
         for history in all_histories:
+            has_starting_stage = any(s.stage == 3 for s in history.snapshots)
+            if not has_starting_stage:
+                continue
+
             game_record = db.query(GameRecord).filter(GameRecord.id == history.game_id).first()
             if not game_record or not game_record.config_json:
                 continue
@@ -601,8 +621,15 @@ class GameManager:
                 current_battle = self._make_battle_view(b, player, game)
                 break
 
-        all_players = [self._make_player_view(p, player) for p in game.players]
-        all_players.extend(self._make_fake_player_view(fp, player) for fp in game.fake_players)
+        probabilities = get_pairing_probabilities(game, player)
+        most_recent_ghost_name = game.most_recent_ghost.name if game.most_recent_ghost else None
+        most_recent_ghost_bot_name = game.most_recent_ghost_bot.name if game.most_recent_ghost_bot else None
+
+        all_players = [self._make_player_view(p, player, probabilities, most_recent_ghost_name) for p in game.players]
+        all_players.extend(
+            self._make_fake_player_view(fp, player, probabilities, most_recent_ghost_bot_name)
+            for fp in game.fake_players
+        )
 
         return GameStateResponse(
             game_id=game_id,
@@ -626,6 +653,8 @@ class GameManager:
                 upgrades=player.upgrades,
                 vanguard=player.vanguard,
                 chosen_basics=player.chosen_basics,
+                most_recently_revealed_cards=player.most_recently_revealed_cards,
+                last_result=self._get_last_result(player),
                 hand=player.hand,
                 sideboard=player.sideboard,
                 current_pack=current_pack,
@@ -644,6 +673,8 @@ class GameManager:
             return "battle"
         if "reward" in phases:
             return "reward"
+        if "awaiting_elimination" in phases:
+            return "awaiting_elimination"
         if "build" in phases:
             return "build"
         if "draft" in phases:
@@ -660,7 +691,23 @@ class GameManager:
             return "loss"
         return "win"
 
-    def _make_player_view(self, player: Player, viewer: Player) -> PlayerView:
+    def _get_fake_player_last_result(self, fake: FakePlayer) -> LastResult | None:
+        result = fake.last_battle_result
+        if result is None:
+            return None
+        if result.is_draw:
+            return "draw"
+        if result.winner_name != fake.name:
+            return "loss"
+        return "win"
+
+    def _make_player_view(
+        self,
+        player: Player,
+        viewer: Player,
+        probabilities: dict[str, float],
+        most_recent_ghost_name: str | None = None,
+    ) -> PlayerView:
         return PlayerView(
             name=player.name,
             treasures=player.treasures,
@@ -681,6 +728,8 @@ class GameManager:
             chosen_basics=player.chosen_basics,
             most_recently_revealed_cards=player.most_recently_revealed_cards,
             last_result=self._get_last_result(player),
+            pairing_probability=probabilities.get(player.name),
+            is_most_recent_ghost=player.name == most_recent_ghost_name,
         )
 
     def _get_prior_snapshot_key(self, stage: int, round_num: int, num_rounds: int = 3) -> str | None:
@@ -692,11 +741,19 @@ class GameManager:
         else:
             return None
 
-    def _make_fake_player_view(self, fake: FakePlayer, viewer: Player) -> PlayerView:
+    def _make_fake_player_view(
+        self,
+        fake: FakePlayer,
+        viewer: Player,
+        probabilities: dict[str, float],
+        most_recent_ghost_bot_name: str | None = None,
+    ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
         prior_key = self._get_prior_snapshot_key(viewer.stage, viewer.round)
         prior_snapshot = fake.snapshots.get(prior_key) if prior_key else None
         revealed_cards = prior_snapshot.hand if prior_snapshot else []
+
+        last_result = self._get_fake_player_last_result(fake)
 
         if snapshot:
             return PlayerView(
@@ -718,6 +775,9 @@ class GameManager:
                 vanguard=snapshot.vanguard,
                 chosen_basics=snapshot.chosen_basics,
                 most_recently_revealed_cards=revealed_cards,
+                last_result=last_result,
+                pairing_probability=probabilities.get(fake.name),
+                is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
             )
         return PlayerView(
             name=fake.name,
@@ -738,6 +798,9 @@ class GameManager:
             vanguard=None,
             chosen_basics=[],
             most_recently_revealed_cards=[],
+            last_result=last_result,
+            pairing_probability=probabilities.get(fake.name),
+            is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
         )
 
     def _get_opponent_poison(self, opponent: StaticOpponent | Player, game: Game) -> int:
@@ -1033,16 +1096,39 @@ class GameManager:
 
         self._advance_bot_if_needed(game, opponent_name)
 
-        process_eliminations(game, player.round)
-        process_bot_eliminations(game)
+        player_at_lethal = player.poison >= game.config.poison_to_lose
 
-        winner, is_game_over = check_game_over(game)
-        if is_game_over:
-            self.complete_game(game_id or "", winner, db)
-            return "game_over"
+        if not player_at_lethal:
+            process_bot_eliminations(game)
+            winner, is_game_over = check_game_over(game)
+            if is_game_over:
+                self.complete_game(game_id or "", winner, db)
+                return "game_over"
+            if player.phase == "draft" and game.draft_state is None:
+                draft.start(game)
+            return None
 
-        if player.phase == "draft" and game.draft_state is None:
-            draft.start(game)
+        if not needs_sudden_death(game):
+            eliminate_player(game, player, player.round)
+            process_bot_eliminations(game)
+            winner, is_game_over = check_game_over(game)
+            if is_game_over:
+                self.complete_game(game_id or "", winner, db)
+                return "game_over"
+            return None
+
+        if not would_be_dead_ready_for_elimination(game):
+            player.phase = "awaiting_elimination"
+            return None
+
+        fighters = get_sudden_death_fighters(game)
+        if fighters:
+            p1, p2 = fighters
+            setup_sudden_death_battle(game, p1, p2)
+            p1.phase = "battle"
+            p2.phase = "battle"
+            battle.start(game, p1, p2, is_sudden_death=True)
+            return "sudden_death"
 
         return None
 

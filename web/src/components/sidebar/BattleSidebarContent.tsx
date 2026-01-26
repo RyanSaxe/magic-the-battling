@@ -11,6 +11,7 @@ interface BattleSidebarContentProps {
   opponentLife: number
   onYourLifeChange: (life: number) => void
   onOpponentLifeChange: (life: number) => void
+  playerName: string
 }
 
 function LifeCounter({
@@ -152,6 +153,7 @@ export function BattleSidebarContent({
   opponentLife,
   onYourLifeChange,
   onOpponentLifeChange,
+  playerName,
 }: BattleSidebarContentProps) {
   const { opponent_name, coin_flip_name, your_zones, opponent_zones } = currentBattle
 
@@ -189,7 +191,11 @@ export function BattleSidebarContent({
             </div>
           </div>
           <div className="text-center text-xs text-gray-500 mt-2">
-            <span className="text-amber-400">{coin_flip_name}</span> goes first
+            {coin_flip_name === playerName ? (
+              'You go first'
+            ) : (
+              <><span className="text-amber-400">{coin_flip_name}</span> goes first</>
+            )}
           </div>
         </div>
       </div>

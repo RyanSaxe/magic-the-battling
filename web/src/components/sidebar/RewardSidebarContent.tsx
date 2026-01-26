@@ -1,5 +1,4 @@
 import type { LastBattleResult, PlayerView } from '../../types'
-import { POISON_COUNTER_IMAGE } from '../../constants/assets'
 import { PlayerList } from '../PlayerList'
 
 interface RewardSidebarContentProps {
@@ -26,25 +25,15 @@ export function RewardSidebarContent({ lastBattleResult, playerName, players }: 
           <div className="text-2xl font-bold text-red-400">Defeat</div>
         )}
         {(lastBattleResult.poison_dealt > 0 || lastBattleResult.poison_taken > 0) && (
-          <div className="flex justify-center gap-4 mt-2 text-sm">
+          <div className="mt-2 text-sm space-y-1 text-center">
             {lastBattleResult.poison_dealt > 0 && (
-              <div className="flex items-center gap-1">
-                <img
-                  src={POISON_COUNTER_IMAGE}
-                  alt="Poison"
-                  className="w-4 h-4 rounded object-cover"
-                />
-                <span className="text-purple-400">+{lastBattleResult.poison_dealt}</span>
+              <div className="text-purple-400">
+                You gave {lastBattleResult.poison_dealt} poison to {lastBattleResult.opponent_name}
               </div>
             )}
             {lastBattleResult.poison_taken > 0 && (
-              <div className="flex items-center gap-1">
-                <img
-                  src={POISON_COUNTER_IMAGE}
-                  alt="Poison"
-                  className="w-4 h-4 rounded object-cover"
-                />
-                <span className="text-red-400">-{lastBattleResult.poison_taken}</span>
+              <div className="text-red-400">
+                {lastBattleResult.opponent_name} gave you {lastBattleResult.poison_taken} poison
               </div>
             )}
           </div>

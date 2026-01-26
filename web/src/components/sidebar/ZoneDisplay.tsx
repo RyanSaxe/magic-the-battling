@@ -49,7 +49,7 @@ function ZoneModal({
   )
 }
 
-export function ZoneDisplay({ title, cards, maxThumbnails = 3 }: ZoneDisplayProps) {
+export function ZoneDisplay({ title, cards, maxThumbnails = 2 }: ZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
 
   const displayedCards = cards.slice(0, maxThumbnails)
@@ -69,14 +69,14 @@ export function ZoneDisplay({ title, cards, maxThumbnails = 3 }: ZoneDisplayProp
           {title} ({cards.length})
         </div>
         {cards.length === 0 ? (
-          <div className="w-[50px] h-[70px] border border-dashed border-gray-600 rounded flex items-center justify-center">
+          <div className="w-[80px] h-[112px] border border-dashed border-gray-600 rounded flex items-center justify-center">
             <span className="text-gray-600 text-[10px]">Empty</span>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-0.5">
-            <div className="flex gap-0.5">
+            <div className="grid grid-cols-2 gap-1">
               {displayedCards.map((card) => (
-                <Card key={card.id} card={card} size="xs" />
+                <Card key={card.id} card={card} size="sm" />
               ))}
             </div>
             {remainingCount > 0 && (

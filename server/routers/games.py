@@ -18,6 +18,8 @@ router = APIRouter(prefix="/api/games", tags=["games"])
 
 @router.post("", response_model=CreateGameResponse)
 async def create_game(request: CreateGameRequest):
+    from server.routers.ws import connection_manager  # noqa: PLC0415
+
     session = session_manager.create_session()
     pending = game_manager.create_game(
         player_name=request.player_name,
@@ -29,7 +31,10 @@ async def create_game(request: CreateGameRequest):
     )
     session_manager.update_game_id(session.session_id, pending.game_id)
 
-    game_manager.start_battler_preload(pending)
+    async def broadcast_lobby():
+        await connection_manager.broadcast_lobby_state(pending.game_id)
+
+    game_manager.start_battler_preload(pending, on_complete=broadcast_lobby)
 
     return CreateGameResponse(
         game_id=pending.game_id,

@@ -127,19 +127,25 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
     player_won = result.winner is not None and result.winner.name == player.name
     is_draw = result.is_draw
 
+    winner_name: str | None
+    if player_won:
+        winner_name = player.name
+    elif is_draw:
+        winner_name = None
+    else:
+        winner_name = opponent.name
+
     poison_dealt = 0
     poison_taken = 0
 
     if player_won:
         poison_dealt = calculate_damage(player)
         _apply_bot_poison(game, opponent, poison_dealt)
-    elif is_draw:
-        poison_taken = _calculate_static_opponent_damage(opponent)
-        player.poison += poison_taken
-        _apply_bot_poison(game, opponent, calculate_damage(player))
     else:
         poison_taken = _calculate_static_opponent_damage(opponent)
         player.poison += poison_taken
+        if is_draw:
+            _apply_bot_poison(game, opponent, calculate_damage(player))
 
     player.treasures += 1
     vanquisher_gained = is_stage_increasing(player)
@@ -148,14 +154,6 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
         player.vanquishers += 1
     else:
         card_gained = award_random_card(game, player)
-
-    winner_name: str | None
-    if player_won:
-        winner_name = player.name
-    elif is_draw:
-        winner_name = None
-    else:
-        winner_name = opponent.name
 
     player.last_battle_result = LastBattleResult(
         opponent_name=opponent.name,
@@ -167,6 +165,17 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
         card_gained=card_gained,
         vanquisher_gained=vanquisher_gained,
     )
+
+    for fake in game.fake_players:
+        if fake.player_history_id == opponent.source_player_history_id:
+            fake.last_battle_result = LastBattleResult(
+                opponent_name=player.name,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                poison_dealt=poison_taken,
+                poison_taken=poison_dealt,
+            )
+            break
 
 
 def _start_with_result(game: Game, winner: Player, loser: Player) -> None:

@@ -145,11 +145,6 @@ export function Card({
           </svg>
         </button>
       )}
-      {card.tokens.length > 0 && (
-        <div className="counter-badge">
-          {card.tokens.length} tokens
-        </div>
-      )}
       {counters && Object.keys(counters).length > 0 && (
         <div className="absolute bottom-1 left-1 flex gap-1">
           {Object.entries(counters).map(([type, count]) => (
