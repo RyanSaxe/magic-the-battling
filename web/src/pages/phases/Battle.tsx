@@ -116,6 +116,20 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
           </div>
         )}
 
+        {/* Opponent's revealed sideboard (companions, wish targets - only for bots) */}
+        {opponent_zones.sideboard.length > 0 && (
+          <div className="px-4 py-2 bg-black/30 border-t border-gray-700/50">
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+              {opponent_name}'s Revealed Sideboard ({opponent_zones.sideboard.length})
+            </div>
+            <div className="flex justify-center gap-1 overflow-x-auto">
+              {opponent_zones.sideboard.map((card) => (
+                <Card key={card.id} card={card} size="sm" />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Battlefields */}
         <div className="flex-1 flex flex-col">
           {/* Opponent's battlefield */}

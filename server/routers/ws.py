@@ -227,7 +227,11 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
                 game, player, payload["card_id"], payload["from_zone"], payload["to_zone"]
             )
         case "battle_submit_result":
-            return game_manager.handle_battle_submit_result(game, player, payload["result"])
+            db_session = db.SessionLocal()
+            try:
+                return game_manager.handle_battle_submit_result(game, player, payload["result"], game_id, db_session)
+            finally:
+                db_session.close()
         case "battle_update_card_state":
             return game_manager.handle_battle_update_card_state(
                 game, player, payload["action_type"], payload["card_id"], payload.get("data")

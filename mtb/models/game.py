@@ -146,7 +146,6 @@ class Player(BaseModel):
     previous_hand_ids: list[str] = Field(default_factory=list)
     previous_basics: list[str] = Field(default_factory=list)
     build_ready: bool = False
-    revealed_sideboard_card_ids: list[str] = Field(default_factory=list)
 
     # model_config is required to allow weakref types
     model_config = {"arbitrary_types_allowed": True}
@@ -249,6 +248,7 @@ class Zones(BaseModel):
     attachments: dict[str, list[str]] = Field(default_factory=dict)
     spawned_tokens: list[Card] = Field(default_factory=list)
     revealed_card_ids: list[str] = Field(default_factory=list)
+    revealed_sideboard_card_ids: list[str] = Field(default_factory=list)
 
     def get_zone(self, zone_name: ZoneName) -> list[Card]:
         match zone_name:

@@ -265,8 +265,8 @@ def test_sideboard_fetch_reveals_card(card_factory):
     assert wish_target in alice.most_recently_revealed_cards
 
 
-def test_sideboard_fetch_persists_to_player(card_factory):
-    """A card fetched from sideboard should be tracked in player's revealed_sideboard_card_ids."""
+def test_sideboard_fetch_tracked_in_zones(card_factory):
+    """A card fetched from sideboard should be tracked in zones' revealed_sideboard_card_ids."""
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
@@ -278,7 +278,7 @@ def test_sideboard_fetch_persists_to_player(card_factory):
     b = battle.start(game, alice, bob)
     battle.move_zone(b, alice, wish_target, "sideboard", "hand")
 
-    assert wish_target.id in alice.revealed_sideboard_card_ids
+    assert wish_target.id in b.player_zones.revealed_sideboard_card_ids
 
 
 def test_end_battle_not_agreed_raises():

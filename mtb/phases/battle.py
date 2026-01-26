@@ -422,8 +422,8 @@ def move_zone(battle: Battle, player: Player, card: Card, from_zone: ZoneName, t
     if should_reveal and _is_revealed_card(card) and card.id not in zones.revealed_card_ids:
         zones.revealed_card_ids.append(card.id)
 
-    if from_zone == "sideboard" and card.id not in player.revealed_sideboard_card_ids:
-        player.revealed_sideboard_card_ids.append(card.id)
+    if from_zone == "sideboard" and card.id not in zones.revealed_sideboard_card_ids:
+        zones.revealed_sideboard_card_ids.append(card.id)
 
 
 DRAW_RESULT = "draw"
