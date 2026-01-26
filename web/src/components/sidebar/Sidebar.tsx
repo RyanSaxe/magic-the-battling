@@ -15,6 +15,8 @@ export function Sidebar({ players, currentPlayer, phaseContent }: SidebarProps) 
   const displayPlayer = state.revealedPlayer ?? currentPlayer
 
   const appliedUpgrades = displayPlayer.upgrades.filter(u => u.upgrade_target !== null)
+  const nonAppliedUpgrades = currentPlayer.upgrades.filter(u => u.upgrade_target === null)
+  const isViewingSelf = displayPlayer.name === currentPlayer.name
 
   return (
     <aside className="w-64 bg-black/30 flex flex-col overflow-hidden">
@@ -32,6 +34,9 @@ export function Sidebar({ players, currentPlayer, phaseContent }: SidebarProps) 
             <div className="flex flex-wrap gap-2">
               <ZoneDisplay title="Upgrades" cards={appliedUpgrades} maxThumbnails={4} />
               <ZoneDisplay title="Revealed" cards={displayPlayer.most_recently_revealed_cards} maxThumbnails={4} />
+              {isViewingSelf && nonAppliedUpgrades.length > 0 && (
+                <ZoneDisplay title="Pending Upgrades" cards={nonAppliedUpgrades} maxThumbnails={4} />
+              )}
             </div>
             {appliedUpgrades.length === 0 && displayPlayer.most_recently_revealed_cards.length === 0 && (
               <div className="text-gray-500 text-sm">No cards to display</div>
