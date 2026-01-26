@@ -359,6 +359,7 @@ function GameContent() {
           opponentLife={current_battle.opponent_life}
           onYourLifeChange={handleYourLifeChange}
           onOpponentLifeChange={handleOpponentLifeChange}
+          playerName={self_player.name}
         />
       )
     }
