@@ -463,6 +463,7 @@ class GameManager:
             basic_lands=player.chosen_basics.copy(),
             applied_upgrades=[u.model_copy() for u in player.upgrades if u.upgrade_target is not None],
             treasures=player.treasures,
+            revealed_sideboard_cards=[],
         )
 
         snapshot = BattleSnapshot(
@@ -477,6 +478,38 @@ class GameManager:
             full_state_json=snapshot_data.model_dump_json(),
         )
         db.add(snapshot)
+        db.commit()
+
+    def _update_snapshot_revealed_sideboard(self, db: Session, game_id: str, player: Player, zones: Zones) -> None:
+        history = (
+            db.query(PlayerGameHistory)
+            .filter(
+                PlayerGameHistory.game_id == game_id,
+                PlayerGameHistory.player_name == player.name,
+            )
+            .first()
+        )
+        if not history:
+            return
+
+        stage = player.hand_size
+        snapshot = (
+            db.query(BattleSnapshot)
+            .filter(
+                BattleSnapshot.player_history_id == history.id,
+                BattleSnapshot.stage == stage,
+                BattleSnapshot.round == player.round,
+            )
+            .first()
+        )
+        if not snapshot:
+            return
+
+        snapshot_data = BattleSnapshotData.model_validate_json(snapshot.full_state_json)
+        all_cards = zones.hand + zones.sideboard + zones.battlefield + zones.graveyard + zones.exile
+        revealed_sb = [c for c in all_cards if c.id in zones.revealed_sideboard_card_ids]
+        snapshot_data.revealed_sideboard_cards = revealed_sb
+        snapshot.full_state_json = snapshot_data.model_dump_json()
         db.commit()
 
     def load_fake_players_for_game(
@@ -748,8 +781,8 @@ class GameManager:
         probabilities: dict[str, float],
         most_recent_ghost_bot_name: str | None = None,
     ) -> PlayerView:
-        snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
-        prior_key = self._get_prior_snapshot_key(viewer.stage, viewer.round)
+        snapshot = fake.get_opponent_for_round(viewer.hand_size, viewer.round)
+        prior_key = self._get_prior_snapshot_key(viewer.hand_size, viewer.round)
         prior_snapshot = fake.snapshots.get(prior_key) if prior_key else None
         revealed_cards = prior_snapshot.hand if prior_snapshot else []
 
@@ -819,13 +852,14 @@ class GameManager:
 
         opponent_obj = b.opponent if is_player else b.player
         hand_revealed = isinstance(opponent_obj, StaticOpponent) and opponent_obj.hand_revealed
+        revealed_sb = opponent_obj.revealed_sideboard_cards if isinstance(opponent_obj, StaticOpponent) else []
 
         hidden_opponent = Zones(
             battlefield=opponent_zones.battlefield,
             graveyard=opponent_zones.graveyard,
             exile=opponent_zones.exile,
             hand=opponent_zones.hand if hand_revealed else [],
-            sideboard=[],
+            sideboard=revealed_sb,
             upgrades=opponent_zones.upgrades,
             command_zone=opponent_zones.command_zone,
             library=[],
@@ -944,7 +978,7 @@ class GameManager:
         if not live_players:
             return
 
-        stage = live_players[0].stage
+        stage = live_players[0].hand_size
         round_num = live_players[0].round
 
         for player in live_players:
@@ -1001,12 +1035,14 @@ class GameManager:
                 return True
         return False
 
-    def handle_battle_submit_result(self, game: Game, player: Player, result: str) -> bool:
+    def handle_battle_submit_result(
+        self, game: Game, player: Player, result: str, game_id: str | None = None, db: Session | None = None
+    ) -> bool:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
                 battle.submit_result(b, player, result)
                 if battle.results_agreed(b):
-                    self._end_battle(game, b)
+                    self._end_battle(game, b, game_id, db)
                 return True
         return False
 
@@ -1039,8 +1075,16 @@ class GameManager:
                 return battle.update_card_state(b, player, action_type, card_id, data)
         return False
 
-    def _end_battle(self, game: Game, b: Battle) -> None:
+    def _end_battle(self, game: Game, b: Battle, game_id: str | None = None, db: Session | None = None) -> None:
+        player_zones = b.player_zones
+        opponent_zones = b.opponent_zones
+
         result = battle.end(game, b)
+
+        if db is not None and game_id is not None:
+            self._update_snapshot_revealed_sideboard(db, game_id, b.player, player_zones)
+            if not isinstance(b.opponent, StaticOpponent) and not b.opponent.is_ghost:
+                self._update_snapshot_revealed_sideboard(db, game_id, b.opponent, opponent_zones)
 
         if isinstance(b.opponent, StaticOpponent):
             reward.start_vs_static(game, b.player, b.opponent, result)

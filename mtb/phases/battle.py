@@ -113,7 +113,7 @@ def get_all_pairing_candidates(game: Game, player: Player) -> list[PairingCandid
             continue
         if _is_opponent_in_active_battle(game, fp.name):
             continue
-        static_opp = fp.get_opponent_for_round(player.stage, player.round)
+        static_opp = fp.get_opponent_for_round(player.hand_size, player.round)
         if static_opp:
             candidates.append(static_opp)
 
@@ -125,7 +125,7 @@ def get_all_pairing_candidates(game: Game, player: Player) -> list[PairingCandid
     if game.most_recent_ghost_bot is not None:
         ghost_bot = game.most_recent_ghost_bot
         if not _is_opponent_in_active_battle(game, ghost_bot.name):
-            static_opp = ghost_bot.get_opponent_for_round(player.stage, player.round)
+            static_opp = ghost_bot.get_opponent_for_round(player.hand_size, player.round)
             if static_opp:
                 candidates.append(static_opp)
 
@@ -264,7 +264,7 @@ def get_potential_pairing_candidates(game: Game, player: Player) -> list[Pairing
     for fp in game.fake_players:
         if fp.is_eliminated:
             continue
-        static_opp = fp.get_opponent_for_round(player.stage, player.round)
+        static_opp = fp.get_opponent_for_round(player.hand_size, player.round)
         if static_opp:
             candidates.append(static_opp)
 
@@ -275,7 +275,7 @@ def get_potential_pairing_candidates(game: Game, player: Player) -> list[Pairing
 
     if game.most_recent_ghost_bot is not None:
         ghost_bot = game.most_recent_ghost_bot
-        static_opp = ghost_bot.get_opponent_for_round(player.stage, player.round)
+        static_opp = ghost_bot.get_opponent_for_round(player.hand_size, player.round)
         if static_opp:
             candidates.append(static_opp)
 
@@ -327,6 +327,8 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
     opponent_poison = opponent.poison
     if player.poison > opponent_poison:
         coin_flip_name = player.name
+    elif opponent_poison > player.poison:
+        coin_flip_name = opponent.name
     else:
         coin_flip_name = random.choice([player.name, opponent.name])
 
@@ -361,6 +363,8 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
     opponent_poison = opponent.poison
     if player.poison > opponent_poison:
         coin_flip_name = player.name
+    elif opponent_poison > player.poison:
+        coin_flip_name = opponent.name
     else:
         coin_flip_name = random.choice([player.name, opponent.name])
 
@@ -397,6 +401,9 @@ def get_zones_for_player(battle: Battle, player: Player) -> Zones:
         raise ValueError("Player is not in this battle")
 
 
+REVEALED_ZONES: set[ZoneName] = {"battlefield", "graveyard", "exile"}
+
+
 def move_zone(battle: Battle, player: Player, card: Card, from_zone: ZoneName, to_zone: ZoneName) -> None:
     if from_zone == to_zone:
         return
@@ -410,6 +417,13 @@ def move_zone(battle: Battle, player: Player, card: Card, from_zone: ZoneName, t
     source.remove(card)
     destination = zones.get_zone(to_zone)
     destination.append(card)
+
+    should_reveal = to_zone in REVEALED_ZONES or from_zone == "sideboard"
+    if should_reveal and _is_revealed_card(card) and card.id not in zones.revealed_card_ids:
+        zones.revealed_card_ids.append(card.id)
+
+    if from_zone == "sideboard" and card.id not in zones.revealed_sideboard_card_ids:
+        zones.revealed_sideboard_card_ids.append(card.id)
 
 
 DRAW_RESULT = "draw"
@@ -483,8 +497,7 @@ def _end_vs_static(game: Game, battle: Battle, opponent: StaticOpponent) -> Batt
 
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
 
-    revealed = battle.player_zones.battlefield + battle.player_zones.graveyard + battle.player_zones.exile
-    battle.player.most_recently_revealed_cards = [c for c in revealed if _is_revealed_card(c)]
+    battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
 
     battle.player.phase = "reward"
 
@@ -496,6 +509,11 @@ def _end_vs_static(game: Game, battle: Battle, opponent: StaticOpponent) -> Batt
 
 def _is_revealed_card(card: Card) -> bool:
     return not card.type_line.startswith("Basic Land") and not card.type_line.startswith("Token")
+
+
+def _collect_revealed_cards(zones: Zones) -> list[Card]:
+    all_cards = zones.hand + zones.sideboard + zones.battlefield + zones.graveyard + zones.exile
+    return [c for c in all_cards if c.id in zones.revealed_card_ids]
 
 
 def _handle_tap(zones: Zones, card_id: str, _data: dict) -> bool:
@@ -616,12 +634,10 @@ def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult
     if not opponent.is_ghost:
         _sync_zones_to_player(battle.opponent_zones, opponent, game.config.max_treasures)
 
-    revealed = battle.player_zones.battlefield + battle.player_zones.graveyard + battle.player_zones.exile
-    battle.player.most_recently_revealed_cards = [c for c in revealed if _is_revealed_card(c)]
+    battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
 
     if not opponent.is_ghost:
-        opp_revealed = battle.opponent_zones.battlefield + battle.opponent_zones.graveyard + battle.opponent_zones.exile
-        opponent.most_recently_revealed_cards = [c for c in opp_revealed if _is_revealed_card(c)]
+        opponent.most_recently_revealed_cards = _collect_revealed_cards(battle.opponent_zones)
 
     battle.player.phase = "reward"
     if not opponent.is_ghost:
