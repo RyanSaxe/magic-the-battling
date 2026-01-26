@@ -75,6 +75,7 @@ class FakePlayer(BaseModel):
     poison: int = 0
     round: int = 1
     stage: int = 1
+    last_battle_result: "LastBattleResult | None" = None
 
     def get_opponent_for_round(self, stage: int, round_num: int) -> StaticOpponent | None:
         key = f"{stage}_{round_num}"

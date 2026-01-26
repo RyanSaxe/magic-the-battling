@@ -4,7 +4,7 @@ from typing import NamedTuple, TypeGuard, cast
 from uuid import uuid4
 
 from mtb.models.cards import Card
-from mtb.models.game import Battle, FakePlayer, Game, Player, StaticOpponent, Zones
+from mtb.models.game import Battle, FakePlayer, Game, LastBattleResult, Player, StaticOpponent, Zones
 from mtb.models.types import ZoneName
 from mtb.phases.elimination import get_live_players
 
@@ -159,11 +159,21 @@ def resolve_bot_vs_bot(bot1: FakePlayer, bot2: FakePlayer, stage: int, round_num
     outcome = random.choice(["bot1_wins", "bot2_wins", "draw"])
     if outcome == "bot1_wins":
         bot2.poison += dmg1
+        bot1.last_battle_result = LastBattleResult(opponent_name=bot2.name, winner_name=bot1.name, poison_dealt=dmg1)
+        bot2.last_battle_result = LastBattleResult(opponent_name=bot1.name, winner_name=bot1.name, poison_taken=dmg1)
     elif outcome == "bot2_wins":
         bot1.poison += dmg2
+        bot1.last_battle_result = LastBattleResult(opponent_name=bot2.name, winner_name=bot2.name, poison_taken=dmg2)
+        bot2.last_battle_result = LastBattleResult(opponent_name=bot1.name, winner_name=bot2.name, poison_dealt=dmg2)
     else:
         bot1.poison += dmg2
         bot2.poison += dmg1
+        bot1.last_battle_result = LastBattleResult(
+            opponent_name=bot2.name, winner_name=None, is_draw=True, poison_dealt=dmg1, poison_taken=dmg2
+        )
+        bot2.last_battle_result = LastBattleResult(
+            opponent_name=bot1.name, winner_name=None, is_draw=True, poison_dealt=dmg2, poison_taken=dmg1
+        )
 
 
 def resolve_unpaired_bot_battles(

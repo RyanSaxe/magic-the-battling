@@ -653,6 +653,8 @@ class GameManager:
                 upgrades=player.upgrades,
                 vanguard=player.vanguard,
                 chosen_basics=player.chosen_basics,
+                most_recently_revealed_cards=player.most_recently_revealed_cards,
+                last_result=self._get_last_result(player),
                 hand=player.hand,
                 sideboard=player.sideboard,
                 current_pack=current_pack,
@@ -686,6 +688,16 @@ class GameManager:
         if result.is_draw:
             return "draw"
         if result.winner_name != player.name:
+            return "loss"
+        return "win"
+
+    def _get_fake_player_last_result(self, fake: FakePlayer) -> LastResult | None:
+        result = fake.last_battle_result
+        if result is None:
+            return None
+        if result.is_draw:
+            return "draw"
+        if result.winner_name != fake.name:
             return "loss"
         return "win"
 
@@ -741,6 +753,8 @@ class GameManager:
         prior_snapshot = fake.snapshots.get(prior_key) if prior_key else None
         revealed_cards = prior_snapshot.hand if prior_snapshot else []
 
+        last_result = self._get_fake_player_last_result(fake)
+
         if snapshot:
             return PlayerView(
                 name=fake.name,
@@ -761,6 +775,7 @@ class GameManager:
                 vanguard=snapshot.vanguard,
                 chosen_basics=snapshot.chosen_basics,
                 most_recently_revealed_cards=revealed_cards,
+                last_result=last_result,
                 pairing_probability=probabilities.get(fake.name),
                 is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
             )
@@ -783,6 +798,7 @@ class GameManager:
             vanguard=None,
             chosen_basics=[],
             most_recently_revealed_cards=[],
+            last_result=last_result,
             pairing_probability=probabilities.get(fake.name),
             is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
         )
