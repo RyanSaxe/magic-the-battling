@@ -381,8 +381,8 @@ class GameManager:
         other_cube: list[PlayerGameHistory] = []
 
         for history in all_histories:
-            has_stage_1 = any(s.stage == 1 for s in history.snapshots)
-            if not has_stage_1:
+            has_starting_stage = any(s.stage == 3 for s in history.snapshots)
+            if not has_starting_stage:
                 continue
 
             game_record = db.query(GameRecord).filter(GameRecord.id == history.game_id).first()
