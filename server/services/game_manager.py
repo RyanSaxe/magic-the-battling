@@ -457,12 +457,14 @@ class GameManager:
             history.max_stage = stage
             history.max_round = player.round
 
+        revealed_sb = [c.model_copy() for c in player.sideboard if c.id in player.revealed_sideboard_card_ids]
         snapshot_data = BattleSnapshotData(
             hand=[c.model_copy() for c in player.hand],
             vanguard=player.vanguard.model_copy() if player.vanguard else None,
             basic_lands=player.chosen_basics.copy(),
             applied_upgrades=[u.model_copy() for u in player.upgrades if u.upgrade_target is not None],
             treasures=player.treasures,
+            revealed_sideboard_cards=revealed_sb,
         )
 
         snapshot = BattleSnapshot(
@@ -748,8 +750,8 @@ class GameManager:
         probabilities: dict[str, float],
         most_recent_ghost_bot_name: str | None = None,
     ) -> PlayerView:
-        snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
-        prior_key = self._get_prior_snapshot_key(viewer.stage, viewer.round)
+        snapshot = fake.get_opponent_for_round(viewer.hand_size, viewer.round)
+        prior_key = self._get_prior_snapshot_key(viewer.hand_size, viewer.round)
         prior_snapshot = fake.snapshots.get(prior_key) if prior_key else None
         revealed_cards = prior_snapshot.hand if prior_snapshot else []
 
@@ -944,7 +946,7 @@ class GameManager:
         if not live_players:
             return
 
-        stage = live_players[0].stage
+        stage = live_players[0].hand_size
         round_num = live_players[0].round
 
         for player in live_players:

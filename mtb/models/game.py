@@ -22,6 +22,7 @@ class StaticOpponent(BaseModel):
     hand_revealed: bool = False
     is_ghost: bool = True
     source_player_history_id: int | None = None
+    revealed_sideboard_cards: list[Card] = Field(default_factory=list)
 
     @classmethod
     def from_player(cls, player: "Player", hand_revealed: bool = False) -> "StaticOpponent":
@@ -52,6 +53,7 @@ class StaticOpponent(BaseModel):
             hand_revealed=True,
             is_ghost=False,
             source_player_history_id=history_id,
+            revealed_sideboard_cards=snapshot.revealed_sideboard_cards,
         )
 
 
@@ -63,6 +65,7 @@ class BattleSnapshotData(BaseModel):
     basic_lands: list[str]
     applied_upgrades: list[Card]
     treasures: int
+    revealed_sideboard_cards: list[Card] = Field(default_factory=list)
 
 
 class FakePlayer(BaseModel):
@@ -143,6 +146,7 @@ class Player(BaseModel):
     previous_hand_ids: list[str] = Field(default_factory=list)
     previous_basics: list[str] = Field(default_factory=list)
     build_ready: bool = False
+    revealed_sideboard_card_ids: list[str] = Field(default_factory=list)
 
     # model_config is required to allow weakref types
     model_config = {"arbitrary_types_allowed": True}
@@ -244,6 +248,7 @@ class Zones(BaseModel):
     counters: dict[str, dict[str, int]] = Field(default_factory=dict)
     attachments: dict[str, list[str]] = Field(default_factory=dict)
     spawned_tokens: list[Card] = Field(default_factory=list)
+    revealed_card_ids: list[str] = Field(default_factory=list)
 
     def get_zone(self, zone_name: ZoneName) -> list[Card]:
         match zone_name:
