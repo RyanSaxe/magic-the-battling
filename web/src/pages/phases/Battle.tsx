@@ -30,6 +30,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   } | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [showSideboard, setShowSideboard] = useState(false)
+  const [showOpponentSideboard, setShowOpponentSideboard] = useState(false)
 
   const { current_battle } = gameState
 
@@ -119,8 +120,16 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
         {/* Opponent's revealed sideboard (companions, wish targets - only for bots) */}
         {opponent_zones.sideboard.length > 0 && (
           <div className="px-4 py-2 bg-black/30 border-t border-gray-700/50">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-              {opponent_name}'s Revealed Sideboard ({opponent_zones.sideboard.length})
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-xs text-gray-400 uppercase tracking-wide">
+                {opponent_name}'s Revealed Sideboard ({opponent_zones.sideboard.length})
+              </div>
+              <button
+                onClick={() => setShowOpponentSideboard(true)}
+                className="text-xs bg-purple-600 hover:bg-purple-500 px-2 py-1 rounded"
+              >
+                Expand
+              </button>
             </div>
             <div className="flex justify-center gap-1 overflow-x-auto">
               {opponent_zones.sideboard.map((card) => (
@@ -237,6 +246,34 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               <div className="flex flex-wrap gap-2">
                 {sideboard.map((card) => (
                   <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Opponent sideboard modal */}
+        {showOpponentSideboard && (
+          <div
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+            onClick={() => setShowOpponentSideboard(false)}
+          >
+            <div
+              className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-white font-medium">{opponent_name}'s Sideboard ({opponent_zones.sideboard.length})</h3>
+                <button
+                  onClick={() => setShowOpponentSideboard(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {opponent_zones.sideboard.map((card) => (
+                  <Card key={card.id} card={card} size="sm" />
                 ))}
               </div>
             </div>
