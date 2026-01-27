@@ -765,15 +765,6 @@ class GameManager:
             is_most_recent_ghost=player.name == most_recent_ghost_name,
         )
 
-    def _get_prior_snapshot_key(self, stage: int, round_num: int, num_rounds: int = 3) -> str | None:
-        """Get the key for the previous stage-round pair."""
-        if round_num > 1:
-            return f"{stage}_{round_num - 1}"
-        elif stage > 3:
-            return f"{stage - 1}_{num_rounds}"
-        else:
-            return None
-
     def _make_fake_player_view(
         self,
         fake: FakePlayer,
@@ -782,9 +773,16 @@ class GameManager:
         most_recent_ghost_bot_name: str | None = None,
     ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
-        prior_key = self._get_prior_snapshot_key(viewer.stage, viewer.round)
-        prior_snapshot = fake.snapshots.get(prior_key) if prior_key else None
+
+        if viewer.round > 1:
+            prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round - 1)
+        elif viewer.stage > 3:
+            prior_snapshot = fake.get_opponent_for_round(viewer.stage - 1, 3)
+        else:
+            prior_snapshot = None
+
         revealed_cards = prior_snapshot.hand if prior_snapshot else []
+        prior_upgrades = prior_snapshot.upgrades if prior_snapshot else []
 
         last_result = self._get_fake_player_last_result(fake)
 
@@ -804,7 +802,7 @@ class GameManager:
                 sideboard_count=len(snapshot.sideboard),
                 hand_size=len(snapshot.hand),
                 is_stage_increasing=False,
-                upgrades=snapshot.upgrades,
+                upgrades=prior_upgrades,
                 vanguard=snapshot.vanguard,
                 chosen_basics=snapshot.chosen_basics,
                 most_recently_revealed_cards=revealed_cards,
