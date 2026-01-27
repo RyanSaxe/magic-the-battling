@@ -455,7 +455,7 @@ function GameContent() {
               {(currentPhase === 'eliminated' || currentPhase === 'winner' || currentPhase === 'game_over') && (
                 <GameSummary
                   player={self_player}
-                  totalPlayers={gameState.players.length}
+                  players={gameState.players}
                   onReturnHome={() => navigate('/')}
                 />
               )}

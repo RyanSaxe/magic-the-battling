@@ -1,10 +1,10 @@
-import type { SelfPlayerView, Card as CardType } from '../types'
+import type { SelfPlayerView, PlayerView, Card as CardType } from '../types'
 import { Card } from './card'
 import { UpgradeStack } from './sidebar/UpgradeStack'
 
 interface GameSummaryProps {
   player: SelfPlayerView
-  totalPlayers: number
+  players: PlayerView[]
   onReturnHome: () => void
 }
 
@@ -45,8 +45,17 @@ function UpgradeGrid({ upgrades }: { upgrades: CardType[] }) {
   )
 }
 
-export function GameSummary({ player, totalPlayers, onReturnHome }: GameSummaryProps) {
-  const displayPlacement = player.placement || 1
+export function GameSummary({ player, players, onReturnHome }: GameSummaryProps) {
+  const sortedPlayers = [...players].sort((a, b) => {
+    if (a.placement === 0 && b.placement === 0) {
+      return a.poison - b.poison
+    }
+    if (a.placement === 0) return -1
+    if (b.placement === 0) return 1
+    return a.placement - b.placement
+  })
+
+  const displayPlacement = sortedPlayers.findIndex((p) => p.name === player.name) + 1
   const isWinner = displayPlacement === 1
 
   const placementText = getOrdinal(displayPlacement)
@@ -64,7 +73,7 @@ export function GameSummary({ player, totalPlayers, onReturnHome }: GameSummaryP
           {placementText} Place
         </h2>
         <p className="text-gray-400 mb-6">
-          Stage {player.stage} - Round {player.round} | {totalPlayers} Players
+          Stage {player.stage} - Round {player.round} | {players.length} Players
         </p>
 
         <div className="bg-black/30 rounded-lg p-6">
