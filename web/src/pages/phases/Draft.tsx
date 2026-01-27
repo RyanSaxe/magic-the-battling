@@ -101,19 +101,13 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
             {pool.map((card, index) => {
               const isInHand = self_player.hand.some((c) => c.id === card.id)
               return (
-                <div key={card.id} className="relative">
-                  <Card
-                    card={card}
-                    onClick={() => handleCardClick(card, index, 'pool', isInHand)}
-                    selected={selectedCard?.card.id === card.id}
-                    size="md"
-                  />
-                  {isInHand && (
-                    <div className="absolute -top-1 -right-1 text-[10px] px-1 rounded bg-blue-600">
-                      H
-                    </div>
-                  )}
-                </div>
+                <Card
+                  key={card.id}
+                  card={card}
+                  onClick={() => handleCardClick(card, index, 'pool', isInHand)}
+                  selected={selectedCard?.card.id === card.id}
+                  size="md"
+                />
               )
             })}
           </div>
