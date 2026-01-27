@@ -50,8 +50,9 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   const sideboard = gameState.self_player.sideboard
 
   const opponentPlayer = gameState.players.find((p) => p.name === opponent_name)
+  const canManipulateOpponent = opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false
   const opponentFullSideboard = opponentPlayer?.full_sideboard || []
-  const showFullSideboardButton = (opponentPlayer?.is_bot || opponentPlayer?.is_ghost) && opponentFullSideboard.length > 0
+  const showFullSideboardButton = canManipulateOpponent && opponentFullSideboard.length > 0
 
   const tappedCardIds = new Set(your_zones.tapped_card_ids || [])
   const faceDownCardIds = new Set(your_zones.face_down_card_ids || [])
@@ -133,12 +134,21 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               </div>
               <div className="flex gap-2">
                 {showFullSideboardButton && (
-                  <button
-                    onClick={() => setShowOpponentFullSideboard(true)}
-                    className="text-xs bg-amber-600 hover:bg-amber-500 px-2 py-1 rounded"
-                  >
-                    Full Sideboard ({opponentFullSideboard.length})
-                  </button>
+                  opponent_zones.sideboard.length > 0 ? (
+                    <button
+                      onClick={() => setShowOpponentFullSideboard(true)}
+                      className="text-xs px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-white animate-pulse"
+                    >
+                      ⚠️ Sideboard in use - click to view
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setShowOpponentFullSideboard(true)}
+                      className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300"
+                    >
+                      Full Sideboard ({opponentFullSideboard.length})
+                    </button>
+                  )
                 )}
                 {opponent_zones.sideboard.length > 0 && (
                   <button

@@ -344,6 +344,31 @@ def test_sideboard_fetch_via_game_manager_tracked(card_factory):
     assert companion.id in b.player_zones.revealed_sideboard_card_ids
 
 
+def test_sideboard_fetch_via_game_manager_no_duplicates(card_factory):
+    """Sideboard card moved via GameManager then played should appear exactly once in revealed cards."""
+
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    companion = card_factory("Companion", "Creature")
+    alice.sideboard = [companion]
+
+    b = battle.start(game, alice, bob)
+
+    manager = GameManager()
+    manager.handle_battle_move(game, alice, companion.id, "sideboard", "hand")
+    manager.handle_battle_move(game, alice, companion.id, "hand", "battlefield")
+
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
+    battle.end(game, b)
+
+    revealed_ids = [c.id for c in alice.most_recently_revealed_cards]
+    assert revealed_ids.count(companion.id) == 1
+
+
 def test_end_battle_not_agreed_raises():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players

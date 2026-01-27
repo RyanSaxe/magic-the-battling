@@ -784,7 +784,9 @@ class GameManager:
         else:
             prior_snapshot = None
 
-        revealed_cards = prior_snapshot.hand if prior_snapshot else []
+        prior_hand = prior_snapshot.hand if prior_snapshot else []
+        prior_revealed_sb = prior_snapshot.revealed_sideboard_cards if prior_snapshot else []
+        revealed_cards = prior_hand + prior_revealed_sb
         prior_upgrades = prior_snapshot.upgrades if prior_snapshot else []
 
         last_result = self._get_fake_player_last_result(fake)
@@ -1026,6 +1028,7 @@ class GameManager:
                         return False
                     player.sideboard.remove(card)
                     zones = battle.get_zones_for_player(b, player)
+                    zones.sideboard.remove(card)
                     zones.hand.append(card)
                     if card.id not in zones.revealed_sideboard_card_ids:
                         zones.revealed_sideboard_card_ids.append(card.id)

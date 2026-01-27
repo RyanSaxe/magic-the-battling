@@ -19,6 +19,7 @@ interface BattlefieldZoneProps {
   validFromZones?: ZoneName[]
   draggable?: boolean
   isOpponent?: boolean
+  canManipulateOpponent?: boolean
   label?: string
   separateLands?: boolean
   cardSize?: 'xs' | 'sm' | 'md' | 'lg'
@@ -37,10 +38,12 @@ export function BattlefieldZone({
   validFromZones = ['hand', 'graveyard', 'exile'],
   draggable = true,
   isOpponent = false,
+  canManipulateOpponent = false,
   label,
   separateLands = false,
   cardSize = 'sm',
 }: BattlefieldZoneProps) {
+  const allowInteraction = !isOpponent || canManipulateOpponent
   const attachedCardIds = new Set(Object.values(attachments).flat())
   const topLevelCards = cards.filter(c => !attachedCardIds.has(c.id))
 
@@ -80,7 +83,7 @@ export function BattlefieldZone({
       <div
         key={card.id}
         onContextMenu={(e) => {
-          if (!isOpponent) {
+          if (allowInteraction) {
             e.preventDefault()
             onCardContextMenu?.(e, card)
           }
@@ -96,7 +99,8 @@ export function BattlefieldZone({
           counters={counters[card.id]}
           onClick={() => onCardClick?.(card)}
           onDoubleClick={() => onCardDoubleClick?.(card)}
-          disabled={!draggable || isOpponent}
+          disabled={!draggable || !allowInteraction}
+          isOpponent={isOpponent}
         />
       </div>
     )
@@ -106,7 +110,7 @@ export function BattlefieldZone({
     <DroppableZone
       zone="battlefield"
       validFromZones={validFromZones}
-      disabled={isOpponent}
+      disabled={!allowInteraction}
       className="battlefield flex-1 p-4"
     >
       {label && (
