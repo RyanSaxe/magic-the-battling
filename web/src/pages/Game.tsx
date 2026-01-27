@@ -24,6 +24,8 @@ function CardPreviewModal({
   upgradeTarget: CardType | null
   onClose: () => void
 }) {
+  const [isFlipped, setIsFlipped] = useState(false)
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -33,6 +35,13 @@ function CardPreviewModal({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
+
+  const getImageUrl = (c: CardType, flipped: boolean) => {
+    if (flipped && c.flip_image_url) {
+      return c.flip_image_url
+    }
+    return c.png_url ?? c.image_url
+  }
 
   return (
     <div
@@ -44,7 +53,7 @@ function CardPreviewModal({
         onClick={(e) => e.stopPropagation()}
       >
         <img
-          src={card.png_url ?? card.image_url}
+          src={getImageUrl(card, isFlipped)}
           alt={card.name}
           className="max-h-[80vh] rounded-lg shadow-2xl"
         />
@@ -52,7 +61,7 @@ function CardPreviewModal({
           <>
             <div className="text-white text-2xl font-bold">→</div>
             <img
-              src={upgradeTarget.png_url ?? upgradeTarget.image_url}
+              src={getImageUrl(upgradeTarget, isFlipped)}
               alt={upgradeTarget.name}
               className="max-h-[80vh] rounded-lg shadow-2xl"
             />
@@ -64,6 +73,14 @@ function CardPreviewModal({
         >
           ×
         </button>
+        {card.flip_image_url && (
+          <button
+            className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white rounded-full px-4 py-1 text-sm hover:bg-black/80"
+            onClick={() => setIsFlipped(!isFlipped)}
+          >
+            Flip
+          </button>
+        )}
       </div>
     </div>
   )
