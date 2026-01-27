@@ -417,7 +417,7 @@ class GameManager:
         player_name = cast(str, history.player_name)
         history_id = cast(int, history.id)
 
-        bot_name = self._ensure_unique_name(f"{player_name} (Bot)", existing_names)
+        bot_name = self._ensure_unique_name(player_name, existing_names)
 
         for snapshot in history.snapshots:
             key = f"{snapshot.stage}_{snapshot.round}"
@@ -763,7 +763,7 @@ class GameManager:
             chosen_basics=player.chosen_basics,
             most_recently_revealed_cards=player.most_recently_revealed_cards,
             last_result=self._get_last_result(player),
-            pairing_probability=probabilities.get(player.name),
+            pairing_probability=probabilities.get(player.name, 0.0),
             is_most_recent_ghost=player.name == most_recent_ghost_name,
             full_sideboard=player.sideboard if is_eliminated else [],
         )
@@ -810,7 +810,7 @@ class GameManager:
                 chosen_basics=snapshot.chosen_basics,
                 most_recently_revealed_cards=revealed_cards,
                 last_result=last_result,
-                pairing_probability=probabilities.get(fake.name),
+                pairing_probability=probabilities.get(fake.name, 0.0),
                 is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
                 full_sideboard=snapshot.sideboard,
             )
@@ -834,7 +834,7 @@ class GameManager:
             chosen_basics=[],
             most_recently_revealed_cards=[],
             last_result=last_result,
-            pairing_probability=probabilities.get(fake.name),
+            pairing_probability=probabilities.get(fake.name, 0.0),
             is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
             full_sideboard=[],
         )

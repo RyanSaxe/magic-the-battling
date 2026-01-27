@@ -356,7 +356,7 @@ class TestUniquePlayerNames:
         fake_player = manager._load_fake_player(MagicMock(), mock_history, existing_names)
 
         assert fake_player.name != "Ryan"
-        assert fake_player.name == "Ryan (Bot)"
+        assert fake_player.name == "Ryan (2)"
         assert fake_player.name not in existing_names
 
     def test_multiple_bots_with_same_historical_name_get_unique_names(self):
@@ -378,14 +378,14 @@ class TestUniquePlayerNames:
 
         names = [fp.name for fp in game.fake_players]
         assert len(names) == len(set(names))
-        assert "Bob (Bot)" in names
-        assert "Bob (Bot) (2)" in names
-        assert "Bob (Bot) (3)" in names
+        assert "Bob" in names
+        assert "Bob (2)" in names
+        assert "Bob (3)" in names
 
     def test_human_named_like_bot_still_gets_unique_bot_name(self):
-        """When human is named 'Ryan (Bot)', a bot from Ryan still gets unique name."""
+        """When human has same name as bot source, bot gets unique name."""
         manager = GameManager()
-        game = create_game(["Ryan (Bot)"], num_players=1)
+        game = create_game(["Ryan"], num_players=1)
 
         mock_history = MagicMock(spec=PlayerGameHistory)
         mock_history.player_name = "Ryan"
@@ -395,8 +395,8 @@ class TestUniquePlayerNames:
         existing_names = {p.name for p in game.players}
         fake_player = manager._load_fake_player(MagicMock(), mock_history, existing_names)
 
-        assert fake_player.name != "Ryan (Bot)"
-        assert fake_player.name == "Ryan (Bot) (2)"
+        assert fake_player.name != "Ryan"
+        assert fake_player.name == "Ryan (2)"
 
 
 class TestBotGameOver:

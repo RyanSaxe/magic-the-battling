@@ -86,8 +86,11 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 {player.name === currentPlayerName && (
                   <span className="text-xs text-amber-400">(You)</span>
                 )}
-                {player.is_bot && <BotIcon size="sm" />}
-                {player.is_most_recent_ghost && <GhostIcon size="sm" />}
+                {player.is_most_recent_ghost ? (
+                  <GhostIcon size="sm" />
+                ) : player.is_bot ? (
+                  <BotIcon size="sm" />
+                ) : null}
               </div>
               <ResultBadge result={player.last_result} />
             </div>
