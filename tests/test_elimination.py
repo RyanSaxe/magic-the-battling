@@ -18,7 +18,7 @@ class TestGhostMechanics:
         bob.poison = 5
         charlie.poison = 3
 
-        eliminated = elimination.process_eliminations(game, round_num=5)
+        eliminated = elimination.process_eliminations(game, round_num=5, stage_num=3)
 
         assert len(eliminated) == 1
         assert alice in eliminated
@@ -116,7 +116,7 @@ class TestSuddenDeath:
 
         assert elimination.needs_sudden_death(game) is False
 
-        eliminated = elimination.process_eliminations(game, round_num=5)
+        eliminated = elimination.process_eliminations(game, round_num=5, stage_num=3)
 
         assert len(eliminated) == 2
         assert alice in eliminated
@@ -198,20 +198,21 @@ class TestSuddenDeathFighters:
         assert alice in fighters
         assert bob in fighters
 
-    def test_get_fighters_lowest_poison_gets_bye_with_three(self):
+    def test_get_fighters_two_lowest_poison_fight_with_three(self):
+        """When 3+ players at lethal, the 2 with lowest poison fight."""
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
-        alice.poison = 10  # lowest - gets bye
-        bob.poison = 11
-        charlie.poison = 12
+        alice.poison = 10  # lowest - fights
+        bob.poison = 11  # second lowest - fights
+        charlie.poison = 12  # highest - eliminated
 
         fighters = elimination.get_sudden_death_fighters(game)
 
         assert fighters is not None
-        assert alice not in fighters
+        assert alice in fighters
         assert bob in fighters
-        assert charlie in fighters
+        assert charlie not in fighters
 
 
 class TestFinale:
@@ -222,7 +223,7 @@ class TestFinale:
         alice.poison = 10
         bob.poison = 5
 
-        eliminated = elimination.process_eliminations(game, round_num=10)
+        eliminated = elimination.process_eliminations(game, round_num=10, stage_num=3)
 
         assert len(eliminated) == 1
         assert alice in eliminated
@@ -245,9 +246,11 @@ class TestFinale:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, _bob = game.players
 
-        elimination.eliminate_player(game, alice, round_num=7)
+        elimination.eliminate_player(game, alice, round_num=7, stage_num=4)
 
         assert alice.phase == "eliminated"
+        assert alice.elimination_round == 7
+        assert alice.elimination_stage == 4
         assert game.most_recent_ghost is not None
         assert game.most_recent_ghost.name == alice.name
         assert isinstance(game.most_recent_ghost, StaticOpponent)
@@ -291,6 +294,8 @@ class TestBotBattleFlow:
         initial_alice_poison = alice.poison
         initial_bot_poison = bot.poison
 
+        # battle.end() no longer sets phase - must set manually for legacy reward.start_vs_static
+        alice.phase = "reward"
         reward.start_vs_static(game, alice, static_opp, result)
 
         assert alice.poison > initial_alice_poison
@@ -332,6 +337,8 @@ class TestBotBattleFlow:
         initial_alice_poison = alice.poison
         initial_bot_poison = bot.poison
 
+        # battle.end() no longer sets phase - must set manually for legacy reward.start_vs_static
+        alice.phase = "reward"
         reward.start_vs_static(game, alice, static_opp, result)
 
         assert alice.poison == initial_alice_poison
@@ -545,57 +552,68 @@ class TestEliminationFlow:
         assert result is None
         assert alice.phase == "draft"
 
-    def test_single_lethal_player_eliminated_immediately(self):
-        """When only one player is at lethal and there are survivors, eliminate immediately."""
+    def test_single_lethal_player_goes_to_awaiting_elimination(self):
+        """When a lethal player finishes battle, they go to awaiting_elimination.
+
+        In the new flow, elimination happens at battle end (_end_battle) not at
+        reward end. Players who are at lethal skip reward and go straight to
+        awaiting_elimination. The actual elimination happens when _check_sudden_death_ready
+        is called and determines no sudden death is needed.
+        """
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
         alice.poison = 10
         bob.poison = 3
         charlie.poison = 5
-        alice.phase = "reward"
+
+        # Set up alice to be in awaiting_elimination (as would happen after battle)
+        alice.phase = "awaiting_elimination"
         bob.phase = "draft"
         charlie.phase = "draft"
 
         manager = GameManager()
         manager._active_games["test"] = game
-        manager._player_id_to_name["alice_id"] = "Alice"
-        manager._player_to_game["alice_id"] = "test"
 
-        result = manager.handle_reward_done(game, alice)
+        # Trigger the check - in the real flow this happens via _end_battle
+        result = manager._check_sudden_death_ready(game, "test", None)
 
+        # With 2 survivors (bob/charlie), alice should be eliminated
         assert result is None
         assert alice.phase == "eliminated"
 
-    def test_awaiting_elimination_when_one_lethal_finishes_first(self):
-        """When sudden death needed but other lethal player still in battle/reward, wait."""
+    def test_awaiting_elimination_when_one_lethal_in_battle(self):
+        """When sudden death may be needed but other players still in battle, wait.
+
+        In the new flow, lethal players skip rewards and go to awaiting_elimination.
+        The check for sudden death only proceeds when all potential fighters are ready.
+        """
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
         alice.poison = 10
         bob.poison = 10
         charlie.poison = 5
-        alice.phase = "reward"
-        bob.phase = "battle"
+        alice.phase = "awaiting_elimination"
+        bob.phase = "battle"  # Still in battle
         charlie.phase = "draft"
 
         manager = GameManager()
         manager._active_games["test"] = game
-        manager._player_id_to_name["alice_id"] = "Alice"
-        manager._player_to_game["alice_id"] = "test"
 
-        result = manager.handle_reward_done(game, alice)
+        # Check should return None since bob is still in battle
+        result = manager._check_sudden_death_ready(game, "test", None)
 
         assert result is None
         assert alice.phase == "awaiting_elimination"
 
     def test_sudden_death_triggered_when_both_lethal_ready(self):
-        """When both lethal players have finished reward, start sudden death."""
+        """When both lethal players are in awaiting_elimination, start sudden death."""
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
         alice.poison = 10
         bob.poison = 11
         charlie.poison = 5
         alice.phase = "awaiting_elimination"
-        bob.phase = "reward"
+        bob.phase = "awaiting_elimination"
         charlie.phase = "draft"
         alice.chosen_basics = ["Plains", "Island", "Mountain"]
         bob.chosen_basics = ["Forest", "Swamp", "Mountain"]
@@ -604,10 +622,8 @@ class TestEliminationFlow:
 
         manager = GameManager()
         manager._active_games["test"] = game
-        manager._player_id_to_name["bob_id"] = "Bob"
-        manager._player_to_game["bob_id"] = "test"
 
-        result = manager.handle_reward_done(game, bob)
+        result = manager._check_sudden_death_ready(game, "test", None)
 
         assert result == "sudden_death"
         assert alice.phase == "battle"
@@ -616,16 +632,16 @@ class TestEliminationFlow:
         assert bob.poison == 9
         assert len(game.active_battles) == 1
 
-    def test_three_player_sudden_death_lowest_gets_bye(self):
-        """When 3 players would die, lowest poison gets bye, other two fight."""
+    def test_three_player_sudden_death_two_lowest_fight(self):
+        """When 3 players would die, 2 lowest poison fight, highest eliminated."""
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
-        alice.poison = 10  # lowest - gets bye
-        bob.poison = 11
-        charlie.poison = 12
+        alice.poison = 10  # lowest - fights
+        bob.poison = 11  # second lowest - fights
+        charlie.poison = 12  # highest - eliminated immediately
         alice.phase = "awaiting_elimination"
         bob.phase = "awaiting_elimination"
-        charlie.phase = "reward"
+        charlie.phase = "awaiting_elimination"
         alice.chosen_basics = ["Plains", "Island", "Mountain"]
         bob.chosen_basics = ["Forest", "Swamp", "Mountain"]
         charlie.chosen_basics = ["Mountain", "Mountain", "Mountain"]
@@ -635,15 +651,13 @@ class TestEliminationFlow:
 
         manager = GameManager()
         manager._active_games["test"] = game
-        manager._player_id_to_name["charlie_id"] = "Charlie"
-        manager._player_to_game["charlie_id"] = "test"
 
-        result = manager.handle_reward_done(game, charlie)
+        result = manager._check_sudden_death_ready(game, "test", None)
 
         assert result == "sudden_death"
+        assert alice.phase == "battle"
         assert bob.phase == "battle"
-        assert charlie.phase == "battle"
-        assert alice.phase == "awaiting_elimination"
+        assert charlie.phase == "eliminated"
         assert len(game.active_battles) == 1
         battle_players = {game.active_battles[0].player.name, game.active_battles[0].opponent.name}
-        assert battle_players == {"Bob", "Charlie"}
+        assert battle_players == {"Alice", "Bob"}

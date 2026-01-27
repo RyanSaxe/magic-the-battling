@@ -34,8 +34,10 @@ from mtb.phases.battle import get_pairing_probabilities
 from mtb.phases.elimination import (
     check_game_over,
     eliminate_player,
+    get_live_bots,
     get_live_players,
     get_sudden_death_fighters,
+    get_would_be_dead,
     needs_sudden_death,
     process_bot_eliminations,
     setup_sudden_death_battle,
@@ -1087,7 +1089,7 @@ class GameManager:
                 return battle.update_card_state(b, player, action_type, card_id, data)
         return False
 
-    def _end_battle(self, game: Game, b: Battle, game_id: str | None = None, db: Session | None = None) -> None:
+    def _end_battle(self, game: Game, b: Battle, game_id: str | None = None, db: Session | None = None) -> str | None:
         player_zones = b.player_zones
         opponent_zones = b.opponent_zones
 
@@ -1099,16 +1101,353 @@ class GameManager:
                 self._update_snapshot_revealed_sideboard(db, game_id, b.opponent, opponent_zones)
 
         if isinstance(b.opponent, StaticOpponent):
-            reward.start_vs_static(game, b.player, b.opponent, result)
-        elif result.is_draw:
-            reward.start(game, b.player, cast(Player, b.opponent), is_draw=True)
+            return self._handle_post_battle_static(game, b.player, b.opponent, result, game_id, db)
         else:
-            reward.start(game, result.winner, result.loser)
+            return self._handle_post_battle_pvp(game, b.player, cast(Player, b.opponent), result, game_id, db)
+
+    def _is_finale(self, game: Game) -> bool:
+        """Check if we're in the finale (only 2 participants alive)."""
+        live_humans = get_live_players(game)
+        live_bots = get_live_bots(game)
+        return len(live_humans) + len(live_bots) == 2
+
+    def _handle_post_battle_static(
+        self,
+        game: Game,
+        player: Player,
+        opponent: StaticOpponent,
+        result: battle.BattleResult,
+        game_id: str | None,
+        db: Session | None,
+    ) -> str | None:
+        """Handle phase transition after static opponent battle."""
+        player_won = result.winner is not None and result.winner.name == player.name
+        is_draw = result.is_draw
+        is_finale = self._is_finale(game)
+
+        poison_info = reward.apply_poison_static(game, player, opponent, player_won, is_draw)
+        poison_dealt = poison_info["poison_dealt"]
+        poison_taken = poison_info["poison_taken"]
+
+        winner_name: str | None
+        if player_won:
+            winner_name = player.name
+        elif is_draw:
+            winner_name = None
+        else:
+            winner_name = opponent.name
+
+        player_at_lethal = player.poison >= game.config.poison_to_lose
 
         process_bot_eliminations(game)
+
+        if is_finale:
+            if player_won or (is_draw and not player_at_lethal):
+                reward.set_last_battle_result_no_rewards(
+                    player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
+                )
+                player.phase = "winner"
+                player.placement = 1
+                self.complete_game(game_id or "", player, db)
+                return "game_over"
+            elif player_at_lethal:
+                reward.set_last_battle_result_no_rewards(
+                    player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
+                )
+                eliminate_player(game, player, player.round, player.stage)
+                self.complete_game(game_id or "", None, db)
+                return "game_over"
+
+        if player_at_lethal:
+            reward.set_last_battle_result_no_rewards(
+                player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
+            )
+            player.phase = "awaiting_elimination"
+            return self._check_sudden_death_ready(game, game_id, db)
+
+        player.phase = "reward"
+        reward.start_vs_static_rewards_only(game, player, opponent, player_won, is_draw, poison_dealt, poison_taken)
+
         winner, is_game_over = check_game_over(game)
-        if is_game_over and winner is not None:
+        if is_game_over:
             self.complete_game(game_id or "", winner, db)
+            return "game_over"
+
+        return None
+
+    def _set_pvp_battle_results_no_rewards(
+        self,
+        player: Player,
+        opponent: Player,
+        is_draw: bool,
+        winner_name: str | None,
+        p1_poison: int,
+        p2_poison: int,
+        poison_dealt: int,
+    ) -> None:
+        """Set last_battle_result for both players when skipping rewards."""
+        if is_draw:
+            reward.set_last_battle_result_no_rewards(player, opponent.name, None, True, 0, p1_poison)
+            reward.set_last_battle_result_no_rewards(opponent, player.name, None, True, 0, p2_poison)
+        else:
+            p_won = winner_name == player.name
+            reward.set_last_battle_result_no_rewards(
+                player, opponent.name, winner_name, False, poison_dealt if p_won else 0, 0 if p_won else poison_dealt
+            )
+            reward.set_last_battle_result_no_rewards(
+                opponent, player.name, winner_name, False, 0 if p_won else poison_dealt, poison_dealt if p_won else 0
+            )
+
+    def _handle_pvp_finale(
+        self,
+        game: Game,
+        player: Player,
+        opponent: Player,
+        result: battle.BattleResult,
+        is_draw: bool,
+        winner_name: str | None,
+        p1_poison: int,
+        p2_poison: int,
+        poison_dealt: int,
+        player_at_lethal: bool,
+        opponent_at_lethal: bool,
+        game_id: str | None,
+        db: Session | None,
+    ) -> str | None:
+        """Handle finale PvP outcomes."""
+        if player_at_lethal and opponent_at_lethal:
+            self._set_pvp_battle_results_no_rewards(
+                player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
+            )
+            setup_sudden_death_battle(game, player, opponent)
+            player.phase = "battle"
+            opponent.phase = "battle"
+            battle.start(game, player, opponent, is_sudden_death=True)
+            return "sudden_death"
+
+        if player_at_lethal:
+            self._set_pvp_battle_results_no_rewards(
+                player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
+            )
+            eliminate_player(game, player, player.round, player.stage)
+            opponent.phase = "winner"
+            opponent.placement = 1
+            self.complete_game(game_id or "", opponent, db)
+            return "game_over"
+
+        if opponent_at_lethal:
+            self._set_pvp_battle_results_no_rewards(
+                player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
+            )
+            eliminate_player(game, opponent, opponent.round, opponent.stage)
+            player.phase = "winner"
+            player.placement = 1
+            self.complete_game(game_id or "", player, db)
+            return "game_over"
+
+        # Neither at lethal in finale - continue with rewards
+        player.phase = "reward"
+        opponent.phase = "reward"
+        if is_draw:
+            reward.start_rewards_draw(game, player, opponent, p1_poison, p2_poison)
+        else:
+            assert result.winner is not None
+            assert result.loser is not None
+            reward.start_rewards_only(game, result.winner, result.loser, poison_dealt)
+        return None
+
+    def _handle_pvp_non_finale(
+        self,
+        game: Game,
+        player: Player,
+        opponent: Player,
+        result: battle.BattleResult,
+        is_draw: bool,
+        winner_name: str | None,
+        p1_poison: int,
+        p2_poison: int,
+        poison_dealt: int,
+        player_at_lethal: bool,
+        opponent_at_lethal: bool,
+        game_id: str | None,
+        db: Session | None,
+    ) -> str | None:
+        """Handle non-finale PvP outcomes."""
+        if player_at_lethal and opponent_at_lethal:
+            self._set_pvp_battle_results_no_rewards(
+                player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
+            )
+            player.phase = "awaiting_elimination"
+            opponent.phase = "awaiting_elimination"
+            return self._check_sudden_death_ready(game, game_id, db)
+
+        if player_at_lethal:
+            self._set_player_result_no_rewards(player, opponent.name, is_draw, winner_name, p1_poison, poison_dealt)
+            player.phase = "awaiting_elimination"
+            opponent.phase = "reward"
+            self._start_single_reward(game, opponent, player.name, is_draw, winner_name, p2_poison, poison_dealt)
+            return self._check_sudden_death_ready(game, game_id, db)
+
+        if opponent_at_lethal:
+            self._set_player_result_no_rewards(opponent, player.name, is_draw, winner_name, p2_poison, poison_dealt)
+            opponent.phase = "awaiting_elimination"
+            player.phase = "reward"
+            self._start_single_reward(game, player, opponent.name, is_draw, winner_name, p1_poison, poison_dealt)
+            return self._check_sudden_death_ready(game, game_id, db)
+
+        # Neither at lethal - both get rewards
+        player.phase = "reward"
+        opponent.phase = "reward"
+        if is_draw:
+            reward.start_rewards_draw(game, player, opponent, p1_poison, p2_poison)
+        else:
+            assert result.winner is not None
+            assert result.loser is not None
+            reward.start_rewards_only(game, result.winner, result.loser, poison_dealt)
+        return None
+
+    def _set_player_result_no_rewards(
+        self,
+        player: Player,
+        opponent_name: str,
+        is_draw: bool,
+        winner_name: str | None,
+        poison_taken: int,
+        poison_dealt: int,
+    ) -> None:
+        """Set last_battle_result for a single player when skipping rewards."""
+        if is_draw:
+            reward.set_last_battle_result_no_rewards(player, opponent_name, None, True, 0, poison_taken)
+        else:
+            p_won = winner_name == player.name
+            reward.set_last_battle_result_no_rewards(
+                player, opponent_name, winner_name, False, poison_dealt if p_won else 0, 0 if p_won else poison_dealt
+            )
+
+    def _start_single_reward(
+        self,
+        game: Game,
+        player: Player,
+        opponent_name: str,
+        is_draw: bool,
+        winner_name: str | None,
+        poison_taken: int,
+        poison_dealt: int,
+    ) -> None:
+        """Start reward phase for a single player."""
+        if is_draw:
+            reward.start_rewards_single(game, player, opponent_name, False, 0, poison_taken)
+        else:
+            p_won = winner_name == player.name
+            reward.start_rewards_single(
+                game, player, opponent_name, p_won, poison_dealt if p_won else 0, 0 if p_won else poison_dealt
+            )
+
+    def _handle_post_battle_pvp(
+        self,
+        game: Game,
+        player: Player,
+        opponent: Player,
+        result: battle.BattleResult,
+        game_id: str | None,
+        db: Session | None,
+    ) -> str | None:
+        """Handle phase transition after PvP battle."""
+        is_draw = result.is_draw
+        is_finale = self._is_finale(game)
+
+        # Apply poison and determine winner
+        p1_poison = 0
+        p2_poison = 0
+        poison_dealt = 0
+        winner_name: str | None = None
+
+        if is_draw:
+            poison_info = reward.apply_poison_pvp(game, player, opponent, True, None)
+            p1_poison = poison_info["player_poison_taken"]
+            p2_poison = poison_info["opponent_poison_taken"]
+        else:
+            winner = result.winner
+            loser = result.loser
+            assert winner is not None
+            assert loser is not None
+            poison_info = reward.apply_poison_pvp(game, player, opponent, False, winner.name)
+            poison_dealt = poison_info["poison"]
+            winner_name = winner.name
+
+        player_at_lethal = player.poison >= game.config.poison_to_lose
+        opponent_at_lethal = opponent.poison >= game.config.poison_to_lose
+
+        process_bot_eliminations(game)
+
+        if is_finale:
+            return self._handle_pvp_finale(
+                game,
+                player,
+                opponent,
+                result,
+                is_draw,
+                winner_name,
+                p1_poison,
+                p2_poison,
+                poison_dealt,
+                player_at_lethal,
+                opponent_at_lethal,
+                game_id,
+                db,
+            )
+
+        return self._handle_pvp_non_finale(
+            game,
+            player,
+            opponent,
+            result,
+            is_draw,
+            winner_name,
+            p1_poison,
+            p2_poison,
+            poison_dealt,
+            player_at_lethal,
+            opponent_at_lethal,
+            game_id,
+            db,
+        )
+
+    def _check_sudden_death_ready(self, game: Game, game_id: str | None, db: Session | None) -> str | None:
+        """Check if sudden death should trigger and set it up."""
+        if not would_be_dead_ready_for_elimination(game):
+            return None
+
+        if not needs_sudden_death(game):
+            would_die = get_would_be_dead(game)
+            for p in would_die:
+                eliminate_player(game, p, p.round, p.stage)
+
+            process_bot_eliminations(game)
+            winner, is_game_over = check_game_over(game)
+            if is_game_over:
+                self.complete_game(game_id or "", winner, db)
+                return "game_over"
+            return None
+
+        fighters = get_sudden_death_fighters(game)
+        if not fighters:
+            return None
+
+        p1, p2 = fighters
+        would_die = get_would_be_dead(game)
+
+        # Eliminate all lethal players not selected to fight (no byes)
+        fighter_names = {p1.name, p2.name}
+        for p in would_die:
+            if p.name not in fighter_names:
+                eliminate_player(game, p, p.round, p.stage)
+
+        setup_sudden_death_battle(game, p1, p2)
+        p1.phase = "battle"
+        p2.phase = "battle"
+        battle.start(game, p1, p2, is_sudden_death=True)
+        return "sudden_death"
 
     def handle_reward_pick_upgrade(self, game: Game, player: Player, upgrade_id: str) -> bool:
         upgrade = next((u for u in game.available_upgrades if u.id == upgrade_id), None)
@@ -1157,39 +1496,14 @@ class GameManager:
 
         self._advance_bot_if_needed(game, opponent_name)
 
-        player_at_lethal = player.poison >= game.config.poison_to_lose
+        process_bot_eliminations(game)
+        winner, is_game_over = check_game_over(game)
+        if is_game_over:
+            self.complete_game(game_id or "", winner, db)
+            return "game_over"
 
-        if not player_at_lethal:
-            process_bot_eliminations(game)
-            winner, is_game_over = check_game_over(game)
-            if is_game_over:
-                self.complete_game(game_id or "", winner, db)
-                return "game_over"
-            if player.phase == "draft" and game.draft_state is None:
-                draft.start(game)
-            return None
-
-        if not needs_sudden_death(game):
-            eliminate_player(game, player, player.round)
-            process_bot_eliminations(game)
-            winner, is_game_over = check_game_over(game)
-            if is_game_over:
-                self.complete_game(game_id or "", winner, db)
-                return "game_over"
-            return None
-
-        if not would_be_dead_ready_for_elimination(game):
-            player.phase = "awaiting_elimination"
-            return None
-
-        fighters = get_sudden_death_fighters(game)
-        if fighters:
-            p1, p2 = fighters
-            setup_sudden_death_battle(game, p1, p2)
-            p1.phase = "battle"
-            p2.phase = "battle"
-            battle.start(game, p1, p2, is_sudden_death=True)
-            return "sudden_death"
+        if player.phase == "draft" and game.draft_state is None:
+            draft.start(game)
 
         return None
 

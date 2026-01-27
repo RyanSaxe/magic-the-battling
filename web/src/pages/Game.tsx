@@ -446,9 +446,21 @@ function GameContent() {
               )}
               {currentPhase === 'awaiting_elimination' && (
                 <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <h2 className="text-2xl text-amber-400 mb-4">Sudden Death Pending</h2>
-                    <p className="text-gray-300 mb-4">Waiting for other battles to finish...</p>
+                  <div className="text-center max-w-md">
+                    <h2 className="text-2xl text-red-400 mb-4">You Have Been Eliminated</h2>
+                    <p className="text-gray-300 mb-6">
+                      Waiting until all battles are complete to determine if you will compete in sudden death to stay alive.
+                    </p>
+                    <div className="bg-black/40 rounded-lg p-4 text-left">
+                      <h3 className="text-amber-400 font-medium mb-2">Sudden Death Rules</h3>
+                      <ul className="text-gray-400 text-sm space-y-1">
+                        <li>Triggers when 2+ players eliminated with fewer than 2 survivors</li>
+                        <li>2 players with lowest poison fight (ties broken randomly)</li>
+                        <li>Other eliminated players are out immediately</li>
+                        <li>Poison resets to 9 for the sudden death battle</li>
+                        <li>Winner survives, loser is eliminated</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               )}

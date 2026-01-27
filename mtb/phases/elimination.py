@@ -1,3 +1,5 @@
+import random
+
 from mtb.models.game import FakePlayer, Game, Player, StaticOpponent
 
 
@@ -13,9 +15,11 @@ def get_would_be_dead(game: Game) -> list[Player]:
     return [p for p in get_live_players(game) if p.poison >= game.config.poison_to_lose]
 
 
-def eliminate_player(game: Game, player: Player, round_num: int) -> None:
+def eliminate_player(game: Game, player: Player, round_num: int, stage_num: int) -> None:
     ghost_opponent = StaticOpponent.from_player(player, hand_revealed=True)
     player.phase = "eliminated"
+    player.elimination_round = round_num
+    player.elimination_stage = stage_num
     game.most_recent_ghost = ghost_opponent
     game.most_recent_ghost_bot = None
 
@@ -39,18 +43,30 @@ def needs_sudden_death(game: Game) -> bool:
 
 
 def get_sudden_death_fighters(game: Game) -> tuple[Player, Player] | None:
-    """Returns the two players who should fight in sudden death, or None if not needed."""
+    """Returns the two players who should fight in sudden death, or None if not needed.
+
+    Selects the 2 players with lowest poison. Ties are broken randomly.
+    Any other players at lethal are eliminated immediately (no byes).
+    """
     if not needs_sudden_death(game):
         return None
 
     would_die = get_would_be_dead(game)
-    would_die_sorted = sorted(would_die, key=lambda p: p.poison)
+    fighters = select_sudden_death_fighters(would_die)
+    return fighters[0], fighters[1]
 
-    if len(would_die_sorted) == 2:
-        return would_die_sorted[0], would_die_sorted[1]
-    else:
-        # Lowest poison gets bye, next two fight
-        return would_die_sorted[1], would_die_sorted[2]
+
+def select_sudden_death_fighters(players_at_lethal: list[Player]) -> list[Player]:
+    """Select 2 players for sudden death: lowest poison, ties broken randomly."""
+    if len(players_at_lethal) == 2:
+        return players_at_lethal
+
+    # Shuffle first to randomize ties, then sort by poison
+    shuffled = players_at_lethal.copy()
+    random.shuffle(shuffled)
+    sorted_by_poison = sorted(shuffled, key=lambda p: p.poison)
+
+    return sorted_by_poison[:2]
 
 
 def setup_sudden_death_battle(game: Game, player1: Player, player2: Player) -> None:
@@ -59,13 +75,13 @@ def setup_sudden_death_battle(game: Game, player1: Player, player2: Player) -> N
     player2.poison = game.config.poison_to_lose - 1
 
 
-def process_eliminations(game: Game, round_num: int) -> list[Player]:
+def process_eliminations(game: Game, round_num: int, stage_num: int) -> list[Player]:
     """Eliminate all players at or above poison threshold. Call after reward phase."""
     eliminated: list[Player] = []
     would_die = get_would_be_dead(game)
 
     for player in would_die:
-        eliminate_player(game, player, round_num)
+        eliminate_player(game, player, round_num, stage_num)
         eliminated.append(player)
 
     return eliminated

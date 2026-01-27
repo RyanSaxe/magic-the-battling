@@ -497,8 +497,6 @@ def _end_vs_static(game: Game, battle: Battle, opponent: StaticOpponent) -> Batt
 
     battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
 
-    battle.player.phase = "reward"
-
     if battle in game.active_battles:
         game.active_battles.remove(battle)
 
@@ -633,9 +631,6 @@ def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult
 
     battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
     opponent.most_recently_revealed_cards = _collect_revealed_cards(battle.opponent_zones)
-
-    battle.player.phase = "reward"
-    opponent.phase = "reward"
 
     if battle in game.active_battles:
         game.active_battles.remove(battle)

@@ -4,7 +4,11 @@ from mtb.phases import battle, build, draft, reward
 
 
 def test_full_round_flow_round_1(card_factory, upgrade_factory):
-    """Round 1 starts in build phase (no draft), then goes to draft for round 2."""
+    """Round 1 starts in build phase (no draft), then goes to draft for round 2.
+
+    Note: battle.end() no longer sets phases - that's now handled by game_manager._end_battle().
+    In unit tests, we set phases manually to simulate the game_manager behavior.
+    """
     game = create_game(["Alice", "Bob"], num_players=2)
     upgrades = [upgrade_factory(f"u{i}") for i in range(4)]
     battler = Battler(cards=[card_factory(f"c{i}") for i in range(50)], upgrades=upgrades, vanguards=[])
@@ -32,9 +36,11 @@ def test_full_round_flow_round_1(card_factory, upgrade_factory):
     battle.submit_result(b, alice, "Alice")
     battle.submit_result(b, bob, "Alice")
     result = battle.end(game, b)
-    assert alice.phase == "reward"
-    assert bob.phase == "reward"
     assert result.winner is alice
+
+    # In production, game_manager._end_battle() sets phases. Here we simulate that.
+    alice.phase = "reward"
+    bob.phase = "reward"
 
     reward.start(game, result.winner, result.loser)
     reward.end_for_player(game, alice)
@@ -48,7 +54,11 @@ def test_full_round_flow_round_1(card_factory, upgrade_factory):
 
 
 def test_full_round_flow_round_2(card_factory, upgrade_factory):
-    """Round 2+ starts with draft phase."""
+    """Round 2+ starts with draft phase.
+
+    Note: battle.end() no longer sets phases - that's now handled by game_manager._end_battle().
+    In unit tests, we set phases manually to simulate the game_manager behavior.
+    """
     game = create_game(["Alice", "Bob"], num_players=2)
     upgrades = [upgrade_factory(f"u{i}") for i in range(4)]
     battler = Battler(cards=[card_factory(f"c{i}") for i in range(50)], upgrades=upgrades, vanguards=[])
@@ -88,8 +98,10 @@ def test_full_round_flow_round_2(card_factory, upgrade_factory):
     battle.submit_result(b, alice, "Alice")
     battle.submit_result(b, bob, "Alice")
     result = battle.end(game, b)
-    assert alice.phase == "reward"
-    assert bob.phase == "reward"
+
+    # In production, game_manager._end_battle() sets phases. Here we simulate that.
+    alice.phase = "reward"
+    bob.phase = "reward"
 
     reward.start(game, result.winner, result.loser)
     reward.end_for_player(game, alice)

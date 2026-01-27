@@ -137,6 +137,8 @@ class Player(BaseModel):
     poison: int = 0
     treasures: int = 0
     placement: int = 0
+    elimination_round: int = 0
+    elimination_stage: int = 0
 
     phase: Phase = "build"
     round: int = 1
