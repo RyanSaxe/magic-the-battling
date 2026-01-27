@@ -99,7 +99,7 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 <span className="flex items-center gap-1 text-amber-400" title="Treasures">
                   <MoneyBagIcon size="sm" /> {player.treasures}
                 </span>
-                {player.name !== currentPlayerName && !player.is_ghost && (
+                {player.name !== currentPlayerName && (!player.is_ghost || player.is_most_recent_ghost) && (
                   <PairingProbability probability={player.pairing_probability} />
                 )}
               </div>

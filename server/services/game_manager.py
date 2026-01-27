@@ -463,6 +463,7 @@ class GameManager:
             basic_lands=player.chosen_basics.copy(),
             applied_upgrades=[u.model_copy() for u in player.upgrades if u.upgrade_target is not None],
             treasures=player.treasures,
+            sideboard=[c.model_copy() for c in player.sideboard],
             revealed_sideboard_cards=[],
         )
 
@@ -764,6 +765,7 @@ class GameManager:
             last_result=self._get_last_result(player),
             pairing_probability=probabilities.get(player.name),
             is_most_recent_ghost=player.name == most_recent_ghost_name,
+            full_sideboard=player.sideboard if is_eliminated else [],
         )
 
     def _make_fake_player_view(
@@ -810,6 +812,7 @@ class GameManager:
                 last_result=last_result,
                 pairing_probability=probabilities.get(fake.name),
                 is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
+                full_sideboard=snapshot.sideboard,
             )
         return PlayerView(
             name=fake.name,
@@ -833,6 +836,7 @@ class GameManager:
             last_result=last_result,
             pairing_probability=probabilities.get(fake.name),
             is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
+            full_sideboard=[],
         )
 
     def _get_opponent_poison(self, opponent: StaticOpponent | Player, game: Game) -> int:

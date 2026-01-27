@@ -66,6 +66,7 @@ class PlayerView(BaseModel):
     last_result: LastResult | None = None
     pairing_probability: float | None = None
     is_most_recent_ghost: bool = False
+    full_sideboard: list[Card] = []
 
 
 class SelfPlayerView(PlayerView):

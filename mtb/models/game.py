@@ -44,7 +44,7 @@ class StaticOpponent(BaseModel):
         return cls(
             name=player_name,
             hand=snapshot.hand,
-            sideboard=[],
+            sideboard=snapshot.sideboard,
             upgrades=snapshot.applied_upgrades,
             vanguard=snapshot.vanguard,
             chosen_basics=snapshot.basic_lands,
@@ -65,6 +65,7 @@ class BattleSnapshotData(BaseModel):
     basic_lands: list[str]
     applied_upgrades: list[Card]
     treasures: int
+    sideboard: list[Card] = Field(default_factory=list)
     revealed_sideboard_cards: list[Card] = Field(default_factory=list)
 
 
@@ -83,7 +84,9 @@ class FakePlayer(BaseModel):
     def get_opponent_for_round(self, stage: int, round_num: int) -> StaticOpponent | None:
         key = f"{stage}_{round_num}"
         if key in self.snapshots:
-            return self.snapshots[key]
+            opponent = self.snapshots[key]
+            opponent.poison = self.poison
+            return opponent
 
         available_keys = sorted(self.snapshots.keys())
         target = (stage, round_num)
@@ -96,9 +99,13 @@ class FakePlayer(BaseModel):
                 break
 
         if best_key:
-            return self.snapshots[best_key]
+            opponent = self.snapshots[best_key]
+            opponent.poison = self.poison
+            return opponent
         if available_keys:
-            return self.snapshots[available_keys[0]]
+            opponent = self.snapshots[available_keys[0]]
+            opponent.poison = self.poison
+            return opponent
         return None
 
 

@@ -60,6 +60,7 @@ export interface PlayerView {
   last_result: LastResult | null
   pairing_probability: number | null
   is_most_recent_ghost: boolean
+  full_sideboard: Card[]
 }
 
 export interface LastBattleResult {

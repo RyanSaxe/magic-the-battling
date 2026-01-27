@@ -87,6 +87,28 @@ def test_higher_poison_player_goes_first():
     assert b.coin_flip_name == bob.name
 
 
+def test_higher_poison_bot_goes_first(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+
+    fake = FakePlayer(name="Bot1", player_history_id=1)
+    snapshot = StaticOpponent(
+        name="Bot1",
+        hand=[card_factory("card1")],
+        chosen_basics=["Plains", "Island", "Mountain"],
+    )
+    fake.snapshots[f"{alice.stage}_1"] = snapshot
+    fake.poison = 5
+    game.fake_players.append(fake)
+
+    alice.poison = 2
+    opponent = fake.get_opponent_for_round(alice.stage, 1)
+    assert opponent is not None
+    b = battle.start(game, alice, opponent)
+    assert b.coin_flip_name == "Bot1"
+
+
 def test_start_battle_wrong_phase_raises():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players

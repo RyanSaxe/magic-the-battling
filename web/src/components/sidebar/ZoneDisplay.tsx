@@ -1,20 +1,24 @@
 import { useState } from 'react'
 import type { Card as CardType } from '../../types'
 import { Card } from '../card'
+import { UpgradeStack } from './UpgradeStack'
 
 interface ZoneDisplayProps {
   title: string
   cards: CardType[]
   maxThumbnails?: number
+  showUpgradeTargets?: boolean
 }
 
 function ZoneModal({
   title,
   cards,
+  showUpgradeTargets,
   onClose,
 }: {
   title: string
   cards: CardType[]
+  showUpgradeTargets?: boolean
   onClose: () => void
 }) {
   return (
@@ -38,10 +42,14 @@ function ZoneModal({
         {cards.length === 0 ? (
           <div className="text-gray-500 text-center py-4">No cards</div>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {cards.map((card) => (
-              <Card key={card.id} card={card} size="sm" />
-            ))}
+          <div className="flex flex-wrap gap-3 items-end">
+            {cards.map((card) =>
+              showUpgradeTargets ? (
+                <UpgradeStack key={card.id} upgrade={card} size="sm" />
+              ) : (
+                <Card key={card.id} card={card} size="sm" />
+              )
+            )}
           </div>
         )}
       </div>
@@ -49,7 +57,7 @@ function ZoneModal({
   )
 }
 
-export function ZoneDisplay({ title, cards, maxThumbnails = 6 }: ZoneDisplayProps) {
+export function ZoneDisplay({ title, cards, maxThumbnails = 6, showUpgradeTargets = false }: ZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
 
   const displayedCards = cards.slice(0, maxThumbnails)
@@ -74,10 +82,14 @@ export function ZoneDisplay({ title, cards, maxThumbnails = 6 }: ZoneDisplayProp
           </div>
         ) : (
           <div className="flex flex-col items-center gap-0.5">
-            <div className="grid grid-cols-3 gap-1">
-              {displayedCards.map((card) => (
-                <Card key={card.id} card={card} size="sm" />
-              ))}
+            <div className={`grid gap-1 ${showUpgradeTargets ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              {displayedCards.map((card) =>
+                showUpgradeTargets ? (
+                  <UpgradeStack key={card.id} upgrade={card} size="xs" />
+                ) : (
+                  <Card key={card.id} card={card} size="sm" />
+                )
+              )}
             </div>
             {remainingCount > 0 && (
               <div className="text-[10px] text-gray-400">+{remainingCount} more</div>
@@ -90,6 +102,7 @@ export function ZoneDisplay({ title, cards, maxThumbnails = 6 }: ZoneDisplayProp
         <ZoneModal
           title={title}
           cards={cards}
+          showUpgradeTargets={showUpgradeTargets}
           onClose={() => setShowModal(false)}
         />
       )}
