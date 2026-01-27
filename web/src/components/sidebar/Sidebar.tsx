@@ -32,10 +32,10 @@ export function Sidebar({ players, currentPlayer, phaseContent }: SidebarProps) 
               {displayPlayer.name === currentPlayer.name ? 'Your Cards' : `${displayPlayer.name}'s Cards`}
             </h3>
             <div className="flex flex-wrap gap-2">
-              <ZoneDisplay title="Upgrades" cards={appliedUpgrades} maxThumbnails={4} />
-              <ZoneDisplay title="Revealed" cards={displayPlayer.most_recently_revealed_cards} maxThumbnails={4} />
+              <ZoneDisplay title="Upgrades" cards={appliedUpgrades} maxThumbnails={6} />
+              <ZoneDisplay title="Revealed" cards={displayPlayer.most_recently_revealed_cards} maxThumbnails={6} />
               {isViewingSelf && nonAppliedUpgrades.length > 0 && (
-                <ZoneDisplay title="Pending Upgrades" cards={nonAppliedUpgrades} maxThumbnails={4} />
+                <ZoneDisplay title="Pending Upgrades" cards={nonAppliedUpgrades} maxThumbnails={6} />
               )}
             </div>
             {appliedUpgrades.length === 0 && displayPlayer.most_recently_revealed_cards.length === 0 && (
