@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { BattleView, Card as CardType, Zones } from '../../types'
-import { Card } from '../card'
 import { DroppableZoneDisplay } from './DroppableZoneDisplay'
+import { UpgradeStack } from './UpgradeStack'
 import { POISON_COUNTER_IMAGE } from '../../constants/assets'
 
 interface BattleSidebarContentProps {
@@ -113,9 +113,9 @@ function PlayerSection({
       </div>
 
       {isOpponent && appliedUpgrades.length > 0 && (
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
           {appliedUpgrades.map((upgrade) => (
-            <Card key={upgrade.id} card={upgrade} size="xs" />
+            <UpgradeStack key={upgrade.id} upgrade={upgrade} size="xs" />
           ))}
         </div>
       )}
@@ -136,9 +136,9 @@ function PlayerSection({
       />
 
       {!isOpponent && appliedUpgrades.length > 0 && (
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-2 flex-wrap">
           {appliedUpgrades.map((upgrade) => (
-            <Card key={upgrade.id} card={upgrade} size="xs" />
+            <UpgradeStack key={upgrade.id} upgrade={upgrade} size="xs" />
           ))}
         </div>
       )}

@@ -3,21 +3,23 @@ from conftest import setup_battle_ready
 
 from mtb.models.game import FakePlayer, StaticOpponent, create_game
 from mtb.phases import battle
+from server.services.game_manager import GameManager
 
 
 def test_can_start_pairing():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
+    starting_stage = game.config.starting_stage
 
     alice.phase = "build"
     bob.phase = "battle"
-    assert not battle.can_start_pairing(game, 1, 1)
+    assert not battle.can_start_pairing(game, 1, starting_stage)
 
     alice.phase = "battle"
-    assert battle.can_start_pairing(game, 1, 1)
+    assert battle.can_start_pairing(game, 1, starting_stage)
 
     alice.round = 2
-    assert not battle.can_start_pairing(game, 1, 1)
+    assert not battle.can_start_pairing(game, 1, starting_stage)
 
 
 def test_find_opponent_returns_candidate():
@@ -84,6 +86,28 @@ def test_higher_poison_player_goes_first():
     bob.poison = 5
     b = battle.start(game, alice, bob)
     assert b.coin_flip_name == bob.name
+
+
+def test_higher_poison_bot_goes_first(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+
+    fake = FakePlayer(name="Bot1", player_history_id=1)
+    snapshot = StaticOpponent(
+        name="Bot1",
+        hand=[card_factory("card1")],
+        chosen_basics=["Plains", "Island", "Mountain"],
+    )
+    fake.snapshots[f"{alice.stage}_1"] = snapshot
+    fake.poison = 5
+    game.fake_players.append(fake)
+
+    alice.poison = 2
+    opponent = fake.get_opponent_for_round(alice.stage, 1)
+    assert opponent is not None
+    b = battle.start(game, alice, opponent)
+    assert b.coin_flip_name == "Bot1"
 
 
 def test_start_battle_wrong_phase_raises():
@@ -245,8 +269,8 @@ def test_bounced_card_still_revealed(card_factory):
     assert creature in alice.most_recently_revealed_cards
 
 
-def test_sideboard_fetch_reveals_card(card_factory):
-    """A card fetched from sideboard should be revealed even if it stays in hand."""
+def test_sideboard_fetch_to_hand_not_revealed(card_factory):
+    """A card fetched from sideboard to hand should NOT appear in most_recently_revealed_cards."""
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
@@ -257,6 +281,26 @@ def test_sideboard_fetch_reveals_card(card_factory):
 
     b = battle.start(game, alice, bob)
     battle.move_zone(b, alice, wish_target, "sideboard", "hand")
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
+
+    battle.end(game, b)
+
+    assert wish_target not in alice.most_recently_revealed_cards
+
+
+def test_sideboard_fetch_to_battlefield_revealed(card_factory):
+    """A card fetched from sideboard to a revealed zone should appear in most_recently_revealed_cards."""
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    wish_target = card_factory("WishTarget", "Creature")
+    alice.sideboard = [wish_target]
+
+    b = battle.start(game, alice, bob)
+    battle.move_zone(b, alice, wish_target, "sideboard", "battlefield")
     battle.submit_result(b, alice, "Alice")
     battle.submit_result(b, bob, "Alice")
 
@@ -281,6 +325,50 @@ def test_sideboard_fetch_tracked_in_zones(card_factory):
     assert wish_target.id in b.player_zones.revealed_sideboard_card_ids
 
 
+def test_sideboard_fetch_via_game_manager_tracked(card_factory):
+    """Sideboard->hand moves via GameManager should also be tracked in revealed_sideboard_card_ids."""
+
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    companion = card_factory("Companion", "Creature")
+    alice.sideboard = [companion]
+
+    b = battle.start(game, alice, bob)
+
+    manager = GameManager()
+    manager.handle_battle_move(game, alice, companion.id, "sideboard", "hand")
+
+    assert companion.id in b.player_zones.revealed_sideboard_card_ids
+
+
+def test_sideboard_fetch_via_game_manager_no_duplicates(card_factory):
+    """Sideboard card moved via GameManager then played should appear exactly once in revealed cards."""
+
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    companion = card_factory("Companion", "Creature")
+    alice.sideboard = [companion]
+
+    b = battle.start(game, alice, bob)
+
+    manager = GameManager()
+    manager.handle_battle_move(game, alice, companion.id, "sideboard", "hand")
+    manager.handle_battle_move(game, alice, companion.id, "hand", "battlefield")
+
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
+    battle.end(game, b)
+
+    revealed_ids = [c.id for c in alice.most_recently_revealed_cards]
+    assert revealed_ids.count(companion.id) == 1
+
+
 def test_end_battle_not_agreed_raises():
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
@@ -294,7 +382,7 @@ def test_end_battle_not_agreed_raises():
         battle.end(game, b)
 
 
-def test_end_battle_returns_cards_to_sideboard(card_factory):
+def test_end_battle_preserves_hand_and_sideboard(card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
@@ -310,9 +398,10 @@ def test_end_battle_returns_cards_to_sideboard(card_factory):
     battle.submit_result(b, bob, "Alice")
     battle.end(game, b)
 
-    assert alice.hand == []
-    assert hand_card in alice.sideboard
+    assert hand_card in alice.hand
     assert sideboard_card in alice.sideboard
+    assert hand_card not in alice.sideboard
+    assert sideboard_card not in alice.hand
 
 
 def test_submit_result_accepts_draw():
@@ -442,7 +531,7 @@ class TestUnifiedPairingCandidates:
             hand=[card_factory("card1")],
             chosen_basics=["Plains", "Island", "Mountain"],
         )
-        fake.snapshots[f"{alice.hand_size}_1"] = snapshot
+        fake.snapshots[f"{alice.stage}_1"] = snapshot
         game.fake_players.append(fake)
 
         candidates = battle.get_all_pairing_candidates(game, alice)
@@ -455,33 +544,32 @@ class TestUnifiedPairingCandidates:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         setup_battle_ready(alice)
-        bob.is_ghost = True
         bob.phase = "eliminated"
-        game.most_recent_ghost = bob
+        ghost = StaticOpponent.from_player(bob, hand_revealed=True)
+        game.most_recent_ghost = ghost
 
         candidates = battle.get_all_pairing_candidates(game, alice)
 
         assert len(candidates) == 1
-        assert candidates[0] is bob
+        assert candidates[0] is ghost
 
     def test_get_all_pairing_candidates_excludes_self_as_ghost(self):
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
-        alice.is_ghost = True
         alice.phase = "eliminated"
-        game.most_recent_ghost = alice
+        ghost = StaticOpponent.from_player(alice, hand_revealed=True)
+        game.most_recent_ghost = ghost
         setup_battle_ready(bob)
 
         candidates = battle.get_all_pairing_candidates(game, alice)
 
-        assert alice not in candidates
+        assert ghost not in candidates
 
-    def test_fake_player_snapshot_uses_hand_size_not_stage(self, card_factory):
-        """Regression test: snapshots should be keyed by hand_size, not player.stage.
+    def test_fake_player_snapshot_uses_stage_for_lookup(self, card_factory):
+        """Snapshots are keyed by stage and round, not hand_size.
 
-        Snapshots are stored in the database with keys like "3_1", "4_1" (hand_size-based)
-        not "1_1", "2_1" (stage-based). The lookup must use hand_size to retrieve the
-        correct snapshot as the game progresses.
+        Snapshots are stored in the database with keys like "3_1", "4_1" (stage-based).
+        The lookup uses player.stage, so advancing stage changes which snapshot is used.
         """
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
@@ -505,7 +593,7 @@ class TestUnifiedPairingCandidates:
         candidates = battle.get_all_pairing_candidates(game, alice)
         assert candidates[0].hand[0].name == "early_card"
 
-        alice.vanquishers = 1
+        alice.stage = 4
         candidates = battle.get_all_pairing_candidates(game, alice)
         assert candidates[0].hand[0].name == "later_card"
 

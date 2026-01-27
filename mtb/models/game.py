@@ -44,7 +44,7 @@ class StaticOpponent(BaseModel):
         return cls(
             name=player_name,
             hand=snapshot.hand,
-            sideboard=[],
+            sideboard=snapshot.sideboard,
             upgrades=snapshot.applied_upgrades,
             vanguard=snapshot.vanguard,
             chosen_basics=snapshot.basic_lands,
@@ -65,6 +65,7 @@ class BattleSnapshotData(BaseModel):
     basic_lands: list[str]
     applied_upgrades: list[Card]
     treasures: int
+    sideboard: list[Card] = Field(default_factory=list)
     revealed_sideboard_cards: list[Card] = Field(default_factory=list)
 
 
@@ -77,13 +78,16 @@ class FakePlayer(BaseModel):
     is_eliminated: bool = False
     poison: int = 0
     round: int = 1
-    stage: int = 1
+    stage: int = 3
+    placement: int = 0
     last_battle_result: "LastBattleResult | None" = None
 
     def get_opponent_for_round(self, stage: int, round_num: int) -> StaticOpponent | None:
         key = f"{stage}_{round_num}"
         if key in self.snapshots:
-            return self.snapshots[key]
+            opponent = self.snapshots[key]
+            opponent.poison = self.poison
+            return opponent
 
         available_keys = sorted(self.snapshots.keys())
         target = (stage, round_num)
@@ -96,9 +100,13 @@ class FakePlayer(BaseModel):
                 break
 
         if best_key:
-            return self.snapshots[best_key]
+            opponent = self.snapshots[best_key]
+            opponent.poison = self.poison
+            return opponent
         if available_keys:
-            return self.snapshots[available_keys[0]]
+            opponent = self.snapshots[available_keys[0]]
+            opponent.poison = self.poison
+            return opponent
         return None
 
 
@@ -128,15 +136,13 @@ class Player(BaseModel):
     vanquishers: int = 0
     poison: int = 0
     treasures: int = 0
+    placement: int = 0
 
     phase: Phase = "build"
     round: int = 1
-    stage: int = 1
+    stage: int = 3
     last_opponent_name: str | None = None
     last_battle_result: "LastBattleResult | None" = None
-
-    is_ghost: bool = False
-    time_of_death: int | None = None
 
     upgrades: list[Card] = Field(default_factory=list)
     vanguard: Card | None = None
@@ -208,7 +214,7 @@ class Game(BaseModel):
     available_upgrades: list[Card] = Field(default_factory=list)
     draft_state: DraftState | None = None
     active_battles: list["Battle"] = Field(default_factory=list)
-    most_recent_ghost: Player | None = None
+    most_recent_ghost: StaticOpponent | None = None
     most_recent_ghost_bot: FakePlayer | None = None
     fake_players: list[FakePlayer] = Field(default_factory=list)
     stage: int = 3
@@ -240,6 +246,7 @@ class Zones(BaseModel):
     library: list[Card] = Field(default_factory=list)
     treasures: int = 0
     submitted_cards: list[Card] = Field(default_factory=list)
+    original_hand_ids: list[str] = Field(default_factory=list)
 
     tapped_card_ids: list[str] = Field(default_factory=list)
     flipped_card_ids: list[str] = Field(default_factory=list)
@@ -290,7 +297,9 @@ def create_game(player_names: list[str], num_players: int, config: Config | None
 
     if config is None:
         config = Config()
-    players = [Player(name=name, treasures=config.starting_treasures) for name in player_names]
+    players = [
+        Player(name=name, treasures=config.starting_treasures, stage=config.starting_stage) for name in player_names
+    ]
     return Game(players=players, config=config)
 
 

@@ -58,6 +58,7 @@ def _create_zones_for_player(player: Player) -> Zones:
         upgrades=player.upgrades.copy(),
         treasures=player.treasures,
         submitted_cards=submitted,
+        original_hand_ids=[c.id for c in player.hand],
     )
 
 
@@ -80,7 +81,6 @@ def get_pairing_candidates(game: Game, player: Player) -> list[Player]:
         p
         for p in game.players
         if p.name != player.name
-        and not p.is_ghost
         and p.phase == "battle"
         and p.round == player.round
         and p.stage == player.stage
@@ -101,7 +101,6 @@ def get_all_pairing_candidates(game: Game, player: Player) -> list[PairingCandid
         p
         for p in game.players
         if p.name != player.name
-        and not p.is_ghost
         and p.phase == "battle"
         and p.round == player.round
         and p.stage == player.stage
@@ -113,7 +112,7 @@ def get_all_pairing_candidates(game: Game, player: Player) -> list[PairingCandid
             continue
         if _is_opponent_in_active_battle(game, fp.name):
             continue
-        static_opp = fp.get_opponent_for_round(player.hand_size, player.round)
+        static_opp = fp.get_opponent_for_round(player.stage, player.round)
         if static_opp:
             candidates.append(static_opp)
 
@@ -125,7 +124,7 @@ def get_all_pairing_candidates(game: Game, player: Player) -> list[PairingCandid
     if game.most_recent_ghost_bot is not None:
         ghost_bot = game.most_recent_ghost_bot
         if not _is_opponent_in_active_battle(game, ghost_bot.name):
-            static_opp = ghost_bot.get_opponent_for_round(player.hand_size, player.round)
+            static_opp = ghost_bot.get_opponent_for_round(player.stage, player.round)
             if static_opp:
                 candidates.append(static_opp)
 
@@ -258,13 +257,13 @@ def get_potential_pairing_candidates(game: Game, player: Player) -> list[Pairing
     candidates: list[PairingCandidate] = [
         p
         for p in game.players
-        if p.name != player.name and not p.is_ghost and p.round == player.round and p.stage == player.stage
+        if p.name != player.name and p.phase != "eliminated" and p.round == player.round and p.stage == player.stage
     ]
 
     for fp in game.fake_players:
         if fp.is_eliminated:
             continue
-        static_opp = fp.get_opponent_for_round(player.hand_size, player.round)
+        static_opp = fp.get_opponent_for_round(player.stage, player.round)
         if static_opp:
             candidates.append(static_opp)
 
@@ -275,7 +274,7 @@ def get_potential_pairing_candidates(game: Game, player: Player) -> list[Pairing
 
     if game.most_recent_ghost_bot is not None:
         ghost_bot = game.most_recent_ghost_bot
-        static_opp = ghost_bot.get_opponent_for_round(player.hand_size, player.round)
+        static_opp = ghost_bot.get_opponent_for_round(player.stage, player.round)
         if static_opp:
             candidates.append(static_opp)
 
@@ -307,6 +306,7 @@ def _create_zones_for_static_opponent(opponent: StaticOpponent) -> Zones:
         upgrades=opponent.upgrades.copy(),
         treasures=opponent.treasures,
         submitted_cards=submitted,
+        original_hand_ids=[c.id for c in opponent.hand],
     )
 
 
@@ -355,9 +355,9 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
     if not is_sudden_death:
         if player.phase != "battle":
             raise ValueError("Player is not in battle phase")
-        if not opponent.is_ghost and opponent.phase != "battle":
+        if opponent.phase != "battle":
             raise ValueError("Opponent is not in battle phase")
-        if not opponent.is_ghost and not can_start_pairing(game, player.round, player.stage):
+        if not can_start_pairing(game, player.round, player.stage):
             raise ValueError("Cannot start pairing yet - not all players are ready")
 
     opponent_poison = opponent.poison
@@ -370,10 +370,8 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
 
     player.previous_hand_ids = [c.id for c in player.hand]
     player.previous_basics = player.chosen_basics.copy()
-
-    if not opponent.is_ghost:
-        opponent.previous_hand_ids = [c.id for c in opponent.hand]
-        opponent.previous_basics = opponent.chosen_basics.copy()
+    opponent.previous_hand_ids = [c.id for c in opponent.hand]
+    opponent.previous_basics = opponent.chosen_basics.copy()
 
     battle = Battle(
         player=player,
@@ -418,8 +416,7 @@ def move_zone(battle: Battle, player: Player, card: Card, from_zone: ZoneName, t
     destination = zones.get_zone(to_zone)
     destination.append(card)
 
-    should_reveal = to_zone in REVEALED_ZONES or from_zone == "sideboard"
-    if should_reveal and _is_revealed_card(card) and card.id not in zones.revealed_card_ids:
+    if to_zone in REVEALED_ZONES and _is_revealed_card(card) and card.id not in zones.revealed_card_ids:
         zones.revealed_card_ids.append(card.id)
 
     if from_zone == "sideboard" and card.id not in zones.revealed_sideboard_card_ids:
@@ -474,8 +471,9 @@ def get_result(battle: Battle) -> BattleResult | None:
 
 
 def _sync_zones_to_player(zones: Zones, player: Player, max_treasures: int) -> None:
-    player.hand = []
-    player.sideboard = list(zones.submitted_cards)
+    original_hand_ids = set(zones.original_hand_ids)
+    player.hand = [c for c in zones.submitted_cards if c.id in original_hand_ids]
+    player.sideboard = [c for c in zones.submitted_cards if c.id not in original_hand_ids]
     player.upgrades = list(zones.upgrades)
     treasure_count = sum(1 for c in zones.battlefield if "Treasure" in c.type_line)
     player.treasures = min(treasure_count, max_treasures)
@@ -623,7 +621,7 @@ def update_card_state(
 def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult:
     if battle.player.phase != "battle":
         raise ValueError("Player is not in battle phase")
-    if not opponent.is_ghost and opponent.phase != "battle":
+    if opponent.phase != "battle":
         raise ValueError("Opponent is not in battle phase")
 
     result = get_result(battle)
@@ -631,17 +629,13 @@ def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult
         raise ValueError("Players have not agreed on the result")
 
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
-    if not opponent.is_ghost:
-        _sync_zones_to_player(battle.opponent_zones, opponent, game.config.max_treasures)
+    _sync_zones_to_player(battle.opponent_zones, opponent, game.config.max_treasures)
 
     battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
-
-    if not opponent.is_ghost:
-        opponent.most_recently_revealed_cards = _collect_revealed_cards(battle.opponent_zones)
+    opponent.most_recently_revealed_cards = _collect_revealed_cards(battle.opponent_zones)
 
     battle.player.phase = "reward"
-    if not opponent.is_ghost:
-        opponent.phase = "reward"
+    opponent.phase = "reward"
 
     if battle in game.active_battles:
         game.active_battles.remove(battle)

@@ -10,6 +10,7 @@ import { RewardPhase } from './phases/Reward'
 import { Sidebar } from '../components/sidebar'
 import { BattleSidebarContent } from '../components/sidebar/BattleSidebarContent'
 import { RewardSidebarContent } from '../components/sidebar/RewardSidebarContent'
+import { GameSummary } from '../components/GameSummary'
 import { ContextStripProvider, useContextStrip } from '../contexts'
 import { CardPreviewContext } from '../components/card'
 import { GameDndProvider, useDndActions } from '../dnd'
@@ -24,6 +25,8 @@ function CardPreviewModal({
   upgradeTarget: CardType | null
   onClose: () => void
 }) {
+  const [isFlipped, setIsFlipped] = useState(false)
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -33,6 +36,13 @@ function CardPreviewModal({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
+
+  const getImageUrl = (c: CardType, flipped: boolean) => {
+    if (flipped && c.flip_image_url) {
+      return c.flip_image_url
+    }
+    return c.png_url ?? c.image_url
+  }
 
   return (
     <div
@@ -44,7 +54,7 @@ function CardPreviewModal({
         onClick={(e) => e.stopPropagation()}
       >
         <img
-          src={card.png_url ?? card.image_url}
+          src={getImageUrl(card, isFlipped)}
           alt={card.name}
           className="max-h-[80vh] rounded-lg shadow-2xl"
         />
@@ -52,7 +62,7 @@ function CardPreviewModal({
           <>
             <div className="text-white text-2xl font-bold">→</div>
             <img
-              src={upgradeTarget.png_url ?? upgradeTarget.image_url}
+              src={getImageUrl(upgradeTarget, isFlipped)}
               alt={upgradeTarget.name}
               className="max-h-[80vh] rounded-lg shadow-2xl"
             />
@@ -64,6 +74,14 @@ function CardPreviewModal({
         >
           ×
         </button>
+        {card.flip_image_url && (
+          <button
+            className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white rounded-full px-4 py-1 text-sm hover:bg-black/80"
+            onClick={() => setIsFlipped(!isFlipped)}
+          >
+            Flip
+          </button>
+        )}
       </div>
     </div>
   )
@@ -368,7 +386,6 @@ function GameContent() {
         <RewardSidebarContent
           lastBattleResult={self_player.last_battle_result}
           playerName={self_player.name}
-          players={gameState.players}
         />
       )
     }
@@ -382,7 +399,7 @@ function GameContent() {
         <header className="flex justify-between items-center px-4 py-2 bg-black/30">
           <div className="flex items-center gap-3">
             <div className="text-sm text-gray-300">
-              Stage {self_player.hand_size} • Round {self_player.round}
+              Stage {self_player.stage} • Round {self_player.round}
             </div>
             <span className={`phase-badge ${phaseBadgeClass}`}>{currentPhase}</span>
           </div>
@@ -435,59 +452,12 @@ function GameContent() {
                   </div>
                 </div>
               )}
-              {currentPhase === 'eliminated' && (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center max-w-md">
-                    <h2 className="text-2xl text-red-400 mb-4">Eliminated</h2>
-                    <p className="text-gray-300 mb-4">
-                      You are now <span className="text-amber-400 font-semibold">The Ghost</span>.
-                    </p>
-                    <div className="text-gray-400 text-sm space-y-2 text-left bg-black/30 p-4 rounded-lg">
-                      <p>Your deck is frozen exactly as it was when you died:</p>
-                      <ul className="list-disc list-inside ml-2 space-y-1">
-                        <li>Same hand, sideboard, and treasures</li>
-                        <li>No rewards or changes between battles</li>
-                        <li>You play the same deck repeatedly</li>
-                      </ul>
-                      <p className="mt-3">
-                        You will continue battling until there is an even number of players,
-                        or until another player is eliminated and becomes the new ghost.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {currentPhase === 'winner' && (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <h2 className="text-3xl text-amber-400 mb-4">Victory!</h2>
-                    <p className="text-gray-300 mb-6">
-                      Congratulations! You won the game!
-                    </p>
-                    <button
-                      onClick={() => navigate('/')}
-                      className="btn btn-primary"
-                    >
-                      Return Home
-                    </button>
-                  </div>
-                </div>
-              )}
-              {currentPhase === 'game_over' && (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <h2 className="text-3xl text-red-400 mb-4">Game Over</h2>
-                    <p className="text-gray-300 mb-6">
-                      You were eliminated from the game.
-                    </p>
-                    <button
-                      onClick={() => navigate('/')}
-                      className="btn btn-primary"
-                    >
-                      Return Home
-                    </button>
-                  </div>
-                </div>
+              {(currentPhase === 'eliminated' || currentPhase === 'winner' || currentPhase === 'game_over') && (
+                <GameSummary
+                  player={self_player}
+                  players={gameState.players}
+                  onReturnHome={() => navigate('/')}
+                />
               )}
             </main>
             <Sidebar

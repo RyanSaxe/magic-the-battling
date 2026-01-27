@@ -17,6 +17,7 @@ interface DraggableCardProps {
   counters?: Record<string, number>
   glow?: 'none' | 'gold' | 'green' | 'red'
   disabled?: boolean
+  isOpponent?: boolean
 }
 
 export function DraggableCard({
@@ -32,8 +33,9 @@ export function DraggableCard({
   counters,
   glow,
   disabled = false,
+  isOpponent = false,
 }: DraggableCardProps) {
-  const dragData: DragData = { card, fromZone: zone }
+  const dragData: DragData = { card, fromZone: zone, isOpponent }
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `${zone}-${card.id}`,

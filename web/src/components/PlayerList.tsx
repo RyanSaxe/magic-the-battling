@@ -48,22 +48,31 @@ function PairingProbability({ probability }: { probability: number | null }) {
 }
 
 export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
-  const { state, setRevealedPlayer } = useContextStrip()
+  const { state, setRevealedPlayerName } = useContextStrip()
 
   const handlePlayerClick = (player: PlayerView) => {
-    if (state.revealedPlayer?.name === player.name) {
-      setRevealedPlayer(null)
+    if (state.revealedPlayerName === player.name) {
+      setRevealedPlayerName(null)
     } else {
-      setRevealedPlayer(player)
+      setRevealedPlayerName(player.name)
     }
   }
+
+  const sortedPlayers = [...players].sort((a, b) => {
+    if (a.placement === 0 && b.placement === 0) {
+      return a.poison - b.poison
+    }
+    if (a.placement === 0) return -1
+    if (b.placement === 0) return 1
+    return a.placement - b.placement
+  })
 
   return (
     <div className="relative">
       <h3 className="text-white font-medium mb-3">Players</h3>
       <div className="space-y-2">
-        {players.map((player) => {
-          const isSelected = state.revealedPlayer?.name === player.name
+        {sortedPlayers.map((player) => {
+          const isSelected = state.revealedPlayerName === player.name
           return (
           <div
             key={player.name}
@@ -86,8 +95,11 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 {player.name === currentPlayerName && (
                   <span className="text-xs text-amber-400">(You)</span>
                 )}
-                {player.is_bot && !player.is_ghost && <BotIcon size="sm" />}
-                {player.is_most_recent_ghost && <GhostIcon size="sm" />}
+                {player.is_most_recent_ghost ? (
+                  <GhostIcon size="sm" />
+                ) : player.is_bot ? (
+                  <BotIcon size="sm" />
+                ) : null}
               </div>
               <ResultBadge result={player.last_result} />
             </div>
@@ -99,12 +111,12 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 <span className="flex items-center gap-1 text-amber-400" title="Treasures">
                   <MoneyBagIcon size="sm" /> {player.treasures}
                 </span>
-                {player.name !== currentPlayerName && !player.is_ghost && (
+                {player.name !== currentPlayerName && (!player.is_ghost || player.is_most_recent_ghost) && (
                   <PairingProbability probability={player.pairing_probability} />
                 )}
               </div>
               <span className="text-gray-500">
-                {player.hand_size}-{player.round} @ {player.phase}
+                {player.stage}-{player.round} @ {player.phase}
               </span>
             </div>
             {player.is_ghost && !player.is_most_recent_ghost && (

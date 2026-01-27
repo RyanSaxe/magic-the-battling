@@ -12,11 +12,18 @@ interface SidebarProps {
 
 export function Sidebar({ players, currentPlayer, phaseContent }: SidebarProps) {
   const { state } = useContextStrip()
-  const displayPlayer = state.revealedPlayer ?? currentPlayer
+  const revealedPlayer = state.revealedPlayerName
+    ? players.find(p => p.name === state.revealedPlayerName)
+    : null
+  const displayPlayer = revealedPlayer ?? currentPlayer
 
   const appliedUpgrades = displayPlayer.upgrades.filter(u => u.upgrade_target !== null)
-  const nonAppliedUpgrades = currentPlayer.upgrades.filter(u => u.upgrade_target === null)
+  const pendingUpgrades = currentPlayer.upgrades.filter(u => u.upgrade_target === null)
   const isViewingSelf = displayPlayer.name === currentPlayer.name
+
+  const allUpgrades = isViewingSelf
+    ? [...appliedUpgrades, ...pendingUpgrades]
+    : appliedUpgrades
 
   return (
     <aside className="w-64 bg-black/30 flex flex-col overflow-hidden">
@@ -32,13 +39,10 @@ export function Sidebar({ players, currentPlayer, phaseContent }: SidebarProps) 
               {displayPlayer.name === currentPlayer.name ? 'Your Cards' : `${displayPlayer.name}'s Cards`}
             </h3>
             <div className="flex flex-wrap gap-2">
-              <ZoneDisplay title="Upgrades" cards={appliedUpgrades} maxThumbnails={4} />
-              <ZoneDisplay title="Revealed" cards={displayPlayer.most_recently_revealed_cards} maxThumbnails={4} />
-              {isViewingSelf && nonAppliedUpgrades.length > 0 && (
-                <ZoneDisplay title="Pending Upgrades" cards={nonAppliedUpgrades} maxThumbnails={4} />
-              )}
+              <ZoneDisplay title="Upgrades" cards={allUpgrades} maxThumbnails={6} showUpgradeTargets />
+              <ZoneDisplay title="Revealed" cards={displayPlayer.most_recently_revealed_cards} maxThumbnails={6} />
             </div>
-            {appliedUpgrades.length === 0 && displayPlayer.most_recently_revealed_cards.length === 0 && (
+            {allUpgrades.length === 0 && displayPlayer.most_recently_revealed_cards.length === 0 && (
               <div className="text-gray-500 text-sm">No cards to display</div>
             )}
           </div>

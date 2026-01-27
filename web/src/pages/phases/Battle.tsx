@@ -30,6 +30,8 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   } | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [showSideboard, setShowSideboard] = useState(false)
+  const [showOpponentSideboard, setShowOpponentSideboard] = useState(false)
+  const [showOpponentFullSideboard, setShowOpponentFullSideboard] = useState(false)
 
   const { current_battle } = gameState
 
@@ -46,6 +48,11 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
 
   const { your_zones, opponent_zones, opponent_name, opponent_hand_count, opponent_hand_revealed } = current_battle
   const sideboard = gameState.self_player.sideboard
+
+  const opponentPlayer = gameState.players.find((p) => p.name === opponent_name)
+  const canManipulateOpponent = opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false
+  const opponentFullSideboard = opponentPlayer?.full_sideboard || []
+  const showFullSideboardButton = canManipulateOpponent && opponentFullSideboard.length > 0
 
   const tappedCardIds = new Set(your_zones.tapped_card_ids || [])
   const faceDownCardIds = new Set(your_zones.face_down_card_ids || [])
@@ -117,16 +124,49 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
         )}
 
         {/* Opponent's revealed sideboard (companions, wish targets - only for bots) */}
-        {opponent_zones.sideboard.length > 0 && (
+        {(opponent_zones.sideboard.length > 0 || showFullSideboardButton) && (
           <div className="px-4 py-2 bg-black/30 border-t border-gray-700/50">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-              {opponent_name}'s Revealed Sideboard ({opponent_zones.sideboard.length})
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-xs text-gray-400 uppercase tracking-wide">
+                {opponent_zones.sideboard.length > 0
+                  ? `${opponent_name}'s Revealed Sideboard (${opponent_zones.sideboard.length})`
+                  : `${opponent_name}'s Sideboard`}
+              </div>
+              <div className="flex gap-2">
+                {showFullSideboardButton && (
+                  opponent_zones.sideboard.length > 0 ? (
+                    <button
+                      onClick={() => setShowOpponentFullSideboard(true)}
+                      className="text-xs px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-white animate-pulse"
+                    >
+                      ⚠️ Sideboard in use - click to view
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setShowOpponentFullSideboard(true)}
+                      className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300"
+                    >
+                      Full Sideboard ({opponentFullSideboard.length})
+                    </button>
+                  )
+                )}
+                {opponent_zones.sideboard.length > 0 && (
+                  <button
+                    onClick={() => setShowOpponentSideboard(true)}
+                    className="text-xs bg-purple-600 hover:bg-purple-500 px-2 py-1 rounded"
+                  >
+                    Expand Revealed
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex justify-center gap-1 overflow-x-auto">
-              {opponent_zones.sideboard.map((card) => (
-                <Card key={card.id} card={card} size="sm" />
-              ))}
-            </div>
+            {opponent_zones.sideboard.length > 0 && (
+              <div className="flex justify-center gap-1 overflow-x-auto">
+                {opponent_zones.sideboard.map((card) => (
+                  <Card key={card.id} card={card} size="sm" />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -237,6 +277,62 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               <div className="flex flex-wrap gap-2">
                 {sideboard.map((card) => (
                   <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Opponent revealed sideboard modal */}
+        {showOpponentSideboard && (
+          <div
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+            onClick={() => setShowOpponentSideboard(false)}
+          >
+            <div
+              className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-white font-medium">{opponent_name}'s Revealed Sideboard ({opponent_zones.sideboard.length})</h3>
+                <button
+                  onClick={() => setShowOpponentSideboard(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {opponent_zones.sideboard.map((card) => (
+                  <Card key={card.id} card={card} size="sm" />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Opponent full sideboard modal */}
+        {showOpponentFullSideboard && (
+          <div
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+            onClick={() => setShowOpponentFullSideboard(false)}
+          >
+            <div
+              className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-white font-medium">{opponent_name}'s Full Sideboard ({opponentFullSideboard.length})</h3>
+                <button
+                  onClick={() => setShowOpponentFullSideboard(false)}
+                  className="text-gray-400 hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {opponentFullSideboard.map((card) => (
+                  <Card key={card.id} card={card} size="sm" />
                 ))}
               </div>
             </div>

@@ -1,8 +1,8 @@
-from mtb.models.game import FakePlayer, Game, Player
+from mtb.models.game import FakePlayer, Game, Player, StaticOpponent
 
 
 def get_live_players(game: Game) -> list[Player]:
-    return [p for p in game.players if not p.is_ghost]
+    return [p for p in game.players if p.phase != "eliminated"]
 
 
 def get_live_bots(game: Game) -> list[FakePlayer]:
@@ -14,11 +14,13 @@ def get_would_be_dead(game: Game) -> list[Player]:
 
 
 def eliminate_player(game: Game, player: Player, round_num: int) -> None:
-    player.is_ghost = True
-    player.time_of_death = round_num
+    ghost_opponent = StaticOpponent.from_player(player, hand_revealed=True)
     player.phase = "eliminated"
-    game.most_recent_ghost = player
+    game.most_recent_ghost = ghost_opponent
     game.most_recent_ghost_bot = None
+
+    remaining_alive = len(get_live_players(game)) + len(get_live_bots(game))
+    player.placement = remaining_alive + 1
 
 
 def would_be_dead_ready_for_elimination(game: Game) -> bool:
@@ -72,9 +74,12 @@ def process_eliminations(game: Game, round_num: int) -> list[Player]:
 def process_bot_eliminations(game: Game) -> list[FakePlayer]:
     """Eliminate bots at or above poison threshold."""
     eliminated: list[FakePlayer] = []
+    total_participants = len(game.players) + len(game.fake_players)
     for fake in game.fake_players:
         if not fake.is_eliminated and fake.poison >= game.config.poison_to_lose:
             fake.is_eliminated = True
+            remaining_after = len(get_live_players(game)) + len(get_live_bots(game)) - 1
+            fake.placement = total_participants - remaining_after
             eliminated.append(fake)
             game.most_recent_ghost = None
             game.most_recent_ghost_bot = fake

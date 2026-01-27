@@ -269,7 +269,8 @@ class GameManager:
         for player in game.players:
             if winner and player.name == winner.name:
                 player.phase = "winner"
-            elif not player.is_ghost:
+                player.placement = 1
+            elif player.phase != "eliminated":
                 player.phase = "game_over"
 
         if db is not None:
@@ -417,7 +418,7 @@ class GameManager:
         player_name = cast(str, history.player_name)
         history_id = cast(int, history.id)
 
-        bot_name = self._ensure_unique_name(f"{player_name} (Bot)", existing_names)
+        bot_name = self._ensure_unique_name(player_name, existing_names)
 
         for snapshot in history.snapshots:
             key = f"{snapshot.stage}_{snapshot.round}"
@@ -441,7 +442,7 @@ class GameManager:
             .first()
         )
 
-        stage = player.hand_size
+        stage = player.stage
 
         if not history:
             history = PlayerGameHistory(
@@ -463,6 +464,7 @@ class GameManager:
             basic_lands=player.chosen_basics.copy(),
             applied_upgrades=[u.model_copy() for u in player.upgrades if u.upgrade_target is not None],
             treasures=player.treasures,
+            sideboard=[c.model_copy() for c in player.sideboard],
             revealed_sideboard_cards=[],
         )
 
@@ -492,7 +494,7 @@ class GameManager:
         if not history:
             return
 
-        stage = player.hand_size
+        stage = player.stage
         snapshot = (
             db.query(BattleSnapshot)
             .filter(
@@ -677,8 +679,8 @@ class GameManager:
                 round=player.round,
                 stage=player.stage,
                 vanquishers=player.vanquishers,
-                is_ghost=player.is_ghost,
-                time_of_death=player.time_of_death,
+                is_ghost=(player.phase == "eliminated"),
+                time_of_death=None,
                 hand_count=len(player.hand),
                 sideboard_count=len(player.sideboard),
                 hand_size=player.hand_size,
@@ -699,7 +701,7 @@ class GameManager:
         )
 
     def _determine_game_phase(self, game: Game) -> str:
-        phases = {p.phase for p in game.players if not p.is_ghost}
+        phases = {p.phase for p in game.players if p.phase != "eliminated"}
         if len(phases) == 1:
             return phases.pop()
         if "battle" in phases:
@@ -741,6 +743,7 @@ class GameManager:
         probabilities: dict[str, float],
         most_recent_ghost_name: str | None = None,
     ) -> PlayerView:
+        is_eliminated = player.phase == "eliminated"
         return PlayerView(
             name=player.name,
             treasures=player.treasures,
@@ -749,9 +752,9 @@ class GameManager:
             round=player.round,
             stage=player.stage,
             vanquishers=player.vanquishers,
-            is_ghost=player.is_ghost,
+            is_ghost=is_eliminated,
             is_bot=False,
-            time_of_death=player.time_of_death,
+            time_of_death=None,
             hand_count=len(player.hand),
             sideboard_count=len(player.sideboard),
             hand_size=player.hand_size,
@@ -761,18 +764,11 @@ class GameManager:
             chosen_basics=player.chosen_basics,
             most_recently_revealed_cards=player.most_recently_revealed_cards,
             last_result=self._get_last_result(player),
-            pairing_probability=probabilities.get(player.name),
+            pairing_probability=probabilities.get(player.name, 0.0),
             is_most_recent_ghost=player.name == most_recent_ghost_name,
+            full_sideboard=player.sideboard if is_eliminated else [],
+            placement=player.placement,
         )
-
-    def _get_prior_snapshot_key(self, stage: int, round_num: int, num_rounds: int = 3) -> str | None:
-        """Get the key for the previous stage-round pair."""
-        if round_num > 1:
-            return f"{stage}_{round_num - 1}"
-        elif stage > 3:
-            return f"{stage - 1}_{num_rounds}"
-        else:
-            return None
 
     def _make_fake_player_view(
         self,
@@ -781,10 +777,19 @@ class GameManager:
         probabilities: dict[str, float],
         most_recent_ghost_bot_name: str | None = None,
     ) -> PlayerView:
-        snapshot = fake.get_opponent_for_round(viewer.hand_size, viewer.round)
-        prior_key = self._get_prior_snapshot_key(viewer.hand_size, viewer.round)
-        prior_snapshot = fake.snapshots.get(prior_key) if prior_key else None
-        revealed_cards = prior_snapshot.hand if prior_snapshot else []
+        snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
+
+        if viewer.round > 1:
+            prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round - 1)
+        elif viewer.stage > 3:
+            prior_snapshot = fake.get_opponent_for_round(viewer.stage - 1, 3)
+        else:
+            prior_snapshot = None
+
+        prior_hand = prior_snapshot.hand if prior_snapshot else []
+        prior_revealed_sb = prior_snapshot.revealed_sideboard_cards if prior_snapshot else []
+        revealed_cards = prior_hand + prior_revealed_sb
+        prior_upgrades = prior_snapshot.upgrades if prior_snapshot else []
 
         last_result = self._get_fake_player_last_result(fake)
 
@@ -804,13 +809,15 @@ class GameManager:
                 sideboard_count=len(snapshot.sideboard),
                 hand_size=len(snapshot.hand),
                 is_stage_increasing=False,
-                upgrades=snapshot.upgrades,
+                upgrades=prior_upgrades,
                 vanguard=snapshot.vanguard,
                 chosen_basics=snapshot.chosen_basics,
                 most_recently_revealed_cards=revealed_cards,
                 last_result=last_result,
-                pairing_probability=probabilities.get(fake.name),
+                pairing_probability=probabilities.get(fake.name, 0.0),
                 is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
+                full_sideboard=snapshot.sideboard,
+                placement=fake.placement,
             )
         return PlayerView(
             name=fake.name,
@@ -832,8 +839,10 @@ class GameManager:
             chosen_basics=[],
             most_recently_revealed_cards=[],
             last_result=last_result,
-            pairing_probability=probabilities.get(fake.name),
+            pairing_probability=probabilities.get(fake.name, 0.0),
             is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
+            full_sideboard=[],
+            placement=fake.placement,
         )
 
     def _get_opponent_poison(self, opponent: StaticOpponent | Player, game: Game) -> int:
@@ -978,7 +987,7 @@ class GameManager:
         if not live_players:
             return
 
-        stage = live_players[0].hand_size
+        stage = live_players[0].stage
         round_num = live_players[0].round
 
         for player in live_players:
@@ -1023,7 +1032,10 @@ class GameManager:
                         return False
                     player.sideboard.remove(card)
                     zones = battle.get_zones_for_player(b, player)
+                    zones.sideboard.remove(card)
                     zones.hand.append(card)
+                    if card.id not in zones.revealed_sideboard_card_ids:
+                        zones.revealed_sideboard_card_ids.append(card.id)
                     return True
 
                 zones = battle.get_zones_for_player(b, player)
@@ -1083,7 +1095,7 @@ class GameManager:
 
         if db is not None and game_id is not None:
             self._update_snapshot_revealed_sideboard(db, game_id, b.player, player_zones)
-            if not isinstance(b.opponent, StaticOpponent) and not b.opponent.is_ghost:
+            if not isinstance(b.opponent, StaticOpponent):
                 self._update_snapshot_revealed_sideboard(db, game_id, b.opponent, opponent_zones)
 
         if isinstance(b.opponent, StaticOpponent):
@@ -1092,6 +1104,11 @@ class GameManager:
             reward.start(game, b.player, cast(Player, b.opponent), is_draw=True)
         else:
             reward.start(game, result.winner, result.loser)
+
+        process_bot_eliminations(game)
+        winner, is_game_over = check_game_over(game)
+        if is_game_over and winner is not None:
+            self.complete_game(game_id or "", winner, db)
 
     def handle_reward_pick_upgrade(self, game: Game, player: Player, upgrade_id: str) -> bool:
         upgrade = next((u for u in game.available_upgrades if u.id == upgrade_id), None)

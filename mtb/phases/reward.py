@@ -78,13 +78,11 @@ def start(game: Game, winner: Player | None, loser: Player | None, is_draw: bool
 
 def _start_draw(game: Game, player1: Player, player2: Player) -> None:
     for player in (player1, player2):
-        if not player.is_ghost and player.phase != "reward":
+        if player.phase != "reward":
             raise ValueError(f"{player.name} is not in reward phase")
 
     other = {player1.name: player2, player2.name: player1}
     for player in (player1, player2):
-        if player.is_ghost:
-            continue
         opponent = other[player.name]
         poison = calculate_damage(opponent)
         player.poison += poison
@@ -179,17 +177,14 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
 
 
 def _start_with_result(game: Game, winner: Player, loser: Player) -> None:
-    if not winner.is_ghost and winner.phase != "reward":
+    if winner.phase != "reward":
         raise ValueError("Winner is not in reward phase")
-    if not loser.is_ghost and loser.phase != "reward":
+    if loser.phase != "reward":
         raise ValueError("Loser is not in reward phase")
 
     poison_dealt = apply_poison(winner, loser)
 
     for player in (winner, loser):
-        if player.is_ghost:
-            continue
-
         is_winner = player.name == winner.name
         opponent = loser if is_winner else winner
 

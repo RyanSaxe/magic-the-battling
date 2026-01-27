@@ -1,19 +1,17 @@
-import type { LastBattleResult, PlayerView } from '../../types'
-import { PlayerList } from '../PlayerList'
+import type { LastBattleResult } from '../../types'
 
 interface RewardSidebarContentProps {
   lastBattleResult: LastBattleResult
   playerName: string
-  players: PlayerView[]
 }
 
-export function RewardSidebarContent({ lastBattleResult, playerName, players }: RewardSidebarContentProps) {
+export function RewardSidebarContent({ lastBattleResult, playerName }: RewardSidebarContentProps) {
   const isWinner = lastBattleResult.winner_name === playerName
 
   return (
     <div className="flex flex-col h-full">
       {/* Battle result */}
-      <div className="p-4 border-b border-gray-700 text-center">
+      <div className="p-4 text-center">
         <div className="text-gray-400 text-xs uppercase tracking-wide mb-1">
           Battle vs {lastBattleResult.opponent_name}
         </div>
@@ -38,11 +36,6 @@ export function RewardSidebarContent({ lastBattleResult, playerName, players }: 
             )}
           </div>
         )}
-      </div>
-
-      {/* Player list */}
-      <div className="p-4 overflow-auto flex-1">
-        <PlayerList players={players} currentPlayerName={playerName} />
       </div>
     </div>
   )
