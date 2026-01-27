@@ -225,7 +225,13 @@ def start_rewards_draw(game: Game, player1: Player, player2: Player, p1_poison: 
 
 
 def start_rewards_single(
-    game: Game, player: Player, opponent_name: str, won: bool, poison_dealt: int, poison_taken: int
+    game: Game,
+    player: Player,
+    opponent_name: str,
+    won: bool,
+    poison_dealt: int,
+    poison_taken: int,
+    is_draw: bool = False,
 ) -> None:
     """Start reward phase for a single player (when other player is at lethal)."""
     if player.phase != "reward":
@@ -239,10 +245,15 @@ def start_rewards_single(
     else:
         card_gained = award_random_card(game, player)
 
+    if is_draw:
+        winner_name = None
+    else:
+        winner_name = player.name if won else opponent_name
+
     player.last_battle_result = LastBattleResult(
         opponent_name=opponent_name,
-        winner_name=player.name if won else opponent_name,
-        is_draw=False,
+        winner_name=winner_name,
+        is_draw=is_draw,
         poison_dealt=poison_dealt,
         poison_taken=poison_taken,
         treasures_gained=1,

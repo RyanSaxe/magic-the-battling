@@ -661,3 +661,134 @@ class TestEliminationFlow:
         assert len(game.active_battles) == 1
         battle_players = {game.active_battles[0].player.name, game.active_battles[0].opponent.name}
         assert battle_players == {"Alice", "Bob"}
+
+
+class TestFinaleVsBot:
+    """Tests for finale scenarios against bots."""
+
+    def test_finale_vs_bot_player_wins_bot_not_eliminated(self):
+        """In finale vs bot, if player wins but bot isn't at lethal, game continues."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+
+        bot = FakePlayer(name="BotPlayer", player_history_id=1, poison=5)
+        game.fake_players.append(bot)
+
+        snapshot = BattleSnapshotData(
+            hand=[Card(name="BotCard", image_url="bot", id="bot", type_line="Creature")],
+            vanguard=None,
+            basic_lands=["Forest", "Swamp", "Mountain"],
+            applied_upgrades=[],
+            treasures=1,
+        )
+        static_opp = StaticOpponent.from_snapshot(snapshot, "BotPlayer", 1)
+
+        setup_battle_ready(alice)
+        b = battle.start(game, alice, static_opp)
+        battle.submit_result(b, alice, alice.name)
+        result = battle.end(game, b)
+        assert result.winner is alice
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+
+        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, "test", None)
+
+        # Bot took damage but not eliminated (started at 5, took ~1-2 damage)
+        assert bot.poison > 5
+        assert bot.poison < 10
+        assert not bot.is_eliminated
+        # Game should NOT be over - player goes to reward phase
+        assert end_result is None
+        assert alice.phase == "reward"
+
+    def test_finale_vs_bot_mutual_lethal_triggers_sudden_death(self):
+        """In finale vs bot, if both at lethal (draw), sudden death triggers."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        alice.poison = 9  # Will go to 10+ with bot damage
+
+        bot = FakePlayer(name="BotPlayer", player_history_id=1, poison=9)
+        game.fake_players.append(bot)
+
+        snapshot = BattleSnapshotData(
+            hand=[Card(name="BotCard", image_url="bot", id="bot", type_line="Creature")],
+            vanguard=None,
+            basic_lands=["Forest", "Swamp", "Mountain"],
+            applied_upgrades=[],
+            treasures=1,
+        )
+        static_opp = StaticOpponent.from_snapshot(snapshot, "BotPlayer", 1)
+        static_opp.upgrades = [Card(name="Upgrade", image_url="u", id="u", type_line="Upgrade")]
+
+        setup_battle_ready(alice)
+        b = battle.start(game, alice, static_opp)
+        # Report a draw
+        battle.submit_result(b, alice, "draw")
+        result = battle.end(game, b)
+        assert result.is_draw
+
+        # Manually set poison to simulate draw damage for both at lethal
+        alice.poison = 10
+        bot.poison = 10
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+
+        # Simulate poison already applied, recheck with both at lethal
+        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, "test", None)
+
+        # Should trigger sudden death
+        assert end_result == "sudden_death"
+        assert alice.phase == "battle"
+        assert alice.poison == 9  # Reset for sudden death
+        assert bot.poison == 9  # Reset for sudden death
+        assert len(game.active_battles) == 1
+
+
+class TestDrawWithOneSurvivor:
+    """Tests for draw battles where one player survives and one is eliminated."""
+
+    def test_draw_survivor_sees_draw_in_last_battle_result(self):
+        """When draw results in one player at lethal, survivor's result shows is_draw=True."""
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, charlie = game.players
+
+        # Alice has high poison, will go to lethal in draw
+        alice.poison = 8
+        bob.poison = 2
+        charlie.poison = 0  # Not involved in this battle
+
+        # All players need to be in battle phase for pairing to work
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+        setup_battle_ready(charlie)
+
+        b = battle.start(game, alice, bob)
+        # Both players report a draw
+        battle.submit_result(b, alice, "draw")
+        battle.submit_result(b, bob, "draw")
+        result = battle.end(game, b)
+        assert result.is_draw
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+
+        # After a draw, both took poison
+        # Alice: 8 + ~1 (from bob's damage) = 9 or more depending on damage calc
+        # Let's manually set to test the scenario
+        alice.poison = 10  # At lethal
+        bob.poison = 5  # Not at lethal
+
+        manager._handle_post_battle_pvp(game, alice, bob, result, "test", None)
+
+        # Alice goes to awaiting_elimination first, then gets eliminated since 2 survivors remain
+        # (bob + charlie means no sudden death needed)
+        assert alice.phase == "eliminated"
+        assert bob.phase == "reward"
+
+        # Bob's last_battle_result should show it was a draw
+        assert bob.last_battle_result is not None
+        assert bob.last_battle_result.is_draw is True
+        assert bob.last_battle_result.winner_name is None
+        assert bob.last_battle_result.opponent_name == alice.name
