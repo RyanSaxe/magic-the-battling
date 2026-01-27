@@ -1,5 +1,7 @@
 import type { LastBattleResult, PlayerView } from '../../types'
 import { PlayerList } from '../PlayerList'
+import { ZoneDisplay } from './ZoneDisplay'
+import { useContextStrip } from '../../contexts'
 
 interface RewardSidebarContentProps {
   lastBattleResult: LastBattleResult
@@ -9,6 +11,21 @@ interface RewardSidebarContentProps {
 
 export function RewardSidebarContent({ lastBattleResult, playerName, players }: RewardSidebarContentProps) {
   const isWinner = lastBattleResult.winner_name === playerName
+  const { state } = useContextStrip()
+
+  const currentPlayer = players.find(p => p.name === playerName)
+  const revealedPlayer = state.revealedPlayerName
+    ? players.find(p => p.name === state.revealedPlayerName)
+    : null
+  const displayPlayer = revealedPlayer ?? currentPlayer
+
+  const appliedUpgrades = displayPlayer?.upgrades.filter(u => u.upgrade_target !== null) ?? []
+  const pendingUpgrades = currentPlayer?.upgrades.filter(u => u.upgrade_target === null) ?? []
+  const isViewingSelf = displayPlayer?.name === currentPlayer?.name
+
+  const allUpgrades = isViewingSelf
+    ? [...appliedUpgrades, ...pendingUpgrades]
+    : appliedUpgrades
 
   return (
     <div className="flex flex-col h-full">
@@ -41,9 +58,25 @@ export function RewardSidebarContent({ lastBattleResult, playerName, players }: 
       </div>
 
       {/* Player list */}
-      <div className="p-4 overflow-auto flex-1">
+      <div className="p-4 border-b border-gray-700">
         <PlayerList players={players} currentPlayerName={playerName} />
       </div>
+
+      {/* Upgrades and revealed cards */}
+      {displayPlayer && (
+        <div className="p-4 overflow-auto flex-1">
+          <h3 className="text-white font-medium mb-3">
+            {isViewingSelf ? 'Your Cards' : `${displayPlayer.name}'s Cards`}
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            <ZoneDisplay title="Upgrades" cards={allUpgrades} maxThumbnails={6} showUpgradeTargets />
+            <ZoneDisplay title="Revealed" cards={displayPlayer.most_recently_revealed_cards} maxThumbnails={6} />
+          </div>
+          {allUpgrades.length === 0 && displayPlayer.most_recently_revealed_cards.length === 0 && (
+            <div className="text-gray-500 text-sm">No cards to display</div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

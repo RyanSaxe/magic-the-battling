@@ -1027,6 +1027,8 @@ class GameManager:
                     player.sideboard.remove(card)
                     zones = battle.get_zones_for_player(b, player)
                     zones.hand.append(card)
+                    if card.id not in zones.revealed_sideboard_card_ids:
+                        zones.revealed_sideboard_card_ids.append(card.id)
                     return True
 
                 zones = battle.get_zones_for_player(b, player)

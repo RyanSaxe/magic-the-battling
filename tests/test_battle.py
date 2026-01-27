@@ -3,6 +3,7 @@ from conftest import setup_battle_ready
 
 from mtb.models.game import FakePlayer, StaticOpponent, create_game
 from mtb.phases import battle
+from server.services.game_manager import GameManager
 
 
 def test_can_start_pairing():
@@ -268,8 +269,8 @@ def test_bounced_card_still_revealed(card_factory):
     assert creature in alice.most_recently_revealed_cards
 
 
-def test_sideboard_fetch_reveals_card(card_factory):
-    """A card fetched from sideboard should be revealed even if it stays in hand."""
+def test_sideboard_fetch_to_hand_not_revealed(card_factory):
+    """A card fetched from sideboard to hand should NOT appear in most_recently_revealed_cards."""
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
@@ -280,6 +281,26 @@ def test_sideboard_fetch_reveals_card(card_factory):
 
     b = battle.start(game, alice, bob)
     battle.move_zone(b, alice, wish_target, "sideboard", "hand")
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
+
+    battle.end(game, b)
+
+    assert wish_target not in alice.most_recently_revealed_cards
+
+
+def test_sideboard_fetch_to_battlefield_revealed(card_factory):
+    """A card fetched from sideboard to a revealed zone should appear in most_recently_revealed_cards."""
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    wish_target = card_factory("WishTarget", "Creature")
+    alice.sideboard = [wish_target]
+
+    b = battle.start(game, alice, bob)
+    battle.move_zone(b, alice, wish_target, "sideboard", "battlefield")
     battle.submit_result(b, alice, "Alice")
     battle.submit_result(b, bob, "Alice")
 
@@ -302,6 +323,25 @@ def test_sideboard_fetch_tracked_in_zones(card_factory):
     battle.move_zone(b, alice, wish_target, "sideboard", "hand")
 
     assert wish_target.id in b.player_zones.revealed_sideboard_card_ids
+
+
+def test_sideboard_fetch_via_game_manager_tracked(card_factory):
+    """Sideboard->hand moves via GameManager should also be tracked in revealed_sideboard_card_ids."""
+
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    companion = card_factory("Companion", "Creature")
+    alice.sideboard = [companion]
+
+    b = battle.start(game, alice, bob)
+
+    manager = GameManager()
+    manager.handle_battle_move(game, alice, companion.id, "sideboard", "hand")
+
+    assert companion.id in b.player_zones.revealed_sideboard_card_ids
 
 
 def test_end_battle_not_agreed_raises():

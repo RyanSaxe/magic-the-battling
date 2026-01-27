@@ -48,13 +48,13 @@ function PairingProbability({ probability }: { probability: number | null }) {
 }
 
 export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
-  const { state, setRevealedPlayer } = useContextStrip()
+  const { state, setRevealedPlayerName } = useContextStrip()
 
   const handlePlayerClick = (player: PlayerView) => {
-    if (state.revealedPlayer?.name === player.name) {
-      setRevealedPlayer(null)
+    if (state.revealedPlayerName === player.name) {
+      setRevealedPlayerName(null)
     } else {
-      setRevealedPlayer(player)
+      setRevealedPlayerName(player.name)
     }
   }
 
@@ -63,7 +63,7 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
       <h3 className="text-white font-medium mb-3">Players</h3>
       <div className="space-y-2">
         {players.map((player) => {
-          const isSelected = state.revealedPlayer?.name === player.name
+          const isSelected = state.revealedPlayerName === player.name
           return (
           <div
             key={player.name}

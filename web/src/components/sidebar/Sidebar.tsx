@@ -12,7 +12,10 @@ interface SidebarProps {
 
 export function Sidebar({ players, currentPlayer, phaseContent }: SidebarProps) {
   const { state } = useContextStrip()
-  const displayPlayer = state.revealedPlayer ?? currentPlayer
+  const revealedPlayer = state.revealedPlayerName
+    ? players.find(p => p.name === state.revealedPlayerName)
+    : null
+  const displayPlayer = revealedPlayer ?? currentPlayer
 
   const appliedUpgrades = displayPlayer.upgrades.filter(u => u.upgrade_target !== null)
   const pendingUpgrades = currentPlayer.upgrades.filter(u => u.upgrade_target === null)
