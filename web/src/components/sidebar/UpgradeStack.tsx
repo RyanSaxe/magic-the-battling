@@ -3,7 +3,13 @@ import { Card } from '../card'
 
 interface UpgradeStackProps {
   upgrade: CardType
-  size?: 'xs' | 'sm'
+  size?: 'xs' | 'sm' | 'md'
+}
+
+const DIMENSIONS = {
+  xs: { width: 50, height: 70, offset: 16 },
+  sm: { width: 80, height: 112, offset: 24 },
+  md: { width: 120, height: 168, offset: 32 },
 }
 
 export function UpgradeStack({ upgrade, size = 'xs' }: UpgradeStackProps) {
@@ -13,15 +19,14 @@ export function UpgradeStack({ upgrade, size = 'xs' }: UpgradeStackProps) {
     return <Card card={upgrade} size={size} />
   }
 
-  const dimensions = size === 'xs' ? { width: 50, height: 70 } : { width: 80, height: 112 }
-  const offset = size === 'xs' ? 16 : 24
+  const { width, height, offset } = DIMENSIONS[size]
 
   return (
     <div
       className="relative"
       style={{
-        width: dimensions.width + offset,
-        height: dimensions.height + offset,
+        width: width + offset,
+        height: height + offset,
       }}
     >
       <div className="absolute top-0 left-0">

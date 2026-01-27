@@ -382,7 +382,7 @@ def test_end_battle_not_agreed_raises():
         battle.end(game, b)
 
 
-def test_end_battle_returns_cards_to_sideboard(card_factory):
+def test_end_battle_preserves_hand_and_sideboard(card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
@@ -398,9 +398,10 @@ def test_end_battle_returns_cards_to_sideboard(card_factory):
     battle.submit_result(b, bob, "Alice")
     battle.end(game, b)
 
-    assert alice.hand == []
-    assert hand_card in alice.sideboard
+    assert hand_card in alice.hand
     assert sideboard_card in alice.sideboard
+    assert hand_card not in alice.sideboard
+    assert sideboard_card not in alice.hand
 
 
 def test_submit_result_accepts_draw():

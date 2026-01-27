@@ -58,11 +58,20 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
     }
   }
 
+  const sortedPlayers = [...players].sort((a, b) => {
+    if (a.placement === 0 && b.placement === 0) {
+      return a.poison - b.poison
+    }
+    if (a.placement === 0) return -1
+    if (b.placement === 0) return 1
+    return a.placement - b.placement
+  })
+
   return (
     <div className="relative">
       <h3 className="text-white font-medium mb-3">Players</h3>
       <div className="space-y-2">
-        {players.map((player) => {
+        {sortedPlayers.map((player) => {
           const isSelected = state.revealedPlayerName === player.name
           return (
           <div

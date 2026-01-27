@@ -58,6 +58,7 @@ def _create_zones_for_player(player: Player) -> Zones:
         upgrades=player.upgrades.copy(),
         treasures=player.treasures,
         submitted_cards=submitted,
+        original_hand_ids=[c.id for c in player.hand],
     )
 
 
@@ -305,6 +306,7 @@ def _create_zones_for_static_opponent(opponent: StaticOpponent) -> Zones:
         upgrades=opponent.upgrades.copy(),
         treasures=opponent.treasures,
         submitted_cards=submitted,
+        original_hand_ids=[c.id for c in opponent.hand],
     )
 
 
@@ -469,8 +471,9 @@ def get_result(battle: Battle) -> BattleResult | None:
 
 
 def _sync_zones_to_player(zones: Zones, player: Player, max_treasures: int) -> None:
-    player.hand = []
-    player.sideboard = list(zones.submitted_cards)
+    original_hand_ids = set(zones.original_hand_ids)
+    player.hand = [c for c in zones.submitted_cards if c.id in original_hand_ids]
+    player.sideboard = [c for c in zones.submitted_cards if c.id not in original_hand_ids]
     player.upgrades = list(zones.upgrades)
     treasure_count = sum(1 for c in zones.battlefield if "Treasure" in c.type_line)
     player.treasures = min(treasure_count, max_treasures)

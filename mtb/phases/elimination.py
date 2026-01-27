@@ -19,6 +19,9 @@ def eliminate_player(game: Game, player: Player, round_num: int) -> None:
     game.most_recent_ghost = ghost_opponent
     game.most_recent_ghost_bot = None
 
+    remaining_alive = len(get_live_players(game)) + len(get_live_bots(game))
+    player.placement = remaining_alive + 1
+
 
 def would_be_dead_ready_for_elimination(game: Game) -> bool:
     """Check if all would-be-dead players have finished reward (not in battle/reward phase)."""
@@ -71,9 +74,12 @@ def process_eliminations(game: Game, round_num: int) -> list[Player]:
 def process_bot_eliminations(game: Game) -> list[FakePlayer]:
     """Eliminate bots at or above poison threshold."""
     eliminated: list[FakePlayer] = []
+    total_participants = len(game.players) + len(game.fake_players)
     for fake in game.fake_players:
         if not fake.is_eliminated and fake.poison >= game.config.poison_to_lose:
             fake.is_eliminated = True
+            remaining_after = len(get_live_players(game)) + len(get_live_bots(game)) - 1
+            fake.placement = total_participants - remaining_after
             eliminated.append(fake)
             game.most_recent_ghost = None
             game.most_recent_ghost_bot = fake

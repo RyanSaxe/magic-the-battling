@@ -269,6 +269,7 @@ class GameManager:
         for player in game.players:
             if winner and player.name == winner.name:
                 player.phase = "winner"
+                player.placement = 1
             elif player.phase != "eliminated":
                 player.phase = "game_over"
 
@@ -766,6 +767,7 @@ class GameManager:
             pairing_probability=probabilities.get(player.name, 0.0),
             is_most_recent_ghost=player.name == most_recent_ghost_name,
             full_sideboard=player.sideboard if is_eliminated else [],
+            placement=player.placement,
         )
 
     def _make_fake_player_view(
@@ -815,6 +817,7 @@ class GameManager:
                 pairing_probability=probabilities.get(fake.name, 0.0),
                 is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
                 full_sideboard=snapshot.sideboard,
+                placement=fake.placement,
             )
         return PlayerView(
             name=fake.name,
@@ -839,6 +842,7 @@ class GameManager:
             pairing_probability=probabilities.get(fake.name, 0.0),
             is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
             full_sideboard=[],
+            placement=fake.placement,
         )
 
     def _get_opponent_poison(self, opponent: StaticOpponent | Player, game: Game) -> int:

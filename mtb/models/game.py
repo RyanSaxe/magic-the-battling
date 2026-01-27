@@ -79,6 +79,7 @@ class FakePlayer(BaseModel):
     poison: int = 0
     round: int = 1
     stage: int = 3
+    placement: int = 0
     last_battle_result: "LastBattleResult | None" = None
 
     def get_opponent_for_round(self, stage: int, round_num: int) -> StaticOpponent | None:
@@ -135,6 +136,7 @@ class Player(BaseModel):
     vanquishers: int = 0
     poison: int = 0
     treasures: int = 0
+    placement: int = 0
 
     phase: Phase = "build"
     round: int = 1
@@ -244,6 +246,7 @@ class Zones(BaseModel):
     library: list[Card] = Field(default_factory=list)
     treasures: int = 0
     submitted_cards: list[Card] = Field(default_factory=list)
+    original_hand_ids: list[str] = Field(default_factory=list)
 
     tapped_card_ids: list[str] = Field(default_factory=list)
     flipped_card_ids: list[str] = Field(default_factory=list)
