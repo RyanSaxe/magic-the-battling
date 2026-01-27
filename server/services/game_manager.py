@@ -1092,6 +1092,11 @@ class GameManager:
         else:
             reward.start(game, result.winner, result.loser)
 
+        process_bot_eliminations(game)
+        winner, is_game_over = check_game_over(game)
+        if is_game_over and winner is not None:
+            self.complete_game(game_id or "", winner, db)
+
     def handle_reward_pick_upgrade(self, game: Game, player: Player, upgrade_id: str) -> bool:
         upgrade = next((u for u in game.available_upgrades if u.id == upgrade_id), None)
         if not upgrade:
