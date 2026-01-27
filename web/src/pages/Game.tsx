@@ -76,7 +76,7 @@ function CardPreviewModal({
         </button>
         {card.flip_image_url && (
           <button
-            className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white rounded-full px-4 py-1 text-sm hover:bg-black/80"
+            className="absolute top-2 right-2 bg-black/60 text-white rounded px-3 py-1 text-sm hover:bg-black/80 transition-colors"
             onClick={() => setIsFlipped(!isFlipped)}
           >
             Flip
