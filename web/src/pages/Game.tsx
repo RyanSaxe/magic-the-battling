@@ -454,6 +454,12 @@ function GameContent() {
                         or until another player is eliminated and becomes the new ghost.
                       </p>
                     </div>
+                    <button
+                      onClick={() => navigate('/')}
+                      className="btn btn-primary mt-6"
+                    >
+                      Return Home
+                    </button>
                   </div>
                 </div>
               )}
