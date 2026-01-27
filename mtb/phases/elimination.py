@@ -1,8 +1,8 @@
-from mtb.models.game import FakePlayer, Game, Player
+from mtb.models.game import FakePlayer, Game, Player, StaticOpponent
 
 
 def get_live_players(game: Game) -> list[Player]:
-    return [p for p in game.players if not p.is_ghost]
+    return [p for p in game.players if p.phase != "eliminated"]
 
 
 def get_live_bots(game: Game) -> list[FakePlayer]:
@@ -14,10 +14,9 @@ def get_would_be_dead(game: Game) -> list[Player]:
 
 
 def eliminate_player(game: Game, player: Player, round_num: int) -> None:
-    player.is_ghost = True
-    player.time_of_death = round_num
+    ghost_opponent = StaticOpponent.from_player(player, hand_revealed=True)
     player.phase = "eliminated"
-    game.most_recent_ghost = player
+    game.most_recent_ghost = ghost_opponent
     game.most_recent_ghost_bot = None
 
 

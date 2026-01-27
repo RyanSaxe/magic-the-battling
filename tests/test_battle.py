@@ -456,26 +456,26 @@ class TestUnifiedPairingCandidates:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         setup_battle_ready(alice)
-        bob.is_ghost = True
         bob.phase = "eliminated"
-        game.most_recent_ghost = bob
+        ghost = StaticOpponent.from_player(bob, hand_revealed=True)
+        game.most_recent_ghost = ghost
 
         candidates = battle.get_all_pairing_candidates(game, alice)
 
         assert len(candidates) == 1
-        assert candidates[0] is bob
+        assert candidates[0] is ghost
 
     def test_get_all_pairing_candidates_excludes_self_as_ghost(self):
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
-        alice.is_ghost = True
         alice.phase = "eliminated"
-        game.most_recent_ghost = alice
+        ghost = StaticOpponent.from_player(alice, hand_revealed=True)
+        game.most_recent_ghost = ghost
         setup_battle_ready(bob)
 
         candidates = battle.get_all_pairing_candidates(game, alice)
 
-        assert alice not in candidates
+        assert ghost not in candidates
 
     def test_fake_player_snapshot_uses_stage_for_lookup(self, card_factory):
         """Snapshots are keyed by stage and round, not hand_size.

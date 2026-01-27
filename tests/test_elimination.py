@@ -22,16 +22,14 @@ class TestGhostMechanics:
 
         assert len(eliminated) == 1
         assert alice in eliminated
-        assert alice.is_ghost is True
-        assert alice.time_of_death == 5
         assert alice.phase == "eliminated"
-        assert game.most_recent_ghost is alice
+        assert game.most_recent_ghost is not None
+        assert game.most_recent_ghost.name == alice.name
 
     def test_ghost_excluded_from_normal_pairing(self):
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
-        alice.is_ghost = True
         alice.phase = "eliminated"
 
         setup_battle_ready(bob)
@@ -46,7 +44,6 @@ class TestGhostMechanics:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
-        alice.is_ghost = True
         alice.phase = "eliminated"
         bob.phase = "battle"
         charlie.phase = "battle"
@@ -57,9 +54,9 @@ class TestGhostMechanics:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
-        alice.is_ghost = True
         alice.phase = "eliminated"
-        game.most_recent_ghost = alice
+        ghost = StaticOpponent.from_player(alice, hand_revealed=True)
+        game.most_recent_ghost = ghost
 
         setup_battle_ready(bob)
         setup_battle_ready(charlie)
@@ -79,9 +76,9 @@ class TestGhostMechanics:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
-        alice.is_ghost = True
         alice.phase = "eliminated"
-        game.most_recent_ghost = alice
+        ghost = StaticOpponent.from_player(alice, hand_revealed=True)
+        game.most_recent_ghost = ghost
 
         setup_battle_ready(bob)
         setup_battle_ready(charlie)
@@ -95,16 +92,16 @@ class TestGhostMechanics:
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
 
-        bob.is_ghost = True
         bob.phase = "eliminated"
-        game.most_recent_ghost = bob
+        ghost = StaticOpponent.from_player(bob, hand_revealed=True)
+        ghost.chosen_basics = ["Plains", "Island", "Mountain"]
+        game.most_recent_ghost = ghost
 
         setup_battle_ready(alice)
-        bob.chosen_basics = ["Plains", "Island", "Mountain"]
 
-        b = battle.start(game, alice, bob)
+        b = battle.start(game, alice, ghost)
         assert b.player is alice
-        assert b.opponent is bob
+        assert b.opponent is ghost
 
 
 class TestSuddenDeath:
@@ -124,8 +121,8 @@ class TestSuddenDeath:
         assert len(eliminated) == 2
         assert alice in eliminated
         assert bob in eliminated
-        assert charlie.is_ghost is False
-        assert dave.is_ghost is False
+        assert charlie.phase != "eliminated"
+        assert dave.phase != "eliminated"
 
     def test_sudden_death_triggers_when_multiple_deaths_would_skip_finale(self):
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
@@ -167,7 +164,7 @@ class TestSuddenDeath:
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
 
-        alice.is_ghost = True
+        alice.phase = "eliminated"
 
         live = elimination.get_live_players(game)
 
@@ -229,7 +226,7 @@ class TestFinale:
 
         assert len(eliminated) == 1
         assert alice in eliminated
-        assert bob.is_ghost is False
+        assert bob.phase != "eliminated"
 
         live = elimination.get_live_players(game)
         assert len(live) == 1
@@ -250,10 +247,10 @@ class TestFinale:
 
         elimination.eliminate_player(game, alice, round_num=7)
 
-        assert alice.is_ghost is True
-        assert alice.time_of_death == 7
         assert alice.phase == "eliminated"
-        assert game.most_recent_ghost is alice
+        assert game.most_recent_ghost is not None
+        assert game.most_recent_ghost.name == alice.name
+        assert isinstance(game.most_recent_ghost, StaticOpponent)
 
 
 class TestBotBattleFlow:
@@ -442,7 +439,7 @@ class TestBotGameOver:
         bot = FakePlayer(name="Bot", player_history_id=1, snapshots={})
         game.fake_players.append(bot)
 
-        alice.is_ghost = True
+        alice.phase = "eliminated"
         alice.poison = 10
 
         winner, is_game_over = elimination.check_game_over(game)
@@ -567,7 +564,6 @@ class TestEliminationFlow:
         result = manager.handle_reward_done(game, alice)
 
         assert result is None
-        assert alice.is_ghost is True
         assert alice.phase == "eliminated"
 
     def test_awaiting_elimination_when_one_lethal_finishes_first(self):
@@ -590,7 +586,6 @@ class TestEliminationFlow:
 
         assert result is None
         assert alice.phase == "awaiting_elimination"
-        assert alice.is_ghost is False
 
     def test_sudden_death_triggered_when_both_lethal_ready(self):
         """When both lethal players have finished reward, start sudden death."""

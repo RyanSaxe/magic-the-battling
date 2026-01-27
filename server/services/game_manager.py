@@ -269,7 +269,7 @@ class GameManager:
         for player in game.players:
             if winner and player.name == winner.name:
                 player.phase = "winner"
-            elif not player.is_ghost:
+            elif player.phase != "eliminated":
                 player.phase = "game_over"
 
         if db is not None:
@@ -677,8 +677,8 @@ class GameManager:
                 round=player.round,
                 stage=player.stage,
                 vanquishers=player.vanquishers,
-                is_ghost=player.is_ghost,
-                time_of_death=player.time_of_death,
+                is_ghost=(player.phase == "eliminated"),
+                time_of_death=None,
                 hand_count=len(player.hand),
                 sideboard_count=len(player.sideboard),
                 hand_size=player.hand_size,
@@ -699,7 +699,7 @@ class GameManager:
         )
 
     def _determine_game_phase(self, game: Game) -> str:
-        phases = {p.phase for p in game.players if not p.is_ghost}
+        phases = {p.phase for p in game.players if p.phase != "eliminated"}
         if len(phases) == 1:
             return phases.pop()
         if "battle" in phases:
@@ -741,6 +741,7 @@ class GameManager:
         probabilities: dict[str, float],
         most_recent_ghost_name: str | None = None,
     ) -> PlayerView:
+        is_eliminated = player.phase == "eliminated"
         return PlayerView(
             name=player.name,
             treasures=player.treasures,
@@ -749,9 +750,9 @@ class GameManager:
             round=player.round,
             stage=player.stage,
             vanquishers=player.vanquishers,
-            is_ghost=player.is_ghost,
+            is_ghost=is_eliminated,
             is_bot=False,
-            time_of_death=player.time_of_death,
+            time_of_death=None,
             hand_count=len(player.hand),
             sideboard_count=len(player.sideboard),
             hand_size=player.hand_size,
@@ -1081,7 +1082,7 @@ class GameManager:
 
         if db is not None and game_id is not None:
             self._update_snapshot_revealed_sideboard(db, game_id, b.player, player_zones)
-            if not isinstance(b.opponent, StaticOpponent) and not b.opponent.is_ghost:
+            if not isinstance(b.opponent, StaticOpponent):
                 self._update_snapshot_revealed_sideboard(db, game_id, b.opponent, opponent_zones)
 
         if isinstance(b.opponent, StaticOpponent):

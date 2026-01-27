@@ -135,9 +135,6 @@ class Player(BaseModel):
     last_opponent_name: str | None = None
     last_battle_result: "LastBattleResult | None" = None
 
-    is_ghost: bool = False
-    time_of_death: int | None = None
-
     upgrades: list[Card] = Field(default_factory=list)
     vanguard: Card | None = None
 
@@ -208,7 +205,7 @@ class Game(BaseModel):
     available_upgrades: list[Card] = Field(default_factory=list)
     draft_state: DraftState | None = None
     active_battles: list["Battle"] = Field(default_factory=list)
-    most_recent_ghost: Player | None = None
+    most_recent_ghost: StaticOpponent | None = None
     most_recent_ghost_bot: FakePlayer | None = None
     fake_players: list[FakePlayer] = Field(default_factory=list)
     stage: int = 3
