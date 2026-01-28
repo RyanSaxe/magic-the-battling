@@ -38,22 +38,22 @@ function UpgradeConfirmationModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="text-white text-lg font-semibold">Apply Upgrade?</div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
           <div className="flex flex-col items-center gap-2">
             <span className="text-gray-400 text-sm">Upgrade</span>
             <img
               src={getImageUrl(upgrade)}
               alt={upgrade.name}
-              className="h-64 rounded-lg shadow-2xl"
+              className="h-96 rounded-lg shadow-2xl"
             />
           </div>
-          <div className="text-white text-2xl font-bold">→</div>
+          <div className="text-white text-3xl font-bold">→</div>
           <div className="flex flex-col items-center gap-2">
             <span className="text-gray-400 text-sm">Target</span>
             <img
               src={getImageUrl(target)}
               alt={target.name}
-              className="h-64 rounded-lg shadow-2xl"
+              className="h-96 rounded-lg shadow-2xl"
             />
           </div>
         </div>
