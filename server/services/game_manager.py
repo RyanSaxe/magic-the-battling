@@ -1302,12 +1302,18 @@ class GameManager:
             fake_player.in_sudden_death = True
             return "sudden_death"
 
-        # Non-finale lethal: check sudden death BEFORE bot elimination
-        if not is_finale and player_at_lethal:
+        # Non-finale: check sudden death BEFORE bot elimination
+        # This covers:
+        # 1. player_at_lethal - player needs elimination check
+        # 2. needs_sudden_death - multiple bots at lethal need sudden death
+        if not is_finale and (player_at_lethal or needs_sudden_death(game)):
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
-            player.phase = "awaiting_elimination"
+            if player_at_lethal:
+                player.phase = "awaiting_elimination"
+            else:
+                player.phase = "reward"
             return self._check_sudden_death_ready(game, game_id, db)
 
         # All other paths: eliminate bots normally
