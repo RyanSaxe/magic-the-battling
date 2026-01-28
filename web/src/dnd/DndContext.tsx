@@ -13,7 +13,7 @@ import {
 } from '@dnd-kit/core'
 import type { Card, ZoneName } from '../types'
 import { Card as CardComponent } from '../components/card'
-import type { DragData } from './types'
+import { parseZoneId, type DragData } from './types'
 import { GameDndContext } from './useGameDnd'
 
 interface GameDndProviderProps {
@@ -59,7 +59,8 @@ export function GameDndProvider({
     const { over } = event
 
     if (over && activeCard && activeFromZone) {
-      const toZone = over.id as ZoneName
+      const toZoneId = over.id as string
+      const { zone: toZone } = parseZoneId(toZoneId)
 
       if (activeFromZone !== toZone) {
         const isValidDrop = !validDropZones || validDropZones(activeFromZone).includes(toZone)
@@ -88,7 +89,7 @@ export function GameDndProvider({
         onDragCancel={handleDragCancel}
       >
         {children}
-        <DragOverlay dropAnimation={null}>
+        <DragOverlay dropAnimation={null} style={{ zIndex: 9999 }}>
           {activeCard && (
             <CardComponent
               card={activeCard}
