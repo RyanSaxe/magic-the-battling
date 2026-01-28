@@ -205,7 +205,12 @@ def test_results_not_agreed_when_different():
     assert not battle.results_agreed(b)
 
 
-def test_end_battle_caps_treasures_and_transitions():
+def test_end_battle_caps_treasures():
+    """battle.end() syncs zones and caps treasures but does NOT set phases.
+
+    Phase transitions are handled by game_manager._end_battle() which calls
+    battle.end() and then determines the appropriate phase based on game state.
+    """
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
@@ -225,8 +230,9 @@ def test_end_battle_caps_treasures_and_transitions():
     assert alice.treasures == game.config.max_treasures
     # bob had 3 treasures, all still on battlefield
     assert bob.treasures == 3
-    assert alice.phase == "reward"
-    assert bob.phase == "reward"
+    # battle.end() no longer sets phase - that's done by game_manager._end_battle()
+    assert alice.phase == "battle"
+    assert bob.phase == "battle"
 
 
 def test_end_battle_tracks_revealed_cards(card_factory):
@@ -422,7 +428,12 @@ def test_submit_result_accepts_draw():
     assert result.loser is None
 
 
-def test_end_battle_with_draw_transitions_to_reward():
+def test_end_battle_with_draw_returns_draw_result():
+    """battle.end() returns draw result but does NOT set phases.
+
+    Phase transitions are handled by game_manager._end_battle() which calls
+    battle.end() and then determines the appropriate phase based on game state.
+    """
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
@@ -435,8 +446,9 @@ def test_end_battle_with_draw_transitions_to_reward():
     result = battle.end(game, b)
 
     assert result.is_draw
-    assert alice.phase == "reward"
-    assert bob.phase == "reward"
+    # battle.end() no longer sets phase - that's done by game_manager._end_battle()
+    assert alice.phase == "battle"
+    assert bob.phase == "battle"
 
 
 class TestPairingProbabilities:

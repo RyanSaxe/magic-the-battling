@@ -91,7 +91,7 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
           >
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
-                <span className="text-white font-medium">{player.name}</span>
+                <span className="text-white font-medium truncate max-w-[120px]">{player.name}</span>
                 {player.name === currentPlayerName && (
                   <span className="text-xs text-amber-400">(You)</span>
                 )}

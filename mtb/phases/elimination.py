@@ -1,4 +1,8 @@
+import random
+
 from mtb.models.game import FakePlayer, Game, Player, StaticOpponent
+
+Participant = Player | FakePlayer
 
 
 def get_live_players(game: Game) -> list[Player]:
@@ -13,18 +17,41 @@ def get_would_be_dead(game: Game) -> list[Player]:
     return [p for p in get_live_players(game) if p.poison >= game.config.poison_to_lose]
 
 
-def eliminate_player(game: Game, player: Player, round_num: int) -> None:
+def get_would_be_dead_bots(game: Game) -> list[FakePlayer]:
+    return [f for f in get_live_bots(game) if f.poison >= game.config.poison_to_lose]
+
+
+def eliminate_bot(game: Game, bot: FakePlayer) -> None:
+    bot.is_eliminated = True
+    remaining = len(get_live_players(game)) + len(get_live_bots(game))
+    bot.placement = remaining + 1
+    game.most_recent_ghost = None
+    if remaining % 2 == 0:
+        game.most_recent_ghost_bot = None
+    else:
+        game.most_recent_ghost_bot = bot
+
+
+def eliminate_player(game: Game, player: Player, round_num: int, stage_num: int) -> None:
     ghost_opponent = StaticOpponent.from_player(player, hand_revealed=True)
     player.phase = "eliminated"
-    game.most_recent_ghost = ghost_opponent
+    player.elimination_round = round_num
+    player.elimination_stage = stage_num
     game.most_recent_ghost_bot = None
 
     remaining_alive = len(get_live_players(game)) + len(get_live_bots(game))
     player.placement = remaining_alive + 1
 
+    if remaining_alive % 2 == 0:
+        game.most_recent_ghost = None
+    else:
+        game.most_recent_ghost = ghost_opponent
+
 
 def would_be_dead_ready_for_elimination(game: Game) -> bool:
     """Check if all would-be-dead players have finished reward (not in battle/reward phase)."""
+    if game.active_battles:
+        return False
     would_die = get_would_be_dead(game)
     if not would_die:
         return True
@@ -32,40 +59,56 @@ def would_be_dead_ready_for_elimination(game: Game) -> bool:
 
 
 def needs_sudden_death(game: Game) -> bool:
-    would_die = get_would_be_dead(game)
+    would_die_humans = get_would_be_dead(game)
+    would_die_bots = get_would_be_dead_bots(game)
+    total_would_die = len(would_die_humans) + len(would_die_bots)
+
     live = get_live_players(game)
-    survivors = len(live) - len(would_die)
-    return survivors < 2 and len(would_die) >= 2
+    live_bots = get_live_bots(game)
+    survivors = (len(live) + len(live_bots)) - total_would_die
+
+    return survivors < 2 and total_would_die >= 2
 
 
-def get_sudden_death_fighters(game: Game) -> tuple[Player, Player] | None:
-    """Returns the two players who should fight in sudden death, or None if not needed."""
+def get_sudden_death_fighters(game: Game) -> tuple[Participant, Participant] | None:
+    """Returns the two participants who should fight in sudden death, or None if not needed.
+
+    Selects the 2 participants with lowest poison. Ties are broken randomly.
+    Any other participants at lethal are eliminated immediately (no byes).
+    """
     if not needs_sudden_death(game):
         return None
 
-    would_die = get_would_be_dead(game)
-    would_die_sorted = sorted(would_die, key=lambda p: p.poison)
-
-    if len(would_die_sorted) == 2:
-        return would_die_sorted[0], would_die_sorted[1]
-    else:
-        # Lowest poison gets bye, next two fight
-        return would_die_sorted[1], would_die_sorted[2]
+    would_die: list[Participant] = list(get_would_be_dead(game)) + list(get_would_be_dead_bots(game))
+    fighters = select_sudden_death_fighters(would_die)
+    return fighters[0], fighters[1]
 
 
-def setup_sudden_death_battle(game: Game, player1: Player, player2: Player) -> None:
-    """Reset both players' poison to threshold - 1 for sudden death."""
-    player1.poison = game.config.poison_to_lose - 1
-    player2.poison = game.config.poison_to_lose - 1
+def select_sudden_death_fighters(participants_at_lethal: list[Participant]) -> list[Participant]:
+    """Select 2 participants for sudden death: lowest poison, ties broken randomly."""
+    if len(participants_at_lethal) == 2:
+        return participants_at_lethal
+
+    shuffled = participants_at_lethal.copy()
+    random.shuffle(shuffled)
+    sorted_by_poison = sorted(shuffled, key=lambda p: p.poison)
+
+    return sorted_by_poison[:2]
 
 
-def process_eliminations(game: Game, round_num: int) -> list[Player]:
+def setup_sudden_death_battle(game: Game, p1: Participant, p2: Participant) -> None:
+    """Reset both participants' poison to threshold - 1 for sudden death."""
+    p1.poison = game.config.poison_to_lose - 1
+    p2.poison = game.config.poison_to_lose - 1
+
+
+def process_eliminations(game: Game, round_num: int, stage_num: int) -> list[Player]:
     """Eliminate all players at or above poison threshold. Call after reward phase."""
     eliminated: list[Player] = []
     would_die = get_would_be_dead(game)
 
     for player in would_die:
-        eliminate_player(game, player, round_num)
+        eliminate_player(game, player, round_num, stage_num)
         eliminated.append(player)
 
     return eliminated
@@ -74,15 +117,10 @@ def process_eliminations(game: Game, round_num: int) -> list[Player]:
 def process_bot_eliminations(game: Game) -> list[FakePlayer]:
     """Eliminate bots at or above poison threshold."""
     eliminated: list[FakePlayer] = []
-    total_participants = len(game.players) + len(game.fake_players)
     for fake in game.fake_players:
         if not fake.is_eliminated and fake.poison >= game.config.poison_to_lose:
-            fake.is_eliminated = True
-            remaining_after = len(get_live_players(game)) + len(get_live_bots(game)) - 1
-            fake.placement = total_participants - remaining_after
+            eliminate_bot(game, fake)
             eliminated.append(fake)
-            game.most_recent_ghost = None
-            game.most_recent_ghost_bot = fake
     return eliminated
 
 

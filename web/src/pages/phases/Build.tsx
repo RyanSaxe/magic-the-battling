@@ -98,6 +98,18 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
 
   return (
     <div className="flex flex-col h-full gap-4 p-4">
+      {/* Sudden Death Banner */}
+      {gameState.self_player.in_sudden_death && (
+        <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center">
+          <div className="text-red-100 font-bold text-lg tracking-wider uppercase animate-pulse">
+            Sudden Death
+          </div>
+          <div className="text-red-200/80 text-xs mt-1">
+            Build your deck - fight to survive!
+          </div>
+        </div>
+      )}
+
       {/* Hand area - large cards at top */}
       <div className="flex-1 flex flex-col items-center justify-center min-h-0">
         <div className="flex justify-between items-center w-full max-w-4xl mb-4">
@@ -225,7 +237,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
         </div>
 
         {/* Unapplied upgrades */}
-        {unappliedUpgrades.length > 0 && (
+        {gameState.use_upgrades && unappliedUpgrades.length > 0 && (
           <div className="bg-purple-950/30 rounded-lg p-3 w-48 flex-shrink-0 overflow-auto">
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
               Apply Upgrade

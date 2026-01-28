@@ -343,6 +343,7 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
         opponent_zones=_create_zones_for_static_opponent(opponent),
         player_life=game.config.starting_life,
         opponent_life=game.config.starting_life,
+        is_sudden_death=is_sudden_death,
     )
 
     game.active_battles.append(battle)
@@ -381,6 +382,7 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
         opponent_zones=_create_zones_for_player(opponent),
         player_life=game.config.starting_life,
         opponent_life=game.config.starting_life,
+        is_sudden_death=is_sudden_death,
     )
 
     game.active_battles.append(battle)
@@ -497,8 +499,6 @@ def _end_vs_static(game: Game, battle: Battle, opponent: StaticOpponent) -> Batt
 
     battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
 
-    battle.player.phase = "reward"
-
     if battle in game.active_battles:
         game.active_battles.remove(battle)
 
@@ -590,6 +590,13 @@ def _handle_spawn(zones: Zones, _card_id: str, data: dict) -> bool:
     return True
 
 
+def _handle_create_treasure(zones: Zones, _card_id: str, _data: dict) -> bool:
+    treasure = _create_treasure_token()
+    zones.spawned_tokens.append(treasure)
+    zones.battlefield.append(treasure)
+    return True
+
+
 CardStateHandler = Callable[[Zones, str, dict], bool]
 
 _CARD_STATE_HANDLERS: dict[str, CardStateHandler] = {
@@ -601,6 +608,7 @@ _CARD_STATE_HANDLERS: dict[str, CardStateHandler] = {
     "attach": _handle_attach,
     "detach": _handle_detach,
     "spawn": _handle_spawn,
+    "create_treasure": _handle_create_treasure,
 }
 
 
@@ -633,9 +641,6 @@ def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult
 
     battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
     opponent.most_recently_revealed_cards = _collect_revealed_cards(battle.opponent_zones)
-
-    battle.player.phase = "reward"
-    opponent.phase = "reward"
 
     if battle in game.active_battles:
         game.active_battles.remove(battle)

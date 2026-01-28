@@ -76,7 +76,7 @@ function CardPreviewModal({
         </button>
         {card.flip_image_url && (
           <button
-            className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white rounded-full px-4 py-1 text-sm hover:bg-black/80"
+            className="absolute top-2 right-2 bg-black/60 text-white rounded px-3 py-1 text-sm hover:bg-black/80 transition-colors"
             onClick={() => setIsFlipped(!isFlipped)}
           >
             Flip
@@ -367,6 +367,10 @@ function GameContent() {
     }
   }
 
+  const handleCreateTreasure = () => {
+    actions.battleUpdateCardState('create_treasure', '', {})
+  }
+
   const renderPhaseContent = (): ReactNode => {
     if (currentPhase === 'battle' && current_battle) {
       return (
@@ -378,6 +382,7 @@ function GameContent() {
           onYourLifeChange={handleYourLifeChange}
           onOpponentLifeChange={handleOpponentLifeChange}
           playerName={self_player.name}
+          onCreateTreasure={handleCreateTreasure}
         />
       )
     }
@@ -419,6 +424,7 @@ function GameContent() {
                 players={gameState.players}
                 currentPlayer={self_player}
                 phaseContent={renderPhaseContent()}
+                useUpgrades={gameState.use_upgrades}
               />
             </div>
           </GameDndProvider>
@@ -446,9 +452,21 @@ function GameContent() {
               )}
               {currentPhase === 'awaiting_elimination' && (
                 <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <h2 className="text-2xl text-amber-400 mb-4">Sudden Death Pending</h2>
-                    <p className="text-gray-300 mb-4">Waiting for other battles to finish...</p>
+                  <div className="text-center max-w-md">
+                    <h2 className="text-2xl text-red-400 mb-4">You Have Been Eliminated</h2>
+                    <p className="text-gray-300 mb-6">
+                      Waiting until all battles are complete to determine if you will compete in sudden death to stay alive.
+                    </p>
+                    <div className="bg-black/40 rounded-lg p-4 text-left">
+                      <h3 className="text-amber-400 font-medium mb-2">Sudden Death Rules</h3>
+                      <ul className="text-gray-400 text-sm space-y-1">
+                        <li>Triggers when 2+ players eliminated with fewer than 2 survivors</li>
+                        <li>2 players with lowest poison fight (ties broken randomly)</li>
+                        <li>Other eliminated players are out immediately</li>
+                        <li>Poison resets to 9 for the sudden death battle</li>
+                        <li>Winner survives, loser is eliminated</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               )}
@@ -457,6 +475,7 @@ function GameContent() {
                   player={self_player}
                   players={gameState.players}
                   onReturnHome={() => navigate('/')}
+                  useUpgrades={gameState.use_upgrades}
                 />
               )}
             </main>
@@ -464,6 +483,7 @@ function GameContent() {
               players={gameState.players}
               currentPlayer={self_player}
               phaseContent={renderPhaseContent()}
+              useUpgrades={gameState.use_upgrades}
             />
           </div>
         )}
