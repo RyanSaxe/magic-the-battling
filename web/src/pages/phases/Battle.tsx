@@ -4,14 +4,11 @@ import { DraggableCard } from '../../dnd'
 import { HandZone, BattlefieldZone } from '../../components/zones'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
 
-const isLandOrTreasure = (card: CardType) =>
-  card.type_line.toLowerCase().includes('land') ||
-  card.type_line.toLowerCase().includes('treasure')
-
 interface ContextMenuState {
   card: CardType
   zone: ZoneName
   position: { x: number; y: number }
+  isOpponent?: boolean
 }
 
 interface BattlePhaseProps {
@@ -63,9 +60,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   const opponentFaceDownIds = new Set(opponent_zones.face_down_card_ids || [])
   const opponentCounters = opponent_zones.counters || {}
 
-  const opponentLands = opponent_zones.battlefield.filter(isLandOrTreasure)
-  const opponentPermanents = opponent_zones.battlefield.filter((c) => !isLandOrTreasure(c))
-
   const handleCardClick = (card: CardType, zone: ZoneName) => {
     if (selectedCard?.card.id === card.id) {
       setSelectedCard(null)
@@ -98,8 +92,23 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
     actions.battleMove(contextMenu.card.id, contextMenu.zone, toZone)
   }
 
+  const handleOpponentCardDoubleClick = (card: CardType) => {
+    const isTapped = opponentTappedIds.has(card.id)
+    actions.battleUpdateCardState(isTapped ? 'untap' : 'tap', card.id)
+  }
+
+  const handleOpponentContextMenu = (e: React.MouseEvent, card: CardType, zone: ZoneName) => {
+    e.preventDefault()
+    setContextMenu({ card, zone, position: { x: e.clientX, y: e.clientY }, isOpponent: true })
+  }
+
   const isCardAttached = (cardId: string): boolean => {
     return Object.values(attachments).some(children => children.includes(cardId))
+  }
+
+  const isOpponentCardAttached = (cardId: string): boolean => {
+    const opponentAttachments = opponent_zones.attachments || {}
+    return Object.values(opponentAttachments).some(children => children.includes(cardId))
   }
 
   return (
@@ -123,10 +132,14 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               <span className="truncate max-w-[120px] inline-block align-bottom">{opponent_name}</span>'s Hand ({opponent_hand_count})
               {opponent_hand_revealed && <span className="text-amber-400 ml-2">(Revealed)</span>}
             </div>
-            <div className="flex justify-center gap-1 overflow-x-auto">
+            <div className="flex justify-center gap-1 flex-wrap">
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
-                    <Card key={card.id} card={card} size="sm" />
+                    canManipulateOpponent ? (
+                      <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" size="sm" isOpponent />
+                    ) : (
+                      <Card key={card.id} card={card} size="sm" />
+                    )
                   ))
                 : Array.from({ length: opponent_hand_count }).map((_, i) => (
                     <CardBack key={i} size="sm" />
@@ -173,9 +186,13 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               </div>
             </div>
             {opponent_zones.sideboard.length > 0 && (
-              <div className="flex justify-center gap-1 overflow-x-auto">
+              <div className="flex justify-center gap-1 flex-wrap">
                 {opponent_zones.sideboard.map((card) => (
-                  <Card key={card.id} card={card} size="sm" />
+                  canManipulateOpponent ? (
+                    <DraggableCard key={card.id} card={card} zone="sideboard" zoneOwner="opponent" size="sm" isOpponent />
+                  ) : (
+                    <Card key={card.id} card={card} size="sm" />
+                  )
                 ))}
               </div>
             )}
@@ -186,47 +203,21 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
         <div className="flex-1 flex flex-col">
           {/* Opponent's battlefield */}
           <div className="relative flex-1 battlefield opacity-80">
-            <div className="absolute top-2 left-2 text-xs text-gray-400 uppercase tracking-wide truncate max-w-[150px]">
-              {opponent_name}
-            </div>
-            <div className="flex flex-col gap-2 p-4 pt-8 min-h-[150px]">
-              {/* Opponent's lands (at top, always visible) */}
-              <div className="flex justify-center flex-wrap gap-1 pb-2 border-b border-gray-700/50 min-h-[50px]">
-                {opponentLands.length > 0 ? (
-                  opponentLands.map((card) => (
-                    <Card
-                      key={card.id}
-                      card={card}
-                      size="sm"
-                      tapped={opponentTappedIds.has(card.id)}
-                      faceDown={opponentFaceDownIds.has(card.id)}
-                      counters={opponentCounters[card.id]}
-                    />
-                  ))
-                ) : (
-                  <div className="text-gray-600 text-xs border border-dashed border-gray-700 rounded px-3 py-2">
-                    Lands
-                  </div>
-                )}
-              </div>
-              {/* Opponent's permanents (non-lands) */}
-              <div className="flex justify-center flex-wrap gap-2">
-                {opponentPermanents.length === 0 ? (
-                  <div className="text-gray-500 text-sm opacity-50">Empty battlefield</div>
-                ) : (
-                  opponentPermanents.map((card) => (
-                    <Card
-                      key={card.id}
-                      card={card}
-                      size="sm"
-                      tapped={opponentTappedIds.has(card.id)}
-                      faceDown={opponentFaceDownIds.has(card.id)}
-                      counters={opponentCounters[card.id]}
-                    />
-                  ))
-                )}
-              </div>
-            </div>
+            <BattlefieldZone
+              cards={opponent_zones.battlefield}
+              selectedCardId={selectedCard?.card.id}
+              onCardClick={(card) => handleCardClick(card, 'battlefield')}
+              onCardDoubleClick={canManipulateOpponent ? handleOpponentCardDoubleClick : undefined}
+              onCardContextMenu={canManipulateOpponent ? (e, card) => handleOpponentContextMenu(e, card, 'battlefield') : undefined}
+              tappedCardIds={opponentTappedIds}
+              faceDownCardIds={opponentFaceDownIds}
+              counters={opponentCounters}
+              attachments={opponent_zones.attachments || {}}
+              label={opponent_name}
+              separateLands
+              isOpponent
+              canManipulateOpponent={canManipulateOpponent}
+            />
           </div>
 
           {/* Center divider */}
@@ -316,7 +307,11 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               </div>
               <div className="flex flex-wrap gap-2">
                 {opponent_zones.sideboard.map((card) => (
-                  <Card key={card.id} card={card} size="sm" />
+                  canManipulateOpponent ? (
+                    <DraggableCard key={card.id} card={card} zone="sideboard" zoneOwner="opponent" size="sm" isOpponent />
+                  ) : (
+                    <Card key={card.id} card={card} size="sm" />
+                  )
                 ))}
               </div>
             </div>
@@ -344,7 +339,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               </div>
               <div className="flex flex-wrap gap-2">
                 {opponentFullSideboard.map((card) => (
-                  <Card key={card.id} card={card} size="sm" />
+                  <DraggableCard key={card.id} card={card} zone="sideboard" zoneOwner="opponent" size="sm" isOpponent />
                 ))}
               </div>
             </div>
@@ -357,12 +352,12 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
             card={contextMenu.card}
             position={contextMenu.position}
             zone={contextMenu.zone}
-            isTapped={tappedCardIds.has(contextMenu.card.id)}
+            isTapped={contextMenu.isOpponent ? opponentTappedIds.has(contextMenu.card.id) : tappedCardIds.has(contextMenu.card.id)}
             isFlipped={false}
-            isFaceDown={faceDownCardIds.has(contextMenu.card.id)}
-            counters={counters[contextMenu.card.id] || {}}
-            isAttached={isCardAttached(contextMenu.card.id)}
-            battlefieldCards={your_zones.battlefield}
+            isFaceDown={contextMenu.isOpponent ? opponentFaceDownIds.has(contextMenu.card.id) : faceDownCardIds.has(contextMenu.card.id)}
+            counters={contextMenu.isOpponent ? opponentCounters[contextMenu.card.id] || {} : counters[contextMenu.card.id] || {}}
+            isAttached={contextMenu.isOpponent ? isOpponentCardAttached(contextMenu.card.id) : isCardAttached(contextMenu.card.id)}
+            battlefieldCards={contextMenu.isOpponent ? opponent_zones.battlefield : your_zones.battlefield}
             onAction={handleContextMenuAction}
             onMove={handleContextMenuMove}
             onClose={() => setContextMenu(null)}
