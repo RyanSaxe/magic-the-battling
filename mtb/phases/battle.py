@@ -343,6 +343,7 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
         opponent_zones=_create_zones_for_static_opponent(opponent),
         player_life=game.config.starting_life,
         opponent_life=game.config.starting_life,
+        is_sudden_death=is_sudden_death,
     )
 
     game.active_battles.append(battle)
@@ -381,6 +382,7 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
         opponent_zones=_create_zones_for_player(opponent),
         player_life=game.config.starting_life,
         opponent_life=game.config.starting_life,
+        is_sudden_death=is_sudden_death,
     )
 
     game.active_battles.append(battle)

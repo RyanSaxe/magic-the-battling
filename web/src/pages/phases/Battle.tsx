@@ -104,6 +104,18 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
 
   return (
     <div className="flex flex-col h-full gap-2">
+        {/* Sudden Death Banner */}
+        {current_battle.is_sudden_death && (
+          <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center">
+            <div className="text-red-100 font-bold text-lg tracking-wider uppercase animate-pulse">
+              Sudden Death
+            </div>
+            <div className="text-red-200/80 text-xs mt-1">
+              Fight to survive - loser is eliminated!
+            </div>
+          </div>
+        )}
+
         {/* Opponent's hand */}
         {opponent_hand_count > 0 && (
           <div className="px-4 py-2 bg-black/30">

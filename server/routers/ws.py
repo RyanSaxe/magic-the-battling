@@ -282,7 +282,7 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
         winners = [p for p in game.players if p.phase == "winner"]
         winner_name = winners[0].name if winners else None
         await connection_manager.broadcast_game_over(game_id, winner_name)
-    elif result is True or result is None:
+    elif result == "sudden_death" or result is True or result is None:
         await connection_manager.broadcast_game_state(game_id)
     elif isinstance(result, str):
         await connection_manager.send_error(websocket, result)

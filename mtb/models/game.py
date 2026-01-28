@@ -81,6 +81,7 @@ class FakePlayer(BaseModel):
     stage: int = 3
     placement: int = 0
     last_battle_result: "LastBattleResult | None" = None
+    in_sudden_death: bool = False
 
     def get_opponent_for_round(self, stage: int, round_num: int) -> StaticOpponent | None:
         key = f"{stage}_{round_num}"
@@ -154,6 +155,7 @@ class Player(BaseModel):
     previous_hand_ids: list[str] = Field(default_factory=list)
     previous_basics: list[str] = Field(default_factory=list)
     build_ready: bool = False
+    in_sudden_death: bool = False
 
     # model_config is required to allow weakref types
     model_config = {"arbitrary_types_allowed": True}
@@ -288,6 +290,7 @@ class Battle(BaseModel):
     result_submissions: dict[str, str] = Field(default_factory=dict)
     player_life: int = 20
     opponent_life: int = 20
+    is_sudden_death: bool = False
 
 
 def create_game(player_names: list[str], num_players: int, config: Config | None = None) -> Game:

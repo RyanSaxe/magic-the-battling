@@ -81,6 +81,7 @@ export interface SelfPlayerView extends PlayerView {
   current_pack: Card[] | null
   last_battle_result: LastBattleResult | null
   build_ready: boolean
+  in_sudden_death: boolean
 }
 
 export interface BattleView {
@@ -95,6 +96,7 @@ export interface BattleView {
   opponent_hand_revealed: boolean
   your_life: number
   opponent_life: number
+  is_sudden_death: boolean
 }
 
 export interface GameState {
