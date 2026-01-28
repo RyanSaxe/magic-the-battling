@@ -1088,25 +1088,42 @@ class GameManager:
     ) -> bool:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
-                # Handle sideboard -> hand moves (Wish/Companion support)
+                # Handle sideboard -> hand moves for player's own cards (Wish/Companion support)
                 if from_zone == "sideboard" and to_zone == "hand":
                     card = next((c for c in player.sideboard if c.id == card_id), None)
-                    if not card:
-                        return False
-                    player.sideboard.remove(card)
-                    zones = battle.get_zones_for_player(b, player)
-                    zones.sideboard.remove(card)
-                    zones.hand.append(card)
-                    if card.id not in zones.revealed_sideboard_card_ids:
-                        zones.revealed_sideboard_card_ids.append(card.id)
-                    return True
+                    if card:
+                        player.sideboard.remove(card)
+                        zones = battle.get_zones_for_player(b, player)
+                        zones.sideboard.remove(card)
+                        zones.hand.append(card)
+                        if card.id not in zones.revealed_sideboard_card_ids:
+                            zones.revealed_sideboard_card_ids.append(card.id)
+                        return True
 
-                zones = battle.get_zones_for_player(b, player)
+                # Use zone lookup that handles opponent zones
+                try:
+                    zones, _ = battle.get_zones_for_card(b, player, card_id)
+                except ValueError:
+                    return False
+
                 from_list = zones.get_zone(from_zone)
                 card = next((c for c in from_list if c.id == card_id), None)
                 if not card:
                     return False
-                battle.move_zone(b, player, card, from_zone, to_zone)
+
+                from_list.remove(card)
+                zones.get_zone(to_zone).append(card)
+
+                # Track revealed cards when moving to public zones
+                if (
+                    to_zone in battle.REVEALED_ZONES
+                    and battle._is_revealed_card(card)
+                    and card.id not in zones.revealed_card_ids
+                ):
+                    zones.revealed_card_ids.append(card.id)
+                if from_zone == "sideboard" and card.id not in zones.revealed_sideboard_card_ids:
+                    zones.revealed_sideboard_card_ids.append(card.id)
+
                 return True
         return False
 

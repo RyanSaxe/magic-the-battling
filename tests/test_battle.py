@@ -664,3 +664,161 @@ class TestViableCandidates:
         names1 = {c.name for c in viable_round1}
         names2 = {c.name for c in viable_round2}
         assert names1 != names2 or names1 == names2
+
+
+class TestOpponentZoneManipulation:
+    """Tests for manipulating opponent zones when opponent is StaticOpponent."""
+
+    def test_get_zones_for_card_finds_player_card(self, card_factory):
+        """get_zones_for_card returns player zones when card is in player's zones."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        card = card_factory("TestCard")
+        alice.hand = [card]
+
+        b = battle.start(game, alice, bob)
+
+        zones, is_opponent = battle.get_zones_for_card(b, alice, card.id)
+        assert zones == b.player_zones
+        assert not is_opponent
+
+    def test_get_zones_for_card_finds_opponent_card_vs_static(self, card_factory):
+        """get_zones_for_card finds card in opponent zones when opponent is StaticOpponent."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        opp_card = card_factory("OppCard")
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[opp_card],
+            sideboard=[],
+            upgrades=[],
+            vanguard=None,
+            chosen_basics=["Island", "Island", "Island"],
+            treasures=0,
+        )
+
+        b = battle.start(game, alice, static_opp)
+
+        zones, is_opponent = battle.get_zones_for_card(b, alice, opp_card.id)
+        assert zones == b.opponent_zones
+        assert is_opponent
+
+    def test_get_zones_for_card_raises_if_not_found(self, card_factory):
+        """get_zones_for_card raises ValueError if card not in any zones."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        b = battle.start(game, alice, bob)
+
+        with pytest.raises(ValueError, match="not found"):
+            battle.get_zones_for_card(b, alice, "nonexistent-card-id")
+
+    def test_update_card_state_works_on_opponent_card(self, card_factory):
+        """update_card_state can tap/untap opponent's cards when opponent is StaticOpponent."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        opp_card = card_factory("OppCard")
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[],
+            sideboard=[],
+            upgrades=[],
+            vanguard=None,
+            chosen_basics=["Island", "Island", "Island"],
+            treasures=0,
+        )
+
+        b = battle.start(game, alice, static_opp)
+        b.opponent_zones.battlefield.append(opp_card)
+
+        # Tap opponent's card
+        result = battle.update_card_state(b, alice, "tap", opp_card.id)
+        assert result
+        assert opp_card.id in b.opponent_zones.tapped_card_ids
+
+        # Untap opponent's card
+        result = battle.update_card_state(b, alice, "untap", opp_card.id)
+        assert result
+        assert opp_card.id not in b.opponent_zones.tapped_card_ids
+
+    def test_battle_move_works_on_opponent_card_via_game_manager(self, card_factory):
+        """handle_battle_move can move opponent's cards when opponent is StaticOpponent."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        opp_card = card_factory("OppCard")
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[],
+            sideboard=[],
+            upgrades=[],
+            vanguard=None,
+            chosen_basics=["Island", "Island", "Island"],
+            treasures=0,
+        )
+
+        b = battle.start(game, alice, static_opp)
+        b.opponent_zones.battlefield.append(opp_card)
+
+        manager = GameManager()
+        result = manager.handle_battle_move(game, alice, opp_card.id, "battlefield", "graveyard")
+
+        assert result
+        assert opp_card not in b.opponent_zones.battlefield
+        assert opp_card in b.opponent_zones.graveyard
+
+    def test_battle_move_works_on_static_opponent_basic_lands(self):
+        """handle_battle_move can move StaticOpponent's auto-created basic lands."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[],
+            sideboard=[],
+            upgrades=[],
+            vanguard=None,
+            chosen_basics=["Island", "Island", "Island"],
+            treasures=0,
+        )
+
+        b = battle.start(game, alice, static_opp)
+
+        # Get one of the auto-created basic lands
+        island = b.opponent_zones.battlefield[0]
+        assert "Island" in island.name
+
+        manager = GameManager()
+        result = manager.handle_battle_move(game, alice, island.id, "battlefield", "graveyard")
+
+        assert result
+        assert island not in b.opponent_zones.battlefield
+        assert island in b.opponent_zones.graveyard
+
+    def test_update_card_state_does_not_work_on_pvp_opponent(self, card_factory):
+        """update_card_state cannot modify opponent's cards in PvP battle."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        opp_card = card_factory("OppCard")
+        bob.hand = [opp_card]
+
+        b = battle.start(game, alice, bob)
+
+        # Alice tries to tap Bob's card - should fail
+        result = battle.update_card_state(b, alice, "tap", opp_card.id)
+        assert not result
+        assert opp_card.id not in b.opponent_zones.tapped_card_ids

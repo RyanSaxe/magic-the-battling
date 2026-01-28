@@ -612,6 +612,39 @@ _CARD_STATE_HANDLERS: dict[str, CardStateHandler] = {
 }
 
 
+_SEARCHABLE_ZONES: list[ZoneName] = ["battlefield", "hand", "graveyard", "exile", "sideboard"]
+
+
+def get_zones_for_card(battle: Battle, player: Player, card_id: str) -> tuple[Zones, bool]:
+    """Find zones containing card. Returns (zones, is_opponent_zones).
+
+    Searches player's zones first, then opponent zones if opponent is StaticOpponent.
+    Raises ValueError if card not found.
+    """
+    player_zones = get_zones_for_player(battle, player)
+
+    for zone_name in _SEARCHABLE_ZONES:
+        zone_cards = player_zones.get_zone(zone_name)
+        if any(c.id == card_id for c in zone_cards):
+            return player_zones, False
+
+    if any(c.id == card_id for c in player_zones.spawned_tokens):
+        return player_zones, False
+
+    if _is_static_opponent(battle.opponent):
+        opp_zones = battle.opponent_zones if player.name == battle.player.name else battle.player_zones
+        for zone_name in _SEARCHABLE_ZONES:
+            if any(c.id == card_id for c in opp_zones.get_zone(zone_name)):
+                return opp_zones, True
+        if any(c.id == card_id for c in opp_zones.spawned_tokens):
+            return opp_zones, True
+
+    raise ValueError(f"Card {card_id} not found")
+
+
+_ACTIONS_WITHOUT_CARD = {"spawn", "create_treasure"}
+
+
 def update_card_state(
     battle: Battle,
     player: Player,
@@ -619,10 +652,19 @@ def update_card_state(
     card_id: str,
     data: dict | None = None,
 ) -> bool:
-    zones = get_zones_for_player(battle, player)
     handler = _CARD_STATE_HANDLERS.get(action_type)
     if not handler:
         return False
+
+    # Actions like spawn/create_treasure don't need an existing card
+    if action_type in _ACTIONS_WITHOUT_CARD:
+        zones = get_zones_for_player(battle, player)
+    else:
+        try:
+            zones, _ = get_zones_for_card(battle, player, card_id)
+        except ValueError:
+            return False
+
     return handler(zones, card_id, data or {})
 
 
