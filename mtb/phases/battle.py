@@ -590,6 +590,13 @@ def _handle_spawn(zones: Zones, _card_id: str, data: dict) -> bool:
     return True
 
 
+def _handle_create_treasure(zones: Zones, _card_id: str, _data: dict) -> bool:
+    treasure = _create_treasure_token()
+    zones.spawned_tokens.append(treasure)
+    zones.battlefield.append(treasure)
+    return True
+
+
 CardStateHandler = Callable[[Zones, str, dict], bool]
 
 _CARD_STATE_HANDLERS: dict[str, CardStateHandler] = {
@@ -601,6 +608,7 @@ _CARD_STATE_HANDLERS: dict[str, CardStateHandler] = {
     "attach": _handle_attach,
     "detach": _handle_detach,
     "spawn": _handle_spawn,
+    "create_treasure": _handle_create_treasure,
 }
 
 

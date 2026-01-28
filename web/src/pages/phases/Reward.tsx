@@ -88,7 +88,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
       )}
 
       {/* Stage upgrade selection */}
-      {isStageIncreasing && available_upgrades.length > 0 && (
+      {gameState.use_upgrades && isStageIncreasing && available_upgrades.length > 0 && (
         <div className="bg-amber-950/30 rounded-lg p-6 border-2 border-amber-500">
           <div className="text-center mb-6">
             <h3 className="text-xl font-bold text-amber-400 mb-2">Stage Complete!</h3>

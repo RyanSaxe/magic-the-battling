@@ -367,6 +367,10 @@ function GameContent() {
     }
   }
 
+  const handleCreateTreasure = () => {
+    actions.battleUpdateCardState('create_treasure', '', {})
+  }
+
   const renderPhaseContent = (): ReactNode => {
     if (currentPhase === 'battle' && current_battle) {
       return (
@@ -378,6 +382,7 @@ function GameContent() {
           onYourLifeChange={handleYourLifeChange}
           onOpponentLifeChange={handleOpponentLifeChange}
           playerName={self_player.name}
+          onCreateTreasure={handleCreateTreasure}
         />
       )
     }
@@ -419,6 +424,7 @@ function GameContent() {
                 players={gameState.players}
                 currentPlayer={self_player}
                 phaseContent={renderPhaseContent()}
+                useUpgrades={gameState.use_upgrades}
               />
             </div>
           </GameDndProvider>
@@ -469,6 +475,7 @@ function GameContent() {
                   player={self_player}
                   players={gameState.players}
                   onReturnHome={() => navigate('/')}
+                  useUpgrades={gameState.use_upgrades}
                 />
               )}
             </main>
@@ -476,6 +483,7 @@ function GameContent() {
               players={gameState.players}
               currentPlayer={self_player}
               phaseContent={renderPhaseContent()}
+              useUpgrades={gameState.use_upgrades}
             />
           </div>
         )}

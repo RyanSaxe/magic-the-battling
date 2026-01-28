@@ -6,6 +6,7 @@ interface GameSummaryProps {
   player: SelfPlayerView
   players: PlayerView[]
   onReturnHome: () => void
+  useUpgrades?: boolean
 }
 
 function getOrdinal(n: number): string {
@@ -45,7 +46,7 @@ function UpgradeGrid({ upgrades }: { upgrades: CardType[] }) {
   )
 }
 
-export function GameSummary({ player, players, onReturnHome }: GameSummaryProps) {
+export function GameSummary({ player, players, onReturnHome, useUpgrades = true }: GameSummaryProps) {
   const sortedPlayers = [...players].sort((a, b) => {
     if (a.placement === 0 && b.placement === 0) {
       return a.poison - b.poison
@@ -63,7 +64,7 @@ export function GameSummary({ player, players, onReturnHome }: GameSummaryProps)
 
   const hasHand = player.hand.length > 0
   const appliedUpgrades = player.upgrades.filter((u) => u.upgrade_target !== null)
-  const hasUpgrades = appliedUpgrades.length > 0
+  const hasUpgrades = useUpgrades && appliedUpgrades.length > 0
   const hasTopRow = hasHand || hasUpgrades
 
   return (
@@ -80,7 +81,7 @@ export function GameSummary({ player, players, onReturnHome }: GameSummaryProps)
           {hasTopRow && (
             <div className={`grid gap-4 mb-4 ${hasHand && hasUpgrades ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <CardGrid cards={player.hand} title="Hand" />
-              <UpgradeGrid upgrades={player.upgrades} />
+              {useUpgrades && <UpgradeGrid upgrades={player.upgrades} />}
             </div>
           )}
           <CardGrid cards={player.sideboard} title="Sideboard" />

@@ -163,7 +163,7 @@ export function Lobby() {
                             player.is_ready ? 'bg-green-500' : 'bg-gray-500'
                           }`}
                         />
-                        <span className="text-white">{player.name}</span>
+                        <span className="text-white truncate max-w-[150px]">{player.name}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {player.is_host && (

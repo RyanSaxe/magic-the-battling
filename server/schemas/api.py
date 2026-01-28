@@ -102,6 +102,7 @@ class GameStateResponse(BaseModel):
     self_player: SelfPlayerView
     available_upgrades: list[Card]
     current_battle: BattleView | None = None
+    use_upgrades: bool = True
 
 
 class LobbyPlayer(BaseModel):

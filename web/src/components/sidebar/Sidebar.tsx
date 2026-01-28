@@ -8,9 +8,10 @@ interface SidebarProps {
   players: PlayerView[]
   currentPlayer: PlayerView
   phaseContent?: ReactNode
+  useUpgrades?: boolean
 }
 
-export function Sidebar({ players, currentPlayer, phaseContent }: SidebarProps) {
+export function Sidebar({ players, currentPlayer, phaseContent, useUpgrades = true }: SidebarProps) {
   const { state } = useContextStrip()
   const revealedPlayer = state.revealedPlayerName
     ? players.find(p => p.name === state.revealedPlayerName)
@@ -39,10 +40,10 @@ export function Sidebar({ players, currentPlayer, phaseContent }: SidebarProps) 
               {displayPlayer.name === currentPlayer.name ? 'Your Cards' : `${displayPlayer.name}'s Cards`}
             </h3>
             <div className="flex flex-wrap gap-2">
-              <ZoneDisplay title="Upgrades" cards={allUpgrades} maxThumbnails={6} showUpgradeTargets />
+              {useUpgrades && <ZoneDisplay title="Upgrades" cards={allUpgrades} maxThumbnails={6} showUpgradeTargets />}
               <ZoneDisplay title="Revealed" cards={displayPlayer.most_recently_revealed_cards} maxThumbnails={6} />
             </div>
-            {allUpgrades.length === 0 && displayPlayer.most_recently_revealed_cards.length === 0 && (
+            {(!useUpgrades || allUpgrades.length === 0) && displayPlayer.most_recently_revealed_cards.length === 0 && (
               <div className="text-gray-500 text-sm">No cards to display</div>
             )}
           </div>

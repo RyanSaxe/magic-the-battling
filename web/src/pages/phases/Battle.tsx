@@ -120,7 +120,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
         {opponent_hand_count > 0 && (
           <div className="px-4 py-2 bg-black/30">
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-              {opponent_name}'s Hand ({opponent_hand_count})
+              <span className="truncate max-w-[120px] inline-block align-bottom">{opponent_name}</span>'s Hand ({opponent_hand_count})
               {opponent_hand_revealed && <span className="text-amber-400 ml-2">(Revealed)</span>}
             </div>
             <div className="flex justify-center gap-1 overflow-x-auto">
@@ -141,8 +141,8 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
             <div className="flex justify-between items-center mb-2">
               <div className="text-xs text-gray-400 uppercase tracking-wide">
                 {opponent_zones.sideboard.length > 0
-                  ? `${opponent_name}'s Revealed Sideboard (${opponent_zones.sideboard.length})`
-                  : `${opponent_name}'s Sideboard`}
+                  ? <><span className="truncate max-w-[120px] inline-block align-bottom">{opponent_name}</span>'s Revealed Sideboard ({opponent_zones.sideboard.length})</>
+                  : <><span className="truncate max-w-[120px] inline-block align-bottom">{opponent_name}</span>'s Sideboard</>}
               </div>
               <div className="flex gap-2">
                 {showFullSideboardButton && (
@@ -186,7 +186,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
         <div className="flex-1 flex flex-col">
           {/* Opponent's battlefield */}
           <div className="relative flex-1 battlefield opacity-80">
-            <div className="absolute top-2 left-2 text-xs text-gray-400 uppercase tracking-wide">
+            <div className="absolute top-2 left-2 text-xs text-gray-400 uppercase tracking-wide truncate max-w-[150px]">
               {opponent_name}
             </div>
             <div className="flex flex-col gap-2 p-4 pt-8 min-h-[150px]">

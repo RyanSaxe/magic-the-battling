@@ -237,7 +237,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
         </div>
 
         {/* Unapplied upgrades */}
-        {unappliedUpgrades.length > 0 && (
+        {gameState.use_upgrades && unappliedUpgrades.length > 0 && (
           <div className="bg-purple-950/30 rounded-lg p-3 w-48 flex-shrink-0 overflow-auto">
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
               Apply Upgrade

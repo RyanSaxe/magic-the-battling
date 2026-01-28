@@ -674,6 +674,7 @@ class GameManager:
             game_id=game_id,
             phase=phase,
             starting_life=game.config.starting_life,
+            use_upgrades=game.config.use_upgrades,
             players=all_players,
             self_player=SelfPlayerView(
                 name=player.name,

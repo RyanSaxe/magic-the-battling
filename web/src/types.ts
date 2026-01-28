@@ -2,7 +2,7 @@ export type Phase = 'draft' | 'build' | 'battle' | 'reward' | 'awaiting_eliminat
 export type LastResult = 'win' | 'loss' | 'draw'
 export type CubeLoadingStatus = 'loading' | 'ready' | 'error'
 export type ZoneName = 'battlefield' | 'graveyard' | 'exile' | 'hand' | 'sideboard' | 'upgrades' | 'command_zone' | 'library'
-export type CardStateAction = 'tap' | 'untap' | 'flip' | 'face_down' | 'counter' | 'attach' | 'detach' | 'spawn'
+export type CardStateAction = 'tap' | 'untap' | 'flip' | 'face_down' | 'counter' | 'attach' | 'detach' | 'spawn' | 'create_treasure'
 export type CardDestination = 'hand' | 'sideboard' | 'upgrades'
 export type BuildSource = 'hand' | 'sideboard'
 
@@ -107,6 +107,7 @@ export interface GameState {
   self_player: SelfPlayerView
   available_upgrades: Card[]
   current_battle: BattleView | null
+  use_upgrades: boolean
 }
 
 export interface LobbyPlayer {

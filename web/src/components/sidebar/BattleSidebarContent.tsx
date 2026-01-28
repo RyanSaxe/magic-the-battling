@@ -12,6 +12,7 @@ interface BattleSidebarContentProps {
   onYourLifeChange: (life: number) => void
   onOpponentLifeChange: (life: number) => void
   playerName: string
+  onCreateTreasure?: () => void
 }
 
 function LifeCounter({
@@ -101,7 +102,7 @@ function PlayerSection({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-white font-medium">{name}</span>
+        <span className="text-sm text-white font-medium truncate max-w-[100px]">{name}</span>
         <div className="flex items-center gap-1">
           <img
             src={POISON_COUNTER_IMAGE}
@@ -154,6 +155,7 @@ export function BattleSidebarContent({
   onYourLifeChange,
   onOpponentLifeChange,
   playerName,
+  onCreateTreasure,
 }: BattleSidebarContentProps) {
   const { opponent_name, coin_flip_name, your_zones, opponent_zones } = currentBattle
 
@@ -178,7 +180,7 @@ export function BattleSidebarContent({
         <div className="p-3 bg-black/40 w-full">
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center">
-              <div className="text-xs text-gray-400 uppercase mb-1">{opponent_name}</div>
+              <div className="text-xs text-gray-400 uppercase mb-1 truncate max-w-[80px]">{opponent_name}</div>
               <div className="flex justify-center">
                 <LifeCounter life={opponentLife} onChange={onOpponentLifeChange} />
               </div>
@@ -197,6 +199,14 @@ export function BattleSidebarContent({
               <><span className="text-amber-400">{coin_flip_name}</span> goes first</>
             )}
           </div>
+          {onCreateTreasure && (
+            <button
+              onClick={onCreateTreasure}
+              className="w-full mt-3 px-3 py-1.5 text-xs rounded bg-amber-600 hover:bg-amber-500 text-white"
+            >
+              Create Treasure
+            </button>
+          )}
         </div>
       </div>
 
