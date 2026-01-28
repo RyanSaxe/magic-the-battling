@@ -10,21 +10,26 @@ interface DroppableZoneDisplayProps {
   maxThumbnails?: number
   validFromZones: ZoneName[]
   isOpponent?: boolean
+  canManipulateOpponent?: boolean
 }
 
 function ZoneModal({
   title,
   zone,
   cards,
+  allowInteraction,
   isOpponent,
   onClose,
 }: {
   title: string
   zone: ZoneName
   cards: CardType[]
+  allowInteraction: boolean
   isOpponent: boolean
   onClose: () => void
 }) {
+  const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+
   return (
     <div
       className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
@@ -48,10 +53,10 @@ function ZoneModal({
         ) : (
           <div className="flex flex-wrap gap-2">
             {cards.map((card) =>
-              isOpponent ? (
-                <Card key={card.id} card={card} size="sm" />
+              allowInteraction ? (
+                <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} size="sm" isOpponent={isOpponent} />
               ) : (
-                <DraggableCard key={card.id} card={card} zone={zone} size="sm" />
+                <Card key={card.id} card={card} size="sm" />
               )
             )}
           </div>
@@ -68,8 +73,11 @@ export function DroppableZoneDisplay({
   maxThumbnails = 3,
   validFromZones,
   isOpponent = false,
+  canManipulateOpponent = false,
 }: DroppableZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
+  const allowInteraction = !isOpponent || canManipulateOpponent
+  const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
   const displayedCards = cards.slice(0, maxThumbnails)
   const remainingCount = cards.length - displayedCards.length
@@ -78,8 +86,9 @@ export function DroppableZoneDisplay({
     <>
       <DroppableZone
         zone={zone}
+        zoneOwner={zoneOwner}
         validFromZones={validFromZones}
-        disabled={isOpponent}
+        disabled={!allowInteraction}
         className="flex-1"
       >
         <button
@@ -101,10 +110,10 @@ export function DroppableZoneDisplay({
             <div className="flex flex-col items-center gap-0.5">
               <div className="flex gap-0.5">
                 {displayedCards.map((card) =>
-                  isOpponent ? (
-                    <Card key={card.id} card={card} size="xs" />
+                  allowInteraction ? (
+                    <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} size="xs" isOpponent={isOpponent} />
                   ) : (
-                    <DraggableCard key={card.id} card={card} zone={zone} size="xs" />
+                    <Card key={card.id} card={card} size="xs" />
                   )
                 )}
               </div>
@@ -121,6 +130,7 @@ export function DroppableZoneDisplay({
           title={title}
           zone={zone}
           cards={cards}
+          allowInteraction={allowInteraction}
           isOpponent={isOpponent}
           onClose={() => setShowModal(false)}
         />

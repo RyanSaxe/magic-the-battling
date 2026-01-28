@@ -13,6 +13,7 @@ interface BattleSidebarContentProps {
   onOpponentLifeChange: (life: number) => void
   playerName: string
   onCreateTreasure?: () => void
+  canManipulateOpponent?: boolean
 }
 
 function LifeCounter({
@@ -90,12 +91,14 @@ function PlayerSection({
   zones,
   upgrades,
   isOpponent = false,
+  canManipulateOpponent = false,
 }: {
   name: string
   poison: number
   zones: Zones
   upgrades: CardType[]
   isOpponent?: boolean
+  canManipulateOpponent?: boolean
 }) {
   const appliedUpgrades = upgrades.filter((u) => u.upgrade_target)
 
@@ -127,6 +130,7 @@ function PlayerSection({
         cards={zones.graveyard}
         validFromZones={['hand', 'battlefield', 'exile']}
         isOpponent={isOpponent}
+        canManipulateOpponent={canManipulateOpponent}
       />
       <DroppableZoneDisplay
         title="Exile"
@@ -134,6 +138,7 @@ function PlayerSection({
         cards={zones.exile}
         validFromZones={['hand', 'battlefield', 'graveyard']}
         isOpponent={isOpponent}
+        canManipulateOpponent={canManipulateOpponent}
       />
 
       {!isOpponent && appliedUpgrades.length > 0 && (
@@ -156,6 +161,7 @@ export function BattleSidebarContent({
   onOpponentLifeChange,
   playerName,
   onCreateTreasure,
+  canManipulateOpponent = false,
 }: BattleSidebarContentProps) {
   const { opponent_name, coin_flip_name, your_zones, opponent_zones } = currentBattle
 
@@ -172,6 +178,7 @@ export function BattleSidebarContent({
           zones={opponent_zones}
           upgrades={opponent_zones.upgrades}
           isOpponent
+          canManipulateOpponent={canManipulateOpponent}
         />
       </div>
 

@@ -79,6 +79,8 @@ export function BattlefieldZone({
       )
     }
 
+    const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+
     return (
       <div
         key={card.id}
@@ -92,6 +94,7 @@ export function BattlefieldZone({
         <DraggableCard
           card={card}
           zone="battlefield"
+          zoneOwner={zoneOwner}
           size={cardSize}
           selected={card.id === selectedCardId}
           tapped={tappedCardIds.has(card.id)}
@@ -106,9 +109,12 @@ export function BattlefieldZone({
     )
   }
 
+  const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+
   return (
     <DroppableZone
       zone="battlefield"
+      zoneOwner={zoneOwner}
       validFromZones={validFromZones}
       disabled={!allowInteraction}
       className="battlefield flex-1 p-4"
@@ -118,7 +124,7 @@ export function BattlefieldZone({
           {label}
         </div>
       )}
-      <div className="flex flex-col gap-2 min-h-[120px]">
+      <div className={`flex flex-col gap-2 min-h-[120px] ${isOpponent ? 'flex-col-reverse' : ''}`}>
         {/* Permanents (non-lands) */}
         <div className="flex justify-center flex-wrap gap-3">
           {permanents.length === 0 && lands.length === 0 ? (
