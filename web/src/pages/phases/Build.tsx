@@ -3,6 +3,80 @@ import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { Card } from '../../components/card'
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
 
+interface UpgradeConfirmationModalProps {
+  upgrade: CardType
+  target: CardType
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+function UpgradeConfirmationModal({
+  upgrade,
+  target,
+  onConfirm,
+  onCancel,
+}: UpgradeConfirmationModalProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onCancel()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onCancel])
+
+  const getImageUrl = (card: CardType) => card.png_url ?? card.image_url
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+      onClick={onCancel}
+    >
+      <div
+        className="relative flex flex-col items-center gap-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="text-white text-lg font-semibold">Apply Upgrade?</div>
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-gray-400 text-sm">Upgrade</span>
+            <img
+              src={getImageUrl(upgrade)}
+              alt={upgrade.name}
+              className="h-64 rounded-lg shadow-2xl"
+            />
+          </div>
+          <div className="text-white text-2xl font-bold">→</div>
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-gray-400 text-sm">Target</span>
+            <img
+              src={getImageUrl(target)}
+              alt={target.name}
+              className="h-64 rounded-lg shadow-2xl"
+            />
+          </div>
+        </div>
+        <div className="text-yellow-500 text-sm">This action cannot be undone</div>
+        <div className="flex gap-4 mt-2">
+          <button
+            className="btn btn-secondary px-6 py-2"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            className="btn btn-primary px-6 py-2"
+            onClick={onConfirm}
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface BuildPhaseProps {
   gameState: GameState
   actions: {
@@ -30,6 +104,10 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
 
   const [selectedCard, setSelectedCard] = useState<CardWithIndex | null>(null)
   const [selectedUpgrade, setSelectedUpgrade] = useState<CardType | null>(null)
+  const [pendingUpgrade, setPendingUpgrade] = useState<{
+    upgrade: CardType
+    target: CardType
+  } | null>(null)
   const hasUserInteracted = useRef(false)
 
   useEffect(() => {
@@ -58,7 +136,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
   const handleCardClick = useCallback(
     (card: CardType, index: number, zone: SelectionZone) => {
       if (selectedUpgrade) {
-        actions.buildApplyUpgrade(selectedUpgrade.id, card.id)
+        setPendingUpgrade({ upgrade: selectedUpgrade, target: card })
         setSelectedUpgrade(null)
         return
       }
@@ -92,6 +170,17 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
       setSelectedCard(null)
     }
   }
+
+  const handleConfirmUpgrade = useCallback(() => {
+    if (pendingUpgrade) {
+      actions.buildApplyUpgrade(pendingUpgrade.upgrade.id, pendingUpgrade.target.id)
+      setPendingUpgrade(null)
+    }
+  }, [pendingUpgrade, actions])
+
+  const handleCancelUpgrade = useCallback(() => {
+    setPendingUpgrade(null)
+  }, [])
 
   const unappliedUpgrades = self_player.upgrades.filter((u) => !u.upgrade_target)
   const handExceedsLimit = self_player.hand.length > maxHandSize
@@ -256,6 +345,15 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
           </div>
         )}
       </div>
+
+      {pendingUpgrade && (
+        <UpgradeConfirmationModal
+          upgrade={pendingUpgrade.upgrade}
+          target={pendingUpgrade.target}
+          onConfirm={handleConfirmUpgrade}
+          onCancel={handleCancelUpgrade}
+        />
+      )}
     </div>
   )
 }
