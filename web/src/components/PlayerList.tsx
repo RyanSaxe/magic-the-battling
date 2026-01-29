@@ -124,14 +124,17 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 )}
               </div>
               <span className="text-gray-500">
-                {player.stage}-{player.round} @ {player.phase}
+                {player.is_ghost && !player.is_most_recent_ghost ? (
+                  <span className="text-red-400">Eliminated</span>
+                ) : player.is_most_recent_ghost ? (
+                  <span className="text-red-400">the ghost</span>
+                ) : player.phase === 'awaiting_elimination' ? (
+                  <span className="text-red-400">pending</span>
+                ) : (
+                  `${player.stage}-${player.round} @ ${player.phase}`
+                )}
               </span>
             </div>
-            {player.is_ghost && !player.is_most_recent_ghost && (
-              <div className="text-xs text-red-400 mt-1">
-                Eliminated
-              </div>
-            )}
           </div>
         )})}
       </div>
