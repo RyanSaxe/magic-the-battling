@@ -1,28 +1,28 @@
-import type { Card as CardType, ZoneName } from '../../types'
-import { DraggableCard, DroppableZone } from '../../dnd'
-import { AttachedCardStack } from '../card'
+import type { Card as CardType, ZoneName } from "../../types";
+import { DraggableCard, DroppableZone } from "../../dnd";
+import { AttachedCardStack } from "../card";
 
 const isLandOrTreasure = (card: CardType) =>
-  card.type_line.toLowerCase().includes('land') ||
-  card.type_line.toLowerCase().includes('treasure')
+  card.type_line.toLowerCase().includes("land") ||
+  card.type_line.toLowerCase().includes("treasure");
 
 interface BattlefieldZoneProps {
-  cards: CardType[]
-  selectedCardId?: string
-  onCardClick?: (card: CardType) => void
-  onCardDoubleClick?: (card: CardType) => void
-  onCardContextMenu?: (e: React.MouseEvent, card: CardType) => void
-  tappedCardIds?: Set<string>
-  faceDownCardIds?: Set<string>
-  counters?: Record<string, Record<string, number>>
-  attachments?: Record<string, string[]>
-  validFromZones?: ZoneName[]
-  draggable?: boolean
-  isOpponent?: boolean
-  canManipulateOpponent?: boolean
-  label?: string
-  separateLands?: boolean
-  cardSize?: 'xs' | 'sm' | 'md' | 'lg'
+  cards: CardType[];
+  selectedCardId?: string;
+  onCardClick?: (card: CardType) => void;
+  onCardDoubleClick?: (card: CardType) => void;
+  onCardContextMenu?: (e: React.MouseEvent, card: CardType) => void;
+  tappedCardIds?: Set<string>;
+  faceDownCardIds?: Set<string>;
+  counters?: Record<string, Record<string, number>>;
+  attachments?: Record<string, string[]>;
+  validFromZones?: ZoneName[];
+  draggable?: boolean;
+  isOpponent?: boolean;
+  canManipulateOpponent?: boolean;
+  label?: string;
+  separateLands?: boolean;
+  cardSize?: "xs" | "sm" | "md" | "lg";
 }
 
 export function BattlefieldZone({
@@ -35,28 +35,32 @@ export function BattlefieldZone({
   faceDownCardIds = new Set(),
   counters = {},
   attachments = {},
-  validFromZones = ['hand', 'graveyard', 'exile', 'command_zone'],
+  validFromZones = ["hand", "graveyard", "exile", "command_zone"],
   draggable = true,
   isOpponent = false,
   canManipulateOpponent = false,
   label,
   separateLands = false,
-  cardSize = 'sm',
+  cardSize = "sm",
 }: BattlefieldZoneProps) {
-  const allowInteraction = !isOpponent || canManipulateOpponent
-  const attachedCardIds = new Set(Object.values(attachments).flat())
-  const topLevelCards = cards.filter(c => !attachedCardIds.has(c.id))
+  const allowInteraction = !isOpponent || canManipulateOpponent;
+  const attachedCardIds = new Set(Object.values(attachments).flat());
+  const topLevelCards = cards.filter((c) => !attachedCardIds.has(c.id));
 
-  const lands = separateLands ? topLevelCards.filter(isLandOrTreasure) : []
-  const permanents = separateLands ? topLevelCards.filter((c) => !isLandOrTreasure(c)) : topLevelCards
+  const lands = separateLands ? topLevelCards.filter(isLandOrTreasure) : [];
+  const permanents = separateLands
+    ? topLevelCards.filter((c) => !isLandOrTreasure(c))
+    : topLevelCards;
 
   const getAttachedCards = (parentId: string): CardType[] => {
-    const childIds = attachments[parentId] || []
-    return childIds.map(id => cards.find(c => c.id === id)).filter((c): c is CardType => !!c)
-  }
+    const childIds = attachments[parentId] || [];
+    return childIds
+      .map((id) => cards.find((c) => c.id === id))
+      .filter((c): c is CardType => !!c);
+  };
 
   const renderCard = (card: CardType) => {
-    const attachedCards = getAttachedCards(card.id)
+    const attachedCards = getAttachedCards(card.id);
 
     if (attachedCards.length > 0) {
       return (
@@ -76,18 +80,18 @@ export function BattlefieldZone({
           onCardDoubleClick={onCardDoubleClick}
           onCardContextMenu={onCardContextMenu}
         />
-      )
+      );
     }
 
-    const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+    const zoneOwner = isOpponent ? "opponent" : ("player" as const);
 
     return (
       <div
         key={card.id}
         onContextMenu={(e) => {
           if (allowInteraction) {
-            e.preventDefault()
-            onCardContextMenu?.(e, card)
+            e.preventDefault();
+            onCardContextMenu?.(e, card);
           }
         }}
       >
@@ -106,10 +110,10 @@ export function BattlefieldZone({
           isOpponent={isOpponent}
         />
       </div>
-    )
-  }
+    );
+  };
 
-  const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+  const zoneOwner = isOpponent ? "opponent" : ("player" as const);
 
   return (
     <DroppableZone
@@ -124,30 +128,26 @@ export function BattlefieldZone({
           {label}
         </div>
       )}
-      <div className={`flex flex-col gap-2 min-h-[120px] ${isOpponent ? 'flex-col-reverse' : ''}`}>
+      <div
+        className={`flex flex-col gap-2 min-h-[112px] ${isOpponent ? "flex-col-reverse" : ""}`}
+      >
         {/* Permanents (non-lands) */}
-        <div className="flex justify-center flex-wrap gap-3">
+        <div className="flex justify-center flex-wrap gap-3 min-h-[112px]">
           {permanents.length === 0 && lands.length === 0 ? (
             <div className="text-gray-500 text-sm opacity-50">
-              {isOpponent ? "Opponent's battlefield" : 'Empty battlefield'}
+              {isOpponent ? "Opponent's battlefield" : "Empty battlefield"}
             </div>
           ) : (
             permanents.map(renderCard)
           )}
         </div>
-        {/* Lands (separate row if enabled, always visible) */}
-        {separateLands && (
-          <div className="flex justify-center flex-wrap gap-2 pt-2 border-t border-gray-700/50 min-h-[50px]">
-            {lands.length > 0 ? (
-              lands.map(renderCard)
-            ) : (
-              <div className="text-gray-600 text-xs border border-dashed border-gray-700 rounded px-3 py-2">
-                Lands
-              </div>
-            )}
+        {/* Lands (separate row if enabled) */}
+        {separateLands && lands.length > 0 && (
+          <div className="flex justify-center flex-wrap gap-2">
+            {lands.map(renderCard)}
           </div>
         )}
       </div>
     </DroppableZone>
-  )
+  );
 }
