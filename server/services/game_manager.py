@@ -1282,6 +1282,13 @@ class GameManager:
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
+            fake_player.last_battle_result = LastBattleResult(
+                opponent_name=player.name,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                poison_dealt=poison_taken,
+                poison_taken=poison_dealt,
+            )
             winner.phase = "winner"
             winner.placement = 1
             self.complete_game(game_id or "", winner, db)
