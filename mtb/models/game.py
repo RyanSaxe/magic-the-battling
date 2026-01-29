@@ -182,6 +182,9 @@ class Player(BaseModel):
 
     def populate_hand(self) -> None:
         """Populate hand with previous battle cards, then fill remaining slots by ELO."""
+        self.sideboard.extend(self.hand)
+        self.hand.clear()
+
         for card_id in self.previous_hand_ids:
             card = next((c for c in self.sideboard if c.id == card_id), None)
             if card:
