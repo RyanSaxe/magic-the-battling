@@ -22,6 +22,7 @@ from mtb.models.game import (
     Config,
     FakePlayer,
     Game,
+    LastBattleResult,
     Player,
     StaticOpponent,
     Zones,
@@ -769,17 +770,21 @@ class GameManager:
     ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
 
-        if viewer.round > 1:
-            prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round - 1)
-        elif viewer.stage > 3:
-            prior_snapshot = fake.get_opponent_for_round(viewer.stage - 1, 3)
+        if viewer.in_sudden_death:
+            revealed_cards = (snapshot.hand + snapshot.command_zone) if snapshot else []
+            prior_upgrades = snapshot.upgrades if snapshot else []
         else:
-            prior_snapshot = None
+            if viewer.round > 1:
+                prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round - 1)
+            elif viewer.stage > 3:
+                prior_snapshot = fake.get_opponent_for_round(viewer.stage - 1, 3)
+            else:
+                prior_snapshot = None
 
-        prior_hand = prior_snapshot.hand if prior_snapshot else []
-        prior_command_zone = prior_snapshot.command_zone if prior_snapshot else []
-        revealed_cards = prior_hand + prior_command_zone
-        prior_upgrades = prior_snapshot.upgrades if prior_snapshot else []
+            prior_hand = prior_snapshot.hand if prior_snapshot else []
+            prior_command_zone = prior_snapshot.command_zone if prior_snapshot else []
+            revealed_cards = prior_hand + prior_command_zone
+            prior_upgrades = prior_snapshot.upgrades if prior_snapshot else []
 
         last_result = self._get_fake_player_last_result(fake)
 
@@ -1225,12 +1230,26 @@ class GameManager:
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
+            fake_player.last_battle_result = LastBattleResult(
+                opponent_name=player.name,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                poison_dealt=poison_taken,
+                poison_taken=poison_dealt,
+            )
             player.phase = "build"
             return None
 
         if player_at_lethal and bot_at_lethal:
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
+            )
+            fake_player.last_battle_result = LastBattleResult(
+                opponent_name=player.name,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                poison_dealt=poison_taken,
+                poison_taken=poison_dealt,
             )
             player.poison = game.config.poison_to_lose - 1
             fake_player.poison = game.config.poison_to_lose - 1
@@ -1243,6 +1262,13 @@ class GameManager:
         if player_at_lethal:
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
+            )
+            fake_player.last_battle_result = LastBattleResult(
+                opponent_name=player.name,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                poison_dealt=poison_taken,
+                poison_taken=poison_dealt,
             )
             eliminate_player(game, player, player.round, player.stage)
             process_bot_eliminations(game)
