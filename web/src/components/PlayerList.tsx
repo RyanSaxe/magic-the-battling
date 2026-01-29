@@ -1,5 +1,5 @@
 import type { PlayerView, LastResult } from '../types'
-import { PoisonIcon, MoneyBagIcon, GhostIcon, BotIcon } from './icons'
+import { PoisonIcon, MoneyBagIcon, GhostIcon, BotIcon, SkullIcon, HourglassIcon } from './icons'
 import { useContextStrip } from '../contexts'
 
 interface PlayerListProps {
@@ -98,17 +98,7 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
             onClick={() => handlePlayerClick(player)}
           >
             <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
-                <span className="text-white font-medium truncate max-w-[120px]">{player.name}</span>
-                {player.name === currentPlayerName && (
-                  <span className="text-xs text-amber-400">(You)</span>
-                )}
-                {player.is_most_recent_ghost ? (
-                  <GhostIcon size="sm" />
-                ) : player.is_bot ? (
-                  <BotIcon size="sm" />
-                ) : null}
-              </div>
+              <span className="text-white font-medium truncate max-w-[120px]">{player.name}</span>
               <ResultBadge result={player.last_result} inSuddenDeath={player.in_sudden_death} />
             </div>
             <div className="flex items-center justify-between text-xs">
@@ -125,11 +115,13 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
               </div>
               <span className="text-gray-500">
                 {player.is_ghost && !player.is_most_recent_ghost ? (
-                  <span className="text-red-400">Eliminated</span>
+                  <SkullIcon size="sm" />
                 ) : player.is_most_recent_ghost ? (
-                  <span className="text-red-400">the ghost</span>
+                  <GhostIcon size="sm" />
                 ) : player.phase === 'awaiting_elimination' ? (
-                  <span className="text-red-400">pending</span>
+                  <HourglassIcon size="sm" />
+                ) : player.is_bot ? (
+                  <BotIcon size="sm" />
                 ) : (
                   `${player.stage}-${player.round} @ ${player.phase === 'build' && player.build_ready ? 'ready' : player.phase}`
                 )}

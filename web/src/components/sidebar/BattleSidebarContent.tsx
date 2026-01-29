@@ -221,9 +221,9 @@ export function BattleSidebarContent({
           </div>
           <div className="text-center text-xs text-gray-500 mt-2">
             {coin_flip_name === playerName ? (
-              'You go first'
+              <>you are on the <span className="text-green-400">play</span></>
             ) : (
-              <><span className="text-amber-400">{coin_flip_name}</span> goes first</>
+              <>you are on the <span className="text-amber-400">draw</span></>
             )}
           </div>
           {onCreateTreasure && (
