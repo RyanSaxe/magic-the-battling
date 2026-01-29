@@ -17,6 +17,7 @@ export interface Card {
   tokens: Card[]
   elo: number | null
   upgrade_target: Card | null
+  oracle_text: string | null
 }
 
 export interface Zones {
@@ -78,6 +79,7 @@ export interface LastBattleResult {
 export interface SelfPlayerView extends PlayerView {
   hand: Card[]
   sideboard: Card[]
+  command_zone: Card[]
   current_pack: Card[] | null
   last_battle_result: LastBattleResult | null
   build_ready: boolean

@@ -35,7 +35,7 @@ export function BattlefieldZone({
   faceDownCardIds = new Set(),
   counters = {},
   attachments = {},
-  validFromZones = ['hand', 'graveyard', 'exile'],
+  validFromZones = ['hand', 'graveyard', 'exile', 'command_zone'],
   draggable = true,
   isOpponent = false,
   canManipulateOpponent = false,

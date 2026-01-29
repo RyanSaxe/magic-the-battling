@@ -315,8 +315,8 @@ def test_sideboard_fetch_to_battlefield_revealed(card_factory):
     assert wish_target in alice.most_recently_revealed_cards
 
 
-def test_sideboard_fetch_tracked_in_zones(card_factory):
-    """A card fetched from sideboard should be tracked in zones' revealed_sideboard_card_ids."""
+def test_sideboard_to_battlefield_syncs_player_model(card_factory):
+    """Moving sideboard->battlefield should remove card from player.sideboard."""
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
@@ -326,53 +326,31 @@ def test_sideboard_fetch_tracked_in_zones(card_factory):
     alice.sideboard = [wish_target]
 
     b = battle.start(game, alice, bob)
-    battle.move_zone(b, alice, wish_target, "sideboard", "hand")
 
-    assert wish_target.id in b.player_zones.revealed_sideboard_card_ids
+    manager = GameManager()
+    manager.handle_battle_move(game, alice, wish_target.id, "sideboard", "battlefield")
+
+    assert wish_target not in alice.sideboard
+    assert wish_target in b.player_zones.battlefield
 
 
-def test_sideboard_fetch_via_game_manager_tracked(card_factory):
-    """Sideboard->hand moves via GameManager should also be tracked in revealed_sideboard_card_ids."""
-
+def test_command_zone_to_battlefield_syncs_player_model(card_factory):
+    """Moving command_zone->battlefield should remove card from player.command_zone."""
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
     setup_battle_ready(bob, ["Island", "Island", "Island"])
 
-    companion = card_factory("Companion", "Creature")
-    alice.sideboard = [companion]
+    companion = card_factory("Companion", "Creature", oracle_text="Companion — test")
+    alice.command_zone = [companion]
 
     b = battle.start(game, alice, bob)
 
     manager = GameManager()
-    manager.handle_battle_move(game, alice, companion.id, "sideboard", "hand")
+    manager.handle_battle_move(game, alice, companion.id, "command_zone", "battlefield")
 
-    assert companion.id in b.player_zones.revealed_sideboard_card_ids
-
-
-def test_sideboard_fetch_via_game_manager_no_duplicates(card_factory):
-    """Sideboard card moved via GameManager then played should appear exactly once in revealed cards."""
-
-    game = create_game(["Alice", "Bob"], num_players=2)
-    alice, bob = game.players
-    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
-    setup_battle_ready(bob, ["Island", "Island", "Island"])
-
-    companion = card_factory("Companion", "Creature")
-    alice.sideboard = [companion]
-
-    b = battle.start(game, alice, bob)
-
-    manager = GameManager()
-    manager.handle_battle_move(game, alice, companion.id, "sideboard", "hand")
-    manager.handle_battle_move(game, alice, companion.id, "hand", "battlefield")
-
-    battle.submit_result(b, alice, "Alice")
-    battle.submit_result(b, bob, "Alice")
-    battle.end(game, b)
-
-    revealed_ids = [c.id for c in alice.most_recently_revealed_cards]
-    assert revealed_ids.count(companion.id) == 1
+    assert companion not in alice.command_zone
+    assert companion in b.player_zones.battlefield
 
 
 def test_end_battle_not_agreed_raises():
@@ -822,3 +800,76 @@ class TestOpponentZoneManipulation:
         result = battle.update_card_state(b, alice, "tap", opp_card.id)
         assert not result
         assert opp_card.id not in b.opponent_zones.tapped_card_ids
+
+
+def test_companion_filtered_from_sideboard_in_battle(card_factory):
+    """Companion should only appear in command_zone during battle, not sideboard."""
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice)
+    setup_battle_ready(bob)
+
+    companion = card_factory("Lurrus")
+    other_sideboard = card_factory("SideboardCard")
+    alice.command_zone = [companion]
+    alice.sideboard = [companion, other_sideboard]
+
+    b = battle.start(game, alice, bob)
+
+    assert companion in b.player_zones.command_zone
+    assert companion not in b.player_zones.sideboard
+    assert other_sideboard in b.player_zones.sideboard
+    assert len(b.player_zones.sideboard) == 1
+
+
+def test_companion_filtered_from_sideboard_vs_static_opponent(card_factory):
+    """Companion should be filtered from sideboard for static opponents too."""
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice)
+
+    companion = card_factory("Kaheera")
+    other_sideboard = card_factory("SideboardCard")
+
+    static_opp = StaticOpponent(
+        name="Bot1",
+        hand=[card_factory("BotCard")],
+        chosen_basics=["Plains", "Island", "Mountain"],
+        command_zone=[companion],
+        sideboard=[companion, other_sideboard],
+    )
+    fake = FakePlayer(name="Bot1", player_history_id=1)
+    fake.snapshots[f"{alice.stage}_1"] = static_opp
+    game.fake_players.append(fake)
+
+    b = battle.start(game, alice, static_opp)
+
+    assert companion in b.opponent_zones.command_zone
+    assert companion not in b.opponent_zones.sideboard
+    assert other_sideboard in b.opponent_zones.sideboard
+    assert len(b.opponent_zones.sideboard) == 1
+
+
+def test_companion_preserved_in_sideboard_after_battle(card_factory):
+    """Companion should be restored to sideboard after battle ends."""
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice)
+    setup_battle_ready(bob)
+
+    companion = card_factory("Lurrus")
+    other_sideboard = card_factory("SideboardCard")
+    alice.command_zone = [companion]
+    alice.sideboard = [companion, other_sideboard]
+
+    b = battle.start(game, alice, bob)
+
+    assert companion not in b.player_zones.sideboard
+    assert companion in b.player_zones.submitted_cards
+
+    battle.submit_result(b, alice, alice.name)
+    battle.submit_result(b, bob, alice.name)
+    battle.end(game, b)
+
+    assert companion in alice.sideboard
+    assert other_sideboard in alice.sideboard

@@ -11,6 +11,7 @@ interface DroppableZoneDisplayProps {
   validFromZones: ZoneName[]
   isOpponent?: boolean
   canManipulateOpponent?: boolean
+  titleClassName?: string
 }
 
 function ZoneModal({
@@ -74,6 +75,7 @@ export function DroppableZoneDisplay({
   validFromZones,
   isOpponent = false,
   canManipulateOpponent = false,
+  titleClassName = 'text-gray-400',
 }: DroppableZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -99,7 +101,7 @@ export function DroppableZoneDisplay({
               : 'cursor-default'
           }`}
         >
-          <div className="text-[10px] text-gray-400 uppercase mb-1">
+          <div className={`text-[10px] uppercase mb-1 ${titleClassName}`}>
             {title} ({cards.length})
           </div>
           {cards.length === 0 ? (

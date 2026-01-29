@@ -14,6 +14,7 @@ class StaticOpponent(BaseModel):
     name: str
     hand: list[Card]
     sideboard: list[Card] = Field(default_factory=list)
+    command_zone: list[Card] = Field(default_factory=list)
     upgrades: list[Card] = Field(default_factory=list)
     vanguard: Card | None = None
     chosen_basics: list[str] = Field(default_factory=list)
@@ -22,7 +23,6 @@ class StaticOpponent(BaseModel):
     hand_revealed: bool = False
     is_ghost: bool = True
     source_player_history_id: int | None = None
-    revealed_sideboard_cards: list[Card] = Field(default_factory=list)
 
     @classmethod
     def from_player(cls, player: "Player", hand_revealed: bool = False) -> "StaticOpponent":
@@ -30,6 +30,7 @@ class StaticOpponent(BaseModel):
             name=player.name,
             hand=player.hand.copy(),
             sideboard=player.sideboard.copy(),
+            command_zone=player.command_zone.copy(),
             upgrades=player.upgrades.copy(),
             vanguard=player.vanguard,
             chosen_basics=player.chosen_basics.copy(),
@@ -45,6 +46,7 @@ class StaticOpponent(BaseModel):
             name=player_name,
             hand=snapshot.hand,
             sideboard=snapshot.sideboard,
+            command_zone=snapshot.command_zone,
             upgrades=snapshot.applied_upgrades,
             vanguard=snapshot.vanguard,
             chosen_basics=snapshot.basic_lands,
@@ -53,7 +55,6 @@ class StaticOpponent(BaseModel):
             hand_revealed=True,
             is_ghost=False,
             source_player_history_id=history_id,
-            revealed_sideboard_cards=snapshot.revealed_sideboard_cards,
         )
 
 
@@ -66,7 +67,7 @@ class BattleSnapshotData(BaseModel):
     applied_upgrades: list[Card]
     treasures: int
     sideboard: list[Card] = Field(default_factory=list)
-    revealed_sideboard_cards: list[Card] = Field(default_factory=list)
+    command_zone: list[Card] = Field(default_factory=list)
 
 
 class FakePlayer(BaseModel):
@@ -133,6 +134,7 @@ class Player(BaseModel):
     most_recently_revealed_cards: list[Card] = Field(default_factory=list)
     hand: list[Card] = Field(default_factory=list)
     sideboard: list[Card] = Field(default_factory=list)
+    command_zone: list[Card] = Field(default_factory=list)
 
     vanquishers: int = 0
     poison: int = 0
@@ -259,7 +261,6 @@ class Zones(BaseModel):
     attachments: dict[str, list[str]] = Field(default_factory=dict)
     spawned_tokens: list[Card] = Field(default_factory=list)
     revealed_card_ids: list[str] = Field(default_factory=list)
-    revealed_sideboard_card_ids: list[str] = Field(default_factory=list)
 
     def get_zone(self, zone_name: ZoneName) -> list[Card]:
         match zone_name:

@@ -50,6 +50,14 @@ export function useGame(gameId: string | null, sessionId: string | null) {
     send('build_apply_upgrade', { upgrade_id: upgradeId, target_card_id: targetCardId })
   }, [send])
 
+  const buildSetCompanion = useCallback((cardId: string) => {
+    send('build_set_companion', { card_id: cardId })
+  }, [send])
+
+  const buildRemoveCompanion = useCallback(() => {
+    send('build_remove_companion')
+  }, [send])
+
   const battleMove = useCallback((cardId: string, fromZone: ZoneName, toZone: ZoneName) => {
     send('battle_move', { card_id: cardId, from_zone: fromZone, to_zone: toZone })
   }, [send])
@@ -98,6 +106,8 @@ export function useGame(gameId: string | null, sessionId: string | null) {
       buildReady,
       buildUnready,
       buildApplyUpgrade,
+      buildSetCompanion,
+      buildRemoveCompanion,
       battleMove,
       battleSubmitResult,
       battleUpdateCardState,

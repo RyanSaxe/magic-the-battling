@@ -27,7 +27,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   } | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [showSideboard, setShowSideboard] = useState(false)
-  const [showOpponentSideboard, setShowOpponentSideboard] = useState(false)
   const [showOpponentFullSideboard, setShowOpponentFullSideboard] = useState(false)
 
   const { current_battle } = gameState
@@ -44,7 +43,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   }
 
   const { your_zones, opponent_zones, opponent_name, opponent_hand_count, opponent_hand_revealed } = current_battle
-  const sideboard = gameState.self_player.sideboard
+  const sideboard = your_zones.sideboard
 
   const opponentPlayer = gameState.players.find((p) => p.name === opponent_name)
   const canManipulateOpponent = opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false
@@ -116,8 +115,14 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
         {/* Sudden Death Banner */}
         {current_battle.is_sudden_death && (
           <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center">
-            <div className="text-red-100 font-bold text-lg tracking-wider uppercase animate-pulse">
+            <div className="text-red-100 font-bold text-lg tracking-wider uppercase animate-pulse flex items-center justify-center gap-2">
               Sudden Death
+              <span className="relative group cursor-help">
+                <span className="text-red-300/80 text-sm not-italic">ⓘ</span>
+                <span className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 p-2 bg-black/95 border border-red-500/50 rounded text-xs text-left text-red-100 font-normal normal-case tracking-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                  Multiple players reached lethal poison. The two with the lowest poison are reset to 9 and face off. A draw causes both players to rebuild. Play continues until one is eliminated.
+                </span>
+              </span>
             </div>
             <div className="text-red-200/80 text-xs mt-1">
               Fight to survive - loser is eliminated!
@@ -136,7 +141,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               <DroppableZone
                 zone="hand"
                 zoneOwner="opponent"
-                validFromZones={['battlefield', 'graveyard', 'exile', 'sideboard']}
+                validFromZones={['battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
                 className="flex justify-center gap-1 flex-wrap min-h-[60px]"
               >
                 {opponent_hand_revealed
@@ -161,54 +166,20 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
           </div>
         )}
 
-        {/* Opponent's revealed sideboard (companions, wish targets - only for bots) */}
-        {(opponent_zones.sideboard.length > 0 || showFullSideboardButton) && (
+        {/* Full opponent sideboard button (for bots only) */}
+        {showFullSideboardButton && (
           <div className="px-4 py-2 bg-black/30 border-t border-gray-700/50">
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex justify-between items-center">
               <div className="text-xs text-gray-400 uppercase tracking-wide">
-                {opponent_zones.sideboard.length > 0
-                  ? <><span className="truncate max-w-[120px] inline-block align-bottom">{opponent_name}</span>'s Revealed Sideboard ({opponent_zones.sideboard.length})</>
-                  : <><span className="truncate max-w-[120px] inline-block align-bottom">{opponent_name}</span>'s Sideboard</>}
+                <span className="truncate max-w-[120px] inline-block align-bottom">{opponent_name}</span>'s Sideboard
               </div>
-              <div className="flex gap-2">
-                {showFullSideboardButton && (
-                  opponent_zones.sideboard.length > 0 ? (
-                    <button
-                      onClick={() => setShowOpponentFullSideboard(true)}
-                      className="text-xs px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-500 text-white animate-pulse"
-                    >
-                      ⚠️ Sideboard in use - click to view
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setShowOpponentFullSideboard(true)}
-                      className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300"
-                    >
-                      Full Sideboard ({opponentFullSideboard.length})
-                    </button>
-                  )
-                )}
-                {opponent_zones.sideboard.length > 0 && (
-                  <button
-                    onClick={() => setShowOpponentSideboard(true)}
-                    className="text-xs bg-purple-600 hover:bg-purple-500 px-2 py-1 rounded"
-                  >
-                    Expand Revealed
-                  </button>
-                )}
-              </div>
+              <button
+                onClick={() => setShowOpponentFullSideboard(true)}
+                className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300"
+              >
+                View ({opponentFullSideboard.length})
+              </button>
             </div>
-            {opponent_zones.sideboard.length > 0 && (
-              <div className="flex justify-center gap-1 flex-wrap">
-                {opponent_zones.sideboard.map((card) => (
-                  canManipulateOpponent ? (
-                    <DraggableCard key={card.id} card={card} zone="sideboard" zoneOwner="opponent" size="sm" isOpponent />
-                  ) : (
-                    <Card key={card.id} card={card} size="sm" />
-                  )
-                ))}
-              </div>
-            )}
           </div>
         )}
 
@@ -293,38 +264,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               <div className="flex flex-wrap gap-2">
                 {sideboard.map((card) => (
                   <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Opponent revealed sideboard modal */}
-        {showOpponentSideboard && (
-          <div
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-            onClick={() => setShowOpponentSideboard(false)}
-          >
-            <div
-              className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-white font-medium">{opponent_name}'s Revealed Sideboard ({opponent_zones.sideboard.length})</h3>
-                <button
-                  onClick={() => setShowOpponentSideboard(false)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {opponent_zones.sideboard.map((card) => (
-                  canManipulateOpponent ? (
-                    <DraggableCard key={card.id} card={card} zone="sideboard" zoneOwner="opponent" size="sm" isOpponent />
-                  ) : (
-                    <Card key={card.id} card={card} size="sm" />
-                  )
                 ))}
               </div>
             </div>

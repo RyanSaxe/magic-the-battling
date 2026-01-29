@@ -85,6 +85,8 @@ interface BuildPhaseProps {
     buildReady: (basics: string[]) => void
     buildUnready: () => void
     buildApplyUpgrade: (upgradeId: string, targetCardId: string) => void
+    buildSetCompanion: (cardId: string) => void
+    buildRemoveCompanion: () => void
   }
   selectedBasics: string[]
   onBasicsChange: (basics: string[]) => void
@@ -185,13 +187,24 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
   const unappliedUpgrades = self_player.upgrades.filter((u) => !u.upgrade_target)
   const handExceedsLimit = self_player.hand.length > maxHandSize
 
+  const isCompanion = (card: CardType) => card.oracle_text?.includes('Companion —') ?? false
+  const companionCards = self_player.sideboard.filter(isCompanion)
+  const selectedCompanionId = self_player.command_zone[0]?.id ?? null
+  const hasCompanions = companionCards.length > 0
+
   return (
     <div className="flex flex-col h-full gap-4 p-4">
       {/* Sudden Death Banner */}
       {gameState.self_player.in_sudden_death && (
         <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center">
-          <div className="text-red-100 font-bold text-lg tracking-wider uppercase animate-pulse">
+          <div className="text-red-100 font-bold text-lg tracking-wider uppercase animate-pulse flex items-center justify-center gap-2">
             Sudden Death
+            <span className="relative group cursor-help">
+              <span className="text-red-300/80 text-sm not-italic">ⓘ</span>
+              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 p-2 bg-black/95 border border-red-500/50 rounded text-xs text-left text-red-100 font-normal normal-case tracking-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                Multiple players reached lethal poison. The two with the lowest poison are reset to 9 and face off. A draw causes both players to rebuild. Play continues until one is eliminated.
+              </span>
+            </span>
           </div>
           <div className="text-red-200/80 text-xs mt-1">
             Build your deck - fight to survive!
@@ -246,6 +259,43 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
           >
             Cancel
           </button>
+        </div>
+      )}
+
+      {/* Companion selection row */}
+      {hasCompanions && (
+        <div className="bg-amber-900/30 rounded-lg p-3">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-amber-400 uppercase tracking-wide">⬢ Companion</span>
+              <span className="text-xs text-gray-400">(optional)</span>
+            </div>
+            <div className="flex gap-3 flex-1 justify-center items-center">
+              {companionCards.map((card) => {
+                const isSelected = card.id === selectedCompanionId
+                return (
+                  <div key={card.id} className="flex items-center gap-2">
+                    <Card
+                      card={card}
+                      size="sm"
+                      glow={isSelected ? 'gold' : 'none'}
+                      onClick={() => isSelected ? actions.buildRemoveCompanion() : actions.buildSetCompanion(card.id)}
+                    />
+                    <button
+                      onClick={() => isSelected ? actions.buildRemoveCompanion() : actions.buildSetCompanion(card.id)}
+                      className={`text-xs px-2 py-1 rounded ${
+                        isSelected
+                          ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                          : 'bg-amber-600 hover:bg-amber-500 text-white'
+                      }`}
+                    >
+                      {isSelected ? 'Remove' : 'Select'}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
 

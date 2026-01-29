@@ -11,13 +11,13 @@ interface UseDndActionsOptions {
 }
 
 const BATTLE_VALID_ZONES: Record<ZoneName, ZoneName[]> = {
-  hand: ['battlefield', 'graveyard', 'exile'],
-  battlefield: ['hand', 'graveyard', 'exile'],
-  graveyard: ['hand', 'battlefield', 'exile'],
-  exile: ['hand', 'battlefield', 'graveyard'],
-  sideboard: ['hand', 'battlefield', 'graveyard', 'exile'],
+  hand: ['battlefield', 'graveyard', 'exile', 'command_zone'],
+  battlefield: ['hand', 'graveyard', 'exile', 'command_zone'],
+  graveyard: ['hand', 'battlefield', 'exile', 'command_zone'],
+  exile: ['hand', 'battlefield', 'graveyard', 'command_zone'],
+  sideboard: ['hand', 'battlefield', 'graveyard', 'exile', 'command_zone'],
   upgrades: [],
-  command_zone: [],
+  command_zone: ['hand', 'battlefield', 'graveyard', 'exile'],
   library: [],
 }
 

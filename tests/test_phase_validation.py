@@ -74,6 +74,8 @@ class TestValidateActionPhase:
             "build_ready",
             "build_unready",
             "build_apply_upgrade",
+            "build_set_companion",
+            "build_remove_companion",
             "battle_move",
             "battle_submit_result",
             "battle_update_card_state",

@@ -14,9 +14,11 @@ def get_card_from_scryfall(card_id: str) -> Card:
         png_url = face_0.get("png")
         flip_image_url = face_1["normal"]
         flip_png_url = face_1.get("png")
+        oracle_text = card_json["card_faces"][0].get("oracle_text")
     else:
         flip_image_url = None
         flip_png_url = None
+        oracle_text = card_json.get("oracle_text")
     card = Card(
         name=card_json["name"],
         image_url=image_url,
@@ -25,6 +27,7 @@ def get_card_from_scryfall(card_id: str) -> Card:
         flip_png_url=flip_png_url,
         type_line=card_json["type_line"],
         id=card_json["id"],
+        oracle_text=oracle_text,
     )
 
     if card.type_line == "Vanguard":

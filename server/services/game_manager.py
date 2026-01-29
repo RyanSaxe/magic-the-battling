@@ -469,7 +469,7 @@ class GameManager:
             applied_upgrades=[u.model_copy() for u in player.upgrades if u.upgrade_target is not None],
             treasures=player.treasures,
             sideboard=[c.model_copy() for c in player.sideboard],
-            revealed_sideboard_cards=[],
+            command_zone=[c.model_copy() for c in player.command_zone],
         )
 
         snapshot = BattleSnapshot(
@@ -484,38 +484,6 @@ class GameManager:
             full_state_json=snapshot_data.model_dump_json(),
         )
         db.add(snapshot)
-        db.commit()
-
-    def _update_snapshot_revealed_sideboard(self, db: Session, game_id: str, player: Player, zones: Zones) -> None:
-        history = (
-            db.query(PlayerGameHistory)
-            .filter(
-                PlayerGameHistory.game_id == game_id,
-                PlayerGameHistory.player_name == player.name,
-            )
-            .first()
-        )
-        if not history:
-            return
-
-        stage = player.stage
-        snapshot = (
-            db.query(BattleSnapshot)
-            .filter(
-                BattleSnapshot.player_history_id == history.id,
-                BattleSnapshot.stage == stage,
-                BattleSnapshot.round == player.round,
-            )
-            .first()
-        )
-        if not snapshot:
-            return
-
-        snapshot_data = BattleSnapshotData.model_validate_json(snapshot.full_state_json)
-        all_cards = zones.hand + zones.sideboard + zones.battlefield + zones.graveyard + zones.exile
-        revealed_sb = [c for c in all_cards if c.id in zones.revealed_sideboard_card_ids]
-        snapshot_data.revealed_sideboard_cards = revealed_sb
-        snapshot.full_state_json = snapshot_data.model_dump_json()
         db.commit()
 
     def load_fake_players_for_game(
@@ -697,6 +665,7 @@ class GameManager:
                 last_result=self._get_last_result(player),
                 hand=player.hand,
                 sideboard=player.sideboard,
+                command_zone=player.command_zone,
                 current_pack=current_pack,
                 last_battle_result=player.last_battle_result,
                 build_ready=player.build_ready,
@@ -806,8 +775,7 @@ class GameManager:
             prior_snapshot = None
 
         prior_hand = prior_snapshot.hand if prior_snapshot else []
-        prior_revealed_sb = prior_snapshot.revealed_sideboard_cards if prior_snapshot else []
-        revealed_cards = prior_hand + prior_revealed_sb
+        revealed_cards = prior_hand
         prior_upgrades = prior_snapshot.upgrades if prior_snapshot else []
 
         last_result = self._get_fake_player_last_result(fake)
@@ -880,14 +848,13 @@ class GameManager:
 
         opponent_obj = b.opponent if is_player else b.player
         hand_revealed = isinstance(opponent_obj, StaticOpponent) and opponent_obj.hand_revealed
-        revealed_sb = opponent_obj.revealed_sideboard_cards if isinstance(opponent_obj, StaticOpponent) else []
 
         hidden_opponent = Zones(
             battlefield=opponent_zones.battlefield,
             graveyard=opponent_zones.graveyard,
             exile=opponent_zones.exile,
             hand=opponent_zones.hand if hand_revealed else [],
-            sideboard=revealed_sb,
+            sideboard=[],
             upgrades=opponent_zones.upgrades,
             command_zone=opponent_zones.command_zone,
             library=[],
@@ -1086,22 +1053,37 @@ class GameManager:
     def handle_build_apply_upgrade(self, player: Player, upgrade_id: str, target_card_id: str) -> bool:
         return self._apply_upgrade(player, upgrade_id, target_card_id)
 
+    def handle_build_set_companion(self, player: Player, card_id: str) -> str | None:
+        card = next((c for c in player.sideboard if c.id == card_id), None)
+        if not card:
+            return "Card not found in sideboard"
+        try:
+            build.set_companion(player, card)
+            return None
+        except ValueError as e:
+            return str(e)
+
+    def handle_build_remove_companion(self, player: Player) -> str | None:
+        try:
+            build.remove_companion(player)
+            return None
+        except ValueError as e:
+            return str(e)
+
     def handle_battle_move(
         self, game: Game, player: Player, card_id: str, from_zone: ZoneName, to_zone: ZoneName
     ) -> bool:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
-                # Handle sideboard -> hand moves for player's own cards (Wish/Companion support)
-                if from_zone == "sideboard" and to_zone == "hand":
+                # Sync Player model when moving from sideboard/command_zone
+                if from_zone == "sideboard":
                     card = next((c for c in player.sideboard if c.id == card_id), None)
                     if card:
                         player.sideboard.remove(card)
-                        zones = battle.get_zones_for_player(b, player)
-                        zones.sideboard.remove(card)
-                        zones.hand.append(card)
-                        if card.id not in zones.revealed_sideboard_card_ids:
-                            zones.revealed_sideboard_card_ids.append(card.id)
-                        return True
+                elif from_zone == "command_zone":
+                    card = next((c for c in player.command_zone if c.id == card_id), None)
+                    if card:
+                        player.command_zone.remove(card)
 
                 # Use zone lookup that handles opponent zones
                 try:
@@ -1124,8 +1106,6 @@ class GameManager:
                     and card.id not in zones.revealed_card_ids
                 ):
                     zones.revealed_card_ids.append(card.id)
-                if from_zone == "sideboard" and card.id not in zones.revealed_sideboard_card_ids:
-                    zones.revealed_sideboard_card_ids.append(card.id)
 
                 return True
         return False
@@ -1171,16 +1151,9 @@ class GameManager:
         return False
 
     def _end_battle(self, game: Game, b: Battle, game_id: str | None = None, db: Session | None = None) -> str | None:
-        player_zones = b.player_zones
-        opponent_zones = b.opponent_zones
         was_sudden_death = b.is_sudden_death
 
         result = battle.end(game, b)
-
-        if db is not None and game_id is not None:
-            self._update_snapshot_revealed_sideboard(db, game_id, b.player, player_zones)
-            if not isinstance(b.opponent, StaticOpponent):
-                self._update_snapshot_revealed_sideboard(db, game_id, b.opponent, opponent_zones)
 
         if isinstance(b.opponent, StaticOpponent):
             return self._handle_post_battle_static(game, b.player, b.opponent, result, was_sudden_death, game_id, db)

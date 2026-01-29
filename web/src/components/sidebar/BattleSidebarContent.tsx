@@ -85,6 +85,7 @@ function LifeCounter({
   )
 }
 
+
 function PlayerSection({
   name,
   poison,
@@ -116,6 +117,18 @@ function PlayerSection({
         </div>
       </div>
 
+      {zones.command_zone.length > 0 && (
+        <DroppableZoneDisplay
+          title="Command Zone"
+          zone="command_zone"
+          cards={zones.command_zone}
+          validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard']}
+          isOpponent={isOpponent}
+          canManipulateOpponent={canManipulateOpponent}
+          titleClassName="text-amber-400"
+        />
+      )}
+
       {isOpponent && appliedUpgrades.length > 0 && (
         <div className="flex gap-2 flex-wrap">
           {appliedUpgrades.map((upgrade) => (
@@ -128,7 +141,7 @@ function PlayerSection({
         title="Graveyard"
         zone="graveyard"
         cards={zones.graveyard}
-        validFromZones={['hand', 'battlefield', 'exile']}
+        validFromZones={['hand', 'battlefield', 'exile', 'command_zone']}
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
       />
@@ -136,7 +149,7 @@ function PlayerSection({
         title="Exile"
         zone="exile"
         cards={zones.exile}
-        validFromZones={['hand', 'battlefield', 'graveyard']}
+        validFromZones={['hand', 'battlefield', 'graveyard', 'command_zone']}
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
       />

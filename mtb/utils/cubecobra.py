@@ -31,4 +31,5 @@ def cubecobra_to_card(card_json: dict) -> Card:
         tokens=tokens,
         flip_image_url=card_json.get("image_flip"),
         id=f"{card_json['scryfall_id']}-{uuid4().hex[:8]}",
+        oracle_text=card_json.get("oracle_text"),
     )

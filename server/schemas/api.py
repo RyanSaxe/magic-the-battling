@@ -73,6 +73,7 @@ class PlayerView(BaseModel):
 class SelfPlayerView(PlayerView):
     hand: list[Card]
     sideboard: list[Card]
+    command_zone: list[Card] = []
     current_pack: list[Card] | None = None
     last_battle_result: LastBattleResult | None = None
     build_ready: bool = False

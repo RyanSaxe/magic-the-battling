@@ -176,26 +176,43 @@ export function Lobby() {
                     </div>
                   ))}
                   {botSlots > 0 && Array.from({ length: botSlots }).map((_, i) => {
-                    const botAvailable = availableBots !== null && i < availableBots
+                    const isSearching = availableBots === null
+                    const botAvailable = !isSearching && i < availableBots
+                    const botUnavailable = !isSearching && i >= availableBots
                     return (
                       <div
                         key={`bot-${i}`}
                         className={`bg-black/20 p-3 rounded-lg flex items-center justify-between border border-dashed ${
-                          botAvailable ? 'border-cyan-700' : 'border-red-700/50'
+                          isSearching ? 'border-amber-600/50' : botAvailable ? 'border-cyan-700' : 'border-red-700/50'
                         }`}
                       >
                         <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${botAvailable ? 'bg-cyan-600' : 'bg-red-700/50'}`} />
-                          <span className={`italic ${botAvailable ? 'text-cyan-500' : 'text-red-400/70'}`}>
+                          {isSearching ? (
+                            <svg className="animate-spin h-3 w-3 text-amber-500" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                          ) : (
+                            <span className={`w-2 h-2 rounded-full ${botAvailable ? 'bg-cyan-600' : 'bg-red-700/50'}`} />
+                          )}
+                          <span className={`italic ${isSearching ? 'text-amber-400' : botAvailable ? 'text-cyan-500' : 'text-red-400/70'}`}>
                             Bot {i + 1}
                           </span>
                         </div>
-                        {!botAvailable && (
-                          <span className="text-red-400/70 text-xs">No bot available</span>
+                        {isSearching && (
+                          <span className="text-amber-400/70 text-xs">Searching...</span>
+                        )}
+                        {botUnavailable && (
+                          <span className="text-red-400/70 text-xs">No match found</span>
                         )}
                       </div>
                     )
                   })}
+                  {botSlots > 0 && availableBots !== null && availableBots < botSlots && (
+                    <p className="text-gray-500 text-xs mt-2 px-1">
+                      Bots are past players with matching settings. Invite more players or try different game options.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -246,9 +263,9 @@ export function Lobby() {
                         : !allReady
                         ? 'Waiting for all players to ready'
                         : availableBots === null
-                        ? 'Loading bot availability...'
+                        ? 'Searching for bots...'
                         : !hasEnoughBots
-                        ? `Need ${botSlots - availableBots} more bot${botSlots - availableBots > 1 ? 's' : ''} (or more players)`
+                        ? `${botSlots - availableBots} bot${botSlots - availableBots > 1 ? 's' : ''} not found - invite players`
                         : 'Start Game'}
                     </button>
                   </>
