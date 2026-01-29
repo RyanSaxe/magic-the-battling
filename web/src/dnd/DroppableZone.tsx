@@ -2,9 +2,11 @@ import { useDroppable } from '@dnd-kit/core'
 import type { ReactNode } from 'react'
 import type { ZoneName } from '../types'
 import { useGameDnd } from './useGameDnd'
+import { makeZoneId, type ZoneOwner } from './types'
 
 interface DroppableZoneProps {
   zone: ZoneName
+  zoneOwner?: ZoneOwner
   children: ReactNode
   className?: string
   validFromZones?: ZoneName[]
@@ -13,6 +15,7 @@ interface DroppableZoneProps {
 
 export function DroppableZone({
   zone,
+  zoneOwner = 'player',
   children,
   className = '',
   validFromZones,
@@ -20,8 +23,9 @@ export function DroppableZone({
 }: DroppableZoneProps) {
   const { activeFromZone } = useGameDnd()
 
+  const zoneId = makeZoneId(zone, zoneOwner)
   const { setNodeRef, isOver } = useDroppable({
-    id: zone,
+    id: zoneId,
     disabled,
   })
 

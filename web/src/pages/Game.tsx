@@ -226,7 +226,13 @@ function GameContent() {
     game_over: 'battle',
   }[currentPhase] || 'draft'
 
-  const { self_player, current_battle } = gameState
+  const { self_player, current_battle, players } = gameState
+
+  const opponentPlayer = current_battle
+    ? players.find((p) => p.name === current_battle.opponent_name)
+    : null
+  const canManipulateOpponent = opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false
+  const opponentHasCompanion = (opponentPlayer?.command_zone.length ?? 0) > 0
   const maxHandSize = self_player.hand_size
   const handExceedsLimit = self_player.hand.length > maxHandSize
   const basicsComplete = selectedBasics.length === 3
@@ -383,6 +389,9 @@ function GameContent() {
           onOpponentLifeChange={handleOpponentLifeChange}
           playerName={self_player.name}
           onCreateTreasure={handleCreateTreasure}
+          canManipulateOpponent={canManipulateOpponent}
+          hasCompanion={self_player.command_zone.length > 0}
+          opponentHasCompanion={opponentHasCompanion}
         />
       )
     }
@@ -425,6 +434,7 @@ function GameContent() {
                 currentPlayer={self_player}
                 phaseContent={renderPhaseContent()}
                 useUpgrades={gameState.use_upgrades}
+                inSuddenDeath={self_player.in_sudden_death}
               />
             </div>
           </GameDndProvider>
@@ -484,6 +494,7 @@ function GameContent() {
               currentPlayer={self_player}
               phaseContent={renderPhaseContent()}
               useUpgrades={gameState.use_upgrades}
+              inSuddenDeath={self_player.in_sudden_death}
             />
           </div>
         )}

@@ -2,11 +2,12 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import type { Card as CardType, ZoneName } from '../types'
 import { Card } from '../components/card'
-import type { DragData } from './types'
+import { makeZoneId, type DragData, type ZoneOwner } from './types'
 
 interface DraggableCardProps {
   card: CardType
   zone: ZoneName
+  zoneOwner?: ZoneOwner
   onClick?: () => void
   onDoubleClick?: () => void
   onContextMenu?: (e: React.MouseEvent) => void
@@ -18,11 +19,13 @@ interface DraggableCardProps {
   glow?: 'none' | 'gold' | 'green' | 'red'
   disabled?: boolean
   isOpponent?: boolean
+  isCompanion?: boolean
 }
 
 export function DraggableCard({
   card,
   zone,
+  zoneOwner = 'player',
   onClick,
   onDoubleClick,
   onContextMenu,
@@ -34,11 +37,13 @@ export function DraggableCard({
   glow,
   disabled = false,
   isOpponent = false,
+  isCompanion = false,
 }: DraggableCardProps) {
-  const dragData: DragData = { card, fromZone: zone, isOpponent }
+  const zoneId = makeZoneId(zone, zoneOwner)
+  const dragData: DragData = { card, fromZone: zone, fromZoneId: zoneId, isOpponent }
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: `${zone}-${card.id}`,
+    id: `${zoneId}-${card.id}`,
     data: dragData,
     disabled,
   })
@@ -71,6 +76,7 @@ export function DraggableCard({
         counters={counters}
         glow={glow}
         dragging={isDragging}
+        isCompanion={isCompanion}
       />
     </div>
   )

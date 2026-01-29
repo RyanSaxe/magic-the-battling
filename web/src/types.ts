@@ -17,6 +17,7 @@ export interface Card {
   tokens: Card[]
   elo: number | null
   upgrade_target: Card | null
+  oracle_text: string | null
 }
 
 export interface Zones {
@@ -61,6 +62,7 @@ export interface PlayerView {
   pairing_probability: number | null
   is_most_recent_ghost: boolean
   full_sideboard: Card[]
+  command_zone: Card[]
   placement: number
 }
 
@@ -78,6 +80,7 @@ export interface LastBattleResult {
 export interface SelfPlayerView extends PlayerView {
   hand: Card[]
   sideboard: Card[]
+  command_zone: Card[]
   current_pack: Card[] | null
   last_battle_result: LastBattleResult | null
   build_ready: boolean
@@ -97,6 +100,7 @@ export interface BattleView {
   your_life: number
   opponent_life: number
   is_sudden_death: boolean
+  opponent_full_sideboard: Card[]
 }
 
 export interface GameState {

@@ -15,7 +15,7 @@ function getOrdinal(n: number): string {
   return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0])
 }
 
-function CardGrid({ cards, title, size = 'md' }: { cards: CardType[]; title: string; size?: 'sm' | 'md' | 'lg' }) {
+function CardGrid({ cards, title, size = 'md', companionIds }: { cards: CardType[]; title: string; size?: 'sm' | 'md' | 'lg'; companionIds?: Set<string> }) {
   if (cards.length === 0) return null
 
   return (
@@ -23,7 +23,7 @@ function CardGrid({ cards, title, size = 'md' }: { cards: CardType[]; title: str
       <h3 className="text-gray-400 text-sm mb-3">{title}</h3>
       <div className="flex flex-wrap gap-2 justify-center">
         {cards.map((card) => (
-          <Card key={card.id} card={card} size={size} />
+          <Card key={card.id} card={card} size={size} isCompanion={companionIds?.has(card.id)} />
         ))}
       </div>
     </div>
@@ -66,6 +66,7 @@ export function GameSummary({ player, players, onReturnHome, useUpgrades = true 
   const appliedUpgrades = player.upgrades.filter((u) => u.upgrade_target !== null)
   const hasUpgrades = useUpgrades && appliedUpgrades.length > 0
   const hasTopRow = hasHand || hasUpgrades
+  const companionIds = new Set(player.command_zone.map((c) => c.id))
 
   return (
     <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
@@ -80,11 +81,11 @@ export function GameSummary({ player, players, onReturnHome, useUpgrades = true 
         <div className="bg-black/30 rounded-lg p-6">
           {hasTopRow && (
             <div className={`grid gap-4 mb-4 ${hasHand && hasUpgrades ? 'grid-cols-2' : 'grid-cols-1'}`}>
-              <CardGrid cards={player.hand} title="Hand" />
+              <CardGrid cards={player.hand} title="Hand" companionIds={companionIds} />
               {useUpgrades && <UpgradeGrid upgrades={player.upgrades} />}
             </div>
           )}
-          <CardGrid cards={player.sideboard} title="Sideboard" />
+          <CardGrid cards={player.sideboard} title="Sideboard" companionIds={companionIds} />
         </div>
 
         <button

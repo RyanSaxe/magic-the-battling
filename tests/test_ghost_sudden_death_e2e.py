@@ -19,6 +19,7 @@ from mtb.models.game import (
 )
 from mtb.phases import battle
 from mtb.phases.elimination import (
+    check_game_over,
     get_live_bots,
     get_live_players,
     get_sudden_death_fighters,
@@ -877,3 +878,103 @@ class TestEdgeCases:
         end_battle_with_result(manager, game, b2, p4.name)
 
         assert count_live_participants(game) == 2, "Both should be eliminated now, 2 remain"
+
+
+class TestDoubleDrawBotSuddenDeath:
+    """Tests for the bug where double draw kills all bots but human survives.
+
+    The bug: In a 1H+3B game, when double draw results in all 3 bots reaching
+    lethal but human survives, game incorrectly declares human winner instead
+    of triggering sudden death between the 2 bots with lowest poison.
+    """
+
+    def test_double_draw_kills_three_bots_human_survives_triggers_sudden_death(self, reset_singletons, mock_cube_data):
+        """When 3 bots die from double draw but human survives, sudden death should trigger.
+
+        Setup: 1H + 3B game
+        - Human at poison 5 (survives)
+        - All 3 bots at poison 10 (lethal)
+
+        Expected: Sudden death triggers between 2 bots, winner advances to face human.
+        Human should NOT be declared winner immediately.
+        """
+        game, manager, participants = create_test_game(1, 3)
+
+        human = next(p for p in participants if isinstance(p, Player))
+        bots = [p for p in participants if isinstance(p, FakePlayer)]
+        bot1, bot2, bot3 = bots
+
+        for p in participants:
+            setup_participant_for_battle(p)
+
+        set_participant_poison(human, 5)
+        set_participant_poison(bot1, 10)
+        set_participant_poison(bot2, 10)
+        set_participant_poison(bot3, 10)
+
+        static_opponent = bot1.get_opponent_for_round(3, 1)
+        assert static_opponent is not None
+
+        b = start_battle_between(game, human, bot1)
+        assert b is not None
+
+        end_battle_with_result(manager, game, b, None, check_eliminations=False)
+
+        assert human.phase != "winner", f"Human should NOT be declared winner yet, got phase {human.phase}"
+
+        live_bots = get_live_bots(game)
+        assert len(live_bots) == 1, f"Exactly 1 bot should survive sudden death to face human, got {len(live_bots)}"
+
+        surviving_bot = live_bots[0]
+        assert surviving_bot.poison == 9, f"Surviving bot should have poison reset to 9, got {surviving_bot.poison}"
+
+        _, is_game_over = check_game_over(game)
+        assert not is_game_over, "Game should NOT be over - human vs bot finale remains"
+
+    def test_double_draw_kills_all_four_triggers_sudden_death(self, reset_singletons, mock_cube_data):
+        """When all 4 (human + 3 bots) reach lethal, sudden death triggers for 2 lowest.
+
+        Setup: 1H + 3B game, poison set so all are at lethal AFTER battle damage
+        - Human at 9 → 10 after draw (lowest - guaranteed fighter)
+        - Bot1 at 14 → 15 after draw (highest - eliminated immediately)
+        - Bot2/Bot3 at 12 (unchanged, not in battle)
+
+        Expected: Human + 1 bot go to sudden death, other 2 eliminated.
+        Human should be in build phase ready for sudden death battle.
+        """
+        game, manager, participants = create_test_game(1, 3)
+
+        human = next(p for p in participants if isinstance(p, Player))
+        bots = [p for p in participants if isinstance(p, FakePlayer)]
+        bot1, bot2, bot3 = bots
+
+        for p in participants:
+            setup_participant_for_battle(p)
+
+        set_participant_poison(human, 9)
+        set_participant_poison(bot1, 14)
+        set_participant_poison(bot2, 12)
+        set_participant_poison(bot3, 12)
+
+        static_opponent = bot1.get_opponent_for_round(3, 1)
+        assert static_opponent is not None
+
+        b = start_battle_between(game, human, bot1)
+        assert b is not None
+
+        end_battle_with_result(manager, game, b, None, check_eliminations=False)
+
+        live_bots = get_live_bots(game)
+        live_humans = get_live_players(game)
+        total_live = len(live_bots) + len(live_humans)
+
+        assert total_live == 2, f"Exactly 2 participants should remain for sudden death, got {total_live}"
+
+        assert human.phase == "build", f"Human should be in build phase for sudden death, got {human.phase}"
+        assert human.in_sudden_death, "Human should have in_sudden_death flag set"
+        assert human.poison == 9, f"Human poison should be reset to 9, got {human.poison}"
+
+        assert len(live_bots) == 1, "Exactly 1 bot should be in sudden death with human"
+        surviving_bot = live_bots[0]
+        assert surviving_bot.in_sudden_death, "Surviving bot should have in_sudden_death flag"
+        assert surviving_bot.poison == 9, f"Bot poison should be reset to 9, got {surviving_bot.poison}"

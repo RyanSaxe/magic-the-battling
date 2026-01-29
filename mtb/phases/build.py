@@ -104,6 +104,30 @@ def populate_hand(player: Player) -> None:
     player.populate_hand()
 
 
+def set_companion(player: Player, card: Card) -> None:
+    if player.phase != "build":
+        raise ValueError("Player is not in build phase")
+
+    if not card.is_companion:
+        raise ValueError(f"{card.name} is not a companion")
+
+    if card not in player.sideboard:
+        raise ValueError(f"{card.name} is not in player's sideboard")
+
+    player.command_zone.clear()
+    player.command_zone.append(card.model_copy())
+
+
+def remove_companion(player: Player) -> None:
+    if player.phase != "build":
+        raise ValueError("Player is not in build phase")
+
+    if not player.command_zone:
+        raise ValueError("No companion in command zone")
+
+    player.command_zone.clear()
+
+
 __all__ = [
     "VALID_BASICS",
     "move_card",
@@ -113,4 +137,6 @@ __all__ = [
     "all_ready",
     "populate_hand",
     "apply_upgrade_to_card",
+    "set_companion",
+    "remove_companion",
 ]

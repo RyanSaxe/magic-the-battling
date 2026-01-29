@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from uuid import uuid4
 
 from mtb.models.cards import Card
 from mtb.utils.json_helpers import get_json
@@ -29,5 +30,6 @@ def cubecobra_to_card(card_json: dict) -> Card:
         type_line=card_json["type"],
         tokens=tokens,
         flip_image_url=card_json.get("image_flip"),
-        id=card_json["scryfall_id"],
+        id=f"{card_json['scryfall_id']}-{uuid4().hex[:8]}",
+        oracle_text=card_json.get("oracle_text"),
     )

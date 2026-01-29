@@ -16,6 +16,7 @@ interface CardProps {
   dragging?: boolean
   disabled?: boolean
   className?: string
+  isCompanion?: boolean
 }
 
 const sizeStyles = {
@@ -45,6 +46,7 @@ export function Card({
   dragging = false,
   disabled = false,
   className = '',
+  isCompanion = false,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -76,6 +78,7 @@ export function Card({
     selected && 'selected',
     tapped && 'tapped',
     dragging && 'dragging',
+    isCompanion && 'ring-2 ring-purple-500',
     className,
   ].filter(Boolean).join(' ')
 
@@ -155,6 +158,11 @@ export function Card({
               {type === '+1/+1' ? `+${count}/+${count}` : `${count} ${type}`}
             </div>
           ))}
+        </div>
+      )}
+      {isCompanion && (
+        <div className="absolute bottom-0 right-0 bg-purple-600/90 text-white text-xs px-1.5 py-0.5 rounded-tl font-medium">
+          Companion
         </div>
       )}
     </div>

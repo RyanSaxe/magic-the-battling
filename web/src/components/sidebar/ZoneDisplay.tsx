@@ -8,17 +8,20 @@ interface ZoneDisplayProps {
   cards: CardType[]
   maxThumbnails?: number
   showUpgradeTargets?: boolean
+  companionIds?: Set<string>
 }
 
 function ZoneModal({
   title,
   cards,
   showUpgradeTargets,
+  companionIds,
   onClose,
 }: {
   title: string
   cards: CardType[]
   showUpgradeTargets?: boolean
+  companionIds?: Set<string>
   onClose: () => void
 }) {
   return (
@@ -47,7 +50,7 @@ function ZoneModal({
               showUpgradeTargets ? (
                 <UpgradeStack key={card.id} upgrade={card} size="sm" />
               ) : (
-                <Card key={card.id} card={card} size="sm" />
+                <Card key={card.id} card={card} size="sm" isCompanion={companionIds?.has(card.id)} />
               )
             )}
           </div>
@@ -57,7 +60,7 @@ function ZoneModal({
   )
 }
 
-export function ZoneDisplay({ title, cards, maxThumbnails = 6, showUpgradeTargets = false }: ZoneDisplayProps) {
+export function ZoneDisplay({ title, cards, maxThumbnails = 6, showUpgradeTargets = false, companionIds }: ZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
 
   const displayedCards = cards.slice(0, maxThumbnails)
@@ -87,7 +90,7 @@ export function ZoneDisplay({ title, cards, maxThumbnails = 6, showUpgradeTarget
                 showUpgradeTargets ? (
                   <UpgradeStack key={card.id} upgrade={card} size="xs" />
                 ) : (
-                  <Card key={card.id} card={card} size="sm" />
+                  <Card key={card.id} card={card} size="sm" isCompanion={companionIds?.has(card.id)} />
                 )
               )}
             </div>
@@ -103,6 +106,7 @@ export function ZoneDisplay({ title, cards, maxThumbnails = 6, showUpgradeTarget
           title={title}
           cards={cards}
           showUpgradeTargets={showUpgradeTargets}
+          companionIds={companionIds}
           onClose={() => setShowModal(false)}
         />
       )}

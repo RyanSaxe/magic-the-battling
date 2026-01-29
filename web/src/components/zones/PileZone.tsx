@@ -11,6 +11,7 @@ interface PileZoneProps {
   validFromZones?: ZoneName[]
   draggable?: boolean
   isOpponent?: boolean
+  canManipulateOpponent?: boolean
 }
 
 export function PileZone({
@@ -21,8 +22,11 @@ export function PileZone({
   validFromZones,
   draggable = true,
   isOpponent = false,
+  canManipulateOpponent = false,
 }: PileZoneProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const allowInteraction = !isOpponent || canManipulateOpponent
+  const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
   const defaultValidZones = zone === 'graveyard'
     ? ['hand', 'battlefield', 'exile']
@@ -37,8 +41,9 @@ export function PileZone({
     return (
       <DroppableZone
         zone={zone}
+        zoneOwner={zoneOwner}
         validFromZones={validFromZones || defaultValidZones as ZoneName[]}
-        disabled={isOpponent}
+        disabled={!allowInteraction}
         className={`zone-pile ${bgColor} w-16 h-24 flex items-center justify-center`}
       >
         <span className="text-gray-500 text-xs">{label}</span>
@@ -69,11 +74,12 @@ export function PileZone({
           </div>
           <div className="flex flex-wrap gap-2">
             {cards.map((card) => (
-              draggable && !isOpponent ? (
+              draggable && allowInteraction ? (
                 <DraggableCard
                   key={card.id}
                   card={card}
                   zone={zone}
+                  zoneOwner={zoneOwner}
                   size="sm"
                   selected={card.id === selectedCardId}
                   onClick={() => onCardClick?.(card)}
@@ -97,8 +103,9 @@ export function PileZone({
   return (
     <DroppableZone
       zone={zone}
+      zoneOwner={zoneOwner}
       validFromZones={validFromZones || defaultValidZones as ZoneName[]}
-      disabled={isOpponent}
+      disabled={!allowInteraction}
       className={`zone-pile ${bgColor}`}
     >
       <div

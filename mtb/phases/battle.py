@@ -50,15 +50,20 @@ def _create_treasure_token() -> Card:
 def _create_zones_for_player(player: Player) -> Zones:
     basics = [_create_basic_land(name) for name in player.chosen_basics]
     treasures = [_create_treasure_token() for _ in range(player.treasures)]
+    command_zone_ids = {c.id for c in player.command_zone}
+    sideboard_display = [c for c in player.sideboard if c.id not in command_zone_ids]
     submitted = player.hand + player.sideboard
+    revealed_card_ids = [c.id for c in player.command_zone]
     return Zones(
         battlefield=basics + treasures,
         hand=player.hand.copy(),
-        sideboard=player.sideboard.copy(),
+        sideboard=sideboard_display,
+        command_zone=player.command_zone.copy(),
         upgrades=player.upgrades.copy(),
         treasures=player.treasures,
         submitted_cards=submitted,
         original_hand_ids=[c.id for c in player.hand],
+        revealed_card_ids=revealed_card_ids,
     )
 
 
@@ -298,15 +303,20 @@ def get_pairing_probabilities(game: Game, player: Player) -> dict[str, float]:
 def _create_zones_for_static_opponent(opponent: StaticOpponent) -> Zones:
     basics = [_create_basic_land(name) for name in opponent.chosen_basics]
     treasures = [_create_treasure_token() for _ in range(opponent.treasures)]
+    command_zone_ids = {c.id for c in opponent.command_zone}
+    sideboard_display = [c for c in opponent.sideboard if c.id not in command_zone_ids]
     submitted = opponent.hand + opponent.sideboard
+    revealed_card_ids = [c.id for c in opponent.command_zone]
     return Zones(
         battlefield=basics + treasures,
         hand=opponent.hand.copy(),
-        sideboard=opponent.sideboard.copy(),
+        sideboard=sideboard_display,
+        command_zone=opponent.command_zone.copy(),
         upgrades=opponent.upgrades.copy(),
         treasures=opponent.treasures,
         submitted_cards=submitted,
         original_hand_ids=[c.id for c in opponent.hand],
+        revealed_card_ids=revealed_card_ids,
     )
 
 
@@ -401,7 +411,7 @@ def get_zones_for_player(battle: Battle, player: Player) -> Zones:
         raise ValueError("Player is not in this battle")
 
 
-REVEALED_ZONES: set[ZoneName] = {"battlefield", "graveyard", "exile"}
+REVEALED_ZONES: set[ZoneName] = {"battlefield", "graveyard", "exile", "command_zone"}
 
 
 def move_zone(battle: Battle, player: Player, card: Card, from_zone: ZoneName, to_zone: ZoneName) -> None:
@@ -420,9 +430,6 @@ def move_zone(battle: Battle, player: Player, card: Card, from_zone: ZoneName, t
 
     if to_zone in REVEALED_ZONES and _is_revealed_card(card) and card.id not in zones.revealed_card_ids:
         zones.revealed_card_ids.append(card.id)
-
-    if from_zone == "sideboard" and card.id not in zones.revealed_sideboard_card_ids:
-        zones.revealed_sideboard_card_ids.append(card.id)
 
 
 DRAW_RESULT = "draw"
@@ -510,7 +517,7 @@ def _is_revealed_card(card: Card) -> bool:
 
 
 def _collect_revealed_cards(zones: Zones) -> list[Card]:
-    all_cards = zones.hand + zones.sideboard + zones.battlefield + zones.graveyard + zones.exile
+    all_cards = zones.hand + zones.sideboard + zones.battlefield + zones.graveyard + zones.exile + zones.command_zone
     return [c for c in all_cards if c.id in zones.revealed_card_ids]
 
 
@@ -612,6 +619,39 @@ _CARD_STATE_HANDLERS: dict[str, CardStateHandler] = {
 }
 
 
+_SEARCHABLE_ZONES: list[ZoneName] = ["battlefield", "hand", "graveyard", "exile", "sideboard", "command_zone"]
+
+
+def get_zones_for_card(battle: Battle, player: Player, card_id: str) -> tuple[Zones, bool]:
+    """Find zones containing card. Returns (zones, is_opponent_zones).
+
+    Searches player's zones first, then opponent zones if opponent is StaticOpponent.
+    Raises ValueError if card not found.
+    """
+    player_zones = get_zones_for_player(battle, player)
+
+    for zone_name in _SEARCHABLE_ZONES:
+        zone_cards = player_zones.get_zone(zone_name)
+        if any(c.id == card_id for c in zone_cards):
+            return player_zones, False
+
+    if any(c.id == card_id for c in player_zones.spawned_tokens):
+        return player_zones, False
+
+    if _is_static_opponent(battle.opponent):
+        opp_zones = battle.opponent_zones if player.name == battle.player.name else battle.player_zones
+        for zone_name in _SEARCHABLE_ZONES:
+            if any(c.id == card_id for c in opp_zones.get_zone(zone_name)):
+                return opp_zones, True
+        if any(c.id == card_id for c in opp_zones.spawned_tokens):
+            return opp_zones, True
+
+    raise ValueError(f"Card {card_id} not found")
+
+
+_ACTIONS_WITHOUT_CARD = {"spawn", "create_treasure"}
+
+
 def update_card_state(
     battle: Battle,
     player: Player,
@@ -619,10 +659,19 @@ def update_card_state(
     card_id: str,
     data: dict | None = None,
 ) -> bool:
-    zones = get_zones_for_player(battle, player)
     handler = _CARD_STATE_HANDLERS.get(action_type)
     if not handler:
         return False
+
+    # Actions like spawn/create_treasure don't need an existing card
+    if action_type in _ACTIONS_WITHOUT_CARD:
+        zones = get_zones_for_player(battle, player)
+    else:
+        try:
+            zones, _ = get_zones_for_card(battle, player, card_id)
+        except ValueError:
+            return False
+
     return handler(zones, card_id, data or {})
 
 

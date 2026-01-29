@@ -469,7 +469,7 @@ class GameManager:
             applied_upgrades=[u.model_copy() for u in player.upgrades if u.upgrade_target is not None],
             treasures=player.treasures,
             sideboard=[c.model_copy() for c in player.sideboard],
-            revealed_sideboard_cards=[],
+            command_zone=[c.model_copy() for c in player.command_zone],
         )
 
         snapshot = BattleSnapshot(
@@ -484,38 +484,6 @@ class GameManager:
             full_state_json=snapshot_data.model_dump_json(),
         )
         db.add(snapshot)
-        db.commit()
-
-    def _update_snapshot_revealed_sideboard(self, db: Session, game_id: str, player: Player, zones: Zones) -> None:
-        history = (
-            db.query(PlayerGameHistory)
-            .filter(
-                PlayerGameHistory.game_id == game_id,
-                PlayerGameHistory.player_name == player.name,
-            )
-            .first()
-        )
-        if not history:
-            return
-
-        stage = player.stage
-        snapshot = (
-            db.query(BattleSnapshot)
-            .filter(
-                BattleSnapshot.player_history_id == history.id,
-                BattleSnapshot.stage == stage,
-                BattleSnapshot.round == player.round,
-            )
-            .first()
-        )
-        if not snapshot:
-            return
-
-        snapshot_data = BattleSnapshotData.model_validate_json(snapshot.full_state_json)
-        all_cards = zones.hand + zones.sideboard + zones.battlefield + zones.graveyard + zones.exile
-        revealed_sb = [c for c in all_cards if c.id in zones.revealed_sideboard_card_ids]
-        snapshot_data.revealed_sideboard_cards = revealed_sb
-        snapshot.full_state_json = snapshot_data.model_dump_json()
         db.commit()
 
     def load_fake_players_for_game(
@@ -697,6 +665,7 @@ class GameManager:
                 last_result=self._get_last_result(player),
                 hand=player.hand,
                 sideboard=player.sideboard,
+                command_zone=player.command_zone,
                 current_pack=current_pack,
                 last_battle_result=player.last_battle_result,
                 build_ready=player.build_ready,
@@ -786,6 +755,7 @@ class GameManager:
             pairing_probability=probabilities.get(player.name, 0.0),
             is_most_recent_ghost=player.name == most_recent_ghost_name,
             full_sideboard=player.sideboard if is_eliminated else [],
+            command_zone=player.command_zone,
             placement=player.placement,
         )
 
@@ -806,8 +776,8 @@ class GameManager:
             prior_snapshot = None
 
         prior_hand = prior_snapshot.hand if prior_snapshot else []
-        prior_revealed_sb = prior_snapshot.revealed_sideboard_cards if prior_snapshot else []
-        revealed_cards = prior_hand + prior_revealed_sb
+        prior_command_zone = prior_snapshot.command_zone if prior_snapshot else []
+        revealed_cards = prior_hand + prior_command_zone
         prior_upgrades = prior_snapshot.upgrades if prior_snapshot else []
 
         last_result = self._get_fake_player_last_result(fake)
@@ -836,6 +806,7 @@ class GameManager:
                 pairing_probability=probabilities.get(fake.name, 0.0),
                 is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
                 full_sideboard=snapshot.sideboard,
+                command_zone=snapshot.command_zone,
                 placement=fake.placement,
             )
         return PlayerView(
@@ -861,6 +832,7 @@ class GameManager:
             pairing_probability=probabilities.get(fake.name, 0.0),
             is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
             full_sideboard=[],
+            command_zone=[],
             placement=fake.placement,
         )
 
@@ -880,14 +852,13 @@ class GameManager:
 
         opponent_obj = b.opponent if is_player else b.player
         hand_revealed = isinstance(opponent_obj, StaticOpponent) and opponent_obj.hand_revealed
-        revealed_sb = opponent_obj.revealed_sideboard_cards if isinstance(opponent_obj, StaticOpponent) else []
 
         hidden_opponent = Zones(
             battlefield=opponent_zones.battlefield,
             graveyard=opponent_zones.graveyard,
             exile=opponent_zones.exile,
             hand=opponent_zones.hand if hand_revealed else [],
-            sideboard=revealed_sb,
+            sideboard=[],
             upgrades=opponent_zones.upgrades,
             command_zone=opponent_zones.command_zone,
             library=[],
@@ -906,6 +877,8 @@ class GameManager:
         your_life = b.player_life if is_player else b.opponent_life
         opponent_life = b.opponent_life if is_player else b.player_life
 
+        full_sideboard = opponent_zones.sideboard if isinstance(opponent_obj, StaticOpponent) else []
+
         return BattleView(
             opponent_name=opponent_name,
             coin_flip_name=b.coin_flip_name,
@@ -919,6 +892,7 @@ class GameManager:
             your_life=your_life,
             opponent_life=opponent_life,
             is_sudden_death=b.is_sudden_death,
+            opponent_full_sideboard=full_sideboard,
         )
 
     def handle_draft_swap(
@@ -1083,30 +1057,57 @@ class GameManager:
     def handle_build_apply_upgrade(self, player: Player, upgrade_id: str, target_card_id: str) -> bool:
         return self._apply_upgrade(player, upgrade_id, target_card_id)
 
+    def handle_build_set_companion(self, player: Player, card_id: str) -> str | None:
+        card = next((c for c in player.sideboard if c.id == card_id), None)
+        if not card:
+            return "Card not found in sideboard"
+        try:
+            build.set_companion(player, card)
+            return None
+        except ValueError as e:
+            return str(e)
+
+    def handle_build_remove_companion(self, player: Player) -> str | None:
+        try:
+            build.remove_companion(player)
+            return None
+        except ValueError as e:
+            return str(e)
+
     def handle_battle_move(
         self, game: Game, player: Player, card_id: str, from_zone: ZoneName, to_zone: ZoneName
     ) -> bool:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
-                # Handle sideboard -> hand moves (Wish/Companion support)
-                if from_zone == "sideboard" and to_zone == "hand":
+                # Sync Player model when moving from sideboard (for wish effects)
+                # Note: command_zone is NOT synced - companion selection persists
+                if from_zone == "sideboard":
                     card = next((c for c in player.sideboard if c.id == card_id), None)
-                    if not card:
-                        return False
-                    player.sideboard.remove(card)
-                    zones = battle.get_zones_for_player(b, player)
-                    zones.sideboard.remove(card)
-                    zones.hand.append(card)
-                    if card.id not in zones.revealed_sideboard_card_ids:
-                        zones.revealed_sideboard_card_ids.append(card.id)
-                    return True
+                    if card:
+                        player.sideboard.remove(card)
 
-                zones = battle.get_zones_for_player(b, player)
+                # Use zone lookup that handles opponent zones
+                try:
+                    zones, _ = battle.get_zones_for_card(b, player, card_id)
+                except ValueError:
+                    return False
+
                 from_list = zones.get_zone(from_zone)
                 card = next((c for c in from_list if c.id == card_id), None)
                 if not card:
                     return False
-                battle.move_zone(b, player, card, from_zone, to_zone)
+
+                from_list.remove(card)
+                zones.get_zone(to_zone).append(card)
+
+                # Track revealed cards when moving to public zones
+                if (
+                    to_zone in battle.REVEALED_ZONES
+                    and battle._is_revealed_card(card)
+                    and card.id not in zones.revealed_card_ids
+                ):
+                    zones.revealed_card_ids.append(card.id)
+
                 return True
         return False
 
@@ -1151,16 +1152,9 @@ class GameManager:
         return False
 
     def _end_battle(self, game: Game, b: Battle, game_id: str | None = None, db: Session | None = None) -> str | None:
-        player_zones = b.player_zones
-        opponent_zones = b.opponent_zones
         was_sudden_death = b.is_sudden_death
 
         result = battle.end(game, b)
-
-        if db is not None and game_id is not None:
-            self._update_snapshot_revealed_sideboard(db, game_id, b.player, player_zones)
-            if not isinstance(b.opponent, StaticOpponent):
-                self._update_snapshot_revealed_sideboard(db, game_id, b.opponent, opponent_zones)
 
         if isinstance(b.opponent, StaticOpponent):
             return self._handle_post_battle_static(game, b.player, b.opponent, result, was_sudden_death, game_id, db)
@@ -1302,12 +1296,18 @@ class GameManager:
             fake_player.in_sudden_death = True
             return "sudden_death"
 
-        # Non-finale lethal: check sudden death BEFORE bot elimination
-        if not is_finale and player_at_lethal:
+        # Non-finale: check sudden death BEFORE bot elimination
+        # This covers:
+        # 1. player_at_lethal - player needs elimination check
+        # 2. needs_sudden_death - multiple bots at lethal need sudden death
+        if not is_finale and (player_at_lethal or needs_sudden_death(game)):
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
-            player.phase = "awaiting_elimination"
+            if player_at_lethal:
+                player.phase = "awaiting_elimination"
+            else:
+                player.phase = "reward"
             return self._check_sudden_death_ready(game, game_id, db)
 
         # All other paths: eliminate bots normally

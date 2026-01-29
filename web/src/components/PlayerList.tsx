@@ -5,10 +5,26 @@ import { useContextStrip } from '../contexts'
 interface PlayerListProps {
   players: PlayerView[]
   currentPlayerName?: string
+  inSuddenDeath?: boolean
 }
 
-function ResultBadge({ result }: { result: LastResult | null }) {
+function ResultBadge({ result, inSuddenDeath }: { result: LastResult | null; inSuddenDeath?: boolean }) {
   if (result === null) return null
+
+  if (inSuddenDeath) {
+    if (result === 'win') {
+      return (
+        <span className="text-[10px] font-bold text-green-400 bg-green-900/50 py-0.5 px-2 rounded" title="Survived">
+          ✓
+        </span>
+      )
+    }
+    return (
+      <span className="text-[10px] font-bold text-red-400 bg-red-900/50 py-0.5 px-2 rounded" title="Eliminated">
+        💀
+      </span>
+    )
+  }
 
   if (result === 'win') {
     return (
@@ -47,7 +63,7 @@ function PairingProbability({ probability }: { probability: number | null }) {
   )
 }
 
-export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
+export function PlayerList({ players, currentPlayerName, inSuddenDeath }: PlayerListProps) {
   const { state, setRevealedPlayerName } = useContextStrip()
 
   const handlePlayerClick = (player: PlayerView) => {
@@ -101,7 +117,7 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                   <BotIcon size="sm" />
                 ) : null}
               </div>
-              <ResultBadge result={player.last_result} />
+              <ResultBadge result={player.last_result} inSuddenDeath={inSuddenDeath} />
             </div>
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-4">

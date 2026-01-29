@@ -110,3 +110,30 @@ def test_full_round_flow_round_2(card_factory, upgrade_factory):
     assert bob.phase == "draft"
     assert alice.round == 3
     assert bob.round == 3
+
+
+def test_populate_hand_clears_existing_hand(card_factory, upgrade_factory):
+    """Regression test: populate_hand should clear hand first to prevent exceeding hand_size.
+
+    This bug caused a game to hang at 3-3 when the hand ended up with 4 cards
+    but hand_size was 3, preventing the player from clicking ready.
+    """
+    game = create_game(["Alice"], num_players=1)
+    upgrades = [upgrade_factory(f"u{i}") for i in range(4)]
+    battler = Battler(cards=[card_factory(f"c{i}") for i in range(50)], upgrades=upgrades, vanguards=[])
+    set_battler(game, battler)
+
+    alice = game.players[0]
+    hand_size = alice.hand_size
+
+    original_hand_ids = [c.id for c in alice.hand]
+    alice.previous_hand_ids = original_hand_ids.copy()
+
+    extra_card = card_factory("extra")
+    alice.hand.append(extra_card)
+    assert len(alice.hand) == hand_size + 1
+
+    alice.populate_hand()
+
+    assert len(alice.hand) == hand_size
+    assert len(alice.hand) <= alice.hand_size

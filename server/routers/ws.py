@@ -17,6 +17,8 @@ ACTION_REQUIRED_PHASES: dict[str, str] = {
     "build_ready": "build",
     "build_unready": "build",
     "build_apply_upgrade": "build",
+    "build_set_companion": "build",
+    "build_remove_companion": "build",
     "battle_move": "battle",
     "battle_submit_result": "battle",
     "battle_update_card_state": "battle",
@@ -222,6 +224,10 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
             return game_manager.handle_build_unready(player)
         case "build_apply_upgrade":
             return game_manager.handle_build_apply_upgrade(player, payload["upgrade_id"], payload["target_card_id"])
+        case "build_set_companion":
+            return game_manager.handle_build_set_companion(player, payload["card_id"])
+        case "build_remove_companion":
+            return game_manager.handle_build_remove_companion(player)
         case "battle_move":
             return game_manager.handle_battle_move(
                 game, player, payload["card_id"], payload["from_zone"], payload["to_zone"]

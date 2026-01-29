@@ -67,12 +67,14 @@ class PlayerView(BaseModel):
     pairing_probability: float | None = None
     is_most_recent_ghost: bool = False
     full_sideboard: list[Card] = []
+    command_zone: list[Card] = []
     placement: int = 0
 
 
 class SelfPlayerView(PlayerView):
     hand: list[Card]
     sideboard: list[Card]
+    command_zone: list[Card] = []
     current_pack: list[Card] | None = None
     last_battle_result: LastBattleResult | None = None
     build_ready: bool = False
@@ -92,6 +94,7 @@ class BattleView(BaseModel):
     your_life: int = 20
     opponent_life: int = 20
     is_sudden_death: bool = False
+    opponent_full_sideboard: list[Card] = []
 
 
 class GameStateResponse(BaseModel):

@@ -17,6 +17,7 @@ class Card(BaseModel):
     flip_png_url: str | None = None
     elo: float = 0.0
     upgrade_target: "Card | None" = None
+    oracle_text: str | None = None
 
     # vanguard specific properties
     life_modifier: int | None = None
@@ -29,6 +30,10 @@ class Card(BaseModel):
     @property
     def is_vanguard(self) -> bool:
         return self.type_line.lower() == VANGUARD_TYPE
+
+    @property
+    def is_companion(self) -> bool:
+        return self.oracle_text is not None and "Companion —" in self.oracle_text
 
     def upgrade(self, upgrade: "Card") -> None:
         if not upgrade.is_upgrade:

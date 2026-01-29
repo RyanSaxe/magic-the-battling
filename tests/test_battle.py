@@ -315,8 +315,28 @@ def test_sideboard_fetch_to_battlefield_revealed(card_factory):
     assert wish_target in alice.most_recently_revealed_cards
 
 
-def test_sideboard_fetch_tracked_in_zones(card_factory):
-    """A card fetched from sideboard should be tracked in zones' revealed_sideboard_card_ids."""
+def test_hand_to_command_zone_revealed(card_factory):
+    """A card moved from hand to command zone should appear in most_recently_revealed_cards."""
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    creature = card_factory("Creature", "Creature")
+    alice.hand = [creature]
+
+    b = battle.start(game, alice, bob)
+    battle.move_zone(b, alice, creature, "hand", "command_zone")
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
+
+    battle.end(game, b)
+
+    assert creature in alice.most_recently_revealed_cards
+
+
+def test_sideboard_to_battlefield_syncs_player_model(card_factory):
+    """Moving sideboard->battlefield should remove card from player.sideboard."""
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
@@ -326,53 +346,35 @@ def test_sideboard_fetch_tracked_in_zones(card_factory):
     alice.sideboard = [wish_target]
 
     b = battle.start(game, alice, bob)
-    battle.move_zone(b, alice, wish_target, "sideboard", "hand")
 
-    assert wish_target.id in b.player_zones.revealed_sideboard_card_ids
+    manager = GameManager()
+    manager.handle_battle_move(game, alice, wish_target.id, "sideboard", "battlefield")
+
+    assert wish_target not in alice.sideboard
+    assert wish_target in b.player_zones.battlefield
 
 
-def test_sideboard_fetch_via_game_manager_tracked(card_factory):
-    """Sideboard->hand moves via GameManager should also be tracked in revealed_sideboard_card_ids."""
-
+def test_command_zone_to_battlefield_preserves_companion_selection(card_factory):
+    """Casting companion should preserve selection state for next build phase."""
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
     setup_battle_ready(bob, ["Island", "Island", "Island"])
 
-    companion = card_factory("Companion", "Creature")
-    alice.sideboard = [companion]
+    companion = card_factory("Companion", "Creature", oracle_text="Companion — test")
+    alice.command_zone = [companion]
 
     b = battle.start(game, alice, bob)
 
     manager = GameManager()
-    manager.handle_battle_move(game, alice, companion.id, "sideboard", "hand")
+    manager.handle_battle_move(game, alice, companion.id, "command_zone", "battlefield")
 
-    assert companion.id in b.player_zones.revealed_sideboard_card_ids
-
-
-def test_sideboard_fetch_via_game_manager_no_duplicates(card_factory):
-    """Sideboard card moved via GameManager then played should appear exactly once in revealed cards."""
-
-    game = create_game(["Alice", "Bob"], num_players=2)
-    alice, bob = game.players
-    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
-    setup_battle_ready(bob, ["Island", "Island", "Island"])
-
-    companion = card_factory("Companion", "Creature")
-    alice.sideboard = [companion]
-
-    b = battle.start(game, alice, bob)
-
-    manager = GameManager()
-    manager.handle_battle_move(game, alice, companion.id, "sideboard", "hand")
-    manager.handle_battle_move(game, alice, companion.id, "hand", "battlefield")
-
-    battle.submit_result(b, alice, "Alice")
-    battle.submit_result(b, bob, "Alice")
-    battle.end(game, b)
-
-    revealed_ids = [c.id for c in alice.most_recently_revealed_cards]
-    assert revealed_ids.count(companion.id) == 1
+    # Companion should remain in player.command_zone (selection state persists)
+    assert companion in alice.command_zone
+    # But should be on battlefield in battle zones
+    assert companion in b.player_zones.battlefield
+    # And removed from battle's command_zone
+    assert companion not in b.player_zones.command_zone
 
 
 def test_end_battle_not_agreed_raises():
@@ -609,6 +611,39 @@ class TestUnifiedPairingCandidates:
         candidates = battle.get_all_pairing_candidates(game, alice)
         assert candidates[0].hand[0].name == "later_card"
 
+    def test_fake_player_revealed_cards_includes_companion(self, card_factory):
+        """Fake player's revealed cards should include companion from command_zone."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+        alice.stage = 4
+        alice.round = 1
+
+        companion = card_factory("Lurrus", oracle_text="Companion — test")
+        creature = card_factory("Grizzly Bears")
+        prior_snapshot = StaticOpponent(
+            name="Bot1",
+            hand=[creature],
+            command_zone=[companion],
+            chosen_basics=["Plains", "Island", "Mountain"],
+        )
+        current_snapshot = StaticOpponent(
+            name="Bot1",
+            hand=[card_factory("current_card")],
+            command_zone=[companion],
+            chosen_basics=["Plains", "Island", "Mountain"],
+        )
+        fake = FakePlayer(name="Bot1", player_history_id=1)
+        fake.snapshots["3_3"] = prior_snapshot
+        fake.snapshots["4_1"] = current_snapshot
+        game.fake_players.append(fake)
+
+        manager = GameManager()
+        player_view = manager._make_fake_player_view(fake, alice, {})
+
+        assert creature in player_view.most_recently_revealed_cards
+        assert companion in player_view.most_recently_revealed_cards
+
 
 class TestViableCandidates:
     def test_get_viable_candidates_returns_all_when_three_or_fewer(self):
@@ -664,3 +699,234 @@ class TestViableCandidates:
         names1 = {c.name for c in viable_round1}
         names2 = {c.name for c in viable_round2}
         assert names1 != names2 or names1 == names2
+
+
+class TestOpponentZoneManipulation:
+    """Tests for manipulating opponent zones when opponent is StaticOpponent."""
+
+    def test_get_zones_for_card_finds_player_card(self, card_factory):
+        """get_zones_for_card returns player zones when card is in player's zones."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        card = card_factory("TestCard")
+        alice.hand = [card]
+
+        b = battle.start(game, alice, bob)
+
+        zones, is_opponent = battle.get_zones_for_card(b, alice, card.id)
+        assert zones == b.player_zones
+        assert not is_opponent
+
+    def test_get_zones_for_card_finds_opponent_card_vs_static(self, card_factory):
+        """get_zones_for_card finds card in opponent zones when opponent is StaticOpponent."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        opp_card = card_factory("OppCard")
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[opp_card],
+            sideboard=[],
+            upgrades=[],
+            vanguard=None,
+            chosen_basics=["Island", "Island", "Island"],
+            treasures=0,
+        )
+
+        b = battle.start(game, alice, static_opp)
+
+        zones, is_opponent = battle.get_zones_for_card(b, alice, opp_card.id)
+        assert zones == b.opponent_zones
+        assert is_opponent
+
+    def test_get_zones_for_card_raises_if_not_found(self, card_factory):
+        """get_zones_for_card raises ValueError if card not in any zones."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        b = battle.start(game, alice, bob)
+
+        with pytest.raises(ValueError, match="not found"):
+            battle.get_zones_for_card(b, alice, "nonexistent-card-id")
+
+    def test_update_card_state_works_on_opponent_card(self, card_factory):
+        """update_card_state can tap/untap opponent's cards when opponent is StaticOpponent."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        opp_card = card_factory("OppCard")
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[],
+            sideboard=[],
+            upgrades=[],
+            vanguard=None,
+            chosen_basics=["Island", "Island", "Island"],
+            treasures=0,
+        )
+
+        b = battle.start(game, alice, static_opp)
+        b.opponent_zones.battlefield.append(opp_card)
+
+        # Tap opponent's card
+        result = battle.update_card_state(b, alice, "tap", opp_card.id)
+        assert result
+        assert opp_card.id in b.opponent_zones.tapped_card_ids
+
+        # Untap opponent's card
+        result = battle.update_card_state(b, alice, "untap", opp_card.id)
+        assert result
+        assert opp_card.id not in b.opponent_zones.tapped_card_ids
+
+    def test_battle_move_works_on_opponent_card_via_game_manager(self, card_factory):
+        """handle_battle_move can move opponent's cards when opponent is StaticOpponent."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        opp_card = card_factory("OppCard")
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[],
+            sideboard=[],
+            upgrades=[],
+            vanguard=None,
+            chosen_basics=["Island", "Island", "Island"],
+            treasures=0,
+        )
+
+        b = battle.start(game, alice, static_opp)
+        b.opponent_zones.battlefield.append(opp_card)
+
+        manager = GameManager()
+        result = manager.handle_battle_move(game, alice, opp_card.id, "battlefield", "graveyard")
+
+        assert result
+        assert opp_card not in b.opponent_zones.battlefield
+        assert opp_card in b.opponent_zones.graveyard
+
+    def test_battle_move_works_on_static_opponent_basic_lands(self):
+        """handle_battle_move can move StaticOpponent's auto-created basic lands."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[],
+            sideboard=[],
+            upgrades=[],
+            vanguard=None,
+            chosen_basics=["Island", "Island", "Island"],
+            treasures=0,
+        )
+
+        b = battle.start(game, alice, static_opp)
+
+        # Get one of the auto-created basic lands
+        island = b.opponent_zones.battlefield[0]
+        assert "Island" in island.name
+
+        manager = GameManager()
+        result = manager.handle_battle_move(game, alice, island.id, "battlefield", "graveyard")
+
+        assert result
+        assert island not in b.opponent_zones.battlefield
+        assert island in b.opponent_zones.graveyard
+
+    def test_update_card_state_does_not_work_on_pvp_opponent(self, card_factory):
+        """update_card_state cannot modify opponent's cards in PvP battle."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        opp_card = card_factory("OppCard")
+        bob.hand = [opp_card]
+
+        b = battle.start(game, alice, bob)
+
+        # Alice tries to tap Bob's card - should fail
+        result = battle.update_card_state(b, alice, "tap", opp_card.id)
+        assert not result
+        assert opp_card.id not in b.opponent_zones.tapped_card_ids
+
+
+def test_companion_filtered_from_sideboard_in_battle(card_factory):
+    """Companion should only appear in command_zone during battle, not sideboard."""
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice)
+    setup_battle_ready(bob)
+
+    companion = card_factory("Lurrus")
+    other_sideboard = card_factory("SideboardCard")
+    alice.command_zone = [companion]
+    alice.sideboard = [companion, other_sideboard]
+
+    b = battle.start(game, alice, bob)
+
+    assert companion in b.player_zones.command_zone
+    assert companion not in b.player_zones.sideboard
+    assert other_sideboard in b.player_zones.sideboard
+    assert len(b.player_zones.sideboard) == 1
+
+
+def test_companion_filtered_from_sideboard_vs_static_opponent(card_factory):
+    """Companion should be filtered from sideboard for static opponents too."""
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice)
+
+    companion = card_factory("Kaheera")
+    other_sideboard = card_factory("SideboardCard")
+
+    static_opp = StaticOpponent(
+        name="Bot1",
+        hand=[card_factory("BotCard")],
+        chosen_basics=["Plains", "Island", "Mountain"],
+        command_zone=[companion],
+        sideboard=[companion, other_sideboard],
+    )
+    fake = FakePlayer(name="Bot1", player_history_id=1)
+    fake.snapshots[f"{alice.stage}_1"] = static_opp
+    game.fake_players.append(fake)
+
+    b = battle.start(game, alice, static_opp)
+
+    assert companion in b.opponent_zones.command_zone
+    assert companion not in b.opponent_zones.sideboard
+    assert other_sideboard in b.opponent_zones.sideboard
+    assert len(b.opponent_zones.sideboard) == 1
+
+
+def test_companion_preserved_in_sideboard_after_battle(card_factory):
+    """Companion should be restored to sideboard after battle ends."""
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice)
+    setup_battle_ready(bob)
+
+    companion = card_factory("Lurrus")
+    other_sideboard = card_factory("SideboardCard")
+    alice.command_zone = [companion]
+    alice.sideboard = [companion, other_sideboard]
+
+    b = battle.start(game, alice, bob)
+
+    assert companion not in b.player_zones.sideboard
+    assert companion in b.player_zones.submitted_cards
+
+    battle.submit_result(b, alice, alice.name)
+    battle.submit_result(b, bob, alice.name)
+    battle.end(game, b)
+
+    assert companion in alice.sideboard
+    assert other_sideboard in alice.sideboard

@@ -13,6 +13,9 @@ interface BattleSidebarContentProps {
   onOpponentLifeChange: (life: number) => void
   playerName: string
   onCreateTreasure?: () => void
+  canManipulateOpponent?: boolean
+  hasCompanion?: boolean
+  opponentHasCompanion?: boolean
 }
 
 function LifeCounter({
@@ -84,18 +87,23 @@ function LifeCounter({
   )
 }
 
+
 function PlayerSection({
   name,
   poison,
   zones,
   upgrades,
   isOpponent = false,
+  canManipulateOpponent = false,
+  hasCompanion = false,
 }: {
   name: string
   poison: number
   zones: Zones
   upgrades: CardType[]
   isOpponent?: boolean
+  canManipulateOpponent?: boolean
+  hasCompanion?: boolean
 }) {
   const appliedUpgrades = upgrades.filter((u) => u.upgrade_target)
 
@@ -113,6 +121,18 @@ function PlayerSection({
         </div>
       </div>
 
+      {(zones.command_zone.length > 0 || hasCompanion) && (
+        <DroppableZoneDisplay
+          title="Command Zone"
+          zone="command_zone"
+          cards={zones.command_zone}
+          validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard']}
+          isOpponent={isOpponent}
+          canManipulateOpponent={canManipulateOpponent}
+          titleClassName="text-amber-400"
+        />
+      )}
+
       {isOpponent && appliedUpgrades.length > 0 && (
         <div className="flex gap-2 flex-wrap">
           {appliedUpgrades.map((upgrade) => (
@@ -125,15 +145,17 @@ function PlayerSection({
         title="Graveyard"
         zone="graveyard"
         cards={zones.graveyard}
-        validFromZones={['hand', 'battlefield', 'exile']}
+        validFromZones={['hand', 'battlefield', 'exile', 'command_zone']}
         isOpponent={isOpponent}
+        canManipulateOpponent={canManipulateOpponent}
       />
       <DroppableZoneDisplay
         title="Exile"
         zone="exile"
         cards={zones.exile}
-        validFromZones={['hand', 'battlefield', 'graveyard']}
+        validFromZones={['hand', 'battlefield', 'graveyard', 'command_zone']}
         isOpponent={isOpponent}
+        canManipulateOpponent={canManipulateOpponent}
       />
 
       {!isOpponent && appliedUpgrades.length > 0 && (
@@ -156,6 +178,9 @@ export function BattleSidebarContent({
   onOpponentLifeChange,
   playerName,
   onCreateTreasure,
+  canManipulateOpponent = false,
+  hasCompanion = false,
+  opponentHasCompanion = false,
 }: BattleSidebarContentProps) {
   const { opponent_name, coin_flip_name, your_zones, opponent_zones } = currentBattle
 
@@ -172,6 +197,8 @@ export function BattleSidebarContent({
           zones={opponent_zones}
           upgrades={opponent_zones.upgrades}
           isOpponent
+          canManipulateOpponent={canManipulateOpponent}
+          hasCompanion={opponentHasCompanion}
         />
       </div>
 
@@ -217,6 +244,7 @@ export function BattleSidebarContent({
           poison={yourPoison}
           zones={your_zones}
           upgrades={selfUpgrades}
+          hasCompanion={hasCompanion}
         />
       </div>
     </div>
