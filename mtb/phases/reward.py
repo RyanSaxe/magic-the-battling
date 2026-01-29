@@ -84,8 +84,9 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
     other = {player1.name: player2, player2.name: player1}
     for player in (player1, player2):
         opponent = other[player.name]
-        poison = calculate_damage(opponent)
-        player.poison += poison
+        poison_taken = calculate_damage(opponent)
+        poison_dealt = calculate_damage(player)
+        player.poison += poison_taken
         player.treasures += 1
         vanquisher_gained = is_stage_increasing(player)
         card_gained = None
@@ -98,8 +99,8 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
             opponent_name=opponent.name,
             winner_name=None,
             is_draw=True,
-            poison_dealt=0,
-            poison_taken=poison,
+            poison_dealt=poison_dealt,
+            poison_taken=poison_taken,
             treasures_gained=1,
             card_gained=card_gained,
             vanquisher_gained=vanquisher_gained,
@@ -197,12 +198,13 @@ def start_rewards_draw(game: Game, player1: Player, player2: Player, p1_poison: 
         if player.phase != "reward":
             raise ValueError(f"{player.name} is not in reward phase")
 
-    poison_lookup = {player1.name: p1_poison, player2.name: p2_poison}
+    poison_taken_lookup = {player1.name: p1_poison, player2.name: p2_poison}
     other = {player1.name: player2, player2.name: player1}
 
     for player in (player1, player2):
         opponent = other[player.name]
-        poison_taken = poison_lookup[player.name]
+        poison_taken = poison_taken_lookup[player.name]
+        poison_dealt = poison_taken_lookup[opponent.name]
 
         player.treasures += 1
         vanquisher_gained = is_stage_increasing(player)
@@ -216,7 +218,7 @@ def start_rewards_draw(game: Game, player1: Player, player2: Player, p1_poison: 
             opponent_name=opponent.name,
             winner_name=None,
             is_draw=True,
-            poison_dealt=0,
+            poison_dealt=poison_dealt,
             poison_taken=poison_taken,
             treasures_gained=1,
             card_gained=card_gained,
