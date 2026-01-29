@@ -22,6 +22,7 @@ from mtb.models.game import (
     Config,
     FakePlayer,
     Game,
+    LastBattleResult,
     Player,
     StaticOpponent,
     Zones,
@@ -757,6 +758,8 @@ class GameManager:
             full_sideboard=player.sideboard if is_eliminated else [],
             command_zone=player.command_zone,
             placement=player.placement,
+            in_sudden_death=player.in_sudden_death,
+            build_ready=player.build_ready,
         )
 
     def _make_fake_player_view(
@@ -768,17 +771,21 @@ class GameManager:
     ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
 
-        if viewer.round > 1:
-            prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round - 1)
-        elif viewer.stage > 3:
-            prior_snapshot = fake.get_opponent_for_round(viewer.stage - 1, 3)
+        if viewer.in_sudden_death:
+            revealed_cards = (snapshot.hand + snapshot.command_zone) if snapshot else []
+            prior_upgrades = snapshot.upgrades if snapshot else []
         else:
-            prior_snapshot = None
+            if viewer.round > 1:
+                prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round - 1)
+            elif viewer.stage > 3:
+                prior_snapshot = fake.get_opponent_for_round(viewer.stage - 1, 3)
+            else:
+                prior_snapshot = None
 
-        prior_hand = prior_snapshot.hand if prior_snapshot else []
-        prior_command_zone = prior_snapshot.command_zone if prior_snapshot else []
-        revealed_cards = prior_hand + prior_command_zone
-        prior_upgrades = prior_snapshot.upgrades if prior_snapshot else []
+            prior_hand = prior_snapshot.hand if prior_snapshot else []
+            prior_command_zone = prior_snapshot.command_zone if prior_snapshot else []
+            revealed_cards = prior_hand + prior_command_zone
+            prior_upgrades = prior_snapshot.upgrades if prior_snapshot else []
 
         last_result = self._get_fake_player_last_result(fake)
 
@@ -808,6 +815,7 @@ class GameManager:
                 full_sideboard=snapshot.sideboard,
                 command_zone=snapshot.command_zone,
                 placement=fake.placement,
+                in_sudden_death=fake.in_sudden_death,
             )
         return PlayerView(
             name=fake.name,
@@ -834,6 +842,7 @@ class GameManager:
             full_sideboard=[],
             command_zone=[],
             placement=fake.placement,
+            in_sudden_death=fake.in_sudden_death,
         )
 
     def _get_opponent_poison(self, opponent: StaticOpponent | Player, game: Game) -> int:
@@ -1019,7 +1028,32 @@ class GameManager:
         except ValueError as e:
             return str(e)
 
+    def _return_eliminated_player_cards(self, game: Game) -> None:
+        """Return eliminated human players' hand/sideboard to battler.
+
+        Does NOT return cards from the ghost (they still need their cards for pairing).
+        Does NOT return cards from bots (they have their own card pools).
+        """
+        if game.battler is None:
+            return
+
+        ghost_name = game.most_recent_ghost.name if game.most_recent_ghost else None
+
+        for player in game.players:
+            if player.phase == "eliminated" and player.name != ghost_name:
+                game.battler.cards.extend(player.hand)
+                game.battler.cards.extend(player.sideboard)
+                # Clear to prevent double-returning
+                player.hand = []
+                player.sideboard = []
+
     def _start_all_battles(self, game: Game, game_id: str | None = None, db: Session | None = None) -> None:
+        # Clean up draft state before battles
+        draft.cleanup_draft(game)
+
+        # Return eliminated players' cards to battler
+        self._return_eliminated_player_cards(game)
+
         live_players = get_live_players(game)
         if not live_players:
             return
@@ -1197,12 +1231,26 @@ class GameManager:
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
+            fake_player.last_battle_result = LastBattleResult(
+                opponent_name=player.name,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                poison_dealt=poison_taken,
+                poison_taken=poison_dealt,
+            )
             player.phase = "build"
             return None
 
         if player_at_lethal and bot_at_lethal:
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
+            )
+            fake_player.last_battle_result = LastBattleResult(
+                opponent_name=player.name,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                poison_dealt=poison_taken,
+                poison_taken=poison_dealt,
             )
             player.poison = game.config.poison_to_lose - 1
             fake_player.poison = game.config.poison_to_lose - 1
@@ -1216,6 +1264,13 @@ class GameManager:
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
+            fake_player.last_battle_result = LastBattleResult(
+                opponent_name=player.name,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                poison_dealt=poison_taken,
+                poison_taken=poison_dealt,
+            )
             eliminate_player(game, player, player.round, player.stage)
             process_bot_eliminations(game)
             self.complete_game(game_id or "", None, db)
@@ -1226,6 +1281,13 @@ class GameManager:
         if is_game_over and winner is not None:
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
+            )
+            fake_player.last_battle_result = LastBattleResult(
+                opponent_name=player.name,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                poison_dealt=poison_taken,
+                poison_taken=poison_dealt,
             )
             winner.phase = "winner"
             winner.placement = 1
@@ -1770,8 +1832,10 @@ class GameManager:
             self.complete_game(game_id or "", winner, db)
             return "game_over"
 
-        if player.phase == "draft" and game.draft_state is None:
-            draft.start(game)
+        if player.phase == "draft":
+            if game.draft_state is None:
+                draft.start(game)
+            draft.deal_pack_to_player(game, player)
 
         return None
 

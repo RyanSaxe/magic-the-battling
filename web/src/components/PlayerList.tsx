@@ -1,30 +1,22 @@
 import type { PlayerView, LastResult } from '../types'
-import { PoisonIcon, MoneyBagIcon, GhostIcon, BotIcon } from './icons'
+import { PoisonIcon, MoneyBagIcon, GhostIcon, BotIcon, SkullIcon, HourglassIcon } from './icons'
 import { useContextStrip } from '../contexts'
 
 interface PlayerListProps {
   players: PlayerView[]
   currentPlayerName?: string
-  inSuddenDeath?: boolean
 }
 
-function ResultBadge({ result, inSuddenDeath }: { result: LastResult | null; inSuddenDeath?: boolean }) {
-  if (result === null) return null
-
+function ResultBadge({ result, inSuddenDeath }: { result: LastResult | null; inSuddenDeath: boolean }) {
   if (inSuddenDeath) {
-    if (result === 'win') {
-      return (
-        <span className="text-[10px] font-bold text-green-400 bg-green-900/50 py-0.5 px-2 rounded" title="Survived">
-          ✓
-        </span>
-      )
-    }
     return (
-      <span className="text-[10px] font-bold text-red-400 bg-red-900/50 py-0.5 px-2 rounded" title="Eliminated">
+      <span className="text-[10px] font-bold text-red-400 bg-red-900/50 py-0.5 px-2 rounded" title="Sudden Death">
         💀
       </span>
     )
   }
+
+  if (result === null) return null
 
   if (result === 'win') {
     return (
@@ -63,7 +55,7 @@ function PairingProbability({ probability }: { probability: number | null }) {
   )
 }
 
-export function PlayerList({ players, currentPlayerName, inSuddenDeath }: PlayerListProps) {
+export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
   const { state, setRevealedPlayerName } = useContextStrip()
 
   const handlePlayerClick = (player: PlayerView) => {
@@ -106,18 +98,8 @@ export function PlayerList({ players, currentPlayerName, inSuddenDeath }: Player
             onClick={() => handlePlayerClick(player)}
           >
             <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
-                <span className="text-white font-medium truncate max-w-[120px]">{player.name}</span>
-                {player.name === currentPlayerName && (
-                  <span className="text-xs text-amber-400">(You)</span>
-                )}
-                {player.is_most_recent_ghost ? (
-                  <GhostIcon size="sm" />
-                ) : player.is_bot ? (
-                  <BotIcon size="sm" />
-                ) : null}
-              </div>
-              <ResultBadge result={player.last_result} inSuddenDeath={inSuddenDeath} />
+              <span className="text-white font-medium truncate max-w-[120px]">{player.name}</span>
+              <ResultBadge result={player.last_result} inSuddenDeath={player.in_sudden_death} />
             </div>
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-4">
@@ -132,14 +114,19 @@ export function PlayerList({ players, currentPlayerName, inSuddenDeath }: Player
                 )}
               </div>
               <span className="text-gray-500">
-                {player.stage}-{player.round} @ {player.phase}
+                {player.is_ghost && !player.is_most_recent_ghost ? (
+                  <SkullIcon size="sm" />
+                ) : player.is_most_recent_ghost ? (
+                  <GhostIcon size="sm" />
+                ) : player.phase === 'awaiting_elimination' ? (
+                  <HourglassIcon size="sm" />
+                ) : player.is_bot ? (
+                  <BotIcon size="sm" />
+                ) : (
+                  `${player.stage}-${player.round} @ ${player.phase === 'build' && player.build_ready ? 'ready' : player.phase}`
+                )}
               </span>
             </div>
-            {player.is_ghost && !player.is_most_recent_ghost && (
-              <div className="text-xs text-red-400 mt-1">
-                Eliminated
-              </div>
-            )}
           </div>
         )})}
       </div>

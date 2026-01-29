@@ -89,16 +89,12 @@ function LifeCounter({
 
 
 function PlayerSection({
-  name,
-  poison,
   zones,
   upgrades,
   isOpponent = false,
   canManipulateOpponent = false,
   hasCompanion = false,
 }: {
-  name: string
-  poison: number
   zones: Zones
   upgrades: CardType[]
   isOpponent?: boolean
@@ -109,18 +105,6 @@ function PlayerSection({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-sm text-white font-medium truncate max-w-[100px]">{name}</span>
-        <div className="flex items-center gap-1">
-          <img
-            src={POISON_COUNTER_IMAGE}
-            alt="Poison"
-            className="w-5 h-5 rounded object-cover"
-          />
-          <span className="text-purple-400 text-sm font-medium">{poison}</span>
-        </div>
-      </div>
-
       {(zones.command_zone.length > 0 || hasCompanion) && (
         <DroppableZoneDisplay
           title="Command Zone"
@@ -192,8 +176,6 @@ export function BattleSidebarContent({
       {/* Opponent section - top */}
       <div className="p-3 border-b border-gray-700">
         <PlayerSection
-          name={opponent_name}
-          poison={opponentPoison}
           zones={opponent_zones}
           upgrades={opponent_zones.upgrades}
           isOpponent
@@ -211,19 +193,27 @@ export function BattleSidebarContent({
               <div className="flex justify-center">
                 <LifeCounter life={opponentLife} onChange={onOpponentLifeChange} />
               </div>
+              <div className="flex items-center justify-center gap-1 mt-1">
+                <img src={POISON_COUNTER_IMAGE} alt="Poison" className="w-4 h-4 rounded object-cover" />
+                <span className="text-purple-400 text-xs font-medium">{opponentPoison}</span>
+              </div>
             </div>
             <div className="text-center">
               <div className="text-xs text-gray-400 uppercase mb-1">You</div>
               <div className="flex justify-center">
                 <LifeCounter life={yourLife} onChange={onYourLifeChange} />
               </div>
+              <div className="flex items-center justify-center gap-1 mt-1">
+                <img src={POISON_COUNTER_IMAGE} alt="Poison" className="w-4 h-4 rounded object-cover" />
+                <span className="text-purple-400 text-xs font-medium">{yourPoison}</span>
+              </div>
             </div>
           </div>
           <div className="text-center text-xs text-gray-500 mt-2">
             {coin_flip_name === playerName ? (
-              'You go first'
+              <>you are on the <span className="text-green-400">play</span></>
             ) : (
-              <><span className="text-amber-400">{coin_flip_name}</span> goes first</>
+              <>you are on the <span className="text-amber-400">draw</span></>
             )}
           </div>
           {onCreateTreasure && (
@@ -240,8 +230,6 @@ export function BattleSidebarContent({
       {/* Your section - bottom */}
       <div className="p-3 border-t border-gray-700">
         <PlayerSection
-          name="You"
-          poison={yourPoison}
           zones={your_zones}
           upgrades={selfUpgrades}
           hasCompanion={hasCompanion}

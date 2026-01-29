@@ -131,58 +131,43 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
           </div>
         )}
 
-        {/* Opponent's hand */}
-        {opponent_hand_count > 0 && (
-          <div className="px-4 py-2 bg-black/30">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-              <span className="truncate max-w-[120px] inline-block align-bottom">{opponent_name}</span>'s Hand ({opponent_hand_count})
-              {opponent_hand_revealed && <span className="text-amber-400 ml-2">(Revealed)</span>}
+        {/* Opponent's hand - always visible */}
+        <div className="relative px-4 py-3" style={{ background: 'rgba(34, 84, 61, 0.4)' }}>
+          {canManipulateOpponent ? (
+            <DroppableZone
+              zone="hand"
+              zoneOwner="opponent"
+              validFromZones={['battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+              className="flex justify-center gap-1 flex-wrap min-h-[120px] w-full"
+            >
+              {opponent_hand_revealed
+                ? opponent_zones.hand.map((card) => (
+                    <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" size="sm" isOpponent />
+                  ))
+                : Array.from({ length: opponent_hand_count }).map((_, i) => (
+                    <CardBack key={i} size="sm" />
+                  ))}
+            </DroppableZone>
+          ) : (
+            <div className="flex justify-center gap-1 flex-wrap min-h-[120px]">
+              {opponent_hand_revealed
+                ? opponent_zones.hand.map((card) => (
+                    <Card key={card.id} card={card} size="sm" />
+                  ))
+                : Array.from({ length: opponent_hand_count }).map((_, i) => (
+                    <CardBack key={i} size="sm" />
+                  ))}
             </div>
-            {canManipulateOpponent ? (
-              <DroppableZone
-                zone="hand"
-                zoneOwner="opponent"
-                validFromZones={['battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
-                className="flex justify-center gap-1 flex-wrap min-h-[60px]"
-              >
-                {opponent_hand_revealed
-                  ? opponent_zones.hand.map((card) => (
-                      <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" size="sm" isOpponent />
-                    ))
-                  : Array.from({ length: opponent_hand_count }).map((_, i) => (
-                      <CardBack key={i} size="sm" />
-                    ))}
-              </DroppableZone>
-            ) : (
-              <div className="flex justify-center gap-1 flex-wrap">
-                {opponent_hand_revealed
-                  ? opponent_zones.hand.map((card) => (
-                      <Card key={card.id} card={card} size="sm" />
-                    ))
-                  : Array.from({ length: opponent_hand_count }).map((_, i) => (
-                      <CardBack key={i} size="sm" />
-                    ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Full opponent sideboard button (for bots only) */}
-        {showFullSideboardButton && (
-          <div className="px-4 py-2 bg-black/30 border-t border-gray-700/50">
-            <div className="flex justify-between items-center">
-              <div className="text-xs text-gray-400 uppercase tracking-wide">
-                <span className="truncate max-w-[120px] inline-block align-bottom">{opponent_name}</span>'s Sideboard
-              </div>
-              <button
-                onClick={() => setShowOpponentFullSideboard(true)}
-                className="text-xs px-2 py-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300"
-              >
-                View ({opponentFullSideboard.length})
-              </button>
-            </div>
-          </div>
-        )}
+          )}
+          {showFullSideboardButton && (
+            <button
+              onClick={() => setShowOpponentFullSideboard(true)}
+              className="absolute top-2 right-4 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
+            >
+              Sideboard ({opponentFullSideboard.length})
+            </button>
+          )}
+        </div>
 
         {/* Battlefields */}
         <div className="flex-1 flex flex-col">
@@ -198,15 +183,11 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               faceDownCardIds={opponentFaceDownIds}
               counters={opponentCounters}
               attachments={opponent_zones.attachments || {}}
-              label={opponent_name}
               separateLands
               isOpponent
               canManipulateOpponent={canManipulateOpponent}
             />
           </div>
-
-          {/* Center divider */}
-          <div className="border-t border-dashed border-gray-600/50 mx-4" />
 
           {/* Your battlefield */}
           <div className="relative flex-1">
@@ -220,7 +201,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               faceDownCardIds={faceDownCardIds}
               counters={counters}
               attachments={attachments}
-              label="Your Battlefield"
               separateLands
             />
           </div>

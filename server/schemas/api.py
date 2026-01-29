@@ -69,6 +69,8 @@ class PlayerView(BaseModel):
     full_sideboard: list[Card] = []
     command_zone: list[Card] = []
     placement: int = 0
+    in_sudden_death: bool = False
+    build_ready: bool = False
 
 
 class SelfPlayerView(PlayerView):

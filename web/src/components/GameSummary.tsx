@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { SelfPlayerView, PlayerView, Card as CardType } from '../types'
 import { Card } from './card'
 import { UpgradeStack } from './sidebar/UpgradeStack'
@@ -47,6 +48,16 @@ function UpgradeGrid({ upgrades }: { upgrades: CardType[] }) {
 }
 
 export function GameSummary({ player, players, onReturnHome, useUpgrades = true }: GameSummaryProps) {
+  const [frozenPlayer] = useState(() => ({
+    hand: [...player.hand],
+    sideboard: [...player.sideboard],
+    upgrades: [...player.upgrades],
+    command_zone: [...player.command_zone],
+    stage: player.stage,
+    round: player.round,
+    name: player.name,
+  }))
+
   const sortedPlayers = [...players].sort((a, b) => {
     if (a.placement === 0 && b.placement === 0) {
       return a.poison - b.poison
@@ -56,17 +67,17 @@ export function GameSummary({ player, players, onReturnHome, useUpgrades = true 
     return a.placement - b.placement
   })
 
-  const displayPlacement = sortedPlayers.findIndex((p) => p.name === player.name) + 1
+  const displayPlacement = sortedPlayers.findIndex((p) => p.name === frozenPlayer.name) + 1
   const isWinner = displayPlacement === 1
 
   const placementText = getOrdinal(displayPlacement)
   const placementColor = isWinner ? 'text-amber-400' : 'text-gray-300'
 
-  const hasHand = player.hand.length > 0
-  const appliedUpgrades = player.upgrades.filter((u) => u.upgrade_target !== null)
+  const hasHand = frozenPlayer.hand.length > 0
+  const appliedUpgrades = frozenPlayer.upgrades.filter((u) => u.upgrade_target !== null)
   const hasUpgrades = useUpgrades && appliedUpgrades.length > 0
   const hasTopRow = hasHand || hasUpgrades
-  const companionIds = new Set(player.command_zone.map((c) => c.id))
+  const companionIds = new Set(frozenPlayer.command_zone.map((c) => c.id))
 
   return (
     <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
@@ -75,17 +86,17 @@ export function GameSummary({ player, players, onReturnHome, useUpgrades = true 
           {placementText} Place
         </h2>
         <p className="text-gray-400 mb-6">
-          Stage {player.stage} - Round {player.round} | {players.length} Players
+          Stage {frozenPlayer.stage} - Round {frozenPlayer.round} | {players.length} Players
         </p>
 
         <div className="bg-black/30 rounded-lg p-6">
           {hasTopRow && (
             <div className={`grid gap-4 mb-4 ${hasHand && hasUpgrades ? 'grid-cols-2' : 'grid-cols-1'}`}>
-              <CardGrid cards={player.hand} title="Hand" companionIds={companionIds} />
-              {useUpgrades && <UpgradeGrid upgrades={player.upgrades} />}
+              <CardGrid cards={frozenPlayer.hand} title="Hand" companionIds={companionIds} />
+              {useUpgrades && <UpgradeGrid upgrades={frozenPlayer.upgrades} />}
             </div>
           )}
-          <CardGrid cards={player.sideboard} title="Sideboard" companionIds={companionIds} />
+          <CardGrid cards={frozenPlayer.sideboard} title="Sideboard" companionIds={companionIds} />
         </div>
 
         <button

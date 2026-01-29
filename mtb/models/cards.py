@@ -47,13 +47,10 @@ class Battler(BaseModel):
     cards: list[Card]
     upgrades: list[Card]
     vanguards: list[Card]
+    elo: float = 0.0
 
     def shuffle(self) -> None:
         random.shuffle(self.cards)
-
-    @property
-    def elo(self) -> float:
-        return sum(card.elo for card in self.cards) / len(self.cards)
 
 
 DEFAULT_BATTLER_ID = "auto"
@@ -94,4 +91,5 @@ def build_battler(
     if not cards:
         raise ValueError(f"Cube '{battler_id}' contains no playable cards after filtering")
 
-    return Battler(cards=cards, upgrades=upgrades, vanguards=vanguards)
+    elo = sum(card.elo for card in cards) / len(cards)
+    return Battler(cards=cards, upgrades=upgrades, vanguards=vanguards, elo=elo)
