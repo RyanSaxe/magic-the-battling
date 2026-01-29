@@ -755,6 +755,7 @@ class GameManager:
             pairing_probability=probabilities.get(player.name, 0.0),
             is_most_recent_ghost=player.name == most_recent_ghost_name,
             full_sideboard=player.sideboard if is_eliminated else [],
+            command_zone=player.command_zone,
             placement=player.placement,
         )
 
@@ -804,6 +805,7 @@ class GameManager:
                 pairing_probability=probabilities.get(fake.name, 0.0),
                 is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
                 full_sideboard=snapshot.sideboard,
+                command_zone=snapshot.command_zone,
                 placement=fake.placement,
             )
         return PlayerView(
@@ -829,6 +831,7 @@ class GameManager:
             pairing_probability=probabilities.get(fake.name, 0.0),
             is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
             full_sideboard=[],
+            command_zone=[],
             placement=fake.placement,
         )
 

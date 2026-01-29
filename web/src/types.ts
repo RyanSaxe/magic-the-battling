@@ -62,6 +62,7 @@ export interface PlayerView {
   pairing_probability: number | null
   is_most_recent_ghost: boolean
   full_sideboard: Card[]
+  command_zone: Card[]
   placement: number
 }
 

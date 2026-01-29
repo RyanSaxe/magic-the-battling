@@ -58,6 +58,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   const opponentTappedIds = new Set(opponent_zones.tapped_card_ids || [])
   const opponentFaceDownIds = new Set(opponent_zones.face_down_card_ids || [])
   const opponentCounters = opponent_zones.counters || {}
+  const opponentCompanionIds = new Set(opponent_zones.command_zone.map((c) => c.id))
 
   const handleCardClick = (card: CardType, zone: ZoneName) => {
     if (selectedCard?.card.id === card.id) {
@@ -291,7 +292,15 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               </div>
               <div className="flex flex-wrap gap-2">
                 {opponentFullSideboard.map((card) => (
-                  <DraggableCard key={card.id} card={card} zone="sideboard" zoneOwner="opponent" size="sm" isOpponent />
+                  <DraggableCard
+                    key={card.id}
+                    card={card}
+                    zone="sideboard"
+                    zoneOwner="opponent"
+                    size="sm"
+                    isOpponent
+                    isCompanion={opponentCompanionIds.has(card.id)}
+                  />
                 ))}
               </div>
             </div>

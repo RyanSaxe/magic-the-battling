@@ -27,6 +27,8 @@ export function Sidebar({ players, currentPlayer, phaseContent, useUpgrades = tr
     ? [...appliedUpgrades, ...pendingUpgrades]
     : appliedUpgrades
 
+  const companionIds = new Set(displayPlayer.command_zone.map((c) => c.id))
+
   return (
     <aside className="w-64 bg-black/30 flex flex-col overflow-hidden">
       {phaseContent ? (
@@ -41,8 +43,8 @@ export function Sidebar({ players, currentPlayer, phaseContent, useUpgrades = tr
               {displayPlayer.name === currentPlayer.name ? 'Your Cards' : `${displayPlayer.name}'s Cards`}
             </h3>
             <div className="flex flex-wrap gap-2">
-              {useUpgrades && <ZoneDisplay title="Upgrades" cards={allUpgrades} maxThumbnails={6} showUpgradeTargets />}
-              <ZoneDisplay title="Revealed" cards={displayPlayer.most_recently_revealed_cards} maxThumbnails={6} />
+              {useUpgrades && <ZoneDisplay key={`upgrades-${displayPlayer.name}`} title="Upgrades" cards={allUpgrades} maxThumbnails={6} showUpgradeTargets />}
+              <ZoneDisplay key={`revealed-${displayPlayer.name}`} title="Revealed" cards={displayPlayer.most_recently_revealed_cards} maxThumbnails={6} companionIds={companionIds} />
             </div>
             {(!useUpgrades || allUpgrades.length === 0) && displayPlayer.most_recently_revealed_cards.length === 0 && (
               <div className="text-gray-500 text-sm">No cards to display</div>

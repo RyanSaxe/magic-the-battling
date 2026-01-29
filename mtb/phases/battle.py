@@ -411,7 +411,7 @@ def get_zones_for_player(battle: Battle, player: Player) -> Zones:
         raise ValueError("Player is not in this battle")
 
 
-REVEALED_ZONES: set[ZoneName] = {"battlefield", "graveyard", "exile"}
+REVEALED_ZONES: set[ZoneName] = {"battlefield", "graveyard", "exile", "command_zone"}
 
 
 def move_zone(battle: Battle, player: Player, card: Card, from_zone: ZoneName, to_zone: ZoneName) -> None:

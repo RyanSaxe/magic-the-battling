@@ -315,6 +315,26 @@ def test_sideboard_fetch_to_battlefield_revealed(card_factory):
     assert wish_target in alice.most_recently_revealed_cards
 
 
+def test_hand_to_command_zone_revealed(card_factory):
+    """A card moved from hand to command zone should appear in most_recently_revealed_cards."""
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    creature = card_factory("Creature", "Creature")
+    alice.hand = [creature]
+
+    b = battle.start(game, alice, bob)
+    battle.move_zone(b, alice, creature, "hand", "command_zone")
+    battle.submit_result(b, alice, "Alice")
+    battle.submit_result(b, bob, "Alice")
+
+    battle.end(game, b)
+
+    assert creature in alice.most_recently_revealed_cards
+
+
 def test_sideboard_to_battlefield_syncs_player_model(card_factory):
     """Moving sideboard->battlefield should remove card from player.sideboard."""
     game = create_game(["Alice", "Bob"], num_players=2)
