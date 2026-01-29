@@ -354,8 +354,8 @@ def test_sideboard_to_battlefield_syncs_player_model(card_factory):
     assert wish_target in b.player_zones.battlefield
 
 
-def test_command_zone_to_battlefield_syncs_player_model(card_factory):
-    """Moving command_zone->battlefield should remove card from player.command_zone."""
+def test_command_zone_to_battlefield_preserves_companion_selection(card_factory):
+    """Casting companion should preserve selection state for next build phase."""
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
@@ -369,8 +369,12 @@ def test_command_zone_to_battlefield_syncs_player_model(card_factory):
     manager = GameManager()
     manager.handle_battle_move(game, alice, companion.id, "command_zone", "battlefield")
 
-    assert companion not in alice.command_zone
+    # Companion should remain in player.command_zone (selection state persists)
+    assert companion in alice.command_zone
+    # But should be on battlefield in battle zones
     assert companion in b.player_zones.battlefield
+    # And removed from battle's command_zone
+    assert companion not in b.player_zones.command_zone
 
 
 def test_end_battle_not_agreed_raises():

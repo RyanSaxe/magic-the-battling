@@ -390,6 +390,7 @@ function GameContent() {
           playerName={self_player.name}
           onCreateTreasure={handleCreateTreasure}
           canManipulateOpponent={canManipulateOpponent}
+          hasCompanion={self_player.command_zone.length > 0}
         />
       )
     }

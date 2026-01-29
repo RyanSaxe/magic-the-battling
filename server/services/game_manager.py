@@ -1078,15 +1078,12 @@ class GameManager:
     ) -> bool:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
-                # Sync Player model when moving from sideboard/command_zone
+                # Sync Player model when moving from sideboard (for wish effects)
+                # Note: command_zone is NOT synced - companion selection persists
                 if from_zone == "sideboard":
                     card = next((c for c in player.sideboard if c.id == card_id), None)
                     if card:
                         player.sideboard.remove(card)
-                elif from_zone == "command_zone":
-                    card = next((c for c in player.command_zone if c.id == card_id), None)
-                    if card:
-                        player.command_zone.remove(card)
 
                 # Use zone lookup that handles opponent zones
                 try:

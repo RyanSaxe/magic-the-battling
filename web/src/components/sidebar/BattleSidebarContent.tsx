@@ -14,6 +14,7 @@ interface BattleSidebarContentProps {
   playerName: string
   onCreateTreasure?: () => void
   canManipulateOpponent?: boolean
+  hasCompanion?: boolean
 }
 
 function LifeCounter({
@@ -93,6 +94,7 @@ function PlayerSection({
   upgrades,
   isOpponent = false,
   canManipulateOpponent = false,
+  hasCompanion = false,
 }: {
   name: string
   poison: number
@@ -100,6 +102,7 @@ function PlayerSection({
   upgrades: CardType[]
   isOpponent?: boolean
   canManipulateOpponent?: boolean
+  hasCompanion?: boolean
 }) {
   const appliedUpgrades = upgrades.filter((u) => u.upgrade_target)
 
@@ -117,7 +120,7 @@ function PlayerSection({
         </div>
       </div>
 
-      {zones.command_zone.length > 0 && (
+      {(zones.command_zone.length > 0 || hasCompanion) && (
         <DroppableZoneDisplay
           title="Command Zone"
           zone="command_zone"
@@ -175,6 +178,7 @@ export function BattleSidebarContent({
   playerName,
   onCreateTreasure,
   canManipulateOpponent = false,
+  hasCompanion = false,
 }: BattleSidebarContentProps) {
   const { opponent_name, coin_flip_name, your_zones, opponent_zones } = currentBattle
 
@@ -237,6 +241,7 @@ export function BattleSidebarContent({
           poison={yourPoison}
           zones={your_zones}
           upgrades={selfUpgrades}
+          hasCompanion={hasCompanion}
         />
       </div>
     </div>
