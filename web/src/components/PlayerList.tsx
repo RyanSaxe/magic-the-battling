@@ -131,7 +131,7 @@ export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
                 ) : player.phase === 'awaiting_elimination' ? (
                   <span className="text-red-400">pending</span>
                 ) : (
-                  `${player.stage}-${player.round} @ ${player.phase}`
+                  `${player.stage}-${player.round} @ ${player.phase === 'build' && player.build_ready ? 'ready' : player.phase}`
                 )}
               </span>
             </div>

@@ -759,6 +759,7 @@ class GameManager:
             command_zone=player.command_zone,
             placement=player.placement,
             in_sudden_death=player.in_sudden_death,
+            build_ready=player.build_ready,
         )
 
     def _make_fake_player_view(
