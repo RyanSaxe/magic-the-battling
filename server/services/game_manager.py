@@ -906,6 +906,8 @@ class GameManager:
         your_life = b.player_life if is_player else b.opponent_life
         opponent_life = b.opponent_life if is_player else b.player_life
 
+        full_sideboard = opponent_zones.sideboard if isinstance(opponent_obj, StaticOpponent) else []
+
         return BattleView(
             opponent_name=opponent_name,
             coin_flip_name=b.coin_flip_name,
@@ -919,6 +921,7 @@ class GameManager:
             your_life=your_life,
             opponent_life=opponent_life,
             is_sudden_death=b.is_sudden_death,
+            opponent_full_sideboard=full_sideboard,
         )
 
     def handle_draft_swap(

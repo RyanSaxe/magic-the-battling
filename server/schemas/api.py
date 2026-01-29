@@ -92,6 +92,7 @@ class BattleView(BaseModel):
     your_life: int = 20
     opponent_life: int = 20
     is_sudden_death: bool = False
+    opponent_full_sideboard: list[Card] = []
 
 
 class GameStateResponse(BaseModel):

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { GameState, Card as CardType, ZoneName, CardStateAction } from '../../types'
-import { DraggableCard } from '../../dnd'
+import { DraggableCard, DroppableZone } from '../../dnd'
 import { HandZone, BattlefieldZone } from '../../components/zones'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
 
@@ -48,7 +48,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
 
   const opponentPlayer = gameState.players.find((p) => p.name === opponent_name)
   const canManipulateOpponent = opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false
-  const opponentFullSideboard = opponentPlayer?.full_sideboard || []
+  const opponentFullSideboard = current_battle.opponent_full_sideboard
   const showFullSideboardButton = canManipulateOpponent && opponentFullSideboard.length > 0
 
   const tappedCardIds = new Set(your_zones.tapped_card_ids || [])
@@ -132,19 +132,32 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               <span className="truncate max-w-[120px] inline-block align-bottom">{opponent_name}</span>'s Hand ({opponent_hand_count})
               {opponent_hand_revealed && <span className="text-amber-400 ml-2">(Revealed)</span>}
             </div>
-            <div className="flex justify-center gap-1 flex-wrap">
-              {opponent_hand_revealed
-                ? opponent_zones.hand.map((card) => (
-                    canManipulateOpponent ? (
+            {canManipulateOpponent ? (
+              <DroppableZone
+                zone="hand"
+                zoneOwner="opponent"
+                validFromZones={['battlefield', 'graveyard', 'exile', 'sideboard']}
+                className="flex justify-center gap-1 flex-wrap min-h-[60px]"
+              >
+                {opponent_hand_revealed
+                  ? opponent_zones.hand.map((card) => (
                       <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" size="sm" isOpponent />
-                    ) : (
+                    ))
+                  : Array.from({ length: opponent_hand_count }).map((_, i) => (
+                      <CardBack key={i} size="sm" />
+                    ))}
+              </DroppableZone>
+            ) : (
+              <div className="flex justify-center gap-1 flex-wrap">
+                {opponent_hand_revealed
+                  ? opponent_zones.hand.map((card) => (
                       <Card key={card.id} card={card} size="sm" />
-                    )
-                  ))
-                : Array.from({ length: opponent_hand_count }).map((_, i) => (
-                    <CardBack key={i} size="sm" />
-                  ))}
-            </div>
+                    ))
+                  : Array.from({ length: opponent_hand_count }).map((_, i) => (
+                      <CardBack key={i} size="sm" />
+                    ))}
+              </div>
+            )}
           </div>
         )}
 
