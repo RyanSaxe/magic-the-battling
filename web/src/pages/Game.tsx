@@ -228,11 +228,11 @@ function GameContent() {
 
   const { self_player, current_battle, players } = gameState
 
-  const canManipulateOpponent = (() => {
-    if (!current_battle) return false
-    const opponentPlayer = players.find((p) => p.name === current_battle.opponent_name)
-    return opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false
-  })()
+  const opponentPlayer = current_battle
+    ? players.find((p) => p.name === current_battle.opponent_name)
+    : null
+  const canManipulateOpponent = opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false
+  const opponentHasCompanion = (opponentPlayer?.command_zone.length ?? 0) > 0
   const maxHandSize = self_player.hand_size
   const handExceedsLimit = self_player.hand.length > maxHandSize
   const basicsComplete = selectedBasics.length === 3
@@ -391,6 +391,7 @@ function GameContent() {
           onCreateTreasure={handleCreateTreasure}
           canManipulateOpponent={canManipulateOpponent}
           hasCompanion={self_player.command_zone.length > 0}
+          opponentHasCompanion={opponentHasCompanion}
         />
       )
     }

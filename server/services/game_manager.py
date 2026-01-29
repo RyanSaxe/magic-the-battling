@@ -776,7 +776,8 @@ class GameManager:
             prior_snapshot = None
 
         prior_hand = prior_snapshot.hand if prior_snapshot else []
-        revealed_cards = prior_hand
+        prior_command_zone = prior_snapshot.command_zone if prior_snapshot else []
+        revealed_cards = prior_hand + prior_command_zone
         prior_upgrades = prior_snapshot.upgrades if prior_snapshot else []
 
         last_result = self._get_fake_player_last_result(fake)

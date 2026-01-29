@@ -611,6 +611,39 @@ class TestUnifiedPairingCandidates:
         candidates = battle.get_all_pairing_candidates(game, alice)
         assert candidates[0].hand[0].name == "later_card"
 
+    def test_fake_player_revealed_cards_includes_companion(self, card_factory):
+        """Fake player's revealed cards should include companion from command_zone."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+        alice.stage = 4
+        alice.round = 1
+
+        companion = card_factory("Lurrus", oracle_text="Companion — test")
+        creature = card_factory("Grizzly Bears")
+        prior_snapshot = StaticOpponent(
+            name="Bot1",
+            hand=[creature],
+            command_zone=[companion],
+            chosen_basics=["Plains", "Island", "Mountain"],
+        )
+        current_snapshot = StaticOpponent(
+            name="Bot1",
+            hand=[card_factory("current_card")],
+            command_zone=[companion],
+            chosen_basics=["Plains", "Island", "Mountain"],
+        )
+        fake = FakePlayer(name="Bot1", player_history_id=1)
+        fake.snapshots["3_3"] = prior_snapshot
+        fake.snapshots["4_1"] = current_snapshot
+        game.fake_players.append(fake)
+
+        manager = GameManager()
+        player_view = manager._make_fake_player_view(fake, alice, {})
+
+        assert creature in player_view.most_recently_revealed_cards
+        assert companion in player_view.most_recently_revealed_cards
+
 
 class TestViableCandidates:
     def test_get_viable_candidates_returns_all_when_three_or_fewer(self):

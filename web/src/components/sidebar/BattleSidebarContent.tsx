@@ -15,6 +15,7 @@ interface BattleSidebarContentProps {
   onCreateTreasure?: () => void
   canManipulateOpponent?: boolean
   hasCompanion?: boolean
+  opponentHasCompanion?: boolean
 }
 
 function LifeCounter({
@@ -179,6 +180,7 @@ export function BattleSidebarContent({
   onCreateTreasure,
   canManipulateOpponent = false,
   hasCompanion = false,
+  opponentHasCompanion = false,
 }: BattleSidebarContentProps) {
   const { opponent_name, coin_flip_name, your_zones, opponent_zones } = currentBattle
 
@@ -196,6 +198,7 @@ export function BattleSidebarContent({
           upgrades={opponent_zones.upgrades}
           isOpponent
           canManipulateOpponent={canManipulateOpponent}
+          hasCompanion={opponentHasCompanion}
         />
       </div>
 
