@@ -757,6 +757,7 @@ class GameManager:
             full_sideboard=player.sideboard if is_eliminated else [],
             command_zone=player.command_zone,
             placement=player.placement,
+            in_sudden_death=player.in_sudden_death,
         )
 
     def _make_fake_player_view(
@@ -808,6 +809,7 @@ class GameManager:
                 full_sideboard=snapshot.sideboard,
                 command_zone=snapshot.command_zone,
                 placement=fake.placement,
+                in_sudden_death=fake.in_sudden_death,
             )
         return PlayerView(
             name=fake.name,
@@ -834,6 +836,7 @@ class GameManager:
             full_sideboard=[],
             command_zone=[],
             placement=fake.placement,
+            in_sudden_death=fake.in_sudden_death,
         )
 
     def _get_opponent_poison(self, opponent: StaticOpponent | Player, game: Game) -> int:

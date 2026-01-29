@@ -434,7 +434,6 @@ function GameContent() {
                 currentPlayer={self_player}
                 phaseContent={renderPhaseContent()}
                 useUpgrades={gameState.use_upgrades}
-                inSuddenDeath={self_player.in_sudden_death}
               />
             </div>
           </GameDndProvider>
@@ -494,7 +493,6 @@ function GameContent() {
               currentPlayer={self_player}
               phaseContent={renderPhaseContent()}
               useUpgrades={gameState.use_upgrades}
-              inSuddenDeath={self_player.in_sudden_death}
             />
           </div>
         )}

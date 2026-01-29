@@ -64,6 +64,7 @@ export interface PlayerView {
   full_sideboard: Card[]
   command_zone: Card[]
   placement: number
+  in_sudden_death: boolean
 }
 
 export interface LastBattleResult {

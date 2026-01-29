@@ -5,26 +5,18 @@ import { useContextStrip } from '../contexts'
 interface PlayerListProps {
   players: PlayerView[]
   currentPlayerName?: string
-  inSuddenDeath?: boolean
 }
 
-function ResultBadge({ result, inSuddenDeath }: { result: LastResult | null; inSuddenDeath?: boolean }) {
-  if (result === null) return null
-
+function ResultBadge({ result, inSuddenDeath }: { result: LastResult | null; inSuddenDeath: boolean }) {
   if (inSuddenDeath) {
-    if (result === 'win') {
-      return (
-        <span className="text-[10px] font-bold text-green-400 bg-green-900/50 py-0.5 px-2 rounded" title="Survived">
-          ✓
-        </span>
-      )
-    }
     return (
-      <span className="text-[10px] font-bold text-red-400 bg-red-900/50 py-0.5 px-2 rounded" title="Eliminated">
+      <span className="text-[10px] font-bold text-red-400 bg-red-900/50 py-0.5 px-2 rounded" title="Sudden Death">
         💀
       </span>
     )
   }
+
+  if (result === null) return null
 
   if (result === 'win') {
     return (
@@ -63,7 +55,7 @@ function PairingProbability({ probability }: { probability: number | null }) {
   )
 }
 
-export function PlayerList({ players, currentPlayerName, inSuddenDeath }: PlayerListProps) {
+export function PlayerList({ players, currentPlayerName }: PlayerListProps) {
   const { state, setRevealedPlayerName } = useContextStrip()
 
   const handlePlayerClick = (player: PlayerView) => {
@@ -117,7 +109,7 @@ export function PlayerList({ players, currentPlayerName, inSuddenDeath }: Player
                   <BotIcon size="sm" />
                 ) : null}
               </div>
-              <ResultBadge result={player.last_result} inSuddenDeath={inSuddenDeath} />
+              <ResultBadge result={player.last_result} inSuddenDeath={player.in_sudden_death} />
             </div>
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-4">
