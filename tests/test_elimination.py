@@ -2,7 +2,7 @@ from unittest.mock import MagicMock
 
 from conftest import setup_battle_ready
 
-from mtb.models.cards import Card
+from mtb.models.cards import Battler, Card
 from mtb.models.game import BattleSnapshotData, DraftState, FakePlayer, StaticOpponent, create_game
 from mtb.phases import battle, elimination, reward
 from server.db.models import PlayerGameHistory
@@ -545,7 +545,7 @@ class TestWouldBeDeadReadyForElimination:
 
 
 class TestEliminationFlow:
-    def test_survivor_goes_directly_to_draft(self):
+    def test_survivor_goes_directly_to_draft(self, card_factory):
         """A player not at lethal poison should go to draft after reward."""
         game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
         alice, bob, charlie = game.players
@@ -555,6 +555,9 @@ class TestEliminationFlow:
         alice.phase = "reward"
         bob.phase = "battle"
         charlie.phase = "battle"
+
+        cards = [card_factory(f"c{i}") for i in range(20)]
+        game.battler = Battler(cards=cards, upgrades=[], vanguards=[])
         game.draft_state = DraftState(packs=[])
 
         manager = GameManager()
@@ -566,6 +569,7 @@ class TestEliminationFlow:
 
         assert result is None
         assert alice.phase == "draft"
+        assert "Alice" in game.draft_state.current_packs
 
     def test_single_lethal_player_goes_to_awaiting_elimination(self):
         """When a lethal player finishes battle, they go to awaiting_elimination.

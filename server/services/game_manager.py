@@ -1022,7 +1022,32 @@ class GameManager:
         except ValueError as e:
             return str(e)
 
+    def _return_eliminated_player_cards(self, game: Game) -> None:
+        """Return eliminated human players' hand/sideboard to battler.
+
+        Does NOT return cards from the ghost (they still need their cards for pairing).
+        Does NOT return cards from bots (they have their own card pools).
+        """
+        if game.battler is None:
+            return
+
+        ghost_name = game.most_recent_ghost.name if game.most_recent_ghost else None
+
+        for player in game.players:
+            if player.phase == "eliminated" and player.name != ghost_name:
+                game.battler.cards.extend(player.hand)
+                game.battler.cards.extend(player.sideboard)
+                # Clear to prevent double-returning
+                player.hand = []
+                player.sideboard = []
+
     def _start_all_battles(self, game: Game, game_id: str | None = None, db: Session | None = None) -> None:
+        # Clean up draft state before battles
+        draft.cleanup_draft(game)
+
+        # Return eliminated players' cards to battler
+        self._return_eliminated_player_cards(game)
+
         live_players = get_live_players(game)
         if not live_players:
             return
@@ -1773,8 +1798,10 @@ class GameManager:
             self.complete_game(game_id or "", winner, db)
             return "game_over"
 
-        if player.phase == "draft" and game.draft_state is None:
-            draft.start(game)
+        if player.phase == "draft":
+            if game.draft_state is None:
+                draft.start(game)
+            draft.deal_pack_to_player(game, player)
 
         return None
 
