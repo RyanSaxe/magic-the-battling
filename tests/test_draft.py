@@ -284,3 +284,48 @@ def test_start_draft_all_packs_correct_size(card_factory):
         assert len(pack) == pack_size
     assert len(game.get_draft_state().current_packs["Alice"]) == pack_size
     assert len(game.get_draft_state().current_packs["Bob"]) == pack_size
+
+
+def test_start_draft_excludes_eliminated_players(card_factory):
+    """Draft should not deal packs to eliminated players (ghosts)."""
+    game = create_game(["Alice", "Bob", "Charlie", "Dana"], num_players=4)
+    cards = [card_factory(f"c{i}") for i in range(30)]
+    game.battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
+
+    alice, bob, charlie, dana = game.players
+    alice.phase = "draft"
+    bob.phase = "draft"
+    charlie.phase = "draft"
+    dana.phase = "eliminated"
+
+    draft.start(game)
+
+    assert "Alice" in game.get_draft_state().current_packs
+    assert "Bob" in game.get_draft_state().current_packs
+    assert "Charlie" in game.get_draft_state().current_packs
+    assert "Dana" not in game.get_draft_state().current_packs
+
+
+def test_draft_cleanup_with_eliminated_player(card_factory):
+    """Draft cleanup should run when all live players finish, ignoring eliminated."""
+    game = create_game(["Alice", "Bob", "Charlie", "Dana"], num_players=4)
+    cards = [card_factory(f"c{i}") for i in range(30)]
+    game.battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
+
+    alice, bob, charlie, dana = game.players
+    alice.phase = "draft"
+    bob.phase = "draft"
+    charlie.phase = "draft"
+    dana.phase = "eliminated"
+
+    draft.start(game)
+
+    draft.end_for_player(game, alice)
+    assert game.draft_state is not None
+
+    draft.end_for_player(game, bob)
+    assert game.draft_state is not None
+
+    draft.end_for_player(game, charlie)
+    assert game.draft_state is None
+    assert game.battler.cards != []

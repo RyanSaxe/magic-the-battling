@@ -4,6 +4,7 @@ from mtb.models.cards import Card
 from mtb.models.game import DraftState, Game, Player
 from mtb.models.types import CardDestination
 from mtb.phases import build
+from mtb.phases.elimination import get_live_players
 
 
 def _get_player_collection(player: Player, destination: CardDestination) -> list[Card]:
@@ -33,7 +34,7 @@ def start(game: Game) -> None:
     game.battler.cards = []
     game.draft_state = DraftState(packs=packs)
 
-    for player in game.players:
+    for player in get_live_players(game):
         deal_pack(game, player)
 
 
