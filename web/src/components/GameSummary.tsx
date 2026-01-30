@@ -8,6 +8,9 @@ interface GameSummaryProps {
   players: PlayerView[]
   onReturnHome: () => void
   useUpgrades?: boolean
+  onRequestSpectate?: (targetPlayerName: string) => void
+  spectateStatus?: 'idle' | 'waiting' | 'denied'
+  spectateTarget?: string | null
 }
 
 function getOrdinal(n: number): string {
@@ -47,7 +50,15 @@ function UpgradeGrid({ upgrades }: { upgrades: CardType[] }) {
   )
 }
 
-export function GameSummary({ player, players, onReturnHome, useUpgrades = true }: GameSummaryProps) {
+export function GameSummary({
+  player,
+  players,
+  onReturnHome,
+  useUpgrades = true,
+  onRequestSpectate,
+  spectateStatus = 'idle',
+  spectateTarget,
+}: GameSummaryProps) {
   const [frozenPlayer] = useState(() => ({
     hand: [...player.hand],
     sideboard: [...player.sideboard],
@@ -79,6 +90,16 @@ export function GameSummary({ player, players, onReturnHome, useUpgrades = true 
   const hasTopRow = hasHand || hasUpgrades
   const companionIds = new Set(frozenPlayer.command_zone.map((c) => c.id))
 
+  const spectateablePlayers = players.filter(
+    (p) =>
+      !p.is_bot &&
+      p.phase !== 'eliminated' &&
+      p.phase !== 'awaiting_elimination' &&
+      p.phase !== 'winner' &&
+      p.phase !== 'game_over' &&
+      p.name !== player.name
+  )
+
   return (
     <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
       <div className="text-center max-w-5xl w-full">
@@ -105,6 +126,53 @@ export function GameSummary({ player, players, onReturnHome, useUpgrades = true 
         >
           Return Home
         </button>
+
+        {onRequestSpectate && spectateablePlayers.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-gray-700">
+            {spectateStatus === 'waiting' && (
+              <div className="text-center">
+                <div className="animate-spin w-6 h-6 border-4 border-amber-500 border-t-transparent rounded-full mx-auto mb-2" />
+                <p className="text-gray-300">Waiting for {spectateTarget} to respond...</p>
+              </div>
+            )}
+            {spectateStatus === 'denied' && (
+              <div className="text-center">
+                <p className="text-red-400 mb-4">{spectateTarget} denied your request.</p>
+                {spectateablePlayers.filter((p) => p.name !== spectateTarget).length > 0 && (
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    {spectateablePlayers
+                      .filter((p) => p.name !== spectateTarget)
+                      .map((p) => (
+                        <button
+                          key={p.name}
+                          onClick={() => onRequestSpectate(p.name)}
+                          className="btn btn-secondary"
+                        >
+                          Watch {p.name}
+                        </button>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {spectateStatus === 'idle' && (
+              <>
+                <p className="text-gray-400 mb-3">Watch the rest of the game?</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {spectateablePlayers.map((p) => (
+                    <button
+                      key={p.name}
+                      onClick={() => onRequestSpectate(p.name)}
+                      className="btn btn-secondary"
+                    >
+                      Watch {p.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

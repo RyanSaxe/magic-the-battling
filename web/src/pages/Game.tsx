@@ -384,6 +384,11 @@ function GameContent() {
 
   const [spectatorConfig, setSpectatorConfig] = useState<SpectatorConfig | null>(null);
   const [spectatingPlayer, setSpectatingPlayer] = useState<string | null>(null);
+  const [eliminatedSpectate, setEliminatedSpectate] = useState<{
+    status: 'idle' | 'waiting' | 'denied'
+    target: string | null
+  }>({ status: 'idle', target: null });
+  const eliminatedSpectatePollingRef = useRef<number | null>(null);
 
   const { gameState, isConnected, actions, error, pendingSpectateRequest } = useGame(
     gameId ?? null,
@@ -446,6 +451,49 @@ function GameContent() {
     if (config) {
       setSpectatorConfig(config);
       setSpectatingPlayer(config.spectatePlayer);
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (eliminatedSpectatePollingRef.current) {
+        clearTimeout(eliminatedSpectatePollingRef.current);
+      }
+    };
+  }, []);
+
+  const handleEliminatedSpectateRequest = async (targetPlayer: string) => {
+    if (!gameId || !gameState) return;
+
+    setEliminatedSpectate({ status: 'waiting', target: targetPlayer });
+
+    try {
+      const { request_id } = await createSpectateRequest(
+        gameId,
+        targetPlayer,
+        gameState.self_player.name
+      );
+
+      const poll = async () => {
+        try {
+          const result = await getSpectateRequestStatus(gameId, request_id);
+          if (result.status === 'approved' && result.session_id && result.player_id) {
+            handleSessionCreated(result.session_id, result.player_id, {
+              spectatePlayer: targetPlayer,
+              requestId: request_id,
+            });
+          } else if (result.status === 'denied') {
+            setEliminatedSpectate({ status: 'denied', target: targetPlayer });
+          } else {
+            eliminatedSpectatePollingRef.current = window.setTimeout(poll, 1000);
+          }
+        } catch {
+          setEliminatedSpectate({ status: 'idle', target: null });
+        }
+      };
+      poll();
+    } catch {
+      setEliminatedSpectate({ status: 'idle', target: null });
     }
   };
 
@@ -859,6 +907,9 @@ function GameContent() {
                   players={gameState.players}
                   onReturnHome={() => navigate("/")}
                   useUpgrades={gameState.use_upgrades}
+                  onRequestSpectate={handleEliminatedSpectateRequest}
+                  spectateStatus={eliminatedSpectate.status}
+                  spectateTarget={eliminatedSpectate.target}
                 />
               )}
             </main>
