@@ -17,7 +17,13 @@ def mock_db_session():
     return MagicMock()
 
 
-def create_mock_history(id: int, player_name: str, battler_elo: float, cube_id: str = "test_cube") -> MagicMock:
+def create_mock_history(
+    id: int,
+    player_name: str,
+    battler_elo: float,
+    cube_id: str = "test_cube",
+    basics: list[str] | None = None,
+) -> MagicMock:
     history = MagicMock(spec=PlayerGameHistory)
     history.id = id
     history.player_name = player_name
@@ -26,6 +32,8 @@ def create_mock_history(id: int, player_name: str, battler_elo: float, cube_id: 
 
     snapshot = MagicMock()
     snapshot.stage = 3
+    snapshot.round = 1
+    snapshot.basic_lands_json = json.dumps(basics or ["Plains", "Island", "Mountain"])
     history.snapshots = [snapshot]
 
     return history
@@ -100,3 +108,55 @@ def test_find_historical_players_filters_by_elo_range(game_manager, mock_db_sess
     assert 3 in result_ids
     assert 4 not in result_ids
     assert 5 not in result_ids
+
+
+class TestSuspiciousNameFiltering:
+    def test_single_character_is_suspicious(self, game_manager):
+        assert game_manager._is_suspicious_name("A") is True
+        assert game_manager._is_suspicious_name("1") is True
+
+    def test_empty_name_is_suspicious(self, game_manager):
+        assert game_manager._is_suspicious_name("") is True
+
+    def test_pure_numbers_are_suspicious(self, game_manager):
+        assert game_manager._is_suspicious_name("123") is True
+        assert game_manager._is_suspicious_name("999999") is True
+
+    def test_test_names_are_suspicious(self, game_manager):
+        assert game_manager._is_suspicious_name("test") is True
+        assert game_manager._is_suspicious_name("Test") is True
+        assert game_manager._is_suspicious_name("testing") is True
+        assert game_manager._is_suspicious_name("asdf") is True
+        assert game_manager._is_suspicious_name("qwerty") is True
+
+    def test_repeated_character_is_suspicious(self, game_manager):
+        assert game_manager._is_suspicious_name("aaa") is True
+        assert game_manager._is_suspicious_name("BBBB") is True
+
+    def test_normal_names_are_not_suspicious(self, game_manager):
+        assert game_manager._is_suspicious_name("Alice") is False
+        assert game_manager._is_suspicious_name("Bob123") is False
+        assert game_manager._is_suspicious_name("Player1") is False
+        assert game_manager._is_suspicious_name("xXDragonSlayerXx") is False
+
+
+class TestTripleSameBasicFiltering:
+    def test_triple_same_basic_is_filtered(self, game_manager):
+        history = create_mock_history(1, "Player", 1200.0, basics=["Plains", "Plains", "Plains"])
+        assert game_manager._has_triple_same_basic(history) is True
+
+    def test_different_basics_pass(self, game_manager):
+        history = create_mock_history(1, "Player", 1200.0, basics=["Plains", "Island", "Mountain"])
+        assert game_manager._has_triple_same_basic(history) is False
+
+    def test_two_same_one_different_pass(self, game_manager):
+        history = create_mock_history(1, "Player", 1200.0, basics=["Plains", "Plains", "Island"])
+        assert game_manager._has_triple_same_basic(history) is False
+
+    def test_missing_first_snapshot_is_filtered(self, game_manager):
+        history = MagicMock(spec=PlayerGameHistory)
+        snapshot = MagicMock()
+        snapshot.stage = 3
+        snapshot.round = 2
+        history.snapshots = [snapshot]
+        assert game_manager._has_triple_same_basic(history) is True
