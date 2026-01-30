@@ -363,6 +363,24 @@ class GameManager:
             counter += 1
         return f"{name} ({counter})"
 
+    def _is_suspicious_name(self, name: str) -> bool:
+        if not name or len(name) <= 1:
+            return True
+        if name.isdigit():
+            return True
+        lower = name.lower()
+        if lower in ("test", "testing", "asdf", "qwerty"):
+            return True
+        return len(set(lower)) == 1
+
+    def _has_triple_same_basic(self, history: PlayerGameHistory) -> bool:
+        first_snapshot = next((s for s in history.snapshots if s.stage == 3 and s.round == 1), None)
+        # Can't verify without the first snapshot, skip to be safe
+        if not first_snapshot:
+            return True
+        basics = json.loads(first_snapshot.basic_lands_json)
+        return len(set(basics)) == 1
+
     def _find_historical_players(
         self,
         db: Session,
@@ -389,6 +407,12 @@ class GameManager:
         for history in all_histories:
             has_starting_stage = any(s.stage == 3 for s in history.snapshots)
             if not has_starting_stage:
+                continue
+
+            if self._is_suspicious_name(history.player_name or ""):
+                continue
+
+            if self._has_triple_same_basic(history):
                 continue
 
             game_record = db.query(GameRecord).filter(GameRecord.id == history.game_id).first()
