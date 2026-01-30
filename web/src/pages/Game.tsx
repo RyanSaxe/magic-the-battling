@@ -1,51 +1,51 @@
-import { useState, useEffect, type ReactNode } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { useSession } from '../hooks/useSession'
-import { useGame } from '../hooks/useGame'
-import { rejoinGame } from '../api/client'
-import { DraftPhase } from './phases/Draft'
-import { BuildPhase } from './phases/Build'
-import { BattlePhase } from './phases/Battle'
-import { RewardPhase } from './phases/Reward'
-import { Sidebar } from '../components/sidebar'
-import { BattleSidebarContent } from '../components/sidebar/BattleSidebarContent'
-import { RewardSidebarContent } from '../components/sidebar/RewardSidebarContent'
-import { GameSummary } from '../components/GameSummary'
-import { RulesModal } from '../components/RulesModal'
-import { InfoIcon } from '../components/icons'
-import { ContextStripProvider, useContextStrip } from '../contexts'
-import { CardPreviewContext } from '../components/card'
-import { GameDndProvider, useDndActions } from '../dnd'
-import { PHASE_HINTS, type Phase } from '../constants/rules'
-import type { Card as CardType } from '../types'
+import { useState, useEffect, type ReactNode } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useSession } from "../hooks/useSession";
+import { useGame } from "../hooks/useGame";
+import { rejoinGame } from "../api/client";
+import { DraftPhase } from "./phases/Draft";
+import { BuildPhase } from "./phases/Build";
+import { BattlePhase } from "./phases/Battle";
+import { RewardPhase } from "./phases/Reward";
+import { Sidebar } from "../components/sidebar";
+import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
+import { RewardSidebarContent } from "../components/sidebar/RewardSidebarContent";
+import { GameSummary } from "../components/GameSummary";
+import { RulesModal } from "../components/RulesModal";
+import { InfoIcon } from "../components/icons";
+import { ContextStripProvider, useContextStrip } from "../contexts";
+import { CardPreviewContext } from "../components/card";
+import { GameDndProvider, useDndActions } from "../dnd";
+import { PHASE_HINTS, type Phase } from "../constants/rules";
+import type { Card as CardType } from "../types";
 
 function CardPreviewModal({
   card,
   upgradeTarget,
   onClose,
 }: {
-  card: CardType
-  upgradeTarget: CardType | null
-  onClose: () => void
+  card: CardType;
+  upgradeTarget: CardType | null;
+  onClose: () => void;
 }) {
-  const [isFlipped, setIsFlipped] = useState(false)
+  const [isFlipped, setIsFlipped] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose()
+      if (e.key === "Escape") {
+        onClose();
       }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const getImageUrl = (c: CardType, flipped: boolean) => {
     if (flipped && c.flip_image_url) {
-      return c.flip_image_url
+      return c.flip_image_url;
     }
-    return c.png_url ?? c.image_url
-  }
+    return c.png_url ?? c.image_url;
+  };
 
   return (
     <div
@@ -87,78 +87,80 @@ function CardPreviewModal({
         )}
       </div>
     </div>
-  )
+  );
 }
 
 function GameContent() {
-  const { gameId } = useParams<{ gameId: string }>()
-  const navigate = useNavigate()
-  const { session, saveSession } = useSession()
+  const { gameId } = useParams<{ gameId: string }>();
+  const navigate = useNavigate();
+  const { session, saveSession } = useSession();
   const { gameState, isConnected, actions, error } = useGame(
     gameId ?? null,
-    session?.sessionId ?? null
-  )
-  const { state, setPreviewCard } = useContextStrip()
+    session?.sessionId ?? null,
+  );
+  const { state, setPreviewCard } = useContextStrip();
 
-  const [rejoinName, setRejoinName] = useState('')
-  const [rejoinError, setRejoinError] = useState('')
-  const [rejoinLoading, setRejoinLoading] = useState(false)
+  const [rejoinName, setRejoinName] = useState("");
+  const [rejoinError, setRejoinError] = useState("");
+  const [rejoinLoading, setRejoinLoading] = useState(false);
 
   // Lifted state from Build phase
-  const [selectedBasics, setSelectedBasics] = useState<string[]>([])
+  const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
 
   // Lifted state from Reward phase
-  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(null)
+  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(
+    null,
+  );
 
   // Lifted state from Battle phase
-  const [isChangingResult, setIsChangingResult] = useState(false)
+  const [isChangingResult, setIsChangingResult] = useState(false);
 
   // Rules modal state
-  const [showRulesModal, setShowRulesModal] = useState(false)
-  const [hasViewedRules, setHasViewedRules] = useState(() =>
-    localStorage.getItem('mtb-rules-viewed') === 'true'
-  )
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [hasViewedRules, setHasViewedRules] = useState(
+    () => localStorage.getItem("mtb-rules-viewed") === "true",
+  );
 
   const handleOpenRules = () => {
-    setShowRulesModal(true)
+    setShowRulesModal(true);
     if (!hasViewedRules) {
-      localStorage.setItem('mtb-rules-viewed', 'true')
-      setHasViewedRules(true)
+      localStorage.setItem("mtb-rules-viewed", "true");
+      setHasViewedRules(true);
     }
-  }
+  };
 
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
-    phase: gameState?.self_player?.phase ?? 'draft',
+    phase: gameState?.self_player?.phase ?? "draft",
     battleMove: actions.battleMove,
-  })
+  });
 
   const handleYourLifeChange = (life: number) => {
-    actions.battleUpdateLife('you', life)
-  }
+    actions.battleUpdateLife("you", life);
+  };
 
   const handleOpponentLifeChange = (life: number) => {
-    actions.battleUpdateLife('opponent', life)
-  }
+    actions.battleUpdateLife("opponent", life);
+  };
 
   const handleRejoin = async () => {
     if (!rejoinName.trim() || !gameId) {
-      setRejoinError('Please enter your name')
-      return
+      setRejoinError("Please enter your name");
+      return;
     }
 
-    setRejoinLoading(true)
-    setRejoinError('')
+    setRejoinLoading(true);
+    setRejoinError("");
 
     try {
-      const response = await rejoinGame(gameId, rejoinName)
-      saveSession(response.session_id, response.player_id)
+      const response = await rejoinGame(gameId, rejoinName);
+      saveSession(response.session_id, response.player_id);
     } catch {
-      setRejoinError('Could not rejoin. Check your name matches exactly.')
+      setRejoinError("Could not rejoin. Check your name matches exactly.");
     } finally {
-      setRejoinLoading(false)
+      setRejoinLoading(false);
     }
-  }
+  };
 
   if (!session) {
     return (
@@ -191,11 +193,11 @@ function GameContent() {
               disabled={rejoinLoading}
               className="btn btn-primary w-full py-2"
             >
-              {rejoinLoading ? 'Rejoining...' : 'Rejoin Game'}
+              {rejoinLoading ? "Rejoining..." : "Rejoin Game"}
             </button>
 
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate("/")}
               className="btn btn-secondary w-full py-2"
             >
               Back to Home
@@ -203,7 +205,7 @@ function GameContent() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (!isConnected) {
@@ -211,7 +213,7 @@ function GameContent() {
       <div className="game-table flex items-center justify-center">
         <div className="text-white">Connecting...</div>
       </div>
-    )
+    );
   }
 
   if (error) {
@@ -219,7 +221,7 @@ function GameContent() {
       <div className="game-table flex items-center justify-center">
         <div className="text-red-400">{error}</div>
       </div>
-    )
+    );
   }
 
   if (!gameState) {
@@ -227,46 +229,49 @@ function GameContent() {
       <div className="game-table flex items-center justify-center">
         <div className="text-white">Loading game...</div>
       </div>
-    )
+    );
   }
 
-  const currentPhase = gameState.self_player.phase
+  const currentPhase = gameState.self_player.phase;
 
-  const phaseBadgeClass = {
-    draft: 'draft',
-    build: 'build',
-    battle: 'battle',
-    reward: 'reward',
-    awaiting_elimination: 'reward',
-    eliminated: 'battle',
-    winner: 'reward',
-    game_over: 'battle',
-  }[currentPhase] || 'draft'
+  const phaseBadgeClass =
+    {
+      draft: "draft",
+      build: "build",
+      battle: "battle",
+      reward: "reward",
+      awaiting_elimination: "reward",
+      eliminated: "battle",
+      winner: "reward",
+      game_over: "battle",
+    }[currentPhase] || "draft";
 
-  const { self_player, current_battle, players } = gameState
+  const { self_player, current_battle, players } = gameState;
 
   const opponentPlayer = current_battle
     ? players.find((p) => p.name === current_battle.opponent_name)
-    : null
-  const canManipulateOpponent = opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false
-  const opponentHasCompanion = (opponentPlayer?.command_zone.length ?? 0) > 0
-  const maxHandSize = self_player.hand_size
-  const handExceedsLimit = self_player.hand.length > maxHandSize
-  const basicsComplete = selectedBasics.length === 3
-  const canReady = basicsComplete && !handExceedsLimit
+    : null;
+  const canManipulateOpponent =
+    opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false;
+  const opponentHasCompanion = (opponentPlayer?.command_zone.length ?? 0) > 0;
+  const maxHandSize = self_player.hand_size;
+  const handExceedsLimit = self_player.hand.length > maxHandSize;
+  const basicsComplete = selectedBasics.length === 3;
+  const canReady = basicsComplete && !handExceedsLimit;
 
-  const isStageIncreasing = self_player.is_stage_increasing
-  const needsUpgrade = isStageIncreasing && gameState.available_upgrades.length > 0
-  const canContinue = !needsUpgrade || !!selectedUpgradeId
+  const isStageIncreasing = self_player.is_stage_increasing;
+  const needsUpgrade =
+    isStageIncreasing && gameState.available_upgrades.length > 0;
+  const canContinue = !needsUpgrade || !!selectedUpgradeId;
 
   const handleContinue = () => {
-    actions.rewardDone(selectedUpgradeId ?? undefined)
-    setSelectedUpgradeId(null)
-  }
+    actions.rewardDone(selectedUpgradeId ?? undefined);
+    setSelectedUpgradeId(null);
+  };
 
   const renderActionButtons = (): ReactNode => {
     switch (currentPhase) {
-      case 'draft':
+      case "draft":
         return (
           <>
             <button
@@ -277,14 +282,14 @@ function GameContent() {
               }
               className="btn btn-secondary"
             >
-              Roll Pack ({self_player.treasures} 💰)
+              Roll for 1💰
             </button>
             <button onClick={actions.draftDone} className="btn btn-primary">
-              Done Drafting
+              Go to Build
             </button>
           </>
-        )
-      case 'build':
+        );
+      case "build":
         if (self_player.build_ready) {
           return (
             <>
@@ -296,7 +301,7 @@ function GameContent() {
                 Unready
               </button>
             </>
-          )
+          );
         }
         return (
           <button
@@ -304,21 +309,24 @@ function GameContent() {
             disabled={!canReady}
             className="btn btn-primary"
           >
-            Ready {!basicsComplete && '(select 3 basics)'}
+            Ready {!basicsComplete && "(select 3 basics)"}
           </button>
-        )
-      case 'battle': {
-        if (!current_battle) return null
-        const { opponent_name, result_submissions } = current_battle
-        const mySubmission = result_submissions[self_player.name]
-        const opponentSubmission = result_submissions[opponent_name]
+        );
+      case "battle": {
+        if (!current_battle) return null;
+        const { opponent_name, result_submissions } = current_battle;
+        const mySubmission = result_submissions[self_player.name];
+        const opponentSubmission = result_submissions[opponent_name];
 
         if (mySubmission && !isChangingResult) {
-          const resultsConflict = opponentSubmission && mySubmission !== opponentSubmission
+          const resultsConflict =
+            opponentSubmission && mySubmission !== opponentSubmission;
           return (
             <>
-              <span className={`text-sm ${resultsConflict ? 'text-red-400' : 'text-amber-400'}`}>
-                {resultsConflict ? 'Results conflict!' : 'Waiting...'}
+              <span
+                className={`text-sm ${resultsConflict ? "text-red-400" : "text-amber-400"}`}
+              >
+                {resultsConflict ? "Results conflict!" : "Waiting..."}
               </span>
               <button
                 onClick={() => setIsChangingResult(true)}
@@ -327,7 +335,7 @@ function GameContent() {
                 Change
               </button>
             </>
-          )
+          );
         }
         return (
           <>
@@ -341,8 +349,8 @@ function GameContent() {
             )}
             <button
               onClick={() => {
-                actions.battleSubmitResult(self_player.name)
-                setIsChangingResult(false)
+                actions.battleSubmitResult(self_player.name);
+                setIsChangingResult(false);
               }}
               className="btn btn-primary"
             >
@@ -350,8 +358,8 @@ function GameContent() {
             </button>
             <button
               onClick={() => {
-                actions.battleSubmitResult('draw')
-                setIsChangingResult(false)
+                actions.battleSubmitResult("draw");
+                setIsChangingResult(false);
               }}
               className="btn btn-secondary"
             >
@@ -359,22 +367,22 @@ function GameContent() {
             </button>
             <button
               onClick={() => {
-                actions.battleSubmitResult(opponent_name)
-                setIsChangingResult(false)
+                actions.battleSubmitResult(opponent_name);
+                setIsChangingResult(false);
               }}
               className="btn btn-danger"
             >
               Opponent Won
             </button>
           </>
-        )
+        );
       }
-      case 'reward': {
+      case "reward": {
         const buttonLabel = needsUpgrade
           ? selectedUpgradeId
-            ? 'Claim & Continue'
-            : 'Select Upgrade'
-          : 'Continue'
+            ? "Claim & Continue"
+            : "Select Upgrade"
+          : "Continue";
         return (
           <button
             onClick={handleContinue}
@@ -383,19 +391,19 @@ function GameContent() {
           >
             {buttonLabel}
           </button>
-        )
+        );
       }
       default:
-        return null
+        return null;
     }
-  }
+  };
 
   const handleCreateTreasure = () => {
-    actions.battleUpdateCardState('create_treasure', '', {})
-  }
+    actions.battleUpdateCardState("create_treasure", "", {});
+  };
 
   const renderPhaseContent = (): ReactNode => {
-    if (currentPhase === 'battle' && current_battle) {
+    if (currentPhase === "battle" && current_battle) {
       return (
         <BattleSidebarContent
           currentBattle={current_battle}
@@ -410,18 +418,18 @@ function GameContent() {
           hasCompanion={self_player.command_zone.length > 0}
           opponentHasCompanion={opponentHasCompanion}
         />
-      )
+      );
     }
-    if (currentPhase === 'reward' && self_player.last_battle_result) {
+    if (currentPhase === "reward" && self_player.last_battle_result) {
       return (
         <RewardSidebarContent
           lastBattleResult={self_player.last_battle_result}
           playerName={self_player.name}
         />
-      )
+      );
     }
-    return null
-  }
+    return null;
+  };
 
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
@@ -434,7 +442,7 @@ function GameContent() {
             </div>
             <button
               onClick={handleOpenRules}
-              className={`phase-badge ${phaseBadgeClass} ${!hasViewedRules ? 'pulse' : ''}`}
+              className={`phase-badge ${phaseBadgeClass} ${!hasViewedRules ? "pulse" : ""}`}
             >
               {currentPhase}
               <InfoIcon size="sm" className="ml-1.5 opacity-60" />
@@ -443,14 +451,15 @@ function GameContent() {
           <div className="text-sm text-gray-400 italic">
             {PHASE_HINTS[currentPhase as Phase]}
           </div>
-          <div className="flex items-center gap-2">
-            {renderActionButtons()}
-          </div>
+          <div className="flex items-center gap-2">{renderActionButtons()}</div>
         </header>
 
         {/* Main content */}
-        {currentPhase === 'battle' ? (
-          <GameDndProvider onCardMove={handleCardMove} validDropZones={getValidDropZones}>
+        {currentPhase === "battle" ? (
+          <GameDndProvider
+            onCardMove={handleCardMove}
+            validDropZones={getValidDropZones}
+          >
             <div className="flex-1 flex min-h-0">
               <main className="flex-1 flex flex-col min-h-0">
                 <BattlePhase gameState={gameState} actions={actions} />
@@ -466,10 +475,10 @@ function GameContent() {
         ) : (
           <div className="flex-1 flex min-h-0">
             <main className="flex-1 flex flex-col min-h-0">
-              {currentPhase === 'draft' && (
+              {currentPhase === "draft" && (
                 <DraftPhase gameState={gameState} actions={actions} />
               )}
-              {currentPhase === 'build' && (
+              {currentPhase === "build" && (
                 <BuildPhase
                   gameState={gameState}
                   actions={actions}
@@ -477,7 +486,7 @@ function GameContent() {
                   onBasicsChange={setSelectedBasics}
                 />
               )}
-              {currentPhase === 'reward' && (
+              {currentPhase === "reward" && (
                 <RewardPhase
                   gameState={gameState}
                   actions={actions}
@@ -485,18 +494,29 @@ function GameContent() {
                   onUpgradeSelect={setSelectedUpgradeId}
                 />
               )}
-              {currentPhase === 'awaiting_elimination' && (
+              {currentPhase === "awaiting_elimination" && (
                 <div className="flex-1 flex items-center justify-center">
                   <div className="text-center max-w-md">
-                    <h2 className="text-2xl text-red-400 mb-4">You Have Been Eliminated</h2>
+                    <h2 className="text-2xl text-red-400 mb-4">
+                      You Have Been Eliminated
+                    </h2>
                     <p className="text-gray-300 mb-6">
-                      Waiting until all battles are complete to determine if you will compete in sudden death to stay alive.
+                      Waiting until all battles are complete to determine if you
+                      will compete in sudden death to stay alive.
                     </p>
                     <div className="bg-black/40 rounded-lg p-4 text-left">
-                      <h3 className="text-amber-400 font-medium mb-2">Sudden Death Rules</h3>
+                      <h3 className="text-amber-400 font-medium mb-2">
+                        Sudden Death Rules
+                      </h3>
                       <ul className="text-gray-400 text-sm space-y-1">
-                        <li>Triggers when 2+ players eliminated with fewer than 2 survivors</li>
-                        <li>2 players with lowest poison fight (ties broken randomly)</li>
+                        <li>
+                          Triggers when 2+ players eliminated with fewer than 2
+                          survivors
+                        </li>
+                        <li>
+                          2 players with lowest poison fight (ties broken
+                          randomly)
+                        </li>
                         <li>Other eliminated players are out immediately</li>
                         <li>Poison resets to 9 for the sudden death battle</li>
                         <li>Winner survives, loser is eliminated</li>
@@ -505,11 +525,13 @@ function GameContent() {
                   </div>
                 </div>
               )}
-              {(currentPhase === 'eliminated' || currentPhase === 'winner' || currentPhase === 'game_over') && (
+              {(currentPhase === "eliminated" ||
+                currentPhase === "winner" ||
+                currentPhase === "game_over") && (
                 <GameSummary
                   player={self_player}
                   players={gameState.players}
-                  onReturnHome={() => navigate('/')}
+                  onReturnHome={() => navigate("/")}
                   useUpgrades={gameState.use_upgrades}
                 />
               )}
@@ -537,7 +559,7 @@ function GameContent() {
         />
       )}
     </CardPreviewContext.Provider>
-  )
+  );
 }
 
 export function Game() {
@@ -545,5 +567,5 @@ export function Game() {
     <ContextStripProvider>
       <GameContent />
     </ContextStripProvider>
-  )
+  );
 }
