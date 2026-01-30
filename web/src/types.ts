@@ -126,6 +126,7 @@ export interface LobbyPlayer {
 export interface LobbyState {
   game_id: string
   join_code: string
+  cube_id: string
   players: LobbyPlayer[]
   can_start: boolean
   is_started: boolean

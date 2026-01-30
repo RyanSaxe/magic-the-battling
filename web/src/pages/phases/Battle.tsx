@@ -60,6 +60,13 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   const opponentCounters = opponent_zones.counters || {}
   const opponentCompanionIds = new Set(opponent_zones.command_zone.map((c) => c.id))
 
+  const upgradedCardIds = new Set(
+    your_zones.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
+  )
+  const opponentUpgradedCardIds = new Set(
+    opponent_zones.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
+  )
+
   const handleCardClick = (card: CardType, zone: ZoneName) => {
     if (selectedCard?.card.id === card.id) {
       setSelectedCard(null)
@@ -142,7 +149,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
             >
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
-                    <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" size="sm" isOpponent />
+                    <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" size="sm" isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} />
                   ))
                 : Array.from({ length: opponent_hand_count }).map((_, i) => (
                     <CardBack key={i} size="sm" />
@@ -152,7 +159,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
             <div className="flex justify-center gap-1 flex-wrap min-h-[120px]">
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
-                    <Card key={card.id} card={card} size="sm" />
+                    <Card key={card.id} card={card} size="sm" upgraded={opponentUpgradedCardIds.has(card.id)} />
                   ))
                 : Array.from({ length: opponent_hand_count }).map((_, i) => (
                     <CardBack key={i} size="sm" />
@@ -186,6 +193,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               separateLands
               isOpponent
               canManipulateOpponent={canManipulateOpponent}
+              upgradedCardIds={opponentUpgradedCardIds}
             />
           </div>
 
@@ -202,6 +210,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               counters={counters}
               attachments={attachments}
               separateLands
+              upgradedCardIds={upgradedCardIds}
             />
           </div>
         </div>
@@ -212,6 +221,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
             cards={your_zones.hand}
             selectedCardId={selectedCard?.card.id}
             onCardClick={(card) => handleCardClick(card, 'hand')}
+            upgradedCardIds={upgradedCardIds}
           />
           {sideboard.length > 0 && (
             <button

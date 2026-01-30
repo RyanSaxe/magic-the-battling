@@ -40,6 +40,9 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
   const { self_player, available_upgrades } = gameState
   const { last_battle_result } = self_player
   const isStageIncreasing = self_player.is_stage_increasing
+  const upgradedCardIds = new Set(
+    self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
+  )
 
   const handleUpgradeClick = (upgrade: CardType) => {
     if (selectedUpgradeId === upgrade.id) {
@@ -111,9 +114,9 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-3 text-center">
               Your Pool ({self_player.hand.length + self_player.sideboard.length} cards)
             </div>
-            <div className="flex flex-wrap gap-1 justify-center max-h-[200px] overflow-auto">
+            <div className="flex flex-wrap gap-1 justify-center max-h-[200px] overflow-auto p-1">
               {[...self_player.hand, ...self_player.sideboard].map((card) => (
-                <Card key={card.id} card={card} size="sm" />
+                <Card key={card.id} card={card} size="sm" upgraded={upgradedCardIds.has(card.id)} />
               ))}
             </div>
           </div>

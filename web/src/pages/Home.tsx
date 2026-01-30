@@ -1,70 +1,70 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { createGame, joinGame } from '../api/client'
-import { useSession } from '../hooks/useSession'
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { createGame, joinGame } from "../api/client";
+import { useSession } from "../hooks/useSession";
 
 export function Home() {
-  const navigate = useNavigate()
-  const { saveSession } = useSession()
+  const navigate = useNavigate();
+  const { saveSession } = useSession();
 
-  const [playerName, setPlayerName] = useState('')
-  const [cubeId, setCubeId] = useState('auto')
-  const [useUpgrades, setUseUpgrades] = useState(true)
-  const [useVanguards, setUseVanguards] = useState(false)
-  const [targetPlayerCount, setTargetPlayerCount] = useState(4)
-  const [joinCode, setJoinCode] = useState('')
-  const [isJoining, setIsJoining] = useState(false)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [playerName, setPlayerName] = useState("");
+  const [cubeId, setCubeId] = useState("auto");
+  const [useUpgrades, setUseUpgrades] = useState(true);
+  const [useVanguards, setUseVanguards] = useState(false);
+  const [targetPlayerCount, setTargetPlayerCount] = useState(4);
+  const [joinCode, setJoinCode] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleCreateGame = async () => {
     if (!playerName.trim()) {
-      setError('Please enter your name')
-      return
+      setError("Please enter your name");
+      return;
     }
 
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError("");
 
     try {
       const response = await createGame(playerName, {
-        cubeId: cubeId || 'auto',
+        cubeId: cubeId || "auto",
         useUpgrades,
         useVanguards,
         targetPlayerCount,
-      })
-      saveSession(response.session_id, response.player_id)
-      navigate(`/game/${response.game_id}/lobby`)
+      });
+      saveSession(response.session_id, response.player_id);
+      navigate(`/game/${response.game_id}/lobby`);
     } catch {
-      setError('Failed to create game')
+      setError("Failed to create game");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleJoinGame = async () => {
     if (!playerName.trim()) {
-      setError('Please enter your name')
-      return
+      setError("Please enter your name");
+      return;
     }
     if (!joinCode.trim()) {
-      setError('Please enter a join code')
-      return
+      setError("Please enter a join code");
+      return;
     }
 
-    setLoading(true)
-    setError('')
+    setLoading(true);
+    setError("");
 
     try {
-      const response = await joinGame(joinCode, playerName)
-      saveSession(response.session_id, response.player_id)
-      navigate(`/game/${response.game_id}/lobby`)
+      const response = await joinGame(joinCode, playerName);
+      saveSession(response.session_id, response.player_id);
+      navigate(`/game/${response.game_id}/lobby`);
     } catch {
-      setError('Failed to join game. Check your join code.')
+      setError("Failed to join game. Check your join code.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <div className="game-table flex items-center justify-center p-4">
@@ -72,17 +72,26 @@ export function Home() {
         <h1 className="text-3xl font-bold text-white text-center mb-2">
           Magic: The Battling
         </h1>
-        <p className="text-gray-400 text-center text-sm mb-8">
-          Draft, build, battle
+        <p className="text-gray-400 text-center text-sm mb-2">
+          An MtG format inspired by the autobattler genre
         </p>
-
+        <p className="space-y-3 pt-2 pb-2 border-b border-gray-700">
+          <a
+            href="https://cubecobra.com/cube/list/auto"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-amber-400 hover:text-amber-300"
+          >
+            View the default card pool on CubeCobra →
+          </a>
+        </p>
         {error && (
           <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
             {error}
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className="space-y-4 pt-2">
           <div>
             <label className="block text-gray-300 mb-1">Your Name</label>
             <input
@@ -115,7 +124,9 @@ export function Home() {
                 </div>
 
                 <div>
-                  <label className="block text-white mb-2">Target Players</label>
+                  <label className="block text-white mb-2">
+                    Target Players
+                  </label>
                   <div className="flex gap-2">
                     {[2, 4, 6, 8].map((count) => (
                       <button
@@ -123,8 +134,8 @@ export function Home() {
                         onClick={() => setTargetPlayerCount(count)}
                         className={`px-4 py-2 rounded font-medium transition-colors ${
                           targetPlayerCount === count
-                            ? 'bg-amber-500 text-black'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                            ? "bg-amber-500 text-black"
+                            : "bg-gray-700 text-gray-300 hover:bg-gray-600"
                         }`}
                       >
                         {count}
@@ -191,7 +202,7 @@ export function Home() {
                   disabled={loading}
                   className="btn btn-primary flex-1 py-2"
                 >
-                  {loading ? 'Creating...' : 'Create Game'}
+                  {loading ? "Creating..." : "Create Game"}
                 </button>
                 <button
                   onClick={() => setIsJoining(true)}
@@ -207,7 +218,7 @@ export function Home() {
                   disabled={loading}
                   className="btn btn-primary flex-1 py-2"
                 >
-                  {loading ? 'Joining...' : 'Join'}
+                  {loading ? "Joining..." : "Join"}
                 </button>
                 <button
                   onClick={() => setIsJoining(false)}
@@ -221,5 +232,5 @@ export function Home() {
         </div>
       </div>
     </div>
-  )
+  );
 }

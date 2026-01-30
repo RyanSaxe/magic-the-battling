@@ -23,6 +23,7 @@ interface BattlefieldZoneProps {
   label?: string;
   separateLands?: boolean;
   cardSize?: "xs" | "sm" | "md" | "lg";
+  upgradedCardIds?: Set<string>;
 }
 
 export function BattlefieldZone({
@@ -42,6 +43,7 @@ export function BattlefieldZone({
   label,
   separateLands = false,
   cardSize = "sm",
+  upgradedCardIds = new Set(),
 }: BattlefieldZoneProps) {
   const allowInteraction = !isOpponent || canManipulateOpponent;
   const attachedCardIds = new Set(Object.values(attachments).flat());
@@ -79,6 +81,7 @@ export function BattlefieldZone({
           onCardClick={onCardClick}
           onCardDoubleClick={onCardDoubleClick}
           onCardContextMenu={onCardContextMenu}
+          upgradedCardIds={upgradedCardIds}
         />
       );
     }
@@ -108,6 +111,7 @@ export function BattlefieldZone({
           onDoubleClick={() => onCardDoubleClick?.(card)}
           disabled={!draggable || !allowInteraction}
           isOpponent={isOpponent}
+          upgraded={upgradedCardIds.has(card.id)}
         />
       </div>
     );

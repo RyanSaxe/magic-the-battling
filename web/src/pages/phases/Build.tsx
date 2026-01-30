@@ -186,6 +186,9 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
 
   const unappliedUpgrades = self_player.upgrades.filter((u) => !u.upgrade_target)
   const handExceedsLimit = self_player.hand.length > maxHandSize
+  const upgradedCardIds = new Set(
+    self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
+  )
 
   const isCompanion = (card: CardType) => card.oracle_text?.includes('Companion —') ?? false
   const companionCards = self_player.sideboard.filter(isCompanion)
@@ -232,7 +235,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
             </p>
           </div>
         ) : (
-          <div className="flex gap-4 justify-center flex-wrap overflow-auto">
+          <div className="flex gap-4 justify-center flex-wrap overflow-auto p-1">
             {self_player.hand.map((card, index) => (
               <Card
                 key={card.id}
@@ -241,6 +244,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                 selected={selectedCard?.card.id === card.id}
                 glow={selectedUpgrade ? 'green' : 'none'}
                 size="lg"
+                upgraded={upgradedCardIds.has(card.id)}
               />
             ))}
           </div>
@@ -360,7 +364,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
               All cards are in your hand
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2 justify-center max-w-[1100px] mx-auto">
+            <div className="flex flex-wrap gap-2 justify-center max-w-[1100px] mx-auto p-1">
               {self_player.sideboard.map((card, index) => (
                 <Card
                   key={card.id}
@@ -369,6 +373,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                   selected={selectedCard?.card.id === card.id}
                   glow={selectedUpgrade ? 'green' : 'none'}
                   size="md"
+                  upgraded={upgradedCardIds.has(card.id)}
                 />
               ))}
             </div>
