@@ -160,8 +160,6 @@ export function Lobby() {
                   </div>
                   <p className="text-gray-500 text-sm mt-2">
                     Target: {lobbyState.target_player_count} players
-                    {botSlots > 0 &&
-                      ` (${botSlots} bot slot${botSlots > 1 ? "s" : ""})`}
                   </p>
                 </div>
 

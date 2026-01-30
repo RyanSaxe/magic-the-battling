@@ -26,8 +26,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
     zone: ZoneName
   } | null>(null)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
-  const [showSideboard, setShowSideboard] = useState(false)
-  const [showOpponentFullSideboard, setShowOpponentFullSideboard] = useState(false)
 
   const { current_battle } = gameState
 
@@ -43,12 +41,9 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   }
 
   const { your_zones, opponent_zones, opponent_name, opponent_hand_count, opponent_hand_revealed } = current_battle
-  const sideboard = your_zones.sideboard
 
   const opponentPlayer = gameState.players.find((p) => p.name === opponent_name)
   const canManipulateOpponent = opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false
-  const opponentFullSideboard = current_battle.opponent_full_sideboard
-  const showFullSideboardButton = canManipulateOpponent && opponentFullSideboard.length > 0
 
   const tappedCardIds = new Set(your_zones.tapped_card_ids || [])
   const faceDownCardIds = new Set(your_zones.face_down_card_ids || [])
@@ -58,7 +53,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
   const opponentTappedIds = new Set(opponent_zones.tapped_card_ids || [])
   const opponentFaceDownIds = new Set(opponent_zones.face_down_card_ids || [])
   const opponentCounters = opponent_zones.counters || {}
-  const opponentCompanionIds = new Set(opponent_zones.command_zone.map((c) => c.id))
 
   const upgradedCardIds = new Set(
     your_zones.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
@@ -166,14 +160,6 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
                   ))}
             </div>
           )}
-          {showFullSideboardButton && (
-            <button
-              onClick={() => setShowOpponentFullSideboard(true)}
-              className="absolute top-2 right-4 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
-            >
-              Sideboard ({opponentFullSideboard.length})
-            </button>
-          )}
         </div>
 
         {/* Battlefields */}
@@ -215,87 +201,13 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
           </div>
         </div>
 
-        {/* Your hand with sideboard toggle */}
-        <div className="relative">
-          <HandZone
-            cards={your_zones.hand}
-            selectedCardId={selectedCard?.card.id}
-            onCardClick={(card) => handleCardClick(card, 'hand')}
-            upgradedCardIds={upgradedCardIds}
-          />
-          {sideboard.length > 0 && (
-            <button
-              onClick={() => setShowSideboard(true)}
-              className="absolute top-2 right-4 text-xs bg-purple-600 hover:bg-purple-500 px-2 py-1 rounded"
-            >
-              Sideboard ({sideboard.length})
-            </button>
-          )}
-        </div>
-
-        {/* Sideboard modal */}
-        {showSideboard && (
-          <div
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-            onClick={() => setShowSideboard(false)}
-          >
-            <div
-              className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-white font-medium">Your Sideboard ({sideboard.length})</h3>
-                <button
-                  onClick={() => setShowSideboard(false)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {sideboard.map((card) => (
-                  <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Opponent full sideboard modal */}
-        {showOpponentFullSideboard && (
-          <div
-            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-            onClick={() => setShowOpponentFullSideboard(false)}
-          >
-            <div
-              className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-white font-medium">{opponent_name}'s Full Sideboard ({opponentFullSideboard.length})</h3>
-                <button
-                  onClick={() => setShowOpponentFullSideboard(false)}
-                  className="text-gray-400 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {opponentFullSideboard.map((card) => (
-                  <DraggableCard
-                    key={card.id}
-                    card={card}
-                    zone="sideboard"
-                    zoneOwner="opponent"
-                    size="sm"
-                    isOpponent
-                    isCompanion={opponentCompanionIds.has(card.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Your hand */}
+        <HandZone
+          cards={your_zones.hand}
+          selectedCardId={selectedCard?.card.id}
+          onCardClick={(card) => handleCardClick(card, 'hand')}
+          upgradedCardIds={upgradedCardIds}
+        />
 
         {/* Context menu */}
         {contextMenu && (

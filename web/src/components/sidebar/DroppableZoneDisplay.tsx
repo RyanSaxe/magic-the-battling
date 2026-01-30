@@ -3,6 +3,13 @@ import type { Card as CardType, ZoneName } from '../../types'
 import { Card } from '../card'
 import { DraggableCard, DroppableZone } from '../../dnd'
 
+type CardSize = 'xs' | 'sm'
+
+const sizeStyles = {
+  xs: { width: 50, height: 70 },
+  sm: { width: 80, height: 112 },
+}
+
 interface DroppableZoneDisplayProps {
   title: string
   zone: ZoneName
@@ -12,6 +19,8 @@ interface DroppableZoneDisplayProps {
   isOpponent?: boolean
   canManipulateOpponent?: boolean
   titleClassName?: string
+  hideCount?: boolean
+  size?: CardSize
 }
 
 function ZoneModal({
@@ -76,6 +85,8 @@ export function DroppableZoneDisplay({
   isOpponent = false,
   canManipulateOpponent = false,
   titleClassName = 'text-gray-400',
+  hideCount = false,
+  size = 'xs',
 }: DroppableZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -102,10 +113,13 @@ export function DroppableZoneDisplay({
           }`}
         >
           <div className={`text-[10px] uppercase mb-1 ${titleClassName}`}>
-            {title} ({cards.length})
+            {title}{!hideCount && ` (${cards.length})`}
           </div>
           {cards.length === 0 ? (
-            <div className="w-[50px] h-[70px] border border-dashed border-gray-600 rounded flex items-center justify-center">
+            <div
+              className="border border-dashed border-gray-600 rounded flex items-center justify-center"
+              style={{ width: sizeStyles[size].width, height: sizeStyles[size].height }}
+            >
               <span className="text-gray-600 text-[10px]">Empty</span>
             </div>
           ) : (
@@ -113,9 +127,9 @@ export function DroppableZoneDisplay({
               <div className="flex gap-0.5">
                 {displayedCards.map((card) =>
                   allowInteraction ? (
-                    <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} size="xs" isOpponent={isOpponent} />
+                    <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} size={size} isOpponent={isOpponent} />
                   ) : (
-                    <Card key={card.id} card={card} size="xs" />
+                    <Card key={card.id} card={card} size={size} />
                   )
                 )}
               </div>
