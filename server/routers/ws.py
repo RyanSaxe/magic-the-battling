@@ -223,6 +223,7 @@ async def websocket_endpoint(
 
     except WebSocketDisconnect:
         connection_manager.disconnect(game_id, player_id)
+        game_manager.remove_player_from_pending(game_id, player_id)
         await connection_manager.broadcast_lobby_state(game_id)
 
 

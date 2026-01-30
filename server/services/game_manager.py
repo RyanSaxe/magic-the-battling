@@ -579,22 +579,45 @@ class GameManager:
         return None
 
     def can_rejoin(self, game_id: str, player_name: str) -> bool:
-        pending = self._pending_games.get(game_id)
-        if pending:
-            return player_name in pending.player_names
-
         game = self._active_games.get(game_id)
         if game:
             return any(p.name == player_name for p in game.players)
-
         return False
 
     def rejoin_game(self, game_id: str, player_name: str, player_id: str) -> bool:
-        if not self.can_rejoin(game_id, player_name):
+        game = self._active_games.get(game_id)
+        if not game or not any(p.name == player_name for p in game.players):
             return False
+
+        old_player_ids = [
+            pid
+            for pid, name in self._player_id_to_name.items()
+            if name == player_name and self._player_to_game.get(pid) == game_id
+        ]
+        for old_pid in old_player_ids:
+            self._player_id_to_name.pop(old_pid, None)
+            self._player_to_game.pop(old_pid, None)
 
         self._player_to_game[player_id] = game_id
         self._player_id_to_name[player_id] = player_name
+        return True
+
+    def remove_player_from_pending(self, game_id: str, player_id: str) -> bool:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.is_started or player_id not in pending.player_ids:
+            return False
+
+        idx = pending.player_ids.index(player_id)
+        pending.player_names.pop(idx)
+        pending.player_ids.pop(idx)
+        pending.player_ready.pop(player_id, None)
+
+        self._player_to_game.pop(player_id, None)
+        self._player_id_to_name.pop(player_id, None)
+
+        if not pending.player_ids:
+            del self._pending_games[game_id]
+
         return True
 
     def get_player_id_by_name(self, game_id: str, player_name: str) -> str | None:
