@@ -15,6 +15,7 @@ interface AttachedCardStackProps {
   onCardClick?: (card: CardType) => void
   onCardDoubleClick?: (card: CardType) => void
   onCardContextMenu?: (e: React.MouseEvent, card: CardType) => void
+  upgradedCardIds?: Set<string>
 }
 
 const ATTACHMENT_OFFSET = 20
@@ -33,6 +34,7 @@ export function AttachedCardStack({
   onCardClick,
   onCardDoubleClick,
   onCardContextMenu,
+  upgradedCardIds = new Set(),
 }: AttachedCardStackProps) {
   const totalOffset = attachedCards.length * ATTACHMENT_OFFSET
 
@@ -67,6 +69,7 @@ export function AttachedCardStack({
               selected={card.id === selectedCardId}
               onClick={() => onCardClick?.(card)}
               onDoubleClick={() => onCardDoubleClick?.(card)}
+              upgraded={upgradedCardIds.has(card.id)}
             />
           </div>
         )
@@ -89,6 +92,7 @@ export function AttachedCardStack({
           selected={parentCard.id === selectedCardId}
           onClick={() => onCardClick?.(parentCard)}
           onDoubleClick={() => onCardDoubleClick?.(parentCard)}
+          upgraded={upgradedCardIds.has(parentCard.id)}
         />
       </div>
     </div>

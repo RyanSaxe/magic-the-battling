@@ -315,8 +315,7 @@ def create_game(player_names: list[str], num_players: int, config: Config | None
 def set_battler(game: Game, battler: Battler) -> None:
     game.battler = battler
 
-    upgrades = battler.upgrades.copy()
-    random.shuffle(upgrades)
+    upgrades = sorted(battler.upgrades, key=lambda u: u.name)
     max_upgrades = game.config.max_available_upgrades
     game.available_upgrades = upgrades[:max_upgrades]
 

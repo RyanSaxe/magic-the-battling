@@ -17,6 +17,7 @@ interface CardProps {
   disabled?: boolean
   className?: string
   isCompanion?: boolean
+  upgraded?: boolean
 }
 
 const sizeStyles = {
@@ -47,6 +48,7 @@ export function Card({
   disabled = false,
   className = '',
   isCompanion = false,
+  upgraded = false,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -73,19 +75,18 @@ export function Card({
 
   const baseClasses = [
     'card',
-    'relative rounded-lg overflow-hidden',
+    'relative rounded-lg',
     disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
     selected && 'selected',
     tapped && 'tapped',
     dragging && 'dragging',
     isCompanion && 'ring-2 ring-purple-500',
+    upgraded && 'ring-2 ring-amber-400',
     className,
   ].filter(Boolean).join(' ')
 
   const glowShadow = glow !== 'none' ? glowColors[glow] : undefined
-  const boxShadow = selected
-    ? glowColors.gold
-    : glowShadow || (dragging ? '0 20px 40px rgba(0, 0, 0, 0.5)' : undefined)
+  const boxShadow = glowShadow || (dragging ? '0 20px 40px rgba(0, 0, 0, 0.5)' : undefined)
 
   return (
     <div
@@ -108,7 +109,7 @@ export function Card({
       <img
         src={imageUrl}
         alt={card.name}
-        className={`w-full h-full object-cover ${isLoading ? 'invisible' : ''}`}
+        className={`w-full h-full object-cover rounded-lg ${isLoading ? 'invisible' : ''}`}
         onLoad={() => setIsLoading(false)}
         onError={() => setIsLoading(false)}
         draggable={false}

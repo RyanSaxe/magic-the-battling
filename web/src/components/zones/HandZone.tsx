@@ -8,6 +8,7 @@ interface HandZoneProps {
   validFromZones?: ZoneName[];
   draggable?: boolean;
   zone?: ZoneName;
+  upgradedCardIds?: Set<string>;
 }
 
 export function HandZone({
@@ -23,6 +24,7 @@ export function HandZone({
   ],
   draggable = true,
   zone = "hand",
+  upgradedCardIds = new Set(),
 }: HandZoneProps) {
   return (
     <DroppableZone
@@ -39,6 +41,7 @@ export function HandZone({
           selected={card.id === selectedCardId}
           onClick={() => onCardClick?.(card)}
           disabled={!draggable}
+          upgraded={upgradedCardIds.has(card.id)}
         />
       ))}
     </DroppableZone>

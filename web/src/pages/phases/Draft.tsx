@@ -26,6 +26,9 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   const { self_player } = gameState
   const currentPack = self_player.current_pack ?? []
   const pool = [...self_player.hand, ...self_player.sideboard]
+  const upgradedCardIds = new Set(
+    self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
+  )
 
   const handleCardClick = useCallback(
     (card: CardType, index: number, zone: SelectionZone, isInHand: boolean) => {
@@ -71,7 +74,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-4">
               Current Pack ({currentPack.length} cards)
             </div>
-            <div className="flex gap-4 justify-center flex-wrap overflow-auto">
+            <div className="flex gap-4 justify-center flex-wrap overflow-auto p-1">
               {currentPack.map((card, index) => (
                 <Card
                   key={card.id}
@@ -97,7 +100,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
             Swap cards from the pack to build your pool
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 p-1">
             {pool.map((card, index) => {
               const isInHand = self_player.hand.some((c) => c.id === card.id)
               return (
@@ -107,6 +110,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
                   onClick={() => handleCardClick(card, index, 'pool', isInHand)}
                   selected={selectedCard?.card.id === card.id}
                   size="md"
+                  upgraded={upgradedCardIds.has(card.id)}
                 />
               )
             })}
