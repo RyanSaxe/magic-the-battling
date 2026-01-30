@@ -1,8 +1,14 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
-import { rejoinGame } from "../api/client";
+import {
+  rejoinGame,
+  getGameStatus,
+  createSpectateRequest,
+  getSpectateRequestStatus,
+} from "../api/client";
+import type { GameStatusResponse } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
 import { BattlePhase } from "./phases/Battle";
@@ -90,19 +96,303 @@ function CardPreviewModal({
   );
 }
 
+interface SpectatorConfig {
+  spectatePlayer: string;
+  requestId: string;
+}
+
+function PlayerSelectionModal({
+  gameId,
+  onSessionCreated,
+}: {
+  gameId: string;
+  onSessionCreated: (
+    sessionId: string,
+    playerId: string,
+    spectatorConfig?: SpectatorConfig
+  ) => void;
+}) {
+  const navigate = useNavigate();
+  const [status, setStatus] = useState<GameStatusResponse | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
+  const [spectatorName, setSpectatorName] = useState("");
+  const [requestStatus, setRequestStatus] = useState<
+    "idle" | "waiting" | "denied"
+  >("idle");
+  const [error, setError] = useState("");
+  const [rejoinName, setRejoinName] = useState("");
+  const [rejoinLoading, setRejoinLoading] = useState(false);
+  const pollingRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    getGameStatus(gameId).then(setStatus).catch(() => setError("Failed to load game status"));
+  }, [gameId]);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearTimeout(pollingRef.current);
+      }
+    };
+  }, []);
+
+  const handleReconnect = async (playerName: string) => {
+    setRejoinName(playerName);
+    setRejoinLoading(true);
+    setError("");
+
+    try {
+      const response = await rejoinGame(gameId, playerName);
+      onSessionCreated(response.session_id, response.player_id);
+    } catch {
+      setError("Could not reconnect. Make sure you enter your name exactly.");
+    } finally {
+      setRejoinLoading(false);
+    }
+  };
+
+  const handleWatchRequest = async () => {
+    if (!selectedPlayer || !spectatorName.trim()) {
+      setError("Please enter your name");
+      return;
+    }
+
+    setError("");
+    try {
+      const { request_id } = await createSpectateRequest(
+        gameId,
+        selectedPlayer,
+        spectatorName
+      );
+      setRequestStatus("waiting");
+      pollForApproval(request_id);
+    } catch {
+      setError("Failed to send watch request");
+    }
+  };
+
+  const pollForApproval = (requestId: string) => {
+    const poll = async () => {
+      try {
+        const result = await getSpectateRequestStatus(gameId, requestId);
+        if (result.status === "approved" && result.session_id && result.player_id) {
+          onSessionCreated(result.session_id, result.player_id, {
+            spectatePlayer: selectedPlayer!,
+            requestId,
+          });
+        } else if (result.status === "denied") {
+          setRequestStatus("denied");
+        } else {
+          pollingRef.current = window.setTimeout(poll, 1000);
+        }
+      } catch {
+        setError("Failed to check request status");
+        setRequestStatus("idle");
+      }
+    };
+    poll();
+  };
+
+  if (!status) {
+    return (
+      <div className="game-table flex items-center justify-center p-4">
+        <div className="text-white">Loading game info...</div>
+      </div>
+    );
+  }
+
+  const humanPlayers = status.players.filter((p) => !p.is_bot);
+
+  return (
+    <div className="game-table flex items-center justify-center p-4">
+      <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-lg">
+        <h1 className="text-2xl font-bold text-white text-center mb-6">
+          Join Game
+        </h1>
+
+        {error && (
+          <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
+            {error}
+          </div>
+        )}
+
+        {requestStatus === "waiting" && (
+          <div className="text-center py-8">
+            <div className="animate-spin w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full mx-auto mb-4" />
+            <p className="text-gray-300">
+              Waiting for {selectedPlayer} to respond...
+            </p>
+            <button
+              onClick={() => {
+                if (pollingRef.current) clearTimeout(pollingRef.current);
+                setRequestStatus("idle");
+                setSelectedPlayer(null);
+              }}
+              className="mt-4 text-gray-400 hover:text-white text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {requestStatus === "denied" && (
+          <div className="text-center py-8">
+            <p className="text-red-400 mb-4">
+              {selectedPlayer} denied your request to watch.
+            </p>
+            <button
+              onClick={() => {
+                setRequestStatus("idle");
+                setSelectedPlayer(null);
+              }}
+              className="btn btn-secondary"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {requestStatus === "idle" && !selectedPlayer && (
+          <>
+            <p className="text-gray-400 text-center mb-4">
+              Select a player to reconnect or watch
+            </p>
+            <div className="space-y-3 mb-6">
+              {humanPlayers.map((player) => (
+                <div
+                  key={player.name}
+                  className="flex items-center justify-between bg-gray-800/50 rounded-lg p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        player.is_connected ? "bg-green-500" : "bg-gray-500"
+                      }`}
+                    />
+                    <span className="text-white">{player.name}</span>
+                    <span className="text-gray-500 text-sm">
+                      ({player.phase})
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    {!player.is_connected && (
+                      <button
+                        onClick={() => handleReconnect(player.name)}
+                        disabled={rejoinLoading}
+                        className="btn btn-primary text-sm py-1 px-3"
+                      >
+                        {rejoinLoading && rejoinName === player.name
+                          ? "..."
+                          : "Reconnect"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setSelectedPlayer(player.name)}
+                      className="btn btn-secondary text-sm py-1 px-3"
+                    >
+                      Watch
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => navigate("/")}
+              className="btn btn-secondary w-full py-2"
+            >
+              Back to Home
+            </button>
+          </>
+        )}
+
+        {requestStatus === "idle" && selectedPlayer && (
+          <div className="space-y-4">
+            <p className="text-gray-300 text-center">
+              Request to watch <strong>{selectedPlayer}</strong>'s game
+            </p>
+            <div>
+              <label className="block text-gray-300 mb-1">Your Name</label>
+              <input
+                type="text"
+                value={spectatorName}
+                onChange={(e) => setSpectatorName(e.target.value)}
+                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                placeholder="Enter your name"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setSelectedPlayer(null)}
+                className="btn btn-secondary flex-1 py-2"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleWatchRequest}
+                disabled={!spectatorName.trim()}
+                className="btn btn-primary flex-1 py-2"
+              >
+                Request to Watch
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SpectateRequestModal({
+  spectatorName,
+  requestId,
+  onRespond,
+}: {
+  spectatorName: string;
+  requestId: string;
+  onRespond: (requestId: string, allowed: boolean) => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+      <div className="bg-gray-900 rounded-lg p-6 max-w-sm">
+        <h2 className="text-xl text-white mb-4">Spectate Request</h2>
+        <p className="text-gray-300 mb-6">
+          <strong>{spectatorName}</strong> wants to watch your game.
+        </p>
+        <div className="flex gap-3">
+          <button
+            className="btn btn-primary flex-1"
+            onClick={() => onRespond(requestId, true)}
+          >
+            Allow
+          </button>
+          <button
+            className="btn btn-secondary flex-1"
+            onClick={() => onRespond(requestId, false)}
+          >
+            Deny
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   const { session, saveSession } = useSession();
-  const { gameState, isConnected, actions, error } = useGame(
+
+  const [spectatorConfig, setSpectatorConfig] = useState<SpectatorConfig | null>(null);
+  const [spectatingPlayer, setSpectatingPlayer] = useState<string | null>(null);
+
+  const { gameState, isConnected, actions, error, pendingSpectateRequest } = useGame(
     gameId ?? null,
     session?.sessionId ?? null,
+    spectatorConfig,
   );
   const { state, setPreviewCard } = useContextStrip();
 
-  const [rejoinName, setRejoinName] = useState("");
-  const [rejoinError, setRejoinError] = useState("");
-  const [rejoinLoading, setRejoinLoading] = useState(false);
+  const isSpectator = !!spectatorConfig;
 
   // Lifted state from Build phase
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
@@ -138,75 +428,33 @@ function GameContent() {
   });
 
   const handleYourLifeChange = (life: number) => {
+    if (isSpectator) return;
     actions.battleUpdateLife("you", life);
   };
 
   const handleOpponentLifeChange = (life: number) => {
+    if (isSpectator) return;
     actions.battleUpdateLife("opponent", life);
   };
 
-  const handleRejoin = async () => {
-    if (!rejoinName.trim() || !gameId) {
-      setRejoinError("Please enter your name");
-      return;
-    }
-
-    setRejoinLoading(true);
-    setRejoinError("");
-
-    try {
-      const response = await rejoinGame(gameId, rejoinName);
-      saveSession(response.session_id, response.player_id);
-    } catch {
-      setRejoinError("Could not rejoin. Check your name matches exactly.");
-    } finally {
-      setRejoinLoading(false);
+  const handleSessionCreated = (
+    sessionId: string,
+    playerId: string,
+    config?: SpectatorConfig
+  ) => {
+    saveSession(sessionId, playerId);
+    if (config) {
+      setSpectatorConfig(config);
+      setSpectatingPlayer(config.spectatePlayer);
     }
   };
 
   if (!session) {
     return (
-      <div className="game-table flex items-center justify-center p-4">
-        <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-md">
-          <h1 className="text-2xl font-bold text-white text-center mb-6">
-            Rejoin Game
-          </h1>
-
-          {rejoinError && (
-            <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
-              {rejoinError}
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-gray-300 mb-1">Your Name</label>
-              <input
-                type="text"
-                value={rejoinName}
-                onChange={(e) => setRejoinName(e.target.value)}
-                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                placeholder="Enter your name exactly as before"
-              />
-            </div>
-
-            <button
-              onClick={handleRejoin}
-              disabled={rejoinLoading}
-              className="btn btn-primary w-full py-2"
-            >
-              {rejoinLoading ? "Rejoining..." : "Rejoin Game"}
-            </button>
-
-            <button
-              onClick={() => navigate("/")}
-              className="btn btn-secondary w-full py-2"
-            >
-              Back to Home
-            </button>
-          </div>
-        </div>
-      </div>
+      <PlayerSelectionModal
+        gameId={gameId!}
+        onSessionCreated={handleSessionCreated}
+      />
     );
   }
 
@@ -272,6 +520,9 @@ function GameContent() {
   };
 
   const renderActionButtons = (): ReactNode => {
+    if (isSpectator) {
+      return null;
+    }
     switch (currentPhase) {
       case "draft":
         return (
@@ -440,6 +691,12 @@ function GameContent() {
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
       <div className="game-table flex flex-col">
+        {/* Spectator Banner */}
+        {isSpectator && spectatingPlayer && (
+          <div className="bg-purple-900/80 text-purple-200 text-center py-2">
+            Watching {spectatingPlayer}'s game (spectator mode)
+          </div>
+        )}
         {/* Header - Action Bar */}
         <header className="flex justify-between items-center px-4 py-2 bg-black/30">
           <div className="flex items-center gap-3">
@@ -625,6 +882,13 @@ function GameContent() {
         <RulesModal
           currentPhase={currentPhase as Phase}
           onClose={() => setShowRulesModal(false)}
+        />
+      )}
+      {pendingSpectateRequest && (
+        <SpectateRequestModal
+          spectatorName={pendingSpectateRequest.spectator_name}
+          requestId={pendingSpectateRequest.request_id}
+          onRespond={actions.spectateResponse}
         />
       )}
     </CardPreviewContext.Provider>

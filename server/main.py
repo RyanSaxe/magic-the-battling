@@ -3,6 +3,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from server.db.database import init_db
@@ -46,4 +47,14 @@ def health_check():
 
 static_dir = Path(__file__).parent.parent / "web" / "dist"
 if static_dir.exists():
-    app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+    assets_dir = static_dir / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/vite.svg")
+    async def vite_svg():
+        return FileResponse(static_dir / "vite.svg")
+
+    @app.get("/{path:path}")
+    async def spa_fallback(path: str):
+        return FileResponse(static_dir / "index.html")

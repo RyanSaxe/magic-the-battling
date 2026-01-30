@@ -5,7 +5,7 @@ import secrets
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from sqlalchemy.orm import Session, joinedload
 
@@ -57,6 +57,18 @@ from server.schemas.api import (
     PlayerView,
     SelfPlayerView,
 )
+from server.services.session_manager import session_manager
+
+
+@dataclass
+class PendingSpectateRequest:
+    request_id: str
+    game_id: str
+    target_player_name: str
+    spectator_name: str
+    status: Literal["pending", "approved", "denied"] = "pending"
+    session_id: str | None = None
+    player_id: str | None = None
 
 
 @dataclass
@@ -86,6 +98,7 @@ class GameManager:
         self._player_id_to_name: dict[str, str] = {}
         self._join_code_to_game: dict[str, str] = {}
         self._cleanup_tasks: dict[str, asyncio.Task] = {}
+        self._spectate_requests: dict[str, PendingSpectateRequest] = {}
 
     def create_game(
         self,
@@ -303,6 +316,15 @@ class GameManager:
             self._cleanup_tasks[game_id] = task
         except RuntimeError:
             pass
+
+    def schedule_abandoned_cleanup(self, game_id: str, delay: float = 7200.0) -> None:
+        """Schedule cleanup for abandoned game (default 2 hours)."""
+        self._schedule_cleanup(game_id, delay)
+
+    def cancel_abandoned_cleanup(self, game_id: str) -> None:
+        """Cancel scheduled cleanup when a player reconnects."""
+        if task := self._cleanup_tasks.pop(game_id, None):
+            task.cancel()
 
     def _cleanup_game(self, game_id: str) -> None:
         """Remove game from memory."""
@@ -574,6 +596,40 @@ class GameManager:
         self._player_to_game[player_id] = game_id
         self._player_id_to_name[player_id] = player_name
         return True
+
+    def get_player_id_by_name(self, game_id: str, player_name: str) -> str | None:
+        for player_id, name in self._player_id_to_name.items():
+            if name == player_name and self._player_to_game.get(player_id) == game_id:
+                return player_id
+        return None
+
+    def create_spectate_request(self, game_id: str, target_player_name: str, spectator_name: str) -> str:
+        request_id = secrets.token_urlsafe(8)
+        self._spectate_requests[request_id] = PendingSpectateRequest(
+            request_id=request_id,
+            game_id=game_id,
+            target_player_name=target_player_name,
+            spectator_name=spectator_name,
+        )
+        return request_id
+
+    def get_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
+        return self._spectate_requests.get(request_id)
+
+    def approve_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
+        req = self._spectate_requests.get(request_id)
+        if req and req.status == "pending":
+            req.status = "approved"
+            session = session_manager.create_session(req.game_id)
+            req.session_id = session.session_id
+            req.player_id = session.player_id
+        return req
+
+    def deny_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
+        req = self._spectate_requests.get(request_id)
+        if req and req.status == "pending":
+            req.status = "denied"
+        return req
 
     def _get_cube_loading_status(self, pending: PendingGame) -> CubeLoadingStatus:
         if pending.battler_error:

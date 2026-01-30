@@ -4,10 +4,15 @@ from server.schemas.api import (
     CreateGameRequest,
     CreateGameResponse,
     GameStateResponse,
+    GameStatusPlayer,
+    GameStatusResponse,
     JoinGameRequest,
     JoinGameResponse,
     LobbyStateResponse,
     RejoinGameRequest,
+    SpectateRequestCreate,
+    SpectateRequestResponse,
+    SpectateRequestStatus,
     StartGameResponse,
 )
 from server.services.game_manager import game_manager
@@ -156,3 +161,123 @@ def get_game_state(game_id: str, session_id: str):
         raise HTTPException(status_code=404, detail="Game not found or player not in game")
 
     return state
+
+
+@router.get("/{game_id}/status", response_model=GameStatusResponse)
+def get_game_status(game_id: str):
+    from server.routers.ws import connection_manager  # noqa: PLC0415
+
+    pending = game_manager.get_pending_game(game_id)
+    game = game_manager.get_game(game_id)
+
+    if not pending and not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    connected_player_ids = connection_manager.get_connected_player_ids(game_id)
+
+    players: list[GameStatusPlayer] = []
+
+    if pending:
+        for i, name in enumerate(pending.player_names):
+            player_id = pending.player_ids[i]
+            players.append(
+                GameStatusPlayer(
+                    name=name,
+                    is_connected=player_id in connected_player_ids,
+                    is_bot=False,
+                    phase="lobby",
+                )
+            )
+        return GameStatusResponse(
+            game_id=game_id,
+            phase="lobby",
+            is_started=pending.is_started,
+            players=players,
+        )
+
+    if game:
+        for player in game.players:
+            player_id = game_manager.get_player_id_by_name(game_id, player.name)
+            players.append(
+                GameStatusPlayer(
+                    name=player.name,
+                    is_connected=player_id in connected_player_ids if player_id else False,
+                    is_bot=False,
+                    phase=player.phase,
+                )
+            )
+        players.extend(
+            GameStatusPlayer(
+                name=fake.name,
+                is_connected=True,
+                is_bot=True,
+                phase="battle" if not fake.is_eliminated else "eliminated",
+            )
+            for fake in game.fake_players
+        )
+
+        phases = {p.phase for p in game.players if p.phase != "eliminated"}
+        phase = phases.pop() if len(phases) == 1 else "mixed"
+
+        return GameStatusResponse(
+            game_id=game_id,
+            phase=phase,
+            is_started=True,
+            players=players,
+        )
+
+    raise HTTPException(status_code=404, detail="Game not found")
+
+
+@router.post("/{game_id}/spectate-request", response_model=SpectateRequestResponse)
+async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
+    from server.routers.ws import connection_manager  # noqa: PLC0415
+
+    pending = game_manager.get_pending_game(game_id)
+    game = game_manager.get_game(game_id)
+
+    if not pending and not game:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    target_name = request.target_player_name
+    player_exists = False
+
+    if pending:
+        player_exists = target_name in pending.player_names
+    elif game:
+        player_exists = any(p.name == target_name for p in game.players)
+        player_exists = player_exists or any(f.name == target_name for f in game.fake_players)
+
+    if not player_exists:
+        raise HTTPException(status_code=404, detail="Target player not found")
+
+    request_id = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
+
+    target_player_id = game_manager.get_player_id_by_name(game_id, target_name)
+    if target_player_id:
+        await connection_manager.send_to_player(
+            game_id,
+            target_player_id,
+            {
+                "type": "spectate_request",
+                "payload": {
+                    "request_id": request_id,
+                    "spectator_name": request.spectator_name,
+                },
+            },
+        )
+
+    return SpectateRequestResponse(request_id=request_id)
+
+
+@router.get("/{game_id}/spectate-request/{request_id}", response_model=SpectateRequestStatus)
+def get_spectate_request_status(game_id: str, request_id: str):
+    req = game_manager.get_spectate_request(request_id)
+    if not req or req.game_id != game_id:
+        raise HTTPException(status_code=404, detail="Spectate request not found")
+
+    return SpectateRequestStatus(
+        status=req.status,
+        session_id=req.session_id,
+        player_id=req.player_id,
+    )

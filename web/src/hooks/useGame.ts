@@ -2,8 +2,17 @@ import { useCallback } from 'react'
 import { useWebSocket } from './useWebSocket'
 import type { CardDestination, BuildSource, ZoneName, CardStateAction } from '../types'
 
-export function useGame(gameId: string | null, sessionId: string | null) {
-  const { isConnected, gameState, lobbyState, error, send } = useWebSocket(gameId, sessionId)
+interface SpectatorConfig {
+  spectatePlayer: string
+  requestId: string
+}
+
+export function useGame(
+  gameId: string | null,
+  sessionId: string | null,
+  spectatorConfig?: SpectatorConfig | null
+) {
+  const { isConnected, gameState, lobbyState, error, send, pendingSpectateRequest, clearSpectateRequest } = useWebSocket(gameId, sessionId, spectatorConfig)
 
   const startGame = useCallback(() => {
     send('start_game')
@@ -90,11 +99,17 @@ export function useGame(gameId: string | null, sessionId: string | null) {
     send('reward_done', upgradeId ? { upgrade_id: upgradeId } : {})
   }, [send])
 
+  const spectateResponse = useCallback((requestId: string, allowed: boolean) => {
+    send('spectate_response', { request_id: requestId, allowed })
+    clearSpectateRequest()
+  }, [send, clearSpectateRequest])
+
   return {
     isConnected,
     gameState,
     lobbyState,
     error,
+    pendingSpectateRequest,
     actions: {
       startGame,
       setReady,
@@ -115,6 +130,7 @@ export function useGame(gameId: string | null, sessionId: string | null) {
       rewardPickUpgrade,
       rewardApplyUpgrade,
       rewardDone,
+      spectateResponse,
     },
   }
 }
