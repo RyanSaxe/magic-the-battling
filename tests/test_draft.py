@@ -404,3 +404,23 @@ def test_battler_elo_is_static(card_factory):
 
     # ELO should remain unchanged (no ZeroDivisionError)
     assert battler.elo == expected_elo
+
+
+def test_swap_clears_command_zone_when_companion_swapped_back(card_factory):
+    """Swapping a companion back to pack should clear command_zone."""
+    game = create_game(["Alice"], num_players=1)
+    game.battler = Battler(cards=[card_factory(f"c{i}") for i in range(10)], upgrades=[], vanguards=[])
+    draft.start(game)
+    draft.deal_pack_to_player(game, game.players[0])
+
+    player = game.players[0]
+    companion = card_factory("companion_card")
+    player.sideboard.append(companion)
+    player.command_zone.append(companion)
+
+    pack_card = game.get_draft_state().current_packs["Alice"][0]
+    draft.swap(game, player, pack_card, companion, "sideboard")
+
+    assert pack_card in player.sideboard
+    assert companion in game.get_draft_state().current_packs["Alice"]
+    assert player.command_zone == []

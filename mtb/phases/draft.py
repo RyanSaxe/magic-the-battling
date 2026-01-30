@@ -144,6 +144,9 @@ def swap(
     current_pack[pack_idx] = player_card
     player_collection[player_idx] = pack_card
 
+    if player.command_zone and any(c.id == player_card.id for c in player.command_zone):
+        player.command_zone.clear()
+
 
 def end_for_player(game: Game, player: Player) -> None:
     """End draft for a player, returning their pack to battler.

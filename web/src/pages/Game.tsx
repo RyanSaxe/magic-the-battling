@@ -15,7 +15,7 @@ import { RulesModal } from "../components/RulesModal";
 import { InfoIcon } from "../components/icons";
 import { ContextStripProvider, useContextStrip } from "../contexts";
 import { CardPreviewContext } from "../components/card";
-import { GameDndProvider, useDndActions } from "../dnd";
+import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
 import { PHASE_HINTS, type Phase } from "../constants/rules";
 import type { Card as CardType } from "../types";
 
@@ -114,6 +114,8 @@ function GameContent() {
 
   // Lifted state from Battle phase
   const [isChangingResult, setIsChangingResult] = useState(false);
+  const [showSidebarSideboard, setShowSidebarSideboard] = useState(false);
+  const [showOpponentSideboard, setShowOpponentSideboard] = useState(false);
 
   // Rules modal state
   const [showRulesModal, setShowRulesModal] = useState(false);
@@ -372,7 +374,7 @@ function GameContent() {
               }}
               className="btn btn-danger"
             >
-              Opponent Won
+              I Lost
             </button>
           </>
         );
@@ -417,6 +419,10 @@ function GameContent() {
           canManipulateOpponent={canManipulateOpponent}
           hasCompanion={self_player.command_zone.length > 0}
           opponentHasCompanion={opponentHasCompanion}
+          sideboardCount={current_battle.your_zones.sideboard.length}
+          onShowSideboard={() => setShowSidebarSideboard(true)}
+          opponentSideboardCount={current_battle.opponent_full_sideboard?.length ?? 0}
+          onShowOpponentSideboard={() => setShowOpponentSideboard(true)}
         />
       );
     }
@@ -471,6 +477,69 @@ function GameContent() {
                 useUpgrades={gameState.use_upgrades}
               />
             </div>
+            {showSidebarSideboard && current_battle && (
+              <div
+                className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+                onClick={() => setShowSidebarSideboard(false)}
+              >
+                <div
+                  className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-white font-medium">
+                      Your Sideboard ({current_battle.your_zones.sideboard.length})
+                    </h3>
+                    <button
+                      onClick={() => setShowSidebarSideboard(false)}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {current_battle.your_zones.sideboard.map((card) => (
+                      <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            {showOpponentSideboard && current_battle && current_battle.opponent_full_sideboard && (
+              <div
+                className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+                onClick={() => setShowOpponentSideboard(false)}
+              >
+                <div
+                  className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-white font-medium">
+                      {current_battle.opponent_name}'s Full Sideboard ({current_battle.opponent_full_sideboard.length})
+                    </h3>
+                    <button
+                      onClick={() => setShowOpponentSideboard(false)}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {current_battle.opponent_full_sideboard.map((card) => (
+                      <DraggableCard
+                        key={card.id}
+                        card={card}
+                        zone="sideboard"
+                        zoneOwner="opponent"
+                        size="sm"
+                        isOpponent
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </GameDndProvider>
         ) : (
           <div className="flex-1 flex min-h-0">

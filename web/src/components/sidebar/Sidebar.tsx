@@ -40,7 +40,7 @@ export function Sidebar({
   return (
     <aside className="w-64 bg-black/30 flex flex-col overflow-hidden">
       {phaseContent ? (
-        <div className="overflow-auto flex-shrink-0">{phaseContent}</div>
+        <div className="overflow-y-auto overflow-x-hidden flex-1">{phaseContent}</div>
       ) : (
         <div className="p-4 overflow-auto flex-1 flex flex-col gap-4">
           <PlayerList

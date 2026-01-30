@@ -405,12 +405,14 @@ class GameManager:
             else:
                 other_cube.append(history)
 
+        elo_range = 200
+
         if target_elo:
-            same_cube.sort(key=lambda h: abs(cast(float, h.battler_elo) - target_elo))
-            other_cube.sort(key=lambda h: abs(cast(float, h.battler_elo) - target_elo))
-        else:
-            random.shuffle(same_cube)
-            random.shuffle(other_cube)
+            same_cube = [h for h in same_cube if abs(cast(float, h.battler_elo) - target_elo) <= elo_range]
+            other_cube = [h for h in other_cube if abs(cast(float, h.battler_elo) - target_elo) <= elo_range]
+
+        random.shuffle(same_cube)
+        random.shuffle(other_cube)
 
         result = same_cube[:count]
         if len(result) < count:
