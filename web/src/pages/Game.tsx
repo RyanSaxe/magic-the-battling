@@ -11,9 +11,12 @@ import { Sidebar } from '../components/sidebar'
 import { BattleSidebarContent } from '../components/sidebar/BattleSidebarContent'
 import { RewardSidebarContent } from '../components/sidebar/RewardSidebarContent'
 import { GameSummary } from '../components/GameSummary'
+import { RulesModal } from '../components/RulesModal'
+import { InfoIcon } from '../components/icons'
 import { ContextStripProvider, useContextStrip } from '../contexts'
 import { CardPreviewContext } from '../components/card'
 import { GameDndProvider, useDndActions } from '../dnd'
+import { PHASE_HINTS, type Phase } from '../constants/rules'
 import type { Card as CardType } from '../types'
 
 function CardPreviewModal({
@@ -109,6 +112,20 @@ function GameContent() {
 
   // Lifted state from Battle phase
   const [isChangingResult, setIsChangingResult] = useState(false)
+
+  // Rules modal state
+  const [showRulesModal, setShowRulesModal] = useState(false)
+  const [hasViewedRules, setHasViewedRules] = useState(() =>
+    localStorage.getItem('mtb-rules-viewed') === 'true'
+  )
+
+  const handleOpenRules = () => {
+    setShowRulesModal(true)
+    if (!hasViewedRules) {
+      localStorage.setItem('mtb-rules-viewed', 'true')
+      setHasViewedRules(true)
+    }
+  }
 
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
@@ -415,7 +432,16 @@ function GameContent() {
             <div className="text-sm text-gray-300">
               Stage {self_player.stage} • Round {self_player.round}
             </div>
-            <span className={`phase-badge ${phaseBadgeClass}`}>{currentPhase}</span>
+            <button
+              onClick={handleOpenRules}
+              className={`phase-badge ${phaseBadgeClass} ${!hasViewedRules ? 'pulse' : ''}`}
+            >
+              {currentPhase}
+              <InfoIcon size="sm" className="ml-1.5 opacity-60" />
+            </button>
+          </div>
+          <div className="text-sm text-gray-400 italic">
+            {PHASE_HINTS[currentPhase as Phase]}
           </div>
           <div className="flex items-center gap-2">
             {renderActionButtons()}
@@ -502,6 +528,12 @@ function GameContent() {
           card={state.previewCard}
           upgradeTarget={state.previewUpgradeTarget}
           onClose={() => setPreviewCard(null)}
+        />
+      )}
+      {showRulesModal && (
+        <RulesModal
+          currentPhase={currentPhase as Phase}
+          onClose={() => setShowRulesModal(false)}
         />
       )}
     </CardPreviewContext.Provider>
