@@ -11,6 +11,7 @@ export function Home() {
   const [cubeId, setCubeId] = useState("auto");
   const [useUpgrades, setUseUpgrades] = useState(true);
   const [useVanguards, setUseVanguards] = useState(false);
+  const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [targetPlayerCount, setTargetPlayerCount] = useState(4);
   const [joinCode, setJoinCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
@@ -31,12 +32,13 @@ export function Home() {
         cubeId: cubeId || "auto",
         useUpgrades,
         useVanguards,
+        autoApproveSpectators,
         targetPlayerCount,
       });
       saveSession(response.session_id, response.player_id);
       navigate(`/game/${response.game_id}/lobby`);
-    } catch {
-      setError("Failed to create game");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create game");
     } finally {
       setLoading(false);
     }
@@ -59,8 +61,8 @@ export function Home() {
       const response = await joinGame(joinCode, playerName);
       saveSession(response.session_id, response.player_id);
       navigate(`/game/${response.game_id}/lobby`);
-    } catch {
-      setError("Failed to join game. Check your join code.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to join game");
     } finally {
       setLoading(false);
     }
@@ -106,9 +108,7 @@ export function Home() {
           {!isJoining && (
             <>
               <div>
-                <label className="block text-gray-300 mb-1">
-                  Cube ID <span className="text-gray-500">(optional)</span>
-                </label>
+                <label className="block text-gray-300 mb-1">CubeCobra ID</label>
                 <input
                   type="text"
                   value={cubeId}
@@ -143,7 +143,7 @@ export function Home() {
                     ))}
                   </div>
                   <p className="text-gray-500 text-sm mt-1">
-                    Bots will fill remaining slots
+                    Bots will fill empty slots to reach this player count.
                   </p>
                 </div>
 
@@ -157,11 +157,25 @@ export function Home() {
                   <div>
                     <div className="text-white">Use Upgrades</div>
                     <div className="text-gray-500 text-sm">
-                      Gain upgrades at stage boundaries to increase damage
+                      Gain upgrades every 3 rounds to improve your cards!
                     </div>
                   </div>
                 </label>
 
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoApproveSpectators}
+                    onChange={(e) => setAutoApproveSpectators(e.target.checked)}
+                    className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
+                  />
+                  <div>
+                    <div className="text-white">Allow all spectators</div>
+                    <div className="text-gray-500 text-sm">
+                      Don't require player permission for spectators to join
+                    </div>
+                  </div>
+                </label>
                 <label className="flex items-center gap-3 cursor-pointer opacity-50">
                   <input
                     type="checkbox"

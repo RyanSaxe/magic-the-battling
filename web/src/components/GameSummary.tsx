@@ -6,7 +6,6 @@ import { UpgradeStack } from './sidebar/UpgradeStack'
 interface GameSummaryProps {
   player: SelfPlayerView
   players: PlayerView[]
-  onReturnHome: () => void
   useUpgrades?: boolean
 }
 
@@ -47,7 +46,11 @@ function UpgradeGrid({ upgrades }: { upgrades: CardType[] }) {
   )
 }
 
-export function GameSummary({ player, players, onReturnHome, useUpgrades = true }: GameSummaryProps) {
+export function GameSummary({
+  player,
+  players,
+  useUpgrades = true,
+}: GameSummaryProps) {
   const [frozenPlayer] = useState(() => ({
     hand: [...player.hand],
     sideboard: [...player.sideboard],
@@ -98,13 +101,6 @@ export function GameSummary({ player, players, onReturnHome, useUpgrades = true 
           )}
           <CardGrid cards={frozenPlayer.sideboard} title="Sideboard" companionIds={companionIds} />
         </div>
-
-        <button
-          onClick={onReturnHome}
-          className="btn btn-primary mt-6"
-        >
-          Return Home
-        </button>
       </div>
     </div>
   )

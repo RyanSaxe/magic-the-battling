@@ -1,11 +1,12 @@
 import asyncio
 import json
+import logging
 import random
 import secrets
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from sqlalchemy.orm import Session, joinedload
 
@@ -57,6 +58,20 @@ from server.schemas.api import (
     PlayerView,
     SelfPlayerView,
 )
+from server.services.session_manager import session_manager
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PendingSpectateRequest:
+    request_id: str
+    game_id: str
+    target_player_name: str
+    spectator_name: str
+    status: Literal["pending", "approved", "denied"] = "pending"
+    session_id: str | None = None
+    player_id: str | None = None
 
 
 @dataclass
@@ -71,6 +86,7 @@ class PendingGame:
     use_upgrades: bool = True
     use_vanguards: bool = False
     target_player_count: int = 4
+    auto_approve_spectators: bool = False
     player_ready: dict[str, bool] = field(default_factory=dict)
     battler: Battler | None = None
     battler_loading: bool = False
@@ -86,6 +102,7 @@ class GameManager:
         self._player_id_to_name: dict[str, str] = {}
         self._join_code_to_game: dict[str, str] = {}
         self._cleanup_tasks: dict[str, asyncio.Task] = {}
+        self._spectate_requests: dict[str, PendingSpectateRequest] = {}
 
     def create_game(
         self,
@@ -95,6 +112,7 @@ class GameManager:
         use_upgrades: bool = True,
         use_vanguards: bool = False,
         target_player_count: int = 4,
+        auto_approve_spectators: bool = False,
     ) -> PendingGame:
         game_id = secrets.token_urlsafe(8)
         join_code = secrets.token_urlsafe(4).upper()[:6]
@@ -109,6 +127,7 @@ class GameManager:
             use_upgrades=use_upgrades,
             use_vanguards=use_vanguards,
             target_player_count=target_player_count,
+            auto_approve_spectators=auto_approve_spectators,
             player_ready={player_id: False},
         )
         self._pending_games[game_id] = pending
@@ -121,13 +140,19 @@ class GameManager:
     def get_pending_game(self, game_id: str) -> PendingGame | None:
         return self._pending_games.get(game_id)
 
+    def get_game_id_by_join_code(self, join_code: str) -> str | None:
+        return self._join_code_to_game.get(join_code.upper())
+
     def get_pending_game_by_code(self, join_code: str) -> PendingGame | None:
-        game_id = self._join_code_to_game.get(join_code.upper())
+        game_id = self.get_game_id_by_join_code(join_code)
         return self._pending_games.get(game_id) if game_id else None
 
     def join_game(self, join_code: str, player_name: str, player_id: str) -> PendingGame | None:
         pending = self.get_pending_game_by_code(join_code)
-        if not pending or pending.is_started:
+        if not pending:
+            return None
+
+        if player_name in pending.player_names:
             return None
 
         pending.player_names.append(player_name)
@@ -179,6 +204,7 @@ class GameManager:
         config = Config(
             use_upgrades=pending.use_upgrades,
             use_vanguards=pending.use_vanguards,
+            auto_approve_spectators=pending.auto_approve_spectators,
         )
         game = create_game(pending.player_names, len(pending.player_names), config)
         battler = self._load_battler(pending.cube_id, pending.use_upgrades, pending.use_vanguards)
@@ -205,6 +231,7 @@ class GameManager:
                 )
 
         self._active_games[game_id] = game
+        self._pending_games.pop(game_id, None)
 
         return game
 
@@ -236,6 +263,7 @@ class GameManager:
         config = Config(
             use_upgrades=pending.use_upgrades,
             use_vanguards=pending.use_vanguards,
+            auto_approve_spectators=pending.auto_approve_spectators,
         )
         game = create_game(pending.player_names, len(pending.player_names), config)
         battler = pending.battler
@@ -262,6 +290,7 @@ class GameManager:
                 )
 
         self._active_games[game_id] = game
+        self._pending_games.pop(game_id, None)
 
         return game
 
@@ -304,8 +333,19 @@ class GameManager:
         except RuntimeError:
             pass
 
+    def schedule_abandoned_cleanup(self, game_id: str, delay: float = 600.0) -> None:
+        """Schedule cleanup for abandoned game (default 10 minutes)."""
+        logger.info("Scheduling abandoned game cleanup for game_id=%s in %.0f seconds", game_id, delay)
+        self._schedule_cleanup(game_id, delay)
+
+    def cancel_abandoned_cleanup(self, game_id: str) -> None:
+        """Cancel scheduled cleanup when a player reconnects."""
+        if task := self._cleanup_tasks.pop(game_id, None):
+            task.cancel()
+
     def _cleanup_game(self, game_id: str) -> None:
         """Remove game from memory."""
+        logger.info("Executing cleanup for game_id=%s", game_id)
         pending = self._pending_games.get(game_id)
         if pending:
             if pending._loading_task and not pending._loading_task.done():
@@ -557,23 +597,93 @@ class GameManager:
         return None
 
     def can_rejoin(self, game_id: str, player_name: str) -> bool:
-        pending = self._pending_games.get(game_id)
-        if pending:
-            return player_name in pending.player_names
+        from server.routers.ws import connection_manager  # noqa: PLC0415
 
         game = self._active_games.get(game_id)
-        if game:
-            return any(p.name == player_name for p in game.players)
+        if not game:
+            return False
 
-        return False
+        if not any(p.name == player_name for p in game.players):
+            return False
+
+        player_id = self.get_player_id_by_name(game_id, player_name)
+        return not (player_id and connection_manager.is_player_connected(game_id, player_id))
 
     def rejoin_game(self, game_id: str, player_name: str, player_id: str) -> bool:
-        if not self.can_rejoin(game_id, player_name):
+        game = self._active_games.get(game_id)
+        if not game or not any(p.name == player_name for p in game.players):
             return False
+
+        old_player_ids = [
+            pid
+            for pid, name in self._player_id_to_name.items()
+            if name == player_name and self._player_to_game.get(pid) == game_id
+        ]
+        for old_pid in old_player_ids:
+            self._player_id_to_name.pop(old_pid, None)
+            self._player_to_game.pop(old_pid, None)
 
         self._player_to_game[player_id] = game_id
         self._player_id_to_name[player_id] = player_name
         return True
+
+    def remove_player_from_pending(self, game_id: str, player_id: str) -> bool:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.is_started or player_id not in pending.player_ids:
+            return False
+
+        idx = pending.player_ids.index(player_id)
+        pending.player_names.pop(idx)
+        pending.player_ids.pop(idx)
+        pending.player_ready.pop(player_id, None)
+
+        self._player_to_game.pop(player_id, None)
+        self._player_id_to_name.pop(player_id, None)
+
+        if not pending.player_ids:
+            del self._pending_games[game_id]
+
+        return True
+
+    def get_player_id_by_name(self, game_id: str, player_name: str) -> str | None:
+        for player_id, name in self._player_id_to_name.items():
+            if name == player_name and self._player_to_game.get(player_id) == game_id:
+                return player_id
+        return None
+
+    def create_spectate_request(self, game_id: str, target_player_name: str, spectator_name: str) -> str:
+        request_id = secrets.token_urlsafe(8)
+        req = PendingSpectateRequest(
+            request_id=request_id,
+            game_id=game_id,
+            target_player_name=target_player_name,
+            spectator_name=spectator_name,
+        )
+        self._spectate_requests[request_id] = req
+
+        game = self.get_game(game_id)
+        if game and game.config.auto_approve_spectators:
+            self.approve_spectate_request(request_id)
+
+        return request_id
+
+    def get_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
+        return self._spectate_requests.get(request_id)
+
+    def approve_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
+        req = self._spectate_requests.get(request_id)
+        if req and req.status == "pending":
+            req.status = "approved"
+            session = session_manager.create_session(req.game_id)
+            req.session_id = session.session_id
+            req.player_id = session.player_id
+        return req
+
+    def deny_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
+        req = self._spectate_requests.get(request_id)
+        if req and req.status == "pending":
+            req.status = "denied"
+        return req
 
     def _get_cube_loading_status(self, pending: PendingGame) -> CubeLoadingStatus:
         if pending.battler_error:

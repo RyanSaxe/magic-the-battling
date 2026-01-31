@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -5,6 +6,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import server.db.database as db
 from server.services.game_manager import game_manager
 from server.services.session_manager import session_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -32,16 +35,57 @@ ACTION_REQUIRED_PHASES: dict[str, str] = {
 class ConnectionManager:
     def __init__(self):
         self._connections: dict[str, dict[str, WebSocket]] = defaultdict(dict)
+        self._pending_connections: dict[str, set[str]] = defaultdict(set)
+        self._spectators: dict[str, dict[str, list[WebSocket]]] = defaultdict(lambda: defaultdict(list))
+
+    def reserve_connection(self, game_id: str, player_id: str):
+        self._pending_connections[game_id].add(player_id)
 
     async def connect(self, game_id: str, player_id: str, websocket: WebSocket):
+        game_manager.cancel_abandoned_cleanup(game_id)
         await websocket.accept()
         self._connections[game_id][player_id] = websocket
+        self._pending_connections[game_id].discard(player_id)
 
     def disconnect(self, game_id: str, player_id: str):
+        logger.debug("Disconnect called for game_id=%s, player_id=%s", game_id, player_id)
         if game_id in self._connections:
             self._connections[game_id].pop(player_id, None)
+            remaining = len(self._connections[game_id])
+            logger.debug("Remaining connections for game_id=%s: %d", game_id, remaining)
             if not self._connections[game_id]:
                 del self._connections[game_id]
+                logger.info("All players disconnected from game_id=%s, scheduling abandoned cleanup", game_id)
+                game_manager.schedule_abandoned_cleanup(game_id)
+        if game_id in self._pending_connections:
+            self._pending_connections[game_id].discard(player_id)
+
+    def get_connected_player_ids(self, game_id: str) -> set[str]:
+        connected = set(self._connections.get(game_id, {}).keys())
+        pending = self._pending_connections.get(game_id, set())
+        return connected | pending
+
+    def is_player_connected(self, game_id: str, player_id: str) -> bool:
+        if player_id in self._connections.get(game_id, {}):
+            return True
+        return player_id in self._pending_connections.get(game_id, set())
+
+    async def connect_spectator(self, game_id: str, target_player_id: str, websocket: WebSocket):
+        await websocket.accept()
+        self._spectators[game_id][target_player_id].append(websocket)
+
+    def disconnect_spectator(self, game_id: str, target_player_id: str, websocket: WebSocket):
+        if game_id in self._spectators and target_player_id in self._spectators[game_id]:
+            self._spectators[game_id][target_player_id] = [
+                ws for ws in self._spectators[game_id][target_player_id] if ws != websocket
+            ]
+
+    async def send_to_player(self, game_id: str, player_id: str, message: dict):
+        if game_id in self._connections and player_id in self._connections[game_id]:
+            try:
+                await self._connections[game_id][player_id].send_json(message)
+            except Exception:
+                self.disconnect(game_id, player_id)
 
     async def broadcast_game_state(self, game_id: str):
         if game_id not in self._connections:
@@ -59,6 +103,15 @@ class ConnectionManager:
                     )
                 except Exception:
                     self.disconnect(game_id, player_id)
+
+        for player_id, spectator_list in self._spectators.get(game_id, {}).items():
+            state = game_manager.get_game_state(game_id, player_id)
+            if state:
+                for ws in list(spectator_list):
+                    try:
+                        await ws.send_json({"type": "game_state", "payload": state.model_dump()})
+                    except Exception:
+                        self.disconnect_spectator(game_id, player_id, ws)
 
     async def broadcast_lobby_state(self, game_id: str):
         if game_id not in self._connections:
@@ -114,11 +167,48 @@ class ConnectionManager:
 connection_manager = ConnectionManager()
 
 
+async def _handle_spectator_connection(
+    websocket: WebSocket, game_id: str, session_id: str, spectate_player: str, request_id: str
+) -> bool:
+    req = game_manager.get_spectate_request(request_id)
+    if not req or req.status != "approved" or req.session_id != session_id:
+        await websocket.close(code=4003, reason="Invalid spectate request")
+        return True
+
+    target_player_id = game_manager.get_player_id_by_name(game_id, spectate_player)
+    if not target_player_id:
+        await websocket.close(code=4004, reason="Target player not found")
+        return True
+
+    await connection_manager.connect_spectator(game_id, target_player_id, websocket)
+
+    state = game_manager.get_game_state(game_id, target_player_id)
+    if state:
+        await websocket.send_json({"type": "game_state", "payload": state.model_dump()})
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        connection_manager.disconnect_spectator(game_id, target_player_id, websocket)
+    return True
+
+
 @router.websocket("/ws/{game_id}")
-async def websocket_endpoint(websocket: WebSocket, game_id: str, session_id: str):
+async def websocket_endpoint(
+    websocket: WebSocket,
+    game_id: str,
+    session_id: str,
+    spectate_player: str | None = None,
+    request_id: str | None = None,
+):
     session = session_manager.get_session(session_id)
     if not session:
         await websocket.close(code=4001, reason="Invalid session")
+        return
+
+    if spectate_player and request_id:
+        await _handle_spectator_connection(websocket, game_id, session_id, spectate_player, request_id)
         return
 
     player_id = session.player_id
@@ -151,6 +241,7 @@ async def websocket_endpoint(websocket: WebSocket, game_id: str, session_id: str
 
     except WebSocketDisconnect:
         connection_manager.disconnect(game_id, player_id)
+        game_manager.remove_player_from_pending(game_id, player_id)
         await connection_manager.broadcast_lobby_state(game_id)
 
 
@@ -258,9 +349,23 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
             return False
 
 
+def _handle_spectate_response(payload: dict) -> None:
+    request_id = payload.get("request_id")
+    if not request_id:
+        return
+    if payload.get("allowed", False):
+        game_manager.approve_spectate_request(request_id)
+    else:
+        game_manager.deny_spectate_request(request_id)
+
+
 async def handle_message(game_id: str, player_id: str, data: dict, websocket: WebSocket):
     action = data.get("action", "")
     payload = data.get("payload", {})
+
+    if action == "spectate_response":
+        _handle_spectate_response(payload)
+        return
 
     if await _handle_lobby_action(action, payload, game_id, player_id, websocket):
         return

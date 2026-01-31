@@ -153,3 +153,24 @@ export interface WebSocketMessage {
   type: string
   payload: unknown
 }
+
+export interface GameStatusPlayer {
+  name: string
+  is_connected: boolean
+  is_bot: boolean
+  phase: string
+}
+
+export interface GameStatusResponse {
+  game_id: string
+  phase: string
+  is_started: boolean
+  players: GameStatusPlayer[]
+  auto_approve_spectators: boolean
+}
+
+export interface SpectateRequestStatus {
+  status: 'pending' | 'approved' | 'denied'
+  session_id?: string
+  player_id?: string
+}

@@ -1,12 +1,22 @@
-import type { CreateGameResponse, JoinGameResponse } from '../types'
+import type { CreateGameResponse, JoinGameResponse, GameStatusResponse, SpectateRequestStatus } from '../types'
 
 const API_BASE = '/api'
+
+async function getErrorMessage(response: Response, fallback: string): Promise<string> {
+  try {
+    const data = await response.json()
+    return data.detail || fallback
+  } catch {
+    return fallback
+  }
+}
 
 export interface GameOptions {
   cubeId?: string
   useUpgrades?: boolean
   useVanguards?: boolean
   targetPlayerCount?: number
+  autoApproveSpectators?: boolean
 }
 
 export async function createGame(
@@ -22,10 +32,11 @@ export async function createGame(
       use_upgrades: options.useUpgrades ?? true,
       use_vanguards: options.useVanguards ?? false,
       target_player_count: options.targetPlayerCount ?? 4,
+      auto_approve_spectators: options.autoApproveSpectators ?? false,
     }),
   })
   if (!response.ok) {
-    throw new Error('Failed to create game')
+    throw new Error(await getErrorMessage(response, 'Failed to create game'))
   }
   return response.json()
 }
@@ -37,7 +48,7 @@ export async function joinGame(joinCode: string, playerName: string): Promise<Jo
     body: JSON.stringify({ join_code: joinCode, player_name: playerName }),
   })
   if (!response.ok) {
-    throw new Error('Failed to join game')
+    throw new Error(await getErrorMessage(response, 'Failed to join game'))
   }
   return response.json()
 }
@@ -47,7 +58,7 @@ export async function startGame(gameId: string): Promise<void> {
     method: 'POST',
   })
   if (!response.ok) {
-    throw new Error('Failed to start game')
+    throw new Error(await getErrorMessage(response, 'Failed to start game'))
   }
 }
 
@@ -58,7 +69,42 @@ export async function rejoinGame(gameId: string, playerName: string): Promise<Jo
     body: JSON.stringify({ player_name: playerName }),
   })
   if (!response.ok) {
-    throw new Error('Failed to rejoin game')
+    throw new Error(await getErrorMessage(response, 'Failed to rejoin game'))
+  }
+  return response.json()
+}
+
+export async function getGameStatus(gameId: string): Promise<GameStatusResponse> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/status`)
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, 'Failed to get game status'))
+  }
+  return response.json()
+}
+
+export async function createSpectateRequest(
+  gameId: string,
+  targetPlayerName: string,
+  spectatorName: string
+): Promise<{ request_id: string }> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/spectate-request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ target_player_name: targetPlayerName, spectator_name: spectatorName }),
+  })
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, 'Failed to create spectate request'))
+  }
+  return response.json()
+}
+
+export async function getSpectateRequestStatus(
+  gameId: string,
+  requestId: string
+): Promise<SpectateRequestStatus> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/spectate-request/${requestId}`)
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, 'Failed to get spectate status'))
   }
   return response.json()
 }

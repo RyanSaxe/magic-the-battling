@@ -16,6 +16,7 @@ class CreateGameRequest(BaseModel):
     use_upgrades: bool = True
     use_vanguards: bool = False
     target_player_count: int = 4
+    auto_approve_spectators: bool = False
 
 
 class CreateGameResponse(BaseModel):
@@ -197,3 +198,33 @@ class WebSocketMessage(BaseModel):
 class ErrorResponse(BaseModel):
     error: str
     detail: str | None = None
+
+
+class GameStatusPlayer(BaseModel):
+    name: str
+    is_connected: bool
+    is_bot: bool
+    phase: str
+
+
+class GameStatusResponse(BaseModel):
+    game_id: str
+    phase: str
+    is_started: bool
+    players: list[GameStatusPlayer]
+    auto_approve_spectators: bool = False
+
+
+class SpectateRequestCreate(BaseModel):
+    target_player_name: str
+    spectator_name: str
+
+
+class SpectateRequestResponse(BaseModel):
+    request_id: str
+
+
+class SpectateRequestStatus(BaseModel):
+    status: Literal["pending", "approved", "denied"]
+    session_id: str | None = None
+    player_id: str | None = None
