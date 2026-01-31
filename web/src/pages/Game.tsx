@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import {
@@ -144,8 +144,12 @@ function PlayerSelectionModal({
     try {
       const response = await rejoinGame(gameId, playerName);
       onSessionCreated(response.session_id, response.player_id);
-    } catch {
-      setError("Could not reconnect. Make sure you enter your name exactly.");
+    } catch (err) {
+      if (err instanceof Error && err.message.includes("409")) {
+        setError("Player is already connected.");
+      } else {
+        setError("Could not reconnect. Make sure you enter your name exactly.");
+      }
     } finally {
       setRejoinLoading(false);
     }
@@ -202,6 +206,13 @@ function PlayerSelectionModal({
   }
 
   const humanPlayers = status.players.filter((p) => !p.is_bot);
+  const watchablePlayers = humanPlayers.filter(
+    (p) =>
+      p.phase !== "eliminated" &&
+      p.phase !== "awaiting_elimination" &&
+      p.phase !== "winner" &&
+      p.phase !== "game_over"
+  );
 
   return (
     <div className="game-table flex items-center justify-center p-4">
@@ -286,12 +297,14 @@ function PlayerSelectionModal({
                           : "Reconnect"}
                       </button>
                     )}
-                    <button
-                      onClick={() => setSelectedPlayer(player.name)}
-                      className="btn btn-secondary text-sm py-1 px-3"
-                    >
-                      Watch
-                    </button>
+                    {watchablePlayers.some((p) => p.name === player.name) && (
+                      <button
+                        onClick={() => setSelectedPlayer(player.name)}
+                        className="btn btn-secondary text-sm py-1 px-3"
+                      >
+                        Watch
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -380,15 +393,13 @@ function SpectateRequestModal({
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { session, saveSession } = useSession();
 
   const [spectatorConfig, setSpectatorConfig] = useState<SpectatorConfig | null>(null);
   const [spectatingPlayer, setSpectatingPlayer] = useState<string | null>(null);
-  const [eliminatedSpectate, setEliminatedSpectate] = useState<{
-    status: 'idle' | 'waiting' | 'denied'
-    target: string | null
-  }>({ status: 'idle', target: null });
-  const eliminatedSpectatePollingRef = useRef<number | null>(null);
+
+  const isSpectateMode = searchParams.get("spectate") === "true";
 
   const { gameState, isConnected, actions, error, pendingSpectateRequest } = useGame(
     gameId ?? null,
@@ -452,52 +463,18 @@ function GameContent() {
       setSpectatorConfig(config);
       setSpectatingPlayer(config.spectatePlayer);
     }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (eliminatedSpectatePollingRef.current) {
-        clearTimeout(eliminatedSpectatePollingRef.current);
-      }
-    };
-  }, []);
-
-  const handleEliminatedSpectateRequest = async (targetPlayer: string) => {
-    if (!gameId || !gameState) return;
-
-    setEliminatedSpectate({ status: 'waiting', target: targetPlayer });
-
-    try {
-      const { request_id } = await createSpectateRequest(
-        gameId,
-        targetPlayer,
-        gameState.self_player.name
-      );
-
-      const poll = async () => {
-        try {
-          const result = await getSpectateRequestStatus(gameId, request_id);
-          if (result.status === 'approved' && result.session_id && result.player_id) {
-            handleSessionCreated(result.session_id, result.player_id, {
-              spectatePlayer: targetPlayer,
-              requestId: request_id,
-            });
-          } else if (result.status === 'denied') {
-            setEliminatedSpectate({ status: 'denied', target: targetPlayer });
-          } else {
-            eliminatedSpectatePollingRef.current = window.setTimeout(poll, 1000);
-          }
-        } catch {
-          setEliminatedSpectate({ status: 'idle', target: null });
-        }
-      };
-      poll();
-    } catch {
-      setEliminatedSpectate({ status: 'idle', target: null });
+    if (isSpectateMode) {
+      setSearchParams({});
     }
   };
 
-  if (!session) {
+  const handleSpectateNewTab = () => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("spectate", "true");
+    window.open(url.toString(), '_blank');
+  };
+
+  if (!session || isSpectateMode) {
     return (
       <PlayerSelectionModal
         gameId={gameId!}
@@ -570,6 +547,18 @@ function GameContent() {
   const renderActionButtons = (): ReactNode => {
     if (isSpectator) {
       return null;
+    }
+    if (currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over") {
+      return (
+        <>
+          <button onClick={handleSpectateNewTab} className="btn btn-secondary">
+            Spectate
+          </button>
+          <button onClick={() => navigate("/")} className="btn btn-primary">
+            Home
+          </button>
+        </>
+      );
     }
     switch (currentPhase) {
       case "draft":
@@ -905,11 +894,7 @@ function GameContent() {
                 <GameSummary
                   player={self_player}
                   players={gameState.players}
-                  onReturnHome={() => navigate("/")}
                   useUpgrades={gameState.use_upgrades}
-                  onRequestSpectate={handleEliminatedSpectateRequest}
-                  spectateStatus={eliminatedSpectate.status}
-                  spectateTarget={eliminatedSpectate.target}
                 />
               )}
             </main>
