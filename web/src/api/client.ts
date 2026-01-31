@@ -58,7 +58,7 @@ export async function rejoinGame(gameId: string, playerName: string): Promise<Jo
     body: JSON.stringify({ player_name: playerName }),
   })
   if (!response.ok) {
-    throw new Error('Failed to rejoin game')
+    throw new Error(`Failed to rejoin game: ${response.status}`)
   }
   return response.json()
 }

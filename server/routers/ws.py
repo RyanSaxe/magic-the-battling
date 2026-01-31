@@ -1,3 +1,4 @@
+import logging
 from collections import defaultdict
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -5,6 +6,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import server.db.database as db
 from server.services.game_manager import game_manager
 from server.services.session_manager import session_manager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -32,25 +35,37 @@ ACTION_REQUIRED_PHASES: dict[str, str] = {
 class ConnectionManager:
     def __init__(self):
         self._connections: dict[str, dict[str, WebSocket]] = defaultdict(dict)
+        self._pending_connections: dict[str, set[str]] = defaultdict(set)
         self._spectators: dict[str, dict[str, list[WebSocket]]] = defaultdict(lambda: defaultdict(list))
+
+    def reserve_connection(self, game_id: str, player_id: str):
+        self._pending_connections[game_id].add(player_id)
 
     async def connect(self, game_id: str, player_id: str, websocket: WebSocket):
         game_manager.cancel_abandoned_cleanup(game_id)
         await websocket.accept()
         self._connections[game_id][player_id] = websocket
+        self._pending_connections[game_id].discard(player_id)
 
     def disconnect(self, game_id: str, player_id: str):
         if game_id in self._connections:
             self._connections[game_id].pop(player_id, None)
             if not self._connections[game_id]:
                 del self._connections[game_id]
+                logger.info("All players disconnected from game_id=%s, scheduling abandoned cleanup", game_id)
                 game_manager.schedule_abandoned_cleanup(game_id)
+        if game_id in self._pending_connections:
+            self._pending_connections[game_id].discard(player_id)
 
     def get_connected_player_ids(self, game_id: str) -> set[str]:
-        return set(self._connections.get(game_id, {}).keys())
+        connected = set(self._connections.get(game_id, {}).keys())
+        pending = self._pending_connections.get(game_id, set())
+        return connected | pending
 
     def is_player_connected(self, game_id: str, player_id: str) -> bool:
-        return player_id in self._connections.get(game_id, {})
+        if player_id in self._connections.get(game_id, {}):
+            return True
+        return player_id in self._pending_connections.get(game_id, set())
 
     async def connect_spectator(self, game_id: str, target_player_id: str, websocket: WebSocket):
         await websocket.accept()

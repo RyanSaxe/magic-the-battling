@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -160,3 +160,71 @@ class TestTripleSameBasicFiltering:
         snapshot.round = 2
         history.snapshots = [snapshot]
         assert game_manager._has_triple_same_basic(history) is True
+
+
+class TestCanRejoin:
+    def test_can_rejoin_returns_false_for_nonexistent_game(self, game_manager):
+        assert game_manager.can_rejoin("nonexistent_game", "Alice") is False
+
+    def test_can_rejoin_returns_false_for_nonexistent_player(self, game_manager):
+        mock_game = MagicMock()
+        mock_player = MagicMock()
+        mock_player.name = "Alice"
+        mock_game.players = [mock_player]
+        game_manager._active_games["game1"] = mock_game
+
+        assert game_manager.can_rejoin("game1", "Bob") is False
+
+    def test_can_rejoin_returns_true_for_disconnected_player(self, game_manager):
+        mock_game = MagicMock()
+        mock_player = MagicMock()
+        mock_player.name = "Alice"
+        mock_game.players = [mock_player]
+        game_manager._active_games["game1"] = mock_game
+
+        with patch("server.routers.ws.connection_manager") as mock_conn:
+            mock_conn.is_player_connected.return_value = False
+            assert game_manager.can_rejoin("game1", "Alice") is True
+
+    def test_can_rejoin_returns_false_for_connected_player(self, game_manager):
+        mock_game = MagicMock()
+        mock_player = MagicMock()
+        mock_player.name = "Alice"
+        mock_game.players = [mock_player]
+        game_manager._active_games["game1"] = mock_game
+        game_manager._player_to_game["player_id_1"] = "game1"
+        game_manager._player_id_to_name["player_id_1"] = "Alice"
+
+        with patch("server.routers.ws.connection_manager") as mock_conn:
+            mock_conn.is_player_connected.return_value = True
+            assert game_manager.can_rejoin("game1", "Alice") is False
+
+
+class TestConnectionManagerPendingConnections:
+    def test_reserve_connection_marks_player_as_connected(self):
+        from server.routers.ws import ConnectionManager  # noqa: PLC0415
+
+        cm = ConnectionManager()
+        assert not cm.is_player_connected("game1", "player1")
+
+        cm.reserve_connection("game1", "player1")
+        assert cm.is_player_connected("game1", "player1")
+
+    def test_reserved_player_included_in_connected_ids(self):
+        from server.routers.ws import ConnectionManager  # noqa: PLC0415
+
+        cm = ConnectionManager()
+        cm.reserve_connection("game1", "player1")
+
+        connected_ids = cm.get_connected_player_ids("game1")
+        assert "player1" in connected_ids
+
+    def test_disconnect_clears_pending_connection(self):
+        from server.routers.ws import ConnectionManager  # noqa: PLC0415
+
+        cm = ConnectionManager()
+        cm.reserve_connection("game1", "player1")
+        assert cm.is_player_connected("game1", "player1")
+
+        cm.disconnect("game1", "player1")
+        assert not cm.is_player_connected("game1", "player1")

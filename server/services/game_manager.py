@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import random
 import secrets
 from collections.abc import Callable, Coroutine
@@ -58,6 +59,8 @@ from server.schemas.api import (
     SelfPlayerView,
 )
 from server.services.session_manager import session_manager
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -317,8 +320,9 @@ class GameManager:
         except RuntimeError:
             pass
 
-    def schedule_abandoned_cleanup(self, game_id: str, delay: float = 7200.0) -> None:
-        """Schedule cleanup for abandoned game (default 2 hours)."""
+    def schedule_abandoned_cleanup(self, game_id: str, delay: float = 600.0) -> None:
+        """Schedule cleanup for abandoned game (default 10 minutes)."""
+        logger.info("Scheduling abandoned game cleanup for game_id=%s in %.0f seconds", game_id, delay)
         self._schedule_cleanup(game_id, delay)
 
     def cancel_abandoned_cleanup(self, game_id: str) -> None:
@@ -328,6 +332,7 @@ class GameManager:
 
     def _cleanup_game(self, game_id: str) -> None:
         """Remove game from memory."""
+        logger.info("Executing cleanup for game_id=%s", game_id)
         pending = self._pending_games.get(game_id)
         if pending:
             if pending._loading_task and not pending._loading_task.done():
@@ -579,10 +584,17 @@ class GameManager:
         return None
 
     def can_rejoin(self, game_id: str, player_name: str) -> bool:
+        from server.routers.ws import connection_manager  # noqa: PLC0415
+
         game = self._active_games.get(game_id)
-        if game:
-            return any(p.name == player_name for p in game.players)
-        return False
+        if not game:
+            return False
+
+        if not any(p.name == player_name for p in game.players):
+            return False
+
+        player_id = self.get_player_id_by_name(game_id, player_name)
+        return not (player_id and connection_manager.is_player_connected(game_id, player_id))
 
     def rejoin_game(self, game_id: str, player_name: str, player_id: str) -> bool:
         game = self._active_games.get(game_id)

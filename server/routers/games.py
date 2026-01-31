@@ -107,14 +107,23 @@ def join_game(game_id: str, request: JoinGameRequest):
 
 @router.post("/{game_id}/rejoin", response_model=JoinGameResponse)
 def rejoin_game(game_id: str, request: RejoinGameRequest):
-    if not game_manager.can_rejoin(game_id, request.player_name):
+    from server.routers.ws import connection_manager  # noqa: PLC0415
+
+    game = game_manager.get_game(game_id)
+    if not game or not any(p.name == request.player_name for p in game.players):
         raise HTTPException(status_code=404, detail="Player not found in game")
+
+    player_id = game_manager.get_player_id_by_name(game_id, request.player_name)
+    if player_id and connection_manager.is_player_connected(game_id, player_id):
+        raise HTTPException(status_code=409, detail="Player is already connected")
 
     session = session_manager.create_session(game_id)
     success = game_manager.rejoin_game(game_id, request.player_name, session.player_id)
 
     if not success:
         raise HTTPException(status_code=400, detail="Failed to rejoin game")
+
+    connection_manager.reserve_connection(game_id, session.player_id)
 
     return JoinGameResponse(
         game_id=game_id,
