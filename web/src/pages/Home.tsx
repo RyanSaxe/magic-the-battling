@@ -35,8 +35,8 @@ export function Home() {
       });
       saveSession(response.session_id, response.player_id);
       navigate(`/game/${response.game_id}/lobby`);
-    } catch {
-      setError("Failed to create game");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create game");
     } finally {
       setLoading(false);
     }
@@ -59,8 +59,8 @@ export function Home() {
       const response = await joinGame(joinCode, playerName);
       saveSession(response.session_id, response.player_id);
       navigate(`/game/${response.game_id}/lobby`);
-    } catch {
-      setError("Failed to join game. Check your join code.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to join game");
     } finally {
       setLoading(false);
     }

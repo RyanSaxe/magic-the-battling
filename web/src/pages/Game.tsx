@@ -152,11 +152,7 @@ function PlayerSelectionModal({
       const response = await rejoinGame(gameId, playerName);
       onSessionCreated(response.session_id, response.player_id);
     } catch (err) {
-      if (err instanceof Error && err.message.includes("409")) {
-        setError("Player is already connected.");
-      } else {
-        setError("Could not reconnect. Make sure you enter your name exactly.");
-      }
+      setError(err instanceof Error ? err.message : "Failed to reconnect");
     } finally {
       setRejoinLoading(false);
     }
@@ -177,8 +173,8 @@ function PlayerSelectionModal({
       );
       setRequestStatus("waiting");
       pollForApproval(request_id);
-    } catch {
-      setError("Failed to send watch request");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send watch request");
     }
   };
 
@@ -196,8 +192,8 @@ function PlayerSelectionModal({
         } else {
           pollingRef.current = window.setTimeout(poll, 1000);
         }
-      } catch {
-        setError("Failed to check request status");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to check request status");
         setRequestStatus("idle");
       }
     };
