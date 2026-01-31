@@ -137,13 +137,19 @@ class GameManager:
     def get_pending_game(self, game_id: str) -> PendingGame | None:
         return self._pending_games.get(game_id)
 
+    def get_game_id_by_join_code(self, join_code: str) -> str | None:
+        return self._join_code_to_game.get(join_code.upper())
+
     def get_pending_game_by_code(self, join_code: str) -> PendingGame | None:
-        game_id = self._join_code_to_game.get(join_code.upper())
+        game_id = self.get_game_id_by_join_code(join_code)
         return self._pending_games.get(game_id) if game_id else None
 
     def join_game(self, join_code: str, player_name: str, player_id: str) -> PendingGame | None:
         pending = self.get_pending_game_by_code(join_code)
-        if not pending or pending.is_started:
+        if not pending:
+            return None
+
+        if player_name in pending.player_names:
             return None
 
         pending.player_names.append(player_name)
@@ -221,6 +227,7 @@ class GameManager:
                 )
 
         self._active_games[game_id] = game
+        self._pending_games.pop(game_id, None)
 
         return game
 
@@ -278,6 +285,7 @@ class GameManager:
                 )
 
         self._active_games[game_id] = game
+        self._pending_games.pop(game_id, None)
 
         return game
 

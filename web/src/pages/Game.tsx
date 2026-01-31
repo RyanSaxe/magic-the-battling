@@ -125,7 +125,14 @@ function PlayerSelectionModal({
   const pollingRef = useRef<number | null>(null);
 
   useEffect(() => {
-    getGameStatus(gameId).then(setStatus).catch(() => setError("Failed to load game status"));
+    const fetchStatus = () => {
+      getGameStatus(gameId).then(setStatus).catch(() => {});
+    };
+
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 3000);
+
+    return () => clearInterval(interval);
   }, [gameId]);
 
   useEffect(() => {
@@ -403,7 +410,7 @@ function GameContent() {
 
   const { gameState, isConnected, actions, error, pendingSpectateRequest } = useGame(
     gameId ?? null,
-    session?.sessionId ?? null,
+    isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
   );
   const { state, setPreviewCard } = useContextStrip();

@@ -48,8 +48,11 @@ class ConnectionManager:
         self._pending_connections[game_id].discard(player_id)
 
     def disconnect(self, game_id: str, player_id: str):
+        logger.debug("Disconnect called for game_id=%s, player_id=%s", game_id, player_id)
         if game_id in self._connections:
             self._connections[game_id].pop(player_id, None)
+            remaining = len(self._connections[game_id])
+            logger.debug("Remaining connections for game_id=%s: %d", game_id, remaining)
             if not self._connections[game_id]:
                 del self._connections[game_id]
                 logger.info("All players disconnected from game_id=%s, scheduling abandoned cleanup", game_id)

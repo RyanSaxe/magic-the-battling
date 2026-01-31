@@ -52,12 +52,19 @@ async def create_game(request: CreateGameRequest):
 @router.post("/join", response_model=JoinGameResponse)
 def join_game_by_code(request: JoinGameRequest):
     """Join a game using just the join code (no game_id needed)."""
-    pending = game_manager.get_pending_game_by_code(request.join_code)
+    game_id = game_manager.get_game_id_by_join_code(request.join_code)
+    if not game_id:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    if game_manager.get_game(game_id):
+        raise HTTPException(status_code=400, detail="Game has already started")
+
+    pending = game_manager.get_pending_game(game_id)
     if not pending:
         raise HTTPException(status_code=404, detail="Game not found")
 
-    if pending.is_started:
-        raise HTTPException(status_code=400, detail="Game has already started")
+    if request.player_name in pending.player_names:
+        raise HTTPException(status_code=409, detail="Player name already taken")
 
     session = session_manager.create_session(pending.game_id)
     result = game_manager.join_game(
@@ -87,6 +94,9 @@ def join_game(game_id: str, request: JoinGameRequest):
 
     if pending.is_started:
         raise HTTPException(status_code=400, detail="Game has already started")
+
+    if request.player_name in pending.player_names:
+        raise HTTPException(status_code=409, detail="Player name already taken")
 
     session = session_manager.create_session(game_id)
     result = game_manager.join_game(
