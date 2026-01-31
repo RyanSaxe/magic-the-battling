@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { Card } from '../../components/card'
+import { PlayerStatsBar } from '../../components/PlayerStatsBar'
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
 
 interface UpgradeConfirmationModalProps {
@@ -196,7 +197,9 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
   const hasCompanions = companionCards.length > 0
 
   return (
-    <div className="flex flex-col h-full gap-4 p-4">
+    <div className="relative flex flex-col h-full gap-4 p-4">
+      <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison} />
+
       {/* Sudden Death Banner */}
       {gameState.self_player.in_sudden_death && (
         <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center">

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { Card } from '../../components/card'
+import { PlayerStatsBar } from '../../components/PlayerStatsBar'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 
 interface DraftPhaseProps {
@@ -59,7 +60,9 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   )
 
   return (
-    <div className="flex flex-col h-full gap-4 p-4">
+    <div className="relative flex flex-col h-full gap-4 p-4">
+      <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison} />
+
       {/* Pack area */}
       <div className="flex-1 flex flex-col items-center justify-center min-h-0">
         {currentPack.length === 0 ? (
