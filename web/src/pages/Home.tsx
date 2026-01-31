@@ -11,6 +11,7 @@ export function Home() {
   const [cubeId, setCubeId] = useState("auto");
   const [useUpgrades, setUseUpgrades] = useState(true);
   const [useVanguards, setUseVanguards] = useState(false);
+  const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [targetPlayerCount, setTargetPlayerCount] = useState(4);
   const [joinCode, setJoinCode] = useState("");
   const [isJoining, setIsJoining] = useState(false);
@@ -31,6 +32,7 @@ export function Home() {
         cubeId: cubeId || "auto",
         useUpgrades,
         useVanguards,
+        autoApproveSpectators,
         targetPlayerCount,
       });
       saveSession(response.session_id, response.player_id);
@@ -174,6 +176,21 @@ export function Home() {
                     <div className="text-white">Use Vanguards</div>
                     <div className="text-gray-500 text-sm">
                       Choose a vanguard at game start (coming soon)
+                    </div>
+                  </div>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={autoApproveSpectators}
+                    onChange={(e) => setAutoApproveSpectators(e.target.checked)}
+                    className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
+                  />
+                  <div>
+                    <div className="text-white">Allow spectators without approval</div>
+                    <div className="text-gray-500 text-sm">
+                      Anyone can spectate without player permission
                     </div>
                   </div>
                 </label>

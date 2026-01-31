@@ -86,6 +86,7 @@ class PendingGame:
     use_upgrades: bool = True
     use_vanguards: bool = False
     target_player_count: int = 4
+    auto_approve_spectators: bool = False
     player_ready: dict[str, bool] = field(default_factory=dict)
     battler: Battler | None = None
     battler_loading: bool = False
@@ -111,6 +112,7 @@ class GameManager:
         use_upgrades: bool = True,
         use_vanguards: bool = False,
         target_player_count: int = 4,
+        auto_approve_spectators: bool = False,
     ) -> PendingGame:
         game_id = secrets.token_urlsafe(8)
         join_code = secrets.token_urlsafe(4).upper()[:6]
@@ -125,6 +127,7 @@ class GameManager:
             use_upgrades=use_upgrades,
             use_vanguards=use_vanguards,
             target_player_count=target_player_count,
+            auto_approve_spectators=auto_approve_spectators,
             player_ready={player_id: False},
         )
         self._pending_games[game_id] = pending
@@ -201,6 +204,7 @@ class GameManager:
         config = Config(
             use_upgrades=pending.use_upgrades,
             use_vanguards=pending.use_vanguards,
+            auto_approve_spectators=pending.auto_approve_spectators,
         )
         game = create_game(pending.player_names, len(pending.player_names), config)
         battler = self._load_battler(pending.cube_id, pending.use_upgrades, pending.use_vanguards)
@@ -259,6 +263,7 @@ class GameManager:
         config = Config(
             use_upgrades=pending.use_upgrades,
             use_vanguards=pending.use_vanguards,
+            auto_approve_spectators=pending.auto_approve_spectators,
         )
         game = create_game(pending.player_names, len(pending.player_names), config)
         battler = pending.battler
@@ -648,12 +653,18 @@ class GameManager:
 
     def create_spectate_request(self, game_id: str, target_player_name: str, spectator_name: str) -> str:
         request_id = secrets.token_urlsafe(8)
-        self._spectate_requests[request_id] = PendingSpectateRequest(
+        req = PendingSpectateRequest(
             request_id=request_id,
             game_id=game_id,
             target_player_name=target_player_name,
             spectator_name=spectator_name,
         )
+        self._spectate_requests[request_id] = req
+
+        game = self.get_game(game_id)
+        if game and game.config.auto_approve_spectators:
+            self.approve_spectate_request(request_id)
+
         return request_id
 
     def get_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:

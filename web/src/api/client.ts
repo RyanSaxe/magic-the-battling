@@ -16,6 +16,7 @@ export interface GameOptions {
   useUpgrades?: boolean
   useVanguards?: boolean
   targetPlayerCount?: number
+  autoApproveSpectators?: boolean
 }
 
 export async function createGame(
@@ -31,6 +32,7 @@ export async function createGame(
       use_upgrades: options.useUpgrades ?? true,
       use_vanguards: options.useVanguards ?? false,
       target_player_count: options.targetPlayerCount ?? 4,
+      auto_approve_spectators: options.autoApproveSpectators ?? false,
     }),
   })
   if (!response.ok) {

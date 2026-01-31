@@ -214,6 +214,7 @@ class Config(BaseModel):
     starting_life: int = 10
     use_upgrades: bool = True
     use_vanguards: bool = False
+    auto_approve_spectators: bool = False
 
 
 class Game(BaseModel):

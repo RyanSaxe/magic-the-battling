@@ -33,6 +33,7 @@ async def create_game(request: CreateGameRequest):
         use_upgrades=request.use_upgrades,
         use_vanguards=request.use_vanguards,
         target_player_count=request.target_player_count,
+        auto_approve_spectators=request.auto_approve_spectators,
     )
     session_manager.update_game_id(session.session_id, pending.game_id)
 

@@ -16,6 +16,7 @@ class CreateGameRequest(BaseModel):
     use_upgrades: bool = True
     use_vanguards: bool = False
     target_player_count: int = 4
+    auto_approve_spectators: bool = False
 
 
 class CreateGameResponse(BaseModel):
