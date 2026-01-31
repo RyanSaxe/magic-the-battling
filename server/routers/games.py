@@ -275,19 +275,21 @@ async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
 
     request_id = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
 
-    target_player_id = game_manager.get_player_id_by_name(game_id, target_name)
-    if target_player_id:
-        await connection_manager.send_to_player(
-            game_id,
-            target_player_id,
-            {
-                "type": "spectate_request",
-                "payload": {
-                    "request_id": request_id,
-                    "spectator_name": request.spectator_name,
+    auto_approve = (pending and pending.auto_approve_spectators) or (game and game.config.auto_approve_spectators)
+    if not auto_approve:
+        target_player_id = game_manager.get_player_id_by_name(game_id, target_name)
+        if target_player_id:
+            await connection_manager.send_to_player(
+                game_id,
+                target_player_id,
+                {
+                    "type": "spectate_request",
+                    "payload": {
+                        "request_id": request_id,
+                        "spectator_name": request.spectator_name,
+                    },
                 },
-            },
-        )
+            )
 
     return SpectateRequestResponse(request_id=request_id)
 

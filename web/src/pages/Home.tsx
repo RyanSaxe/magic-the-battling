@@ -108,9 +108,7 @@ export function Home() {
           {!isJoining && (
             <>
               <div>
-                <label className="block text-gray-300 mb-1">
-                  Cube ID <span className="text-gray-500">(optional)</span>
-                </label>
+                <label className="block text-gray-300 mb-1">CubeCobra ID</label>
                 <input
                   type="text"
                   value={cubeId}
@@ -145,7 +143,7 @@ export function Home() {
                     ))}
                   </div>
                   <p className="text-gray-500 text-sm mt-1">
-                    Bots will fill remaining slots
+                    Bots will fill empty slots to reach this player count.
                   </p>
                 </div>
 
