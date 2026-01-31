@@ -212,6 +212,7 @@ class GameStatusResponse(BaseModel):
     phase: str
     is_started: bool
     players: list[GameStatusPlayer]
+    auto_approve_spectators: bool = False
 
 
 class SpectateRequestCreate(BaseModel):

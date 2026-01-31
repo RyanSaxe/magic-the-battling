@@ -213,6 +213,7 @@ def get_game_status(game_id: str):
             phase="lobby",
             is_started=pending.is_started,
             players=players,
+            auto_approve_spectators=pending.auto_approve_spectators,
         )
 
     if game:
@@ -244,6 +245,7 @@ def get_game_status(game_id: str):
             phase=phase,
             is_started=True,
             players=players,
+            auto_approve_spectators=game.config.auto_approve_spectators,
         )
 
     raise HTTPException(status_code=404, detail="Game not found")

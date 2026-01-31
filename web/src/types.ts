@@ -166,6 +166,7 @@ export interface GameStatusResponse {
   phase: string
   is_started: boolean
   players: GameStatusPlayer[]
+  auto_approve_spectators: boolean
 }
 
 export interface SpectateRequestStatus {

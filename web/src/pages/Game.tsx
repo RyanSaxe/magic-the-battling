@@ -172,19 +172,19 @@ function PlayerSelectionModal({
         spectatorName
       );
       setRequestStatus("waiting");
-      pollForApproval(request_id);
+      pollForApproval(request_id, selectedPlayer);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send watch request");
     }
   };
 
-  const pollForApproval = (requestId: string) => {
+  const pollForApproval = (requestId: string, playerName: string) => {
     const poll = async () => {
       try {
         const result = await getSpectateRequestStatus(gameId, requestId);
         if (result.status === "approved" && result.session_id && result.player_id) {
           onSessionCreated(result.session_id, result.player_id, {
-            spectatePlayer: selectedPlayer!,
+            spectatePlayer: playerName,
             requestId,
           });
         } else if (result.status === "denied") {
@@ -198,6 +198,21 @@ function PlayerSelectionModal({
       }
     };
     poll();
+  };
+
+  const handleQuickWatch = async (playerName: string) => {
+    setError("");
+    setSelectedPlayer(playerName);
+    try {
+      const { request_id } = await createSpectateRequest(
+        gameId,
+        playerName,
+        "Spectator"
+      );
+      pollForApproval(request_id, playerName);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start spectating");
+    }
   };
 
   if (!status) {
@@ -302,7 +317,11 @@ function PlayerSelectionModal({
                     )}
                     {watchablePlayers.some((p) => p.name === player.name) && (
                       <button
-                        onClick={() => setSelectedPlayer(player.name)}
+                        onClick={() =>
+                          status.auto_approve_spectators
+                            ? handleQuickWatch(player.name)
+                            : setSelectedPlayer(player.name)
+                        }
                         className="btn btn-secondary text-sm py-1 px-3"
                       >
                         Watch

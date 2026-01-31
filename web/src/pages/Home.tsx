@@ -159,23 +159,7 @@ export function Home() {
                   <div>
                     <div className="text-white">Use Upgrades</div>
                     <div className="text-gray-500 text-sm">
-                      Gain upgrades at stage boundaries to increase damage
-                    </div>
-                  </div>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer opacity-50">
-                  <input
-                    type="checkbox"
-                    checked={useVanguards}
-                    onChange={(e) => setUseVanguards(e.target.checked)}
-                    disabled
-                    className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
-                  />
-                  <div>
-                    <div className="text-white">Use Vanguards</div>
-                    <div className="text-gray-500 text-sm">
-                      Choose a vanguard at game start (coming soon)
+                      Gain upgrades every 3 rounds to improve your cards!
                     </div>
                   </div>
                 </label>
@@ -188,9 +172,24 @@ export function Home() {
                     className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
                   />
                   <div>
-                    <div className="text-white">Allow spectators without approval</div>
+                    <div className="text-white">Allow all spectators</div>
                     <div className="text-gray-500 text-sm">
-                      Anyone can spectate without player permission
+                      Don't require player permission for spectators to join
+                    </div>
+                  </div>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer opacity-50">
+                  <input
+                    type="checkbox"
+                    checked={useVanguards}
+                    onChange={(e) => setUseVanguards(e.target.checked)}
+                    disabled
+                    className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
+                  />
+                  <div>
+                    <div className="text-white">Use Vanguards</div>
+                    <div className="text-gray-500 text-sm">
+                      Choose a vanguard at game start (coming soon)
                     </div>
                   </div>
                 </label>
