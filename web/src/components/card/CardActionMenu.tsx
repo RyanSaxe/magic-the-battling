@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../../types'
 
 interface CardActionMenuProps {
@@ -11,6 +11,7 @@ interface CardActionMenuProps {
   counters: Record<string, number>
   isAttached: boolean
   battlefieldCards: CardType[]
+  isOpponent?: boolean
   onAction: (action: CardStateAction, data?: Record<string, unknown>) => void
   onMove: (toZone: ZoneName) => void
   onClose: () => void
@@ -30,11 +31,33 @@ export function CardActionMenu({
   counters,
   isAttached,
   battlefieldCards,
+  isOpponent = false,
   onAction,
   onMove,
   onClose,
 }: CardActionMenuProps) {
   const [submenu, setSubmenu] = useState<Submenu>('none')
+
+  const menuRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      const rect = node.getBoundingClientRect()
+      const padding = 8
+      let x = position.x
+      let y = position.y
+
+      if (position.x + rect.width > window.innerWidth) {
+        x = window.innerWidth - rect.width - padding
+      }
+      if (position.y + rect.height > window.innerHeight) {
+        y = window.innerHeight - rect.height - padding
+      }
+      x = Math.max(padding, x)
+      y = Math.max(padding, y)
+
+      node.style.left = `${x}px`
+      node.style.top = `${y}px`
+    }
+  }, [position])
 
   const onBattlefield = zone === 'battlefield'
   const hasFlip = !!card.flip_image_url
@@ -70,6 +93,7 @@ export function CardActionMenu({
         }}
       />
       <div
+        ref={menuRef}
         style={menuStyle}
         className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[160px] z-50"
       >
@@ -170,7 +194,8 @@ export function CardActionMenu({
                         name: token.name,
                         image_url: token.image_url,
                         type_line: token.type_line,
-                      }
+                      },
+                      for_opponent: isOpponent,
                     })}
                   />
                 ))}

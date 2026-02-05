@@ -315,6 +315,7 @@ class TestBotBattleFlow:
 
         assert alice.poison > initial_alice_poison
         assert bot.poison == initial_bot_poison
+        assert alice.last_battle_result is not None
         assert alice.last_battle_result.winner_name == static_opp.name
 
     def test_player_wins_against_bot_bot_takes_poison(self):
@@ -358,6 +359,7 @@ class TestBotBattleFlow:
 
         assert alice.poison == initial_alice_poison
         assert bot.poison > initial_bot_poison
+        assert alice.last_battle_result is not None
         assert alice.last_battle_result.winner_name == alice.name
 
 

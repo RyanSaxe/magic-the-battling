@@ -665,7 +665,12 @@ def update_card_state(
 
     # Actions like spawn/create_treasure don't need an existing card
     if action_type in _ACTIONS_WITHOUT_CARD:
-        zones = get_zones_for_player(battle, player)
+        for_opponent = (data or {}).get("for_opponent", False)
+        if for_opponent:
+            is_player_side = player.name == battle.player.name
+            zones = battle.opponent_zones if is_player_side else battle.player_zones
+        else:
+            zones = get_zones_for_player(battle, player)
     else:
         try:
             zones, _ = get_zones_for_card(battle, player, card_id)

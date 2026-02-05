@@ -221,6 +221,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
             counters={contextMenu.isOpponent ? opponentCounters[contextMenu.card.id] || {} : counters[contextMenu.card.id] || {}}
             isAttached={contextMenu.isOpponent ? isOpponentCardAttached(contextMenu.card.id) : isCardAttached(contextMenu.card.id)}
             battlefieldCards={contextMenu.isOpponent ? opponent_zones.battlefield : your_zones.battlefield}
+            isOpponent={contextMenu.isOpponent}
             onAction={handleContextMenuAction}
             onMove={handleContextMenuMove}
             onClose={() => setContextMenu(null)}

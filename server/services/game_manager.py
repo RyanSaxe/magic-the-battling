@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
+from sqlalchemy import true as sql_true
 from sqlalchemy.orm import Session, joinedload
 
 import server.db.database as db
@@ -225,7 +226,7 @@ class GameManager:
 
             num_fakes_needed = pending.target_player_count - len(pending.player_names)
             if num_fakes_needed > 0:
-                target_elo = battler.elo if battler.elo else 1200.0
+                target_elo = battler.elo or 1200.0
                 self.load_fake_players_for_game(
                     db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards, pending.cube_id
                 )
@@ -284,7 +285,7 @@ class GameManager:
 
             num_fakes_needed = pending.target_player_count - len(pending.player_names)
             if num_fakes_needed > 0:
-                target_elo = battler.elo if battler.elo else 1200.0
+                target_elo = battler.elo or 1200.0
                 self.load_fake_players_for_game(
                     db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards, pending.cube_id
                 )
@@ -435,7 +436,7 @@ class GameManager:
             db.query(PlayerGameHistory)
             .options(joinedload(PlayerGameHistory.snapshots))
             .filter(
-                PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else True,
+                PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else sql_true(),
                 PlayerGameHistory.max_stage >= 5,
             )
         )
@@ -449,7 +450,7 @@ class GameManager:
             if not has_starting_stage:
                 continue
 
-            if self._is_suspicious_name(history.player_name or ""):
+            if self._is_suspicious_name(str(history.player_name or "")):
                 continue
 
             if self._has_triple_same_basic(history):
@@ -458,7 +459,7 @@ class GameManager:
             game_record = db.query(GameRecord).filter(GameRecord.id == history.game_id).first()
             if not game_record or not game_record.config_json:
                 continue
-            config = json.loads(game_record.config_json)
+            config = json.loads(str(game_record.config_json))
             if use_upgrades is not None and config.get("use_upgrades") != use_upgrades:
                 continue
             if use_vanguards is not None and config.get("use_vanguards") != use_vanguards:
@@ -698,7 +699,7 @@ class GameManager:
 
         db_session = db.SessionLocal()
         try:
-            target_elo = pending.battler.elo if pending.battler.elo else 1200.0
+            target_elo = pending.battler.elo or 1200.0
             num_needed = pending.target_player_count - len(pending.player_names)
             if num_needed <= 0:
                 return 0
@@ -1202,7 +1203,7 @@ class GameManager:
             player.build_ready = False
 
         if db is not None and game_id is not None and game.battler is not None:
-            battler_elo = game.battler.elo if game.battler.elo else 1200.0
+            battler_elo = game.battler.elo or 1200.0
             for player in live_players:
                 self._record_snapshot(db, game_id, player, battler_elo)
 

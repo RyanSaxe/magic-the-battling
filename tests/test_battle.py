@@ -930,3 +930,74 @@ def test_companion_preserved_in_sideboard_after_battle(card_factory):
 
     assert companion in alice.sideboard
     assert other_sideboard in alice.sideboard
+
+
+def test_spawn_token_for_opponent(card_factory):
+    """Spawning a token with for_opponent=True should add it to opponent's battlefield."""
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice)
+
+    opp_card = card_factory("OppCard")
+    static_opp = StaticOpponent(
+        name="Bot",
+        hand=[opp_card],
+        chosen_basics=["Plains", "Island", "Mountain"],
+    )
+
+    b = battle.start(game, alice, static_opp)
+
+    initial_player_battlefield = len(b.player_zones.battlefield)
+    initial_opponent_battlefield = len(b.opponent_zones.battlefield)
+
+    result = battle.update_card_state(
+        b,
+        alice,
+        "spawn",
+        "",
+        data={
+            "token": {"name": "Zombie", "image_url": "", "type_line": "Token Creature"},
+            "for_opponent": True,
+        },
+    )
+
+    assert result
+    assert len(b.player_zones.battlefield) == initial_player_battlefield
+    assert len(b.opponent_zones.battlefield) == initial_opponent_battlefield + 1
+    zombie = b.opponent_zones.battlefield[-1]
+    assert zombie.name == "Zombie"
+
+
+def test_spawn_token_for_player(card_factory):
+    """Spawning a token without for_opponent should add it to player's battlefield."""
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice)
+
+    opp_card = card_factory("OppCard")
+    static_opp = StaticOpponent(
+        name="Bot",
+        hand=[opp_card],
+        chosen_basics=["Plains", "Island", "Mountain"],
+    )
+
+    b = battle.start(game, alice, static_opp)
+
+    initial_player_battlefield = len(b.player_zones.battlefield)
+    initial_opponent_battlefield = len(b.opponent_zones.battlefield)
+
+    result = battle.update_card_state(
+        b,
+        alice,
+        "spawn",
+        "",
+        data={
+            "token": {"name": "Zombie", "image_url": "", "type_line": "Token Creature"},
+        },
+    )
+
+    assert result
+    assert len(b.player_zones.battlefield) == initial_player_battlefield + 1
+    assert len(b.opponent_zones.battlefield) == initial_opponent_battlefield
+    zombie = b.player_zones.battlefield[-1]
+    assert zombie.name == "Zombie"
