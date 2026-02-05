@@ -80,6 +80,7 @@ class TestValidateActionPhase:
             "battle_submit_result",
             "battle_update_card_state",
             "battle_update_life",
+            "battle_choose_play_draw",
             "reward_pick_upgrade",
             "reward_apply_upgrade",
             "reward_done",

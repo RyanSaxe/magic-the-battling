@@ -1028,6 +1028,7 @@ class GameManager:
         return BattleView(
             opponent_name=opponent_name,
             coin_flip_name=b.coin_flip_name,
+            on_the_play_name=b.on_the_play_name,
             your_zones=your_zones,
             opponent_zones=hidden_opponent,
             opponent_hand_count=len(opponent_zones.hand),
@@ -1307,6 +1308,16 @@ class GameManager:
                 else:
                     b.player_life = life
                 return True
+        return False
+
+    def handle_battle_choose_play_draw(self, game: Game, player: Player, choice: str) -> bool | str:
+        for b in game.active_battles:
+            if player.name in (b.player.name, b.opponent.name):
+                if battle.is_play_draw_pending(b):
+                    if battle.choose_play_or_draw(b, player, choice):
+                        return True
+                    return "Only the coin flip winner can choose"
+                return "Choice already made"
         return False
 
     def handle_battle_update_card_state(

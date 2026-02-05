@@ -1001,3 +1001,131 @@ def test_spawn_token_for_player(card_factory):
     assert len(b.opponent_zones.battlefield) == initial_opponent_battlefield
     zombie = b.player_zones.battlefield[-1]
     assert zombie.name == "Zombie"
+
+
+class TestPlayDrawChoice:
+    def test_winner_can_choose_play(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+        alice.poison = 5
+        bob.poison = 0
+
+        b = battle.start(game, alice, bob)
+        assert b.coin_flip_name == alice.name
+        assert b.on_the_play_name is None
+
+        result = battle.choose_play_or_draw(b, alice, "play")
+        assert result is True
+        assert b.on_the_play_name == alice.name
+
+    def test_winner_can_choose_draw(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+        alice.poison = 5
+        bob.poison = 0
+
+        b = battle.start(game, alice, bob)
+        assert b.coin_flip_name == alice.name
+
+        result = battle.choose_play_or_draw(b, alice, "draw")
+        assert result is True
+        assert b.on_the_play_name == bob.name
+
+    def test_non_winner_cannot_choose(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+        alice.poison = 5
+        bob.poison = 0
+
+        b = battle.start(game, alice, bob)
+        assert b.coin_flip_name == alice.name
+
+        result = battle.choose_play_or_draw(b, bob, "play")
+        assert result is False
+        assert b.on_the_play_name is None
+
+    def test_cannot_choose_twice(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+        alice.poison = 5
+        bob.poison = 0
+
+        b = battle.start(game, alice, bob)
+        battle.choose_play_or_draw(b, alice, "play")
+        assert b.on_the_play_name == alice.name
+
+        result = battle.choose_play_or_draw(b, alice, "draw")
+        assert result is False
+        assert b.on_the_play_name == alice.name
+
+    def test_invalid_choice_rejected(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+        alice.poison = 5
+        bob.poison = 0
+
+        b = battle.start(game, alice, bob)
+        result = battle.choose_play_or_draw(b, alice, "invalid")
+        assert result is False
+        assert b.on_the_play_name is None
+
+    def test_bot_auto_chooses_when_winning(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+        alice.poison = 0
+
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[card_factory("card1")],
+            chosen_basics=["Plains", "Island", "Mountain"],
+            poison=5,
+        )
+
+        b = battle.start(game, alice, static_opp)
+        assert b.coin_flip_name == "Bot"
+        assert b.on_the_play_name is not None
+        assert b.on_the_play_name in (alice.name, "Bot")
+
+    def test_human_must_choose_vs_bot(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+        alice.poison = 5
+
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[card_factory("card1")],
+            chosen_basics=["Plains", "Island", "Mountain"],
+            poison=0,
+        )
+
+        b = battle.start(game, alice, static_opp)
+        assert b.coin_flip_name == alice.name
+        assert b.on_the_play_name is None
+
+        result = battle.choose_play_or_draw(b, alice, "play")
+        assert result is True
+        assert b.on_the_play_name == alice.name
+
+    def test_is_play_draw_pending(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        b = battle.start(game, alice, bob)
+        assert battle.is_play_draw_pending(b) is True
+
+        battle.choose_play_or_draw(b, b.player if b.coin_flip_name == alice.name else bob, "play")
+        assert battle.is_play_draw_pending(b) is False

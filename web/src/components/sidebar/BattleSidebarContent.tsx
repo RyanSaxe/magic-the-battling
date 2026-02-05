@@ -207,7 +207,7 @@ export function BattleSidebarContent({
   opponentSideboardCount = 0,
   onShowOpponentSideboard,
 }: BattleSidebarContentProps) {
-  const { opponent_name, coin_flip_name, your_zones, opponent_zones } =
+  const { opponent_name, on_the_play_name, your_zones, opponent_zones } =
     currentBattle;
 
   const yourPoison = currentBattle.your_poison;
@@ -279,17 +279,19 @@ export function BattleSidebarContent({
               </div>
             </div>
           </div>
-          <div className="text-center text-xs text-gray-500 mt-2">
-            {coin_flip_name === playerName ? (
-              <>
-                you are on the <span className="text-green-400">play</span>
-              </>
-            ) : (
-              <>
-                you are on the <span className="text-amber-400">draw</span>
-              </>
-            )}
-          </div>
+          {on_the_play_name && (
+            <div className="text-center text-xs text-gray-500 mt-2">
+              {on_the_play_name === playerName ? (
+                <>
+                  you are on the <span className="text-green-400">play</span>
+                </>
+              ) : (
+                <>
+                  you are on the <span className="text-amber-400">draw</span>
+                </>
+              )}
+            </div>
+          )}
           {onCreateTreasure && (
             <button
               onClick={onCreateTreasure}
