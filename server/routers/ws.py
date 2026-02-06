@@ -323,7 +323,13 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
             return game_manager.handle_build_remove_companion(player)
         case "battle_move":
             return game_manager.handle_battle_move(
-                game, player, payload["card_id"], payload["from_zone"], payload["to_zone"]
+                game,
+                player,
+                payload["card_id"],
+                payload["from_zone"],
+                payload["to_zone"],
+                payload.get("from_owner", "player"),
+                payload.get("to_owner", "player"),
             )
         case "battle_submit_result":
             db_session = db.SessionLocal()

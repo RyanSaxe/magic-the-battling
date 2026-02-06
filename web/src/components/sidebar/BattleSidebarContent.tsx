@@ -118,7 +118,7 @@ function PlayerSection({
         zone="graveyard"
         cards={zones.graveyard}
         maxThumbnails={2}
-        validFromZones={["hand", "battlefield", "exile", "command_zone"]}
+        validFromZones={["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone"]}
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
       />
@@ -127,7 +127,7 @@ function PlayerSection({
         zone="exile"
         cards={zones.exile}
         maxThumbnails={2}
-        validFromZones={["hand", "battlefield", "graveyard", "command_zone"]}
+        validFromZones={["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone"]}
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
       />
@@ -153,6 +153,7 @@ function PlayerSection({
         "graveyard",
         "exile",
         "sideboard",
+        "command_zone",
       ]}
       isOpponent={isOpponent}
       canManipulateOpponent={canManipulateOpponent}

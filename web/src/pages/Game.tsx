@@ -548,8 +548,7 @@ function GameContent() {
   const opponentPlayer = current_battle
     ? players.find((p) => p.name === current_battle.opponent_name)
     : null;
-  const canManipulateOpponent =
-    opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false;
+  const canManipulateOpponent = currentPhase === "battle";
   const opponentHasCompanion = (opponentPlayer?.command_zone.length ?? 0) > 0;
   const maxHandSize = self_player.hand_size;
   const handExceedsLimit = self_player.hand.length > maxHandSize;

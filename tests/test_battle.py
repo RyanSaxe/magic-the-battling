@@ -806,7 +806,9 @@ class TestOpponentZoneManipulation:
         b.opponent_zones.battlefield.append(opp_card)
 
         manager = GameManager()
-        result = manager.handle_battle_move(game, alice, opp_card.id, "battlefield", "graveyard")
+        result = manager.handle_battle_move(
+            game, alice, opp_card.id, "battlefield", "graveyard", from_owner="opponent", to_owner="opponent"
+        )
 
         assert result
         assert opp_card not in b.opponent_zones.battlefield
@@ -835,7 +837,9 @@ class TestOpponentZoneManipulation:
         assert "Island" in island.name
 
         manager = GameManager()
-        result = manager.handle_battle_move(game, alice, island.id, "battlefield", "graveyard")
+        result = manager.handle_battle_move(
+            game, alice, island.id, "battlefield", "graveyard", from_owner="opponent", to_owner="opponent"
+        )
 
         assert result
         assert island not in b.opponent_zones.battlefield

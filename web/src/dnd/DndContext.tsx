@@ -13,12 +13,12 @@ import {
 } from '@dnd-kit/core'
 import type { Card, ZoneName } from '../types'
 import { Card as CardComponent } from '../components/card'
-import { parseZoneId, type DragData } from './types'
+import { parseZoneId, type DragData, type ZoneOwner } from './types'
 import { GameDndContext } from './useGameDnd'
 
 interface GameDndProviderProps {
   children: ReactNode
-  onCardMove?: (card: Card, fromZone: ZoneName, toZone: ZoneName) => void
+  onCardMove?: (card: Card, fromZone: ZoneName, toZone: ZoneName, fromOwner: ZoneOwner, toOwner: ZoneOwner) => void
   validDropZones?: (fromZone: ZoneName) => ZoneName[]
 }
 
@@ -29,6 +29,7 @@ export function GameDndProvider({
 }: GameDndProviderProps) {
   const [activeCard, setActiveCard] = useState<Card | null>(null)
   const [activeFromZone, setActiveFromZone] = useState<ZoneName | null>(null)
+  const [activeFromZoneId, setActiveFromZoneId] = useState<string | null>(null)
 
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: {
@@ -52,6 +53,7 @@ export function GameDndProvider({
     if (data) {
       setActiveCard(data.card)
       setActiveFromZone(data.fromZone)
+      setActiveFromZoneId(data.fromZoneId)
     }
   }
 
@@ -60,27 +62,33 @@ export function GameDndProvider({
 
     if (over && activeCard && activeFromZone) {
       const toZoneId = over.id as string
-      const { zone: toZone } = parseZoneId(toZoneId)
+      const { zone: toZone, owner: toOwner } = parseZoneId(toZoneId)
 
-      if (activeFromZone !== toZone) {
+      const dragData = event.active.data.current as DragData | undefined
+      const fromZoneId = dragData?.fromZoneId || ''
+      const { owner: fromOwner } = parseZoneId(fromZoneId)
+
+      if (fromZoneId !== toZoneId) {
         const isValidDrop = !validDropZones || validDropZones(activeFromZone).includes(toZone)
         if (isValidDrop && onCardMove) {
-          onCardMove(activeCard, activeFromZone, toZone)
+          onCardMove(activeCard, activeFromZone, toZone, fromOwner, toOwner)
         }
       }
     }
 
     setActiveCard(null)
     setActiveFromZone(null)
+    setActiveFromZoneId(null)
   }
 
   function handleDragCancel() {
     setActiveCard(null)
     setActiveFromZone(null)
+    setActiveFromZoneId(null)
   }
 
   return (
-    <GameDndContext.Provider value={{ activeCard, activeFromZone }}>
+    <GameDndContext.Provider value={{ activeCard, activeFromZone, activeFromZoneId }}>
       <DndKitContext
         sensors={sensors}
         collisionDetection={pointerWithin}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { GameState, Card as CardType, ZoneName, CardStateAction } from '../../types'
-import { DraggableCard, DroppableZone } from '../../dnd'
+import { DraggableCard, DroppableZone, type ZoneOwner } from '../../dnd'
 import { HandZone, BattlefieldZone } from '../../components/zones'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
 
@@ -14,7 +14,7 @@ interface ContextMenuState {
 interface BattlePhaseProps {
   gameState: GameState
   actions: {
-    battleMove: (cardId: string, fromZone: ZoneName, toZone: ZoneName) => void
+    battleMove: (cardId: string, fromZone: ZoneName, toZone: ZoneName, fromOwner: ZoneOwner, toOwner: ZoneOwner) => void
     battleSubmitResult: (result: string) => void
     battleUpdateCardState: (actionType: CardStateAction, cardId: string, data?: Record<string, unknown>) => void
     battleChoosePlayDraw: (choice: 'play' | 'draw') => void
@@ -91,10 +91,9 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
     return <WaitingForChoiceScreen coinFlipWinner={current_battle.coin_flip_name} />
   }
 
-  const { your_zones, opponent_zones, opponent_name, opponent_hand_count, opponent_hand_revealed } = current_battle
+  const { your_zones, opponent_zones, opponent_hand_count, opponent_hand_revealed } = current_battle
 
-  const opponentPlayer = gameState.players.find((p) => p.name === opponent_name)
-  const canManipulateOpponent = opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false
+  const canManipulateOpponent = true
 
   const tappedCardIds = new Set(your_zones.tapped_card_ids || [])
   const faceDownCardIds = new Set(your_zones.face_down_card_ids || [])
@@ -139,9 +138,11 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
     actions.battleUpdateCardState(action, contextMenu.card.id, data)
   }
 
-  const handleContextMenuMove = (toZone: ZoneName) => {
+  const handleContextMenuMove = (toZone: ZoneName, toOwner?: ZoneOwner) => {
     if (!contextMenu) return
-    actions.battleMove(contextMenu.card.id, contextMenu.zone, toZone)
+    const fromOwner: ZoneOwner = contextMenu.isOpponent ? 'opponent' : 'player'
+    const resolvedToOwner = toOwner ?? fromOwner
+    actions.battleMove(contextMenu.card.id, contextMenu.zone, toZone, fromOwner, resolvedToOwner)
   }
 
   const handleOpponentCardDoubleClick = (card: CardType) => {
@@ -189,7 +190,7 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
             <DroppableZone
               zone="hand"
               zoneOwner="opponent"
-              validFromZones={['battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
               className="flex justify-center gap-1 flex-wrap min-h-[120px] w-full"
             >
               {opponent_hand_revealed

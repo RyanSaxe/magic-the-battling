@@ -21,7 +21,7 @@ export function DroppableZone({
   validFromZones,
   disabled = false,
 }: DroppableZoneProps) {
-  const { activeFromZone } = useGameDnd()
+  const { activeFromZone, activeFromZoneId } = useGameDnd()
 
   const zoneId = makeZoneId(zone, zoneOwner)
   const { setNodeRef, isOver } = useDroppable({
@@ -31,9 +31,9 @@ export function DroppableZone({
 
   const isValidDrop = activeFromZone !== null && (
     !validFromZones || validFromZones.includes(activeFromZone)
-  ) && activeFromZone !== zone
+  ) && activeFromZoneId !== zoneId
 
-  const isInvalidDrop = activeFromZone !== null && !isValidDrop && activeFromZone !== zone
+  const isInvalidDrop = activeFromZone !== null && !isValidDrop && activeFromZoneId !== zoneId
 
   const dropStateClass = isOver
     ? isValidDrop

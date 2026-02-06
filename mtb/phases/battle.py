@@ -47,6 +47,12 @@ def _create_treasure_token() -> Card:
     )
 
 
+def _tag_cards_with_owner(cards: list[Card], owner_name: str) -> list[Card]:
+    for card in cards:
+        card.original_owner = owner_name
+    return cards
+
+
 def _create_zones_for_player(player: Player) -> Zones:
     basics = [_create_basic_land(name) for name in player.chosen_basics]
     treasures = [_create_treasure_token() for _ in range(player.treasures)]
@@ -54,6 +60,11 @@ def _create_zones_for_player(player: Player) -> Zones:
     sideboard_display = [c for c in player.sideboard if c.id not in command_zone_ids]
     submitted = player.hand + player.sideboard
     revealed_card_ids = [c.id for c in player.command_zone]
+
+    _tag_cards_with_owner(player.hand, player.name)
+    _tag_cards_with_owner(player.sideboard, player.name)
+    _tag_cards_with_owner(player.command_zone, player.name)
+
     return Zones(
         battlefield=basics + treasures,
         hand=player.hand.copy(),
@@ -307,6 +318,11 @@ def _create_zones_for_static_opponent(opponent: StaticOpponent) -> Zones:
     sideboard_display = [c for c in opponent.sideboard if c.id not in command_zone_ids]
     submitted = opponent.hand + opponent.sideboard
     revealed_card_ids = [c.id for c in opponent.command_zone]
+
+    _tag_cards_with_owner(opponent.hand, opponent.name)
+    _tag_cards_with_owner(opponent.sideboard, opponent.name)
+    _tag_cards_with_owner(opponent.command_zone, opponent.name)
+
     return Zones(
         battlefield=basics + treasures,
         hand=opponent.hand.copy(),
@@ -547,7 +563,7 @@ def _end_vs_static(game: Game, battle: Battle, opponent: StaticOpponent) -> Batt
 
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
 
-    battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
+    battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones, battle.player.name)
 
     if battle in game.active_battles:
         game.active_battles.remove(battle)
@@ -559,9 +575,13 @@ def _is_revealed_card(card: Card) -> bool:
     return not card.type_line.startswith("Basic Land") and not card.type_line.startswith("Token")
 
 
-def _collect_revealed_cards(zones: Zones) -> list[Card]:
+def _collect_revealed_cards(zones: Zones, owner_name: str) -> list[Card]:
     all_cards = zones.hand + zones.sideboard + zones.battlefield + zones.graveyard + zones.exile + zones.command_zone
-    return [c for c in all_cards if c.id in zones.revealed_card_ids]
+    return [
+        c
+        for c in all_cards
+        if c.id in zones.revealed_card_ids and (c.original_owner is None or c.original_owner == owner_name)
+    ]
 
 
 def _handle_tap(zones: Zones, card_id: str, _data: dict) -> bool:
@@ -736,8 +756,8 @@ def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
     _sync_zones_to_player(battle.opponent_zones, opponent, game.config.max_treasures)
 
-    battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
-    opponent.most_recently_revealed_cards = _collect_revealed_cards(battle.opponent_zones)
+    battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones, battle.player.name)
+    opponent.most_recently_revealed_cards = _collect_revealed_cards(battle.opponent_zones, opponent.name)
 
     if battle in game.active_battles:
         game.active_battles.remove(battle)

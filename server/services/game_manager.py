@@ -1248,38 +1248,50 @@ class GameManager:
             return str(e)
 
     def handle_battle_move(
-        self, game: Game, player: Player, card_id: str, from_zone: ZoneName, to_zone: ZoneName
+        self,
+        game: Game,
+        player: Player,
+        card_id: str,
+        from_zone: ZoneName,
+        to_zone: ZoneName,
+        from_owner: str = "player",
+        to_owner: str = "player",
     ) -> bool:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
+                is_battle_player = player.name == b.player.name
+
+                if from_owner == "player":
+                    from_zones = b.player_zones if is_battle_player else b.opponent_zones
+                else:
+                    from_zones = b.opponent_zones if is_battle_player else b.player_zones
+
+                if to_owner == "player":
+                    to_zones = b.player_zones if is_battle_player else b.opponent_zones
+                else:
+                    to_zones = b.opponent_zones if is_battle_player else b.player_zones
+
                 # Sync Player model when moving from sideboard (for wish effects)
-                # Note: command_zone is NOT synced - companion selection persists
-                if from_zone == "sideboard":
+                if from_zone == "sideboard" and from_owner == "player":
                     card = next((c for c in player.sideboard if c.id == card_id), None)
                     if card:
                         player.sideboard.remove(card)
 
-                # Use zone lookup that handles opponent zones
-                try:
-                    zones, _ = battle.get_zones_for_card(b, player, card_id)
-                except ValueError:
-                    return False
-
-                from_list = zones.get_zone(from_zone)
+                from_list = from_zones.get_zone(from_zone)
                 card = next((c for c in from_list if c.id == card_id), None)
                 if not card:
                     return False
 
                 from_list.remove(card)
-                zones.get_zone(to_zone).append(card)
+                to_zones.get_zone(to_zone).append(card)
 
                 # Track revealed cards when moving to public zones
                 if (
                     to_zone in battle.REVEALED_ZONES
                     and battle._is_revealed_card(card)
-                    and card.id not in zones.revealed_card_ids
+                    and card.id not in to_zones.revealed_card_ids
                 ):
-                    zones.revealed_card_ids.append(card.id)
+                    to_zones.revealed_card_ids.append(card.id)
 
                 return True
         return False

@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { useWebSocket } from './useWebSocket'
 import type { CardDestination, BuildSource, ZoneName, CardStateAction } from '../types'
+import type { ZoneOwner } from '../dnd/types'
 
 interface SpectatorConfig {
   spectatePlayer: string
@@ -67,8 +68,8 @@ export function useGame(
     send('build_remove_companion')
   }, [send])
 
-  const battleMove = useCallback((cardId: string, fromZone: ZoneName, toZone: ZoneName) => {
-    send('battle_move', { card_id: cardId, from_zone: fromZone, to_zone: toZone })
+  const battleMove = useCallback((cardId: string, fromZone: ZoneName, toZone: ZoneName, fromOwner: ZoneOwner, toOwner: ZoneOwner) => {
+    send('battle_move', { card_id: cardId, from_zone: fromZone, to_zone: toZone, from_owner: fromOwner, to_owner: toOwner })
   }, [send])
 
   const battleSubmitResult = useCallback((result: string) => {

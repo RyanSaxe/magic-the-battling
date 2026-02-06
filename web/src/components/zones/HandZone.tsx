@@ -16,6 +16,7 @@ export function HandZone({
   selectedCardId,
   onCardClick,
   validFromZones = [
+    "hand",
     "battlefield",
     "graveyard",
     "exile",
