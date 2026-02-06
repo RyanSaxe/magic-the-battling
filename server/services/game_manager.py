@@ -912,7 +912,9 @@ class GameManager:
             revealed_cards = (snapshot.hand + snapshot.command_zone) if snapshot else []
             prior_upgrades = snapshot.upgrades if snapshot else []
         else:
-            if viewer.round > 1:
+            if viewer.phase == "reward":
+                prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
+            elif viewer.round > 1:
                 prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round - 1)
             elif viewer.stage > 3:
                 prior_snapshot = fake.get_opponent_for_round(viewer.stage - 1, 3)

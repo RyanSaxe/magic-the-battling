@@ -740,13 +740,13 @@ function GameContent() {
           canManipulateOpponent={canManipulateOpponent}
           hasCompanion={self_player.command_zone.length > 0}
           opponentHasCompanion={opponentHasCompanion}
-          sideboardCount={current_battle.your_zones.sideboard.length}
-          onShowSideboard={() => setShowSidebarSideboard(true)}
-          opponentSideboardCount={current_battle.opponent_full_sideboard?.length ?? 0}
-          onShowOpponentSideboard={() => setShowOpponentSideboard(true)}
         />
       );
     }
+    return null;
+  };
+
+  const renderHeaderContent = (): ReactNode => {
     if (currentPhase === "reward" && self_player.last_battle_result) {
       return (
         <RewardSidebarContent
@@ -795,12 +795,20 @@ function GameContent() {
           >
             <div className="flex-1 flex min-h-0">
               <main className="flex-1 flex flex-col min-h-0">
-                <BattlePhase gameState={gameState} actions={actions} />
+                <BattlePhase
+                  gameState={gameState}
+                  actions={actions}
+                  sideboardCount={current_battle?.your_zones.sideboard.length ?? 0}
+                  onShowSideboard={() => setShowSidebarSideboard(true)}
+                  opponentSideboardCount={current_battle?.opponent_full_sideboard?.length ?? 0}
+                  onShowOpponentSideboard={() => setShowOpponentSideboard(true)}
+                />
               </main>
               <Sidebar
                 players={gameState.players}
                 currentPlayer={self_player}
                 phaseContent={renderPhaseContent()}
+                headerContent={renderHeaderContent()}
                 useUpgrades={gameState.use_upgrades}
               />
             </div>
@@ -935,6 +943,7 @@ function GameContent() {
               players={gameState.players}
               currentPlayer={self_player}
               phaseContent={renderPhaseContent()}
+              headerContent={renderHeaderContent()}
               useUpgrades={gameState.use_upgrades}
             />
           </div>

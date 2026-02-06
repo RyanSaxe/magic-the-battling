@@ -19,6 +19,10 @@ interface BattlePhaseProps {
     battleUpdateCardState: (actionType: CardStateAction, cardId: string, data?: Record<string, unknown>) => void
     battleChoosePlayDraw: (choice: 'play' | 'draw') => void
   }
+  sideboardCount?: number
+  onShowSideboard?: () => void
+  opponentSideboardCount?: number
+  onShowOpponentSideboard?: () => void
 }
 
 function PlayDrawModal({ onChoose }: { onChoose: (choice: 'play' | 'draw') => void }) {
@@ -59,7 +63,14 @@ function WaitingForChoiceScreen({ coinFlipWinner }: { coinFlipWinner: string }) 
   )
 }
 
-export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
+export function BattlePhase({
+  gameState,
+  actions,
+  sideboardCount = 0,
+  onShowSideboard,
+  opponentSideboardCount = 0,
+  onShowOpponentSideboard,
+}: BattlePhaseProps) {
   const [selectedCard, setSelectedCard] = useState<{
     card: CardType
     zone: ZoneName
@@ -155,6 +166,24 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
     setContextMenu({ card, zone, position: { x: e.clientX, y: e.clientY }, isOpponent: true })
   }
 
+  const battlefieldIds = new Set(your_zones.battlefield.map((c) => c.id))
+  const handleUntapAll = () => {
+    for (const cardId of your_zones.tapped_card_ids || []) {
+      if (battlefieldIds.has(cardId)) {
+        actions.battleUpdateCardState('untap', cardId)
+      }
+    }
+  }
+
+  const opponentBattlefieldIds = new Set(opponent_zones.battlefield.map((c) => c.id))
+  const handleOpponentUntapAll = () => {
+    for (const cardId of opponent_zones.tapped_card_ids || []) {
+      if (opponentBattlefieldIds.has(cardId)) {
+        actions.battleUpdateCardState('untap', cardId)
+      }
+    }
+  }
+
   const isCardAttached = (cardId: string): boolean => {
     return Object.values(attachments).some(children => children.includes(cardId))
   }
@@ -212,6 +241,14 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
                   ))}
             </div>
           )}
+          {opponentSideboardCount > 0 && onShowOpponentSideboard && (
+            <button
+              onClick={onShowOpponentSideboard}
+              className="absolute bottom-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
+            >
+              Sideboard ({opponentSideboardCount})
+            </button>
+          )}
         </div>
 
         {/* Battlefields */}
@@ -233,6 +270,14 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               canManipulateOpponent={canManipulateOpponent}
               upgradedCardIds={opponentUpgradedCardIds}
             />
+            {opponentSideboardCount > 0 && (
+              <button
+                onClick={handleOpponentUntapAll}
+                className="absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
+              >
+                Untap All
+              </button>
+            )}
           </div>
 
           {/* Your battlefield */}
@@ -250,16 +295,32 @@ export function BattlePhase({ gameState, actions }: BattlePhaseProps) {
               separateLands
               upgradedCardIds={upgradedCardIds}
             />
+            <button
+              onClick={handleUntapAll}
+              className="absolute bottom-2 right-2 text-xs bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded text-white"
+            >
+              Untap All
+            </button>
           </div>
         </div>
 
         {/* Your hand */}
-        <HandZone
-          cards={your_zones.hand}
-          selectedCardId={selectedCard?.card.id}
-          onCardClick={(card) => handleCardClick(card, 'hand')}
-          upgradedCardIds={upgradedCardIds}
-        />
+        <div className="relative">
+          <HandZone
+            cards={your_zones.hand}
+            selectedCardId={selectedCard?.card.id}
+            onCardClick={(card) => handleCardClick(card, 'hand')}
+            upgradedCardIds={upgradedCardIds}
+          />
+          {sideboardCount > 0 && onShowSideboard && (
+            <button
+              onClick={onShowSideboard}
+              className="absolute top-2 right-2 text-xs bg-purple-600 hover:bg-purple-500 px-2 py-1 rounded text-white"
+            >
+              Sideboard ({sideboardCount})
+            </button>
+          )}
+        </div>
 
         {/* Context menu */}
         {contextMenu && (

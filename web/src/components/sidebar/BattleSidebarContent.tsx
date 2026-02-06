@@ -17,10 +17,6 @@ interface BattleSidebarContentProps {
   canManipulateOpponent?: boolean;
   hasCompanion?: boolean;
   opponentHasCompanion?: boolean;
-  sideboardCount?: number;
-  onShowSideboard?: () => void;
-  opponentSideboardCount?: number;
-  onShowOpponentSideboard?: () => void;
 }
 
 function LifeCounter({
@@ -99,7 +95,6 @@ function PlayerSection({
   canManipulateOpponent = false,
   hasCompanion = false,
   isReversed = false,
-  sideboardButton,
 }: {
   zones: Zones;
   upgrades: CardType[];
@@ -107,7 +102,6 @@ function PlayerSection({
   canManipulateOpponent?: boolean;
   hasCompanion?: boolean;
   isReversed?: boolean;
-  sideboardButton?: React.ReactNode;
 }) {
   const appliedUpgrades = upgrades.filter((u) => u.upgrade_target);
 
@@ -182,7 +176,6 @@ function PlayerSection({
       {isReversed ? (
         <>
           <div className="space-y-2">
-            {sideboardButton}
             {commandZone}
           </div>
           <div className="space-y-2">
@@ -198,7 +191,6 @@ function PlayerSection({
           </div>
           <div className="space-y-2">
             {commandZone}
-            {sideboardButton}
           </div>
         </>
       )}
@@ -219,10 +211,6 @@ export function BattleSidebarContent({
   canManipulateOpponent = false,
   hasCompanion = false,
   opponentHasCompanion = false,
-  sideboardCount = 0,
-  onShowSideboard,
-  opponentSideboardCount = 0,
-  onShowOpponentSideboard,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, your_zones, opponent_zones } =
     currentBattle;
@@ -241,16 +229,6 @@ export function BattleSidebarContent({
           canManipulateOpponent={canManipulateOpponent}
           hasCompanion={opponentHasCompanion}
           isReversed
-          sideboardButton={
-            opponentSideboardCount > 0 && onShowOpponentSideboard ? (
-              <button
-                onClick={onShowOpponentSideboard}
-                className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
-              >
-                Sideboard ({opponentSideboardCount})
-              </button>
-            ) : undefined
-          }
         />
       </div>
 
@@ -335,16 +313,6 @@ export function BattleSidebarContent({
           zones={your_zones}
           upgrades={selfUpgrades}
           hasCompanion={hasCompanion}
-          sideboardButton={
-            sideboardCount > 0 && onShowSideboard ? (
-              <button
-                onClick={onShowSideboard}
-                className="text-xs bg-purple-600 hover:bg-purple-500 px-2 py-1 rounded"
-              >
-                Sideboard ({sideboardCount})
-              </button>
-            ) : undefined
-          }
         />
       </div>
     </div>
