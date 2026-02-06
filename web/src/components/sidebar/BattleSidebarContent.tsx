@@ -118,7 +118,14 @@ function PlayerSection({
         zone="graveyard"
         cards={zones.graveyard}
         maxThumbnails={2}
-        validFromZones={["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone"]}
+        validFromZones={[
+          "hand",
+          "battlefield",
+          "graveyard",
+          "exile",
+          "sideboard",
+          "command_zone",
+        ]}
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
       />
@@ -127,7 +134,14 @@ function PlayerSection({
         zone="exile"
         cards={zones.exile}
         maxThumbnails={2}
-        validFromZones={["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone"]}
+        validFromZones={[
+          "hand",
+          "battlefield",
+          "graveyard",
+          "exile",
+          "sideboard",
+          "command_zone",
+        ]}
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
       />
@@ -299,7 +313,7 @@ export function BattleSidebarContent({
                   disabled={current_turn_name !== playerName}
                   className="flex-1 px-3 py-1.5 text-xs rounded bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Pass Turn
+                  Pass
                 </button>
               )}
               {onCreateTreasure && (
@@ -307,7 +321,7 @@ export function BattleSidebarContent({
                   onClick={onCreateTreasure}
                   className="flex-1 px-3 py-1.5 text-xs rounded bg-amber-600 hover:bg-amber-500 text-white"
                 >
-                  Create Treasure
+                  Treasure
                 </button>
               )}
             </div>
