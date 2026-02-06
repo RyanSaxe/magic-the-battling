@@ -570,7 +570,7 @@ function GameContent() {
     if (isSpectator) {
       return null;
     }
-    if (currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over") {
+    if (currentPhase === "eliminated") {
       return (
         <>
           <button onClick={handleSpectateNewTab} className="btn btn-secondary">
@@ -580,6 +580,13 @@ function GameContent() {
             Home
           </button>
         </>
+      );
+    }
+    if (currentPhase === "winner" || currentPhase === "game_over") {
+      return (
+        <button onClick={() => navigate("/")} className="btn btn-primary">
+          Home
+        </button>
       );
     }
     switch (currentPhase) {
