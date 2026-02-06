@@ -1247,6 +1247,23 @@ class GameManager:
         except ValueError as e:
             return str(e)
 
+    def _get_zones_for_owner(self, b: Battle, player: Player, owner: str) -> Zones:
+        is_battle_player = player.name == b.player.name
+        if owner == "player":
+            return b.player_zones if is_battle_player else b.opponent_zones
+        return b.opponent_zones if is_battle_player else b.player_zones
+
+    def _track_revealed_card(self, b: Battle, card, from_zones: Zones, to_zone: ZoneName) -> None:
+        if to_zone not in battle.REVEALED_ZONES or not battle._is_revealed_card(card):
+            return
+        if card.original_owner:
+            is_owner_battle_player = card.original_owner == b.player.name
+            owner_zones = b.player_zones if is_owner_battle_player else b.opponent_zones
+        else:
+            owner_zones = from_zones
+        if card.id not in owner_zones.revealed_card_ids:
+            owner_zones.revealed_card_ids.append(card.id)
+
     def handle_battle_move(
         self,
         game: Game,
@@ -1258,42 +1275,26 @@ class GameManager:
         to_owner: str = "player",
     ) -> bool:
         for b in game.active_battles:
-            if player.name in (b.player.name, b.opponent.name):
-                is_battle_player = player.name == b.player.name
+            if player.name not in (b.player.name, b.opponent.name):
+                continue
 
-                if from_owner == "player":
-                    from_zones = b.player_zones if is_battle_player else b.opponent_zones
-                else:
-                    from_zones = b.opponent_zones if is_battle_player else b.player_zones
+            from_zones = self._get_zones_for_owner(b, player, from_owner)
+            to_zones = self._get_zones_for_owner(b, player, to_owner)
 
-                if to_owner == "player":
-                    to_zones = b.player_zones if is_battle_player else b.opponent_zones
-                else:
-                    to_zones = b.opponent_zones if is_battle_player else b.player_zones
+            if from_zone == "sideboard" and from_owner == "player":
+                card = next((c for c in player.sideboard if c.id == card_id), None)
+                if card:
+                    player.sideboard.remove(card)
 
-                # Sync Player model when moving from sideboard (for wish effects)
-                if from_zone == "sideboard" and from_owner == "player":
-                    card = next((c for c in player.sideboard if c.id == card_id), None)
-                    if card:
-                        player.sideboard.remove(card)
+            from_list = from_zones.get_zone(from_zone)
+            card = next((c for c in from_list if c.id == card_id), None)
+            if not card:
+                return False
 
-                from_list = from_zones.get_zone(from_zone)
-                card = next((c for c in from_list if c.id == card_id), None)
-                if not card:
-                    return False
-
-                from_list.remove(card)
-                to_zones.get_zone(to_zone).append(card)
-
-                # Track revealed cards when moving to public zones
-                if (
-                    to_zone in battle.REVEALED_ZONES
-                    and battle._is_revealed_card(card)
-                    and card.id not in to_zones.revealed_card_ids
-                ):
-                    to_zones.revealed_card_ids.append(card.id)
-
-                return True
+            from_list.remove(card)
+            to_zones.get_zone(to_zone).append(card)
+            self._track_revealed_card(b, card, from_zones, to_zone)
+            return True
         return False
 
     def handle_battle_submit_result(

@@ -563,7 +563,9 @@ def _end_vs_static(game: Game, battle: Battle, opponent: StaticOpponent) -> Batt
 
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
 
-    battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones, battle.player.name)
+    battle.player.most_recently_revealed_cards = _collect_revealed_cards(
+        battle.player_zones, battle.opponent_zones, battle.player.name
+    )
 
     if battle in game.active_battles:
         game.active_battles.remove(battle)
@@ -575,12 +577,25 @@ def _is_revealed_card(card: Card) -> bool:
     return not card.type_line.startswith("Basic Land") and not card.type_line.startswith("Token")
 
 
-def _collect_revealed_cards(zones: Zones, owner_name: str) -> list[Card]:
-    all_cards = zones.hand + zones.sideboard + zones.battlefield + zones.graveyard + zones.exile + zones.command_zone
+def _collect_revealed_cards(owner_zones: Zones, other_zones: Zones, owner_name: str) -> list[Card]:
+    all_cards = (
+        owner_zones.hand
+        + owner_zones.sideboard
+        + owner_zones.battlefield
+        + owner_zones.graveyard
+        + owner_zones.exile
+        + owner_zones.command_zone
+        + other_zones.hand
+        + other_zones.sideboard
+        + other_zones.battlefield
+        + other_zones.graveyard
+        + other_zones.exile
+        + other_zones.command_zone
+    )
     return [
         c
         for c in all_cards
-        if c.id in zones.revealed_card_ids and (c.original_owner is None or c.original_owner == owner_name)
+        if c.id in owner_zones.revealed_card_ids and (c.original_owner is None or c.original_owner == owner_name)
     ]
 
 
@@ -756,8 +771,12 @@ def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
     _sync_zones_to_player(battle.opponent_zones, opponent, game.config.max_treasures)
 
-    battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones, battle.player.name)
-    opponent.most_recently_revealed_cards = _collect_revealed_cards(battle.opponent_zones, opponent.name)
+    battle.player.most_recently_revealed_cards = _collect_revealed_cards(
+        battle.player_zones, battle.opponent_zones, battle.player.name
+    )
+    opponent.most_recently_revealed_cards = _collect_revealed_cards(
+        battle.opponent_zones, battle.player_zones, opponent.name
+    )
 
     if battle in game.active_battles:
         game.active_battles.remove(battle)
