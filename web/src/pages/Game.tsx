@@ -721,6 +721,10 @@ function GameContent() {
     actions.battleUpdateCardState("create_treasure", "", {});
   };
 
+  const handlePassTurn = () => {
+    actions.battlePassTurn();
+  };
+
   const renderPhaseContent = (): ReactNode => {
     if (currentPhase === "battle" && current_battle) {
       return (
@@ -733,6 +737,7 @@ function GameContent() {
           onOpponentLifeChange={handleOpponentLifeChange}
           playerName={self_player.name}
           onCreateTreasure={handleCreateTreasure}
+          onPassTurn={handlePassTurn}
           canManipulateOpponent={canManipulateOpponent}
           hasCompanion={self_player.command_zone.length > 0}
           opponentHasCompanion={opponentHasCompanion}

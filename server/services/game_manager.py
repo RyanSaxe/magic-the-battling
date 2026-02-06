@@ -1029,6 +1029,7 @@ class GameManager:
             opponent_name=opponent_name,
             coin_flip_name=b.coin_flip_name,
             on_the_play_name=b.on_the_play_name,
+            current_turn_name=b.current_turn_name,
             your_zones=your_zones,
             opponent_zones=hidden_opponent,
             opponent_hand_count=len(opponent_zones.hand),
@@ -1331,6 +1332,14 @@ class GameManager:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
                 return battle.update_card_state(b, player, action_type, card_id, data)
+        return False
+
+    def handle_battle_pass_turn(self, game: Game, player: Player) -> bool | str:
+        for b in game.active_battles:
+            if player.name in (b.player.name, b.opponent.name):
+                if battle.pass_turn(b, player):
+                    return True
+                return "Not your turn"
         return False
 
     def _end_battle(self, game: Game, b: Battle, game_id: str | None = None, db: Session | None = None) -> str | None:

@@ -91,6 +91,10 @@ export function useGame(
     send('battle_choose_play_draw', { choice })
   }, [send])
 
+  const battlePassTurn = useCallback(() => {
+    send('battle_pass_turn')
+  }, [send])
+
   const rewardPickUpgrade = useCallback((upgradeId: string) => {
     send('reward_pick_upgrade', { upgrade_id: upgradeId })
   }, [send])
@@ -132,6 +136,7 @@ export function useGame(
       battleUpdateCardState,
       battleUpdateLife,
       battleChoosePlayDraw,
+      battlePassTurn,
       rewardPickUpgrade,
       rewardApplyUpgrade,
       rewardDone,

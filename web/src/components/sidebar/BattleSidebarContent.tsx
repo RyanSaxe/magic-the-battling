@@ -13,6 +13,7 @@ interface BattleSidebarContentProps {
   onOpponentLifeChange: (life: number) => void;
   playerName: string;
   onCreateTreasure?: () => void;
+  onPassTurn?: () => void;
   canManipulateOpponent?: boolean;
   hasCompanion?: boolean;
   opponentHasCompanion?: boolean;
@@ -199,6 +200,7 @@ export function BattleSidebarContent({
   onOpponentLifeChange,
   playerName,
   onCreateTreasure,
+  onPassTurn,
   canManipulateOpponent = false,
   hasCompanion = false,
   opponentHasCompanion = false,
@@ -207,7 +209,7 @@ export function BattleSidebarContent({
   opponentSideboardCount = 0,
   onShowOpponentSideboard,
 }: BattleSidebarContentProps) {
-  const { opponent_name, on_the_play_name, your_zones, opponent_zones } =
+  const { opponent_name, current_turn_name, your_zones, opponent_zones } =
     currentBattle;
 
   const yourPoison = currentBattle.your_poison;
@@ -279,26 +281,35 @@ export function BattleSidebarContent({
               </div>
             </div>
           </div>
-          {on_the_play_name && (
-            <div className="text-center text-xs text-gray-500 mt-2">
-              {on_the_play_name === playerName ? (
-                <>
-                  you are on the <span className="text-green-400">play</span>
-                </>
+          {current_turn_name && (
+            <div className="text-center text-xs mt-2">
+              {current_turn_name === playerName ? (
+                <span className="text-green-400">It is your turn</span>
               ) : (
-                <>
-                  you are on the <span className="text-amber-400">draw</span>
-                </>
+                <span className="text-amber-400">Opponent's turn</span>
               )}
             </div>
           )}
-          {onCreateTreasure && (
-            <button
-              onClick={onCreateTreasure}
-              className="w-full mt-3 px-3 py-1.5 text-xs rounded bg-amber-600 hover:bg-amber-500 text-white"
-            >
-              Create Treasure
-            </button>
+          {(onPassTurn || onCreateTreasure) && (
+            <div className="flex gap-2 mt-3">
+              {onPassTurn && (
+                <button
+                  onClick={onPassTurn}
+                  disabled={current_turn_name !== playerName}
+                  className="flex-1 px-3 py-1.5 text-xs rounded bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Pass Turn
+                </button>
+              )}
+              {onCreateTreasure && (
+                <button
+                  onClick={onCreateTreasure}
+                  className="flex-1 px-3 py-1.5 text-xs rounded bg-amber-600 hover:bg-amber-500 text-white"
+                >
+                  Create Treasure
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

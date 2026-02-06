@@ -342,6 +342,18 @@ def choose_play_or_draw(battle: Battle, player: Player, choice: str) -> bool:
         battle.on_the_play_name = other
     else:
         return False
+    battle.current_turn_name = battle.on_the_play_name
+    return True
+
+
+def pass_turn(battle: Battle, player: Player) -> bool:
+    """Pass turn to opponent. Returns True if successful."""
+    if battle.current_turn_name != player.name:
+        return False
+    if player.name == battle.player.name:
+        battle.current_turn_name = battle.opponent.name
+    else:
+        battle.current_turn_name = battle.player.name
     return True
 
 
@@ -366,8 +378,10 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
     # Bot auto-chooses play/draw randomly when it wins the flip
     if coin_flip_name == opponent.name:
         on_the_play_name = random.choice([player.name, opponent.name])
+        current_turn_name = on_the_play_name
     else:
         on_the_play_name = None
+        current_turn_name = None
 
     player.previous_hand_ids = [c.id for c in player.hand]
     player.previous_basics = player.chosen_basics.copy()
@@ -377,6 +391,7 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
         opponent=opponent,
         coin_flip_name=coin_flip_name,
         on_the_play_name=on_the_play_name,
+        current_turn_name=current_turn_name,
         player_zones=_create_zones_for_player(player),
         opponent_zones=_create_zones_for_static_opponent(opponent),
         player_life=game.config.starting_life,

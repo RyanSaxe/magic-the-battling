@@ -291,6 +291,7 @@ class Battle(BaseModel):
     opponent: Player | StaticOpponent
     coin_flip_name: str
     on_the_play_name: str | None = None
+    current_turn_name: str | None = None
     player_zones: Zones
     opponent_zones: Zones
     result_submissions: dict[str, str] = Field(default_factory=dict)

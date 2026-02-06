@@ -88,6 +88,7 @@ class BattleView(BaseModel):
     opponent_name: str
     coin_flip_name: str
     on_the_play_name: str | None = None
+    current_turn_name: str | None = None
     your_zones: Zones
     opponent_zones: Zones
     opponent_hand_count: int
