@@ -3,6 +3,7 @@ import { Card } from '../../components/card'
 import { PlayerStatsBar } from '../../components/PlayerStatsBar'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
+import { useAutoFitCardSizes } from '../../hooks/useAutoFitCardSizes'
 
 interface DraftPhaseProps {
   gameState: GameState
@@ -34,11 +35,10 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
     gap: 16,
     maxCardWidth: 180,
   })
-  const [poolRef, poolCardDims] = useContainerCardSizes({
+  const [poolRef, poolCardDims] = useAutoFitCardSizes({
     cardCount: pool.length,
     gap: 8,
     maxCardWidth: 130,
-    rows: 3,
   })
   const upgradedCardIds = new Set(
     self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
@@ -95,29 +95,29 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
       </PlayerStatsBar>
 
       {/* Pool */}
-      <div className="p-2 max-h-[35vh] min-h-[120px] overflow-auto shrink-0">
-        {pool.length === 0 ? (
-          <div className="text-gray-500 text-sm text-center py-4">
+      {pool.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-gray-500 text-sm text-center">
             Swap cards from the pack to build your pool
           </div>
-        ) : (
-          <div ref={poolRef} className="flex flex-wrap gap-2 p-1">
-            {pool.map((card, index) => {
-              const isInHand = self_player.hand.some((c) => c.id === card.id)
-              return (
-                <Card
-                  key={card.id}
-                  card={card}
-                  onClick={() => handleCardClick(card, index, 'pool', isInHand)}
-                  selected={selectedCard?.card.id === card.id}
-                  dimensions={poolCardDims}
-                  upgraded={upgradedCardIds.has(card.id)}
-                />
-              )
-            })}
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div ref={poolRef} className="flex-1 min-h-0 overflow-hidden flex flex-wrap gap-2 justify-center content-start p-1">
+          {pool.map((card, index) => {
+            const isInHand = self_player.hand.some((c) => c.id === card.id)
+            return (
+              <Card
+                key={card.id}
+                card={card}
+                onClick={() => handleCardClick(card, index, 'pool', isInHand)}
+                selected={selectedCard?.card.id === card.id}
+                dimensions={poolCardDims}
+                upgraded={upgradedCardIds.has(card.id)}
+              />
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

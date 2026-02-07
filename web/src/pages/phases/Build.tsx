@@ -4,6 +4,7 @@ import { Card } from '../../components/card'
 import { PlayerStatsBar } from '../../components/PlayerStatsBar'
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
 import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
+import { useAutoFitCardSizes } from '../../hooks/useAutoFitCardSizes'
 
 interface UpgradeConfirmationModalProps {
   upgrade: CardType
@@ -199,11 +200,10 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
     gap: 16,
     maxCardWidth: 180,
   })
-  const [poolRef, poolCardDims] = useContainerCardSizes({
+  const [poolRef, poolCardDims] = useAutoFitCardSizes({
     cardCount: self_player.sideboard.length,
     gap: 8,
     maxCardWidth: 130,
-    rows: 3,
   })
 
   return (
@@ -315,75 +315,72 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
         </div>
       </div>
 
-      {/* Pool and Upgrades side by side */}
-      <div className="flex gap-2 max-h-[30vh] min-h-[100px] shrink-0 overflow-hidden">
-        {/* Pool (sideboard) */}
-        <div className="p-2 flex-1 overflow-auto">
-          {self_player.sideboard.length === 0 ? (
-            <div className="text-gray-500 text-sm text-center py-4">
-              All cards are in your hand
-            </div>
-          ) : (
-            <div ref={poolRef} className="flex flex-wrap gap-2 justify-center p-1">
-              {self_player.sideboard.map((card, index) => {
-                const cardIsCompanion = isCompanion(card)
-                const isActiveCompanion = card.id === selectedCompanionId
-                return (
-                  <div key={card.id} className="relative">
-                    <Card
-                      card={card}
-                      onClick={() => handleCardClick(card, index, 'sideboard')}
-                      selected={selectedCard?.card.id === card.id}
-                      glow={selectedUpgrade ? 'green' : isActiveCompanion ? 'gold' : 'none'}
-                      dimensions={poolCardDims}
-                      upgraded={upgradedCardIds.has(card.id)}
-                    />
-                    {cardIsCompanion && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (isActiveCompanion) {
-                            actions.buildRemoveCompanion()
-                          } else {
-                            actions.buildSetCompanion(card.id)
-                          }
-                        }}
-                        className={`absolute top-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-t-lg ${
-                          isActiveCompanion
-                            ? 'bg-amber-500/90 text-black'
-                            : 'bg-purple-600/80 text-white hover:bg-purple-500/90'
-                        }`}
-                      >
-                        {isActiveCompanion ? 'Companion' : 'Set Companion'}
-                      </button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Unapplied upgrades */}
-        {gameState.use_upgrades && unappliedUpgrades.length > 0 && (
-          <div className="bg-purple-950/30 rounded-lg p-3 w-48 flex-shrink-0 overflow-auto">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-              Apply Upgrade
-            </div>
-            <div className="flex flex-col gap-2">
-              {unappliedUpgrades.map((upgrade) => (
-                <Card
-                  key={upgrade.id}
-                  card={upgrade}
-                  size="sm"
-                  selected={selectedUpgrade?.id === upgrade.id}
-                  onClick={() => handleUpgradeClick(upgrade)}
-                />
-              ))}
-            </div>
+      {/* Pool */}
+      {self_player.sideboard.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-gray-500 text-sm text-center">
+            All cards are in your hand
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div ref={poolRef} className="flex-1 min-h-0 overflow-hidden flex flex-wrap gap-2 justify-center content-start p-1">
+          {self_player.sideboard.map((card, index) => {
+            const cardIsCompanion = isCompanion(card)
+            const isActiveCompanion = card.id === selectedCompanionId
+            return (
+              <div key={card.id} className="relative">
+                <Card
+                  card={card}
+                  onClick={() => handleCardClick(card, index, 'sideboard')}
+                  selected={selectedCard?.card.id === card.id}
+                  glow={selectedUpgrade ? 'green' : isActiveCompanion ? 'gold' : 'none'}
+                  dimensions={poolCardDims}
+                  upgraded={upgradedCardIds.has(card.id)}
+                />
+                {cardIsCompanion && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (isActiveCompanion) {
+                        actions.buildRemoveCompanion()
+                      } else {
+                        actions.buildSetCompanion(card.id)
+                      }
+                    }}
+                    className={`absolute top-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-t-lg ${
+                      isActiveCompanion
+                        ? 'bg-amber-500/90 text-black'
+                        : 'bg-purple-600/80 text-white hover:bg-purple-500/90'
+                    }`}
+                  >
+                    {isActiveCompanion ? 'Companion' : 'Set Companion'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Unapplied upgrades */}
+      {gameState.use_upgrades && unappliedUpgrades.length > 0 && (
+        <div className="bg-purple-950/30 rounded-lg p-3 shrink-0">
+          <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
+            Apply Upgrade
+          </div>
+          <div className="flex gap-2 justify-center flex-wrap">
+            {unappliedUpgrades.map((upgrade) => (
+              <Card
+                key={upgrade.id}
+                card={upgrade}
+                size="sm"
+                selected={selectedUpgrade?.id === upgrade.id}
+                onClick={() => handleUpgradeClick(upgrade)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {pendingUpgrade && (
         <UpgradeConfirmationModal
