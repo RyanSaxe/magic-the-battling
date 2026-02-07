@@ -30,29 +30,23 @@ export function HandZone({
   upgradedCardIds = new Set(),
   cardDimensions,
 }: HandZoneProps) {
-  const overlap = cardDimensions ? Math.round(cardDimensions.width * 0.3) : 0;
-
   return (
     <DroppableZone
       zone={zone}
       validFromZones={validFromZones}
       className="hand-zone w-full"
     >
-      {cards.map((card, index) => (
-        <div
+      {cards.map((card) => (
+        <DraggableCard
           key={card.id}
-          style={cardDimensions ? { marginLeft: index === 0 ? 0 : -overlap } : undefined}
-        >
-          <DraggableCard
-            card={card}
-            zone={zone}
-            dimensions={cardDimensions}
-            selected={card.id === selectedCardId}
-            onClick={() => onCardClick?.(card)}
-            disabled={!draggable}
-            upgraded={upgradedCardIds.has(card.id)}
-          />
-        </div>
+          card={card}
+          zone={zone}
+          dimensions={cardDimensions}
+          selected={card.id === selectedCardId}
+          onClick={() => onCardClick?.(card)}
+          disabled={!draggable}
+          upgraded={upgradedCardIds.has(card.id)}
+        />
       ))}
     </DroppableZone>
   );
