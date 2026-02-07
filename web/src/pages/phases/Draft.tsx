@@ -94,6 +94,8 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
         )}
       </PlayerStatsBar>
 
+      <hr className="border-gray-700/50" />
+
       {/* Pool */}
       {pool.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
