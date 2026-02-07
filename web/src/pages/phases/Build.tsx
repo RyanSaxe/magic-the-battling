@@ -187,7 +187,6 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
   }, [])
 
   const unappliedUpgrades = self_player.upgrades.filter((u) => !u.upgrade_target)
-  const handExceedsLimit = self_player.hand.length > maxHandSize
   const upgradedCardIds = new Set(
     self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
   )
@@ -210,7 +209,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
   })
 
   return (
-    <div className="relative flex flex-col h-full gap-4 p-4">
+    <div className="relative flex flex-col h-full gap-2 p-4">
       <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison} />
 
       {/* Sudden Death Banner */}
@@ -231,16 +230,16 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
         </div>
       )}
 
-      {/* Hand area - large cards at top */}
+      {/* Hand area */}
       <div className="flex-1 flex flex-col items-center justify-center min-h-0">
-        <div className="flex justify-between items-center w-full max-w-4xl mb-4">
-          <span className="text-xs text-gray-400 uppercase tracking-wide">Your Hand</span>
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs text-gray-400 uppercase tracking-wide">Hand</span>
           <span
-            className={`text-sm ${
-              self_player.hand.length > maxHandSize ? 'text-red-400' : 'text-gray-400'
+            className={`text-xs px-1.5 py-0.5 rounded ${
+              self_player.hand.length > maxHandSize ? 'bg-red-900/50 text-red-400' : 'text-gray-500'
             }`}
           >
-            {self_player.hand.length} / {maxHandSize}
+            {self_player.hand.length}/{maxHandSize}
           </span>
         </div>
         {self_player.hand.length === 0 ? (
@@ -319,14 +318,11 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
         </div>
       )}
 
-      {/* Basic lands - horizontal row */}
-      <div className="bg-slate-800/50 rounded-lg p-2 shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 uppercase tracking-wide">Basic Lands</span>
-            <span className="text-xs text-gray-400">({selectedBasics.length}/3)</span>
-          </div>
-          <div className="flex gap-3 flex-1 justify-center">
+      {/* Basic lands */}
+      <div className="p-1 shrink-0">
+        <div className="flex items-center gap-2 justify-center">
+          <span className="text-xs text-gray-500">{selectedBasics.length}/3</span>
+          <div className="flex gap-3">
             {BASIC_LANDS.map(({ name }) => {
               const count = countBasic(name)
               return (
@@ -359,22 +355,13 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
               )
             })}
           </div>
-          {handExceedsLimit && !self_player.build_ready && (
-            <div className="text-red-400 text-xs">
-              Hand exceeds limit ({self_player.hand.length}/{maxHandSize})
-            </div>
-          )}
         </div>
       </div>
 
       {/* Pool and Upgrades side by side */}
-      <div className="flex gap-4 max-h-[30vh] min-h-[100px] shrink-0 overflow-hidden">
+      <div className="flex gap-2 max-h-[30vh] min-h-[100px] shrink-0 overflow-hidden">
         {/* Pool (sideboard) */}
-        <div className="bg-slate-800/50 rounded-lg p-3 flex-1 overflow-auto">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-xs text-gray-400 uppercase tracking-wide">Your Pool</span>
-            <span className="text-sm text-gray-400">{self_player.sideboard.length} cards</span>
-          </div>
+        <div className="p-2 flex-1 overflow-auto">
           {self_player.sideboard.length === 0 ? (
             <div className="text-gray-500 text-sm text-center py-4">
               All cards are in your hand
