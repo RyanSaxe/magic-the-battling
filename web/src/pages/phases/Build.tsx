@@ -3,6 +3,7 @@ import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { Card } from '../../components/card'
 import { PlayerStatsBar } from '../../components/PlayerStatsBar'
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
+import { useViewportCardSizes } from '../../hooks/useViewportCardSizes'
 
 interface UpgradeConfirmationModalProps {
   upgrade: CardType
@@ -102,6 +103,7 @@ interface CardWithIndex {
 }
 
 export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange }: BuildPhaseProps) {
+  const sizes = useViewportCardSizes()
   const { self_player } = gameState
   const maxHandSize = self_player.hand_size
 
@@ -246,7 +248,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                 onClick={() => handleCardClick(card, index, 'hand')}
                 selected={selectedCard?.card.id === card.id}
                 glow={selectedUpgrade ? 'green' : 'none'}
-                size="lg"
+                size={sizes.featured}
                 upgraded={upgradedCardIds.has(card.id)}
               />
             ))}
@@ -271,7 +273,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
 
       {/* Companion selection row */}
       {hasCompanions && (
-        <div className="bg-amber-900/30 rounded-lg p-3">
+        <div className="bg-amber-900/30 rounded-lg p-2 shrink-0">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <span className="text-xs text-amber-400 uppercase tracking-wide">⬢ Companion</span>
@@ -307,7 +309,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
       )}
 
       {/* Basic lands - horizontal row */}
-      <div className="bg-slate-800/50 rounded-lg p-3">
+      <div className="bg-slate-800/50 rounded-lg p-2 shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-400 uppercase tracking-wide">Basic Lands</span>
@@ -355,7 +357,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
       </div>
 
       {/* Pool and Upgrades side by side */}
-      <div className="flex gap-4 max-h-[240px]">
+      <div className="flex gap-4 max-h-[30vh] min-h-[100px] shrink-0 overflow-hidden">
         {/* Pool (sideboard) */}
         <div className="bg-slate-800/50 rounded-lg p-3 flex-1 overflow-auto">
           <div className="flex justify-between items-center mb-2">
@@ -375,7 +377,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                   onClick={() => handleCardClick(card, index, 'sideboard')}
                   selected={selectedCard?.card.id === card.id}
                   glow={selectedUpgrade ? 'green' : 'none'}
-                  size="md"
+                  size={sizes.pool}
                   upgraded={upgradedCardIds.has(card.id)}
                 />
               ))}

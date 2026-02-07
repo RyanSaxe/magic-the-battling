@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { Card } from '../../components/card'
 import { PlayerStatsBar } from '../../components/PlayerStatsBar'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
+import { useViewportCardSizes } from '../../hooks/useViewportCardSizes'
 
 interface DraftPhaseProps {
   gameState: GameState
@@ -22,6 +23,7 @@ interface CardWithIndex {
 }
 
 export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
+  const sizes = useViewportCardSizes()
   const [selectedCard, setSelectedCard] = useState<CardWithIndex | null>(null)
 
   const { self_player } = gameState
@@ -84,7 +86,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
                   card={card}
                   onClick={() => handleCardClick(card, index, 'pack', false)}
                   selected={selectedCard?.card.id === card.id}
-                  size="lg"
+                  size={sizes.featured}
                 />
               ))}
             </div>
@@ -93,7 +95,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
       </div>
 
       {/* Pool */}
-      <div className="bg-slate-800/50 rounded-lg p-3 max-h-[280px] overflow-auto">
+      <div className="bg-slate-800/50 rounded-lg p-3 max-h-[35vh] min-h-[120px] overflow-auto shrink-0">
         <div className="flex justify-between items-center mb-2">
           <span className="text-xs text-gray-400 uppercase tracking-wide">Your Pool</span>
           <span className="text-sm text-gray-400">{pool.length} cards</span>
@@ -112,7 +114,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
                   card={card}
                   onClick={() => handleCardClick(card, index, 'pool', isInHand)}
                   selected={selectedCard?.card.id === card.id}
-                  size="md"
+                  size={sizes.pool}
                   upgraded={upgradedCardIds.has(card.id)}
                 />
               )

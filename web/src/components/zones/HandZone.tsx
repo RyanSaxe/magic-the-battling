@@ -9,6 +9,7 @@ interface HandZoneProps {
   draggable?: boolean;
   zone?: ZoneName;
   upgradedCardIds?: Set<string>;
+  cardSize?: "xs" | "sm" | "md" | "lg";
 }
 
 export function HandZone({
@@ -26,19 +27,21 @@ export function HandZone({
   draggable = true,
   zone = "hand",
   upgradedCardIds = new Set(),
+  cardSize = "md",
 }: HandZoneProps) {
+  const sizeClass = cardSize === 'xs' ? ' hand-xs' : cardSize !== 'md' ? ' hand-compact' : '';
   return (
     <DroppableZone
       zone={zone}
       validFromZones={validFromZones}
-      className="hand-zone min-h-[220px] w-full"
+      className={`hand-zone w-full${sizeClass}`}
     >
       {cards.map((card) => (
         <DraggableCard
           key={card.id}
           card={card}
           zone={zone}
-          size="md"
+          size={cardSize}
           selected={card.id === selectedCardId}
           onClick={() => onCardClick?.(card)}
           disabled={!draggable}

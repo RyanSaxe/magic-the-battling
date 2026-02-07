@@ -119,13 +119,16 @@ export function BattlefieldZone({
 
   const zoneOwner = isOpponent ? "opponent" : ("player" as const);
 
+  const minH = { xs: 'min-h-[70px]', sm: 'min-h-[112px]', md: 'min-h-[182px]', lg: 'min-h-[280px]' }[cardSize];
+  const compact = cardSize === 'xs';
+
   return (
     <DroppableZone
       zone="battlefield"
       zoneOwner={zoneOwner}
       validFromZones={validFromZones}
       disabled={!allowInteraction}
-      className="battlefield flex-1 p-4"
+      className={`battlefield flex-1 ${compact ? 'p-1' : 'p-4'}`}
     >
       {label && (
         <div className="text-xs text-gray-400 mb-2 uppercase tracking-wide">
@@ -133,10 +136,9 @@ export function BattlefieldZone({
         </div>
       )}
       <div
-        className={`flex flex-col gap-2 min-h-[112px] ${isOpponent ? "flex-col-reverse" : ""}`}
+        className={`flex flex-col ${compact ? 'gap-1' : 'gap-2'} ${minH} ${isOpponent ? "flex-col-reverse" : ""}`}
       >
-        {/* Permanents (non-lands) */}
-        <div className="flex justify-center flex-wrap gap-3 min-h-[112px]">
+        <div className={`flex justify-center flex-wrap ${compact ? 'gap-1' : 'gap-3'} ${minH}`}>
           {permanents.length === 0 && lands.length === 0 ? (
             <div className="text-gray-500 text-sm opacity-50">
               {isOpponent ? "Opponent's battlefield" : "Empty battlefield"}
@@ -145,9 +147,8 @@ export function BattlefieldZone({
             permanents.map(renderCard)
           )}
         </div>
-        {/* Lands (separate row if enabled) */}
         {separateLands && lands.length > 0 && (
-          <div className="flex justify-center flex-wrap gap-2">
+          <div className={`flex justify-center flex-wrap ${compact ? 'gap-1' : 'gap-2'}`}>
             {lands.map(renderCard)}
           </div>
         )}

@@ -3,6 +3,7 @@ import type { GameState, Card as CardType, ZoneName, CardStateAction } from '../
 import { DraggableCard, DroppableZone, type ZoneOwner } from '../../dnd'
 import { HandZone, BattlefieldZone } from '../../components/zones'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
+import { useViewportCardSizes } from '../../hooks/useViewportCardSizes'
 
 interface ContextMenuState {
   card: CardType
@@ -71,6 +72,7 @@ export function BattlePhase({
   opponentSideboardCount = 0,
   onShowOpponentSideboard,
 }: BattlePhaseProps) {
+  const sizes = useViewportCardSizes()
   const [selectedCard, setSelectedCard] = useState<{
     card: CardType
     zone: ZoneName
@@ -214,30 +216,30 @@ export function BattlePhase({
         )}
 
         {/* Opponent's hand - always visible */}
-        <div className="relative px-4 py-3" style={{ background: 'rgba(34, 84, 61, 0.4)' }}>
+        <div className="relative px-2 py-2 shrink-0" style={{ background: 'rgba(34, 84, 61, 0.4)' }}>
           {canManipulateOpponent ? (
             <DroppableZone
               zone="hand"
               zoneOwner="opponent"
               validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
-              className="flex justify-center gap-1 flex-wrap min-h-[120px] w-full"
+              className="flex justify-center gap-1 flex-wrap w-full"
             >
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
-                    <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" size="sm" isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} />
+                    <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" size={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} />
                   ))
                 : Array.from({ length: opponent_hand_count }).map((_, i) => (
-                    <CardBack key={i} size="sm" />
+                    <CardBack key={i} size={sizes.opponentHand} />
                   ))}
             </DroppableZone>
           ) : (
-            <div className="flex justify-center gap-1 flex-wrap min-h-[120px]">
+            <div className="flex justify-center gap-1 flex-wrap">
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
-                    <Card key={card.id} card={card} size="sm" upgraded={opponentUpgradedCardIds.has(card.id)} />
+                    <Card key={card.id} card={card} size={sizes.opponentHand} upgraded={opponentUpgradedCardIds.has(card.id)} />
                   ))
                 : Array.from({ length: opponent_hand_count }).map((_, i) => (
-                    <CardBack key={i} size="sm" />
+                    <CardBack key={i} size={sizes.opponentHand} />
                   ))}
             </div>
           )}
@@ -252,9 +254,9 @@ export function BattlePhase({
         </div>
 
         {/* Battlefields */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Opponent's battlefield */}
-          <div className="relative flex-1 battlefield opacity-80">
+          <div className="relative flex-1 battlefield opacity-80 min-h-0 overflow-hidden">
             <BattlefieldZone
               cards={opponent_zones.battlefield}
               selectedCardId={selectedCard?.card.id}
@@ -269,6 +271,7 @@ export function BattlePhase({
               isOpponent
               canManipulateOpponent={canManipulateOpponent}
               upgradedCardIds={opponentUpgradedCardIds}
+              cardSize={sizes.battlefield}
             />
             {opponentSideboardCount > 0 && (
               <button
@@ -281,7 +284,7 @@ export function BattlePhase({
           </div>
 
           {/* Your battlefield */}
-          <div className="relative flex-1">
+          <div className="relative flex-1 min-h-0 overflow-hidden">
             <BattlefieldZone
               cards={your_zones.battlefield}
               selectedCardId={selectedCard?.card.id}
@@ -294,6 +297,7 @@ export function BattlePhase({
               attachments={attachments}
               separateLands
               upgradedCardIds={upgradedCardIds}
+              cardSize={sizes.battlefield}
             />
             <button
               onClick={handleUntapAll}
@@ -305,12 +309,13 @@ export function BattlePhase({
         </div>
 
         {/* Your hand */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <HandZone
             cards={your_zones.hand}
             selectedCardId={selectedCard?.card.id}
             onCardClick={(card) => handleCardClick(card, 'hand')}
             upgradedCardIds={upgradedCardIds}
+            cardSize={sizes.hand}
           />
           {sideboardCount > 0 && onShowSideboard && (
             <button
