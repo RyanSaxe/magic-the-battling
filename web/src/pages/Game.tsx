@@ -765,7 +765,7 @@ function GameContent() {
 
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
-      <div className="game-table h-screen overflow-hidden flex flex-col">
+      <div className={`game-table h-screen overflow-hidden flex flex-col ${sizes.isMobile && !isSpectator ? 'pb-12' : ''}`}>
         {/* Spectator Banner */}
         {isSpectator && spectatingPlayer && (
           <div className="bg-purple-900/80 text-purple-200 text-center py-2">
@@ -790,7 +790,7 @@ function GameContent() {
             {PHASE_HINTS[currentPhase as Phase]}
           </div>
           <div className="flex items-center gap-2">
-            {renderActionButtons()}
+            {!sizes.isMobile && renderActionButtons()}
             {sizes.isMobile && (
               <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-2">☰</button>
             )}
@@ -1014,6 +1014,13 @@ function GameContent() {
                 useUpgrades={gameState.use_upgrades}
               />
             )}
+          </div>
+        )}
+        {sizes.isMobile && !isSpectator && (
+          <div className="fixed bottom-0 left-0 right-0 z-30 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
+            <div className="flex items-center justify-center gap-3">
+              {renderActionButtons()}
+            </div>
           </div>
         )}
       </div>
