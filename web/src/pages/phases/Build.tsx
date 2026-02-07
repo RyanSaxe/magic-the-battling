@@ -197,7 +197,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
   const [handRef, handCardDims] = useContainerCardSizes({
     cardCount: self_player.hand.length,
     gap: 16,
-    maxCardWidth: 250,
+    maxCardWidth: 180,
   })
   const [poolRef, poolCardDims] = useContainerCardSizes({
     cardCount: self_player.sideboard.length,
@@ -207,8 +207,40 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
   })
 
   return (
-    <div className="relative flex flex-col h-full gap-2 p-4">
-      <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison} />
+    <div className="flex flex-col h-full gap-2 p-4">
+      <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison}>
+        {self_player.hand.length === 0 ? (
+          <div className="text-center">
+            <div className="text-gray-400 text-sm">Hand is empty</div>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center gap-2 justify-center mb-1">
+              <span className="text-xs text-gray-400 uppercase tracking-wide">Hand</span>
+              <span
+                className={`text-xs px-1.5 py-0.5 rounded ${
+                  self_player.hand.length > maxHandSize ? 'bg-red-900/50 text-red-400' : 'text-gray-500'
+                }`}
+              >
+                {self_player.hand.length}/{maxHandSize}
+              </span>
+            </div>
+            <div ref={handRef} className="flex gap-4 justify-center flex-wrap p-1 w-full">
+              {self_player.hand.map((card, index) => (
+                <Card
+                  key={card.id}
+                  card={card}
+                  onClick={() => handleCardClick(card, index, 'hand')}
+                  selected={selectedCard?.card.id === card.id}
+                  glow={selectedUpgrade ? 'green' : 'none'}
+                  dimensions={handCardDims}
+                  upgraded={upgradedCardIds.has(card.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </PlayerStatsBar>
 
       {/* Sudden Death Banner */}
       {gameState.self_player.in_sudden_death && (
@@ -227,42 +259,6 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
           </div>
         </div>
       )}
-
-      {/* Hand area */}
-      <div className="flex-1 flex flex-col items-center justify-center min-h-0">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs text-gray-400 uppercase tracking-wide">Hand</span>
-          <span
-            className={`text-xs px-1.5 py-0.5 rounded ${
-              self_player.hand.length > maxHandSize ? 'bg-red-900/50 text-red-400' : 'text-gray-500'
-            }`}
-          >
-            {self_player.hand.length}/{maxHandSize}
-          </span>
-        </div>
-        {self_player.hand.length === 0 ? (
-          <div className="text-center">
-            <div className="text-gray-400 text-lg mb-2">Hand is empty</div>
-            <p className="text-gray-500 text-sm">
-              Click a card from your pool to add it to your hand
-            </p>
-          </div>
-        ) : (
-          <div ref={handRef} className="flex gap-4 justify-center flex-wrap p-1 w-full">
-            {self_player.hand.map((card, index) => (
-              <Card
-                key={card.id}
-                card={card}
-                onClick={() => handleCardClick(card, index, 'hand')}
-                selected={selectedCard?.card.id === card.id}
-                glow={selectedUpgrade ? 'green' : 'none'}
-                dimensions={handCardDims}
-                upgraded={upgradedCardIds.has(card.id)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Upgrade application instruction */}
       {selectedUpgrade && (

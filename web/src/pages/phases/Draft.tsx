@@ -32,7 +32,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   const [packRef, packCardDims] = useContainerCardSizes({
     cardCount: currentPack.length,
     gap: 16,
-    maxCardWidth: 250,
+    maxCardWidth: 180,
   })
   const [poolRef, poolCardDims] = useContainerCardSizes({
     cardCount: pool.length,
@@ -73,37 +73,26 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   )
 
   return (
-    <div className="relative flex flex-col h-full gap-2 p-4">
-      <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison} />
-
-      {/* Pack area */}
-      <div className="flex-1 flex flex-col items-center justify-center min-h-0">
+    <div className="flex flex-col h-full gap-2 p-4">
+      <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison}>
         {currentPack.length === 0 ? (
           <div className="text-center">
-            <div className="text-gray-400 text-lg mb-2">No pack available</div>
-            <p className="text-gray-500 text-sm">
-              Wait for the next pack or click "Done Drafting"
-            </p>
+            <div className="text-gray-400 text-sm">No pack available</div>
           </div>
         ) : (
-          <>
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-4">
-              Current Pack ({currentPack.length} cards)
-            </div>
-            <div ref={packRef} className="flex gap-4 justify-center flex-wrap p-1 w-full">
-              {currentPack.map((card, index) => (
-                <Card
-                  key={card.id}
-                  card={card}
-                  onClick={() => handleCardClick(card, index, 'pack', false)}
-                  selected={selectedCard?.card.id === card.id}
-                  dimensions={packCardDims}
-                />
-              ))}
-            </div>
-          </>
+          <div ref={packRef} className="flex gap-4 justify-center flex-wrap p-1 w-full">
+            {currentPack.map((card, index) => (
+              <Card
+                key={card.id}
+                card={card}
+                onClick={() => handleCardClick(card, index, 'pack', false)}
+                selected={selectedCard?.card.id === card.id}
+                dimensions={packCardDims}
+              />
+            ))}
+          </div>
         )}
-      </div>
+      </PlayerStatsBar>
 
       {/* Pool */}
       <div className="p-2 max-h-[35vh] min-h-[120px] overflow-auto shrink-0">
