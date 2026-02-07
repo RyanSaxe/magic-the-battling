@@ -73,7 +73,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   )
 
   return (
-    <div className="relative flex flex-col h-full gap-4 p-4">
+    <div className="relative flex flex-col h-full gap-2 p-4">
       <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison} />
 
       {/* Pack area */}
@@ -106,11 +106,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
       </div>
 
       {/* Pool */}
-      <div className="bg-slate-800/50 rounded-lg p-3 max-h-[35vh] min-h-[120px] overflow-auto shrink-0">
-        <div className="flex justify-between items-center mb-2">
-          <span className="text-xs text-gray-400 uppercase tracking-wide">Your Pool</span>
-          <span className="text-sm text-gray-400">{pool.length} cards</span>
-        </div>
+      <div className="p-2 max-h-[35vh] min-h-[120px] overflow-auto shrink-0">
         {pool.length === 0 ? (
           <div className="text-gray-500 text-sm text-center py-4">
             Swap cards from the pack to build your pool
