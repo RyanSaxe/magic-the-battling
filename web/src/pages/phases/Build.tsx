@@ -248,7 +248,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                 onClick={() => handleCardClick(card, index, 'hand')}
                 selected={selectedCard?.card.id === card.id}
                 glow={selectedUpgrade ? 'green' : 'none'}
-                size={sizes.featured}
+                dimensions={sizes.featured}
                 upgraded={upgradedCardIds.has(card.id)}
               />
             ))}
@@ -377,7 +377,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                   onClick={() => handleCardClick(card, index, 'sideboard')}
                   selected={selectedCard?.card.id === card.id}
                   glow={selectedUpgrade ? 'green' : 'none'}
-                  size={sizes.pool}
+                  dimensions={sizes.pool}
                   upgraded={upgradedCardIds.has(card.id)}
                 />
               ))}

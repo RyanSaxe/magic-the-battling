@@ -9,6 +9,7 @@ interface CardProps {
   onDoubleClick?: () => void
   selected?: boolean
   size?: 'xs' | 'sm' | 'md' | 'lg'
+  dimensions?: { width: number; height: number }
   tapped?: boolean
   faceDown?: boolean
   counters?: Record<string, number>
@@ -40,6 +41,7 @@ export function Card({
   onDoubleClick,
   selected,
   size = 'md',
+  dimensions,
   tapped = false,
   faceDown = false,
   counters,
@@ -60,6 +62,7 @@ export function Card({
     return (
       <CardBack
         size={size}
+        dimensions={dimensions}
         tapped={tapped}
         onClick={onClick}
         className={className}
@@ -71,7 +74,7 @@ export function Card({
   const pngUrl = showFlip && card.flip_png_url ? card.flip_png_url : card.png_url
   const imageUrl = isHovered && pngUrl ? pngUrl : normalUrl
 
-  const dimensions = sizeStyles[size]
+  const dims = dimensions ?? sizeStyles[size]
 
   const baseClasses = [
     'card',
@@ -92,8 +95,8 @@ export function Card({
     <div
       className={baseClasses}
       style={{
-        width: dimensions.width,
-        height: dimensions.height,
+        width: dims.width,
+        height: dims.height,
         boxShadow,
       }}
       onClick={disabled ? undefined : onClick}

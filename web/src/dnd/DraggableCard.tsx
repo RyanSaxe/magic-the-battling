@@ -13,6 +13,7 @@ interface DraggableCardProps {
   onContextMenu?: (e: React.MouseEvent) => void
   selected?: boolean
   size?: 'xs' | 'sm' | 'md' | 'lg'
+  dimensions?: { width: number; height: number }
   tapped?: boolean
   faceDown?: boolean
   counters?: Record<string, number>
@@ -32,6 +33,7 @@ export function DraggableCard({
   onContextMenu,
   selected,
   size = 'md',
+  dimensions,
   tapped,
   faceDown,
   counters,
@@ -73,6 +75,7 @@ export function DraggableCard({
         onDoubleClick={onDoubleClick}
         selected={selected}
         size={size}
+        dimensions={dimensions}
         tapped={tapped}
         faceDown={faceDown}
         counters={counters}

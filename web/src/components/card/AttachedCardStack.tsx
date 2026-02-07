@@ -5,6 +5,7 @@ interface AttachedCardStackProps {
   parentCard: CardType
   attachedCards: CardType[]
   size?: 'xs' | 'sm' | 'md' | 'lg'
+  dimensions?: { width: number; height: number }
   parentTapped?: boolean
   parentFaceDown?: boolean
   parentCounters?: Record<string, number>
@@ -24,6 +25,7 @@ export function AttachedCardStack({
   parentCard,
   attachedCards,
   size = 'md',
+  dimensions,
   parentTapped = false,
   parentFaceDown = false,
   parentCounters,
@@ -63,6 +65,7 @@ export function AttachedCardStack({
             <Card
               card={card}
               size={size}
+              dimensions={dimensions}
               tapped={attachedTappedIds.has(card.id)}
               faceDown={attachedFaceDownIds.has(card.id)}
               counters={attachedCounters[card.id]}
@@ -86,6 +89,7 @@ export function AttachedCardStack({
         <Card
           card={parentCard}
           size={size}
+          dimensions={dimensions}
           tapped={parentTapped}
           faceDown={parentFaceDown}
           counters={parentCounters}

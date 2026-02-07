@@ -196,9 +196,8 @@ export function BattlePhase({
   }
 
   const HAND_ZONE_PADDING = 16
-  const cardHeights: Record<string, number> = { xs: 70, sm: 112, md: 182, lg: 280 }
-  const handMinHeight = cardHeights[sizes.hand] + HAND_ZONE_PADDING
-  const opponentHandMinHeight = cardHeights[sizes.opponentHand] + HAND_ZONE_PADDING
+  const handMinHeight = sizes.hand.height + HAND_ZONE_PADDING
+  const opponentHandMinHeight = sizes.opponentHand.height + HAND_ZONE_PADDING
 
   return (
     <div className="flex flex-col h-full gap-2">
@@ -231,20 +230,20 @@ export function BattlePhase({
             >
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
-                    <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" size={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} />
+                    <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} />
                   ))
                 : Array.from({ length: opponent_hand_count }).map((_, i) => (
-                    <CardBack key={i} size={sizes.opponentHand} />
+                    <CardBack key={i} dimensions={sizes.opponentHand} />
                   ))}
             </DroppableZone>
           ) : (
             <div className="flex justify-center gap-1 flex-wrap">
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
-                    <Card key={card.id} card={card} size={sizes.opponentHand} upgraded={opponentUpgradedCardIds.has(card.id)} />
+                    <Card key={card.id} card={card} dimensions={sizes.opponentHand} upgraded={opponentUpgradedCardIds.has(card.id)} />
                   ))
                 : Array.from({ length: opponent_hand_count }).map((_, i) => (
-                    <CardBack key={i} size={sizes.opponentHand} />
+                    <CardBack key={i} dimensions={sizes.opponentHand} />
                   ))}
             </div>
           )}
@@ -276,7 +275,7 @@ export function BattlePhase({
               isOpponent
               canManipulateOpponent={canManipulateOpponent}
               upgradedCardIds={opponentUpgradedCardIds}
-              cardSize={sizes.battlefield}
+              cardDimensions={sizes.battlefield}
             />
             {opponentSideboardCount > 0 && (
               <button
@@ -302,7 +301,7 @@ export function BattlePhase({
               attachments={attachments}
               separateLands
               upgradedCardIds={upgradedCardIds}
-              cardSize={sizes.battlefield}
+              cardDimensions={sizes.battlefield}
             />
             <button
               onClick={handleUntapAll}
@@ -320,7 +319,7 @@ export function BattlePhase({
             selectedCardId={selectedCard?.card.id}
             onCardClick={(card) => handleCardClick(card, 'hand')}
             upgradedCardIds={upgradedCardIds}
-            cardSize={sizes.hand}
+            cardDimensions={sizes.hand}
           />
           {sideboardCount > 0 && onShowSideboard && (
             <button

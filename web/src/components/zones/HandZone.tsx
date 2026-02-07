@@ -1,4 +1,5 @@
 import type { Card as CardType, ZoneName } from "../../types";
+import type { CardDimensions } from "../../hooks/useViewportCardSizes";
 import { DraggableCard, DroppableZone } from "../../dnd";
 
 interface HandZoneProps {
@@ -9,7 +10,7 @@ interface HandZoneProps {
   draggable?: boolean;
   zone?: ZoneName;
   upgradedCardIds?: Set<string>;
-  cardSize?: "xs" | "sm" | "md" | "lg";
+  cardDimensions?: CardDimensions;
 }
 
 export function HandZone({
@@ -27,26 +28,31 @@ export function HandZone({
   draggable = true,
   zone = "hand",
   upgradedCardIds = new Set(),
-  cardSize = "md",
+  cardDimensions,
 }: HandZoneProps) {
-  const sizeClass = cardSize === 'xs' ? ' hand-xs' : cardSize !== 'md' ? ' hand-compact' : '';
+  const overlap = cardDimensions ? Math.round(cardDimensions.width * 0.3) : 0;
+
   return (
     <DroppableZone
       zone={zone}
       validFromZones={validFromZones}
-      className={`hand-zone w-full${sizeClass}`}
+      className="hand-zone w-full"
     >
-      {cards.map((card) => (
-        <DraggableCard
+      {cards.map((card, index) => (
+        <div
           key={card.id}
-          card={card}
-          zone={zone}
-          size={cardSize}
-          selected={card.id === selectedCardId}
-          onClick={() => onCardClick?.(card)}
-          disabled={!draggable}
-          upgraded={upgradedCardIds.has(card.id)}
-        />
+          style={cardDimensions ? { marginLeft: index === 0 ? 0 : -overlap } : undefined}
+        >
+          <DraggableCard
+            card={card}
+            zone={zone}
+            dimensions={cardDimensions}
+            selected={card.id === selectedCardId}
+            onClick={() => onCardClick?.(card)}
+            disabled={!draggable}
+            upgraded={upgradedCardIds.has(card.id)}
+          />
+        </div>
       ))}
     </DroppableZone>
   );

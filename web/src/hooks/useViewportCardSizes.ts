@@ -1,27 +1,37 @@
 import { useState, useEffect } from 'react'
 
-type CardSize = 'xs' | 'sm' | 'md' | 'lg'
+export interface CardDimensions {
+  width: number
+  height: number
+}
 
 interface ViewportCardSizes {
-  hand: CardSize
-  battlefield: CardSize
-  featured: CardSize
-  pool: CardSize
-  opponentHand: CardSize
+  hand: CardDimensions
+  battlefield: CardDimensions
+  featured: CardDimensions
+  pool: CardDimensions
+  opponentHand: CardDimensions
   isMobile: boolean
 }
 
+function clampDims(vh: number, fraction: number, min: number, max: number): CardDimensions {
+  const height = Math.round(Math.min(max, Math.max(min, vh * fraction)))
+  const width = Math.round(height * 5 / 7)
+  return { width, height }
+}
+
 function computeSizes(width: number, height: number): ViewportCardSizes {
-  if (width < 640) {
-    return { hand: 'xs', battlefield: 'xs', featured: 'sm', pool: 'xs', opponentHand: 'xs', isMobile: true }
+  const isMobile = width < 640
+  const scale = isMobile ? 0.6 : 1
+
+  return {
+    featured: clampDims(height, 0.22 * scale, 70, 250),
+    pool: clampDims(height, 0.11 * scale, 50, 130),
+    hand: clampDims(height, 0.14 * scale, 70, 182),
+    battlefield: clampDims(height, 0.10 * scale, 50, 130),
+    opponentHand: clampDims(height, 0.08 * scale, 50, 112),
+    isMobile,
   }
-  if (height >= 900) {
-    return { hand: 'md', battlefield: 'sm', featured: 'lg', pool: 'md', opponentHand: 'sm', isMobile: false }
-  }
-  if (height >= 750) {
-    return { hand: 'sm', battlefield: 'sm', featured: 'md', pool: 'sm', opponentHand: 'xs', isMobile: false }
-  }
-  return { hand: 'sm', battlefield: 'xs', featured: 'md', pool: 'sm', opponentHand: 'xs', isMobile: false }
 }
 
 export function useViewportCardSizes(): ViewportCardSizes {

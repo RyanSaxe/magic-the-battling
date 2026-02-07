@@ -142,43 +142,6 @@ body {
   background: rgba(34, 84, 61, 0.4);
 }
 
-.hand-zone .card {
-  margin-left: -40px;
-  transition:
-    transform var(--transition-normal),
-    margin var(--transition-fast);
-}
-
-.hand-zone .card:first-child {
-  margin-left: 5px;
-}
-
-.hand-zone.hand-compact .card {
-  margin-left: -25px;
-}
-
-.hand-zone.hand-compact .card:first-child {
-  margin-left: 5px;
-}
-
-.hand-zone.hand-xs .card {
-  margin-left: -15px;
-}
-
-.hand-zone.hand-xs .card:first-child {
-  margin-left: 5px;
-}
-
-/* .hand-zone .card:hover { */
-/*   transform: translateY(-20px); */
-/*   z-index: 10; */
-/*   margin-left: 0; */
-/*   margin-right: 0; */
-/* } */
-/**/
-/* .hand-zone .card:hover + .card { */
-/*   margin-left: 0; */
-/* } */
 
 /* Counter badges */
 .counter-badge {

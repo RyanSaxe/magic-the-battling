@@ -1,4 +1,5 @@
 import type { Card as CardType, ZoneName } from "../../types";
+import type { CardDimensions } from "../../hooks/useViewportCardSizes";
 import { DraggableCard, DroppableZone } from "../../dnd";
 import { AttachedCardStack } from "../card";
 
@@ -22,7 +23,7 @@ interface BattlefieldZoneProps {
   canManipulateOpponent?: boolean;
   label?: string;
   separateLands?: boolean;
-  cardSize?: "xs" | "sm" | "md" | "lg";
+  cardDimensions?: CardDimensions;
   upgradedCardIds?: Set<string>;
 }
 
@@ -42,7 +43,7 @@ export function BattlefieldZone({
   canManipulateOpponent = false,
   label,
   separateLands = false,
-  cardSize = "sm",
+  cardDimensions,
   upgradedCardIds = new Set(),
 }: BattlefieldZoneProps) {
   const allowInteraction = !isOpponent || canManipulateOpponent;
@@ -70,7 +71,7 @@ export function BattlefieldZone({
           key={card.id}
           parentCard={card}
           attachedCards={attachedCards}
-          size={cardSize}
+          dimensions={cardDimensions}
           parentTapped={tappedCardIds.has(card.id)}
           parentFaceDown={faceDownCardIds.has(card.id)}
           parentCounters={counters[card.id]}
@@ -102,7 +103,7 @@ export function BattlefieldZone({
           card={card}
           zone="battlefield"
           zoneOwner={zoneOwner}
-          size={cardSize}
+          dimensions={cardDimensions}
           selected={card.id === selectedCardId}
           tapped={tappedCardIds.has(card.id)}
           faceDown={faceDownCardIds.has(card.id)}
@@ -119,8 +120,8 @@ export function BattlefieldZone({
 
   const zoneOwner = isOpponent ? "opponent" : ("player" as const);
 
-  const minH = { xs: 'min-h-[70px]', sm: 'min-h-[112px]', md: 'min-h-[182px]', lg: 'min-h-[280px]' }[cardSize];
-  const compact = cardSize === 'xs';
+  const minH = cardDimensions ? cardDimensions.height : 112;
+  const compact = cardDimensions ? cardDimensions.height <= 70 : false;
 
   return (
     <DroppableZone
@@ -136,9 +137,13 @@ export function BattlefieldZone({
         </div>
       )}
       <div
-        className={`flex flex-col ${compact ? 'gap-1' : 'gap-2'} ${minH} ${isOpponent ? "flex-col-reverse" : ""}`}
+        className={`flex flex-col ${compact ? 'gap-1' : 'gap-2'} ${isOpponent ? "flex-col-reverse" : ""}`}
+        style={{ minHeight: minH }}
       >
-        <div className={`flex justify-center flex-wrap ${compact ? 'gap-1' : 'gap-3'} ${minH}`}>
+        <div
+          className={`flex justify-center flex-wrap ${compact ? 'gap-1' : 'gap-3'}`}
+          style={{ minHeight: minH }}
+        >
           {permanents.length === 0 && lands.length === 0 ? (
             <div className="text-gray-500 text-sm opacity-50">
               {isOpponent ? "Opponent's battlefield" : "Empty battlefield"}

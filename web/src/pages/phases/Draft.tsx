@@ -86,7 +86,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
                   card={card}
                   onClick={() => handleCardClick(card, index, 'pack', false)}
                   selected={selectedCard?.card.id === card.id}
-                  size={sizes.featured}
+                  dimensions={sizes.featured}
                 />
               ))}
             </div>
@@ -114,7 +114,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
                   card={card}
                   onClick={() => handleCardClick(card, index, 'pool', isInHand)}
                   selected={selectedCard?.card.id === card.id}
-                  size={sizes.pool}
+                  dimensions={sizes.pool}
                   upgraded={upgradedCardIds.has(card.id)}
                 />
               )
