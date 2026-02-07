@@ -1,6 +1,7 @@
 import { Card } from '../../components/card'
 import { THE_VANQUISHER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import type { GameState, Card as CardType } from '../../types'
+import { useViewportCardSizes } from '../../hooks/useViewportCardSizes'
 
 interface RewardPhaseProps {
   gameState: GameState
@@ -16,17 +17,20 @@ function RewardCard({
   imageUrl,
   label,
   sublabel,
+  dimensions,
 }: {
   imageUrl: string
   label: string
   sublabel?: string
+  dimensions: { width: number; height: number }
 }) {
   return (
     <div className="flex flex-col items-center gap-2">
       <img
         src={imageUrl}
         alt={label}
-        className="w-[200px] h-[280px] rounded-lg object-cover shadow-lg"
+        className="rounded-lg object-cover shadow-lg"
+        style={{ width: dimensions.width, height: dimensions.height }}
       />
       <div className="text-center">
         <div className="text-white font-medium">{label}</div>
@@ -37,6 +41,7 @@ function RewardCard({
 }
 
 export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: RewardPhaseProps) {
+  const sizes = useViewportCardSizes()
   const { self_player, available_upgrades } = gameState
   const { last_battle_result } = self_player
   const isStageIncreasing = self_player.is_stage_increasing
@@ -63,6 +68,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
               <RewardCard
                 imageUrl={TREASURE_TOKEN_IMAGE}
                 label={`+${last_battle_result.treasures_gained} Treasure`}
+                dimensions={sizes.featured}
               />
             )}
             {last_battle_result.vanquisher_gained && (
@@ -70,11 +76,12 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
                 imageUrl={THE_VANQUISHER_IMAGE}
                 label="Vanquisher"
                 sublabel="+1 Hand Size"
+                dimensions={sizes.featured}
               />
             )}
             {last_battle_result.card_gained && (
               <div className="flex flex-col items-center gap-2">
-                <Card card={last_battle_result.card_gained} size="lg" />
+                <Card card={last_battle_result.card_gained} dimensions={sizes.featured} />
                 <div className="text-center">
                   <div className="text-white font-medium">New Card</div>
                   <div className="text-gray-400 text-sm">{last_battle_result.card_gained.name}</div>
@@ -102,7 +109,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
               <Card
                 key={upgrade.id}
                 card={upgrade}
-                size="lg"
+                dimensions={sizes.featured}
                 selected={selectedUpgradeId === upgrade.id}
                 onClick={() => handleUpgradeClick(upgrade)}
               />
@@ -116,7 +123,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
             </div>
             <div className="flex flex-wrap gap-1 justify-center max-h-[200px] overflow-auto p-1">
               {[...self_player.hand, ...self_player.sideboard].map((card) => (
-                <Card key={card.id} card={card} size="sm" upgraded={upgradedCardIds.has(card.id)} />
+                <Card key={card.id} card={card} dimensions={sizes.pool} upgraded={upgradedCardIds.has(card.id)} />
               ))}
             </div>
           </div>
