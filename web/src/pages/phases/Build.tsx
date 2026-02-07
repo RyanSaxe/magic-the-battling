@@ -192,9 +192,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
   )
 
   const isCompanion = (card: CardType) => card.oracle_text?.includes('Companion —') ?? false
-  const companionCards = self_player.sideboard.filter(isCompanion)
   const selectedCompanionId = self_player.command_zone[0]?.id ?? null
-  const hasCompanions = companionCards.length > 0
 
   const [handRef, handCardDims] = useContainerCardSizes({
     cardCount: self_player.hand.length,
@@ -281,43 +279,6 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
         </div>
       )}
 
-      {/* Companion selection row */}
-      {hasCompanions && (
-        <div className="bg-amber-900/30 rounded-lg p-2 shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-amber-400 uppercase tracking-wide">⬢ Companion</span>
-              <span className="text-xs text-gray-400">(optional)</span>
-            </div>
-            <div className="flex gap-3 flex-1 justify-center items-center">
-              {companionCards.map((card) => {
-                const isSelected = card.id === selectedCompanionId
-                return (
-                  <div key={card.id} className="flex items-center gap-2">
-                    <Card
-                      card={card}
-                      size="sm"
-                      glow={isSelected ? 'gold' : 'none'}
-                      onClick={() => isSelected ? actions.buildRemoveCompanion() : actions.buildSetCompanion(card.id)}
-                    />
-                    <button
-                      onClick={() => isSelected ? actions.buildRemoveCompanion() : actions.buildSetCompanion(card.id)}
-                      className={`text-xs px-2 py-1 rounded ${
-                        isSelected
-                          ? 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                          : 'bg-amber-600 hover:bg-amber-500 text-white'
-                      }`}
-                    >
-                      {isSelected ? 'Remove' : 'Select'}
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Basic lands */}
       <div className="p-1 shrink-0">
         <div className="flex items-center gap-2 justify-center">
@@ -368,17 +329,41 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
             </div>
           ) : (
             <div ref={poolRef} className="flex flex-wrap gap-2 justify-center p-1">
-              {self_player.sideboard.map((card, index) => (
-                <Card
-                  key={card.id}
-                  card={card}
-                  onClick={() => handleCardClick(card, index, 'sideboard')}
-                  selected={selectedCard?.card.id === card.id}
-                  glow={selectedUpgrade ? 'green' : 'none'}
-                  dimensions={poolCardDims}
-                  upgraded={upgradedCardIds.has(card.id)}
-                />
-              ))}
+              {self_player.sideboard.map((card, index) => {
+                const cardIsCompanion = isCompanion(card)
+                const isActiveCompanion = card.id === selectedCompanionId
+                return (
+                  <div key={card.id} className="relative">
+                    <Card
+                      card={card}
+                      onClick={() => handleCardClick(card, index, 'sideboard')}
+                      selected={selectedCard?.card.id === card.id}
+                      glow={selectedUpgrade ? 'green' : isActiveCompanion ? 'gold' : 'none'}
+                      dimensions={poolCardDims}
+                      upgraded={upgradedCardIds.has(card.id)}
+                    />
+                    {cardIsCompanion && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (isActiveCompanion) {
+                            actions.buildRemoveCompanion()
+                          } else {
+                            actions.buildSetCompanion(card.id)
+                          }
+                        }}
+                        className={`absolute top-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-t-lg ${
+                          isActiveCompanion
+                            ? 'bg-amber-500/90 text-black'
+                            : 'bg-purple-600/80 text-white hover:bg-purple-500/90'
+                        }`}
+                      >
+                        {isActiveCompanion ? 'Companion' : 'Set Companion'}
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
