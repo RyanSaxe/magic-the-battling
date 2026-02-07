@@ -99,7 +99,7 @@ export function GameSummary({
               {useUpgrades && <UpgradeGrid upgrades={frozenPlayer.upgrades} />}
             </div>
           )}
-          <CardGrid cards={frozenPlayer.sideboard} title="Sideboard" companionIds={companionIds} />
+          <CardGrid cards={frozenPlayer.sideboard} title="Sideboard" size="sm" companionIds={companionIds} />
         </div>
       </div>
     </div>
