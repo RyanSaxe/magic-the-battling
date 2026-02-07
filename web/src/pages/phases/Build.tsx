@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { Card } from '../../components/card'
+import { UpgradeStack } from '../../components/sidebar/UpgradeStack'
 import { PlayerStatsBar } from '../../components/PlayerStatsBar'
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
 import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
@@ -187,10 +188,10 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
     setPendingUpgrade(null)
   }, [])
 
+  const appliedUpgrades = self_player.upgrades.filter((u) => u.upgrade_target)
   const unappliedUpgrades = self_player.upgrades.filter((u) => !u.upgrade_target)
-  const upgradedCardIds = new Set(
-    self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
-  )
+  const upgradedCardIds = new Set(appliedUpgrades.map((u) => u.upgrade_target!.id))
+  const allUpgrades = [...appliedUpgrades, ...unappliedUpgrades]
 
   const isCompanion = (card: CardType) => card.oracle_text?.includes('Companion —') ?? false
   const selectedCompanionId = self_player.command_zone[0]?.id ?? null
@@ -200,8 +201,9 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
     gap: 16,
     maxCardWidth: 180,
   })
+  const poolItemCount = allUpgrades.length + self_player.sideboard.length
   const [poolRef, poolCardDims] = useAutoFitCardSizes({
-    cardCount: self_player.sideboard.length,
+    cardCount: poolItemCount,
     gap: 8,
     maxCardWidth: 130,
   })
@@ -315,8 +317,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
         </div>
       </div>
 
-      {/* Pool */}
-      {self_player.sideboard.length === 0 ? (
+      {/* Pool (upgrades + sideboard) */}
+      {poolItemCount === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-gray-500 text-sm text-center">
             All cards are in your hand
@@ -324,6 +326,38 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
         </div>
       ) : (
         <div ref={poolRef} className="flex-1 min-h-0 overflow-hidden flex flex-wrap gap-2 justify-center content-start p-1">
+          {allUpgrades.map((upgrade) => {
+            const isApplied = !!upgrade.upgrade_target
+            return (
+              <div key={upgrade.id} className="relative">
+                {isApplied ? (
+                  <UpgradeStack upgrade={upgrade} dimensions={poolCardDims} />
+                ) : (
+                  <>
+                    <Card
+                      card={upgrade}
+                      dimensions={poolCardDims}
+                      selected={selectedUpgrade?.id === upgrade.id}
+                      onClick={() => handleUpgradeClick(upgrade)}
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleUpgradeClick(upgrade)
+                      }}
+                      className={`absolute top-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-t-lg ${
+                        selectedUpgrade?.id === upgrade.id
+                          ? 'bg-purple-500/90 text-white'
+                          : 'bg-purple-600/80 text-white hover:bg-purple-500/90'
+                      }`}
+                    >
+                      Apply
+                    </button>
+                  </>
+                )}
+              </div>
+            )
+          })}
           {self_player.sideboard.map((card, index) => {
             const cardIsCompanion = isCompanion(card)
             const isActiveCompanion = card.id === selectedCompanionId
@@ -359,26 +393,6 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
               </div>
             )
           })}
-        </div>
-      )}
-
-      {/* Unapplied upgrades */}
-      {gameState.use_upgrades && unappliedUpgrades.length > 0 && (
-        <div className="bg-purple-950/30 rounded-lg p-3 shrink-0">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">
-            Apply Upgrade
-          </div>
-          <div className="flex gap-2 justify-center flex-wrap">
-            {unappliedUpgrades.map((upgrade) => (
-              <Card
-                key={upgrade.id}
-                card={upgrade}
-                size="sm"
-                selected={selectedUpgrade?.id === upgrade.id}
-                onClick={() => handleUpgradeClick(upgrade)}
-              />
-            ))}
-          </div>
         </div>
       )}
 
