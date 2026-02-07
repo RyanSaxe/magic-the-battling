@@ -3,7 +3,7 @@ import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { Card } from '../../components/card'
 import { PlayerStatsBar } from '../../components/PlayerStatsBar'
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
-import { useViewportCardSizes } from '../../hooks/useViewportCardSizes'
+import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
 
 interface UpgradeConfirmationModalProps {
   upgrade: CardType
@@ -103,7 +103,6 @@ interface CardWithIndex {
 }
 
 export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange }: BuildPhaseProps) {
-  const sizes = useViewportCardSizes()
   const { self_player } = gameState
   const maxHandSize = self_player.hand_size
 
@@ -198,6 +197,18 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
   const selectedCompanionId = self_player.command_zone[0]?.id ?? null
   const hasCompanions = companionCards.length > 0
 
+  const [handRef, handCardDims] = useContainerCardSizes({
+    cardCount: self_player.hand.length,
+    gap: 16,
+    maxCardWidth: 250,
+  })
+  const [poolRef, poolCardDims] = useContainerCardSizes({
+    cardCount: self_player.sideboard.length,
+    gap: 8,
+    maxCardWidth: 130,
+    rows: 3,
+  })
+
   return (
     <div className="relative flex flex-col h-full gap-4 p-4">
       <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison} />
@@ -240,7 +251,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
             </p>
           </div>
         ) : (
-          <div className="flex gap-4 justify-center flex-wrap overflow-auto p-1">
+          <div ref={handRef} className="flex gap-4 justify-center flex-wrap p-1 w-full">
             {self_player.hand.map((card, index) => (
               <Card
                 key={card.id}
@@ -248,7 +259,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                 onClick={() => handleCardClick(card, index, 'hand')}
                 selected={selectedCard?.card.id === card.id}
                 glow={selectedUpgrade ? 'green' : 'none'}
-                dimensions={sizes.featured}
+                dimensions={handCardDims}
                 upgraded={upgradedCardIds.has(card.id)}
               />
             ))}
@@ -369,7 +380,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
               All cards are in your hand
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2 justify-center max-w-[1100px] mx-auto p-1">
+            <div ref={poolRef} className="flex flex-wrap gap-2 justify-center p-1">
               {self_player.sideboard.map((card, index) => (
                 <Card
                   key={card.id}
@@ -377,7 +388,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                   onClick={() => handleCardClick(card, index, 'sideboard')}
                   selected={selectedCard?.card.id === card.id}
                   glow={selectedUpgrade ? 'green' : 'none'}
-                  dimensions={sizes.pool}
+                  dimensions={poolCardDims}
                   upgraded={upgradedCardIds.has(card.id)}
                 />
               ))}
