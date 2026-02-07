@@ -46,7 +46,7 @@ function UpgradeConfirmationModal({
             <img
               src={getImageUrl(upgrade)}
               alt={upgrade.name}
-              className="h-96 rounded-lg shadow-2xl"
+              className="max-h-[35vh] w-auto rounded-lg shadow-2xl"
             />
           </div>
           <div className="text-white text-3xl font-bold">→</div>
@@ -55,7 +55,7 @@ function UpgradeConfirmationModal({
             <img
               src={getImageUrl(target)}
               alt={target.name}
-              className="h-96 rounded-lg shadow-2xl"
+              className="max-h-[35vh] w-auto rounded-lg shadow-2xl"
             />
           </div>
         </div>
