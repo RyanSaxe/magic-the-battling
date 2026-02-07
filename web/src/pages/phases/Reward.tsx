@@ -1,6 +1,7 @@
 import { Card } from '../../components/card'
 import { THE_VANQUISHER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import type { GameState, Card as CardType } from '../../types'
+import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
 import { useViewportCardSizes } from '../../hooks/useViewportCardSizes'
 
 interface RewardPhaseProps {
@@ -48,6 +49,19 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
   const upgradedCardIds = new Set(
     self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
   )
+
+  const [upgradeRef, upgradeCardDims] = useContainerCardSizes({
+    cardCount: available_upgrades.length,
+    gap: 24,
+    maxCardWidth: 200,
+  })
+  const poolCards = [...self_player.hand, ...self_player.sideboard]
+  const [poolRef, poolCardDims] = useContainerCardSizes({
+    cardCount: poolCards.length,
+    gap: 4,
+    maxCardWidth: 80,
+    rows: 3,
+  })
 
   const handleUpgradeClick = (upgrade: CardType) => {
     if (selectedUpgradeId === upgrade.id) {
@@ -104,12 +118,12 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
             <h3 className="text-xl font-bold text-amber-400 mb-2">Stage Complete!</h3>
             <p className="text-gray-400">Select an upgrade to claim as your vanquisher reward</p>
           </div>
-          <div className="flex gap-6 justify-center flex-wrap">
+          <div ref={upgradeRef} className="flex gap-6 justify-center flex-wrap">
             {available_upgrades.map((upgrade) => (
               <Card
                 key={upgrade.id}
                 card={upgrade}
-                dimensions={sizes.featured}
+                dimensions={upgradeCardDims}
                 selected={selectedUpgradeId === upgrade.id}
                 onClick={() => handleUpgradeClick(upgrade)}
               />
@@ -121,9 +135,9 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-3 text-center">
               Your Pool ({self_player.hand.length + self_player.sideboard.length} cards)
             </div>
-            <div className="flex flex-wrap gap-1 justify-center max-h-[200px] overflow-auto p-1">
-              {[...self_player.hand, ...self_player.sideboard].map((card) => (
-                <Card key={card.id} card={card} dimensions={sizes.pool} upgraded={upgradedCardIds.has(card.id)} />
+            <div ref={poolRef} className="flex flex-wrap gap-1 justify-center max-h-[200px] overflow-auto p-1">
+              {poolCards.map((card) => (
+                <Card key={card.id} card={card} dimensions={poolCardDims} upgraded={upgradedCardIds.has(card.id)} />
               ))}
             </div>
           </div>
