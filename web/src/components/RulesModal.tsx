@@ -27,7 +27,7 @@ export function RulesModal({ currentPhase, onClose }: RulesModalProps) {
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 rounded-lg shadow-2xl max-w-lg w-full mx-4"
+        className="bg-gray-900 rounded-lg shadow-2xl max-w-lg w-full mx-4 max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex border-b border-gray-700">
@@ -46,7 +46,7 @@ export function RulesModal({ currentPhase, onClose }: RulesModalProps) {
           ))}
         </div>
 
-        <div className="p-6 grid">
+        <div className="p-6 grid overflow-y-auto flex-1">
           {PHASES.map((phase) => {
             const rules = PHASE_RULES[phase]
             const isActive = phase === activeTab
