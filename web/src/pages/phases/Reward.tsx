@@ -71,8 +71,31 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
     }
   }
 
+  const isWinner = last_battle_result?.winner_name === self_player.name
+  const isDraw = last_battle_result?.is_draw
+
   return (
     <div className="flex flex-col h-full gap-6 p-4 overflow-auto">
+      {/* Battle result header */}
+      {last_battle_result && (
+        <div className="flex items-center justify-center gap-4 shrink-0 text-sm">
+          {isDraw ? (
+            <span className="text-yellow-400 font-bold">Draw</span>
+          ) : isWinner ? (
+            <span className="text-green-400 font-bold">Victory!</span>
+          ) : (
+            <span className="text-red-400 font-bold">Defeat</span>
+          )}
+          <span className="text-gray-500">vs {last_battle_result.opponent_name}</span>
+          {last_battle_result.poison_dealt > 0 && (
+            <span className="text-purple-400">Dealt {last_battle_result.poison_dealt} poison</span>
+          )}
+          {last_battle_result.poison_taken > 0 && (
+            <span className="text-red-400">Took {last_battle_result.poison_taken} poison</span>
+          )}
+        </div>
+      )}
+
       {/* Rewards - shown as big cards */}
       {last_battle_result && (
         <div className="flex-1 flex flex-col items-center justify-center">

@@ -15,7 +15,6 @@ import { BattlePhase } from "./phases/Battle";
 import { RewardPhase } from "./phases/Reward";
 import { Sidebar } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
-import { RewardSidebarContent } from "../components/sidebar/RewardSidebarContent";
 import { GameSummary } from "../components/GameSummary";
 import { RulesModal } from "../components/RulesModal";
 import { InfoIcon } from "../components/icons";
@@ -752,14 +751,6 @@ function GameContent() {
   };
 
   const renderHeaderContent = (): ReactNode => {
-    if (currentPhase === "reward" && self_player.last_battle_result) {
-      return (
-        <RewardSidebarContent
-          lastBattleResult={self_player.last_battle_result}
-          playerName={self_player.name}
-        />
-      );
-    }
     return null;
   };
 
