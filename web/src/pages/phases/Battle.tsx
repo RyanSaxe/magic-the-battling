@@ -195,6 +195,11 @@ export function BattlePhase({
     return Object.values(opponentAttachments).some(children => children.includes(cardId))
   }
 
+  const HAND_ZONE_PADDING = 16
+  const cardHeights: Record<string, number> = { xs: 70, sm: 112, md: 182, lg: 280 }
+  const handMinHeight = cardHeights[sizes.hand] + HAND_ZONE_PADDING
+  const opponentHandMinHeight = cardHeights[sizes.opponentHand] + HAND_ZONE_PADDING
+
   return (
     <div className="flex flex-col h-full gap-2">
         {/* Sudden Death Banner */}
@@ -216,7 +221,7 @@ export function BattlePhase({
         )}
 
         {/* Opponent's hand - always visible */}
-        <div className="relative px-2 py-2 shrink-0" style={{ background: 'rgba(34, 84, 61, 0.4)' }}>
+        <div className="relative px-2 py-2 shrink-0" style={{ background: 'rgba(34, 84, 61, 0.4)', minHeight: opponentHandMinHeight }}>
           {canManipulateOpponent ? (
             <DroppableZone
               zone="hand"
@@ -309,7 +314,7 @@ export function BattlePhase({
         </div>
 
         {/* Your hand */}
-        <div className="relative shrink-0">
+        <div className="relative shrink-0" style={{ minHeight: handMinHeight, background: 'rgba(34, 84, 61, 0.4)' }}>
           <HandZone
             cards={your_zones.hand}
             selectedCardId={selectedCard?.card.id}
