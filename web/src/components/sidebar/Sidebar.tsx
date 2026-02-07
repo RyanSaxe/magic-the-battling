@@ -40,7 +40,7 @@ export function Sidebar({
   const companionIds = new Set(displayPlayer.command_zone.map((c) => c.id));
 
   return (
-    <aside className="w-64 bg-black/30 flex flex-col overflow-hidden">
+    <aside className="w-64 h-full bg-black/30 flex flex-col overflow-hidden">
       {phaseContent ? (
         <div className="overflow-y-auto overflow-x-hidden flex-1">{phaseContent}</div>
       ) : (
