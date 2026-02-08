@@ -2,8 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { Card } from '../../components/card'
 import { UpgradeStack } from '../../components/sidebar/UpgradeStack'
-import { PlayerStatsBar } from '../../components/PlayerStatsBar'
-import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
+import { BASIC_LANDS, BASIC_LAND_IMAGES, POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
 
 interface UpgradeConfirmationModalProps {
@@ -213,39 +212,37 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
 
   return (
     <div ref={containerRef} className="flex flex-col h-full gap-2 p-4">
-      <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison}>
-        {self_player.hand.length === 0 ? (
-          <div className="text-center">
-            <div className="text-gray-400 text-sm">Hand is empty</div>
+      {self_player.hand.length === 0 ? (
+        <div className="text-center">
+          <div className="text-gray-400 text-sm">Hand is empty</div>
+        </div>
+      ) : (
+        <div>
+          <div className="flex items-center gap-2 justify-center mb-1">
+            <span className="text-xs text-gray-400 uppercase tracking-wide">Hand</span>
+            <span
+              className={`text-xs px-1.5 py-0.5 rounded ${
+                self_player.hand.length > maxHandSize ? 'bg-red-900/50 text-red-400' : 'text-gray-500'
+              }`}
+            >
+              {self_player.hand.length}/{maxHandSize}
+            </span>
           </div>
-        ) : (
-          <div>
-            <div className="flex items-center gap-2 justify-center mb-1">
-              <span className="text-xs text-gray-400 uppercase tracking-wide">Hand</span>
-              <span
-                className={`text-xs px-1.5 py-0.5 rounded ${
-                  self_player.hand.length > maxHandSize ? 'bg-red-900/50 text-red-400' : 'text-gray-500'
-                }`}
-              >
-                {self_player.hand.length}/{maxHandSize}
-              </span>
-            </div>
-            <div className="flex gap-4 justify-center flex-wrap p-1 w-full">
-              {self_player.hand.map((card, index) => (
-                <Card
-                  key={card.id}
-                  card={card}
-                  onClick={() => handleCardClick(card, index, 'hand')}
-                  selected={selectedCard?.card.id === card.id}
-                  glow={selectedUpgrade ? 'green' : 'none'}
-                  dimensions={handCardDims}
-                  upgraded={upgradedCardIds.has(card.id)}
-                />
-              ))}
-            </div>
+          <div className="flex gap-4 justify-center flex-wrap w-full">
+            {self_player.hand.map((card, index) => (
+              <Card
+                key={card.id}
+                card={card}
+                onClick={() => handleCardClick(card, index, 'hand')}
+                selected={selectedCard?.card.id === card.id}
+                glow={selectedUpgrade ? 'green' : 'none'}
+                dimensions={handCardDims}
+                upgraded={upgradedCardIds.has(card.id)}
+              />
+            ))}
           </div>
-        )}
-      </PlayerStatsBar>
+        </div>
+      )}
 
       {/* Sudden Death Banner */}
       {gameState.self_player.in_sudden_death && (
@@ -280,43 +277,48 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
         </div>
       )}
 
-      {/* Basic lands */}
-      <div className="p-1">
-        <div className="flex items-center gap-2 justify-center">
-          <span className="text-xs text-gray-500">{selectedBasics.length}/3</span>
-          <div className="flex gap-3">
-            {BASIC_LANDS.map(({ name }) => {
-              const count = countBasic(name)
-              return (
-                <div key={name} className="flex items-center gap-1">
-                  <img
-                    src={BASIC_LAND_IMAGES[name]}
-                    alt={name}
-                    className="rounded object-cover shadow-lg"
-                    style={{ width: 60, height: 84 }}
-                    title={name}
-                  />
-                  <div className="flex flex-col gap-0.5">
-                    <button
-                      onClick={() => addBasic(name)}
-                      disabled={selectedBasics.length >= 3}
-                      className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
-                    >
-                      +
-                    </button>
-                    <span className="text-white text-xs w-5 text-center">{count}</span>
-                    <button
-                      onClick={() => removeBasic(name)}
-                      disabled={count === 0}
-                      className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
-                    >
-                      -
-                    </button>
-                  </div>
+      {/* Basic lands + stats */}
+      <div className="flex items-center px-2 py-1">
+        <div className="flex items-center gap-1">
+          <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-7 rounded" />
+          <span className="text-sm font-bold text-purple-400">{self_player.poison}</span>
+        </div>
+        <div className="flex-1 flex gap-3 justify-center">
+          {BASIC_LANDS.map(({ name }) => {
+            const count = countBasic(name)
+            return (
+              <div key={name} className="relative">
+                <img
+                  src={BASIC_LAND_IMAGES[name]}
+                  alt={name}
+                  className="rounded object-cover shadow-lg"
+                  style={{ width: 60, height: 84 }}
+                  title={name}
+                />
+                <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 bg-black/70 rounded-b py-0.5">
+                  <button
+                    onClick={() => addBasic(name)}
+                    disabled={selectedBasics.length >= 3}
+                    className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
+                  >
+                    +
+                  </button>
+                  <span className="text-white text-xs w-4 text-center">{count}</span>
+                  <button
+                    onClick={() => removeBasic(name)}
+                    disabled={count === 0}
+                    className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
+                  >
+                    -
+                  </button>
                 </div>
-              )
-            })}
-          </div>
+              </div>
+            )
+          })}
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-bold text-amber-400">{self_player.treasures}</span>
+          <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-7 rounded" />
         </div>
       </div>
 
@@ -328,7 +330,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2 justify-center content-start p-1">
+        <div className="flex flex-wrap gap-2 justify-center content-start">
           {allUpgrades.map((upgrade) => {
             const isApplied = !!upgrade.upgrade_target
             return (
@@ -348,7 +350,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                         e.stopPropagation()
                         handleUpgradeClick(upgrade)
                       }}
-                      className={`absolute top-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-t-lg ${
+                      className={`absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg ${
                         selectedUpgrade?.id === upgrade.id
                           ? 'bg-purple-500/90 text-white'
                           : 'bg-purple-600/80 text-white hover:bg-purple-500/90'
@@ -384,7 +386,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                         actions.buildSetCompanion(card.id)
                       }
                     }}
-                    className={`absolute top-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-t-lg ${
+                    className={`absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg ${
                       isActiveCompanion
                         ? 'bg-amber-500/90 text-black'
                         : 'bg-purple-600/80 text-white hover:bg-purple-500/90'

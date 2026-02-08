@@ -36,26 +36,23 @@ function bestFit(
     return { width: maxWidth, height: Math.round(maxWidth * CARD_ASPECT_RATIO), rows: 1 }
   }
 
-  let best: ZoneDims = { width: minWidth, height: Math.round(minWidth * CARD_ASPECT_RATIO), rows: 1 }
-
   for (let rows = 1; rows <= count; rows++) {
     const cardsPerRow = Math.ceil(count / rows)
     const hGaps = gap * Math.max(0, cardsPerRow - 1)
-    let cardWidth = (availWidth - hGaps) / cardsPerRow
-    cardWidth = Math.min(maxWidth, Math.max(minWidth, cardWidth))
-    cardWidth = Math.round(cardWidth)
+    const naturalWidth = (availWidth - hGaps) / cardsPerRow
+
+    if (naturalWidth < minWidth) continue
+
+    const cardWidth = Math.floor(Math.min(maxWidth, naturalWidth))
     const cardHeight = Math.round(cardWidth * CARD_ASPECT_RATIO)
-    const vGaps = gap * (rows - 1)
-    const totalHeight = rows * cardHeight + vGaps
+    const totalHeight = rows * cardHeight + gap * (rows - 1)
 
     if (totalHeight <= availHeight) {
-      best = { width: cardWidth, height: cardHeight, rows }
-    } else {
-      break
+      return { width: cardWidth, height: cardHeight, rows }
     }
   }
 
-  return best
+  return { width: minWidth, height: Math.round(minWidth * CARD_ASPECT_RATIO), rows: 1 }
 }
 
 const TOP_FRACTIONS = [0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60]

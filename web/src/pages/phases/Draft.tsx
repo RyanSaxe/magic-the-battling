@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react'
 import { Card } from '../../components/card'
-import { PlayerStatsBar } from '../../components/PlayerStatsBar'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
+import { POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 
 interface DraftPhaseProps {
   gameState: GameState
@@ -72,30 +72,36 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
 
   return (
     <div ref={containerRef} className="flex flex-col h-full gap-2 p-4">
-      <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison}>
-        {currentPack.length === 0 ? (
-          <div className="text-center">
-            <div className="text-gray-400 text-sm">No pack available</div>
-          </div>
-        ) : (
-          <div className="flex gap-4 justify-center flex-wrap p-1 w-full">
-            {currentPack.map((card, index) => (
-              <Card
-                key={card.id}
-                card={card}
-                onClick={() => handleCardClick(card, index, 'pack', false)}
-                selected={selectedCard?.card.id === card.id}
-                dimensions={packCardDims}
-              />
-            ))}
-          </div>
-        )}
-      </PlayerStatsBar>
+      {currentPack.length === 0 ? (
+        <div className="text-center">
+          <div className="text-gray-400 text-sm">No pack available</div>
+        </div>
+      ) : (
+        <div className="flex gap-4 justify-center flex-wrap w-full">
+          {currentPack.map((card, index) => (
+            <Card
+              key={card.id}
+              card={card}
+              onClick={() => handleCardClick(card, index, 'pack', false)}
+              selected={selectedCard?.card.id === card.id}
+              dimensions={packCardDims}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center gap-3 px-2">
+        <div className="flex items-center gap-1">
+          <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-7 rounded" />
+          <span className="text-sm font-bold text-purple-400">{self_player.poison}</span>
+        </div>
         <div className="flex-1 border-t border-gray-600/40" />
         <span className="text-[10px] text-gray-500 uppercase tracking-widest">Your Pool</span>
         <div className="flex-1 border-t border-gray-600/40" />
+        <div className="flex items-center gap-1">
+          <span className="text-sm font-bold text-amber-400">{self_player.treasures}</span>
+          <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-7 rounded" />
+        </div>
       </div>
 
       {/* Pool */}
@@ -106,7 +112,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2 justify-center content-start p-1">
+        <div className="flex flex-wrap gap-2 justify-center content-start">
           {pool.map((card, index) => {
             const isInHand = self_player.hand.some((c) => c.id === card.id)
             return (
