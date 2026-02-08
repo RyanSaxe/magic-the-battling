@@ -756,7 +756,7 @@ function GameContent() {
 
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
-      <div className="game-table h-screen overflow-hidden flex flex-col">
+      <div className="game-table h-dvh overflow-hidden flex flex-col">
         {/* Spectator Banner */}
         {isSpectator && spectatingPlayer && (
           <div className="bg-purple-900/80 text-purple-200 text-center py-2">
