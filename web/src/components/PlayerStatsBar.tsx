@@ -9,7 +9,7 @@ interface PlayerStatsBarProps {
 
 export function PlayerStatsBar({ treasures, poison, children }: PlayerStatsBarProps) {
   return (
-    <div className="relative shrink-0">
+    <div className="relative">
       {children}
       <div className="absolute right-0 top-1/2 -translate-y-1/2 flex flex-col gap-1 z-10">
         <div className="relative">

@@ -2,8 +2,7 @@ import { useState, useCallback } from 'react'
 import { Card } from '../../components/card'
 import { PlayerStatsBar } from '../../components/PlayerStatsBar'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
-import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
-import { useAutoFitCardSizes } from '../../hooks/useAutoFitCardSizes'
+import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
 
 interface DraftPhaseProps {
   gameState: GameState
@@ -30,16 +29,14 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   const currentPack = self_player.current_pack ?? []
   const pool = [...self_player.hand, ...self_player.sideboard]
 
-  const [packRef, packCardDims] = useContainerCardSizes({
-    cardCount: currentPack.length,
-    gap: 16,
-    maxCardWidth: 180,
-  })
-  const poolMaxWidth = Math.min(130, Math.round(packCardDims.width * 0.7))
-  const [poolRef, poolCardDims] = useAutoFitCardSizes({
-    cardCount: pool.length,
-    gap: 8,
-    maxCardWidth: poolMaxWidth,
+  const [containerRef, { top: packCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
+    topCount: currentPack.length,
+    bottomCount: pool.length,
+    topGap: 16,
+    bottomGap: 8,
+    fixedHeight: 30,
+    topMaxWidth: 200,
+    bottomMaxWidth: 130,
   })
   const upgradedCardIds = new Set(
     self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
@@ -74,14 +71,14 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   )
 
   return (
-    <div className="flex flex-col h-full gap-2 p-4">
+    <div ref={containerRef} className="flex flex-col h-full gap-2 p-4">
       <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison}>
         {currentPack.length === 0 ? (
           <div className="text-center">
             <div className="text-gray-400 text-sm">No pack available</div>
           </div>
         ) : (
-          <div ref={packRef} className="flex gap-4 justify-center flex-wrap p-1 w-full">
+          <div className="flex gap-4 justify-center flex-wrap p-1 w-full">
             {currentPack.map((card, index) => (
               <Card
                 key={card.id}
@@ -95,7 +92,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
         )}
       </PlayerStatsBar>
 
-      <div className="flex items-center gap-3 px-2 shrink-0">
+      <div className="flex items-center gap-3 px-2">
         <div className="flex-1 border-t border-gray-600/40" />
         <span className="text-[10px] text-gray-500 uppercase tracking-widest">Your Pool</span>
         <div className="flex-1 border-t border-gray-600/40" />
@@ -103,13 +100,13 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
 
       {/* Pool */}
       {pool.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex items-center justify-center">
           <div className="text-gray-500 text-sm text-center">
             Swap cards from the pack to build your pool
           </div>
         </div>
       ) : (
-        <div ref={poolRef} className="flex-1 min-h-0 overflow-hidden flex flex-wrap gap-2 justify-center content-start p-1">
+        <div className="flex flex-wrap gap-2 justify-center content-start p-1">
           {pool.map((card, index) => {
             const isInHand = self_player.hand.some((c) => c.id === card.id)
             return (
