@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { GameState, Card as CardType, ZoneName, CardStateAction } from '../../types'
 import { DraggableCard, DroppableZone, type ZoneOwner } from '../../dnd'
-import { HandZone, BattlefieldZone } from '../../components/zones'
+import { HandZone, BattlefieldZone, BattlefieldZoneColumn } from '../../components/zones'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
 import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
 
@@ -20,6 +20,7 @@ interface BattlePhaseProps {
     battleUpdateCardState: (actionType: CardStateAction, cardId: string, data?: Record<string, unknown>) => void
     battleChoosePlayDraw: (choice: 'play' | 'draw') => void
   }
+  isMobile?: boolean
   sideboardCount?: number
   onShowSideboard?: () => void
   opponentSideboardCount?: number
@@ -76,6 +77,7 @@ function countTopLevel(cards: CardType[], attachments: Record<string, string[]>,
 export function BattlePhase({
   gameState,
   actions,
+  isMobile = false,
   sideboardCount = 0,
   onShowSideboard,
   opponentSideboardCount = 0,
@@ -110,6 +112,7 @@ export function BattlePhase({
   const BF_PADDING = 20
   const suddenDeathHeight = battle?.is_sudden_death ? 70 : 0
   const fixedHeight = (2 * HAND_PADDING) + (2 * BF_PADDING) + suddenDeathHeight
+  const zoneColumnWidth = isMobile ? 48 : 72
 
   const [containerRef, sizes] = useBattleCardSizes({
     playerHandCount,
@@ -119,6 +122,7 @@ export function BattlePhase({
     opponentLandCount,
     opponentNonlandCount,
     fixedHeight,
+    zoneColumnWidth,
   })
 
   if (!battle) {
@@ -297,61 +301,77 @@ export function BattlePhase({
         </div>
 
         {/* Opponent's battlefield */}
-        <div className="relative shrink-0 battlefield opacity-80 overflow-hidden" style={{ height: bfHeight }}>
-          <BattlefieldZone
-            cards={opponent_zones.battlefield}
-            selectedCardId={selectedCard?.card.id}
-            onCardClick={(card) => handleCardClick(card, 'battlefield')}
-            onCardDoubleClick={canManipulateOpponent ? handleOpponentCardDoubleClick : undefined}
-            onCardContextMenu={canManipulateOpponent ? (e, card) => handleOpponentContextMenu(e, card, 'battlefield') : undefined}
-            tappedCardIds={opponentTappedIds}
-            faceDownCardIds={opponentFaceDownIds}
-            counters={opponentCounters}
-            attachments={opponent_zones.attachments || {}}
-            separateLands
+        <div className="flex shrink-0 battlefield opacity-80 overflow-hidden" style={{ height: bfHeight }}>
+          <div className="relative flex-1 min-w-0">
+            <BattlefieldZone
+              cards={opponent_zones.battlefield}
+              selectedCardId={selectedCard?.card.id}
+              onCardClick={(card) => handleCardClick(card, 'battlefield')}
+              onCardDoubleClick={canManipulateOpponent ? handleOpponentCardDoubleClick : undefined}
+              onCardContextMenu={canManipulateOpponent ? (e, card) => handleOpponentContextMenu(e, card, 'battlefield') : undefined}
+              tappedCardIds={opponentTappedIds}
+              faceDownCardIds={opponentFaceDownIds}
+              counters={opponentCounters}
+              attachments={opponent_zones.attachments || {}}
+              separateLands
+              isOpponent
+              canManipulateOpponent={canManipulateOpponent}
+              upgradedCardIds={opponentUpgradedCardIds}
+              cardDimensions={sizes.opponentNonlands}
+              rowHeight={rowHeight}
+              landCardDimensions={sizes.opponentLands}
+              nonlandCardDimensions={sizes.opponentNonlands}
+            />
+            {opponentSideboardCount > 0 && (
+              <button
+                onClick={handleOpponentUntapAll}
+                className="absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
+              >
+                Untap All
+              </button>
+            )}
+          </div>
+          <BattlefieldZoneColumn
+            zones={opponent_zones}
             isOpponent
             canManipulateOpponent={canManipulateOpponent}
-            upgradedCardIds={opponentUpgradedCardIds}
-            cardDimensions={sizes.opponentNonlands}
             rowHeight={rowHeight}
-            landCardDimensions={sizes.opponentLands}
-            nonlandCardDimensions={sizes.opponentNonlands}
+            columnWidth={zoneColumnWidth}
           />
-          {opponentSideboardCount > 0 && (
-            <button
-              onClick={handleOpponentUntapAll}
-              className="absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
-            >
-              Untap All
-            </button>
-          )}
         </div>
 
         {/* Your battlefield */}
-        <div className="relative shrink-0 overflow-hidden" style={{ height: bfHeight }}>
-          <BattlefieldZone
-            cards={your_zones.battlefield}
-            selectedCardId={selectedCard?.card.id}
-            onCardClick={(card) => handleCardClick(card, 'battlefield')}
-            onCardDoubleClick={handleCardDoubleClick}
-            onCardContextMenu={(e, card) => handleContextMenu(e, card, 'battlefield')}
-            tappedCardIds={tappedCardIds}
-            faceDownCardIds={faceDownCardIds}
-            counters={counters}
-            attachments={attachments}
-            separateLands
-            upgradedCardIds={upgradedCardIds}
-            cardDimensions={sizes.playerNonlands}
+        <div className="flex shrink-0 overflow-hidden" style={{ height: bfHeight }}>
+          <div className="relative flex-1 min-w-0">
+            <BattlefieldZone
+              cards={your_zones.battlefield}
+              selectedCardId={selectedCard?.card.id}
+              onCardClick={(card) => handleCardClick(card, 'battlefield')}
+              onCardDoubleClick={handleCardDoubleClick}
+              onCardContextMenu={(e, card) => handleContextMenu(e, card, 'battlefield')}
+              tappedCardIds={tappedCardIds}
+              faceDownCardIds={faceDownCardIds}
+              counters={counters}
+              attachments={attachments}
+              separateLands
+              upgradedCardIds={upgradedCardIds}
+              cardDimensions={sizes.playerNonlands}
+              rowHeight={rowHeight}
+              landCardDimensions={sizes.playerLands}
+              nonlandCardDimensions={sizes.playerNonlands}
+            />
+            <button
+              onClick={handleUntapAll}
+              className="absolute bottom-2 right-2 text-xs bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded text-white"
+            >
+              Untap All
+            </button>
+          </div>
+          <BattlefieldZoneColumn
+            zones={your_zones}
             rowHeight={rowHeight}
-            landCardDimensions={sizes.playerLands}
-            nonlandCardDimensions={sizes.playerNonlands}
+            columnWidth={zoneColumnWidth}
           />
-          <button
-            onClick={handleUntapAll}
-            className="absolute bottom-2 right-2 text-xs bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded text-white"
-          >
-            Untap All
-          </button>
         </div>
 
         {/* Your hand */}

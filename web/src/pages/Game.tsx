@@ -823,6 +823,7 @@ function GameContent() {
                 <BattlePhase
                   gameState={gameState}
                   actions={actions}
+                  isMobile={sizes.isMobile}
                   sideboardCount={current_battle?.your_zones.sideboard.length ?? 0}
                   onShowSideboard={() => setShowSidebarSideboard(true)}
                   opponentSideboardCount={current_battle?.opponent_full_sideboard?.length ?? 0}
