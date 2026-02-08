@@ -7,6 +7,10 @@ const isLandOrTreasure = (card: CardType) =>
   card.type_line.toLowerCase().includes("land") ||
   card.type_line.toLowerCase().includes("treasure");
 
+const isTreasureToken = (card: CardType) =>
+  card.type_line.toLowerCase().includes("treasure") &&
+  !card.type_line.toLowerCase().includes("land");
+
 interface BattlefieldZoneProps {
   cards: CardType[];
   selectedCardId?: string;
@@ -132,6 +136,12 @@ export function BattlefieldZone({
   const fixedRows = rowHeight != null && rowHeight > 0;
 
   if (fixedRows) {
+    const actualLands = lands.filter((c) => !isTreasureToken(c));
+    const treasures = lands.filter(isTreasureToken);
+    const treasureOverlap = landCardDimensions
+      ? Math.round(landCardDimensions.width * 0.6)
+      : 0;
+
     return (
       <DroppableZone
         zone="battlefield"
@@ -154,7 +164,16 @@ export function BattlefieldZone({
               className="flex items-center justify-center flex-nowrap gap-2 overflow-hidden"
               style={{ height: rowHeight }}
             >
-              {lands.map((c) => renderCard(c, landCardDimensions))}
+              {actualLands.map((c) => renderCard(c, landCardDimensions))}
+              {treasures.length > 0 && (
+                <div className="flex items-center flex-nowrap shrink-0">
+                  {treasures.map((c, i) => (
+                    <div key={c.id} style={i > 0 ? { marginLeft: -treasureOverlap } : undefined}>
+                      {renderCard(c, landCardDimensions)}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
