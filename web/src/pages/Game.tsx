@@ -756,7 +756,7 @@ function GameContent() {
 
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
-      <div className={`game-table h-screen overflow-hidden flex flex-col ${sizes.isMobile && !isSpectator ? 'pb-12' : ''}`}>
+      <div className="game-table h-screen overflow-hidden flex flex-col">
         {/* Spectator Banner */}
         {isSpectator && spectatingPlayer && (
           <div className="bg-purple-900/80 text-purple-200 text-center py-2">
@@ -1008,7 +1008,7 @@ function GameContent() {
           </div>
         )}
         {sizes.isMobile && !isSpectator && (
-          <div className="fixed bottom-0 left-0 right-0 z-30 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
+          <div className="shrink-0 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
             <div className="flex items-center justify-center gap-3">
               {renderActionButtons()}
             </div>
