@@ -157,8 +157,8 @@ export function useDualZoneCardSizes(config: DualZoneConfig): [
     topGap = 16,
     bottomGap = 8,
     fixedHeight = 0,
-    topMaxWidth = 200,
-    bottomMaxWidth = 130,
+    topMaxWidth = 400,
+    bottomMaxWidth = 300,
     minCardWidth = 40,
   } = config
 

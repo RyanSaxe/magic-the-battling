@@ -35,8 +35,8 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
     topGap: 16,
     bottomGap: 8,
     fixedHeight: 30,
-    topMaxWidth: 200,
-    bottomMaxWidth: 130,
+    topMaxWidth: 400,
+    bottomMaxWidth: 300,
   })
   const upgradedCardIds = new Set(
     self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
@@ -92,15 +92,15 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
 
       <div className="flex items-center gap-3 px-2">
         <div className="flex items-center gap-1">
-          <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-7 rounded" />
-          <span className="text-sm font-bold text-purple-400">{self_player.poison}</span>
+          <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-9 rounded" />
+          <span className="text-base font-bold text-purple-400">{self_player.poison}</span>
         </div>
         <div className="flex-1 border-t border-gray-600/40" />
         <span className="text-[10px] text-gray-500 uppercase tracking-widest">Your Pool</span>
         <div className="flex-1 border-t border-gray-600/40" />
         <div className="flex items-center gap-1">
-          <span className="text-sm font-bold text-amber-400">{self_player.treasures}</span>
-          <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-7 rounded" />
+          <span className="text-base font-bold text-amber-400">{self_player.treasures}</span>
+          <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-9 rounded" />
         </div>
       </div>
 

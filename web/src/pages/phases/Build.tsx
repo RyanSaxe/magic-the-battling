@@ -206,8 +206,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
     topGap: 16,
     bottomGap: 8,
     fixedHeight,
-    topMaxWidth: 200,
-    bottomMaxWidth: 130,
+    topMaxWidth: 400,
+    bottomMaxWidth: 300,
   })
 
   return (
@@ -280,8 +280,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
       {/* Basic lands + stats */}
       <div className="flex items-center px-2 py-1">
         <div className="flex items-center gap-1">
-          <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-7 rounded" />
-          <span className="text-sm font-bold text-purple-400">{self_player.poison}</span>
+          <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-9 rounded" />
+          <span className="text-base font-bold text-purple-400">{self_player.poison}</span>
         </div>
         <div className="flex-1 flex gap-3 justify-center">
           {BASIC_LANDS.map(({ name }) => {
@@ -317,8 +317,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
           })}
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-sm font-bold text-amber-400">{self_player.treasures}</span>
-          <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-7 rounded" />
+          <span className="text-base font-bold text-amber-400">{self_player.treasures}</span>
+          <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-9 rounded" />
         </div>
       </div>
 
