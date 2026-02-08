@@ -22,7 +22,7 @@ import { ContextStripProvider, useContextStrip } from "../contexts";
 import { CardPreviewContext } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
 import { PHASE_HINTS, type Phase } from "../constants/rules";
-import { POISON_COUNTER_IMAGE } from "../constants/assets";
+import { POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import type { Card as CardType } from "../types";
 
@@ -922,7 +922,7 @@ function GameContent() {
           <div className="flex-1 flex min-h-0">
             <main className="flex-1 flex flex-col min-h-0">
               {currentPhase === "draft" && (
-                <DraftPhase gameState={gameState} actions={actions} />
+                <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
               )}
               {currentPhase === "build" && (
                 <BuildPhase
@@ -930,6 +930,7 @@ function GameContent() {
                   actions={actions}
                   selectedBasics={selectedBasics}
                   onBasicsChange={setSelectedBasics}
+                  isMobile={sizes.isMobile}
                 />
               )}
               {currentPhase === "reward" && (
@@ -1010,7 +1011,19 @@ function GameContent() {
         {sizes.isMobile && !isSpectator && (
           <div className="shrink-0 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
             <div className="flex items-center justify-center gap-3">
+              {(currentPhase === "draft" || currentPhase === "build") && (
+                <div className="flex items-center gap-1">
+                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-6 rounded-sm" />
+                  <span className="text-sm font-bold text-purple-400">{self_player.poison}</span>
+                </div>
+              )}
               {renderActionButtons()}
+              {(currentPhase === "draft" || currentPhase === "build") && (
+                <div className="flex items-center gap-1">
+                  <span className="text-sm font-bold text-amber-400">{self_player.treasures}</span>
+                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-6 rounded-sm" />
+                </div>
+              )}
             </div>
           </div>
         )}
