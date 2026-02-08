@@ -1013,16 +1013,16 @@ function GameContent() {
           <div className="shrink-0 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
             <div className="flex items-center justify-center gap-3">
               {(currentPhase === "draft" || currentPhase === "build") && (
-                <div className="flex items-center gap-1">
-                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-6 rounded-sm" />
-                  <span className="text-sm font-bold text-purple-400">{self_player.poison}</span>
+                <div className="flex items-center gap-1.5">
+                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-8 rounded-sm" />
+                  <span className="text-base font-bold text-purple-400">{self_player.poison}</span>
                 </div>
               )}
               {renderActionButtons()}
               {(currentPhase === "draft" || currentPhase === "build") && (
-                <div className="flex items-center gap-1">
-                  <span className="text-sm font-bold text-amber-400">{self_player.treasures}</span>
-                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-6 rounded-sm" />
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base font-bold text-amber-400">{self_player.treasures}</span>
+                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-8 rounded-sm" />
                 </div>
               )}
             </div>

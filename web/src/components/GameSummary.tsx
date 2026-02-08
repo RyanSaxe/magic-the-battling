@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { SelfPlayerView, PlayerView, Card as CardType } from '../types'
 import { Card } from './card'
 import { UpgradeStack } from './sidebar/UpgradeStack'
+import { useContainerCardSizes } from '../hooks/useContainerCardSizes'
 
 interface GameSummaryProps {
   player: SelfPlayerView
@@ -15,15 +16,22 @@ function getOrdinal(n: number): string {
   return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0])
 }
 
-function CardGrid({ cards, title, size = 'md', companionIds }: { cards: CardType[]; title: string; size?: 'sm' | 'md' | 'lg'; companionIds?: Set<string> }) {
+function CardGrid({ cards, title, maxCardWidth = 130, rows = 1, gap = 8, companionIds }: { cards: CardType[]; title: string; maxCardWidth?: number; rows?: number; gap?: number; companionIds?: Set<string> }) {
+  const [ref, dims] = useContainerCardSizes({
+    cardCount: cards.length,
+    gap,
+    maxCardWidth,
+    rows,
+  })
+
   if (cards.length === 0) return null
 
   return (
     <div className="bg-black/20 rounded-lg p-4">
       <h3 className="text-gray-400 text-sm mb-3">{title}</h3>
-      <div className="flex flex-wrap gap-2 justify-center">
+      <div ref={ref} className="flex flex-wrap gap-2 justify-center">
         {cards.map((card) => (
-          <Card key={card.id} card={card} size={size} isCompanion={companionIds?.has(card.id)} />
+          <Card key={card.id} card={card} dimensions={dims} isCompanion={companionIds?.has(card.id)} />
         ))}
       </div>
     </div>
@@ -32,14 +40,20 @@ function CardGrid({ cards, title, size = 'md', companionIds }: { cards: CardType
 
 function UpgradeGrid({ upgrades }: { upgrades: CardType[] }) {
   const appliedUpgrades = upgrades.filter((u) => u.upgrade_target !== null)
+  const [ref, dims] = useContainerCardSizes({
+    cardCount: appliedUpgrades.length,
+    gap: 12,
+    maxCardWidth: 120,
+  })
+
   if (appliedUpgrades.length === 0) return null
 
   return (
     <div className="bg-black/20 rounded-lg p-4">
       <h3 className="text-gray-400 text-sm mb-3">Upgrades</h3>
-      <div className="flex flex-wrap gap-3 justify-center">
+      <div ref={ref} className="flex flex-wrap gap-3 justify-center">
         {appliedUpgrades.map((upgrade) => (
-          <UpgradeStack key={upgrade.id} upgrade={upgrade} size="md" />
+          <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={dims} />
         ))}
       </div>
     </div>
@@ -83,7 +97,7 @@ export function GameSummary({
   const companionIds = new Set(frozenPlayer.command_zone.map((c) => c.id))
 
   return (
-    <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
+    <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
       <div className="text-center max-w-5xl w-full">
         <h2 className={`text-4xl font-bold mb-2 ${placementColor}`}>
           {placementText} Place
@@ -99,7 +113,7 @@ export function GameSummary({
               {useUpgrades && <UpgradeGrid upgrades={frozenPlayer.upgrades} />}
             </div>
           )}
-          <CardGrid cards={frozenPlayer.sideboard} title="Sideboard" size="sm" companionIds={companionIds} />
+          <CardGrid cards={frozenPlayer.sideboard} title="Sideboard" maxCardWidth={80} rows={3} companionIds={companionIds} />
         </div>
       </div>
     </div>

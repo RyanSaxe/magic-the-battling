@@ -2,7 +2,6 @@ import { Card } from '../../components/card'
 import { THE_VANQUISHER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import type { GameState, Card as CardType } from '../../types'
 import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
-import { useViewportCardSizes } from '../../hooks/useViewportCardSizes'
 
 interface RewardPhaseProps {
   gameState: GameState
@@ -14,24 +13,46 @@ interface RewardPhaseProps {
   onUpgradeSelect: (upgradeId: string | null) => void
 }
 
+const REWARD_DIMS = { width: 143, height: 200 }
+const REWARD_COMPACT_DIMS = { width: 50, height: 70 }
+
 function RewardCard({
   imageUrl,
   label,
   sublabel,
-  dimensions,
+  compact,
 }: {
   imageUrl: string
   label: string
   sublabel?: string
-  dimensions: { width: number; height: number }
+  compact?: boolean
 }) {
+  const dims = compact ? REWARD_COMPACT_DIMS : REWARD_DIMS
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2">
+        <img
+          src={imageUrl}
+          alt={label}
+          className="rounded object-cover shadow-lg shrink-0"
+          style={{ width: dims.width, height: dims.height }}
+        />
+        <div>
+          <div className="text-white text-sm font-medium">{label}</div>
+          {sublabel && <div className="text-gray-400 text-xs">{sublabel}</div>}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col items-center gap-2">
       <img
         src={imageUrl}
         alt={label}
         className="rounded-lg object-cover shadow-lg"
-        style={{ width: dimensions.width, height: dimensions.height }}
+        style={{ width: dims.width, height: dims.height }}
       />
       <div className="text-center">
         <div className="text-white font-medium">{label}</div>
@@ -42,10 +63,10 @@ function RewardCard({
 }
 
 export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: RewardPhaseProps) {
-  const sizes = useViewportCardSizes()
   const { self_player, available_upgrades } = gameState
   const { last_battle_result } = self_player
   const isStageIncreasing = self_player.is_stage_increasing
+  const hasUpgradeSection = gameState.use_upgrades && isStageIncreasing && available_upgrades.length > 0
   const upgradedCardIds = new Set(
     self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
   )
@@ -75,7 +96,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
   const isDraw = last_battle_result?.is_draw
 
   return (
-    <div className="flex flex-col h-full gap-6 p-4 overflow-auto">
+    <div className="flex flex-col h-full gap-4 p-4 overflow-hidden">
       {/* Battle result header */}
       {last_battle_result && (
         <div className="flex items-center justify-center gap-4 shrink-0 text-sm">
@@ -96,16 +117,18 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
         </div>
       )}
 
-      {/* Rewards - shown as big cards */}
+      {/* Rewards */}
       {last_battle_result && (
-        <div className="flex-1 flex flex-col items-center justify-center">
-          <div className="text-xs text-gray-400 uppercase tracking-wide mb-6">Your Rewards</div>
-          <div className="flex gap-8 justify-center flex-wrap">
+        <div className={hasUpgradeSection ? 'shrink-0' : 'flex-1 flex flex-col items-center justify-center'}>
+          {!hasUpgradeSection && (
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-6">Your Rewards</div>
+          )}
+          <div className={`flex justify-center flex-wrap ${hasUpgradeSection ? 'gap-6' : 'gap-8'}`}>
             {last_battle_result.treasures_gained > 0 && (
               <RewardCard
                 imageUrl={TREASURE_TOKEN_IMAGE}
                 label={`+${last_battle_result.treasures_gained} Treasure`}
-                dimensions={sizes.featured}
+                compact={hasUpgradeSection}
               />
             )}
             {last_battle_result.vanquisher_gained && (
@@ -113,17 +136,25 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
                 imageUrl={THE_VANQUISHER_IMAGE}
                 label="Vanquisher"
                 sublabel="+1 Hand Size"
-                dimensions={sizes.featured}
+                compact={hasUpgradeSection}
               />
             )}
             {last_battle_result.card_gained && (
-              <div className="flex flex-col items-center gap-2">
-                <Card card={last_battle_result.card_gained} dimensions={sizes.featured} />
-                <div className="text-center">
-                  <div className="text-white font-medium">New Card</div>
-                  <div className="text-gray-400 text-sm">{last_battle_result.card_gained.name}</div>
+              hasUpgradeSection ? (
+                <RewardCard
+                  imageUrl={(last_battle_result.card_gained.png_url ?? last_battle_result.card_gained.image_url)!}
+                  label={`New: ${last_battle_result.card_gained.name}`}
+                  compact
+                />
+              ) : (
+                <div className="flex flex-col items-center gap-2">
+                  <Card card={last_battle_result.card_gained} dimensions={REWARD_DIMS} />
+                  <div className="text-center">
+                    <div className="text-white font-medium">New Card</div>
+                    <div className="text-gray-400 text-sm">{last_battle_result.card_gained.name}</div>
+                  </div>
                 </div>
-              </div>
+              )
             )}
             {!last_battle_result.treasures_gained &&
               !last_battle_result.vanquisher_gained &&
@@ -135,13 +166,12 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
       )}
 
       {/* Stage upgrade selection */}
-      {gameState.use_upgrades && isStageIncreasing && available_upgrades.length > 0 && (
-        <div className="bg-amber-950/30 rounded-lg p-6 border-2 border-amber-500">
-          <div className="text-center mb-6">
-            <h3 className="text-xl font-bold text-amber-400 mb-2">Stage Complete!</h3>
-            <p className="text-gray-400">Select an upgrade to claim as your vanquisher reward</p>
+      {hasUpgradeSection && (
+        <div className="flex-1 min-h-0 flex flex-col bg-amber-950/30 rounded-lg p-4 border-2 border-amber-500">
+          <div className="text-center mb-3 shrink-0">
+            <h3 className="text-lg font-bold text-amber-400">Stage Complete! Select an upgrade</h3>
           </div>
-          <div ref={upgradeRef} className="flex gap-6 justify-center flex-wrap">
+          <div ref={upgradeRef} className="flex gap-6 justify-center flex-wrap shrink-0">
             {available_upgrades.map((upgrade) => (
               <Card
                 key={upgrade.id}
@@ -154,11 +184,11 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
           </div>
 
           {/* Pool reference panel */}
-          <div className="mt-6 pt-4 border-t border-amber-500/30">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-3 text-center">
+          <div className="mt-3 pt-3 border-t border-amber-500/30 flex-1 min-h-0 flex flex-col">
+            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center shrink-0">
               Your Pool ({self_player.hand.length + self_player.sideboard.length} cards)
             </div>
-            <div ref={poolRef} className="flex flex-wrap gap-1 justify-center max-h-[200px] overflow-auto p-1">
+            <div ref={poolRef} className="flex flex-wrap gap-1 justify-center overflow-auto flex-1 min-h-0 p-1">
               {poolCards.map((card) => (
                 <Card key={card.id} card={card} dimensions={poolCardDims} upgraded={upgradedCardIds.has(card.id)} />
               ))}

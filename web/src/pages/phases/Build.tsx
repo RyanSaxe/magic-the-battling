@@ -286,7 +286,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
             <span className="text-xl font-bold text-purple-400">{self_player.poison}</span>
           </div>
         )}
-        <div className="flex-1 flex gap-3 justify-center">
+        <div className={`flex-1 flex ${isMobile ? 'gap-1' : 'gap-3'} justify-center`}>
           {BASIC_LANDS.map(({ name }) => {
             const count = countBasic(name)
             return (
@@ -295,7 +295,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                   src={BASIC_LAND_IMAGES[name]}
                   alt={name}
                   className="rounded object-cover shadow-lg"
-                  style={{ width: 60, height: 84 }}
+                  style={{ width: isMobile ? 44 : 60, height: isMobile ? 62 : 84 }}
                   title={name}
                 />
                 <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 bg-black/70 rounded-b py-0.5">
