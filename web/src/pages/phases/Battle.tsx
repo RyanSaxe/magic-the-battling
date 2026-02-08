@@ -3,7 +3,7 @@ import type { GameState, Card as CardType, ZoneName, CardStateAction } from '../
 import { DraggableCard, DroppableZone, type ZoneOwner } from '../../dnd'
 import { HandZone, BattlefieldZone } from '../../components/zones'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
-import { useViewportCardSizes } from '../../hooks/useViewportCardSizes'
+import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
 
 interface ContextMenuState {
   card: CardType
@@ -64,6 +64,15 @@ function WaitingForChoiceScreen({ coinFlipWinner }: { coinFlipWinner: string }) 
   )
 }
 
+const isLandOrTreasure = (card: CardType) =>
+  card.type_line.toLowerCase().includes("land") ||
+  card.type_line.toLowerCase().includes("treasure")
+
+function countTopLevel(cards: CardType[], attachments: Record<string, string[]>, predicate: (c: CardType) => boolean): number {
+  const attachedIds = new Set(Object.values(attachments).flat())
+  return cards.filter((c) => !attachedIds.has(c.id) && predicate(c)).length
+}
+
 export function BattlePhase({
   gameState,
   actions,
@@ -72,7 +81,6 @@ export function BattlePhase({
   opponentSideboardCount = 0,
   onShowOpponentSideboard,
 }: BattlePhaseProps) {
-  const sizes = useViewportCardSizes()
   const [selectedCard, setSelectedCard] = useState<{
     card: CardType
     zone: ZoneName
@@ -82,7 +90,38 @@ export function BattlePhase({
   const { current_battle } = gameState
   const playerName = gameState.self_player.name
 
-  if (!current_battle) {
+  const battle = current_battle
+  const yourZones = battle?.your_zones
+  const oppZones = battle?.opponent_zones
+
+  const playerHandCount = yourZones?.hand.length ?? 0
+  const opponentHandCount = battle?.opponent_hand_count ?? 0
+  const playerAttachments = yourZones?.attachments ?? {}
+  const opponentAttachments = oppZones?.attachments ?? {}
+  const playerBf = yourZones?.battlefield ?? []
+  const opponentBf = oppZones?.battlefield ?? []
+
+  const playerLandCount = countTopLevel(playerBf, playerAttachments, isLandOrTreasure)
+  const playerNonlandCount = countTopLevel(playerBf, playerAttachments, (c) => !isLandOrTreasure(c))
+  const opponentLandCount = countTopLevel(opponentBf, opponentAttachments, isLandOrTreasure)
+  const opponentNonlandCount = countTopLevel(opponentBf, opponentAttachments, (c) => !isLandOrTreasure(c))
+
+  const HAND_PADDING = 16
+  const BF_PADDING = 20
+  const suddenDeathHeight = battle?.is_sudden_death ? 70 : 0
+  const fixedHeight = (2 * HAND_PADDING) + (2 * BF_PADDING) + suddenDeathHeight
+
+  const [containerRef, sizes] = useBattleCardSizes({
+    playerHandCount,
+    opponentHandCount,
+    playerLandCount,
+    playerNonlandCount,
+    opponentLandCount,
+    opponentNonlandCount,
+    fixedHeight,
+  })
+
+  if (!battle) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
@@ -93,18 +132,18 @@ export function BattlePhase({
     )
   }
 
-  const needsChoice = current_battle.on_the_play_name === null &&
-                      current_battle.coin_flip_name === playerName
+  const needsChoice = battle.on_the_play_name === null &&
+                      battle.coin_flip_name === playerName
 
   if (needsChoice) {
     return <PlayDrawModal onChoose={actions.battleChoosePlayDraw} />
   }
 
-  if (current_battle.on_the_play_name === null) {
-    return <WaitingForChoiceScreen coinFlipWinner={current_battle.coin_flip_name} />
+  if (battle.on_the_play_name === null) {
+    return <WaitingForChoiceScreen coinFlipWinner={battle.coin_flip_name} />
   }
 
-  const { your_zones, opponent_zones, opponent_hand_count, opponent_hand_revealed } = current_battle
+  const { your_zones, opponent_zones, opponent_hand_count: oppHandCount, opponent_hand_revealed } = battle
 
   const canManipulateOpponent = true
 
@@ -191,19 +230,19 @@ export function BattlePhase({
   }
 
   const isOpponentCardAttached = (cardId: string): boolean => {
-    const opponentAttachments = opponent_zones.attachments || {}
-    return Object.values(opponentAttachments).some(children => children.includes(cardId))
+    const opAttachments = opponent_zones.attachments || {}
+    return Object.values(opAttachments).some(children => children.includes(cardId))
   }
 
-  const HAND_ZONE_PADDING = 16
-  const handMinHeight = sizes.hand.height + HAND_ZONE_PADDING
-  const opponentHandMinHeight = sizes.opponentHand.height + HAND_ZONE_PADDING
+  const { rowHeight } = sizes
+  const handHeight = rowHeight + HAND_PADDING
+  const bfHeight = 2 * rowHeight + BF_PADDING
 
   return (
-    <div className="flex flex-col h-full gap-2">
+    <div ref={containerRef} className="flex flex-col h-full">
         {/* Sudden Death Banner */}
-        {current_battle.is_sudden_death && (
-          <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center">
+        {battle.is_sudden_death && (
+          <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center shrink-0">
             <div className="text-red-100 font-bold text-lg tracking-wider uppercase animate-pulse flex items-center justify-center gap-2">
               Sudden Death
               <span className="relative group cursor-help">
@@ -219,30 +258,30 @@ export function BattlePhase({
           </div>
         )}
 
-        {/* Opponent's hand - always visible */}
-        <div className="relative px-2 py-2 shrink-0" style={{ background: 'rgba(34, 84, 61, 0.4)', minHeight: opponentHandMinHeight }}>
+        {/* Opponent's hand */}
+        <div className="relative px-2 shrink-0 overflow-hidden" style={{ height: handHeight, background: 'rgba(34, 84, 61, 0.4)' }}>
           {canManipulateOpponent ? (
             <DroppableZone
               zone="hand"
               zoneOwner="opponent"
               validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
-              className="flex justify-center gap-1 flex-wrap w-full"
+              className="flex items-center justify-center gap-1 flex-nowrap w-full h-full"
             >
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
                     <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} />
                   ))
-                : Array.from({ length: opponent_hand_count }).map((_, i) => (
+                : Array.from({ length: oppHandCount }).map((_, i) => (
                     <CardBack key={i} dimensions={sizes.opponentHand} />
                   ))}
             </DroppableZone>
           ) : (
-            <div className="flex justify-center gap-1 flex-wrap">
+            <div className="flex items-center justify-center gap-1 flex-nowrap h-full">
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
                     <Card key={card.id} card={card} dimensions={sizes.opponentHand} upgraded={opponentUpgradedCardIds.has(card.id)} />
                   ))
-                : Array.from({ length: opponent_hand_count }).map((_, i) => (
+                : Array.from({ length: oppHandCount }).map((_, i) => (
                     <CardBack key={i} dimensions={sizes.opponentHand} />
                   ))}
             </div>
@@ -257,69 +296,72 @@ export function BattlePhase({
           )}
         </div>
 
-        {/* Battlefields */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Opponent's battlefield */}
-          <div className="relative flex-1 battlefield opacity-80 min-h-0 overflow-hidden">
-            <BattlefieldZone
-              cards={opponent_zones.battlefield}
-              selectedCardId={selectedCard?.card.id}
-              onCardClick={(card) => handleCardClick(card, 'battlefield')}
-              onCardDoubleClick={canManipulateOpponent ? handleOpponentCardDoubleClick : undefined}
-              onCardContextMenu={canManipulateOpponent ? (e, card) => handleOpponentContextMenu(e, card, 'battlefield') : undefined}
-              tappedCardIds={opponentTappedIds}
-              faceDownCardIds={opponentFaceDownIds}
-              counters={opponentCounters}
-              attachments={opponent_zones.attachments || {}}
-              separateLands
-              isOpponent
-              canManipulateOpponent={canManipulateOpponent}
-              upgradedCardIds={opponentUpgradedCardIds}
-              cardDimensions={sizes.battlefield}
-            />
-            {opponentSideboardCount > 0 && (
-              <button
-                onClick={handleOpponentUntapAll}
-                className="absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
-              >
-                Untap All
-              </button>
-            )}
-          </div>
-
-          {/* Your battlefield */}
-          <div className="relative flex-1 min-h-0 overflow-hidden">
-            <BattlefieldZone
-              cards={your_zones.battlefield}
-              selectedCardId={selectedCard?.card.id}
-              onCardClick={(card) => handleCardClick(card, 'battlefield')}
-              onCardDoubleClick={handleCardDoubleClick}
-              onCardContextMenu={(e, card) => handleContextMenu(e, card, 'battlefield')}
-              tappedCardIds={tappedCardIds}
-              faceDownCardIds={faceDownCardIds}
-              counters={counters}
-              attachments={attachments}
-              separateLands
-              upgradedCardIds={upgradedCardIds}
-              cardDimensions={sizes.battlefield}
-            />
+        {/* Opponent's battlefield */}
+        <div className="relative shrink-0 battlefield opacity-80 overflow-hidden" style={{ height: bfHeight }}>
+          <BattlefieldZone
+            cards={opponent_zones.battlefield}
+            selectedCardId={selectedCard?.card.id}
+            onCardClick={(card) => handleCardClick(card, 'battlefield')}
+            onCardDoubleClick={canManipulateOpponent ? handleOpponentCardDoubleClick : undefined}
+            onCardContextMenu={canManipulateOpponent ? (e, card) => handleOpponentContextMenu(e, card, 'battlefield') : undefined}
+            tappedCardIds={opponentTappedIds}
+            faceDownCardIds={opponentFaceDownIds}
+            counters={opponentCounters}
+            attachments={opponent_zones.attachments || {}}
+            separateLands
+            isOpponent
+            canManipulateOpponent={canManipulateOpponent}
+            upgradedCardIds={opponentUpgradedCardIds}
+            cardDimensions={sizes.opponentNonlands}
+            rowHeight={rowHeight}
+            landCardDimensions={sizes.opponentLands}
+            nonlandCardDimensions={sizes.opponentNonlands}
+          />
+          {opponentSideboardCount > 0 && (
             <button
-              onClick={handleUntapAll}
-              className="absolute bottom-2 right-2 text-xs bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded text-white"
+              onClick={handleOpponentUntapAll}
+              className="absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
             >
               Untap All
             </button>
-          </div>
+          )}
+        </div>
+
+        {/* Your battlefield */}
+        <div className="relative shrink-0 overflow-hidden" style={{ height: bfHeight }}>
+          <BattlefieldZone
+            cards={your_zones.battlefield}
+            selectedCardId={selectedCard?.card.id}
+            onCardClick={(card) => handleCardClick(card, 'battlefield')}
+            onCardDoubleClick={handleCardDoubleClick}
+            onCardContextMenu={(e, card) => handleContextMenu(e, card, 'battlefield')}
+            tappedCardIds={tappedCardIds}
+            faceDownCardIds={faceDownCardIds}
+            counters={counters}
+            attachments={attachments}
+            separateLands
+            upgradedCardIds={upgradedCardIds}
+            cardDimensions={sizes.playerNonlands}
+            rowHeight={rowHeight}
+            landCardDimensions={sizes.playerLands}
+            nonlandCardDimensions={sizes.playerNonlands}
+          />
+          <button
+            onClick={handleUntapAll}
+            className="absolute bottom-2 right-2 text-xs bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded text-white"
+          >
+            Untap All
+          </button>
         </div>
 
         {/* Your hand */}
-        <div className="relative shrink-0" style={{ minHeight: handMinHeight, background: 'rgba(34, 84, 61, 0.4)' }}>
+        <div className="relative shrink-0 overflow-hidden" style={{ height: handHeight, background: 'rgba(34, 84, 61, 0.4)' }}>
           <HandZone
             cards={your_zones.hand}
             selectedCardId={selectedCard?.card.id}
             onCardClick={(card) => handleCardClick(card, 'hand')}
             upgradedCardIds={upgradedCardIds}
-            cardDimensions={sizes.hand}
+            cardDimensions={sizes.playerHand}
           />
           {sideboardCount > 0 && onShowSideboard && (
             <button

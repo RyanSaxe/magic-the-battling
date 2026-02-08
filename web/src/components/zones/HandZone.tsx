@@ -34,7 +34,7 @@ export function HandZone({
     <DroppableZone
       zone={zone}
       validFromZones={validFromZones}
-      className="hand-zone w-full"
+      className="hand-zone w-full h-full flex-nowrap"
     >
       {cards.map((card) => (
         <DraggableCard
