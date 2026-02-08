@@ -4,8 +4,7 @@ import { Card } from '../../components/card'
 import { UpgradeStack } from '../../components/sidebar/UpgradeStack'
 import { PlayerStatsBar } from '../../components/PlayerStatsBar'
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
-import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
-import { useAutoFitCardSizes } from '../../hooks/useAutoFitCardSizes'
+import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
 
 interface UpgradeConfirmationModalProps {
   upgrade: CardType
@@ -196,21 +195,24 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
   const isCompanion = (card: CardType) => card.oracle_text?.includes('Companion —') ?? false
   const selectedCompanionId = self_player.command_zone[0]?.id ?? null
 
-  const [handRef, handCardDims] = useContainerCardSizes({
-    cardCount: self_player.hand.length,
-    gap: 16,
-    maxCardWidth: 180,
-  })
   const poolItemCount = allUpgrades.length + self_player.sideboard.length
-  const poolMaxWidth = Math.min(130, Math.round(handCardDims.width * 0.7))
-  const [poolRef, poolCardDims] = useAutoFitCardSizes({
-    cardCount: poolItemCount,
-    gap: 8,
-    maxCardWidth: poolMaxWidth,
+
+  let fixedHeight = 130
+  if (self_player.in_sudden_death) fixedHeight += 70
+  if (selectedUpgrade) fixedHeight += 50
+
+  const [containerRef, { top: handCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
+    topCount: self_player.hand.length,
+    bottomCount: poolItemCount,
+    topGap: 16,
+    bottomGap: 8,
+    fixedHeight,
+    topMaxWidth: 200,
+    bottomMaxWidth: 130,
   })
 
   return (
-    <div className="flex flex-col h-full gap-2 p-4">
+    <div ref={containerRef} className="flex flex-col h-full gap-2 p-4">
       <PlayerStatsBar treasures={self_player.treasures} poison={self_player.poison}>
         {self_player.hand.length === 0 ? (
           <div className="text-center">
@@ -228,7 +230,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                 {self_player.hand.length}/{maxHandSize}
               </span>
             </div>
-            <div ref={handRef} className="flex gap-4 justify-center flex-wrap p-1 w-full">
+            <div className="flex gap-4 justify-center flex-wrap p-1 w-full">
               {self_player.hand.map((card, index) => (
                 <Card
                   key={card.id}
@@ -279,7 +281,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
       )}
 
       {/* Basic lands */}
-      <div className="p-1 shrink-0">
+      <div className="p-1">
         <div className="flex items-center gap-2 justify-center">
           <span className="text-xs text-gray-500">{selectedBasics.length}/3</span>
           <div className="flex gap-3">
@@ -320,13 +322,13 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
 
       {/* Pool (upgrades + sideboard) */}
       {poolItemCount === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex items-center justify-center">
           <div className="text-gray-500 text-sm text-center">
             All cards are in your hand
           </div>
         </div>
       ) : (
-        <div ref={poolRef} className="flex-1 min-h-0 overflow-hidden flex flex-wrap gap-2 justify-center content-start p-1">
+        <div className="flex flex-wrap gap-2 justify-center content-start p-1">
           {allUpgrades.map((upgrade) => {
             const isApplied = !!upgrade.upgrade_target
             return (
