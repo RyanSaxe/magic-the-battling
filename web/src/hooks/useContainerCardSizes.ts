@@ -1,0 +1,87 @@
+import { useState, useCallback, useRef, useEffect } from 'react'
+
+const CARD_ASPECT_RATIO = 7 / 5
+
+interface UseContainerCardSizesOptions {
+  cardCount: number
+  gap?: number
+  padding?: number
+  minCardWidth?: number
+  maxCardWidth?: number
+  rows?: number
+}
+
+interface ContainerCardDimensions {
+  width: number
+  height: number
+}
+
+export function useContainerCardSizes({
+  cardCount,
+  gap = 16,
+  padding = 0,
+  minCardWidth = 40,
+  maxCardWidth = 300,
+  rows = 1,
+}: UseContainerCardSizesOptions): [React.RefCallback<HTMLElement>, ContainerCardDimensions] {
+  const [dims, setDims] = useState<ContainerCardDimensions>(() => ({
+    width: maxCardWidth,
+    height: Math.round(maxCardWidth * CARD_ASPECT_RATIO),
+  }))
+
+  const observerRef = useRef<ResizeObserver | null>(null)
+  const elementRef = useRef<HTMLElement | null>(null)
+
+  const compute = useCallback(
+    (containerWidth: number) => {
+      if (cardCount === 0) {
+        return { width: maxCardWidth, height: Math.round(maxCardWidth * CARD_ASPECT_RATIO) }
+      }
+
+      const cardsPerRow = rows > 1 ? Math.ceil(cardCount / rows) : cardCount
+      const totalGap = gap * Math.max(0, cardsPerRow - 1)
+      const available = containerWidth - padding * 2 - totalGap
+      const rawWidth = available / cardsPerRow
+      const width = Math.round(Math.min(maxCardWidth, Math.max(minCardWidth, rawWidth)))
+      const height = Math.round(width * CARD_ASPECT_RATIO)
+      return { width, height }
+    },
+    [cardCount, gap, padding, minCardWidth, maxCardWidth, rows]
+  )
+
+  const refCallback = useCallback(
+    (node: HTMLElement | null) => {
+      if (observerRef.current) {
+        observerRef.current.disconnect()
+        observerRef.current = null
+      }
+
+      elementRef.current = node
+
+      if (!node) return
+
+      const observer = new ResizeObserver((entries) => {
+        const entry = entries[0]
+        if (!entry) return
+        const containerWidth = entry.contentRect.width
+        const next = compute(containerWidth)
+        setDims((prev) => (prev.width === next.width && prev.height === next.height ? prev : next))
+      })
+
+      observer.observe(node)
+      observerRef.current = observer
+    },
+    [compute]
+  )
+
+  // Recompute when options change but element stays the same
+  useEffect(() => {
+    if (elementRef.current) {
+      const containerWidth = elementRef.current.getBoundingClientRect().width
+      const next = compute(containerWidth)
+      setDims((prev) => (prev.width === next.width && prev.height === next.height ? prev : next))
+    }
+  }, [compute])
+
+  return [refCallback, dims]
+}

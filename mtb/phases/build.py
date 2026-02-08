@@ -23,6 +23,9 @@ def move_card(player: Player, card: Card, source: BuildSource, destination: Buil
     destination_collection = _get_build_collection(player, destination)
     destination_collection.append(card)
 
+    if source == "sideboard" and any(c.id == card.id for c in player.command_zone):
+        player.command_zone.clear()
+
 
 def swap_card(
     player: Player,
@@ -47,6 +50,11 @@ def swap_card(
 
     collection_a[idx_a] = card_b
     collection_b[idx_b] = card_a
+
+    if (source_a == "sideboard" and any(c.id == card_a.id for c in player.command_zone)) or (
+        source_b == "sideboard" and any(c.id == card_b.id for c in player.command_zone)
+    ):
+        player.command_zone.clear()
 
 
 def set_ready(game: Game, player: Player, basics: list[str]) -> None:

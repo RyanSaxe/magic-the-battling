@@ -95,3 +95,33 @@ def test_remove_companion_no_companion_raises(card_factory):
 
     with pytest.raises(ValueError, match="No companion"):
         build.remove_companion(player)
+
+
+def test_move_card_clears_command_zone_when_companion_moved_from_sideboard(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    player = game.players[0]
+    companion = card_factory("Lurrus", "Creature", oracle_text="Companion — test requirement")
+    player.sideboard.append(companion)
+    build.set_companion(player, companion)
+
+    build.move_card(player, companion, "sideboard", "hand")
+
+    assert companion in player.hand
+    assert companion not in player.sideboard
+    assert len(player.command_zone) == 0
+
+
+def test_swap_card_clears_command_zone_when_companion_swapped_from_sideboard(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    player = game.players[0]
+    companion = card_factory("Lurrus", "Creature", oracle_text="Companion — test requirement")
+    other_card = card_factory("Other")
+    player.sideboard.append(companion)
+    player.hand.append(other_card)
+    build.set_companion(player, companion)
+
+    build.swap_card(player, companion, "sideboard", other_card, "hand")
+
+    assert companion in player.hand
+    assert other_card in player.sideboard
+    assert len(player.command_zone) == 0

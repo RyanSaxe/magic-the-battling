@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
+from sqlalchemy import true as sql_true
 from sqlalchemy.orm import Session, joinedload
 
 import server.db.database as db
@@ -225,7 +226,7 @@ class GameManager:
 
             num_fakes_needed = pending.target_player_count - len(pending.player_names)
             if num_fakes_needed > 0:
-                target_elo = battler.elo if battler.elo else 1200.0
+                target_elo = battler.elo or 1200.0
                 self.load_fake_players_for_game(
                     db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards, pending.cube_id
                 )
@@ -284,7 +285,7 @@ class GameManager:
 
             num_fakes_needed = pending.target_player_count - len(pending.player_names)
             if num_fakes_needed > 0:
-                target_elo = battler.elo if battler.elo else 1200.0
+                target_elo = battler.elo or 1200.0
                 self.load_fake_players_for_game(
                     db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards, pending.cube_id
                 )
@@ -435,7 +436,7 @@ class GameManager:
             db.query(PlayerGameHistory)
             .options(joinedload(PlayerGameHistory.snapshots))
             .filter(
-                PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else True,
+                PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else sql_true(),
                 PlayerGameHistory.max_stage >= 5,
             )
         )
@@ -449,7 +450,7 @@ class GameManager:
             if not has_starting_stage:
                 continue
 
-            if self._is_suspicious_name(history.player_name or ""):
+            if self._is_suspicious_name(str(history.player_name or "")):
                 continue
 
             if self._has_triple_same_basic(history):
@@ -458,7 +459,7 @@ class GameManager:
             game_record = db.query(GameRecord).filter(GameRecord.id == history.game_id).first()
             if not game_record or not game_record.config_json:
                 continue
-            config = json.loads(game_record.config_json)
+            config = json.loads(str(game_record.config_json))
             if use_upgrades is not None and config.get("use_upgrades") != use_upgrades:
                 continue
             if use_vanguards is not None and config.get("use_vanguards") != use_vanguards:
@@ -698,7 +699,7 @@ class GameManager:
 
         db_session = db.SessionLocal()
         try:
-            target_elo = pending.battler.elo if pending.battler.elo else 1200.0
+            target_elo = pending.battler.elo or 1200.0
             num_needed = pending.target_player_count - len(pending.player_names)
             if num_needed <= 0:
                 return 0
@@ -911,7 +912,9 @@ class GameManager:
             revealed_cards = (snapshot.hand + snapshot.command_zone) if snapshot else []
             prior_upgrades = snapshot.upgrades if snapshot else []
         else:
-            if viewer.round > 1:
+            if viewer.phase == "reward":
+                prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
+            elif viewer.round > 1:
                 prior_snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round - 1)
             elif viewer.stage > 3:
                 prior_snapshot = fake.get_opponent_for_round(viewer.stage - 1, 3)
@@ -1027,6 +1030,8 @@ class GameManager:
         return BattleView(
             opponent_name=opponent_name,
             coin_flip_name=b.coin_flip_name,
+            on_the_play_name=b.on_the_play_name,
+            current_turn_name=b.current_turn_name,
             your_zones=your_zones,
             opponent_zones=hidden_opponent,
             opponent_hand_count=len(opponent_zones.hand),
@@ -1202,7 +1207,7 @@ class GameManager:
             player.build_ready = False
 
         if db is not None and game_id is not None and game.battler is not None:
-            battler_elo = game.battler.elo if game.battler.elo else 1200.0
+            battler_elo = game.battler.elo or 1200.0
             for player in live_players:
                 self._record_snapshot(db, game_id, player, battler_elo)
 
@@ -1244,41 +1249,54 @@ class GameManager:
         except ValueError as e:
             return str(e)
 
+    def _get_zones_for_owner(self, b: Battle, player: Player, owner: str) -> Zones:
+        is_battle_player = player.name == b.player.name
+        if owner == "player":
+            return b.player_zones if is_battle_player else b.opponent_zones
+        return b.opponent_zones if is_battle_player else b.player_zones
+
+    def _track_revealed_card(self, b: Battle, card, from_zones: Zones, to_zone: ZoneName) -> None:
+        if to_zone not in battle.REVEALED_ZONES or not battle._is_revealed_card(card):
+            return
+        if card.original_owner:
+            is_owner_battle_player = card.original_owner == b.player.name
+            owner_zones = b.player_zones if is_owner_battle_player else b.opponent_zones
+        else:
+            owner_zones = from_zones
+        if card.id not in owner_zones.revealed_card_ids:
+            owner_zones.revealed_card_ids.append(card.id)
+
     def handle_battle_move(
-        self, game: Game, player: Player, card_id: str, from_zone: ZoneName, to_zone: ZoneName
+        self,
+        game: Game,
+        player: Player,
+        card_id: str,
+        from_zone: ZoneName,
+        to_zone: ZoneName,
+        from_owner: str = "player",
+        to_owner: str = "player",
     ) -> bool:
         for b in game.active_battles:
-            if player.name in (b.player.name, b.opponent.name):
-                # Sync Player model when moving from sideboard (for wish effects)
-                # Note: command_zone is NOT synced - companion selection persists
-                if from_zone == "sideboard":
-                    card = next((c for c in player.sideboard if c.id == card_id), None)
-                    if card:
-                        player.sideboard.remove(card)
+            if player.name not in (b.player.name, b.opponent.name):
+                continue
 
-                # Use zone lookup that handles opponent zones
-                try:
-                    zones, _ = battle.get_zones_for_card(b, player, card_id)
-                except ValueError:
-                    return False
+            from_zones = self._get_zones_for_owner(b, player, from_owner)
+            to_zones = self._get_zones_for_owner(b, player, to_owner)
 
-                from_list = zones.get_zone(from_zone)
-                card = next((c for c in from_list if c.id == card_id), None)
-                if not card:
-                    return False
+            if from_zone == "sideboard" and from_owner == "player":
+                card = next((c for c in player.sideboard if c.id == card_id), None)
+                if card:
+                    player.sideboard.remove(card)
 
-                from_list.remove(card)
-                zones.get_zone(to_zone).append(card)
+            from_list = from_zones.get_zone(from_zone)
+            card = next((c for c in from_list if c.id == card_id), None)
+            if not card:
+                return False
 
-                # Track revealed cards when moving to public zones
-                if (
-                    to_zone in battle.REVEALED_ZONES
-                    and battle._is_revealed_card(card)
-                    and card.id not in zones.revealed_card_ids
-                ):
-                    zones.revealed_card_ids.append(card.id)
-
-                return True
+            from_list.remove(card)
+            to_zones.get_zone(to_zone).append(card)
+            self._track_revealed_card(b, card, from_zones, to_zone)
+            return True
         return False
 
     def handle_battle_submit_result(
@@ -1308,6 +1326,16 @@ class GameManager:
                 return True
         return False
 
+    def handle_battle_choose_play_draw(self, game: Game, player: Player, choice: str) -> bool | str:
+        for b in game.active_battles:
+            if player.name in (b.player.name, b.opponent.name):
+                if battle.is_play_draw_pending(b):
+                    if battle.choose_play_or_draw(b, player, choice):
+                        return True
+                    return "Only the coin flip winner can choose"
+                return "Choice already made"
+        return False
+
     def handle_battle_update_card_state(
         self,
         game: Game,
@@ -1319,6 +1347,14 @@ class GameManager:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
                 return battle.update_card_state(b, player, action_type, card_id, data)
+        return False
+
+    def handle_battle_pass_turn(self, game: Game, player: Player) -> bool | str:
+        for b in game.active_battles:
+            if player.name in (b.player.name, b.opponent.name):
+                if battle.pass_turn(b, player):
+                    return True
+                return "Not your turn"
         return False
 
     def _end_battle(self, game: Game, b: Battle, game_id: str | None = None, db: Session | None = None) -> str | None:

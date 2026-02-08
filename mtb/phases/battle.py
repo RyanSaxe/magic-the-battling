@@ -47,6 +47,12 @@ def _create_treasure_token() -> Card:
     )
 
 
+def _tag_cards_with_owner(cards: list[Card], owner_name: str) -> list[Card]:
+    for card in cards:
+        card.original_owner = owner_name
+    return cards
+
+
 def _create_zones_for_player(player: Player) -> Zones:
     basics = [_create_basic_land(name) for name in player.chosen_basics]
     treasures = [_create_treasure_token() for _ in range(player.treasures)]
@@ -54,6 +60,11 @@ def _create_zones_for_player(player: Player) -> Zones:
     sideboard_display = [c for c in player.sideboard if c.id not in command_zone_ids]
     submitted = player.hand + player.sideboard
     revealed_card_ids = [c.id for c in player.command_zone]
+
+    _tag_cards_with_owner(player.hand, player.name)
+    _tag_cards_with_owner(player.sideboard, player.name)
+    _tag_cards_with_owner(player.command_zone, player.name)
+
     return Zones(
         battlefield=basics + treasures,
         hand=player.hand.copy(),
@@ -307,6 +318,11 @@ def _create_zones_for_static_opponent(opponent: StaticOpponent) -> Zones:
     sideboard_display = [c for c in opponent.sideboard if c.id not in command_zone_ids]
     submitted = opponent.hand + opponent.sideboard
     revealed_card_ids = [c.id for c in opponent.command_zone]
+
+    _tag_cards_with_owner(opponent.hand, opponent.name)
+    _tag_cards_with_owner(opponent.sideboard, opponent.name)
+    _tag_cards_with_owner(opponent.command_zone, opponent.name)
+
     return Zones(
         battlefield=basics + treasures,
         hand=opponent.hand.copy(),
@@ -322,6 +338,39 @@ def _create_zones_for_static_opponent(opponent: StaticOpponent) -> Zones:
 
 def _is_static_opponent(opponent: Player | StaticOpponent) -> TypeGuard[StaticOpponent]:
     return isinstance(opponent, StaticOpponent)
+
+
+def is_play_draw_pending(battle: Battle) -> bool:
+    return battle.on_the_play_name is None
+
+
+def choose_play_or_draw(battle: Battle, player: Player, choice: str) -> bool:
+    """Handle play/draw choice by coin flip winner. Returns True if valid."""
+    if player.name != battle.coin_flip_name:
+        return False
+    if battle.on_the_play_name is not None:
+        return False
+
+    if choice == "play":
+        battle.on_the_play_name = player.name
+    elif choice == "draw":
+        other = battle.opponent.name if battle.player.name == player.name else battle.player.name
+        battle.on_the_play_name = other
+    else:
+        return False
+    battle.current_turn_name = battle.on_the_play_name
+    return True
+
+
+def pass_turn(battle: Battle, player: Player) -> bool:
+    """Pass turn to opponent. Returns True if successful."""
+    if battle.current_turn_name != player.name:
+        return False
+    if player.name == battle.player.name:
+        battle.current_turn_name = battle.opponent.name
+    else:
+        battle.current_turn_name = battle.player.name
+    return True
 
 
 def start(game: Game, player: Player, opponent: Player | StaticOpponent, is_sudden_death: bool = False) -> Battle:
@@ -342,6 +391,14 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
     else:
         coin_flip_name = random.choice([player.name, opponent.name])
 
+    # Bot auto-chooses play/draw randomly when it wins the flip
+    if coin_flip_name == opponent.name:
+        on_the_play_name = random.choice([player.name, opponent.name])
+        current_turn_name = on_the_play_name
+    else:
+        on_the_play_name = None
+        current_turn_name = None
+
     player.previous_hand_ids = [c.id for c in player.hand]
     player.previous_basics = player.chosen_basics.copy()
 
@@ -349,6 +406,8 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
         player=player,
         opponent=opponent,
         coin_flip_name=coin_flip_name,
+        on_the_play_name=on_the_play_name,
+        current_turn_name=current_turn_name,
         player_zones=_create_zones_for_player(player),
         opponent_zones=_create_zones_for_static_opponent(opponent),
         player_life=game.config.starting_life,
@@ -504,7 +563,9 @@ def _end_vs_static(game: Game, battle: Battle, opponent: StaticOpponent) -> Batt
 
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
 
-    battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
+    battle.player.most_recently_revealed_cards = _collect_revealed_cards(
+        battle.player_zones, battle.opponent_zones, battle.player.name
+    )
 
     if battle in game.active_battles:
         game.active_battles.remove(battle)
@@ -516,9 +577,26 @@ def _is_revealed_card(card: Card) -> bool:
     return not card.type_line.startswith("Basic Land") and not card.type_line.startswith("Token")
 
 
-def _collect_revealed_cards(zones: Zones) -> list[Card]:
-    all_cards = zones.hand + zones.sideboard + zones.battlefield + zones.graveyard + zones.exile + zones.command_zone
-    return [c for c in all_cards if c.id in zones.revealed_card_ids]
+def _collect_revealed_cards(owner_zones: Zones, other_zones: Zones, owner_name: str) -> list[Card]:
+    all_cards = (
+        owner_zones.hand
+        + owner_zones.sideboard
+        + owner_zones.battlefield
+        + owner_zones.graveyard
+        + owner_zones.exile
+        + owner_zones.command_zone
+        + other_zones.hand
+        + other_zones.sideboard
+        + other_zones.battlefield
+        + other_zones.graveyard
+        + other_zones.exile
+        + other_zones.command_zone
+    )
+    return [
+        c
+        for c in all_cards
+        if c.id in owner_zones.revealed_card_ids and (c.original_owner is None or c.original_owner == owner_name)
+    ]
 
 
 def _handle_tap(zones: Zones, card_id: str, _data: dict) -> bool:
@@ -665,7 +743,12 @@ def update_card_state(
 
     # Actions like spawn/create_treasure don't need an existing card
     if action_type in _ACTIONS_WITHOUT_CARD:
-        zones = get_zones_for_player(battle, player)
+        for_opponent = (data or {}).get("for_opponent", False)
+        if for_opponent:
+            is_player_side = player.name == battle.player.name
+            zones = battle.opponent_zones if is_player_side else battle.player_zones
+        else:
+            zones = get_zones_for_player(battle, player)
     else:
         try:
             zones, _ = get_zones_for_card(battle, player, card_id)
@@ -688,8 +771,12 @@ def _end_vs_player(game: Game, battle: Battle, opponent: Player) -> BattleResult
     _sync_zones_to_player(battle.player_zones, battle.player, game.config.max_treasures)
     _sync_zones_to_player(battle.opponent_zones, opponent, game.config.max_treasures)
 
-    battle.player.most_recently_revealed_cards = _collect_revealed_cards(battle.player_zones)
-    opponent.most_recently_revealed_cards = _collect_revealed_cards(battle.opponent_zones)
+    battle.player.most_recently_revealed_cards = _collect_revealed_cards(
+        battle.player_zones, battle.opponent_zones, battle.player.name
+    )
+    opponent.most_recently_revealed_cards = _collect_revealed_cards(
+        battle.opponent_zones, battle.player_zones, opponent.name
+    )
 
     if battle in game.active_battles:
         game.active_battles.remove(battle)

@@ -1,4 +1,5 @@
 import type { Card as CardType, ZoneName } from "../../types";
+import type { CardDimensions } from "../../hooks/useViewportCardSizes";
 import { DraggableCard, DroppableZone } from "../../dnd";
 import { AttachedCardStack } from "../card";
 
@@ -22,7 +23,7 @@ interface BattlefieldZoneProps {
   canManipulateOpponent?: boolean;
   label?: string;
   separateLands?: boolean;
-  cardSize?: "xs" | "sm" | "md" | "lg";
+  cardDimensions?: CardDimensions;
   upgradedCardIds?: Set<string>;
 }
 
@@ -36,13 +37,13 @@ export function BattlefieldZone({
   faceDownCardIds = new Set(),
   counters = {},
   attachments = {},
-  validFromZones = ["hand", "graveyard", "exile", "command_zone"],
+  validFromZones = ["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone"],
   draggable = true,
   isOpponent = false,
   canManipulateOpponent = false,
   label,
   separateLands = false,
-  cardSize = "sm",
+  cardDimensions,
   upgradedCardIds = new Set(),
 }: BattlefieldZoneProps) {
   const allowInteraction = !isOpponent || canManipulateOpponent;
@@ -70,7 +71,7 @@ export function BattlefieldZone({
           key={card.id}
           parentCard={card}
           attachedCards={attachedCards}
-          size={cardSize}
+          dimensions={cardDimensions}
           parentTapped={tappedCardIds.has(card.id)}
           parentFaceDown={faceDownCardIds.has(card.id)}
           parentCounters={counters[card.id]}
@@ -102,7 +103,7 @@ export function BattlefieldZone({
           card={card}
           zone="battlefield"
           zoneOwner={zoneOwner}
-          size={cardSize}
+          dimensions={cardDimensions}
           selected={card.id === selectedCardId}
           tapped={tappedCardIds.has(card.id)}
           faceDown={faceDownCardIds.has(card.id)}
@@ -119,13 +120,16 @@ export function BattlefieldZone({
 
   const zoneOwner = isOpponent ? "opponent" : ("player" as const);
 
+  const minH = cardDimensions ? cardDimensions.height : 112;
+  const compact = cardDimensions ? cardDimensions.height <= 70 : false;
+
   return (
     <DroppableZone
       zone="battlefield"
       zoneOwner={zoneOwner}
       validFromZones={validFromZones}
       disabled={!allowInteraction}
-      className="battlefield flex-1 p-4"
+      className={`battlefield flex-1 ${compact ? 'p-1' : 'p-4'}`}
     >
       {label && (
         <div className="text-xs text-gray-400 mb-2 uppercase tracking-wide">
@@ -133,10 +137,13 @@ export function BattlefieldZone({
         </div>
       )}
       <div
-        className={`flex flex-col gap-2 min-h-[112px] ${isOpponent ? "flex-col-reverse" : ""}`}
+        className={`flex flex-col ${compact ? 'gap-1' : 'gap-2'} ${isOpponent ? "flex-col-reverse" : ""}`}
+        style={{ minHeight: minH }}
       >
-        {/* Permanents (non-lands) */}
-        <div className="flex justify-center flex-wrap gap-3 min-h-[112px]">
+        <div
+          className={`flex justify-center flex-wrap ${compact ? 'gap-1' : 'gap-3'}`}
+          style={{ minHeight: minH }}
+        >
           {permanents.length === 0 && lands.length === 0 ? (
             <div className="text-gray-500 text-sm opacity-50">
               {isOpponent ? "Opponent's battlefield" : "Empty battlefield"}
@@ -145,9 +152,8 @@ export function BattlefieldZone({
             permanents.map(renderCard)
           )}
         </div>
-        {/* Lands (separate row if enabled) */}
         {separateLands && lands.length > 0 && (
-          <div className="flex justify-center flex-wrap gap-2">
+          <div className={`flex justify-center flex-wrap ${compact ? 'gap-1' : 'gap-2'}`}>
             {lands.map(renderCard)}
           </div>
         )}

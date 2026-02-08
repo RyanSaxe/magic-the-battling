@@ -18,6 +18,7 @@ class Card(BaseModel):
     elo: float = 0.0
     upgrade_target: "Card | None" = None
     oracle_text: str | None = None
+    original_owner: str | None = None
 
     # vanguard specific properties
     life_modifier: int | None = None

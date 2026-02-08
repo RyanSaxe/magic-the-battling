@@ -13,13 +13,10 @@ interface BattleSidebarContentProps {
   onOpponentLifeChange: (life: number) => void;
   playerName: string;
   onCreateTreasure?: () => void;
+  onPassTurn?: () => void;
   canManipulateOpponent?: boolean;
   hasCompanion?: boolean;
   opponentHasCompanion?: boolean;
-  sideboardCount?: number;
-  onShowSideboard?: () => void;
-  opponentSideboardCount?: number;
-  onShowOpponentSideboard?: () => void;
 }
 
 function LifeCounter({
@@ -98,7 +95,6 @@ function PlayerSection({
   canManipulateOpponent = false,
   hasCompanion = false,
   isReversed = false,
-  sideboardButton,
 }: {
   zones: Zones;
   upgrades: CardType[];
@@ -106,7 +102,6 @@ function PlayerSection({
   canManipulateOpponent?: boolean;
   hasCompanion?: boolean;
   isReversed?: boolean;
-  sideboardButton?: React.ReactNode;
 }) {
   const appliedUpgrades = upgrades.filter((u) => u.upgrade_target);
 
@@ -117,7 +112,14 @@ function PlayerSection({
         zone="graveyard"
         cards={zones.graveyard}
         maxThumbnails={2}
-        validFromZones={["hand", "battlefield", "exile", "command_zone"]}
+        validFromZones={[
+          "hand",
+          "battlefield",
+          "graveyard",
+          "exile",
+          "sideboard",
+          "command_zone",
+        ]}
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
       />
@@ -126,7 +128,14 @@ function PlayerSection({
         zone="exile"
         cards={zones.exile}
         maxThumbnails={2}
-        validFromZones={["hand", "battlefield", "graveyard", "command_zone"]}
+        validFromZones={[
+          "hand",
+          "battlefield",
+          "graveyard",
+          "exile",
+          "sideboard",
+          "command_zone",
+        ]}
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
       />
@@ -152,6 +161,7 @@ function PlayerSection({
         "graveyard",
         "exile",
         "sideboard",
+        "command_zone",
       ]}
       isOpponent={isOpponent}
       canManipulateOpponent={canManipulateOpponent}
@@ -166,7 +176,6 @@ function PlayerSection({
       {isReversed ? (
         <>
           <div className="space-y-2">
-            {sideboardButton}
             {commandZone}
           </div>
           <div className="space-y-2">
@@ -182,7 +191,6 @@ function PlayerSection({
           </div>
           <div className="space-y-2">
             {commandZone}
-            {sideboardButton}
           </div>
         </>
       )}
@@ -199,15 +207,12 @@ export function BattleSidebarContent({
   onOpponentLifeChange,
   playerName,
   onCreateTreasure,
+  onPassTurn,
   canManipulateOpponent = false,
   hasCompanion = false,
   opponentHasCompanion = false,
-  sideboardCount = 0,
-  onShowSideboard,
-  opponentSideboardCount = 0,
-  onShowOpponentSideboard,
 }: BattleSidebarContentProps) {
-  const { opponent_name, coin_flip_name, your_zones, opponent_zones } =
+  const { opponent_name, current_turn_name, your_zones, opponent_zones } =
     currentBattle;
 
   const yourPoison = currentBattle.your_poison;
@@ -224,16 +229,6 @@ export function BattleSidebarContent({
           canManipulateOpponent={canManipulateOpponent}
           hasCompanion={opponentHasCompanion}
           isReversed
-          sideboardButton={
-            opponentSideboardCount > 0 && onShowOpponentSideboard ? (
-              <button
-                onClick={onShowOpponentSideboard}
-                className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
-              >
-                Sideboard ({opponentSideboardCount})
-              </button>
-            ) : undefined
-          }
         />
       </div>
 
@@ -279,24 +274,35 @@ export function BattleSidebarContent({
               </div>
             </div>
           </div>
-          <div className="text-center text-xs text-gray-500 mt-2">
-            {coin_flip_name === playerName ? (
-              <>
-                you are on the <span className="text-green-400">play</span>
-              </>
-            ) : (
-              <>
-                you are on the <span className="text-amber-400">draw</span>
-              </>
-            )}
-          </div>
-          {onCreateTreasure && (
-            <button
-              onClick={onCreateTreasure}
-              className="w-full mt-3 px-3 py-1.5 text-xs rounded bg-amber-600 hover:bg-amber-500 text-white"
-            >
-              Create Treasure
-            </button>
+          {current_turn_name && (
+            <div className="text-center text-xs mt-2">
+              {current_turn_name === playerName ? (
+                <span className="text-green-400">It is your turn</span>
+              ) : (
+                <span className="text-amber-400">Opponent's turn</span>
+              )}
+            </div>
+          )}
+          {(onPassTurn || onCreateTreasure) && (
+            <div className="flex gap-2 mt-3">
+              {onPassTurn && (
+                <button
+                  onClick={onPassTurn}
+                  disabled={current_turn_name !== playerName}
+                  className="flex-1 px-3 py-1.5 text-xs rounded bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Pass
+                </button>
+              )}
+              {onCreateTreasure && (
+                <button
+                  onClick={onCreateTreasure}
+                  className="flex-1 px-3 py-1.5 text-xs rounded bg-amber-600 hover:bg-amber-500 text-white"
+                >
+                  Treasure
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -307,16 +313,6 @@ export function BattleSidebarContent({
           zones={your_zones}
           upgrades={selfUpgrades}
           hasCompanion={hasCompanion}
-          sideboardButton={
-            sideboardCount > 0 && onShowSideboard ? (
-              <button
-                onClick={onShowSideboard}
-                className="text-xs bg-purple-600 hover:bg-purple-500 px-2 py-1 rounded"
-              >
-                Sideboard ({sideboardCount})
-              </button>
-            ) : undefined
-          }
         />
       </div>
     </div>

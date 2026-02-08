@@ -1,6 +1,8 @@
 import { Card } from '../../components/card'
 import { THE_VANQUISHER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import type { GameState, Card as CardType } from '../../types'
+import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
+import { useViewportCardSizes } from '../../hooks/useViewportCardSizes'
 
 interface RewardPhaseProps {
   gameState: GameState
@@ -16,17 +18,20 @@ function RewardCard({
   imageUrl,
   label,
   sublabel,
+  dimensions,
 }: {
   imageUrl: string
   label: string
   sublabel?: string
+  dimensions: { width: number; height: number }
 }) {
   return (
     <div className="flex flex-col items-center gap-2">
       <img
         src={imageUrl}
         alt={label}
-        className="w-[200px] h-[280px] rounded-lg object-cover shadow-lg"
+        className="rounded-lg object-cover shadow-lg"
+        style={{ width: dimensions.width, height: dimensions.height }}
       />
       <div className="text-center">
         <div className="text-white font-medium">{label}</div>
@@ -37,12 +42,26 @@ function RewardCard({
 }
 
 export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: RewardPhaseProps) {
+  const sizes = useViewportCardSizes()
   const { self_player, available_upgrades } = gameState
   const { last_battle_result } = self_player
   const isStageIncreasing = self_player.is_stage_increasing
   const upgradedCardIds = new Set(
     self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
   )
+
+  const [upgradeRef, upgradeCardDims] = useContainerCardSizes({
+    cardCount: available_upgrades.length,
+    gap: 24,
+    maxCardWidth: 200,
+  })
+  const poolCards = [...self_player.hand, ...self_player.sideboard]
+  const [poolRef, poolCardDims] = useContainerCardSizes({
+    cardCount: poolCards.length,
+    gap: 4,
+    maxCardWidth: 80,
+    rows: 3,
+  })
 
   const handleUpgradeClick = (upgrade: CardType) => {
     if (selectedUpgradeId === upgrade.id) {
@@ -52,8 +71,31 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
     }
   }
 
+  const isWinner = last_battle_result?.winner_name === self_player.name
+  const isDraw = last_battle_result?.is_draw
+
   return (
     <div className="flex flex-col h-full gap-6 p-4 overflow-auto">
+      {/* Battle result header */}
+      {last_battle_result && (
+        <div className="flex items-center justify-center gap-4 shrink-0 text-sm">
+          {isDraw ? (
+            <span className="text-yellow-400 font-bold">Draw</span>
+          ) : isWinner ? (
+            <span className="text-green-400 font-bold">Victory!</span>
+          ) : (
+            <span className="text-red-400 font-bold">Defeat</span>
+          )}
+          <span className="text-gray-500">vs {last_battle_result.opponent_name}</span>
+          {last_battle_result.poison_dealt > 0 && (
+            <span className="text-purple-400">Dealt {last_battle_result.poison_dealt} poison</span>
+          )}
+          {last_battle_result.poison_taken > 0 && (
+            <span className="text-red-400">Took {last_battle_result.poison_taken} poison</span>
+          )}
+        </div>
+      )}
+
       {/* Rewards - shown as big cards */}
       {last_battle_result && (
         <div className="flex-1 flex flex-col items-center justify-center">
@@ -63,6 +105,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
               <RewardCard
                 imageUrl={TREASURE_TOKEN_IMAGE}
                 label={`+${last_battle_result.treasures_gained} Treasure`}
+                dimensions={sizes.featured}
               />
             )}
             {last_battle_result.vanquisher_gained && (
@@ -70,11 +113,12 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
                 imageUrl={THE_VANQUISHER_IMAGE}
                 label="Vanquisher"
                 sublabel="+1 Hand Size"
+                dimensions={sizes.featured}
               />
             )}
             {last_battle_result.card_gained && (
               <div className="flex flex-col items-center gap-2">
-                <Card card={last_battle_result.card_gained} size="lg" />
+                <Card card={last_battle_result.card_gained} dimensions={sizes.featured} />
                 <div className="text-center">
                   <div className="text-white font-medium">New Card</div>
                   <div className="text-gray-400 text-sm">{last_battle_result.card_gained.name}</div>
@@ -97,12 +141,12 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
             <h3 className="text-xl font-bold text-amber-400 mb-2">Stage Complete!</h3>
             <p className="text-gray-400">Select an upgrade to claim as your vanquisher reward</p>
           </div>
-          <div className="flex gap-6 justify-center flex-wrap">
+          <div ref={upgradeRef} className="flex gap-6 justify-center flex-wrap">
             {available_upgrades.map((upgrade) => (
               <Card
                 key={upgrade.id}
                 card={upgrade}
-                size="lg"
+                dimensions={upgradeCardDims}
                 selected={selectedUpgradeId === upgrade.id}
                 onClick={() => handleUpgradeClick(upgrade)}
               />
@@ -114,9 +158,9 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-3 text-center">
               Your Pool ({self_player.hand.length + self_player.sideboard.length} cards)
             </div>
-            <div className="flex flex-wrap gap-1 justify-center max-h-[200px] overflow-auto p-1">
-              {[...self_player.hand, ...self_player.sideboard].map((card) => (
-                <Card key={card.id} card={card} size="sm" upgraded={upgradedCardIds.has(card.id)} />
+            <div ref={poolRef} className="flex flex-wrap gap-1 justify-center max-h-[200px] overflow-auto p-1">
+              {poolCards.map((card) => (
+                <Card key={card.id} card={card} dimensions={poolCardDims} upgraded={upgradedCardIds.has(card.id)} />
               ))}
             </div>
           </div>

@@ -92,6 +92,8 @@ export interface SelfPlayerView extends PlayerView {
 export interface BattleView {
   opponent_name: string
   coin_flip_name: string
+  on_the_play_name: string | null
+  current_turn_name: string | null
   your_zones: Zones
   opponent_zones: Zones
   opponent_hand_count: number

@@ -8,6 +8,7 @@ interface SidebarProps {
   players: PlayerView[];
   currentPlayer: PlayerView;
   phaseContent?: ReactNode;
+  headerContent?: ReactNode;
   useUpgrades?: boolean;
 }
 
@@ -15,6 +16,7 @@ export function Sidebar({
   players,
   currentPlayer,
   phaseContent,
+  headerContent,
   useUpgrades = true,
 }: SidebarProps) {
   const { state } = useContextStrip();
@@ -38,11 +40,12 @@ export function Sidebar({
   const companionIds = new Set(displayPlayer.command_zone.map((c) => c.id));
 
   return (
-    <aside className="w-64 bg-black/30 flex flex-col overflow-hidden">
+    <aside className="w-64 h-full bg-black/30 flex flex-col overflow-hidden">
       {phaseContent ? (
         <div className="overflow-y-auto overflow-x-hidden flex-1">{phaseContent}</div>
       ) : (
         <div className="p-4 overflow-auto flex-1 flex flex-col gap-4">
+          {headerContent}
           <PlayerList
             players={players}
             currentPlayerName={currentPlayer.name}

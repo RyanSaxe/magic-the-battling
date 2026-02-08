@@ -2,6 +2,7 @@ import { CARD_BACK_IMAGE } from '../../constants/assets'
 
 interface CardBackProps {
   size?: 'xs' | 'sm' | 'md' | 'lg'
+  dimensions?: { width: number; height: number }
   tapped?: boolean
   onClick?: () => void
   className?: string
@@ -16,11 +17,12 @@ const sizeStyles = {
 
 export function CardBack({
   size = 'md',
+  dimensions,
   tapped = false,
   onClick,
   className = '',
 }: CardBackProps) {
-  const dimensions = sizeStyles[size]
+  const dims = dimensions ?? sizeStyles[size]
 
   const baseClasses = [
     'card card-on-table',
@@ -34,8 +36,8 @@ export function CardBack({
     <div
       className={baseClasses}
       style={{
-        width: dimensions.width,
-        height: dimensions.height,
+        width: dims.width,
+        height: dims.height,
       }}
       onClick={onClick}
     >

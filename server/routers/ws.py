@@ -26,6 +26,8 @@ ACTION_REQUIRED_PHASES: dict[str, str] = {
     "battle_submit_result": "battle",
     "battle_update_card_state": "battle",
     "battle_update_life": "battle",
+    "battle_choose_play_draw": "battle",
+    "battle_pass_turn": "battle",
     "reward_pick_upgrade": "reward",
     "reward_apply_upgrade": "reward",
     "reward_done": "reward",
@@ -321,7 +323,13 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
             return game_manager.handle_build_remove_companion(player)
         case "battle_move":
             return game_manager.handle_battle_move(
-                game, player, payload["card_id"], payload["from_zone"], payload["to_zone"]
+                game,
+                player,
+                payload["card_id"],
+                payload["from_zone"],
+                payload["to_zone"],
+                payload.get("from_owner", "player"),
+                payload.get("to_owner", "player"),
             )
         case "battle_submit_result":
             db_session = db.SessionLocal()
@@ -335,6 +343,10 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
             )
         case "battle_update_life":
             return game_manager.handle_battle_update_life(game, player, payload["target"], payload["life"])
+        case "battle_choose_play_draw":
+            return game_manager.handle_battle_choose_play_draw(game, player, payload["choice"])
+        case "battle_pass_turn":
+            return game_manager.handle_battle_pass_turn(game, player)
         case "reward_pick_upgrade":
             return game_manager.handle_reward_pick_upgrade(game, player, payload["upgrade_id"])
         case "reward_apply_upgrade":

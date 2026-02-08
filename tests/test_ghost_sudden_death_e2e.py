@@ -154,7 +154,7 @@ def end_battle_with_result(
     If check_eliminations is True and there are no more active battles,
     triggers the elimination check.
     """
-    result_str = winner_name if winner_name else "draw"
+    result_str = winner_name or "draw"
 
     battle.submit_result(b, b.player, result_str)
     if isinstance(b.opponent, Player):
@@ -233,7 +233,9 @@ class TestGhostAndSuddenDeathE2E:
         elif game.most_recent_ghost_bot:
             pass
         else:
-            pytest.fail("Expected either most_recent_ghost or most_recent_ghost_bot to be set with 3 survivors")
+            raise AssertionError(
+                "Expected either most_recent_ghost or most_recent_ghost_bot to be set with 3 survivors"
+            )
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
     def test_ghost_cleared_when_even_survivors(self, num_humans: int, num_bots: int, reset_singletons, mock_cube_data):
@@ -544,7 +546,7 @@ class TestGhostAndSuddenDeathE2E:
     ):
         """After sudden death resolves (one dies), flags should be cleared."""
         if num_humans < 2:
-            pytest.skip("Need at least 2 humans to test PvP sudden death resolution")
+            raise pytest.skip.Exception("Need at least 2 humans to test PvP sudden death resolution")
 
         game, manager, participants = create_test_game(num_humans, num_bots)
 
@@ -581,7 +583,7 @@ class TestGhostAndSuddenDeathE2E:
 
         humans = [p for p in participants if isinstance(p, Player)]
         if len(humans) < 2:
-            pytest.skip("Need at least 2 humans to test active battles blocking")
+            raise pytest.skip.Exception("Need at least 2 humans to test active battles blocking")
 
         h1, h2 = humans[0], humans[1]
         h1.poison = 10

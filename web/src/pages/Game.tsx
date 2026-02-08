@@ -15,7 +15,6 @@ import { BattlePhase } from "./phases/Battle";
 import { RewardPhase } from "./phases/Reward";
 import { Sidebar } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
-import { RewardSidebarContent } from "../components/sidebar/RewardSidebarContent";
 import { GameSummary } from "../components/GameSummary";
 import { RulesModal } from "../components/RulesModal";
 import { InfoIcon } from "../components/icons";
@@ -23,6 +22,8 @@ import { ContextStripProvider, useContextStrip } from "../contexts";
 import { CardPreviewContext } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
 import { PHASE_HINTS, type Phase } from "../constants/rules";
+import { POISON_COUNTER_IMAGE } from "../constants/assets";
+import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import type { Card as CardType } from "../types";
 
 function CardPreviewModal({
@@ -421,6 +422,9 @@ function GameContent() {
   const [spectatorConfig, setSpectatorConfig] = useState<SpectatorConfig | null>(null);
   const [spectatingPlayer, setSpectatingPlayer] = useState<string | null>(null);
 
+  const sizes = useViewportCardSizes();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const isSpectateMode = searchParams.get("spectate") === "true";
 
   const { gameState, isConnected, actions, error, pendingSpectateRequest } = useGame(
@@ -548,8 +552,7 @@ function GameContent() {
   const opponentPlayer = current_battle
     ? players.find((p) => p.name === current_battle.opponent_name)
     : null;
-  const canManipulateOpponent =
-    opponentPlayer?.is_bot || opponentPlayer?.is_ghost || false;
+  const canManipulateOpponent = currentPhase === "battle";
   const opponentHasCompanion = (opponentPlayer?.command_zone.length ?? 0) > 0;
   const maxHandSize = self_player.hand_size;
   const handExceedsLimit = self_player.hand.length > maxHandSize;
@@ -570,7 +573,7 @@ function GameContent() {
     if (isSpectator) {
       return null;
     }
-    if (currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over") {
+    if (currentPhase === "eliminated") {
       return (
         <>
           <button onClick={handleSpectateNewTab} className="btn btn-secondary">
@@ -580,6 +583,13 @@ function GameContent() {
             Home
           </button>
         </>
+      );
+    }
+    if (currentPhase === "winner" || currentPhase === "game_over") {
+      return (
+        <button onClick={() => navigate("/")} className="btn btn-primary">
+          Home
+        </button>
       );
     }
     switch (currentPhase) {
@@ -714,6 +724,10 @@ function GameContent() {
     actions.battleUpdateCardState("create_treasure", "", {});
   };
 
+  const handlePassTurn = () => {
+    actions.battlePassTurn();
+  };
+
   const renderPhaseContent = (): ReactNode => {
     if (currentPhase === "battle" && current_battle) {
       return (
@@ -726,30 +740,23 @@ function GameContent() {
           onOpponentLifeChange={handleOpponentLifeChange}
           playerName={self_player.name}
           onCreateTreasure={handleCreateTreasure}
+          onPassTurn={handlePassTurn}
           canManipulateOpponent={canManipulateOpponent}
           hasCompanion={self_player.command_zone.length > 0}
           opponentHasCompanion={opponentHasCompanion}
-          sideboardCount={current_battle.your_zones.sideboard.length}
-          onShowSideboard={() => setShowSidebarSideboard(true)}
-          opponentSideboardCount={current_battle.opponent_full_sideboard?.length ?? 0}
-          onShowOpponentSideboard={() => setShowOpponentSideboard(true)}
-        />
-      );
-    }
-    if (currentPhase === "reward" && self_player.last_battle_result) {
-      return (
-        <RewardSidebarContent
-          lastBattleResult={self_player.last_battle_result}
-          playerName={self_player.name}
         />
       );
     }
     return null;
   };
 
+  const renderHeaderContent = (): ReactNode => {
+    return null;
+  };
+
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
-      <div className="game-table flex flex-col">
+      <div className={`game-table h-screen overflow-hidden flex flex-col ${sizes.isMobile && !isSpectator ? 'pb-12' : ''}`}>
         {/* Spectator Banner */}
         {isSpectator && spectatingPlayer && (
           <div className="bg-purple-900/80 text-purple-200 text-center py-2">
@@ -757,7 +764,7 @@ function GameContent() {
           </div>
         )}
         {/* Header - Action Bar */}
-        <header className="flex justify-between items-center px-4 py-2 bg-black/30">
+        <header className="flex justify-between items-center px-2 sm:px-4 py-1 sm:py-2 bg-black/30">
           <div className="flex items-center gap-3">
             <div className="text-sm text-gray-300">
               Stage {self_player.stage} • Round {self_player.round}
@@ -770,10 +777,15 @@ function GameContent() {
               <InfoIcon size="sm" className="ml-1.5 opacity-60" />
             </button>
           </div>
-          <div className="text-sm text-gray-400 italic">
+          <div className="text-sm text-gray-400 italic hidden sm:block">
             {PHASE_HINTS[currentPhase as Phase]}
           </div>
-          <div className="flex items-center gap-2">{renderActionButtons()}</div>
+          <div className="flex items-center gap-2">
+            {!sizes.isMobile && renderActionButtons()}
+            {sizes.isMobile && (
+              <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-2">☰</button>
+            )}
+          </div>
         </header>
 
         {/* Main content */}
@@ -782,16 +794,65 @@ function GameContent() {
             onCardMove={handleCardMove}
             validDropZones={getValidDropZones}
           >
+            {sizes.isMobile && current_battle && (
+              <div className="shrink-0 flex items-center justify-between px-2 py-1 bg-black/40 text-xs">
+                <div className="flex items-center gap-1">
+                  <span className="text-gray-300 truncate max-w-[60px]">{current_battle.opponent_name}</span>
+                  <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
+                  <span className="text-white font-bold">{current_battle.opponent_life}</span>
+                  <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life + 1)} className="text-gray-400 hover:text-white px-1">+</button>
+                  <img src={POISON_COUNTER_IMAGE} alt="poison" className="w-4 h-4 rounded-sm" />
+                  <span className="text-green-400">{current_battle.opponent_poison ?? 0}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={handlePassTurn} className="btn btn-secondary text-xs py-0 px-2">Pass</button>
+                  <button onClick={handleCreateTreasure} className="btn btn-secondary text-xs py-0 px-2">Treasure</button>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-gray-300">You</span>
+                  <button onClick={() => handleYourLifeChange(current_battle.your_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
+                  <span className="text-white font-bold">{current_battle.your_life}</span>
+                  <button onClick={() => handleYourLifeChange(current_battle.your_life + 1)} className="text-gray-400 hover:text-white px-1">+</button>
+                  <img src={POISON_COUNTER_IMAGE} alt="poison" className="w-4 h-4 rounded-sm" />
+                  <span className="text-green-400">{current_battle.your_poison ?? 0}</span>
+                </div>
+              </div>
+            )}
             <div className="flex-1 flex min-h-0">
               <main className="flex-1 flex flex-col min-h-0">
-                <BattlePhase gameState={gameState} actions={actions} />
+                <BattlePhase
+                  gameState={gameState}
+                  actions={actions}
+                  sideboardCount={current_battle?.your_zones.sideboard.length ?? 0}
+                  onShowSideboard={() => setShowSidebarSideboard(true)}
+                  opponentSideboardCount={current_battle?.opponent_full_sideboard?.length ?? 0}
+                  onShowOpponentSideboard={() => setShowOpponentSideboard(true)}
+                />
               </main>
-              <Sidebar
-                players={gameState.players}
-                currentPlayer={self_player}
-                phaseContent={renderPhaseContent()}
-                useUpgrades={gameState.use_upgrades}
-              />
+              {sizes.isMobile ? (
+                <>
+                  {sidebarOpen && (
+                    <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
+                  )}
+                  <div className={`fixed top-0 right-0 h-full z-50 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                    <Sidebar
+                      players={gameState.players}
+                      currentPlayer={self_player}
+                      phaseContent={renderPhaseContent()}
+                      headerContent={renderHeaderContent()}
+                      useUpgrades={gameState.use_upgrades}
+                    />
+                  </div>
+                </>
+              ) : (
+                <Sidebar
+                  players={gameState.players}
+                  currentPlayer={self_player}
+                  phaseContent={renderPhaseContent()}
+                  headerContent={renderHeaderContent()}
+                  useUpgrades={gameState.use_upgrades}
+                />
+              )}
             </div>
             {showSidebarSideboard && current_battle && (
               <div
@@ -920,12 +981,37 @@ function GameContent() {
                 />
               )}
             </main>
-            <Sidebar
-              players={gameState.players}
-              currentPlayer={self_player}
-              phaseContent={renderPhaseContent()}
-              useUpgrades={gameState.use_upgrades}
-            />
+            {sizes.isMobile ? (
+              <>
+                {sidebarOpen && (
+                  <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
+                )}
+                <div className={`fixed top-0 right-0 h-full z-50 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                  <Sidebar
+                    players={gameState.players}
+                    currentPlayer={self_player}
+                    phaseContent={renderPhaseContent()}
+                    headerContent={renderHeaderContent()}
+                    useUpgrades={gameState.use_upgrades}
+                  />
+                </div>
+              </>
+            ) : (
+              <Sidebar
+                players={gameState.players}
+                currentPlayer={self_player}
+                phaseContent={renderPhaseContent()}
+                headerContent={renderHeaderContent()}
+                useUpgrades={gameState.use_upgrades}
+              />
+            )}
+          </div>
+        )}
+        {sizes.isMobile && !isSpectator && (
+          <div className="fixed bottom-0 left-0 right-0 z-30 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
+            <div className="flex items-center justify-center gap-3">
+              {renderActionButtons()}
+            </div>
           </div>
         )}
       </div>

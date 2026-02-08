@@ -1,4 +1,5 @@
 import type { Card as CardType, ZoneName } from "../../types";
+import type { CardDimensions } from "../../hooks/useViewportCardSizes";
 import { DraggableCard, DroppableZone } from "../../dnd";
 
 interface HandZoneProps {
@@ -9,6 +10,7 @@ interface HandZoneProps {
   draggable?: boolean;
   zone?: ZoneName;
   upgradedCardIds?: Set<string>;
+  cardDimensions?: CardDimensions;
 }
 
 export function HandZone({
@@ -16,6 +18,7 @@ export function HandZone({
   selectedCardId,
   onCardClick,
   validFromZones = [
+    "hand",
     "battlefield",
     "graveyard",
     "exile",
@@ -25,19 +28,20 @@ export function HandZone({
   draggable = true,
   zone = "hand",
   upgradedCardIds = new Set(),
+  cardDimensions,
 }: HandZoneProps) {
   return (
     <DroppableZone
       zone={zone}
       validFromZones={validFromZones}
-      className="hand-zone min-h-[220px] w-full"
+      className="hand-zone w-full"
     >
       {cards.map((card) => (
         <DraggableCard
           key={card.id}
           card={card}
           zone={zone}
-          size="md"
+          dimensions={cardDimensions}
           selected={card.id === selectedCardId}
           onClick={() => onCardClick?.(card)}
           disabled={!draggable}

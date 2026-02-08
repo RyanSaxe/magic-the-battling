@@ -1,6 +1,7 @@
 import { useCallback } from 'react'
 import { useWebSocket } from './useWebSocket'
 import type { CardDestination, BuildSource, ZoneName, CardStateAction } from '../types'
+import type { ZoneOwner } from '../dnd/types'
 
 interface SpectatorConfig {
   spectatePlayer: string
@@ -67,8 +68,8 @@ export function useGame(
     send('build_remove_companion')
   }, [send])
 
-  const battleMove = useCallback((cardId: string, fromZone: ZoneName, toZone: ZoneName) => {
-    send('battle_move', { card_id: cardId, from_zone: fromZone, to_zone: toZone })
+  const battleMove = useCallback((cardId: string, fromZone: ZoneName, toZone: ZoneName, fromOwner: ZoneOwner, toOwner: ZoneOwner) => {
+    send('battle_move', { card_id: cardId, from_zone: fromZone, to_zone: toZone, from_owner: fromOwner, to_owner: toOwner })
   }, [send])
 
   const battleSubmitResult = useCallback((result: string) => {
@@ -85,6 +86,14 @@ export function useGame(
 
   const battleUpdateLife = useCallback((target: 'you' | 'opponent', life: number) => {
     send('battle_update_life', { target, life })
+  }, [send])
+
+  const battleChoosePlayDraw = useCallback((choice: 'play' | 'draw') => {
+    send('battle_choose_play_draw', { choice })
+  }, [send])
+
+  const battlePassTurn = useCallback(() => {
+    send('battle_pass_turn')
   }, [send])
 
   const rewardPickUpgrade = useCallback((upgradeId: string) => {
@@ -127,6 +136,8 @@ export function useGame(
       battleSubmitResult,
       battleUpdateCardState,
       battleUpdateLife,
+      battleChoosePlayDraw,
+      battlePassTurn,
       rewardPickUpgrade,
       rewardApplyUpgrade,
       rewardDone,
