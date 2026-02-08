@@ -55,7 +55,6 @@ function bestFit(
   return { width: minWidth, height: Math.round(minWidth * CARD_ASPECT_RATIO), rows: 1 }
 }
 
-const TOP_FRACTIONS = [0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60]
 const DEFAULT_DIMS: ZoneDims = { width: 100, height: 140, rows: 1 }
 
 function computeDualZone(
@@ -88,23 +87,60 @@ function computeDualZone(
   let bestScore = -1
   let bestResult: DualZoneDims = { top: DEFAULT_DIMS, bottom: DEFAULT_DIMS }
 
-  for (const frac of TOP_FRACTIONS) {
-    const topH = availHeight * frac
-    const botH = availHeight - topH
+  for (let topRows = 1; topRows <= topCount; topRows++) {
+    const topCols = Math.ceil(topCount / topRows)
+    const topHGaps = topGap * Math.max(0, topCols - 1)
+    const topWidthCap = Math.min(topMaxWidth, Math.floor((availWidth - topHGaps) / topCols))
+    if (topWidthCap < minCardWidth) continue
 
-    const top = bestFit(topCount, availWidth, topH, topGap, topMaxWidth, minCardWidth)
-    let bottom = bestFit(bottomCount, availWidth, botH, bottomGap, bottomMaxWidth, minCardWidth)
+    for (let botRows = 1; botRows <= bottomCount; botRows++) {
+      const botCols = Math.ceil(bottomCount / botRows)
+      const botHGaps = bottomGap * Math.max(0, botCols - 1)
+      const botWidthCap = Math.min(bottomMaxWidth, Math.floor((availWidth - botHGaps) / botCols))
+      if (botWidthCap < minCardWidth) continue
 
-    if (bottom.width > top.width) {
-      const clampedWidth = top.width
-      const clampedHeight = Math.round(clampedWidth * CARD_ASPECT_RATIO)
-      bottom = { ...bottom, width: clampedWidth, height: clampedHeight }
-    }
+      const topVGaps = topGap * (topRows - 1)
+      const botVGaps = bottomGap * (botRows - 1)
+      const totalVGaps = topVGaps + botVGaps
+      const idealW = (availHeight - totalVGaps) / (CARD_ASPECT_RATIO * (topRows + botRows))
 
-    const score = top.width * top.height + bottom.width * bottom.height
-    if (score > bestScore) {
-      bestScore = score
-      bestResult = { top, bottom }
+      let topW = Math.floor(Math.min(topWidthCap, idealW))
+      let botW = Math.floor(Math.min(botWidthCap, idealW))
+
+      if (topW < minCardWidth || botW < minCardWidth) continue
+
+      // If one zone is capped below idealW, redistribute remaining height
+      if (topW < idealW || botW < idealW) {
+        const cappedW = Math.min(topW, botW)
+        const cappedRows = topW <= botW ? topRows : botRows
+        const otherCap = topW <= botW ? botWidthCap : topWidthCap
+        const otherRows = topW <= botW ? botRows : topRows
+        const otherGap = topW <= botW ? bottomGap : topGap
+        const cappedHeight = cappedRows * Math.round(cappedW * CARD_ASPECT_RATIO) + (topW <= botW ? topVGaps : botVGaps)
+        const remainingH = availHeight - cappedHeight
+        const otherVGaps = otherGap * (otherRows - 1)
+        const otherW = Math.floor(Math.min(otherCap, (remainingH - otherVGaps) / (CARD_ASPECT_RATIO * otherRows)))
+        if (otherW < minCardWidth) continue
+        if (topW <= botW) {
+          botW = otherW
+        } else {
+          topW = otherW
+        }
+      }
+
+      const topH = topRows * Math.round(topW * CARD_ASPECT_RATIO) + topVGaps
+      const botH = botRows * Math.round(botW * CARD_ASPECT_RATIO) + botVGaps
+      const totalH = topH + botH
+      const fill = Math.min(1, totalH / availHeight)
+      const score = Math.min(topW, botW) * fill
+
+      if (score > bestScore) {
+        bestScore = score
+        bestResult = {
+          top: { width: topW, height: Math.round(topW * CARD_ASPECT_RATIO), rows: topRows },
+          bottom: { width: botW, height: Math.round(botW * CARD_ASPECT_RATIO), rows: botRows },
+        }
+      }
     }
   }
 
