@@ -35,10 +35,11 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
     gap: 16,
     maxCardWidth: 180,
   })
+  const poolMaxWidth = Math.min(130, Math.round(packCardDims.width * 0.7))
   const [poolRef, poolCardDims] = useAutoFitCardSizes({
     cardCount: pool.length,
     gap: 8,
-    maxCardWidth: 130,
+    maxCardWidth: poolMaxWidth,
   })
   const upgradedCardIds = new Set(
     self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
@@ -94,7 +95,11 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
         )}
       </PlayerStatsBar>
 
-      <hr className="border-gray-700/50" />
+      <div className="flex items-center gap-3 px-2 shrink-0">
+        <div className="flex-1 border-t border-gray-600/40" />
+        <span className="text-[10px] text-gray-500 uppercase tracking-widest">Your Pool</span>
+        <div className="flex-1 border-t border-gray-600/40" />
+      </div>
 
       {/* Pool */}
       {pool.length === 0 ? (

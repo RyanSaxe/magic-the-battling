@@ -202,10 +202,11 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
     maxCardWidth: 180,
   })
   const poolItemCount = allUpgrades.length + self_player.sideboard.length
+  const poolMaxWidth = Math.min(130, Math.round(handCardDims.width * 0.7))
   const [poolRef, poolCardDims] = useAutoFitCardSizes({
     cardCount: poolItemCount,
     gap: 8,
-    maxCardWidth: 130,
+    maxCardWidth: poolMaxWidth,
   })
 
   return (
