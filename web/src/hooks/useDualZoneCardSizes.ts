@@ -154,8 +154,8 @@ export function useDualZoneCardSizes(config: DualZoneConfig): [
   const {
     topCount,
     bottomCount,
-    topGap = 16,
-    bottomGap = 8,
+    topGap = 6,
+    bottomGap = 6,
     fixedHeight = 0,
     topMaxWidth = 400,
     bottomMaxWidth = 300,

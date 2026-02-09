@@ -139,7 +139,7 @@ body {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   padding: 8px 16px;
   background: rgba(34, 84, 61, 0.4);
 }

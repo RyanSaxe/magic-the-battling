@@ -73,13 +73,13 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
 
   const [upgradeRef, upgradeCardDims] = useContainerCardSizes({
     cardCount: available_upgrades.length,
-    gap: 24,
+    gap: 6,
     maxCardWidth: 200,
   })
   const poolCards = [...self_player.hand, ...self_player.sideboard]
   const [poolRef, poolCardDims] = useContainerCardSizes({
     cardCount: poolCards.length,
-    gap: 4,
+    gap: 6,
     maxCardWidth: 80,
     rows: 3,
   })
@@ -123,7 +123,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
           {!hasUpgradeSection && (
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-6">Your Rewards</div>
           )}
-          <div className={`flex justify-center flex-wrap ${hasUpgradeSection ? 'gap-6' : 'gap-8'}`}>
+          <div className="flex justify-center flex-wrap gap-1.5">
             {last_battle_result.treasures_gained > 0 && (
               <RewardCard
                 imageUrl={TREASURE_TOKEN_IMAGE}
@@ -171,7 +171,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
           <div className="text-center mb-3 shrink-0">
             <h3 className="text-lg font-bold text-amber-400">Stage Complete! Select an upgrade</h3>
           </div>
-          <div ref={upgradeRef} className="flex gap-6 justify-center flex-wrap shrink-0">
+          <div ref={upgradeRef} className="flex gap-1.5 justify-center flex-wrap shrink-0">
             {available_upgrades.map((upgrade) => (
               <Card
                 key={upgrade.id}
@@ -188,7 +188,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center shrink-0">
               Your Pool ({self_player.hand.length + self_player.sideboard.length} cards)
             </div>
-            <div ref={poolRef} className="flex flex-wrap gap-1 justify-center overflow-auto flex-1 min-h-0 p-1">
+            <div ref={poolRef} className="flex flex-wrap gap-1.5 justify-center overflow-auto flex-1 min-h-0 p-1">
               {poolCards.map((card) => (
                 <Card key={card.id} card={card} dimensions={poolCardDims} upgraded={upgradedCardIds.has(card.id)} />
               ))}

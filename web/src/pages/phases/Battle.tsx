@@ -269,7 +269,7 @@ export function BattlePhase({
               zone="hand"
               zoneOwner="opponent"
               validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
-              className="flex items-center justify-center gap-1 flex-nowrap w-full h-full"
+              className="flex items-center justify-center gap-1.5 flex-nowrap w-full h-full"
             >
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
@@ -280,7 +280,7 @@ export function BattlePhase({
                   ))}
             </DroppableZone>
           ) : (
-            <div className="flex items-center justify-center gap-1 flex-nowrap h-full">
+            <div className="flex items-center justify-center gap-1.5 flex-nowrap h-full">
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
                     <Card key={card.id} card={card} dimensions={sizes.opponentHand} upgraded={opponentUpgradedCardIds.has(card.id)} />

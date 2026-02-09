@@ -151,17 +151,17 @@ export function BattlefieldZone({
         className="battlefield p-2"
       >
         <div
-          className={`flex flex-col ${compact ? 'gap-1' : 'gap-2'} ${isOpponent ? "flex-col-reverse" : ""}`}
+          className={`flex flex-col gap-1.5 ${isOpponent ? "flex-col-reverse" : ""}`}
         >
           <div
-            className="flex items-center justify-center flex-nowrap gap-3 overflow-hidden"
+            className="flex items-center justify-center flex-nowrap gap-1.5 overflow-hidden"
             style={{ height: rowHeight }}
           >
             {permanents.map((c) => renderCard(c, nonlandCardDimensions))}
           </div>
           {separateLands && (
             <div
-              className="flex items-center justify-center flex-nowrap gap-2 overflow-hidden"
+              className="flex items-center justify-center flex-nowrap gap-1.5 overflow-hidden"
               style={{ height: rowHeight }}
             >
               {actualLands.map((c) => renderCard(c, landCardDimensions))}
@@ -195,11 +195,11 @@ export function BattlefieldZone({
         </div>
       )}
       <div
-        className={`flex flex-col ${compact ? 'gap-1' : 'gap-2'} ${isOpponent ? "flex-col-reverse" : ""}`}
+        className={`flex flex-col gap-1.5 ${isOpponent ? "flex-col-reverse" : ""}`}
         style={{ minHeight: minH }}
       >
         <div
-          className={`flex justify-center flex-wrap ${compact ? 'gap-1' : 'gap-3'}`}
+          className="flex justify-center flex-wrap gap-1.5"
           style={{ minHeight: minH }}
         >
           {permanents.length === 0 && lands.length === 0 ? (
@@ -211,7 +211,7 @@ export function BattlefieldZone({
           )}
         </div>
         {separateLands && lands.length > 0 && (
-          <div className={`flex justify-center flex-wrap ${compact ? 'gap-1' : 'gap-2'}`}>
+          <div className="flex justify-center flex-wrap gap-1.5">
             {lands.map((c) => renderCard(c))}
           </div>
         )}

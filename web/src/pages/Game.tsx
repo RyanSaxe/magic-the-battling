@@ -875,7 +875,7 @@ function GameContent() {
                       ✕
                     </button>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {current_battle.your_zones.sideboard.map((card) => (
                       <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" />
                     ))}
@@ -903,7 +903,7 @@ function GameContent() {
                       ✕
                     </button>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {current_battle.opponent_full_sideboard.map((card) => (
                       <DraggableCard
                         key={card.id}

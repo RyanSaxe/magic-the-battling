@@ -16,7 +16,7 @@ function getOrdinal(n: number): string {
   return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0])
 }
 
-function CardGrid({ cards, title, maxCardWidth = 130, rows = 1, gap = 8, companionIds }: { cards: CardType[]; title: string; maxCardWidth?: number; rows?: number; gap?: number; companionIds?: Set<string> }) {
+function CardGrid({ cards, title, maxCardWidth = 130, rows = 1, gap = 6, companionIds }: { cards: CardType[]; title: string; maxCardWidth?: number; rows?: number; gap?: number; companionIds?: Set<string> }) {
   const [ref, dims] = useContainerCardSizes({
     cardCount: cards.length,
     gap,
@@ -29,7 +29,7 @@ function CardGrid({ cards, title, maxCardWidth = 130, rows = 1, gap = 8, compani
   return (
     <div className="bg-black/20 rounded-lg p-4">
       <h3 className="text-gray-400 text-sm mb-3">{title}</h3>
-      <div ref={ref} className="flex flex-wrap gap-2 justify-center">
+      <div ref={ref} className="flex flex-wrap gap-1.5 justify-center">
         {cards.map((card) => (
           <Card key={card.id} card={card} dimensions={dims} isCompanion={companionIds?.has(card.id)} />
         ))}
@@ -42,7 +42,7 @@ function UpgradeGrid({ upgrades }: { upgrades: CardType[] }) {
   const appliedUpgrades = upgrades.filter((u) => u.upgrade_target !== null)
   const [ref, dims] = useContainerCardSizes({
     cardCount: appliedUpgrades.length,
-    gap: 12,
+    gap: 6,
     maxCardWidth: 120,
   })
 
@@ -51,7 +51,7 @@ function UpgradeGrid({ upgrades }: { upgrades: CardType[] }) {
   return (
     <div className="bg-black/20 rounded-lg p-4">
       <h3 className="text-gray-400 text-sm mb-3">Upgrades</h3>
-      <div ref={ref} className="flex flex-wrap gap-3 justify-center">
+      <div ref={ref} className="flex flex-wrap gap-1.5 justify-center">
         {appliedUpgrades.map((upgrade) => (
           <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={dims} />
         ))}

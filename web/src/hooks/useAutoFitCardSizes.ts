@@ -18,7 +18,7 @@ interface AutoFitCardDimensions {
 
 export function useAutoFitCardSizes({
   cardCount,
-  gap = 8,
+  gap = 6,
   padding = 0,
   minCardWidth = 40,
   maxCardWidth = 200,
