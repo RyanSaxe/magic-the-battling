@@ -41,26 +41,24 @@ export function CompactZoneDisplay({
       >
         <button
           onClick={() => cards.length > 0 && setShowModal(true)}
-          className={`flex flex-col items-center justify-center rounded transition-colors ${
+          className={`relative flex flex-col items-center justify-end overflow-hidden rounded border border-gray-700 ${
             cards.length > 0
-              ? 'hover:bg-gray-700/50 cursor-pointer'
-              : 'cursor-default'
+              ? 'hover:border-gray-500 cursor-pointer'
+              : 'border-dashed cursor-default'
           }`}
-          style={{
-            width,
-            height,
-            backgroundImage: imageUrl ? `url(${imageUrl})` : undefined,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
+          style={{ width, height }}
         >
-          <div className={`flex flex-col items-center justify-center w-full h-full rounded ${imageUrl ? 'bg-black/60' : ''}`}>
-            <span className="text-[9px] uppercase text-gray-300 font-medium leading-none">{title}</span>
-            {cards.length > 0 ? (
-              <span className="text-xs font-bold text-white">{cards.length}</span>
-            ) : (
-              <span className="text-[8px] text-gray-500 mt-0.5">—</span>
-            )}
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              alt=""
+              className="absolute inset-0 w-full h-full object-contain rounded"
+              draggable={false}
+            />
+          )}
+          <div className="relative z-10 flex items-center gap-0.5 bg-black/70 rounded px-1 py-0.5 mb-0.5">
+            <span className="text-[8px] uppercase text-gray-300 font-medium leading-none">{title}</span>
+            <span className="text-[10px] font-bold text-white leading-none">{cards.length}</span>
           </div>
         </button>
       </DroppableZone>
