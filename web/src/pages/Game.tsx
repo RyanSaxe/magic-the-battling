@@ -22,7 +22,7 @@ import { ContextStripProvider, useContextStrip } from "../contexts";
 import { CardPreviewContext } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
 import { PHASE_HINTS, type Phase } from "../constants/rules";
-import { POISON_COUNTER_IMAGE } from "../constants/assets";
+import { POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import type { Card as CardType } from "../types";
 
@@ -756,7 +756,7 @@ function GameContent() {
 
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
-      <div className={`game-table h-screen overflow-hidden flex flex-col ${sizes.isMobile && !isSpectator ? 'pb-12' : ''}`}>
+      <div className="game-table h-dvh overflow-hidden flex flex-col">
         {/* Spectator Banner */}
         {isSpectator && spectatingPlayer && (
           <div className="bg-purple-900/80 text-purple-200 text-center py-2">
@@ -823,6 +823,7 @@ function GameContent() {
                 <BattlePhase
                   gameState={gameState}
                   actions={actions}
+                  isMobile={sizes.isMobile}
                   sideboardCount={current_battle?.your_zones.sideboard.length ?? 0}
                   onShowSideboard={() => setShowSidebarSideboard(true)}
                   opponentSideboardCount={current_battle?.opponent_full_sideboard?.length ?? 0}
@@ -874,7 +875,7 @@ function GameContent() {
                       ✕
                     </button>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {current_battle.your_zones.sideboard.map((card) => (
                       <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" />
                     ))}
@@ -902,7 +903,7 @@ function GameContent() {
                       ✕
                     </button>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     {current_battle.opponent_full_sideboard.map((card) => (
                       <DraggableCard
                         key={card.id}
@@ -922,7 +923,7 @@ function GameContent() {
           <div className="flex-1 flex min-h-0">
             <main className="flex-1 flex flex-col min-h-0">
               {currentPhase === "draft" && (
-                <DraftPhase gameState={gameState} actions={actions} />
+                <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
               )}
               {currentPhase === "build" && (
                 <BuildPhase
@@ -930,6 +931,7 @@ function GameContent() {
                   actions={actions}
                   selectedBasics={selectedBasics}
                   onBasicsChange={setSelectedBasics}
+                  isMobile={sizes.isMobile}
                 />
               )}
               {currentPhase === "reward" && (
@@ -1008,9 +1010,21 @@ function GameContent() {
           </div>
         )}
         {sizes.isMobile && !isSpectator && (
-          <div className="fixed bottom-0 left-0 right-0 z-30 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
+          <div className="shrink-0 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
             <div className="flex items-center justify-center gap-3">
+              {(currentPhase === "draft" || currentPhase === "build") && (
+                <div className="flex items-center gap-1.5">
+                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-8 rounded-sm" />
+                  <span className="text-base font-bold text-purple-400">{self_player.poison}</span>
+                </div>
+              )}
               {renderActionButtons()}
+              {(currentPhase === "draft" || currentPhase === "build") && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-base font-bold text-amber-400">{self_player.treasures}</span>
+                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-8 rounded-sm" />
+                </div>
+              )}
             </div>
           </div>
         )}

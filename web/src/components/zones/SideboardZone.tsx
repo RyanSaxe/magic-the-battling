@@ -26,7 +26,7 @@ export function SideboardZone({
       <div className="text-xs text-gray-400 mb-2 uppercase tracking-wide">
         Sideboard ({cards.length})
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {cards.length === 0 ? (
           <div className="text-gray-500 text-sm">No cards in sideboard</div>
         ) : (

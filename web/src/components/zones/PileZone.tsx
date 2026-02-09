@@ -70,7 +70,7 @@ export function PileZone({
               Close
             </button>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {cards.map((card) => (
               draggable && allowInteraction ? (
                 <DraggableCard

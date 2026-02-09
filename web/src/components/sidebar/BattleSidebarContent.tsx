@@ -105,43 +105,6 @@ function PlayerSection({
 }) {
   const appliedUpgrades = upgrades.filter((u) => u.upgrade_target);
 
-  const graveyardExileRow = (
-    <div className="flex flex-row gap-2">
-      <DroppableZoneDisplay
-        title="Yard"
-        zone="graveyard"
-        cards={zones.graveyard}
-        maxThumbnails={2}
-        validFromZones={[
-          "hand",
-          "battlefield",
-          "graveyard",
-          "exile",
-          "sideboard",
-          "command_zone",
-        ]}
-        isOpponent={isOpponent}
-        canManipulateOpponent={canManipulateOpponent}
-      />
-      <DroppableZoneDisplay
-        title="Exile"
-        zone="exile"
-        cards={zones.exile}
-        maxThumbnails={2}
-        validFromZones={[
-          "hand",
-          "battlefield",
-          "graveyard",
-          "exile",
-          "sideboard",
-          "command_zone",
-        ]}
-        isOpponent={isOpponent}
-        canManipulateOpponent={canManipulateOpponent}
-      />
-    </div>
-  );
-
   const upgradesRow = appliedUpgrades.length > 0 && (
     <div className="flex gap-2 flex-wrap justify-center">
       {appliedUpgrades.map((upgrade) => (
@@ -180,13 +143,11 @@ function PlayerSection({
           </div>
           <div className="space-y-2">
             {upgradesRow}
-            {graveyardExileRow}
           </div>
         </>
       ) : (
         <>
           <div className="space-y-2">
-            {graveyardExileRow}
             {upgradesRow}
           </div>
           <div className="space-y-2">

@@ -23,7 +23,7 @@ interface DroppableZoneDisplayProps {
   size?: CardSize
 }
 
-function ZoneModal({
+export function ZoneModal({
   title,
   zone,
   cards,

@@ -92,6 +92,7 @@ interface BuildPhaseProps {
   }
   selectedBasics: string[]
   onBasicsChange: (basics: string[]) => void
+  isMobile?: boolean
 }
 
 type SelectionZone = 'hand' | 'sideboard'
@@ -102,7 +103,7 @@ interface CardWithIndex {
   zone: SelectionZone
 }
 
-export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange }: BuildPhaseProps) {
+export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange, isMobile = false }: BuildPhaseProps) {
   const { self_player } = gameState
   const maxHandSize = self_player.hand_size
 
@@ -203,15 +204,15 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
   const [containerRef, { top: handCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
     topCount: self_player.hand.length,
     bottomCount: poolItemCount,
-    topGap: 16,
-    bottomGap: 8,
+    topGap: 6,
+    bottomGap: 6,
     fixedHeight,
     topMaxWidth: 400,
     bottomMaxWidth: 300,
   })
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full gap-2 p-4">
+    <div ref={containerRef} className="flex flex-col h-full gap-2 p-4 overflow-hidden">
       {self_player.hand.length === 0 ? (
         <div className="text-center">
           <div className="text-gray-400 text-sm">Hand is empty</div>
@@ -228,7 +229,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
               {self_player.hand.length}/{maxHandSize}
             </span>
           </div>
-          <div className="flex gap-4 justify-center flex-wrap w-full">
+          <div className="flex gap-1.5 justify-center flex-wrap w-full">
             {self_player.hand.map((card, index) => (
               <Card
                 key={card.id}
@@ -279,11 +280,13 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
 
       {/* Basic lands + stats */}
       <div className="flex items-center px-2 py-1">
-        <div className="flex items-center gap-1">
-          <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-9 rounded" />
-          <span className="text-base font-bold text-purple-400">{self_player.poison}</span>
-        </div>
-        <div className="flex-1 flex gap-3 justify-center">
+        {!isMobile && (
+          <div className="flex items-center gap-2">
+            <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-14 rounded" />
+            <span className="text-xl font-bold text-purple-400">{self_player.poison}</span>
+          </div>
+        )}
+        <div className="flex-1 flex gap-1.5 justify-center">
           {BASIC_LANDS.map(({ name }) => {
             const count = countBasic(name)
             return (
@@ -292,18 +295,10 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                   src={BASIC_LAND_IMAGES[name]}
                   alt={name}
                   className="rounded object-cover shadow-lg"
-                  style={{ width: 60, height: 84 }}
+                  style={{ width: isMobile ? 44 : 60, height: isMobile ? 62 : 84 }}
                   title={name}
                 />
                 <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 bg-black/70 rounded-b py-0.5">
-                  <button
-                    onClick={() => addBasic(name)}
-                    disabled={selectedBasics.length >= 3}
-                    className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
-                  >
-                    +
-                  </button>
-                  <span className="text-white text-xs w-4 text-center">{count}</span>
                   <button
                     onClick={() => removeBasic(name)}
                     disabled={count === 0}
@@ -311,15 +306,25 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
                   >
                     -
                   </button>
+                  <span className="text-white text-xs w-4 text-center">{count}</span>
+                  <button
+                    onClick={() => addBasic(name)}
+                    disabled={selectedBasics.length >= 3}
+                    className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             )
           })}
         </div>
-        <div className="flex items-center gap-1">
-          <span className="text-base font-bold text-amber-400">{self_player.treasures}</span>
-          <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-9 rounded" />
-        </div>
+        {!isMobile && (
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold text-amber-400">{self_player.treasures}</span>
+            <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-14 rounded" />
+          </div>
+        )}
       </div>
 
       {/* Pool (upgrades + sideboard) */}
@@ -330,7 +335,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange 
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2 justify-center content-start">
+        <div className="flex flex-wrap gap-1.5 justify-center content-start">
           {allUpgrades.map((upgrade) => {
             const isApplied = !!upgrade.upgrade_target
             return (

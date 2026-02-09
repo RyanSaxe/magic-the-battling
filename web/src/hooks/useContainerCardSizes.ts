@@ -18,7 +18,7 @@ interface ContainerCardDimensions {
 
 export function useContainerCardSizes({
   cardCount,
-  gap = 16,
+  gap = 6,
   padding = 0,
   minCardWidth = 40,
   maxCardWidth = 300,
