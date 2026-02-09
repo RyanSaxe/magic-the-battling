@@ -204,15 +204,15 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
   const [containerRef, { top: handCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
     topCount: self_player.hand.length,
     bottomCount: poolItemCount,
-    topGap: 16,
-    bottomGap: 8,
+    topGap: 6,
+    bottomGap: 6,
     fixedHeight,
     topMaxWidth: 400,
     bottomMaxWidth: 300,
   })
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full gap-2 p-4">
+    <div ref={containerRef} className="flex flex-col h-full gap-2 p-4 overflow-hidden">
       {self_player.hand.length === 0 ? (
         <div className="text-center">
           <div className="text-gray-400 text-sm">Hand is empty</div>
@@ -229,7 +229,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
               {self_player.hand.length}/{maxHandSize}
             </span>
           </div>
-          <div className="flex gap-4 justify-center flex-wrap w-full">
+          <div className="flex gap-1.5 justify-center flex-wrap w-full">
             {self_player.hand.map((card, index) => (
               <Card
                 key={card.id}
@@ -286,7 +286,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
             <span className="text-xl font-bold text-purple-400">{self_player.poison}</span>
           </div>
         )}
-        <div className={`flex-1 flex ${isMobile ? 'gap-1' : 'gap-3'} justify-center`}>
+        <div className="flex-1 flex gap-1.5 justify-center">
           {BASIC_LANDS.map(({ name }) => {
             const count = countBasic(name)
             return (
@@ -335,7 +335,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2 justify-center content-start">
+        <div className="flex flex-wrap gap-1.5 justify-center content-start">
           {allUpgrades.map((upgrade) => {
             const isApplied = !!upgrade.upgrade_target
             return (

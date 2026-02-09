@@ -33,8 +33,8 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
   const [containerRef, { top: packCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
     topCount: currentPack.length,
     bottomCount: pool.length,
-    topGap: 16,
-    bottomGap: 8,
+    topGap: 6,
+    bottomGap: 6,
     fixedHeight: 30,
     topMaxWidth: 400,
     bottomMaxWidth: 300,
@@ -72,13 +72,13 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
   )
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full gap-2 p-4">
+    <div ref={containerRef} className="flex flex-col h-full gap-2 p-4 overflow-hidden">
       {currentPack.length === 0 ? (
         <div className="text-center">
           <div className="text-gray-400 text-sm">No pack available</div>
         </div>
       ) : (
-        <div className="flex gap-4 justify-center flex-wrap w-full">
+        <div className="flex gap-1.5 justify-center flex-wrap w-full">
           {currentPack.map((card, index) => (
             <Card
               key={card.id}
@@ -117,7 +117,7 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2 justify-center content-start">
+        <div className="flex flex-wrap gap-1.5 justify-center content-start">
           {pool.map((card, index) => {
             const isInHand = self_player.hand.some((c) => c.id === card.id)
             return (
