@@ -620,19 +620,28 @@ function GameContent() {
                 onClick={actions.buildUnready}
                 className="btn bg-gray-600 hover:bg-gray-500 text-white"
               >
-                Unready
+                Undo
               </button>
             </>
           );
         }
         return (
-          <button
-            onClick={() => actions.buildReady(selectedBasics)}
-            disabled={!canReady}
-            className="btn btn-primary"
-          >
-            Ready {!basicsComplete && "(select 3 basics)"}
-          </button>
+          <>
+            <button
+              onClick={() => actions.buildReady(selectedBasics, 'play')}
+              disabled={!canReady}
+              className="btn bg-green-600 hover:bg-green-500 text-white"
+            >
+              Play {!basicsComplete && "(select basics)"}
+            </button>
+            <button
+              onClick={() => actions.buildReady(selectedBasics, 'draw')}
+              disabled={!canReady}
+              className="btn bg-amber-600 hover:bg-amber-500 text-white"
+            >
+              Draw {!basicsComplete && "(select basics)"}
+            </button>
+          </>
         );
       case "battle": {
         if (!current_battle) return null;

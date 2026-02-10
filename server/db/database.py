@@ -42,3 +42,4 @@ def init_db():
         _migrate(conn, "player_game_history", "is_bot", "BOOLEAN", "0")
         _migrate(conn, "player_game_history", "source_history_id", "INTEGER")
         _migrate(conn, "player_game_history", "poison_history_json", "TEXT")
+        _migrate(conn, "battle_snapshots", "play_draw_preference", "TEXT")

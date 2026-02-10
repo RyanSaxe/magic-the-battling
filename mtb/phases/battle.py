@@ -340,28 +340,6 @@ def _is_static_opponent(opponent: Player | StaticOpponent) -> TypeGuard[StaticOp
     return isinstance(opponent, StaticOpponent)
 
 
-def is_play_draw_pending(battle: Battle) -> bool:
-    return battle.on_the_play_name is None
-
-
-def choose_play_or_draw(battle: Battle, player: Player, choice: str) -> bool:
-    """Handle play/draw choice by coin flip winner. Returns True if valid."""
-    if player.name != battle.coin_flip_name:
-        return False
-    if battle.on_the_play_name is not None:
-        return False
-
-    if choice == "play":
-        battle.on_the_play_name = player.name
-    elif choice == "draw":
-        other = battle.opponent.name if battle.player.name == player.name else battle.player.name
-        battle.on_the_play_name = other
-    else:
-        return False
-    battle.current_turn_name = battle.on_the_play_name
-    return True
-
-
 def pass_turn(battle: Battle, player: Player) -> bool:
     """Pass turn to opponent. Returns True if successful."""
     if battle.current_turn_name != player.name:
@@ -391,13 +369,15 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
     else:
         coin_flip_name = random.choice([player.name, opponent.name])
 
-    # Bot auto-chooses play/draw randomly when it wins the flip
-    if coin_flip_name == opponent.name:
-        on_the_play_name = random.choice([player.name, opponent.name])
-        current_turn_name = on_the_play_name
+    winner_pref = player.play_draw_preference if coin_flip_name == player.name else opponent.play_draw_preference
+    if winner_pref == "draw":
+        loser_name = opponent.name if coin_flip_name == player.name else player.name
+        on_the_play_name = loser_name
+    elif winner_pref == "play" or (winner_pref is None and coin_flip_name == player.name):
+        on_the_play_name = coin_flip_name
     else:
-        on_the_play_name = None
-        current_turn_name = None
+        on_the_play_name = random.choice([player.name, opponent.name])
+    current_turn_name = on_the_play_name
 
     player.previous_hand_ids = [c.id for c in player.hand]
     player.previous_basics = player.chosen_basics.copy()
@@ -439,6 +419,14 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
     else:
         coin_flip_name = random.choice([player.name, opponent.name])
 
+    winner_pref = player.play_draw_preference if coin_flip_name == player.name else opponent.play_draw_preference
+    if winner_pref == "draw":
+        loser_name = opponent.name if coin_flip_name == player.name else player.name
+        on_the_play_name = loser_name
+    else:
+        on_the_play_name = coin_flip_name
+    current_turn_name = on_the_play_name
+
     player.previous_hand_ids = [c.id for c in player.hand]
     player.previous_basics = player.chosen_basics.copy()
     player.pre_battle_treasures = player.treasures
@@ -450,6 +438,8 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
         player=player,
         opponent=opponent,
         coin_flip_name=coin_flip_name,
+        on_the_play_name=on_the_play_name,
+        current_turn_name=current_turn_name,
         player_zones=_create_zones_for_player(player),
         opponent_zones=_create_zones_for_player(opponent),
         player_life=game.config.starting_life,

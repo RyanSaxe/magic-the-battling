@@ -18,51 +18,12 @@ interface BattlePhaseProps {
     battleMove: (cardId: string, fromZone: ZoneName, toZone: ZoneName, fromOwner: ZoneOwner, toOwner: ZoneOwner) => void
     battleSubmitResult: (result: string) => void
     battleUpdateCardState: (actionType: CardStateAction, cardId: string, data?: Record<string, unknown>) => void
-    battleChoosePlayDraw: (choice: 'play' | 'draw') => void
   }
   isMobile?: boolean
   sideboardCount?: number
   onShowSideboard?: () => void
   opponentSideboardCount?: number
   onShowOpponentSideboard?: () => void
-}
-
-function PlayDrawModal({ onChoose }: { onChoose: (choice: 'play' | 'draw') => void }) {
-  return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 max-w-sm border border-gray-700">
-        <h2 className="text-xl text-white mb-4 text-center">You Won the Coin Flip!</h2>
-        <p className="text-gray-300 mb-6 text-center">
-          Choose to go first (play) or second (draw).
-        </p>
-        <div className="flex gap-3">
-          <button
-            className="flex-1 px-4 py-2 rounded bg-green-600 hover:bg-green-500 text-white font-medium"
-            onClick={() => onChoose('play')}
-          >
-            Play First
-          </button>
-          <button
-            className="flex-1 px-4 py-2 rounded bg-amber-600 hover:bg-amber-500 text-white font-medium"
-            onClick={() => onChoose('draw')}
-          >
-            Draw First
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function WaitingForChoiceScreen({ coinFlipWinner }: { coinFlipWinner: string }) {
-  return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="text-center">
-        <div className="text-xl text-white mb-4">Waiting for Choice</div>
-        <p className="text-gray-400">{coinFlipWinner} is choosing play or draw...</p>
-      </div>
-    </div>
-  )
 }
 
 const isLandOrTreasure = (card: CardType) =>
@@ -90,7 +51,6 @@ export function BattlePhase({
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
   const { current_battle } = gameState
-  const playerName = gameState.self_player.name
 
   const battle = current_battle
   const yourZones = battle?.your_zones
@@ -134,17 +94,6 @@ export function BattlePhase({
         </div>
       </div>
     )
-  }
-
-  const needsChoice = battle.on_the_play_name === null &&
-                      battle.coin_flip_name === playerName
-
-  if (needsChoice) {
-    return <PlayDrawModal onChoose={actions.battleChoosePlayDraw} />
-  }
-
-  if (battle.on_the_play_name === null) {
-    return <WaitingForChoiceScreen coinFlipWinner={battle.coin_flip_name} />
   }
 
   const { your_zones, opponent_zones, opponent_hand_count: oppHandCount, opponent_hand_revealed } = battle

@@ -85,7 +85,7 @@ interface BuildPhaseProps {
   actions: {
     buildMove: (cardId: string, source: BuildSource, destination: BuildSource) => void
     buildSwap: (cardAId: string, sourceA: BuildSource, cardBId: string, sourceB: BuildSource) => void
-    buildReady: (basics: string[]) => void
+    buildReady: (basics: string[], playDrawPreference: 'play' | 'draw') => void
     buildUnready: () => void
     buildApplyUpgrade: (upgradeId: string, targetCardId: string) => void
     buildSetCompanion: (cardId: string) => void

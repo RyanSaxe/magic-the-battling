@@ -20,6 +20,7 @@ class StaticOpponent(BaseModel):
     chosen_basics: list[str] = Field(default_factory=list)
     treasures: int = 0
     poison: int = 0
+    play_draw_preference: str | None = None
     hand_revealed: bool = False
     is_ghost: bool = True
     source_player_history_id: int | None = None
@@ -52,6 +53,7 @@ class StaticOpponent(BaseModel):
             chosen_basics=snapshot.basic_lands,
             treasures=snapshot.treasures,
             poison=0,
+            play_draw_preference=snapshot.play_draw_preference,
             hand_revealed=True,
             is_ghost=False,
             source_player_history_id=history_id,
@@ -69,6 +71,7 @@ class BattleSnapshotData(BaseModel):
     sideboard: list[Card] = Field(default_factory=list)
     command_zone: list[Card] = Field(default_factory=list)
     poison: int = 0
+    play_draw_preference: str | None = None
 
 
 class FakePlayer(BaseModel):
@@ -160,6 +163,7 @@ class Player(BaseModel):
     previous_hand_ids: list[str] = Field(default_factory=list)
     previous_basics: list[str] = Field(default_factory=list)
     build_ready: bool = False
+    play_draw_preference: str | None = None
     in_sudden_death: bool = False
 
     # model_config is required to allow weakref types
@@ -293,8 +297,8 @@ class Battle(BaseModel):
     player: Player
     opponent: Player | StaticOpponent
     coin_flip_name: str
-    on_the_play_name: str | None = None
-    current_turn_name: str | None = None
+    on_the_play_name: str
+    current_turn_name: str
     player_zones: Zones
     opponent_zones: Zones
     result_submissions: dict[str, str] = Field(default_factory=dict)

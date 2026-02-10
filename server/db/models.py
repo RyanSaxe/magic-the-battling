@@ -72,6 +72,7 @@ class BattleSnapshot(Base):
     applied_upgrades_json = Column(Text, nullable=False)
     treasures = Column(Integer, nullable=False)
     poison = Column(Integer, nullable=True)
+    play_draw_preference = Column(String, nullable=True)
 
     full_state_json = Column(Text, nullable=False)
 

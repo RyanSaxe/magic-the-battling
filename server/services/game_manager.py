@@ -573,6 +573,7 @@ class GameManager:
             sideboard=[c.model_copy() for c in player.sideboard],
             command_zone=[c.model_copy() for c in player.command_zone],
             poison=player.poison,
+            play_draw_preference=player.play_draw_preference,
         )
 
         snapshot = BattleSnapshot(
@@ -585,6 +586,7 @@ class GameManager:
             applied_upgrades_json=json.dumps([u.model_dump() for u in player.upgrades if u.upgrade_target]),
             treasures=player.treasures,
             poison=player.poison,
+            play_draw_preference=player.play_draw_preference,
             full_state_json=snapshot_data.model_dump_json(),
         )
         db.add(snapshot)
@@ -1180,10 +1182,16 @@ class GameManager:
         return True
 
     def handle_build_ready(
-        self, game: Game, player: Player, basics: list[str], game_id: str | None = None, db: Session | None = None
+        self,
+        game: Game,
+        player: Player,
+        basics: list[str],
+        game_id: str | None = None,
+        db: Session | None = None,
+        play_draw_preference: str = "play",
     ) -> str | None:
         try:
-            build.set_ready(game, player, basics)
+            build.set_ready(game, player, basics, play_draw_preference)
 
             # Handle sudden death players specially
             if player.in_sudden_death:
@@ -1398,16 +1406,6 @@ class GameManager:
                 else:
                     b.player_life = life
                 return True
-        return False
-
-    def handle_battle_choose_play_draw(self, game: Game, player: Player, choice: str) -> bool | str:
-        for b in game.active_battles:
-            if player.name in (b.player.name, b.opponent.name):
-                if battle.is_play_draw_pending(b):
-                    if battle.choose_play_or_draw(b, player, choice):
-                        return True
-                    return "Only the coin flip winner can choose"
-                return "Choice already made"
         return False
 
     def handle_battle_update_card_state(
