@@ -4,6 +4,7 @@ import { Card } from '../../components/card'
 import { UpgradeStack } from '../../components/sidebar/UpgradeStack'
 import { BASIC_LANDS, BASIC_LAND_IMAGES, POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
+import { useElementHeight } from '../../hooks/useElementHeight'
 
 interface UpgradeConfirmationModalProps {
   upgrade: CardType
@@ -197,9 +198,11 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
 
   const poolItemCount = allUpgrades.length + self_player.sideboard.length
 
-  let fixedHeight = 130
-  if (self_player.in_sudden_death) fixedHeight += 70
-  if (selectedUpgrade) fixedHeight += 50
+  const [topFixedRef, topFixedHeight] = useElementHeight()
+  const [middleRef, middleHeight] = useElementHeight()
+
+  const topExtra = self_player.hand.length > 0 ? topFixedHeight + 4 : topFixedHeight
+  const fixedHeight = topExtra + middleHeight + 16
 
   const [containerRef, { top: handCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
     topCount: self_player.hand.length,
@@ -214,12 +217,12 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
   return (
     <div ref={containerRef} className="flex flex-col h-full gap-2 p-4 overflow-hidden">
       {self_player.hand.length === 0 ? (
-        <div className="text-center">
+        <div ref={topFixedRef} className="text-center">
           <div className="text-gray-400 text-sm">Hand is empty</div>
         </div>
       ) : (
         <div>
-          <div className="flex items-center gap-2 justify-center mb-1">
+          <div ref={topFixedRef} className="flex items-center gap-2 justify-center mb-1">
             <span className="text-xs text-gray-400 uppercase tracking-wide">Hand</span>
             <span
               className={`text-xs px-1.5 py-0.5 rounded ${
@@ -245,86 +248,88 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
         </div>
       )}
 
-      {/* Sudden Death Banner */}
-      {gameState.self_player.in_sudden_death && (
-        <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center">
-          <div className="text-red-100 font-bold text-lg tracking-wider uppercase animate-pulse flex items-center justify-center gap-2">
-            Sudden Death
-            <span className="relative group cursor-help">
-              <span className="text-red-300/80 text-sm not-italic">ⓘ</span>
-              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 p-2 bg-black/95 border border-red-500/50 rounded text-xs text-left text-red-100 font-normal normal-case tracking-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                Multiple players reached lethal poison. The two with the lowest poison are reset to 9 and face off. A draw causes both players to rebuild. Play continues until one is eliminated.
+      <div ref={middleRef} className="flex flex-col gap-2">
+        {/* Sudden Death Banner */}
+        {gameState.self_player.in_sudden_death && (
+          <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center">
+            <div className="text-red-100 font-bold text-lg tracking-wider uppercase animate-pulse flex items-center justify-center gap-2">
+              Sudden Death
+              <span className="relative group cursor-help">
+                <span className="text-red-300/80 text-sm not-italic">ⓘ</span>
+                <span className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 p-2 bg-black/95 border border-red-500/50 rounded text-xs text-left text-red-100 font-normal normal-case tracking-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                  Multiple players reached lethal poison. The two with the lowest poison are reset to 9 and face off. A draw causes both players to rebuild. Play continues until one is eliminated.
+                </span>
               </span>
+            </div>
+            <div className="text-red-200/80 text-xs mt-1">
+              Build your deck - fight to survive!
+            </div>
+          </div>
+        )}
+
+        {/* Upgrade application instruction */}
+        {selectedUpgrade && (
+          <div className="bg-purple-900/40 rounded-lg p-3 text-center">
+            <span className="text-purple-400 text-sm">
+              Click a card to apply "{selectedUpgrade.name}" to it
             </span>
-          </div>
-          <div className="text-red-200/80 text-xs mt-1">
-            Build your deck - fight to survive!
-          </div>
-        </div>
-      )}
-
-      {/* Upgrade application instruction */}
-      {selectedUpgrade && (
-        <div className="bg-purple-900/40 rounded-lg p-3 text-center">
-          <span className="text-purple-400 text-sm">
-            Click a card to apply "{selectedUpgrade.name}" to it
-          </span>
-          <button
-            onClick={() => setSelectedUpgrade(null)}
-            className="ml-4 text-gray-400 text-sm hover:text-white"
-          >
-            Cancel
-          </button>
-        </div>
-      )}
-
-      {/* Basic lands + stats */}
-      <div className="flex items-center px-2 py-1">
-        {!isMobile && (
-          <div className="flex items-center gap-2">
-            <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-14 rounded" />
-            <span className="text-xl font-bold text-purple-400">{self_player.poison}</span>
+            <button
+              onClick={() => setSelectedUpgrade(null)}
+              className="ml-4 text-gray-400 text-sm hover:text-white"
+            >
+              Cancel
+            </button>
           </div>
         )}
-        <div className="flex-1 flex gap-1.5 justify-center">
-          {BASIC_LANDS.map(({ name }) => {
-            const count = countBasic(name)
-            return (
-              <div key={name} className="relative">
-                <img
-                  src={BASIC_LAND_IMAGES[name]}
-                  alt={name}
-                  className="rounded object-cover shadow-lg"
-                  style={{ width: isMobile ? 44 : 60, height: isMobile ? 62 : 84 }}
-                  title={name}
-                />
-                <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 bg-black/70 rounded-b py-0.5">
-                  <button
-                    onClick={() => removeBasic(name)}
-                    disabled={count === 0}
-                    className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
-                  >
-                    -
-                  </button>
-                  <span className="text-white text-xs w-4 text-center">{count}</span>
-                  <button
-                    onClick={() => addBasic(name)}
-                    disabled={selectedBasics.length >= 3}
-                    className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
-                  >
-                    +
-                  </button>
+
+        {/* Basic lands + stats */}
+        <div className="flex items-center px-2 py-1">
+          {!isMobile && (
+            <div className="flex items-center gap-2">
+              <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-14 rounded" />
+              <span className="text-xl font-bold text-purple-400">{self_player.poison}</span>
+            </div>
+          )}
+          <div className="flex-1 flex gap-1.5 justify-center">
+            {BASIC_LANDS.map(({ name }) => {
+              const count = countBasic(name)
+              return (
+                <div key={name} className="relative">
+                  <img
+                    src={BASIC_LAND_IMAGES[name]}
+                    alt={name}
+                    className="rounded object-cover shadow-lg"
+                    style={{ width: isMobile ? 44 : 60, height: isMobile ? 62 : 84 }}
+                    title={name}
+                  />
+                  <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 bg-black/70 rounded-b py-0.5">
+                    <button
+                      onClick={() => removeBasic(name)}
+                      disabled={count === 0}
+                      className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
+                    >
+                      -
+                    </button>
+                    <span className="text-white text-xs w-4 text-center">{count}</span>
+                    <button
+                      onClick={() => addBasic(name)}
+                      disabled={selectedBasics.length >= 3}
+                      className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
-        {!isMobile && (
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-amber-400">{self_player.treasures}</span>
-            <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-14 rounded" />
+              )
+            })}
           </div>
-        )}
+          {!isMobile && (
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-bold text-amber-400">{self_player.treasures}</span>
+              <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-14 rounded" />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Pool (upgrades + sideboard) */}

@@ -19,10 +19,12 @@ interface UpgradeStackDimensionsProps extends UpgradeStackBaseProps {
 
 type UpgradeStackProps = UpgradeStackSizeProps | UpgradeStackDimensionsProps
 
+const ASPECT_RATIO = 7 / 5
+
 const DIMENSIONS = {
-  xs: { width: 50, height: 70, offset: 16 },
-  sm: { width: 80, height: 112, offset: 24 },
-  md: { width: 120, height: 168, offset: 32 },
+  xs: { width: 50, height: 70 },
+  sm: { width: 80, height: 112 },
+  md: { width: 130, height: 182 },
 }
 
 export function UpgradeStack({ upgrade, size, dimensions, onClick, selected }: UpgradeStackProps) {
@@ -34,33 +36,26 @@ export function UpgradeStack({ upgrade, size, dimensions, onClick, selected }: U
       : <Card card={upgrade} size={size ?? 'xs'} onClick={onClick} selected={selected} />
   }
 
-  const resolved = dimensions
-    ? { width: dimensions.width, height: dimensions.height, offset: Math.round(dimensions.width * 0.2) }
-    : DIMENSIONS[size ?? 'xs']
+  const container = dimensions ?? DIMENSIONS[size ?? 'xs']
+  const offset = Math.round(container.width * 0.2)
+  const subWidth = container.width - offset
+  const subHeight = Math.round(subWidth * ASPECT_RATIO)
+  const subDims = { width: subWidth, height: subHeight }
 
   return (
     <div
       className="relative"
-      style={{
-        width: resolved.width + resolved.offset,
-        height: resolved.height + resolved.offset,
-      }}
+      style={{ width: container.width, height: container.height }}
       onClick={onClick}
     >
       <div className="absolute top-0 left-0">
-        {dimensions
-          ? <Card card={target} dimensions={dimensions} />
-          : <Card card={target} size={size ?? 'xs'} />
-        }
+        <Card card={target} dimensions={subDims} />
       </div>
       <div
         className="absolute"
         style={{ bottom: 0, right: 0 }}
       >
-        {dimensions
-          ? <Card card={upgrade} dimensions={dimensions} selected={selected} />
-          : <Card card={upgrade} size={size ?? 'xs'} selected={selected} />
-        }
+        <Card card={upgrade} dimensions={subDims} selected={selected} />
       </div>
     </div>
   )

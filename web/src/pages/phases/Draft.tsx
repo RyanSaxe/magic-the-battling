@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
+import { useElementHeight } from '../../hooks/useElementHeight'
 import { POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 
 interface DraftPhaseProps {
@@ -30,12 +31,14 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
   const currentPack = self_player.current_pack ?? []
   const pool = [...self_player.hand, ...self_player.sideboard]
 
+  const [separatorRef, separatorHeight] = useElementHeight()
+
   const [containerRef, { top: packCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
     topCount: currentPack.length,
     bottomCount: pool.length,
     topGap: 6,
     bottomGap: 6,
-    fixedHeight: 30,
+    fixedHeight: separatorHeight + 16,
     topMaxWidth: 400,
     bottomMaxWidth: 300,
   })
@@ -91,7 +94,7 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
         </div>
       )}
 
-      <div className="flex items-center gap-3 px-2">
+      <div ref={separatorRef} className="flex items-center gap-3 px-2">
         {!isMobile && (
           <div className="flex items-center gap-2">
             <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-14 rounded" />

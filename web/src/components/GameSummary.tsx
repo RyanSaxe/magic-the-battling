@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import type { SelfPlayerView, PlayerView, Card as CardType } from '../types'
+import type { SelfPlayerView, PlayerView } from '../types'
 import { Card } from './card'
 import { UpgradeStack } from './sidebar/UpgradeStack'
-import { useContainerCardSizes } from '../hooks/useContainerCardSizes'
+import { useGameSummaryCardSize } from '../hooks/useGameSummaryCardSize'
 
 interface GameSummaryProps {
   player: SelfPlayerView
@@ -14,50 +14,6 @@ function getOrdinal(n: number): string {
   const suffixes = ['th', 'st', 'nd', 'rd']
   const v = n % 100
   return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0])
-}
-
-function CardGrid({ cards, title, maxCardWidth = 130, rows = 1, gap = 6, companionIds }: { cards: CardType[]; title: string; maxCardWidth?: number; rows?: number; gap?: number; companionIds?: Set<string> }) {
-  const [ref, dims] = useContainerCardSizes({
-    cardCount: cards.length,
-    gap,
-    maxCardWidth,
-    rows,
-  })
-
-  if (cards.length === 0) return null
-
-  return (
-    <div className="bg-black/20 rounded-lg p-4">
-      <h3 className="text-gray-400 text-sm mb-3">{title}</h3>
-      <div ref={ref} className="flex flex-wrap gap-1.5 justify-center">
-        {cards.map((card) => (
-          <Card key={card.id} card={card} dimensions={dims} isCompanion={companionIds?.has(card.id)} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function UpgradeGrid({ upgrades }: { upgrades: CardType[] }) {
-  const appliedUpgrades = upgrades.filter((u) => u.upgrade_target !== null)
-  const [ref, dims] = useContainerCardSizes({
-    cardCount: appliedUpgrades.length,
-    gap: 6,
-    maxCardWidth: 120,
-  })
-
-  if (appliedUpgrades.length === 0) return null
-
-  return (
-    <div className="bg-black/20 rounded-lg p-4">
-      <h3 className="text-gray-400 text-sm mb-3">Upgrades</h3>
-      <div ref={ref} className="flex flex-wrap gap-1.5 justify-center">
-        {appliedUpgrades.map((upgrade) => (
-          <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={dims} />
-        ))}
-      </div>
-    </div>
-  )
 }
 
 export function GameSummary({
@@ -90,11 +46,19 @@ export function GameSummary({
   const placementText = getOrdinal(displayPlacement)
   const placementColor = isWinner ? 'text-amber-400' : 'text-gray-300'
 
-  const hasHand = frozenPlayer.hand.length > 0
   const appliedUpgrades = frozenPlayer.upgrades.filter((u) => u.upgrade_target !== null)
+  const hasHand = frozenPlayer.hand.length > 0
   const hasUpgrades = useUpgrades && appliedUpgrades.length > 0
-  const hasTopRow = hasHand || hasUpgrades
+  const hasSideboard = frozenPlayer.sideboard.length > 0
   const companionIds = new Set(frozenPlayer.command_zone.map((c) => c.id))
+
+  const [ref, cardDims] = useGameSummaryCardSize({
+    handCount: hasHand ? frozenPlayer.hand.length : 0,
+    upgradeCount: hasUpgrades ? appliedUpgrades.length : 0,
+    sideboardCount: frozenPlayer.sideboard.length,
+  })
+
+  const dims = { width: cardDims.width, height: cardDims.height }
 
   return (
     <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
@@ -106,14 +70,78 @@ export function GameSummary({
           Stage {frozenPlayer.stage} - Round {frozenPlayer.round} | {players.length} Players
         </p>
 
-        <div className="bg-black/30 rounded-lg p-6">
-          {hasTopRow && (
-            <div className={`grid gap-4 mb-4 ${hasHand && hasUpgrades ? 'grid-cols-2' : 'grid-cols-1'}`}>
-              <CardGrid cards={frozenPlayer.hand} title="Hand" companionIds={companionIds} />
-              {useUpgrades && <UpgradeGrid upgrades={frozenPlayer.upgrades} />}
+        <div ref={ref} className="bg-black/30 rounded-lg p-4">
+          {cardDims.isNarrow ? (
+            <div className="flex flex-col gap-2">
+              {hasHand && (
+                <div>
+                  <h3 className="text-xs text-gray-400 mb-1">Hand</h3>
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {frozenPlayer.hand.map((card) => (
+                      <Card key={card.id} card={card} dimensions={dims} isCompanion={companionIds.has(card.id)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {hasUpgrades && (
+                <div>
+                  <h3 className="text-xs text-gray-400 mb-1">Upgrades</h3>
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {appliedUpgrades.map((upgrade) => (
+                      <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={dims} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {hasSideboard && (
+                <div>
+                  <h3 className="text-xs text-gray-400 mb-1">Sideboard</h3>
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {frozenPlayer.sideboard.map((card) => (
+                      <Card key={card.id} card={card} dimensions={dims} isCompanion={companionIds.has(card.id)} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex gap-4">
+              {(hasHand || hasUpgrades) && (
+                <div className="flex-1 flex flex-col gap-2">
+                  {hasHand && (
+                    <div>
+                      <h3 className="text-xs text-gray-400 mb-1">Hand</h3>
+                      <div className="flex flex-wrap gap-1.5 justify-center">
+                        {frozenPlayer.hand.map((card) => (
+                          <Card key={card.id} card={card} dimensions={dims} isCompanion={companionIds.has(card.id)} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {hasUpgrades && (
+                    <div>
+                      <h3 className="text-xs text-gray-400 mb-1">Upgrades</h3>
+                      <div className="flex flex-wrap gap-1.5 justify-center">
+                        {appliedUpgrades.map((upgrade) => (
+                          <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={dims} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {hasSideboard && (
+                <div className={hasHand || hasUpgrades ? 'flex-1' : 'w-full'}>
+                  <h3 className="text-xs text-gray-400 mb-1">Sideboard</h3>
+                  <div className="flex flex-wrap gap-1.5 justify-center">
+                    {frozenPlayer.sideboard.map((card) => (
+                      <Card key={card.id} card={card} dimensions={dims} isCompanion={companionIds.has(card.id)} />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
-          <CardGrid cards={frozenPlayer.sideboard} title="Sideboard" maxCardWidth={80} rows={3} companionIds={companionIds} />
         </div>
       </div>
     </div>
