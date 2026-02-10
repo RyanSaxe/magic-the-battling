@@ -1,132 +1,294 @@
 import { useState, useCallback, useRef, useLayoutEffect } from 'react'
 
 const ASPECT_RATIO = 7 / 5
-const COLUMN_GAP = 16
 const CARD_GAP = 6
-const SECTION_LABEL_HEIGHT = 24
+const DIVIDER_HEIGHT = 20
 const SECTION_GAP = 8
 const NARROW_BREAKPOINT = 500
+const VERTICAL_DIVIDER_WIDTH = 32
 
 interface GameSummaryCardSizeConfig {
   handCount: number
-  upgradeCount: number
+  extrasCount: number
   sideboardCount: number
+  hasExtras: boolean
   maxCardWidth?: number
   minCardWidth?: number
 }
 
-interface GameSummaryCardDims {
+interface SectionDims {
   width: number
   height: number
-  isNarrow: boolean
-  handCols: number
-  sideboardCols: number
+  columns: number
+}
+
+export interface GameSummaryDims {
+  isVertical: boolean
+  hand: SectionDims
+  extras: SectionDims
+  sideboard: SectionDims
+}
+
+function bestFitSection(
+  count: number,
+  availW: number,
+  availH: number,
+  gap: number,
+  maxW: number,
+  minW: number
+): SectionDims {
+  if (count === 0) return { width: 0, height: 0, columns: 0 }
+
+  let best: SectionDims = { width: minW, height: Math.round(minW * ASPECT_RATIO), columns: count }
+
+  for (let rows = 1; rows <= count; rows++) {
+    const cols = Math.ceil(count / rows)
+    const cardW = Math.min(maxW, Math.floor((availW - (cols - 1) * gap) / cols))
+    if (cardW < minW) continue
+
+    const cardH = Math.round(cardW * ASPECT_RATIO)
+    const totalH = rows * cardH + (rows - 1) * gap
+    if (totalH > availH) continue
+
+    if (cardW > best.width) {
+      best = { width: cardW, height: cardH, columns: cols }
+    }
+  }
+
+  return best
+}
+
+function computeVertical(
+  containerW: number,
+  containerH: number,
+  handCount: number,
+  extrasCount: number,
+  sideboardCount: number,
+  maxW: number,
+  minW: number
+): { hand: SectionDims; extras: SectionDims; sideboard: SectionDims } {
+  const sections = [handCount, extrasCount, sideboardCount].filter((c) => c > 0)
+  const visibleCount = sections.length
+  if (visibleCount === 0) {
+    const w = maxW
+    const h = Math.round(w * ASPECT_RATIO)
+    const empty = { width: w, height: h, columns: 0 }
+    return { hand: empty, extras: empty, sideboard: empty }
+  }
+
+  const overhead = visibleCount * DIVIDER_HEIGHT + Math.max(0, visibleCount - 1) * SECTION_GAP
+
+  let bestScore = -1
+  let bestResult = {
+    hand: { width: minW, height: Math.round(minW * ASPECT_RATIO), columns: 1 } as SectionDims,
+    extras: { width: minW, height: Math.round(minW * ASPECT_RATIO), columns: 1 } as SectionDims,
+    sideboard: { width: minW, height: Math.round(minW * ASPECT_RATIO), columns: 1 } as SectionDims,
+  }
+
+  const maxHandRows = handCount || 1
+  const maxExtrasRows = extrasCount || 1
+  const maxSbRows = sideboardCount || 1
+
+  for (let hr = 1; hr <= maxHandRows; hr++) {
+    for (let er = 1; er <= maxExtrasRows; er++) {
+      for (let sr = 1; sr <= maxSbRows; sr++) {
+        const handRows = handCount > 0 ? hr : 0
+        const extrasRows = extrasCount > 0 ? er : 0
+        const sbRows = sideboardCount > 0 ? sr : 0
+
+        if (handCount > 0 && Math.ceil(handCount / Math.ceil(handCount / hr)) !== hr) continue
+        if (extrasCount > 0 && Math.ceil(extrasCount / Math.ceil(extrasCount / er)) !== er) continue
+        if (sideboardCount > 0 && Math.ceil(sideboardCount / Math.ceil(sideboardCount / sr)) !== sr) continue
+
+        const rowGaps =
+          (handRows > 0 ? (handRows - 1) : 0) +
+          (extrasRows > 0 ? (extrasRows - 1) : 0) +
+          (sbRows > 0 ? (sbRows - 1) : 0)
+        const availH = containerH - overhead - rowGaps * CARD_GAP
+
+        if (availH <= 0) continue
+
+        const handCols = handCount > 0 ? Math.ceil(handCount / hr) : 0
+        const extrasCols = extrasCount > 0 ? Math.ceil(extrasCount / er) : 0
+        const sbCols = sideboardCount > 0 ? Math.ceil(sideboardCount / sr) : 0
+
+        const handW = handCount > 0
+          ? Math.min(maxW, Math.floor((containerW - (handCols - 1) * CARD_GAP) / handCols))
+          : 0
+        const extrasW = extrasCount > 0
+          ? Math.min(maxW, Math.floor((containerW - (extrasCols - 1) * CARD_GAP) / extrasCols))
+          : 0
+        const sbW = sideboardCount > 0
+          ? Math.min(maxW, Math.floor((containerW - (sbCols - 1) * CARD_GAP) / sbCols))
+          : 0
+
+        const widths = [handW, extrasW, sbW].filter((w) => w > 0)
+        if (widths.some((w) => w < minW)) continue
+
+        const handSectionH = handRows * Math.round(handW * ASPECT_RATIO) + (handRows > 0 ? (handRows - 1) * CARD_GAP : 0)
+        const extrasSectionH = extrasRows * Math.round(extrasW * ASPECT_RATIO) + (extrasRows > 0 ? (extrasRows - 1) * CARD_GAP : 0)
+        const sbSectionH = sbRows * Math.round(sbW * ASPECT_RATIO) + (sbRows > 0 ? (sbRows - 1) * CARD_GAP : 0)
+
+        const actualTotalH = handSectionH + extrasSectionH + sbSectionH + overhead
+
+        if (actualTotalH > containerH) continue
+
+        const minWidth = Math.min(...widths)
+        const fill = actualTotalH / containerH
+        const score = minWidth * fill
+
+        if (score > bestScore) {
+          bestScore = score
+          bestResult = {
+            hand: handCount > 0
+              ? { width: handW, height: Math.round(handW * ASPECT_RATIO), columns: handCols }
+              : { width: 0, height: 0, columns: 0 },
+            extras: extrasCount > 0
+              ? { width: extrasW, height: Math.round(extrasW * ASPECT_RATIO), columns: extrasCols }
+              : { width: 0, height: 0, columns: 0 },
+            sideboard: sideboardCount > 0
+              ? { width: sbW, height: Math.round(sbW * ASPECT_RATIO), columns: sbCols }
+              : { width: 0, height: 0, columns: 0 },
+          }
+        }
+      }
+    }
+  }
+
+  return bestResult
+}
+
+function computeTwoColumn(
+  containerW: number,
+  containerH: number,
+  handCount: number,
+  extrasCount: number,
+  sideboardCount: number,
+  maxW: number,
+  minW: number
+): { hand: SectionDims; extras: SectionDims; sideboard: SectionDims } {
+  const leftW = (containerW - VERTICAL_DIVIDER_WIDTH) / 2
+  const rightW = (containerW - VERTICAL_DIVIDER_WIDTH) / 2
+
+  const sbDims = bestFitSection(sideboardCount, rightW, containerH, CARD_GAP, maxW, minW)
+
+  const leftSections = (handCount > 0 ? 1 : 0) + (extrasCount > 0 ? 1 : 0)
+  const leftOverhead = leftSections * DIVIDER_HEIGHT + Math.max(0, leftSections - 1) * SECTION_GAP
+
+  let bestScore = -1
+  let bestHand: SectionDims = { width: minW, height: Math.round(minW * ASPECT_RATIO), columns: 1 }
+  let bestExtras: SectionDims = { width: 0, height: 0, columns: 0 }
+
+  const maxHandRows = handCount || 1
+  const maxExtrasRows = extrasCount || 1
+
+  for (let hr = 1; hr <= maxHandRows; hr++) {
+    for (let er = 1; er <= maxExtrasRows; er++) {
+      const handRows = handCount > 0 ? hr : 0
+      const extrasRows = extrasCount > 0 ? er : 0
+
+      if (handCount > 0 && Math.ceil(handCount / Math.ceil(handCount / hr)) !== hr) continue
+      if (extrasCount > 0 && Math.ceil(extrasCount / Math.ceil(extrasCount / er)) !== er) continue
+
+      const rowGaps =
+        (handRows > 0 ? (handRows - 1) : 0) +
+        (extrasRows > 0 ? (extrasRows - 1) : 0)
+      const availH = containerH - leftOverhead - rowGaps * CARD_GAP
+
+      if (availH <= 0) continue
+
+      const handCols = handCount > 0 ? Math.ceil(handCount / hr) : 0
+      const extrasCols = extrasCount > 0 ? Math.ceil(extrasCount / er) : 0
+
+      const handW = handCount > 0
+        ? Math.min(maxW, Math.floor((leftW - (handCols - 1) * CARD_GAP) / handCols))
+        : 0
+      const extrasW = extrasCount > 0
+        ? Math.min(maxW, Math.floor((leftW - (extrasCols - 1) * CARD_GAP) / extrasCols))
+        : 0
+
+      const widths = [handW, extrasW].filter((w) => w > 0)
+      if (widths.some((w) => w < minW)) continue
+
+      const handSectionH = handRows * Math.round(handW * ASPECT_RATIO) + (handRows > 0 ? (handRows - 1) * CARD_GAP : 0)
+      const extrasSectionH = extrasRows * Math.round(extrasW * ASPECT_RATIO) + (extrasRows > 0 ? (extrasRows - 1) * CARD_GAP : 0)
+
+      const leftTotalH = handSectionH + extrasSectionH + leftOverhead +
+        Math.max(0, leftSections - 1) * SECTION_GAP
+
+      if (leftTotalH > containerH) continue
+
+      const minWidth = widths.length > 0 ? Math.min(...widths) : 0
+      const fill = leftTotalH / containerH
+      const score = minWidth * fill
+
+      if (score > bestScore) {
+        bestScore = score
+        bestHand = handCount > 0
+          ? { width: handW, height: Math.round(handW * ASPECT_RATIO), columns: handCols }
+          : { width: 0, height: 0, columns: 0 }
+        bestExtras = extrasCount > 0
+          ? { width: extrasW, height: Math.round(extrasW * ASPECT_RATIO), columns: extrasCols }
+          : { width: 0, height: 0, columns: 0 }
+      }
+    }
+  }
+
+  return { hand: bestHand, extras: bestExtras, sideboard: sbDims }
 }
 
 function computeSize(
-  containerWidth: number,
-  containerHeight: number,
+  containerW: number,
+  containerH: number,
   config: GameSummaryCardSizeConfig
-): GameSummaryCardDims {
-  const { handCount, upgradeCount, sideboardCount, maxCardWidth = 130, minCardWidth = 30 } = config
+): GameSummaryDims {
+  const { handCount, extrasCount, sideboardCount, hasExtras, maxCardWidth = 200, minCardWidth = 30 } = config
 
-  if (containerWidth <= 0 || containerHeight <= 0) {
-    return {
-      width: maxCardWidth,
-      height: Math.round(maxCardWidth * ASPECT_RATIO),
-      isNarrow: true,
-      handCols: Math.max(1, Math.ceil(handCount / 2)),
-      sideboardCols: Math.max(1, Math.ceil(sideboardCount / 3)),
-    }
+  if (containerW <= 0 || containerH <= 0) {
+    const w = minCardWidth
+    const h = Math.round(w * ASPECT_RATIO)
+    const d = { width: w, height: h, columns: 1 }
+    return { isVertical: true, hand: d, extras: d, sideboard: d }
   }
 
-  const isNarrow = containerWidth < NARROW_BREAKPOINT
+  const isVertical = !hasExtras || containerW < NARROW_BREAKPOINT
 
-  const handCols = handCount > 0 ? Math.ceil(handCount / 2) : 0
-  const handRows = handCount > 0 ? Math.ceil(handCount / handCols) : 0
-  const upgradeCols = upgradeCount
-  const upgradeRows = upgradeCount > 0 ? 1 : 0
-  const sideboardCols = sideboardCount > 0 ? Math.ceil(sideboardCount / 3) : 0
-  const sideboardRows = sideboardCount > 0 ? Math.ceil(sideboardCount / sideboardCols) : 0
-
-  if (isNarrow) {
-    const totalRows = handRows + upgradeRows + sideboardRows
-    if (totalRows === 0) {
-      return { width: maxCardWidth, height: Math.round(maxCardWidth * ASPECT_RATIO), isNarrow, handCols: 0, sideboardCols: 0 }
-    }
-
-    const sectionCount = (handCount > 0 ? 1 : 0) + (upgradeCount > 0 ? 1 : 0) + (sideboardCount > 0 ? 1 : 0)
-    const labelOverhead = sectionCount * SECTION_LABEL_HEIGHT
-    const sectionGapOverhead = Math.max(0, sectionCount - 1) * SECTION_GAP
-    const rowGapOverhead = Math.max(0, totalRows - sectionCount) * CARD_GAP
-    const availH = containerHeight - labelOverhead - sectionGapOverhead - rowGapOverhead
-    const heightBased = availH / totalRows / ASPECT_RATIO
-
-    const maxCols = Math.max(handCols || 1, upgradeCols || 1, sideboardCols || 1)
-    const widthBased = (containerWidth - CARD_GAP * Math.max(0, maxCols - 1)) / maxCols
-
-    const width = Math.round(Math.max(minCardWidth, Math.min(maxCardWidth, heightBased, widthBased)))
-    return { width, height: Math.round(width * ASPECT_RATIO), isNarrow, handCols: handCols || 0, sideboardCols: sideboardCols || 0 }
+  if (isVertical) {
+    const result = computeVertical(containerW, containerH, handCount, extrasCount, sideboardCount, maxCardWidth, minCardWidth)
+    return { isVertical: true, ...result }
   }
 
-  // Wide layout: two columns (left = hand + upgrades, right = sideboard)
-  const hasLeft = handCount > 0 || upgradeCount > 0
-  const hasRight = sideboardCount > 0
-  const hasBothColumns = hasLeft && hasRight
+  const result = computeTwoColumn(containerW, containerH, handCount, extrasCount, sideboardCount, maxCardWidth, minCardWidth)
+  return { isVertical: false, ...result }
+}
 
-  const colWidth = hasBothColumns
-    ? (containerWidth - COLUMN_GAP) / 2
-    : containerWidth
-
-  const leftRows = handRows + upgradeRows
-  const rightRows = sideboardRows
-  const maxRows = Math.max(leftRows, rightRows)
-
-  if (maxRows === 0) {
-    return { width: maxCardWidth, height: Math.round(maxCardWidth * ASPECT_RATIO), isNarrow, handCols: 0, sideboardCols: 0 }
-  }
-
-  const leftSectionCount = (handCount > 0 ? 1 : 0) + (upgradeCount > 0 ? 1 : 0)
-  const leftSectionGaps = Math.max(0, leftSectionCount - 1) * SECTION_GAP
-  const leftLabelOverhead = leftSectionCount * SECTION_LABEL_HEIGHT
-  const leftRowGaps = Math.max(0, leftRows - 1) * CARD_GAP
-
-  const rightLabelOverhead = hasRight ? SECTION_LABEL_HEIGHT : 0
-  const rightRowGaps = Math.max(0, rightRows - 1) * CARD_GAP
-
-  const candidates: number[] = []
-
-  if (hasLeft && leftRows > 0) {
-    const leftAvailH = containerHeight - leftLabelOverhead - leftSectionGaps - leftRowGaps
-    candidates.push(leftAvailH / leftRows / ASPECT_RATIO)
-
-    const leftMaxCols = Math.max(handCols || 1, upgradeCols || 1)
-    candidates.push((colWidth - CARD_GAP * Math.max(0, leftMaxCols - 1)) / leftMaxCols)
-  }
-
-  if (hasRight && rightRows > 0) {
-    const rightAvailH = containerHeight - rightLabelOverhead - rightRowGaps
-    candidates.push(rightAvailH / rightRows / ASPECT_RATIO)
-    candidates.push((colWidth - CARD_GAP * Math.max(0, (sideboardCols || 1) - 1)) / (sideboardCols || 1))
-  }
-
-  const width = Math.round(Math.max(minCardWidth, Math.min(maxCardWidth, ...candidates)))
-  return { width, height: Math.round(width * ASPECT_RATIO), isNarrow, handCols: handCols || 0, sideboardCols: sideboardCols || 0 }
+function dimsEqual(a: GameSummaryDims, b: GameSummaryDims): boolean {
+  return (
+    a.isVertical === b.isVertical &&
+    a.hand.width === b.hand.width &&
+    a.hand.height === b.hand.height &&
+    a.hand.columns === b.hand.columns &&
+    a.extras.width === b.extras.width &&
+    a.extras.height === b.extras.height &&
+    a.extras.columns === b.extras.columns &&
+    a.sideboard.width === b.sideboard.width &&
+    a.sideboard.height === b.sideboard.height &&
+    a.sideboard.columns === b.sideboard.columns
+  )
 }
 
 export function useGameSummaryCardSize(
   config: GameSummaryCardSizeConfig
-): [React.RefCallback<HTMLElement>, GameSummaryCardDims] {
-  const { handCount, upgradeCount, sideboardCount, maxCardWidth = 130, minCardWidth = 30 } = config
-  const resolved = { handCount, upgradeCount, sideboardCount, maxCardWidth, minCardWidth }
+): [React.RefCallback<HTMLElement>, GameSummaryDims] {
+  const { handCount, extrasCount, sideboardCount, hasExtras, maxCardWidth = 200, minCardWidth = 30 } = config
+  const resolved = { handCount, extrasCount, sideboardCount, hasExtras, maxCardWidth, minCardWidth }
 
-  const [dims, setDims] = useState<GameSummaryCardDims>(() => ({
-    width: maxCardWidth,
-    height: Math.round(maxCardWidth * ASPECT_RATIO),
-    isNarrow: false,
-    handCols: Math.max(1, Math.ceil(handCount / 2)),
-    sideboardCols: Math.max(1, Math.ceil(sideboardCount / 3)),
-  }))
+  const [dims, setDims] = useState<GameSummaryDims>(() => {
+    const w = minCardWidth
+    const h = Math.round(w * ASPECT_RATIO)
+    const d = { width: w, height: h, columns: 1 }
+    return { isVertical: true, hand: d, extras: d, sideboard: d }
+  })
 
   const observerRef = useRef<ResizeObserver | null>(null)
   const elementRef = useRef<HTMLElement | null>(null)
@@ -134,7 +296,7 @@ export function useGameSummaryCardSize(
   const compute = useCallback(
     (w: number, h: number) => computeSize(w, h, resolved),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [handCount, upgradeCount, sideboardCount, maxCardWidth, minCardWidth]
+    [handCount, extrasCount, sideboardCount, hasExtras, maxCardWidth, minCardWidth]
   )
 
   const refCallback = useCallback(
@@ -151,22 +313,14 @@ export function useGameSummaryCardSize(
       const w = node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
       const h = node.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
       const next = compute(w, h)
-      setDims((prev) =>
-        prev.width === next.width && prev.height === next.height && prev.isNarrow === next.isNarrow
-          ? prev
-          : next
-      )
+      setDims((prev) => (dimsEqual(prev, next) ? prev : next))
 
       const observer = new ResizeObserver((entries) => {
         const entry = entries[0]
         if (!entry) return
         const { width, height } = entry.contentRect
         const next = compute(width, height)
-        setDims((prev) =>
-          prev.width === next.width && prev.height === next.height && prev.isNarrow === next.isNarrow
-            ? prev
-            : next
-        )
+        setDims((prev) => (dimsEqual(prev, next) ? prev : next))
       })
 
       observer.observe(node)
@@ -181,11 +335,7 @@ export function useGameSummaryCardSize(
       const w = elementRef.current.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
       const h = elementRef.current.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
       const next = compute(w, h)
-      setDims((prev) =>
-        prev.width === next.width && prev.height === next.height && prev.isNarrow === next.isNarrow
-          ? prev
-          : next
-      )
+      setDims((prev) => (dimsEqual(prev, next) ? prev : next))
     }
   }, [compute])
 

@@ -77,6 +77,7 @@ export interface LastBattleResult {
   treasures_gained: number
   card_gained: Card | null
   vanquisher_gained: boolean
+  pre_battle_treasures: number
 }
 
 export interface SelfPlayerView extends PlayerView {

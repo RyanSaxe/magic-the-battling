@@ -86,6 +86,8 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
           gridTemplateColumns: `repeat(${packCardDims.columns}, ${packCardDims.width}px)`,
           gap: '6px',
           justifyContent: 'center',
+          maxWidth: '100%',
+          overflow: 'hidden',
         }}>
           {currentPack.map((card, index) => (
             <Card
@@ -130,6 +132,8 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
           gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
           gap: '6px',
           justifyContent: 'center',
+          maxWidth: '100%',
+          overflow: 'hidden',
         }}>
           {pool.map((card, index) => {
             const isInHand = self_player.hand.some((c) => c.id === card.id)

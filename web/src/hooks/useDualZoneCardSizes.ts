@@ -166,8 +166,8 @@ export function useDualZoneCardSizes(config: DualZoneConfig): [
   const resolved = { topCount, bottomCount, topGap, bottomGap, fixedHeight, topMaxWidth, bottomMaxWidth, minCardWidth }
 
   const [dims, setDims] = useState<DualZoneDims>(() => ({
-    top: { width: topMaxWidth, height: Math.round(topMaxWidth * CARD_ASPECT_RATIO), rows: 1, columns: 1 },
-    bottom: { width: bottomMaxWidth, height: Math.round(bottomMaxWidth * CARD_ASPECT_RATIO), rows: 1, columns: 1 },
+    top: { width: minCardWidth, height: Math.round(minCardWidth * CARD_ASPECT_RATIO), rows: 1, columns: 1 },
+    bottom: { width: minCardWidth, height: Math.round(minCardWidth * CARD_ASPECT_RATIO), rows: 1, columns: 1 },
   }))
 
   const observerRef = useRef<ResizeObserver | null>(null)

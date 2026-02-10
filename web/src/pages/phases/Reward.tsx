@@ -176,6 +176,8 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
             gridTemplateColumns: `repeat(${upgradeCardDims.columns}, ${upgradeCardDims.width}px)`,
             gap: '6px',
             justifyContent: 'center',
+            maxWidth: '100%',
+            overflow: 'hidden',
           }}>
             {available_upgrades.map((upgrade) => (
               <Card
@@ -199,6 +201,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
               gap: '6px',
               justifyContent: 'center',
               alignContent: 'start',
+              maxWidth: '100%',
             }}>
               {poolCards.map((card) => (
                 <Card key={card.id} card={card} dimensions={poolCardDims} upgraded={upgradedCardIds.has(card.id)} />

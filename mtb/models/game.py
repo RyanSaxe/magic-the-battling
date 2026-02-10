@@ -127,6 +127,7 @@ class LastBattleResult(BaseModel):
     treasures_gained: int = 0
     card_gained: Card | None = None
     vanquisher_gained: bool = False
+    pre_battle_treasures: int = 0
 
 
 class Player(BaseModel):
@@ -139,6 +140,7 @@ class Player(BaseModel):
     vanquishers: int = 0
     poison: int = 0
     treasures: int = 0
+    pre_battle_treasures: int = 0
     placement: int = 0
     elimination_round: int = 0
     elimination_stage: int = 0

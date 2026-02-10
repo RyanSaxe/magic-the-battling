@@ -401,6 +401,7 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
 
     player.previous_hand_ids = [c.id for c in player.hand]
     player.previous_basics = player.chosen_basics.copy()
+    player.pre_battle_treasures = player.treasures
 
     battle = Battle(
         player=player,
@@ -440,8 +441,10 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
 
     player.previous_hand_ids = [c.id for c in player.hand]
     player.previous_basics = player.chosen_basics.copy()
+    player.pre_battle_treasures = player.treasures
     opponent.previous_hand_ids = [c.id for c in opponent.hand]
     opponent.previous_basics = opponent.chosen_basics.copy()
+    opponent.pre_battle_treasures = opponent.treasures
 
     battle = Battle(
         player=player,

@@ -237,6 +237,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
             gridTemplateColumns: `repeat(${handCardDims.columns}, ${handCardDims.width}px)`,
             gap: '6px',
             justifyContent: 'center',
+            maxWidth: '100%',
+            overflow: 'hidden',
           }}>
             {self_player.hand.map((card, index) => (
               <Card
@@ -350,6 +352,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
           gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
           gap: '6px',
           justifyContent: 'center',
+          maxWidth: '100%',
+          overflow: 'hidden',
         }}>
           {allUpgrades.map((upgrade) => {
             const isApplied = !!upgrade.upgrade_target
