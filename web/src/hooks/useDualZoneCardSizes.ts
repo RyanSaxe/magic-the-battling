@@ -133,7 +133,7 @@ function computeDualZone(
       const botH = botRows * Math.round(botW * CARD_ASPECT_RATIO) + botVGaps
       const totalH = topH + botH
       const fill = Math.min(1, totalH / availHeight)
-      const score = Math.min(topW, botW) * fill
+      const score = Math.min(topW, botW) * Math.sqrt(fill)
 
       if (score > bestScore) {
         bestScore = score

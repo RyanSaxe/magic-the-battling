@@ -58,6 +58,44 @@ function bestFitSection(
   return best
 }
 
+function solveIdealWidths(
+  sections: { rows: number; widthCap: number; idx: number }[],
+  availH: number,
+  minW: number
+): number[] | null {
+  const widths = [0, 0, 0]
+  let remainingH = availH
+  let uncapped = [...sections]
+
+  while (uncapped.length > 0) {
+    const totalRows = uncapped.reduce((sum, s) => sum + s.rows, 0)
+    const totalInternalGaps = uncapped.reduce(
+      (sum, s) => sum + Math.max(0, s.rows - 1) * CARD_GAP,
+      0
+    )
+    const idealW = (remainingH - totalInternalGaps) / (ASPECT_RATIO * totalRows)
+
+    if (idealW < minW) return null
+
+    const newlyCapped = uncapped.filter((s) => s.widthCap < idealW)
+    if (newlyCapped.length === 0) {
+      for (const s of uncapped) {
+        widths[s.idx] = Math.floor(Math.min(s.widthCap, idealW))
+      }
+      break
+    }
+
+    for (const s of newlyCapped) {
+      widths[s.idx] = s.widthCap
+      const h = Math.round(s.widthCap * ASPECT_RATIO)
+      remainingH -= s.rows * h + Math.max(0, s.rows - 1) * CARD_GAP
+    }
+    uncapped = uncapped.filter((s) => !newlyCapped.includes(s))
+  }
+
+  return widths
+}
+
 function computeVertical(
   containerW: number,
   containerH: number,
@@ -67,8 +105,8 @@ function computeVertical(
   maxW: number,
   minW: number
 ): { hand: SectionDims; extras: SectionDims; sideboard: SectionDims } {
-  const sections = [handCount, extrasCount, sideboardCount].filter((c) => c > 0)
-  const visibleCount = sections.length
+  const counts = [handCount, extrasCount, sideboardCount]
+  const visibleCount = counts.filter((c) => c > 0).length
   if (visibleCount === 0) {
     const w = maxW
     const h = Math.round(w * ASPECT_RATIO)
@@ -92,50 +130,56 @@ function computeVertical(
   for (let hr = 1; hr <= maxHandRows; hr++) {
     for (let er = 1; er <= maxExtrasRows; er++) {
       for (let sr = 1; sr <= maxSbRows; sr++) {
-        const handRows = handCount > 0 ? hr : 0
-        const extrasRows = extrasCount > 0 ? er : 0
-        const sbRows = sideboardCount > 0 ? sr : 0
-
         if (handCount > 0 && Math.ceil(handCount / Math.ceil(handCount / hr)) !== hr) continue
         if (extrasCount > 0 && Math.ceil(extrasCount / Math.ceil(extrasCount / er)) !== er) continue
         if (sideboardCount > 0 && Math.ceil(sideboardCount / Math.ceil(sideboardCount / sr)) !== sr) continue
 
-        const rowGaps =
-          (handRows > 0 ? (handRows - 1) : 0) +
-          (extrasRows > 0 ? (extrasRows - 1) : 0) +
-          (sbRows > 0 ? (sbRows - 1) : 0)
-        const availH = containerH - overhead - rowGaps * CARD_GAP
-
-        if (availH <= 0) continue
+        const handRows = handCount > 0 ? hr : 0
+        const extrasRows = extrasCount > 0 ? er : 0
+        const sbRows = sideboardCount > 0 ? sr : 0
 
         const handCols = handCount > 0 ? Math.ceil(handCount / hr) : 0
         const extrasCols = extrasCount > 0 ? Math.ceil(extrasCount / er) : 0
         const sbCols = sideboardCount > 0 ? Math.ceil(sideboardCount / sr) : 0
 
-        const handW = handCount > 0
+        const handWidthCap = handCols > 0
           ? Math.min(maxW, Math.floor((containerW - (handCols - 1) * CARD_GAP) / handCols))
           : 0
-        const extrasW = extrasCount > 0
+        const extrasWidthCap = extrasCols > 0
           ? Math.min(maxW, Math.floor((containerW - (extrasCols - 1) * CARD_GAP) / extrasCols))
           : 0
-        const sbW = sideboardCount > 0
+        const sbWidthCap = sbCols > 0
           ? Math.min(maxW, Math.floor((containerW - (sbCols - 1) * CARD_GAP) / sbCols))
           : 0
 
-        const widths = [handW, extrasW, sbW].filter((w) => w > 0)
-        if (widths.some((w) => w < minW)) continue
+        const active: { rows: number; widthCap: number; idx: number }[] = []
+        if (handCount > 0) active.push({ rows: handRows, widthCap: handWidthCap, idx: 0 })
+        if (extrasCount > 0) active.push({ rows: extrasRows, widthCap: extrasWidthCap, idx: 1 })
+        if (sideboardCount > 0) active.push({ rows: sbRows, widthCap: sbWidthCap, idx: 2 })
 
-        const handSectionH = handRows * Math.round(handW * ASPECT_RATIO) + (handRows > 0 ? (handRows - 1) * CARD_GAP : 0)
-        const extrasSectionH = extrasRows * Math.round(extrasW * ASPECT_RATIO) + (extrasRows > 0 ? (extrasRows - 1) * CARD_GAP : 0)
-        const sbSectionH = sbRows * Math.round(sbW * ASPECT_RATIO) + (sbRows > 0 ? (sbRows - 1) * CARD_GAP : 0)
+        if (active.some((s) => s.widthCap < minW)) continue
+
+        const widths = solveIdealWidths(active, containerH - overhead, minW)
+        if (!widths) continue
+
+        const handW = widths[0]
+        const extrasW = widths[1]
+        const sbW = widths[2]
+
+        const handSectionH = handRows > 0
+          ? handRows * Math.round(handW * ASPECT_RATIO) + (handRows - 1) * CARD_GAP : 0
+        const extrasSectionH = extrasRows > 0
+          ? extrasRows * Math.round(extrasW * ASPECT_RATIO) + (extrasRows - 1) * CARD_GAP : 0
+        const sbSectionH = sbRows > 0
+          ? sbRows * Math.round(sbW * ASPECT_RATIO) + (sbRows - 1) * CARD_GAP : 0
 
         const actualTotalH = handSectionH + extrasSectionH + sbSectionH + overhead
-
         if (actualTotalH > containerH) continue
 
-        const minWidth = Math.min(...widths)
+        const activeWidths = active.map((s) => widths[s.idx])
+        const minWidth = Math.min(...activeWidths)
         const fill = actualTotalH / containerH
-        const score = minWidth * fill
+        const score = minWidth * Math.sqrt(fill)
 
         if (score > bestScore) {
           bestScore = score
@@ -184,43 +228,46 @@ function computeTwoColumn(
 
   for (let hr = 1; hr <= maxHandRows; hr++) {
     for (let er = 1; er <= maxExtrasRows; er++) {
-      const handRows = handCount > 0 ? hr : 0
-      const extrasRows = extrasCount > 0 ? er : 0
-
       if (handCount > 0 && Math.ceil(handCount / Math.ceil(handCount / hr)) !== hr) continue
       if (extrasCount > 0 && Math.ceil(extrasCount / Math.ceil(extrasCount / er)) !== er) continue
 
-      const rowGaps =
-        (handRows > 0 ? (handRows - 1) : 0) +
-        (extrasRows > 0 ? (extrasRows - 1) : 0)
-      const availH = containerH - leftOverhead - rowGaps * CARD_GAP
-
-      if (availH <= 0) continue
+      const handRows = handCount > 0 ? hr : 0
+      const extrasRows = extrasCount > 0 ? er : 0
 
       const handCols = handCount > 0 ? Math.ceil(handCount / hr) : 0
       const extrasCols = extrasCount > 0 ? Math.ceil(extrasCount / er) : 0
 
-      const handW = handCount > 0
+      const handWidthCap = handCols > 0
         ? Math.min(maxW, Math.floor((leftW - (handCols - 1) * CARD_GAP) / handCols))
         : 0
-      const extrasW = extrasCount > 0
+      const extrasWidthCap = extrasCols > 0
         ? Math.min(maxW, Math.floor((leftW - (extrasCols - 1) * CARD_GAP) / extrasCols))
         : 0
 
-      const widths = [handW, extrasW].filter((w) => w > 0)
-      if (widths.some((w) => w < minW)) continue
+      const active: { rows: number; widthCap: number; idx: number }[] = []
+      if (handCount > 0) active.push({ rows: handRows, widthCap: handWidthCap, idx: 0 })
+      if (extrasCount > 0) active.push({ rows: extrasRows, widthCap: extrasWidthCap, idx: 1 })
 
-      const handSectionH = handRows * Math.round(handW * ASPECT_RATIO) + (handRows > 0 ? (handRows - 1) * CARD_GAP : 0)
-      const extrasSectionH = extrasRows * Math.round(extrasW * ASPECT_RATIO) + (extrasRows > 0 ? (extrasRows - 1) * CARD_GAP : 0)
+      if (active.some((s) => s.widthCap < minW)) continue
 
-      const leftTotalH = handSectionH + extrasSectionH + leftOverhead +
-        Math.max(0, leftSections - 1) * SECTION_GAP
+      const widths = solveIdealWidths(active, containerH - leftOverhead, minW)
+      if (!widths) continue
 
+      const handW = widths[0]
+      const extrasW = widths[1]
+
+      const handSectionH = handRows > 0
+        ? handRows * Math.round(handW * ASPECT_RATIO) + (handRows - 1) * CARD_GAP : 0
+      const extrasSectionH = extrasRows > 0
+        ? extrasRows * Math.round(extrasW * ASPECT_RATIO) + (extrasRows - 1) * CARD_GAP : 0
+
+      const leftTotalH = handSectionH + extrasSectionH + leftOverhead
       if (leftTotalH > containerH) continue
 
-      const minWidth = widths.length > 0 ? Math.min(...widths) : 0
+      const activeWidths = active.map((s) => widths[s.idx])
+      const minWidth = activeWidths.length > 0 ? Math.min(...activeWidths) : 0
       const fill = leftTotalH / containerH
-      const score = minWidth * fill
+      const score = minWidth * Math.sqrt(fill)
 
       if (score > bestScore) {
         bestScore = score
