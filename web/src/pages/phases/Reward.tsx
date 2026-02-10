@@ -13,7 +13,6 @@ interface RewardPhaseProps {
   onUpgradeSelect: (upgradeId: string | null) => void
 }
 
-const REWARD_DIMS = { width: 143, height: 200 }
 const REWARD_COMPACT_DIMS = { width: 50, height: 70 }
 
 function RewardCard({
@@ -21,14 +20,14 @@ function RewardCard({
   label,
   sublabel,
   compact,
+  dimensions,
 }: {
   imageUrl: string
   label: string
   sublabel?: string
   compact?: boolean
+  dimensions?: { width: number; height: number }
 }) {
-  const dims = compact ? REWARD_COMPACT_DIMS : REWARD_DIMS
-
   if (compact) {
     return (
       <div className="flex items-center gap-2">
@@ -36,7 +35,7 @@ function RewardCard({
           src={imageUrl}
           alt={label}
           className="rounded object-cover shadow-lg shrink-0"
-          style={{ width: dims.width, height: dims.height }}
+          style={{ width: REWARD_COMPACT_DIMS.width, height: REWARD_COMPACT_DIMS.height }}
         />
         <div>
           <div className="text-white text-sm font-medium">{label}</div>
@@ -45,6 +44,8 @@ function RewardCard({
       </div>
     )
   }
+
+  const dims = dimensions ?? { width: 143, height: 200 }
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -70,6 +71,16 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
   const upgradedCardIds = new Set(
     self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
   )
+
+  const rewardCount =
+    (last_battle_result?.treasures_gained ? 1 : 0) +
+    (last_battle_result?.vanquisher_gained ? 1 : 0) +
+    (last_battle_result?.card_gained ? 1 : 0)
+  const [rewardRef, rewardCardDims] = useContainerCardSizes({
+    cardCount: Math.max(rewardCount, 1),
+    gap: 24,
+    maxCardWidth: 300,
+  })
 
   const [upgradeRef, upgradeCardDims] = useContainerCardSizes({
     cardCount: available_upgrades.length,
@@ -123,12 +134,13 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
           {!hasUpgradeSection && (
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-6">Your Rewards</div>
           )}
-          <div className="flex justify-center flex-wrap gap-1.5">
+          <div ref={hasUpgradeSection ? undefined : rewardRef} className="flex justify-center flex-wrap gap-6">
             {last_battle_result.treasures_gained > 0 && (
               <RewardCard
                 imageUrl={TREASURE_TOKEN_IMAGE}
                 label={`+${last_battle_result.treasures_gained} Treasure`}
                 compact={hasUpgradeSection}
+                dimensions={hasUpgradeSection ? undefined : rewardCardDims}
               />
             )}
             {last_battle_result.vanquisher_gained && (
@@ -137,6 +149,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
                 label="Vanquisher"
                 sublabel="+1 Hand Size"
                 compact={hasUpgradeSection}
+                dimensions={hasUpgradeSection ? undefined : rewardCardDims}
               />
             )}
             {last_battle_result.card_gained && (
@@ -148,7 +161,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
                 />
               ) : (
                 <div className="flex flex-col items-center gap-2">
-                  <Card card={last_battle_result.card_gained} dimensions={REWARD_DIMS} />
+                  <Card card={last_battle_result.card_gained} dimensions={rewardCardDims} />
                   <div className="text-center">
                     <div className="text-white font-medium">New Card</div>
                     <div className="text-gray-400 text-sm">{last_battle_result.card_gained.name}</div>
