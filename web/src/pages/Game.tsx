@@ -980,6 +980,7 @@ function GameContent() {
                   player={self_player}
                   players={gameState.players}
                   useUpgrades={gameState.use_upgrades}
+                  gameId={gameId}
                 />
               )}
             </main>

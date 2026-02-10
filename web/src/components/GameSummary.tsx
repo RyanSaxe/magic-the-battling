@@ -1,87 +1,23 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import type { SelfPlayerView, PlayerView } from '../types'
 import { Card } from './card'
 import { UpgradeStack } from './sidebar/UpgradeStack'
 import { useGameSummaryCardSize } from '../hooks/useGameSummaryCardSize'
-import { TREASURE_TOKEN_IMAGE } from '../constants/assets'
+import { CardGrid, LabeledDivider, VerticalDivider, TreasureCard } from './common'
+import { getOrdinal } from '../utils/format'
 
 interface GameSummaryProps {
   player: SelfPlayerView
   players: PlayerView[]
   useUpgrades?: boolean
-}
-
-function getOrdinal(n: number): string {
-  const suffixes = ['th', 'st', 'nd', 'rd']
-  const v = n % 100
-  return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0])
-}
-
-function LabeledDivider({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="flex-1 border-t border-gray-600/40" />
-      <span className="text-[10px] text-gray-500 uppercase tracking-widest">{label}</span>
-      <div className="flex-1 border-t border-gray-600/40" />
-    </div>
-  )
-}
-
-function VerticalDivider({ label }: { label: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center self-stretch" style={{ width: 32 }}>
-      <div className="flex-1 border-l border-gray-600/40" />
-      <span
-        className="text-[10px] text-gray-500 uppercase tracking-widest py-2"
-        style={{ writingMode: 'vertical-rl' }}
-      >
-        {label}
-      </span>
-      <div className="flex-1 border-l border-gray-600/40" />
-    </div>
-  )
-}
-
-function TreasureCard({ count, dimensions }: { count: number; dimensions: { width: number; height: number } }) {
-  return (
-    <div className="relative rounded overflow-hidden" style={{ width: dimensions.width, height: dimensions.height }}>
-      <img src={TREASURE_TOKEN_IMAGE} className="w-full h-full object-cover" />
-      <div className="absolute bottom-1 right-1 bg-black/70 text-amber-400 font-bold text-sm rounded-full w-6 h-6 flex items-center justify-center">
-        {count}
-      </div>
-    </div>
-  )
-}
-
-function CardGrid({
-  columns,
-  cardWidth,
-  children,
-}: {
-  columns: number
-  cardWidth: number
-  children: React.ReactNode
-}) {
-  return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(${columns}, ${cardWidth}px)`,
-        gap: '6px',
-        justifyContent: 'center',
-        maxWidth: '100%',
-        overflow: 'hidden',
-      }}
-    >
-      {children}
-    </div>
-  )
+  gameId?: string
 }
 
 export function GameSummary({
   player,
   players,
   useUpgrades = true,
+  gameId,
 }: GameSummaryProps) {
   const [frozenPlayer] = useState(() => ({
     hand: [...player.hand],
@@ -117,6 +53,15 @@ export function GameSummary({
   const hasExtras = appliedUpgrades.length > 0 || preBattleTreasures > 0
   const extrasCount = appliedUpgrades.length + (preBattleTreasures > 0 ? 1 : 0)
 
+  const [copied, setCopied] = useState(false)
+  const handleShare = useCallback(() => {
+    if (!gameId) return
+    const url = `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(frozenPlayer.name)}`
+    navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [gameId, frozenPlayer.name])
+
   const [ref, dims] = useGameSummaryCardSize({
     handCount: hasHand ? frozenPlayer.hand.length : 0,
     extrasCount: hasExtras ? extrasCount : 0,
@@ -134,9 +79,18 @@ export function GameSummary({
         <h2 className={`text-4xl font-bold mb-2 ${placementColor}`}>
           {placementText} Place
         </h2>
-        <p className="text-gray-400 mb-6">
+        <p className="text-gray-400 mb-2">
           Stage {frozenPlayer.stage} - Round {frozenPlayer.round} | {players.length} Players
         </p>
+        {gameId && (
+          <button
+            className="text-xs bg-gray-800 border border-gray-600 text-gray-300 rounded px-3 py-1 hover:bg-gray-700 mb-4"
+            onClick={handleShare}
+          >
+            {copied ? 'Link Copied!' : 'Share Game'}
+          </button>
+        )}
+        {!gameId && <div className="mb-4" />}
       </div>
 
       <div className="max-w-5xl w-full flex-1 min-h-0">

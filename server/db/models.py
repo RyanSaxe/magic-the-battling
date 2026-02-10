@@ -48,9 +48,14 @@ class PlayerGameHistory(Base):
     max_stage = Column(Integer, nullable=False)
     max_round = Column(Integer, nullable=False)
     final_placement = Column(Integer, nullable=True)
+    is_bot = Column(Boolean, default=False)
+    source_history_id = Column(Integer, ForeignKey("player_game_history.id"), nullable=True)
+    poison_history_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=_utc_now)
 
-    snapshots = relationship("BattleSnapshot", back_populates="player_history")
+    snapshots = relationship(
+        "BattleSnapshot", back_populates="player_history", foreign_keys="BattleSnapshot.player_history_id"
+    )
 
 
 class BattleSnapshot(Base):
@@ -66,6 +71,7 @@ class BattleSnapshot(Base):
     basic_lands_json = Column(Text, nullable=False)
     applied_upgrades_json = Column(Text, nullable=False)
     treasures = Column(Integer, nullable=False)
+    poison = Column(Integer, nullable=True)
 
     full_state_json = Column(Text, nullable=False)
 

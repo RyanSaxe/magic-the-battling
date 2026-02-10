@@ -68,6 +68,7 @@ class BattleSnapshotData(BaseModel):
     treasures: int
     sideboard: list[Card] = Field(default_factory=list)
     command_zone: list[Card] = Field(default_factory=list)
+    poison: int = 0
 
 
 class FakePlayer(BaseModel):

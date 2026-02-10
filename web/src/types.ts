@@ -177,3 +177,32 @@ export interface SpectateRequestStatus {
   session_id?: string
   player_id?: string
 }
+
+export interface SharePlayerSnapshot {
+  stage: number
+  round: number
+  hand: Card[]
+  sideboard: Card[]
+  command_zone: Card[]
+  applied_upgrades: Card[]
+  basic_lands: string[]
+  treasures: number
+  poison: number
+  vanguard: Card | null
+}
+
+export interface SharePlayerData {
+  name: string
+  final_placement: number | null
+  final_poison: number
+  is_bot: boolean
+  snapshots: SharePlayerSnapshot[]
+}
+
+export interface ShareGameResponse {
+  game_id: string
+  owner_name: string
+  created_at: string
+  use_upgrades: boolean
+  players: SharePlayerData[]
+}

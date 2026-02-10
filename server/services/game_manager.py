@@ -301,11 +301,26 @@ class GameManager:
         if not game:
             return
 
+        live_players = [p for p in game.players if p.phase != "eliminated"]
+        live_bots = [fp for fp in game.fake_players if not fp.is_eliminated]
+
+        if winner:
+            winner.phase = "winner"
+            winner.placement = 1
+
+        remaining_no_placement = [
+            p for p in live_players if p.placement == 0 and p.name != (winner.name if winner else "")
+        ]
+        for p in remaining_no_placement:
+            p.placement = 2
+            p.phase = "game_over"
+
+        for fp in live_bots:
+            if fp.placement == 0:
+                fp.placement = 2
+
         for player in game.players:
-            if winner and player.name == winner.name:
-                player.phase = "winner"
-                player.placement = 1
-            elif player.phase != "eliminated":
+            if player.phase not in ("winner", "eliminated", "game_over"):
                 player.phase = "game_over"
 
         if db is not None:
@@ -316,7 +331,26 @@ class GameManager:
                     game_record.winner_player_id = winner.name
                 db.commit()
 
+            self._persist_final_placements(db, game_id, game)
+
         self._schedule_cleanup(game_id)
+
+    def _persist_final_placements(self, db: Session, game_id: str, game: Game) -> None:
+        all_participants = [(p.name, p.placement) for p in game.players if p.placement > 0]
+        all_participants.extend((fp.name, fp.placement) for fp in game.fake_players if fp.placement > 0)
+
+        for name, placement in all_participants:
+            history = (
+                db.query(PlayerGameHistory)
+                .filter(
+                    PlayerGameHistory.game_id == game_id,
+                    PlayerGameHistory.player_name == name,
+                )
+                .first()
+            )
+            if history:
+                history.final_placement = placement
+        db.commit()
 
     def _schedule_cleanup(self, game_id: str, delay: float = 300.0) -> None:
         """Schedule async cleanup after delay seconds (default 5 min)."""
@@ -538,6 +572,7 @@ class GameManager:
             treasures=player.treasures,
             sideboard=[c.model_copy() for c in player.sideboard],
             command_zone=[c.model_copy() for c in player.command_zone],
+            poison=player.poison,
         )
 
         snapshot = BattleSnapshot(
@@ -549,9 +584,45 @@ class GameManager:
             basic_lands_json=json.dumps(player.chosen_basics),
             applied_upgrades_json=json.dumps([u.model_dump() for u in player.upgrades if u.upgrade_target]),
             treasures=player.treasures,
+            poison=player.poison,
             full_state_json=snapshot_data.model_dump_json(),
         )
         db.add(snapshot)
+        db.commit()
+
+    def _record_bot_poison(
+        self, db: Session, game_id: str, fp: FakePlayer, battler_elo: float, stage: int, round_num: int
+    ) -> None:
+        history = (
+            db.query(PlayerGameHistory)
+            .filter(
+                PlayerGameHistory.game_id == game_id,
+                PlayerGameHistory.player_name == fp.name,
+                PlayerGameHistory.is_bot == True,  # noqa: E712
+            )
+            .first()
+        )
+
+        if not history:
+            history = PlayerGameHistory(
+                game_id=game_id,
+                player_name=fp.name,
+                battler_elo=battler_elo,
+                max_stage=stage,
+                max_round=round_num,
+                is_bot=True,
+                source_history_id=fp.player_history_id,
+            )
+            db.add(history)
+            db.flush()
+        elif stage > history.max_stage or (stage == history.max_stage and round_num > history.max_round):
+            history.max_stage = stage
+            history.max_round = round_num
+
+        raw = cast(str, history.poison_history_json) if history.poison_history_json else ""
+        poison_map: dict[str, int] = json.loads(raw) if raw else {}
+        poison_map[f"{stage}_{round_num}"] = fp.poison
+        history.poison_history_json = json.dumps(poison_map)
         db.commit()
 
     def load_fake_players_for_game(
@@ -1210,6 +1281,9 @@ class GameManager:
             battler_elo = game.battler.elo or 1200.0
             for player in live_players:
                 self._record_snapshot(db, game_id, player, battler_elo)
+            for fp in game.fake_players:
+                if not fp.is_eliminated:
+                    self._record_bot_poison(db, game_id, fp, battler_elo, stage, round_num)
 
         paired: set[str] = set()
         paired_bot_names: set[str] = set()

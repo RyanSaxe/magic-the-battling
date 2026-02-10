@@ -1,4 +1,4 @@
-import type { CreateGameResponse, JoinGameResponse, GameStatusResponse, SpectateRequestStatus } from '../types'
+import type { CreateGameResponse, JoinGameResponse, GameStatusResponse, SpectateRequestStatus, ShareGameResponse } from '../types'
 
 const API_BASE = '/api'
 
@@ -105,6 +105,14 @@ export async function getSpectateRequestStatus(
   const response = await fetch(`${API_BASE}/games/${gameId}/spectate-request/${requestId}`)
   if (!response.ok) {
     throw new Error(await getErrorMessage(response, 'Failed to get spectate status'))
+  }
+  return response.json()
+}
+
+export async function getShareGame(gameId: string, playerName: string): Promise<ShareGameResponse> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/share/${encodeURIComponent(playerName)}`)
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, 'Failed to load shared game'))
   }
   return response.json()
 }
