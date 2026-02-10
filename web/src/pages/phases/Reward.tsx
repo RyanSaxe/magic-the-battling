@@ -2,6 +2,8 @@ import { Card } from '../../components/card'
 import { THE_VANQUISHER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import type { GameState, Card as CardType } from '../../types'
 import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
+import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
+import { useElementHeight } from '../../hooks/useElementHeight'
 
 interface RewardPhaseProps {
   gameState: GameState
@@ -82,17 +84,20 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
     maxCardWidth: 300,
   })
 
-  const [upgradeRef, upgradeCardDims] = useContainerCardSizes({
-    cardCount: available_upgrades.length,
-    gap: 6,
-    maxCardWidth: 200,
-  })
   const poolCards = [...self_player.hand, ...self_player.sideboard]
-  const [poolRef, poolCardDims] = useContainerCardSizes({
-    cardCount: poolCards.length,
-    gap: 6,
-    maxCardWidth: 80,
-    rows: 3,
+
+  const [upgradeHeaderRef, upgradeHeaderHeight] = useElementHeight()
+  const [poolLabelRef, poolLabelHeight] = useElementHeight()
+  const fixedHeight = upgradeHeaderHeight + poolLabelHeight + 44
+
+  const [dualRef, { top: upgradeCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
+    topCount: available_upgrades.length,
+    bottomCount: poolCards.length,
+    topGap: 6,
+    bottomGap: 6,
+    fixedHeight,
+    topMaxWidth: 200,
+    bottomMaxWidth: 120,
   })
 
   const handleUpgradeClick = (upgrade: CardType) => {
@@ -180,11 +185,11 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
 
       {/* Stage upgrade selection */}
       {hasUpgradeSection && (
-        <div className="flex-1 min-h-0 flex flex-col bg-amber-950/30 rounded-lg p-4 border-2 border-amber-500">
-          <div className="text-center mb-3 shrink-0">
+        <div ref={dualRef} className="flex-1 min-h-0 flex flex-col bg-amber-950/30 rounded-lg p-4 border-2 border-amber-500">
+          <div ref={upgradeHeaderRef} className="text-center mb-3 shrink-0">
             <h3 className="text-lg font-bold text-amber-400">Stage Complete! Select an upgrade</h3>
           </div>
-          <div ref={upgradeRef} className="shrink-0" style={{
+          <div className="shrink-0" style={{
             display: 'grid',
             gridTemplateColumns: `repeat(${upgradeCardDims.columns}, ${upgradeCardDims.width}px)`,
             gap: '6px',
@@ -205,10 +210,10 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
 
           {/* Pool reference panel */}
           <div className="mt-3 pt-3 border-t border-amber-500/30 flex-1 min-h-0 flex flex-col">
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center shrink-0">
+            <div ref={poolLabelRef} className="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center shrink-0">
               Your Pool ({self_player.hand.length + self_player.sideboard.length} cards)
             </div>
-            <div ref={poolRef} className="overflow-auto flex-1 min-h-0 p-1" style={{
+            <div className="overflow-auto flex-1 min-h-0 p-1" style={{
               display: 'grid',
               gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
               gap: '6px',
