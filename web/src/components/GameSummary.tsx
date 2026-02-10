@@ -16,6 +16,29 @@ function getOrdinal(n: number): string {
   return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0])
 }
 
+function CardGrid({
+  cols,
+  cardWidth,
+  children,
+}: {
+  cols: number
+  cardWidth: number
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${cols}, ${cardWidth}px)`,
+        gap: '6px',
+        justifyContent: 'center',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 export function GameSummary({
   player,
   players,
@@ -61,46 +84,48 @@ export function GameSummary({
   const dims = { width: cardDims.width, height: cardDims.height }
 
   return (
-    <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
-      <div className="text-center max-w-5xl w-full">
+    <div className="flex-1 flex flex-col items-center p-4 overflow-hidden">
+      <div className="text-center shrink-0">
         <h2 className={`text-4xl font-bold mb-2 ${placementColor}`}>
           {placementText} Place
         </h2>
         <p className="text-gray-400 mb-6">
           Stage {frozenPlayer.stage} - Round {frozenPlayer.round} | {players.length} Players
         </p>
+      </div>
 
-        <div ref={ref} className="bg-black/30 rounded-lg p-4">
+      <div className="max-w-5xl w-full flex-1 min-h-0">
+        <div ref={ref} className="bg-black/30 rounded-lg p-4 h-full overflow-hidden">
           {cardDims.isNarrow ? (
             <div className="flex flex-col gap-2">
               {hasHand && (
                 <div>
                   <h3 className="text-xs text-gray-400 mb-1">Hand</h3>
-                  <div className="flex flex-wrap gap-1.5 justify-center">
+                  <CardGrid cols={cardDims.handCols} cardWidth={dims.width}>
                     {frozenPlayer.hand.map((card) => (
                       <Card key={card.id} card={card} dimensions={dims} isCompanion={companionIds.has(card.id)} />
                     ))}
-                  </div>
+                  </CardGrid>
                 </div>
               )}
               {hasUpgrades && (
                 <div>
                   <h3 className="text-xs text-gray-400 mb-1">Upgrades</h3>
-                  <div className="flex flex-wrap gap-1.5 justify-center">
+                  <CardGrid cols={appliedUpgrades.length} cardWidth={dims.width}>
                     {appliedUpgrades.map((upgrade) => (
                       <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={dims} />
                     ))}
-                  </div>
+                  </CardGrid>
                 </div>
               )}
               {hasSideboard && (
                 <div>
                   <h3 className="text-xs text-gray-400 mb-1">Sideboard</h3>
-                  <div className="flex flex-wrap gap-1.5 justify-center">
+                  <CardGrid cols={cardDims.sideboardCols} cardWidth={dims.width}>
                     {frozenPlayer.sideboard.map((card) => (
                       <Card key={card.id} card={card} dimensions={dims} isCompanion={companionIds.has(card.id)} />
                     ))}
-                  </div>
+                  </CardGrid>
                 </div>
               )}
             </div>
@@ -111,21 +136,21 @@ export function GameSummary({
                   {hasHand && (
                     <div>
                       <h3 className="text-xs text-gray-400 mb-1">Hand</h3>
-                      <div className="flex flex-wrap gap-1.5 justify-center">
+                      <CardGrid cols={cardDims.handCols} cardWidth={dims.width}>
                         {frozenPlayer.hand.map((card) => (
                           <Card key={card.id} card={card} dimensions={dims} isCompanion={companionIds.has(card.id)} />
                         ))}
-                      </div>
+                      </CardGrid>
                     </div>
                   )}
                   {hasUpgrades && (
                     <div>
                       <h3 className="text-xs text-gray-400 mb-1">Upgrades</h3>
-                      <div className="flex flex-wrap gap-1.5 justify-center">
+                      <CardGrid cols={appliedUpgrades.length} cardWidth={dims.width}>
                         {appliedUpgrades.map((upgrade) => (
                           <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={dims} />
                         ))}
-                      </div>
+                      </CardGrid>
                     </div>
                   )}
                 </div>
@@ -133,11 +158,11 @@ export function GameSummary({
               {hasSideboard && (
                 <div className={hasHand || hasUpgrades ? 'flex-1' : 'w-full'}>
                   <h3 className="text-xs text-gray-400 mb-1">Sideboard</h3>
-                  <div className="flex flex-wrap gap-1.5 justify-center">
+                  <CardGrid cols={cardDims.sideboardCols} cardWidth={dims.width}>
                     {frozenPlayer.sideboard.map((card) => (
                       <Card key={card.id} card={card} dimensions={dims} isCompanion={companionIds.has(card.id)} />
                     ))}
-                  </div>
+                  </CardGrid>
                 </div>
               )}
             </div>
