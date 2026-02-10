@@ -297,7 +297,10 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
               <span className="text-xl font-bold text-purple-400">{self_player.poison}</span>
             </div>
           )}
-          <div className="flex-1 flex gap-1.5 justify-center">
+          <div className="flex-1 flex gap-1.5 justify-center items-end">
+            <span className={`text-xs font-medium mb-1 ${selectedBasics.length === 3 ? 'text-green-400' : 'text-amber-400 animate-pulse'}`}>
+              {selectedBasics.length}/3
+            </span>
             {BASIC_LANDS.map(({ name }) => {
               const count = countBasic(name)
               return (

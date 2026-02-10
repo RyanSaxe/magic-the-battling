@@ -630,16 +630,16 @@ function GameContent() {
             <button
               onClick={() => actions.buildReady(selectedBasics, 'play')}
               disabled={!canReady}
-              className="btn bg-green-600 hover:bg-green-500 text-white"
+              className="btn btn-primary"
             >
-              Play {!basicsComplete && "(select basics)"}
+              Play
             </button>
             <button
               onClick={() => actions.buildReady(selectedBasics, 'draw')}
               disabled={!canReady}
-              className="btn bg-amber-600 hover:bg-amber-500 text-white"
+              className="btn btn-primary"
             >
-              Draw {!basicsComplete && "(select basics)"}
+              Draw
             </button>
           </>
         );
