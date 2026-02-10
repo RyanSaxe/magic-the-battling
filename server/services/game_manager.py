@@ -334,8 +334,8 @@ class GameManager:
         except RuntimeError:
             pass
 
-    def schedule_abandoned_cleanup(self, game_id: str, delay: float = 600.0) -> None:
-        """Schedule cleanup for abandoned game (default 10 minutes)."""
+    def schedule_abandoned_cleanup(self, game_id: str, delay: float = 86400.0) -> None:
+        """Schedule cleanup for abandoned game (default 24 hours)."""
         logger.info("Scheduling abandoned game cleanup for game_id=%s in %.0f seconds", game_id, delay)
         self._schedule_cleanup(game_id, delay)
 
