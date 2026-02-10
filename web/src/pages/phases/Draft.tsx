@@ -81,7 +81,12 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
           <div className="text-gray-400 text-sm">No pack available</div>
         </div>
       ) : (
-        <div className="flex gap-1.5 justify-center flex-wrap w-full">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${packCardDims.columns}, ${packCardDims.width}px)`,
+          gap: '6px',
+          justifyContent: 'center',
+        }}>
           {currentPack.map((card, index) => (
             <Card
               key={card.id}
@@ -120,7 +125,12 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-1.5 justify-center content-start">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
+          gap: '6px',
+          justifyContent: 'center',
+        }}>
           {pool.map((card, index) => {
             const isInHand = self_player.hand.some((c) => c.id === card.id)
             return (

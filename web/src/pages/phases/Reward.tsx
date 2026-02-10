@@ -171,7 +171,12 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
           <div className="text-center mb-3 shrink-0">
             <h3 className="text-lg font-bold text-amber-400">Stage Complete! Select an upgrade</h3>
           </div>
-          <div ref={upgradeRef} className="flex gap-1.5 justify-center flex-wrap shrink-0">
+          <div ref={upgradeRef} className="shrink-0" style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${upgradeCardDims.columns}, ${upgradeCardDims.width}px)`,
+            gap: '6px',
+            justifyContent: 'center',
+          }}>
             {available_upgrades.map((upgrade) => (
               <Card
                 key={upgrade.id}
@@ -188,7 +193,13 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center shrink-0">
               Your Pool ({self_player.hand.length + self_player.sideboard.length} cards)
             </div>
-            <div ref={poolRef} className="flex flex-wrap gap-1.5 justify-center overflow-auto flex-1 min-h-0 p-1">
+            <div ref={poolRef} className="overflow-auto flex-1 min-h-0 p-1" style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
+              gap: '6px',
+              justifyContent: 'center',
+              alignContent: 'start',
+            }}>
               {poolCards.map((card) => (
                 <Card key={card.id} card={card} dimensions={poolCardDims} upgraded={upgradedCardIds.has(card.id)} />
               ))}

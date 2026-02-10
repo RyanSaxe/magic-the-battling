@@ -232,7 +232,12 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
               {self_player.hand.length}/{maxHandSize}
             </span>
           </div>
-          <div className="flex gap-1.5 justify-center flex-wrap w-full">
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${handCardDims.columns}, ${handCardDims.width}px)`,
+            gap: '6px',
+            justifyContent: 'center',
+          }}>
             {self_player.hand.map((card, index) => (
               <Card
                 key={card.id}
@@ -340,7 +345,12 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-1.5 justify-center content-start">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
+          gap: '6px',
+          justifyContent: 'center',
+        }}>
           {allUpgrades.map((upgrade) => {
             const isApplied = !!upgrade.upgrade_target
             return (

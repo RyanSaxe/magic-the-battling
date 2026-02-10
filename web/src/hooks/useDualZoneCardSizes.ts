@@ -17,6 +17,7 @@ interface ZoneDims {
   width: number
   height: number
   rows: number
+  columns: number
 }
 
 interface DualZoneDims {
@@ -33,7 +34,7 @@ function bestFit(
   minWidth: number
 ): ZoneDims {
   if (count === 0) {
-    return { width: maxWidth, height: Math.round(maxWidth * CARD_ASPECT_RATIO), rows: 1 }
+    return { width: maxWidth, height: Math.round(maxWidth * CARD_ASPECT_RATIO), rows: 1, columns: 1 }
   }
 
   for (let rows = 1; rows <= count; rows++) {
@@ -48,14 +49,14 @@ function bestFit(
     const totalHeight = rows * cardHeight + gap * (rows - 1)
 
     if (totalHeight <= availHeight) {
-      return { width: cardWidth, height: cardHeight, rows }
+      return { width: cardWidth, height: cardHeight, rows, columns: cardsPerRow }
     }
   }
 
-  return { width: minWidth, height: Math.round(minWidth * CARD_ASPECT_RATIO), rows: 1 }
+  return { width: minWidth, height: Math.round(minWidth * CARD_ASPECT_RATIO), rows: 1, columns: count }
 }
 
-const DEFAULT_DIMS: ZoneDims = { width: 100, height: 140, rows: 1 }
+const DEFAULT_DIMS: ZoneDims = { width: 100, height: 140, rows: 1, columns: 1 }
 
 function computeDualZone(
   containerWidth: number,
@@ -137,8 +138,8 @@ function computeDualZone(
       if (score > bestScore) {
         bestScore = score
         bestResult = {
-          top: { width: topW, height: Math.round(topW * CARD_ASPECT_RATIO), rows: topRows },
-          bottom: { width: botW, height: Math.round(botW * CARD_ASPECT_RATIO), rows: botRows },
+          top: { width: topW, height: Math.round(topW * CARD_ASPECT_RATIO), rows: topRows, columns: topCols },
+          bottom: { width: botW, height: Math.round(botW * CARD_ASPECT_RATIO), rows: botRows, columns: botCols },
         }
       }
     }
@@ -165,8 +166,8 @@ export function useDualZoneCardSizes(config: DualZoneConfig): [
   const resolved = { topCount, bottomCount, topGap, bottomGap, fixedHeight, topMaxWidth, bottomMaxWidth, minCardWidth }
 
   const [dims, setDims] = useState<DualZoneDims>(() => ({
-    top: { width: topMaxWidth, height: Math.round(topMaxWidth * CARD_ASPECT_RATIO), rows: 1 },
-    bottom: { width: bottomMaxWidth, height: Math.round(bottomMaxWidth * CARD_ASPECT_RATIO), rows: 1 },
+    top: { width: topMaxWidth, height: Math.round(topMaxWidth * CARD_ASPECT_RATIO), rows: 1, columns: 1 },
+    bottom: { width: bottomMaxWidth, height: Math.round(bottomMaxWidth * CARD_ASPECT_RATIO), rows: 1, columns: 1 },
   }))
 
   const observerRef = useRef<ResizeObserver | null>(null)
@@ -199,9 +200,11 @@ export function useDualZoneCardSizes(config: DualZoneConfig): [
         prev.top.width === next.top.width &&
         prev.top.height === next.top.height &&
         prev.top.rows === next.top.rows &&
+        prev.top.columns === next.top.columns &&
         prev.bottom.width === next.bottom.width &&
         prev.bottom.height === next.bottom.height &&
-        prev.bottom.rows === next.bottom.rows
+        prev.bottom.rows === next.bottom.rows &&
+        prev.bottom.columns === next.bottom.columns
           ? prev
           : next
       )
@@ -239,9 +242,11 @@ export function useDualZoneCardSizes(config: DualZoneConfig): [
         prev.top.width === next.top.width &&
         prev.top.height === next.top.height &&
         prev.top.rows === next.top.rows &&
+        prev.top.columns === next.top.columns &&
         prev.bottom.width === next.bottom.width &&
         prev.bottom.height === next.bottom.height &&
-        prev.bottom.rows === next.bottom.rows
+        prev.bottom.rows === next.bottom.rows &&
+        prev.bottom.columns === next.bottom.columns
           ? prev
           : next
       )
