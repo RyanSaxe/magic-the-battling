@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useLayoutEffect } from 'react'
 
 const CARD_ASPECT_RATIO = 7 / 5
 
@@ -74,6 +74,16 @@ export function useAutoFitCardSizes({
 
       if (!node) return
 
+      const cs = getComputedStyle(node)
+      const w = node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      const h = node.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+      const next = compute(w, h)
+      setDims((prev) =>
+        prev.width === next.width && prev.height === next.height && prev.rows === next.rows
+          ? prev
+          : next
+      )
+
       const observer = new ResizeObserver((entries) => {
         const entry = entries[0]
         if (!entry) return
@@ -92,10 +102,12 @@ export function useAutoFitCardSizes({
     [compute]
   )
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (elementRef.current) {
-      const rect = elementRef.current.getBoundingClientRect()
-      const next = compute(rect.width, rect.height)
+      const cs = getComputedStyle(elementRef.current)
+      const w = elementRef.current.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      const h = elementRef.current.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+      const next = compute(w, h)
       setDims((prev) =>
         prev.width === next.width && prev.height === next.height && prev.rows === next.rows
           ? prev

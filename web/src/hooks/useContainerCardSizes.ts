@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useLayoutEffect } from 'react'
 
 const CARD_ASPECT_RATIO = 7 / 5
 
@@ -60,6 +60,11 @@ export function useContainerCardSizes({
 
       if (!node) return
 
+      const cs = getComputedStyle(node)
+      const w = node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      const next = compute(w)
+      setDims((prev) => (prev.width === next.width && prev.height === next.height ? prev : next))
+
       const observer = new ResizeObserver((entries) => {
         const entry = entries[0]
         if (!entry) return
@@ -74,11 +79,11 @@ export function useContainerCardSizes({
     [compute]
   )
 
-  // Recompute when options change but element stays the same
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (elementRef.current) {
-      const containerWidth = elementRef.current.getBoundingClientRect().width
-      const next = compute(containerWidth)
+      const cs = getComputedStyle(elementRef.current)
+      const w = elementRef.current.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      const next = compute(w)
       setDims((prev) => (prev.width === next.width && prev.height === next.height ? prev : next))
     }
   }, [compute])
