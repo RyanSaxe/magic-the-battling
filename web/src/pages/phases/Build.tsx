@@ -107,6 +107,7 @@ interface CardWithIndex {
 export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange, isMobile = false }: BuildPhaseProps) {
   const { self_player } = gameState
   const maxHandSize = self_player.hand_size
+  const locked = self_player.build_ready
 
   const [selectedCard, setSelectedCard] = useState<CardWithIndex | null>(null)
   const [selectedUpgrade, setSelectedUpgrade] = useState<CardType | null>(null)
@@ -141,6 +142,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
 
   const handleCardClick = useCallback(
     (card: CardType, index: number, zone: SelectionZone) => {
+      if (locked) return
       if (selectedUpgrade) {
         setPendingUpgrade({ upgrade: selectedUpgrade, target: card })
         setSelectedUpgrade(null)
@@ -165,10 +167,11 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
       actions.buildSwap(selectedCard.card.id, selectedCard.zone, card.id, zone)
       setSelectedCard(null)
     },
-    [selectedCard, selectedUpgrade, actions]
+    [locked, selectedCard, selectedUpgrade, actions]
   )
 
   const handleUpgradeClick = (upgrade: CardType) => {
+    if (locked) return
     if (selectedUpgrade?.id === upgrade.id) {
       setSelectedUpgrade(null)
     } else {
@@ -215,7 +218,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
   })
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full gap-2 p-4 overflow-hidden">
+    <div ref={containerRef} className={`flex flex-col h-full gap-2 p-4 overflow-hidden transition-opacity ${locked ? 'opacity-60 pointer-events-none' : ''}`}>
       {self_player.hand.length === 0 ? (
         <div ref={topFixedRef} className="text-center">
           <div className="text-gray-400 text-sm">Hand is empty</div>
@@ -297,10 +300,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
               <span className="text-xl font-bold text-purple-400">{self_player.poison}</span>
             </div>
           )}
-          <div className="flex-1 flex gap-1.5 justify-center items-end">
-            <span className={`text-xs font-medium mb-1 ${selectedBasics.length === 3 ? 'text-green-400' : 'text-amber-400 animate-pulse'}`}>
-              {selectedBasics.length}/3
-            </span>
+          <div className="flex-1 flex gap-1.5 justify-center">
             {BASIC_LANDS.map(({ name }) => {
               const count = countBasic(name)
               return (
@@ -315,7 +315,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                   <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 bg-black/70 rounded-b py-0.5">
                     <button
                       onClick={() => removeBasic(name)}
-                      disabled={count === 0}
+                      disabled={locked || count === 0}
                       className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
                     >
                       -
@@ -323,7 +323,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                     <span className="text-white text-xs w-4 text-center">{count}</span>
                     <button
                       onClick={() => addBasic(name)}
-                      disabled={selectedBasics.length >= 3}
+                      disabled={locked || selectedBasics.length >= 3}
                       className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
                     >
                       +
@@ -405,6 +405,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                 />
                 {cardIsCompanion && (
                   <button
+                    disabled={locked}
                     onClick={(e) => {
                       e.stopPropagation()
                       if (isActiveCompanion) {
@@ -413,7 +414,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                         actions.buildSetCompanion(card.id)
                       }
                     }}
-                    className={`absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg ${
+                    className={`absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg disabled:opacity-50 disabled:cursor-not-allowed ${
                       isActiveCompanion
                         ? 'bg-amber-500/90 text-black'
                         : 'bg-purple-600/80 text-white hover:bg-purple-500/90'

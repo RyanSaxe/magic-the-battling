@@ -627,6 +627,11 @@ function GameContent() {
         }
         return (
           <>
+            {!basicsComplete && (
+              <span className="text-amber-400 text-sm animate-pulse">
+                {selectedBasics.length}/3 basics
+              </span>
+            )}
             <button
               onClick={() => actions.buildReady(selectedBasics, 'play')}
               disabled={!canReady}
