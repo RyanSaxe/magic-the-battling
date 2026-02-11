@@ -1,6 +1,5 @@
 import { useState } from "react";
-import type { BattleView, Card as CardType, Zones } from "../../types";
-import { DroppableZoneDisplay } from "./DroppableZoneDisplay";
+import type { BattleView, Card as CardType } from "../../types";
 import { UpgradeStack } from "./UpgradeStack";
 import { POISON_COUNTER_IMAGE } from "../../constants/assets";
 
@@ -12,11 +11,7 @@ interface BattleSidebarContentProps {
   onYourLifeChange: (life: number) => void;
   onOpponentLifeChange: (life: number) => void;
   playerName: string;
-  onCreateTreasure?: () => void;
-  onPassTurn?: () => void;
-  canManipulateOpponent?: boolean;
-  hasCompanion?: boolean;
-  opponentHasCompanion?: boolean;
+  onOpenActions?: () => void;
 }
 
 function LifeCounter({
@@ -89,72 +84,23 @@ function LifeCounter({
 }
 
 function PlayerSection({
-  zones,
   upgrades,
-  isOpponent = false,
-  canManipulateOpponent = false,
-  hasCompanion = false,
   isReversed = false,
 }: {
-  zones: Zones;
   upgrades: CardType[];
-  isOpponent?: boolean;
-  canManipulateOpponent?: boolean;
-  hasCompanion?: boolean;
   isReversed?: boolean;
 }) {
   const appliedUpgrades = upgrades.filter((u) => u.upgrade_target);
 
-  const upgradesRow = appliedUpgrades.length > 0 && (
-    <div className="flex gap-2 flex-wrap justify-center">
-      {appliedUpgrades.map((upgrade) => (
-        <UpgradeStack key={upgrade.id} upgrade={upgrade} size="xs" />
-      ))}
-    </div>
-  );
-
-  const commandZone = (zones.command_zone.length > 0 || hasCompanion) && (
-    <DroppableZoneDisplay
-      title="Special"
-      zone="command_zone"
-      cards={zones.command_zone}
-      validFromZones={[
-        "hand",
-        "battlefield",
-        "graveyard",
-        "exile",
-        "sideboard",
-        "command_zone",
-      ]}
-      isOpponent={isOpponent}
-      canManipulateOpponent={canManipulateOpponent}
-      titleClassName="text-amber-400"
-      hideCount
-      size="sm"
-    />
-  );
+  if (appliedUpgrades.length === 0) return null;
 
   return (
-    <div className="flex flex-col justify-between h-full">
-      {isReversed ? (
-        <>
-          <div className="space-y-2">
-            {commandZone}
-          </div>
-          <div className="space-y-2">
-            {upgradesRow}
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="space-y-2">
-            {upgradesRow}
-          </div>
-          <div className="space-y-2">
-            {commandZone}
-          </div>
-        </>
-      )}
+    <div className={`flex flex-col ${isReversed ? 'justify-end' : 'justify-start'} h-full`}>
+      <div className="flex gap-2 flex-wrap justify-center">
+        {appliedUpgrades.map((upgrade) => (
+          <UpgradeStack key={upgrade.id} upgrade={upgrade} size="xs" />
+        ))}
+      </div>
     </div>
   );
 }
@@ -167,13 +113,9 @@ export function BattleSidebarContent({
   onYourLifeChange,
   onOpponentLifeChange,
   playerName,
-  onCreateTreasure,
-  onPassTurn,
-  canManipulateOpponent = false,
-  hasCompanion = false,
-  opponentHasCompanion = false,
+  onOpenActions,
 }: BattleSidebarContentProps) {
-  const { opponent_name, current_turn_name, your_zones, opponent_zones } =
+  const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
 
   const yourPoison = currentBattle.your_poison;
@@ -184,11 +126,7 @@ export function BattleSidebarContent({
       {/* Opponent section - top */}
       <div className="flex-1 pb-3 pl-3 pr-3 border-b border-gray-700">
         <PlayerSection
-          zones={opponent_zones}
           upgrades={opponent_zones.upgrades}
-          isOpponent
-          canManipulateOpponent={canManipulateOpponent}
-          hasCompanion={opponentHasCompanion}
           isReversed
         />
       </div>
@@ -244,25 +182,14 @@ export function BattleSidebarContent({
               )}
             </div>
           )}
-          {(onPassTurn || onCreateTreasure) && (
-            <div className="flex gap-2 mt-3">
-              {onPassTurn && (
-                <button
-                  onClick={onPassTurn}
-                  disabled={current_turn_name !== playerName}
-                  className="flex-1 px-3 py-1.5 text-xs rounded bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Pass
-                </button>
-              )}
-              {onCreateTreasure && (
-                <button
-                  onClick={onCreateTreasure}
-                  className="flex-1 px-3 py-1.5 text-xs rounded bg-amber-600 hover:bg-amber-500 text-white"
-                >
-                  Treasure
-                </button>
-              )}
+          {onOpenActions && (
+            <div className="mt-3">
+              <button
+                onClick={onOpenActions}
+                className="w-full px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+              >
+                Actions
+              </button>
             </div>
           )}
         </div>
@@ -271,9 +198,7 @@ export function BattleSidebarContent({
       {/* Your section - bottom */}
       <div className="flex-1 p-3 border-t border-gray-700">
         <PlayerSection
-          zones={your_zones}
           upgrades={selfUpgrades}
-          hasCompanion={hasCompanion}
         />
       </div>
     </div>

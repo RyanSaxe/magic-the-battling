@@ -125,3 +125,55 @@ def test_swap_card_clears_command_zone_when_companion_swapped_from_sideboard(car
     assert companion in player.hand
     assert other_card in player.sideboard
     assert len(player.command_zone) == 0
+
+
+class TestPlayDrawPreference:
+    def test_set_ready_stores_play_preference(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        player.hand.extend([card_factory(f"c{i}") for i in range(3)])
+
+        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "play")
+
+        assert player.play_draw_preference == "play"
+        assert player.build_ready is True
+
+    def test_set_ready_stores_draw_preference(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        player.hand.extend([card_factory(f"c{i}") for i in range(3)])
+
+        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "draw")
+
+        assert player.play_draw_preference == "draw"
+        assert player.build_ready is True
+
+    def test_set_ready_rejects_invalid_preference(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        player.hand.extend([card_factory(f"c{i}") for i in range(3)])
+
+        with pytest.raises(ValueError, match="Invalid play/draw preference"):
+            build.set_ready(game, player, ["Plains", "Island", "Mountain"], "invalid")
+
+    def test_unready_clears_preference(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        player.hand.extend([card_factory(f"c{i}") for i in range(3)])
+
+        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "play")
+        assert player.play_draw_preference == "play"
+
+        build.unready(player)
+
+        assert player.play_draw_preference is None
+        assert player.build_ready is False
+
+    def test_set_ready_defaults_to_play(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        player.hand.extend([card_factory(f"c{i}") for i in range(3)])
+
+        build.set_ready(game, player, ["Plains", "Island", "Mountain"])
+
+        assert player.play_draw_preference == "play"

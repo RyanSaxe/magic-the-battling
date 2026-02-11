@@ -57,9 +57,12 @@ def swap_card(
         player.command_zone.clear()
 
 
-def set_ready(game: Game, player: Player, basics: list[str]) -> None:
+def set_ready(game: Game, player: Player, basics: list[str], play_draw_preference: str = "play") -> None:
     if player.phase != "build":
         raise ValueError("Player is not in build phase")
+
+    if play_draw_preference not in ("play", "draw"):
+        raise ValueError(f"Invalid play/draw preference: {play_draw_preference}")
 
     if len(basics) != game.config.num_basics:
         raise ValueError(f"Must choose exactly {game.config.num_basics} basic lands")
@@ -73,12 +76,14 @@ def set_ready(game: Game, player: Player, basics: list[str]) -> None:
 
     player.chosen_basics = basics
     player.build_ready = True
+    player.play_draw_preference = play_draw_preference
 
 
 def unready(player: Player) -> None:
     if player.phase != "build":
         raise ValueError("Player is not in build phase")
     player.build_ready = False
+    player.play_draw_preference = None
 
 
 def all_ready(game: Game) -> bool:

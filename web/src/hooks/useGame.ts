@@ -48,8 +48,8 @@ export function useGame(
     send('build_swap', { card_a_id: cardAId, source_a: sourceA, card_b_id: cardBId, source_b: sourceB })
   }, [send])
 
-  const buildReady = useCallback((basics: string[]) => {
-    send('build_ready', { basics })
+  const buildReady = useCallback((basics: string[], playDrawPreference: 'play' | 'draw') => {
+    send('build_ready', { basics, play_draw_preference: playDrawPreference })
   }, [send])
 
   const buildUnready = useCallback(() => {
@@ -86,10 +86,6 @@ export function useGame(
 
   const battleUpdateLife = useCallback((target: 'you' | 'opponent', life: number) => {
     send('battle_update_life', { target, life })
-  }, [send])
-
-  const battleChoosePlayDraw = useCallback((choice: 'play' | 'draw') => {
-    send('battle_choose_play_draw', { choice })
   }, [send])
 
   const battlePassTurn = useCallback(() => {
@@ -136,7 +132,6 @@ export function useGame(
       battleSubmitResult,
       battleUpdateCardState,
       battleUpdateLife,
-      battleChoosePlayDraw,
       battlePassTurn,
       rewardPickUpgrade,
       rewardApplyUpgrade,

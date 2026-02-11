@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
+import { useElementHeight } from '../../hooks/useElementHeight'
 import { POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 
 interface DraftPhaseProps {
@@ -30,18 +31,21 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
   const currentPack = self_player.current_pack ?? []
   const pool = [...self_player.hand, ...self_player.sideboard]
 
+  const [separatorRef, separatorHeight] = useElementHeight()
+
   const [containerRef, { top: packCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
     topCount: currentPack.length,
     bottomCount: pool.length,
     topGap: 6,
     bottomGap: 6,
-    fixedHeight: 30,
+    fixedHeight: separatorHeight + 16,
     topMaxWidth: 400,
     bottomMaxWidth: 300,
   })
-  const upgradedCardIds = new Set(
-    self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
-  )
+  const appliedUpgradesList = self_player.upgrades.filter((u) => u.upgrade_target)
+  const upgradedCardIds = new Set(appliedUpgradesList.map((u) => u.upgrade_target!.id))
+  const getAppliedUpgrades = (cardId: string) =>
+    appliedUpgradesList.filter((u) => u.upgrade_target!.id === cardId)
 
   const handleCardClick = useCallback(
     (card: CardType, index: number, zone: SelectionZone, isInHand: boolean) => {
@@ -78,7 +82,14 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
           <div className="text-gray-400 text-sm">No pack available</div>
         </div>
       ) : (
-        <div className="flex gap-1.5 justify-center flex-wrap w-full">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${packCardDims.columns}, ${packCardDims.width}px)`,
+          gap: '6px',
+          justifyContent: 'center',
+          maxWidth: '100%',
+          overflow: 'hidden',
+        }}>
           {currentPack.map((card, index) => (
             <Card
               key={card.id}
@@ -91,7 +102,7 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
         </div>
       )}
 
-      <div className="flex items-center gap-3 px-2">
+      <div ref={separatorRef} className="flex items-center gap-3 px-2">
         {!isMobile && (
           <div className="flex items-center gap-2">
             <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-14 rounded" />
@@ -117,7 +128,14 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
           </div>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-1.5 justify-center content-start">
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
+          gap: '6px',
+          justifyContent: 'center',
+          maxWidth: '100%',
+          overflow: 'hidden',
+        }}>
           {pool.map((card, index) => {
             const isInHand = self_player.hand.some((c) => c.id === card.id)
             return (
@@ -128,6 +146,7 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
                 selected={selectedCard?.card.id === card.id}
                 dimensions={poolCardDims}
                 upgraded={upgradedCardIds.has(card.id)}
+                appliedUpgrades={getAppliedUpgrades(card.id)}
               />
             )
           })}

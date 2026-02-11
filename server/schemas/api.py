@@ -87,8 +87,8 @@ class SelfPlayerView(PlayerView):
 class BattleView(BaseModel):
     opponent_name: str
     coin_flip_name: str
-    on_the_play_name: str | None = None
-    current_turn_name: str | None = None
+    on_the_play_name: str
+    current_turn_name: str
     your_zones: Zones
     opponent_zones: Zones
     opponent_hand_count: int
@@ -230,3 +230,32 @@ class SpectateRequestStatus(BaseModel):
     status: Literal["pending", "approved", "denied"]
     session_id: str | None = None
     player_id: str | None = None
+
+
+class SharePlayerSnapshot(BaseModel):
+    stage: int
+    round: int
+    hand: list[Card]
+    sideboard: list[Card]
+    command_zone: list[Card]
+    applied_upgrades: list[Card]
+    basic_lands: list[str]
+    treasures: int
+    poison: int
+    vanguard: Card | None = None
+
+
+class SharePlayerData(BaseModel):
+    name: str
+    final_placement: int | None
+    final_poison: int
+    is_bot: bool
+    snapshots: list[SharePlayerSnapshot]
+
+
+class ShareGameResponse(BaseModel):
+    game_id: str
+    owner_name: str
+    created_at: str
+    use_upgrades: bool
+    players: list[SharePlayerData]

@@ -1,5 +1,12 @@
-from fastapi import APIRouter, HTTPException
+import json
+from typing import cast
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session, joinedload
+
+from mtb.models.game import BattleSnapshotData
+from server.db import database
+from server.db.models import GameRecord, PlayerGameHistory
 from server.schemas.api import (
     CreateGameRequest,
     CreateGameResponse,
@@ -10,6 +17,9 @@ from server.schemas.api import (
     JoinGameResponse,
     LobbyStateResponse,
     RejoinGameRequest,
+    ShareGameResponse,
+    SharePlayerData,
+    SharePlayerSnapshot,
     SpectateRequestCreate,
     SpectateRequestResponse,
     SpectateRequestStatus,
@@ -17,6 +27,15 @@ from server.schemas.api import (
 )
 from server.services.game_manager import game_manager
 from server.services.session_manager import session_manager
+
+
+def get_db():
+    db = database.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 router = APIRouter(prefix="/api/games", tags=["games"])
 
@@ -304,4 +323,117 @@ def get_spectate_request_status(game_id: str, request_id: str):
         status=req.status,
         session_id=req.session_id,
         player_id=req.player_id,
+    )
+
+
+def _build_human_snapshots(history: PlayerGameHistory) -> list[SharePlayerSnapshot]:
+    snapshots: list[SharePlayerSnapshot] = []
+    sorted_snaps = sorted(history.snapshots, key=lambda s: (s.stage, s.round))
+    for snap in sorted_snaps:
+        snapshot_data = BattleSnapshotData.model_validate_json(snap.full_state_json)
+        poison = snap.poison if snap.poison is not None else snapshot_data.poison
+        snapshots.append(
+            SharePlayerSnapshot(
+                stage=snap.stage,
+                round=snap.round,
+                hand=snapshot_data.hand,
+                sideboard=snapshot_data.sideboard,
+                command_zone=snapshot_data.command_zone,
+                applied_upgrades=snapshot_data.applied_upgrades,
+                basic_lands=snapshot_data.basic_lands,
+                treasures=snapshot_data.treasures,
+                poison=poison,
+                vanguard=snapshot_data.vanguard,
+            )
+        )
+    return snapshots
+
+
+def _build_bot_snapshots(history: PlayerGameHistory, db: Session) -> list[SharePlayerSnapshot]:
+    source = (
+        db.query(PlayerGameHistory)
+        .options(joinedload(PlayerGameHistory.snapshots))
+        .filter(PlayerGameHistory.id == history.source_history_id)
+        .first()
+    )
+    if not source:
+        return []
+
+    raw = str(history.poison_history_json) if history.poison_history_json else ""
+    poison_map: dict[str, int] = json.loads(raw) if raw else {}
+
+    sorted_snaps = sorted(source.snapshots, key=lambda s: (s.stage, s.round))
+    snapshots: list[SharePlayerSnapshot] = []
+    for snap in sorted_snaps:
+        key = f"{snap.stage}_{snap.round}"
+        if key not in poison_map:
+            continue
+        snapshot_data = BattleSnapshotData.model_validate_json(snap.full_state_json)
+        snapshots.append(
+            SharePlayerSnapshot(
+                stage=snap.stage,
+                round=snap.round,
+                hand=snapshot_data.hand,
+                sideboard=snapshot_data.sideboard,
+                command_zone=snapshot_data.command_zone,
+                applied_upgrades=snapshot_data.applied_upgrades,
+                basic_lands=snapshot_data.basic_lands,
+                treasures=snapshot_data.treasures,
+                poison=poison_map[key],
+                vanguard=snapshot_data.vanguard,
+            )
+        )
+    return snapshots
+
+
+@router.get("/{game_id}/share/{player_name}", response_model=ShareGameResponse)
+def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)):  # noqa: B008
+    game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
+    if not game_record:
+        raise HTTPException(status_code=404, detail="Game not found")
+
+    config = json.loads(str(game_record.config_json)) if game_record.config_json else {}
+    use_upgrades = config.get("use_upgrades", True)
+
+    histories = (
+        db.query(PlayerGameHistory)
+        .options(joinedload(PlayerGameHistory.snapshots))
+        .filter(PlayerGameHistory.game_id == game_id)
+        .all()
+    )
+
+    if not histories:
+        raise HTTPException(status_code=404, detail="No player data found for this game")
+
+    owner_exists = any(str(h.player_name) == player_name for h in histories)
+    if not owner_exists:
+        raise HTTPException(status_code=404, detail="Player not found in this game")
+
+    players: list[SharePlayerData] = []
+    for history in histories:
+        is_bot = bool(history.is_bot)
+        if is_bot:
+            snapshots = _build_bot_snapshots(history, db)
+        else:
+            snapshots = _build_human_snapshots(history)
+
+        final_poison = snapshots[-1].poison if snapshots else 0
+        players.append(
+            SharePlayerData(
+                name=str(history.player_name),
+                final_placement=cast(int, history.final_placement) if history.final_placement is not None else None,
+                final_poison=final_poison,
+                is_bot=is_bot,
+                snapshots=snapshots,
+            )
+        )
+
+    created_at = game_record.created_at.isoformat() if game_record.created_at else ""
+
+    return ShareGameResponse(
+        game_id=game_id,
+        owner_name=player_name,
+        created_at=created_at,
+        use_upgrades=use_upgrades,
+        players=players,
     )

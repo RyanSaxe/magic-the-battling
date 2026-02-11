@@ -104,6 +104,7 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
             treasures_gained=1,
             card_gained=card_gained,
             vanquisher_gained=vanquisher_gained,
+            pre_battle_treasures=player.pre_battle_treasures,
         )
 
 
@@ -189,6 +190,7 @@ def start_rewards_only(game: Game, winner: Player, loser: Player, poison_dealt: 
             treasures_gained=1,
             card_gained=card_gained,
             vanquisher_gained=vanquisher_gained,
+            pre_battle_treasures=player.pre_battle_treasures,
         )
 
 
@@ -223,6 +225,7 @@ def start_rewards_draw(game: Game, player1: Player, player2: Player, p1_poison: 
             treasures_gained=1,
             card_gained=card_gained,
             vanquisher_gained=vanquisher_gained,
+            pre_battle_treasures=player.pre_battle_treasures,
         )
 
 
@@ -261,6 +264,7 @@ def start_rewards_single(
         treasures_gained=1,
         card_gained=card_gained,
         vanquisher_gained=vanquisher_gained,
+        pre_battle_treasures=player.pre_battle_treasures,
     )
 
 
@@ -302,6 +306,7 @@ def start_vs_static_rewards_only(
         treasures_gained=1,
         card_gained=card_gained,
         vanquisher_gained=vanquisher_gained,
+        pre_battle_treasures=player.pre_battle_treasures,
     )
 
     for fake in game.fake_players:
@@ -329,6 +334,7 @@ def set_last_battle_result_no_rewards(
         treasures_gained=0,
         card_gained=None,
         vanquisher_gained=False,
+        pre_battle_treasures=player.pre_battle_treasures,
     )
 
 
@@ -380,6 +386,7 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
         treasures_gained=1,
         card_gained=card_gained,
         vanquisher_gained=vanquisher_gained,
+        pre_battle_treasures=player.pre_battle_treasures,
     )
 
     for fake in game.fake_players:
@@ -423,6 +430,7 @@ def _start_with_result(game: Game, winner: Player, loser: Player) -> None:
             treasures_gained=1,
             card_gained=card_gained,
             vanquisher_gained=vanquisher_gained,
+            pre_battle_treasures=player.pre_battle_treasures,
         )
 
 

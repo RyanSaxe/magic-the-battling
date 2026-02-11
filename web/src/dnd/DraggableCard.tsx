@@ -22,6 +22,7 @@ interface DraggableCardProps {
   isOpponent?: boolean
   isCompanion?: boolean
   upgraded?: boolean
+  appliedUpgrades?: CardType[]
 }
 
 export function DraggableCard({
@@ -42,6 +43,7 @@ export function DraggableCard({
   isOpponent = false,
   isCompanion = false,
   upgraded = false,
+  appliedUpgrades,
 }: DraggableCardProps) {
   const zoneId = makeZoneId(zone, zoneOwner)
   const dragData: DragData = { card, fromZone: zone, fromZoneId: zoneId, isOpponent }
@@ -83,6 +85,7 @@ export function DraggableCard({
         dragging={isDragging}
         isCompanion={isCompanion}
         upgraded={upgraded}
+        appliedUpgrades={appliedUpgrades}
       />
     </div>
   )

@@ -26,7 +26,7 @@ export function BattlefieldZoneColumn({
       style={{ width: columnWidth }}
     >
       <CompactZoneDisplay
-        title="GY"
+        title="Graveyard"
         zone="graveyard"
         cards={zones.graveyard}
         height={rowHeight}

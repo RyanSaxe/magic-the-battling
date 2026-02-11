@@ -11,11 +11,12 @@ import {
 import type { GameStatusResponse } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
-import { BattlePhase } from "./phases/Battle";
+import { BattlePhase, type BattleSelectedCard } from "./phases/Battle";
 import { RewardPhase } from "./phases/Reward";
 import { Sidebar } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
 import { GameSummary } from "../components/GameSummary";
+import { ActionMenu } from "../components/ActionMenu";
 import { RulesModal } from "../components/RulesModal";
 import { InfoIcon } from "../components/icons";
 import { ContextStripProvider, useContextStrip } from "../contexts";
@@ -28,11 +29,11 @@ import type { Card as CardType } from "../types";
 
 function CardPreviewModal({
   card,
-  upgradeTarget,
+  appliedUpgrades,
   onClose,
 }: {
   card: CardType;
-  upgradeTarget: CardType | null;
+  appliedUpgrades: CardType[];
   onClose: () => void;
 }) {
   const [isFlipped, setIsFlipped] = useState(false);
@@ -60,22 +61,27 @@ function CardPreviewModal({
       onClick={onClose}
     >
       <div
-        className="relative flex gap-4 items-center"
+        className="relative flex gap-4 items-center max-w-[95vw] max-h-[85vh] px-4"
         onClick={(e) => e.stopPropagation()}
       >
         <img
           src={getImageUrl(card, isFlipped)}
           alt={card.name}
-          className="max-h-[80vh] rounded-lg shadow-2xl"
+          className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
+          style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
         />
-        {upgradeTarget && (
+        {appliedUpgrades.length > 0 && (
           <>
-            <div className="text-white text-2xl font-bold">→</div>
-            <img
-              src={getImageUrl(upgradeTarget, isFlipped)}
-              alt={upgradeTarget.name}
-              className="max-h-[80vh] rounded-lg shadow-2xl"
-            />
+            <div className="text-white text-2xl font-bold shrink-0">→</div>
+            {appliedUpgrades.map((upgrade) => (
+              <img
+                key={upgrade.id}
+                src={getImageUrl(upgrade, isFlipped)}
+                alt={upgrade.name}
+                className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
+                style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
+              />
+            ))}
           </>
         )}
         <button
@@ -445,9 +451,19 @@ function GameContent() {
   );
 
   // Lifted state from Battle phase
+  const [battleSelectedCard, setBattleSelectedCard] = useState<BattleSelectedCard | null>(null);
   const [isChangingResult, setIsChangingResult] = useState(false);
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [showSidebarSideboard, setShowSidebarSideboard] = useState(false);
   const [showOpponentSideboard, setShowOpponentSideboard] = useState(false);
+
+  const prevPhaseRef = useRef(gameState?.self_player.phase);
+  if (gameState?.self_player.phase !== prevPhaseRef.current) {
+    prevPhaseRef.current = gameState?.self_player.phase;
+    if (gameState?.self_player.phase !== 'battle' && battleSelectedCard !== null) {
+      setBattleSelectedCard(null);
+    }
+  }
 
   // Rules modal state
   const [showRulesModal, setShowRulesModal] = useState(false);
@@ -547,13 +563,8 @@ function GameContent() {
       game_over: "battle",
     }[currentPhase] || "draft";
 
-  const { self_player, current_battle, players } = gameState;
+  const { self_player, current_battle } = gameState;
 
-  const opponentPlayer = current_battle
-    ? players.find((p) => p.name === current_battle.opponent_name)
-    : null;
-  const canManipulateOpponent = currentPhase === "battle";
-  const opponentHasCompanion = (opponentPlayer?.command_zone.length ?? 0) > 0;
   const maxHandSize = self_player.hand_size;
   const handExceedsLimit = self_player.hand.length > maxHandSize;
   const basicsComplete = selectedBasics.length === 3;
@@ -620,19 +631,33 @@ function GameContent() {
                 onClick={actions.buildUnready}
                 className="btn bg-gray-600 hover:bg-gray-500 text-white"
               >
-                Unready
+                Undo
               </button>
             </>
           );
         }
         return (
-          <button
-            onClick={() => actions.buildReady(selectedBasics)}
-            disabled={!canReady}
-            className="btn btn-primary"
-          >
-            Ready {!basicsComplete && "(select 3 basics)"}
-          </button>
+          <>
+            {!basicsComplete && (
+              <span className="text-amber-400 text-sm animate-pulse">
+                {selectedBasics.length}/3 basics
+              </span>
+            )}
+            <button
+              onClick={() => actions.buildReady(selectedBasics, 'play')}
+              disabled={!canReady}
+              className="btn btn-primary"
+            >
+              Play
+            </button>
+            <button
+              onClick={() => actions.buildReady(selectedBasics, 'draw')}
+              disabled={!canReady}
+              className="btn btn-primary"
+            >
+              Draw
+            </button>
+          </>
         );
       case "battle": {
         if (!current_battle) return null;
@@ -728,6 +753,26 @@ function GameContent() {
     actions.battlePassTurn();
   };
 
+  const handleUntapAll = () => {
+    if (!current_battle) return;
+    const battlefieldIds = new Set(current_battle.your_zones.battlefield.map(c => c.id));
+    for (const cardId of current_battle.your_zones.tapped_card_ids || []) {
+      if (battlefieldIds.has(cardId)) {
+        actions.battleUpdateCardState('untap', cardId);
+      }
+    }
+  };
+
+  const handleUntapOpponentAll = () => {
+    if (!current_battle) return;
+    const battlefieldIds = new Set(current_battle.opponent_zones.battlefield.map(c => c.id));
+    for (const cardId of current_battle.opponent_zones.tapped_card_ids || []) {
+      if (battlefieldIds.has(cardId)) {
+        actions.battleUpdateCardState('untap', cardId);
+      }
+    }
+  };
+
   const renderPhaseContent = (): ReactNode => {
     if (currentPhase === "battle" && current_battle) {
       return (
@@ -739,11 +784,7 @@ function GameContent() {
           onYourLifeChange={handleYourLifeChange}
           onOpponentLifeChange={handleOpponentLifeChange}
           playerName={self_player.name}
-          onCreateTreasure={handleCreateTreasure}
-          onPassTurn={handlePassTurn}
-          canManipulateOpponent={canManipulateOpponent}
-          hasCompanion={self_player.command_zone.length > 0}
-          opponentHasCompanion={opponentHasCompanion}
+          onOpenActions={() => setActionMenuOpen(true)}
         />
       );
     }
@@ -804,9 +845,12 @@ function GameContent() {
                   <img src={POISON_COUNTER_IMAGE} alt="poison" className="w-4 h-4 rounded-sm" />
                   <span className="text-green-400">{current_battle.opponent_poison ?? 0}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={handlePassTurn} className="btn btn-secondary text-xs py-0 px-2">Pass</button>
-                  <button onClick={handleCreateTreasure} className="btn btn-secondary text-xs py-0 px-2">Treasure</button>
+                <div className="text-center">
+                  {current_battle.current_turn_name === self_player.name ? (
+                    <span className="text-green-400 font-medium">Your turn</span>
+                  ) : (
+                    <span className="text-amber-400 font-medium">Opp's turn</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="text-gray-300">You</span>
@@ -819,15 +863,13 @@ function GameContent() {
               </div>
             )}
             <div className="flex-1 flex min-h-0">
-              <main className="flex-1 flex flex-col min-h-0">
+              <main className="flex-1 flex flex-col min-h-0 min-w-0">
                 <BattlePhase
                   gameState={gameState}
                   actions={actions}
                   isMobile={sizes.isMobile}
-                  sideboardCount={current_battle?.your_zones.sideboard.length ?? 0}
-                  onShowSideboard={() => setShowSidebarSideboard(true)}
-                  opponentSideboardCount={current_battle?.opponent_full_sideboard?.length ?? 0}
-                  onShowOpponentSideboard={() => setShowOpponentSideboard(true)}
+                  selectedCard={battleSelectedCard}
+                  onSelectedCardChange={setBattleSelectedCard}
                 />
               </main>
               {sizes.isMobile ? (
@@ -921,7 +963,7 @@ function GameContent() {
           </GameDndProvider>
         ) : (
           <div className="flex-1 flex min-h-0">
-            <main className="flex-1 flex flex-col min-h-0">
+            <main className="flex-1 flex flex-col min-h-0 min-w-0">
               {currentPhase === "draft" && (
                 <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
               )}
@@ -980,6 +1022,7 @@ function GameContent() {
                   player={self_player}
                   players={gameState.players}
                   useUpgrades={gameState.use_upgrades}
+                  gameId={gameId}
                 />
               )}
             </main>
@@ -1019,6 +1062,14 @@ function GameContent() {
                 </div>
               )}
               {renderActionButtons()}
+              {currentPhase === "battle" && (
+                <button
+                  onClick={() => setActionMenuOpen(true)}
+                  className="btn bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium"
+                >
+                  Actions
+                </button>
+              )}
               {(currentPhase === "draft" || currentPhase === "build") && (
                 <div className="flex items-center gap-1.5">
                   <span className="text-base font-bold text-amber-400">{self_player.treasures}</span>
@@ -1032,7 +1083,7 @@ function GameContent() {
       {state.previewCard && (
         <CardPreviewModal
           card={state.previewCard}
-          upgradeTarget={state.previewUpgradeTarget}
+          appliedUpgrades={state.previewAppliedUpgrades}
           onClose={() => setPreviewCard(null)}
         />
       )}
@@ -1040,6 +1091,24 @@ function GameContent() {
         <RulesModal
           currentPhase={currentPhase as Phase}
           onClose={() => setShowRulesModal(false)}
+        />
+      )}
+      {actionMenuOpen && currentPhase === "battle" && current_battle && (
+        <ActionMenu
+          selectedCard={battleSelectedCard}
+          battle={current_battle}
+          playerName={self_player.name}
+          sideboardCount={current_battle.your_zones.sideboard.length}
+          opponentSideboardCount={current_battle.opponent_full_sideboard?.length ?? 0}
+          onAction={(action, cardId, data) => actions.battleUpdateCardState(action, cardId, data)}
+          onMove={(cardId, fromZone, toZone, fromOwner, toOwner) => actions.battleMove(cardId, fromZone, toZone, fromOwner, toOwner)}
+          onUntapAll={handleUntapAll}
+          onUntapOpponentAll={handleUntapOpponentAll}
+          onShowSideboard={() => { setShowSidebarSideboard(true); setActionMenuOpen(false); }}
+          onShowOpponentSideboard={() => { setShowOpponentSideboard(true); setActionMenuOpen(false); }}
+          onCreateTreasure={handleCreateTreasure}
+          onPassTurn={handlePassTurn}
+          onClose={() => setActionMenuOpen(false)}
         />
       )}
       {pendingSpectateRequest && (

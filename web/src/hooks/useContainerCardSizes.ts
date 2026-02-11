@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useLayoutEffect } from 'react'
 
 const CARD_ASPECT_RATIO = 7 / 5
 
@@ -14,6 +14,7 @@ interface UseContainerCardSizesOptions {
 interface ContainerCardDimensions {
   width: number
   height: number
+  columns: number
 }
 
 export function useContainerCardSizes({
@@ -27,6 +28,7 @@ export function useContainerCardSizes({
   const [dims, setDims] = useState<ContainerCardDimensions>(() => ({
     width: maxCardWidth,
     height: Math.round(maxCardWidth * CARD_ASPECT_RATIO),
+    columns: 1,
   }))
 
   const observerRef = useRef<ResizeObserver | null>(null)
@@ -35,7 +37,7 @@ export function useContainerCardSizes({
   const compute = useCallback(
     (containerWidth: number) => {
       if (cardCount === 0) {
-        return { width: maxCardWidth, height: Math.round(maxCardWidth * CARD_ASPECT_RATIO) }
+        return { width: maxCardWidth, height: Math.round(maxCardWidth * CARD_ASPECT_RATIO), columns: 1 }
       }
 
       const cardsPerRow = rows > 1 ? Math.ceil(cardCount / rows) : cardCount
@@ -44,7 +46,7 @@ export function useContainerCardSizes({
       const rawWidth = available / cardsPerRow
       const width = Math.round(Math.min(maxCardWidth, Math.max(minCardWidth, rawWidth)))
       const height = Math.round(width * CARD_ASPECT_RATIO)
-      return { width, height }
+      return { width, height, columns: cardsPerRow }
     },
     [cardCount, gap, padding, minCardWidth, maxCardWidth, rows]
   )
@@ -60,12 +62,17 @@ export function useContainerCardSizes({
 
       if (!node) return
 
+      const cs = getComputedStyle(node)
+      const w = node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      const next = compute(w)
+      setDims((prev) => (prev.width === next.width && prev.height === next.height && prev.columns === next.columns ? prev : next))
+
       const observer = new ResizeObserver((entries) => {
         const entry = entries[0]
         if (!entry) return
         const containerWidth = entry.contentRect.width
         const next = compute(containerWidth)
-        setDims((prev) => (prev.width === next.width && prev.height === next.height ? prev : next))
+        setDims((prev) => (prev.width === next.width && prev.height === next.height && prev.columns === next.columns ? prev : next))
       })
 
       observer.observe(node)
@@ -74,12 +81,12 @@ export function useContainerCardSizes({
     [compute]
   )
 
-  // Recompute when options change but element stays the same
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (elementRef.current) {
-      const containerWidth = elementRef.current.getBoundingClientRect().width
-      const next = compute(containerWidth)
-      setDims((prev) => (prev.width === next.width && prev.height === next.height ? prev : next))
+      const cs = getComputedStyle(elementRef.current)
+      const w = elementRef.current.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+      const next = compute(w)
+      setDims((prev) => (prev.width === next.width && prev.height === next.height && prev.columns === next.columns ? prev : next))
     }
   }, [compute])
 

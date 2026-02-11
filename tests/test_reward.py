@@ -1,7 +1,7 @@
 import pytest
 
 from mtb.models.cards import Battler
-from mtb.models.game import create_game
+from mtb.models.game import FakePlayer, StaticOpponent, create_game
 from mtb.phases import reward
 
 
@@ -267,3 +267,33 @@ def test_fibonacci_damage_formula():
     alice.vanquishers = 4
     reward.apply_poison(alice, bob)
     assert bob.poison == 5
+
+
+def test_vs_static_rewards_given_when_sudden_death_triggers_for_bots(card_factory):
+    """Non-lethal player should receive vanquisher/treasure rewards even when
+    sudden death is triggered by multiple bots hitting lethal simultaneously."""
+    game = create_game(["Alice"], num_players=1)
+    game.config.num_rounds_per_stage = 3
+    game.battler = Battler(cards=[card_factory("c1")], upgrades=[], vanguards=[])
+    player = game.players[0]
+
+    bot1 = FakePlayer(name="Bot1", player_history_id=1, poison=10)
+    bot2 = FakePlayer(name="Bot2", player_history_id=2, poison=10)
+    game.fake_players = [bot1, bot2]
+
+    player.round = 3
+    player.stage = 5
+    player.vanquishers = 2
+    player.treasures = 2
+    player.phase = "reward"
+
+    opponent = StaticOpponent(name="Bot1", hand=[], source_player_history_id=1)
+
+    reward.start_vs_static_rewards_only(
+        game, player, opponent, player_won=True, is_draw=False, poison_dealt=1, poison_taken=0
+    )
+
+    assert player.vanquishers == 3
+    assert player.treasures == 3
+    assert player.last_battle_result is not None
+    assert player.last_battle_result.vanquisher_gained is True
