@@ -288,9 +288,11 @@ body {
   color: #1a1a1a;
 }
 
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+  }
 }
 
 .btn-primary:disabled {
@@ -301,7 +303,6 @@ body {
 .btn-secondary {
   background: rgba(255, 255, 255, 0.1);
   color: white;
-  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .btn-secondary:hover:not(:disabled) {
@@ -313,9 +314,11 @@ body {
   color: white;
 }
 
-.btn-danger:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(211, 32, 42, 0.4);
+@media (hover: hover) {
+  .btn-danger:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(211, 32, 42, 0.4);
+  }
 }
 
 /* Drag overlay */
