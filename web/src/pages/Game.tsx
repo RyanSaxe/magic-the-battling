@@ -1063,7 +1063,7 @@ function GameContent() {
               {currentPhase === "battle" && (
                 <button
                   onClick={() => setActionMenuOpen(true)}
-                  className="btn bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium"
+                  className="btn bg-indigo-600 hover:bg-indigo-500 text-white"
                 >
                   Actions
                 </button>
