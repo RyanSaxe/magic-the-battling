@@ -39,7 +39,8 @@ export function GameDndProvider({
 
   const touchSensor = useSensor(TouchSensor, {
     activationConstraint: {
-      distance: 8,
+      delay: 200,
+      tolerance: 8,
     },
   })
 
