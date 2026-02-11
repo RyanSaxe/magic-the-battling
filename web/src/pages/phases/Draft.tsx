@@ -42,9 +42,10 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
     topMaxWidth: 400,
     bottomMaxWidth: 300,
   })
-  const upgradedCardIds = new Set(
-    self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
-  )
+  const appliedUpgradesList = self_player.upgrades.filter((u) => u.upgrade_target)
+  const upgradedCardIds = new Set(appliedUpgradesList.map((u) => u.upgrade_target!.id))
+  const getAppliedUpgrades = (cardId: string) =>
+    appliedUpgradesList.filter((u) => u.upgrade_target!.id === cardId)
 
   const handleCardClick = useCallback(
     (card: CardType, index: number, zone: SelectionZone, isInHand: boolean) => {
@@ -145,6 +146,7 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
                 selected={selectedCard?.card.id === card.id}
                 dimensions={poolCardDims}
                 upgraded={upgradedCardIds.has(card.id)}
+                appliedUpgrades={getAppliedUpgrades(card.id)}
               />
             )
           })}

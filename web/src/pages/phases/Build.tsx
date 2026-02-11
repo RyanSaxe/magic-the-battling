@@ -200,6 +200,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
   const unappliedUpgrades = self_player.upgrades.filter((u) => !u.upgrade_target)
   const upgradedCardIds = new Set(appliedUpgrades.map((u) => u.upgrade_target!.id))
   const allUpgrades = [...appliedUpgrades, ...unappliedUpgrades]
+  const getAppliedUpgrades = (cardId: string) =>
+    appliedUpgrades.filter((u) => u.upgrade_target!.id === cardId)
 
   const isCompanion = (card: CardType) => card.oracle_text?.includes('Companion —') ?? false
   const selectedCompanionId = self_player.command_zone[0]?.id ?? null
@@ -257,6 +259,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                   glow={selectedUpgrade ? 'green' : 'none'}
                   dimensions={handCardDims}
                   upgraded={upgradedCardIds.has(card.id)}
+                  appliedUpgrades={getAppliedUpgrades(card.id)}
                 />
                 {selectedUpgrade && (
                   <button
@@ -405,6 +408,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                   glow={selectedUpgrade ? 'green' : isActiveCompanion ? 'gold' : 'none'}
                   dimensions={poolCardDims}
                   upgraded={upgradedCardIds.has(card.id)}
+                  appliedUpgrades={getAppliedUpgrades(card.id)}
                 />
                 {selectedUpgrade ? (
                   <button

@@ -19,6 +19,7 @@ interface CardProps {
   className?: string
   isCompanion?: boolean
   upgraded?: boolean
+  appliedUpgrades?: CardType[]
 }
 
 const sizeStyles = {
@@ -51,6 +52,7 @@ export function Card({
   className = '',
   isCompanion = false,
   upgraded = false,
+  appliedUpgrades,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -133,7 +135,11 @@ export function Card({
           className="absolute top-1 left-1 bg-black/60 rounded p-1 text-white hover:bg-black/80 transition-colors"
           onClick={(e) => {
             e.stopPropagation()
-            previewContext.setPreviewCard(card, card.upgrade_target)
+            if (card.upgrade_target) {
+              previewContext.setPreviewCard(card.upgrade_target, [card])
+            } else {
+              previewContext.setPreviewCard(card, appliedUpgrades)
+            }
           }}
           title="Preview card"
         >

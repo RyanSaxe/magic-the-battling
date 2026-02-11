@@ -28,11 +28,11 @@ import type { Card as CardType } from "../types";
 
 function CardPreviewModal({
   card,
-  upgradeTarget,
+  appliedUpgrades,
   onClose,
 }: {
   card: CardType;
-  upgradeTarget: CardType | null;
+  appliedUpgrades: CardType[];
   onClose: () => void;
 }) {
   const [isFlipped, setIsFlipped] = useState(false);
@@ -68,14 +68,17 @@ function CardPreviewModal({
           alt={card.name}
           className="max-h-[80vh] rounded-lg shadow-2xl"
         />
-        {upgradeTarget && (
+        {appliedUpgrades.length > 0 && (
           <>
             <div className="text-white text-2xl font-bold">→</div>
-            <img
-              src={getImageUrl(upgradeTarget, isFlipped)}
-              alt={upgradeTarget.name}
-              className="max-h-[80vh] rounded-lg shadow-2xl"
-            />
+            {appliedUpgrades.map((upgrade) => (
+              <img
+                key={upgrade.id}
+                src={getImageUrl(upgrade, isFlipped)}
+                alt={upgrade.name}
+                className="max-h-[80vh] rounded-lg shadow-2xl"
+              />
+            ))}
           </>
         )}
         <button
@@ -1047,7 +1050,7 @@ function GameContent() {
       {state.previewCard && (
         <CardPreviewModal
           card={state.previewCard}
-          upgradeTarget={state.previewUpgradeTarget}
+          appliedUpgrades={state.previewAppliedUpgrades}
           onClose={() => setPreviewCard(null)}
         />
       )}

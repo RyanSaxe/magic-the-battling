@@ -29,6 +29,7 @@ interface BattlefieldZoneProps {
   separateLands?: boolean;
   cardDimensions?: CardDimensions;
   upgradedCardIds?: Set<string>;
+  upgradesByCardId?: Map<string, CardType[]>;
   rowHeight?: number;
   landCardDimensions?: CardDimensions;
   nonlandCardDimensions?: CardDimensions;
@@ -52,6 +53,7 @@ export function BattlefieldZone({
   separateLands = false,
   cardDimensions,
   upgradedCardIds = new Set(),
+  upgradesByCardId,
   rowHeight,
   landCardDimensions,
   nonlandCardDimensions,
@@ -94,6 +96,7 @@ export function BattlefieldZone({
           onCardDoubleClick={onCardDoubleClick}
           onCardContextMenu={onCardContextMenu}
           upgradedCardIds={upgradedCardIds}
+          upgradesByCardId={upgradesByCardId}
         />
       );
     }
@@ -124,6 +127,7 @@ export function BattlefieldZone({
           disabled={!draggable || !allowInteraction}
           isOpponent={isOpponent}
           upgraded={upgradedCardIds.has(card.id)}
+          appliedUpgrades={upgradesByCardId?.get(card.id)}
         />
       </div>
     );

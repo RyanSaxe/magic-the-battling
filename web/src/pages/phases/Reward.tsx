@@ -70,9 +70,10 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
   const { last_battle_result } = self_player
   const isStageIncreasing = self_player.is_stage_increasing
   const hasUpgradeSection = gameState.use_upgrades && isStageIncreasing && available_upgrades.length > 0
-  const upgradedCardIds = new Set(
-    self_player.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
-  )
+  const appliedUpgradesList = self_player.upgrades.filter((u) => u.upgrade_target)
+  const upgradedCardIds = new Set(appliedUpgradesList.map((u) => u.upgrade_target!.id))
+  const getAppliedUpgrades = (cardId: string) =>
+    appliedUpgradesList.filter((u) => u.upgrade_target!.id === cardId)
 
   const rewardCount =
     (last_battle_result?.treasures_gained ? 1 : 0) +
@@ -222,7 +223,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
               maxWidth: '100%',
             }}>
               {poolCards.map((card) => (
-                <Card key={card.id} card={card} dimensions={poolCardDims} upgraded={upgradedCardIds.has(card.id)} />
+                <Card key={card.id} card={card} dimensions={poolCardDims} upgraded={upgradedCardIds.has(card.id)} appliedUpgrades={getAppliedUpgrades(card.id)} />
               ))}
             </div>
           </div>

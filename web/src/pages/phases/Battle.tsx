@@ -109,12 +109,26 @@ export function BattlePhase({
   const opponentFaceDownIds = new Set(opponent_zones.face_down_card_ids || [])
   const opponentCounters = opponent_zones.counters || {}
 
-  const upgradedCardIds = new Set(
-    your_zones.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
-  )
-  const opponentUpgradedCardIds = new Set(
-    opponent_zones.upgrades.filter((u) => u.upgrade_target).map((u) => u.upgrade_target!.id)
-  )
+  const playerAppliedUpgrades = your_zones.upgrades.filter((u) => u.upgrade_target)
+  const opponentAppliedUpgrades = opponent_zones.upgrades.filter((u) => u.upgrade_target)
+
+  const upgradedCardIds = new Set(playerAppliedUpgrades.map((u) => u.upgrade_target!.id))
+  const opponentUpgradedCardIds = new Set(opponentAppliedUpgrades.map((u) => u.upgrade_target!.id))
+
+  const upgradesByCardId = new Map<string, CardType[]>()
+  for (const u of playerAppliedUpgrades) {
+    const id = u.upgrade_target!.id
+    const existing = upgradesByCardId.get(id) ?? []
+    existing.push(u)
+    upgradesByCardId.set(id, existing)
+  }
+  const opponentUpgradesByCardId = new Map<string, CardType[]>()
+  for (const u of opponentAppliedUpgrades) {
+    const id = u.upgrade_target!.id
+    const existing = opponentUpgradesByCardId.get(id) ?? []
+    existing.push(u)
+    opponentUpgradesByCardId.set(id, existing)
+  }
 
   const handleCardClick = (card: CardType, zone: ZoneName) => {
     if (selectedCard?.card.id === card.id) {
@@ -222,7 +236,7 @@ export function BattlePhase({
             >
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
-                    <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} />
+                    <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} />
                   ))
                 : Array.from({ length: oppHandCount }).map((_, i) => (
                     <CardBack key={i} dimensions={sizes.opponentHand} />
@@ -232,7 +246,7 @@ export function BattlePhase({
             <div className="flex items-center justify-center gap-1.5 flex-nowrap h-full">
               {opponent_hand_revealed
                 ? opponent_zones.hand.map((card) => (
-                    <Card key={card.id} card={card} dimensions={sizes.opponentHand} upgraded={opponentUpgradedCardIds.has(card.id)} />
+                    <Card key={card.id} card={card} dimensions={sizes.opponentHand} upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} />
                   ))
                 : Array.from({ length: oppHandCount }).map((_, i) => (
                     <CardBack key={i} dimensions={sizes.opponentHand} />
@@ -266,6 +280,7 @@ export function BattlePhase({
               isOpponent
               canManipulateOpponent={canManipulateOpponent}
               upgradedCardIds={opponentUpgradedCardIds}
+              upgradesByCardId={opponentUpgradesByCardId}
               cardDimensions={sizes.opponentNonlands}
               rowHeight={rowHeight}
               landCardDimensions={sizes.opponentLands}
@@ -304,6 +319,7 @@ export function BattlePhase({
               attachments={attachments}
               separateLands
               upgradedCardIds={upgradedCardIds}
+              upgradesByCardId={upgradesByCardId}
               cardDimensions={sizes.playerNonlands}
               rowHeight={rowHeight}
               landCardDimensions={sizes.playerLands}
@@ -330,6 +346,7 @@ export function BattlePhase({
             selectedCardId={selectedCard?.card.id}
             onCardClick={(card) => handleCardClick(card, 'hand')}
             upgradedCardIds={upgradedCardIds}
+            upgradesByCardId={upgradesByCardId}
             cardDimensions={sizes.playerHand}
           />
           {sideboardCount > 0 && onShowSideboard && (
