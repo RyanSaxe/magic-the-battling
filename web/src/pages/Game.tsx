@@ -638,11 +638,9 @@ function GameContent() {
         }
         return (
           <>
-            {!basicsComplete && (
-              <span className="text-amber-400 text-sm animate-pulse">
-                {selectedBasics.length}/3 basics
-              </span>
-            )}
+            <span className={`text-sm ${basicsComplete ? "text-green-400" : "text-amber-400 animate-pulse"}`}>
+              {selectedBasics.length}/3 basics
+            </span>
             <button
               onClick={() => actions.buildReady(selectedBasics, 'play')}
               disabled={!canReady}
@@ -1065,7 +1063,7 @@ function GameContent() {
               {currentPhase === "battle" && (
                 <button
                   onClick={() => setActionMenuOpen(true)}
-                  className="btn bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium"
+                  className="btn bg-indigo-600 hover:bg-indigo-500 text-white"
                 >
                   Actions
                 </button>

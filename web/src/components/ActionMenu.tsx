@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
 import type { BattleSelectedCard } from '../pages/phases/Battle'
@@ -74,15 +74,6 @@ export function ActionMenu({
     onClose()
   }
 
-  const menuRef = useCallback((node: HTMLDivElement | null) => {
-    if (!node) return
-    const rect = node.getBoundingClientRect()
-    if (rect.top < 0) {
-      node.style.bottom = 'auto'
-      node.style.top = '8px'
-    }
-  }, [])
-
   const card = selectedCard?.card
   const zone = selectedCard?.zone
   const onBattlefield = zone === 'battlefield'
@@ -104,8 +95,7 @@ export function ActionMenu({
     <>
       <div className="fixed inset-0 z-50" onClick={onClose} />
       <div
-        ref={menuRef}
-        className="fixed bottom-16 right-4 sm:right-auto sm:bottom-auto bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-50"
+        className="fixed bottom-16 right-4 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-50"
         style={{ maxWidth: 280 }}
       >
         {card && (
