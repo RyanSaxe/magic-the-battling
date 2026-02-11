@@ -186,7 +186,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
 
       {/* Stage upgrade selection */}
       {hasUpgradeSection && (
-        <div ref={dualRef} className="flex-1 min-h-0 flex flex-col bg-amber-950/30 rounded-lg p-4 border-2 border-amber-500">
+        <div ref={dualRef} className="flex-1 min-h-0 flex flex-col bg-amber-950/30 rounded-lg p-4 border-2 border-amber-500 overflow-hidden">
           <div ref={upgradeHeaderRef} className="text-center mb-3 shrink-0">
             <h3 className="text-lg font-bold text-amber-400">Stage Complete! Select an upgrade</h3>
           </div>

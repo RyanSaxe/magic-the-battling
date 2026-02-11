@@ -15,12 +15,12 @@ export function useElementHeight(): [React.RefCallback<HTMLElement>, number] {
       return
     }
 
-    setHeight(node.getBoundingClientRect().height)
+    setHeight(Math.round(node.getBoundingClientRect().height))
 
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0]
       if (!entry) return
-      setHeight(entry.borderBoxSize[0].blockSize)
+      setHeight(Math.round(entry.borderBoxSize[0].blockSize))
     })
 
     observer.observe(node, { box: 'border-box' })

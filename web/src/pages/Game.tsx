@@ -863,7 +863,7 @@ function GameContent() {
               </div>
             )}
             <div className="flex-1 flex min-h-0">
-              <main className="flex-1 flex flex-col min-h-0">
+              <main className="flex-1 flex flex-col min-h-0 min-w-0">
                 <BattlePhase
                   gameState={gameState}
                   actions={actions}
@@ -963,7 +963,7 @@ function GameContent() {
           </GameDndProvider>
         ) : (
           <div className="flex-1 flex min-h-0">
-            <main className="flex-1 flex flex-col min-h-0">
+            <main className="flex-1 flex flex-col min-h-0 min-w-0">
               {currentPhase === "draft" && (
                 <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
               )}
