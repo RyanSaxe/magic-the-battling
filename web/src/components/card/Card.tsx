@@ -36,6 +36,8 @@ const glowColors = {
   red: '0 0 20px rgba(239, 68, 68, 0.6)',
 }
 
+const canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
+
 export function Card({
   card,
   onClick,
@@ -103,8 +105,8 @@ export function Card({
       }}
       onClick={disabled ? undefined : onClick}
       onDoubleClick={disabled ? undefined : onDoubleClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={canHover ? () => setIsHovered(true) : undefined}
+      onMouseLeave={canHover ? () => setIsHovered(false) : undefined}
     >
       {isLoading && (
         <div className="skeleton absolute inset-0 flex items-center justify-center bg-gray-800">
@@ -130,7 +132,7 @@ export function Card({
           Flip
         </button>
       )}
-      {previewContext && isHovered && (
+      {previewContext && (isHovered || selected) && (
         <button
           className="absolute top-1 left-1 bg-black/60 rounded p-1 text-white hover:bg-black/80 transition-colors"
           onClick={(e) => {
