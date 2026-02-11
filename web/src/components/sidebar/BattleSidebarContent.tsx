@@ -11,8 +11,7 @@ interface BattleSidebarContentProps {
   onYourLifeChange: (life: number) => void;
   onOpponentLifeChange: (life: number) => void;
   playerName: string;
-  onCreateTreasure?: () => void;
-  onPassTurn?: () => void;
+  onOpenActions?: () => void;
 }
 
 function LifeCounter({
@@ -114,8 +113,7 @@ export function BattleSidebarContent({
   onYourLifeChange,
   onOpponentLifeChange,
   playerName,
-  onCreateTreasure,
-  onPassTurn,
+  onOpenActions,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
@@ -184,25 +182,14 @@ export function BattleSidebarContent({
               )}
             </div>
           )}
-          {(onPassTurn || onCreateTreasure) && (
-            <div className="flex gap-2 mt-3">
-              {onPassTurn && (
-                <button
-                  onClick={onPassTurn}
-                  disabled={current_turn_name !== playerName}
-                  className="flex-1 px-3 py-1.5 text-xs rounded bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Pass
-                </button>
-              )}
-              {onCreateTreasure && (
-                <button
-                  onClick={onCreateTreasure}
-                  className="flex-1 px-3 py-1.5 text-xs rounded bg-amber-600 hover:bg-amber-500 text-white"
-                >
-                  Treasure
-                </button>
-              )}
+          {onOpenActions && (
+            <div className="mt-3">
+              <button
+                onClick={onOpenActions}
+                className="w-full px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+              >
+                Actions
+              </button>
             </div>
           )}
         </div>

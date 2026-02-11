@@ -13,6 +13,11 @@ interface ContextMenuState {
   isOpponent?: boolean
 }
 
+export interface BattleSelectedCard {
+  card: CardType
+  zone: ZoneName
+}
+
 interface BattlePhaseProps {
   gameState: GameState
   actions: {
@@ -21,10 +26,8 @@ interface BattlePhaseProps {
     battleUpdateCardState: (actionType: CardStateAction, cardId: string, data?: Record<string, unknown>) => void
   }
   isMobile?: boolean
-  sideboardCount?: number
-  onShowSideboard?: () => void
-  opponentSideboardCount?: number
-  onShowOpponentSideboard?: () => void
+  selectedCard: BattleSelectedCard | null
+  onSelectedCardChange: (card: BattleSelectedCard | null) => void
 }
 
 const isLandOrTreasure = (card: CardType) =>
@@ -40,15 +43,10 @@ export function BattlePhase({
   gameState,
   actions,
   isMobile = false,
-  sideboardCount = 0,
-  onShowSideboard,
-  opponentSideboardCount = 0,
-  onShowOpponentSideboard,
+  selectedCard,
+  onSelectedCardChange,
 }: BattlePhaseProps) {
-  const [selectedCard, setSelectedCard] = useState<{
-    card: CardType
-    zone: ZoneName
-  } | null>(null)
+  const setSelectedCard = onSelectedCardChange
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
   const { current_battle } = gameState
@@ -175,24 +173,6 @@ export function BattlePhase({
     setContextMenu({ card, zone, position: { x: e.clientX, y: e.clientY }, isOpponent: true })
   }
 
-  const battlefieldIds = new Set(your_zones.battlefield.map((c) => c.id))
-  const handleUntapAll = () => {
-    for (const cardId of your_zones.tapped_card_ids || []) {
-      if (battlefieldIds.has(cardId)) {
-        actions.battleUpdateCardState('untap', cardId)
-      }
-    }
-  }
-
-  const opponentBattlefieldIds = new Set(opponent_zones.battlefield.map((c) => c.id))
-  const handleOpponentUntapAll = () => {
-    for (const cardId of opponent_zones.tapped_card_ids || []) {
-      if (opponentBattlefieldIds.has(cardId)) {
-        actions.battleUpdateCardState('untap', cardId)
-      }
-    }
-  }
-
   const isCardAttached = (cardId: string): boolean => {
     return Object.values(attachments).some(children => children.includes(cardId))
   }
@@ -255,14 +235,6 @@ export function BattlePhase({
                     ))}
               </div>
             )}
-            {opponentSideboardCount > 0 && onShowOpponentSideboard && (
-              <button
-                onClick={onShowOpponentSideboard}
-                className="absolute bottom-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
-              >
-                Sideboard ({opponentSideboardCount})
-              </button>
-            )}
           </div>
           <CompactZoneDisplay
             title="Companion"
@@ -299,14 +271,6 @@ export function BattlePhase({
               landCardDimensions={sizes.opponentLands}
               nonlandCardDimensions={sizes.opponentNonlands}
             />
-            {opponentSideboardCount > 0 && (
-              <button
-                onClick={handleOpponentUntapAll}
-                className="absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded text-gray-300"
-              >
-                Untap All
-              </button>
-            )}
           </div>
           <BattlefieldZoneColumn
             zones={opponent_zones}
@@ -338,12 +302,6 @@ export function BattlePhase({
               landCardDimensions={sizes.playerLands}
               nonlandCardDimensions={sizes.playerNonlands}
             />
-            <button
-              onClick={handleUntapAll}
-              className="absolute bottom-2 right-2 text-xs bg-blue-600 hover:bg-blue-500 px-2 py-1 rounded text-white"
-            >
-              Untap All
-            </button>
           </div>
           <BattlefieldZoneColumn
             zones={your_zones}
@@ -363,14 +321,6 @@ export function BattlePhase({
               upgradesByCardId={upgradesByCardId}
               cardDimensions={sizes.playerHand}
             />
-            {sideboardCount > 0 && onShowSideboard && (
-              <button
-                onClick={onShowSideboard}
-                className="absolute top-2 right-2 text-xs bg-purple-600 hover:bg-purple-500 px-2 py-1 rounded text-white"
-              >
-                Sideboard ({sideboardCount})
-              </button>
-            )}
           </div>
           <CompactZoneDisplay
             title="Companion"
