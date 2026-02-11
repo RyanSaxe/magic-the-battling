@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { Card as CardType, ZoneName } from '../../types'
-import { DraggableCard, DroppableZone } from '../../dnd'
+import { DraggableCard, DroppableZone, useGameDnd } from '../../dnd'
 import { ZoneModal } from '../sidebar/DroppableZoneDisplay'
+import { makeZoneId } from '../../dnd/types'
 
 const CARD_ASPECT = 5 / 7
 const LABEL_HEIGHT = 16
@@ -31,7 +32,11 @@ export function CompactZoneDisplay({
   const allowInteraction = !isOpponent || canManipulateOpponent
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
+  const { activeCard, activeFromZoneId } = useGameDnd()
+  const thisZoneId = makeZoneId(zone, zoneOwner)
   const topCard = cards[cards.length - 1]
+  const isDraggingTopCard = activeCard?.id === topCard?.id && activeFromZoneId === thisZoneId
+  const nextCard = isDraggingTopCard ? cards[cards.length - 2] : null
 
   const availW = width - 4
   const availH = height - LABEL_HEIGHT
@@ -65,7 +70,16 @@ export function CompactZoneDisplay({
           style={{ width, height }}
         >
           {isOpponent && label}
-          <div className="flex-1 flex items-center justify-center min-h-0">
+          <div className="flex-1 flex items-center justify-center min-h-0 relative">
+            {nextCard && (
+              <img
+                src={nextCard.image_url}
+                alt=""
+                className="absolute rounded"
+                style={{ width: cardW, height: cardH }}
+                draggable={false}
+              />
+            )}
             {topCard && (
               <DraggableCard
                 card={topCard}
