@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type ReactNode } from "react";
 import {
   DndContext as DndKitContext,
   DragOverlay,
@@ -10,16 +10,22 @@ import {
   type DragStartEvent,
   type DragEndEvent,
   pointerWithin,
-} from '@dnd-kit/core'
-import type { Card, ZoneName } from '../types'
-import { Card as CardComponent } from '../components/card'
-import { parseZoneId, type DragData, type ZoneOwner } from './types'
-import { GameDndContext } from './useGameDnd'
+} from "@dnd-kit/core";
+import type { Card, ZoneName } from "../types";
+import { Card as CardComponent } from "../components/card";
+import { parseZoneId, type DragData, type ZoneOwner } from "./types";
+import { GameDndContext } from "./useGameDnd";
 
 interface GameDndProviderProps {
-  children: ReactNode
-  onCardMove?: (card: Card, fromZone: ZoneName, toZone: ZoneName, fromOwner: ZoneOwner, toOwner: ZoneOwner) => void
-  validDropZones?: (fromZone: ZoneName) => ZoneName[]
+  children: ReactNode;
+  onCardMove?: (
+    card: Card,
+    fromZone: ZoneName,
+    toZone: ZoneName,
+    fromOwner: ZoneOwner,
+    toOwner: ZoneOwner,
+  ) => void;
+  validDropZones?: (fromZone: ZoneName) => ZoneName[];
 }
 
 export function GameDndProvider({
@@ -27,68 +33,71 @@ export function GameDndProvider({
   onCardMove,
   validDropZones,
 }: GameDndProviderProps) {
-  const [activeCard, setActiveCard] = useState<Card | null>(null)
-  const [activeFromZone, setActiveFromZone] = useState<ZoneName | null>(null)
-  const [activeFromZoneId, setActiveFromZoneId] = useState<string | null>(null)
+  const [activeCard, setActiveCard] = useState<Card | null>(null);
+  const [activeFromZone, setActiveFromZone] = useState<ZoneName | null>(null);
+  const [activeFromZoneId, setActiveFromZoneId] = useState<string | null>(null);
 
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: {
       distance: 8,
     },
-  })
+  });
 
   const touchSensor = useSensor(TouchSensor, {
     activationConstraint: {
-      delay: 200,
+      delay: 100,
       tolerance: 8,
     },
-  })
+  });
 
-  const keyboardSensor = useSensor(KeyboardSensor)
+  const keyboardSensor = useSensor(KeyboardSensor);
 
-  const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor)
+  const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
 
   function handleDragStart(event: DragStartEvent) {
-    const data = event.active.data.current as DragData | undefined
+    const data = event.active.data.current as DragData | undefined;
     if (data) {
-      setActiveCard(data.card)
-      setActiveFromZone(data.fromZone)
-      setActiveFromZoneId(data.fromZoneId)
+      setActiveCard(data.card);
+      setActiveFromZone(data.fromZone);
+      setActiveFromZoneId(data.fromZoneId);
     }
   }
 
   function handleDragEnd(event: DragEndEvent) {
-    const { over } = event
+    const { over } = event;
 
     if (over && activeCard && activeFromZone) {
-      const toZoneId = over.id as string
-      const { zone: toZone, owner: toOwner } = parseZoneId(toZoneId)
+      const toZoneId = over.id as string;
+      const { zone: toZone, owner: toOwner } = parseZoneId(toZoneId);
 
-      const dragData = event.active.data.current as DragData | undefined
-      const fromZoneId = dragData?.fromZoneId || ''
-      const { owner: fromOwner } = parseZoneId(fromZoneId)
+      const dragData = event.active.data.current as DragData | undefined;
+      const fromZoneId = dragData?.fromZoneId || "";
+      const { owner: fromOwner } = parseZoneId(fromZoneId);
 
       if (fromZoneId !== toZoneId) {
-        const isValidDrop = !validDropZones || validDropZones(activeFromZone).includes(toZone)
+        const isValidDrop =
+          !validDropZones || validDropZones(activeFromZone).includes(toZone);
         if (isValidDrop && onCardMove) {
-          onCardMove(activeCard, activeFromZone, toZone, fromOwner, toOwner)
+          onCardMove(activeCard, activeFromZone, toZone, fromOwner, toOwner);
         }
       }
     }
 
-    setActiveCard(null)
-    setActiveFromZone(null)
-    setActiveFromZoneId(null)
+    setActiveCard(null);
+    setActiveFromZone(null);
+    setActiveFromZoneId(null);
   }
 
   function handleDragCancel() {
-    setActiveCard(null)
-    setActiveFromZone(null)
-    setActiveFromZoneId(null)
+    setActiveCard(null);
+    setActiveFromZone(null);
+    setActiveFromZoneId(null);
   }
 
   return (
-    <GameDndContext.Provider value={{ activeCard, activeFromZone, activeFromZoneId }}>
+    <GameDndContext.Provider
+      value={{ activeCard, activeFromZone, activeFromZoneId }}
+    >
       <DndKitContext
         sensors={sensors}
         collisionDetection={pointerWithin}
@@ -108,5 +117,5 @@ export function GameDndProvider({
         </DragOverlay>
       </DndKitContext>
     </GameDndContext.Provider>
-  )
+  );
 }
