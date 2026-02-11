@@ -140,7 +140,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
           {!hasUpgradeSection && (
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-6">Your Rewards</div>
           )}
-          <div ref={hasUpgradeSection ? undefined : rewardRef} className="flex justify-center flex-wrap gap-6">
+          <div ref={hasUpgradeSection ? undefined : rewardRef} className="flex justify-center gap-6 w-full">
             {last_battle_result.treasures_gained > 0 && (
               <RewardCard
                 imageUrl={TREASURE_TOKEN_IMAGE}
