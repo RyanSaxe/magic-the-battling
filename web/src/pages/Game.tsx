@@ -60,23 +60,25 @@ function CardPreviewModal({
       onClick={onClose}
     >
       <div
-        className="relative flex gap-4 items-center"
+        className="relative flex gap-4 items-center max-w-[95vw] max-h-[85vh] px-4"
         onClick={(e) => e.stopPropagation()}
       >
         <img
           src={getImageUrl(card, isFlipped)}
           alt={card.name}
-          className="max-h-[80vh] rounded-lg shadow-2xl"
+          className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
+          style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
         />
         {appliedUpgrades.length > 0 && (
           <>
-            <div className="text-white text-2xl font-bold">→</div>
+            <div className="text-white text-2xl font-bold shrink-0">→</div>
             {appliedUpgrades.map((upgrade) => (
               <img
                 key={upgrade.id}
                 src={getImageUrl(upgrade, isFlipped)}
                 alt={upgrade.name}
-                className="max-h-[80vh] rounded-lg shadow-2xl"
+                className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
+                style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
               />
             ))}
           </>

@@ -85,8 +85,8 @@ export function Card({
     selected && 'selected',
     tapped && 'tapped',
     dragging && 'dragging',
-    isCompanion && 'ring-inset ring-2 ring-purple-500',
-    upgraded && 'ring-inset ring-2 ring-amber-400',
+    isCompanion && 'companion',
+    upgraded && 'upgraded',
     className,
   ].filter(Boolean).join(' ')
 
