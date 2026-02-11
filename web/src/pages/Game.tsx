@@ -552,13 +552,8 @@ function GameContent() {
       game_over: "battle",
     }[currentPhase] || "draft";
 
-  const { self_player, current_battle, players } = gameState;
+  const { self_player, current_battle } = gameState;
 
-  const opponentPlayer = current_battle
-    ? players.find((p) => p.name === current_battle.opponent_name)
-    : null;
-  const canManipulateOpponent = currentPhase === "battle";
-  const opponentHasCompanion = (opponentPlayer?.command_zone.length ?? 0) > 0;
   const maxHandSize = self_player.hand_size;
   const handExceedsLimit = self_player.hand.length > maxHandSize;
   const basicsComplete = selectedBasics.length === 3;
@@ -760,9 +755,6 @@ function GameContent() {
           playerName={self_player.name}
           onCreateTreasure={handleCreateTreasure}
           onPassTurn={handlePassTurn}
-          canManipulateOpponent={canManipulateOpponent}
-          hasCompanion={self_player.command_zone.length > 0}
-          opponentHasCompanion={opponentHasCompanion}
         />
       );
     }
