@@ -172,6 +172,11 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
 
   const handleUpgradeClick = (upgrade: CardType) => {
     if (locked) return
+    if (selectedCard) {
+      setPendingUpgrade({ upgrade, target: selectedCard.card })
+      setSelectedCard(null)
+      return
+    }
     if (selectedUpgrade?.id === upgrade.id) {
       setSelectedUpgrade(null)
     } else {
@@ -244,15 +249,28 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
             overflow: 'hidden',
           }}>
             {self_player.hand.map((card, index) => (
-              <Card
-                key={card.id}
-                card={card}
-                onClick={() => handleCardClick(card, index, 'hand')}
-                selected={selectedCard?.card.id === card.id}
-                glow={selectedUpgrade ? 'green' : 'none'}
-                dimensions={handCardDims}
-                upgraded={upgradedCardIds.has(card.id)}
-              />
+              <div key={card.id} className="relative">
+                <Card
+                  card={card}
+                  onClick={() => handleCardClick(card, index, 'hand')}
+                  selected={selectedCard?.card.id === card.id}
+                  glow={selectedUpgrade ? 'green' : 'none'}
+                  dimensions={handCardDims}
+                  upgraded={upgradedCardIds.has(card.id)}
+                />
+                {selectedUpgrade && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPendingUpgrade({ upgrade: selectedUpgrade, target: card })
+                      setSelectedUpgrade(null)
+                    }}
+                    className="absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg bg-purple-600/80 text-white hover:bg-purple-500/90"
+                  >
+                    Apply
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -274,21 +292,6 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
             <div className="text-red-200/80 text-xs mt-1">
               Build your deck - fight to survive!
             </div>
-          </div>
-        )}
-
-        {/* Upgrade application instruction */}
-        {selectedUpgrade && (
-          <div className="bg-purple-900/40 rounded-lg p-3 text-center">
-            <span className="text-purple-400 text-sm">
-              Click a card to apply "{selectedUpgrade.name}" to it
-            </span>
-            <button
-              onClick={() => setSelectedUpgrade(null)}
-              className="ml-4 text-gray-400 text-sm hover:text-white"
-            >
-              Cancel
-            </button>
           </div>
         )}
 
@@ -370,21 +373,21 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                       card={upgrade}
                       dimensions={poolCardDims}
                       selected={selectedUpgrade?.id === upgrade.id}
+                      glow={selectedCard ? 'green' : 'none'}
                       onClick={() => handleUpgradeClick(upgrade)}
                     />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleUpgradeClick(upgrade)
-                      }}
-                      className={`absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg ${
-                        selectedUpgrade?.id === upgrade.id
-                          ? 'bg-purple-500/90 text-white'
-                          : 'bg-purple-600/80 text-white hover:bg-purple-500/90'
-                      }`}
-                    >
-                      Apply
-                    </button>
+                    {selectedCard && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setPendingUpgrade({ upgrade, target: selectedCard.card })
+                          setSelectedCard(null)
+                        }}
+                        className="absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg bg-purple-600/80 text-white hover:bg-purple-500/90"
+                      >
+                        Apply
+                      </button>
+                    )}
                   </>
                 )}
               </div>
@@ -403,7 +406,18 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                   dimensions={poolCardDims}
                   upgraded={upgradedCardIds.has(card.id)}
                 />
-                {cardIsCompanion && (
+                {selectedUpgrade ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setPendingUpgrade({ upgrade: selectedUpgrade, target: card })
+                      setSelectedUpgrade(null)
+                    }}
+                    className="absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg bg-purple-600/80 text-white hover:bg-purple-500/90"
+                  >
+                    Apply
+                  </button>
+                ) : cardIsCompanion ? (
                   <button
                     disabled={locked}
                     onClick={(e) => {
@@ -422,7 +436,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                   >
                     {isActiveCompanion ? 'Companion' : 'Set Companion'}
                   </button>
-                )}
+                ) : null}
               </div>
             )
           })}
