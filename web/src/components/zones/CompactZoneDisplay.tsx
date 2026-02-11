@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import type { Card as CardType, ZoneName } from '../../types'
-import { DroppableZone } from '../../dnd'
+import { DraggableCard, DroppableZone } from '../../dnd'
 import { ZoneModal } from '../sidebar/DroppableZoneDisplay'
+
+const CARD_ASPECT = 5 / 7
+const LABEL_HEIGHT = 16
 
 interface CompactZoneDisplayProps {
   title: string
@@ -29,7 +32,20 @@ export function CompactZoneDisplay({
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
   const topCard = cards[cards.length - 1]
-  const imageUrl = topCard?.image_url
+
+  const availW = width - 4
+  const availH = height - LABEL_HEIGHT
+  const cardW = Math.floor(Math.min(availW, availH * CARD_ASPECT))
+  const cardH = Math.floor(cardW / CARD_ASPECT)
+
+  const label = (
+    <div className="flex items-center justify-center gap-0.5 bg-black/70 rounded px-1 shrink-0" style={{ height: LABEL_HEIGHT }}>
+      <span className="text-[7px] uppercase text-gray-300 font-medium leading-none">{title}</span>
+      {cards.length >= 2 && (
+        <span className="text-[9px] font-bold text-white leading-none">{cards.length}</span>
+      )}
+    </div>
+  )
 
   return (
     <>
@@ -39,28 +55,30 @@ export function CompactZoneDisplay({
         validFromZones={validFromZones}
         disabled={!allowInteraction}
       >
-        <button
+        <div
           onClick={() => cards.length > 0 && setShowModal(true)}
-          className={`relative flex flex-col items-center justify-end overflow-hidden rounded border border-gray-700 ${
+          className={`flex flex-col items-center overflow-hidden rounded border border-gray-700 ${
             cards.length > 0
               ? 'hover:border-gray-500 cursor-pointer'
               : 'border-dashed cursor-default'
           }`}
           style={{ width, height }}
         >
-          {imageUrl && (
-            <img
-              src={imageUrl}
-              alt=""
-              className="absolute inset-0 w-full h-full object-contain rounded"
-              draggable={false}
-            />
-          )}
-          <div className="relative z-10 flex items-center gap-0.5 bg-black/70 rounded px-1 py-0.5 mb-0.5">
-            <span className="text-[8px] uppercase text-gray-300 font-medium leading-none">{title}</span>
-            <span className="text-[10px] font-bold text-white leading-none">{cards.length}</span>
+          {isOpponent && label}
+          <div className="flex-1 flex items-center justify-center min-h-0">
+            {topCard && (
+              <DraggableCard
+                card={topCard}
+                zone={zone}
+                zoneOwner={zoneOwner}
+                dimensions={{ width: cardW, height: cardH }}
+                disabled={!allowInteraction}
+                isOpponent={isOpponent}
+              />
+            )}
           </div>
-        </button>
+          {!isOpponent && label}
+        </div>
       </DroppableZone>
 
       {showModal && (

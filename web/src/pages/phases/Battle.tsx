@@ -265,7 +265,7 @@ export function BattlePhase({
             )}
           </div>
           <CompactZoneDisplay
-            title="Comp"
+            title="Companion"
             zone="command_zone"
             cards={opponent_zones.command_zone}
             height={handHeight}
@@ -373,7 +373,7 @@ export function BattlePhase({
             )}
           </div>
           <CompactZoneDisplay
-            title="Comp"
+            title="Companion"
             zone="command_zone"
             cards={your_zones.command_zone}
             height={handHeight}
