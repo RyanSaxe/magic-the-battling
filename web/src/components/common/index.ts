@@ -1,3 +1,4 @@
+export { BasicLandCard } from './BasicLandCard'
 export { CardGrid } from './CardGrid'
 export { LabeledDivider } from './LabeledDivider'
 export { VerticalDivider } from './VerticalDivider'

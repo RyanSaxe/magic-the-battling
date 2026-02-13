@@ -3,8 +3,8 @@ import type { SelfPlayerView, PlayerView } from '../types'
 import { Card } from './card'
 import { UpgradeStack } from './sidebar/UpgradeStack'
 import { useGameSummaryCardSize } from '../hooks/useGameSummaryCardSize'
-import { CardGrid, LabeledDivider, VerticalDivider, TreasureCard } from './common'
-import { getOrdinal } from '../utils/format'
+import { BasicLandCard, CardGrid, LabeledDivider, TreasureCard } from './common'
+import { getOrdinal, collapseDuplicateBasics } from '../utils/format'
 
 interface GameSummaryProps {
   player: SelfPlayerView
@@ -24,6 +24,7 @@ export function GameSummary({
     sideboard: [...player.sideboard],
     upgrades: [...player.upgrades],
     command_zone: [...player.command_zone],
+    chosen_basics: [...player.chosen_basics],
     stage: player.stage,
     round: player.round,
     name: player.name,
@@ -42,8 +43,10 @@ export function GameSummary({
   const hasSideboard = frozenPlayer.sideboard.length > 0
   const companionIds = new Set(frozenPlayer.command_zone.map((c) => c.id))
   const preBattleTreasures = frozenPlayer.preBattleTreasures
-  const hasExtras = appliedUpgrades.length > 0 || preBattleTreasures > 0
-  const extrasCount = appliedUpgrades.length + (preBattleTreasures > 0 ? 1 : 0)
+
+  const collapsedBasics = collapseDuplicateBasics(frozenPlayer.chosen_basics)
+  const battlefieldCount = collapsedBasics.length + (preBattleTreasures > 0 ? 1 : 0)
+  const commandZoneCount = appliedUpgrades.length
 
   const [copied, setCopied] = useState(false)
   const handleShare = useCallback(() => {
@@ -56,14 +59,19 @@ export function GameSummary({
 
   const [ref, dims] = useGameSummaryCardSize({
     handCount: hasHand ? frozenPlayer.hand.length : 0,
-    extrasCount: hasExtras ? extrasCount : 0,
     sideboardCount: frozenPlayer.sideboard.length,
-    hasExtras,
+    battlefieldCount,
+    commandZoneCount,
   })
 
   const handDims = { width: dims.hand.width, height: dims.hand.height }
-  const extrasDims = { width: dims.extras.width, height: dims.extras.height }
   const sideboardDims = { width: dims.sideboard.width, height: dims.sideboard.height }
+  const bfDims = { width: dims.battlefield.width, height: dims.battlefield.height }
+  const czDims = { width: dims.commandZone.width, height: dims.commandZone.height }
+
+  const hasBattlefield = battlefieldCount > 0
+  const hasCommandZone = commandZoneCount > 0
+  const hasMiddle = hasBattlefield || hasCommandZone
 
   return (
     <div className="flex-1 flex flex-col items-center p-4 overflow-hidden">
@@ -87,81 +95,55 @@ export function GameSummary({
 
       <div className="max-w-5xl w-full flex-1 min-h-0">
         <div ref={ref} className="bg-black/30 rounded-lg p-4 h-full overflow-hidden border border-gray-600/40">
-          {dims.isVertical ? (
-            <div className="flex flex-col gap-2">
-              {hasHand && (
-                <div>
-                  <LabeledDivider label="Hand" />
-                  <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
-                    {frozenPlayer.hand.map((card) => (
-                      <Card key={card.id} card={card} dimensions={handDims} isCompanion={companionIds.has(card.id)} />
-                    ))}
-                  </CardGrid>
-                </div>
-              )}
-              {hasExtras && (
-                <div>
-                  <LabeledDivider label="Extras" />
-                  <CardGrid columns={dims.extras.columns} cardWidth={extrasDims.width}>
-                    {appliedUpgrades.map((upgrade) => (
-                      <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={extrasDims} />
-                    ))}
-                    {preBattleTreasures > 0 && (
-                      <TreasureCard count={preBattleTreasures} dimensions={extrasDims} />
-                    )}
-                  </CardGrid>
-                </div>
-              )}
-              {hasSideboard && (
-                <div>
-                  <LabeledDivider label="Sideboard" />
-                  <CardGrid columns={dims.sideboard.columns} cardWidth={sideboardDims.width}>
-                    {frozenPlayer.sideboard.map((card) => (
-                      <Card key={card.id} card={card} dimensions={sideboardDims} isCompanion={companionIds.has(card.id)} />
-                    ))}
-                  </CardGrid>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="flex h-full">
-              <div className="flex-1 flex flex-col gap-2">
-                {hasHand && (
-                  <div>
-                    <LabeledDivider label="Hand" />
-                    <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
-                      {frozenPlayer.hand.map((card) => (
-                        <Card key={card.id} card={card} dimensions={handDims} isCompanion={companionIds.has(card.id)} />
-                      ))}
-                    </CardGrid>
-                  </div>
-                )}
-                {hasExtras && (
-                  <div>
-                    <LabeledDivider label="Extras" />
-                    <CardGrid columns={dims.extras.columns} cardWidth={extrasDims.width}>
-                      {appliedUpgrades.map((upgrade) => (
-                        <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={extrasDims} />
+          <div className="flex flex-col gap-2">
+            {hasHand && (
+              <div>
+                <LabeledDivider label="Hand" />
+                <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
+                  {frozenPlayer.hand.map((card) => (
+                    <Card key={card.id} card={card} dimensions={handDims} isCompanion={companionIds.has(card.id)} />
+                  ))}
+                </CardGrid>
+              </div>
+            )}
+            {hasMiddle && (
+              <div className="flex gap-4">
+                {hasBattlefield && (
+                  <div className={hasCommandZone ? 'flex-1 min-w-0' : 'w-full'}>
+                    <LabeledDivider label="Battlefield" />
+                    <CardGrid columns={dims.battlefield.columns} cardWidth={bfDims.width}>
+                      {collapsedBasics.map((land) => (
+                        <BasicLandCard key={land.name} name={land.name} count={land.count} dimensions={bfDims} />
                       ))}
                       {preBattleTreasures > 0 && (
-                        <TreasureCard count={preBattleTreasures} dimensions={extrasDims} />
+                        <TreasureCard count={preBattleTreasures} dimensions={bfDims} />
                       )}
                     </CardGrid>
                   </div>
                 )}
-              </div>
-              <VerticalDivider label="Sideboard" />
-              <div className="flex-1 flex flex-col justify-center">
-                {hasSideboard && (
-                  <CardGrid columns={dims.sideboard.columns} cardWidth={sideboardDims.width}>
-                    {frozenPlayer.sideboard.map((card) => (
-                      <Card key={card.id} card={card} dimensions={sideboardDims} isCompanion={companionIds.has(card.id)} />
-                    ))}
-                  </CardGrid>
+                {hasCommandZone && (
+                  <div className={hasBattlefield ? 'flex-1 min-w-0' : 'w-full'}>
+                    <LabeledDivider label="Command Zone" />
+                    <CardGrid columns={dims.commandZone.columns} cardWidth={czDims.width}>
+                      {appliedUpgrades.map((upgrade) => (
+                        <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={czDims} />
+                      ))}
+                    </CardGrid>
+                  </div>
                 )}
               </div>
-            </div>
-          )}
+            )}
+            {hasSideboard && (
+              <div>
+                <LabeledDivider label="Sideboard" />
+                <CardGrid columns={dims.sideboard.columns} cardWidth={sideboardDims.width}>
+                  {frozenPlayer.sideboard.map((card) => (
+                    <Card key={card.id} card={card} dimensions={sideboardDims} isCompanion={companionIds.has(card.id)} />
+                  ))}
+                </CardGrid>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
