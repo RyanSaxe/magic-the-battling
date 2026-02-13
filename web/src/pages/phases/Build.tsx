@@ -302,8 +302,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
         <div className="flex items-center px-2 py-1">
           {!isMobile && (
             <div className="flex items-center gap-2">
-              <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-14 rounded" />
-              <span className="text-xl font-bold text-purple-400">{self_player.poison}</span>
+              <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-20 rounded" />
+              <span className="text-2xl font-bold text-purple-400">{self_player.poison}</span>
             </div>
           )}
           <div className="flex-1 flex gap-1.5 justify-center">
@@ -314,9 +314,17 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                   <img
                     src={BASIC_LAND_IMAGES[name]}
                     alt={name}
-                    className="rounded object-cover shadow-lg"
-                    style={{ width: isMobile ? 44 : 60, height: isMobile ? 62 : 84 }}
+                    className="rounded object-cover shadow-lg cursor-pointer"
+                    style={{ width: isMobile ? 66 : 90, height: isMobile ? 93 : 126 }}
                     title={name}
+                    onClick={() => {
+                      if (locked) return
+                      if (selectedBasics.length < 3) {
+                        addBasic(name)
+                      } else if (count > 0) {
+                        removeBasic(name)
+                      }
+                    }}
                   />
                   <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 bg-black/70 rounded-b py-0.5">
                     <button
@@ -341,8 +349,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
           </div>
           {!isMobile && (
             <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-amber-400">{self_player.treasures}</span>
-              <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-14 rounded" />
+              <span className="text-2xl font-bold text-amber-400">{self_player.treasures}</span>
+              <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-20 rounded" />
             </div>
           )}
         </div>

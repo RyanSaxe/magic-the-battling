@@ -1055,8 +1055,8 @@ function GameContent() {
             <div className="flex items-center justify-center gap-3">
               {(currentPhase === "draft" || currentPhase === "build") && (
                 <div className="flex items-center gap-1.5">
-                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-8 rounded-sm" />
-                  <span className="text-base font-bold text-purple-400">{self_player.poison}</span>
+                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-12 rounded-sm" />
+                  <span className="text-lg font-bold text-purple-400">{self_player.poison}</span>
                 </div>
               )}
               {renderActionButtons()}
@@ -1070,8 +1070,8 @@ function GameContent() {
               )}
               {(currentPhase === "draft" || currentPhase === "build") && (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-base font-bold text-amber-400">{self_player.treasures}</span>
-                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-8 rounded-sm" />
+                  <span className="text-lg font-bold text-amber-400">{self_player.treasures}</span>
+                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-12 rounded-sm" />
                 </div>
               )}
             </div>

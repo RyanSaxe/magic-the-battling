@@ -149,7 +149,7 @@ export function BattleSidebarContent({
                 <img
                   src={POISON_COUNTER_IMAGE}
                   alt="Poison"
-                  className="w-4 h-4 rounded object-cover"
+                  className="w-6 h-6 rounded object-cover"
                 />
                 <span className="text-purple-400 text-xs font-medium">
                   {opponentPoison}
@@ -165,7 +165,7 @@ export function BattleSidebarContent({
                 <img
                   src={POISON_COUNTER_IMAGE}
                   alt="Poison"
-                  className="w-4 h-4 rounded object-cover"
+                  className="w-6 h-6 rounded object-cover"
                 />
                 <span className="text-purple-400 text-xs font-medium">
                   {yourPoison}
