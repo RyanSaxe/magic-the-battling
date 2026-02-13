@@ -30,16 +30,8 @@ export function GameSummary({
     preBattleTreasures: player.last_battle_result?.pre_battle_treasures ?? 0,
   }))
 
-  const sortedPlayers = [...players].sort((a, b) => {
-    if (a.placement === 0 && b.placement === 0) {
-      return a.poison - b.poison
-    }
-    if (a.placement === 0) return -1
-    if (b.placement === 0) return 1
-    return a.placement - b.placement
-  })
-
-  const displayPlacement = sortedPlayers.findIndex((p) => p.name === frozenPlayer.name) + 1
+  const selfPlayer = players.find((p) => p.name === frozenPlayer.name)
+  const displayPlacement = selfPlayer?.placement ?? 0
   const isWinner = displayPlacement === 1
 
   const placementText = getOrdinal(displayPlacement)

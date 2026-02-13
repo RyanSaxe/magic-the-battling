@@ -881,6 +881,7 @@ class GameManager:
                 last_battle_result=player.last_battle_result,
                 build_ready=player.build_ready,
                 in_sudden_death=player.in_sudden_death,
+                placement=player.placement,
             ),
             available_upgrades=game.available_upgrades,
             current_battle=current_battle,

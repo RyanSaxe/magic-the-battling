@@ -3,6 +3,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from mtb.models.cards import Battler, Card
+from mtb.models.game import FakePlayer, create_game, set_battler
 from server.db.models import PlayerGameHistory
 from server.services.game_manager import GameManager
 
@@ -228,3 +230,43 @@ class TestConnectionManagerPendingConnections:
 
         cm.disconnect("game1", "player1")
         assert not cm.is_player_connected("game1", "player1")
+
+
+class TestSelfPlayerPlacement:
+    def _make_card(self, name: str) -> Card:
+        return Card(name=name, image_url="img", id=name, type_line="Creature")
+
+    def test_get_game_state_includes_self_player_placement(self, game_manager):
+        cards = [self._make_card(f"c{i}") for i in range(50)]
+        battler = Battler(cards=cards, upgrades=[], vanguards=[])
+
+        game = create_game(["Alice"], num_players=1)
+        set_battler(game, battler)
+        game.fake_players.append(FakePlayer(name="Bot", player_history_id=1, snapshots={}))
+
+        game_manager._active_games["g1"] = game
+        game_manager._player_to_game["pid_alice"] = "g1"
+        game_manager._player_id_to_name["pid_alice"] = "Alice"
+
+        alice = game.players[0]
+        alice.placement = 2
+        alice.phase = "game_over"
+
+        state = game_manager.get_game_state("g1", "pid_alice")
+        assert state is not None
+        assert state.self_player.placement == 2
+
+    def test_placement_zero_before_game_over(self, game_manager):
+        cards = [self._make_card(f"c{i}") for i in range(50)]
+        battler = Battler(cards=cards, upgrades=[], vanguards=[])
+
+        game = create_game(["Alice"], num_players=1)
+        set_battler(game, battler)
+
+        game_manager._active_games["g1"] = game
+        game_manager._player_to_game["pid_alice"] = "g1"
+        game_manager._player_id_to_name["pid_alice"] = "Alice"
+
+        state = game_manager.get_game_state("g1", "pid_alice")
+        assert state is not None
+        assert state.self_player.placement == 0
