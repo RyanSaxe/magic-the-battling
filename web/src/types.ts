@@ -117,6 +117,7 @@ export interface GameState {
   available_upgrades: Card[]
   current_battle: BattleView | null
   use_upgrades: boolean
+  cube_id: string
 }
 
 export interface LobbyPlayer {

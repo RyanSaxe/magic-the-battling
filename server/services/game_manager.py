@@ -206,6 +206,7 @@ class GameManager:
             use_upgrades=pending.use_upgrades,
             use_vanguards=pending.use_vanguards,
             auto_approve_spectators=pending.auto_approve_spectators,
+            cube_id=pending.cube_id,
         )
         game = create_game(pending.player_names, len(pending.player_names), config)
         battler = self._load_battler(pending.cube_id, pending.use_upgrades, pending.use_vanguards)
@@ -265,6 +266,7 @@ class GameManager:
             use_upgrades=pending.use_upgrades,
             use_vanguards=pending.use_vanguards,
             auto_approve_spectators=pending.auto_approve_spectators,
+            cube_id=pending.cube_id,
         )
         game = create_game(pending.player_names, len(pending.player_names), config)
         battler = pending.battler
@@ -885,6 +887,7 @@ class GameManager:
             ),
             available_upgrades=game.available_upgrades,
             current_battle=current_battle,
+            cube_id=game.config.cube_id,
         )
 
     def _determine_game_phase(self, game: Game) -> str:

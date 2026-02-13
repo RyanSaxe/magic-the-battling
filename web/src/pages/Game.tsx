@@ -1089,6 +1089,9 @@ function GameContent() {
         <RulesModal
           currentPhase={currentPhase as Phase}
           onClose={() => setShowRulesModal(false)}
+          availableUpgrades={gameState.available_upgrades}
+          useUpgrades={gameState.use_upgrades}
+          cubeId={gameState.cube_id}
         />
       )}
       {actionMenuOpen && currentPhase === "battle" && current_battle && (

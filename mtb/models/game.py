@@ -222,6 +222,7 @@ class Config(BaseModel):
     use_upgrades: bool = True
     use_vanguards: bool = False
     auto_approve_spectators: bool = False
+    cube_id: str = "auto"
 
 
 class Game(BaseModel):
