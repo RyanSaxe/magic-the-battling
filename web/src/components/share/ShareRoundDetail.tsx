@@ -1,10 +1,20 @@
 import type { SharePlayerSnapshot } from '../../types'
 import { Card } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
-import { BasicLandCard, CardGrid, LabeledDivider, TreasureCard } from '../common'
+import { BasicLandCard, CardGrid, TreasureCard } from '../common'
 import { useGameSummaryCardSize } from '../../hooks/useGameSummaryCardSize'
 import { collapseDuplicateBasics } from '../../utils/format'
 import { POISON_COUNTER_IMAGE } from '../../constants/assets'
+
+const badgeCls =
+  'absolute left-1/2 -translate-x-1/2 -top-[9px] z-10 ' +
+  'bg-gray-800 text-gray-400 text-[10px] uppercase tracking-widest ' +
+  'px-2.5 py-0.5 rounded-full border border-gray-600/40 whitespace-nowrap'
+
+const czBadgeCls =
+  'absolute top-1/2 -left-[9px] z-10 ' +
+  'bg-gray-800 text-gray-400 text-[10px] uppercase tracking-widest ' +
+  'py-2.5 px-0.5 rounded-full border border-gray-600/40'
 
 interface ShareRoundDetailProps {
   snapshot: SharePlayerSnapshot
@@ -35,7 +45,8 @@ export function ShareRoundDetail({ snapshot, useUpgrades }: ShareRoundDetailProp
 
   const hasBattlefield = battlefieldCount > 0
   const hasCommandZone = commandZoneCount > 0
-  const hasMiddle = hasBattlefield || hasCommandZone
+  const hasLower = hasBattlefield || hasSideboard || hasCommandZone
+  const hasRight = hasBattlefield || hasSideboard
 
   return (
     <div className="flex flex-col gap-3 flex-1 min-h-0">
@@ -47,11 +58,11 @@ export function ShareRoundDetail({ snapshot, useUpgrades }: ShareRoundDetailProp
       </div>
 
       <div className="flex-1 min-h-0">
-        <div ref={ref} className="bg-black/30 rounded-lg p-4 h-full overflow-hidden border border-gray-600/40">
-          <div className="flex flex-col gap-2">
+        <div ref={ref} className="rounded-lg bg-gray-600/40 p-[1px] h-full flex flex-col">
+          <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
             {hasHand && (
-              <div>
-                <LabeledDivider label="Hand" />
+              <div className="bg-black/30 px-3 pt-5 pb-3 relative">
+                <span className={badgeCls}>Hand</span>
                 <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
                   {snapshot.hand.map((card) => (
                     <Card key={card.id} card={card} dimensions={handDims} isCompanion={companionIds.has(card.id)} />
@@ -59,41 +70,50 @@ export function ShareRoundDetail({ snapshot, useUpgrades }: ShareRoundDetailProp
                 </CardGrid>
               </div>
             )}
-            {hasMiddle && (
-              <div className="flex gap-4">
-                {hasBattlefield && (
-                  <div className={hasCommandZone ? 'flex-1 min-w-0' : 'w-full'}>
-                    <LabeledDivider label="Battlefield" />
-                    <CardGrid columns={dims.battlefield.columns} cardWidth={bfDims.width}>
-                      {collapsedBasics.map((land) => (
-                        <BasicLandCard key={land.name} name={land.name} count={land.count} dimensions={bfDims} />
-                      ))}
-                      {snapshot.treasures > 0 && (
-                        <TreasureCard count={snapshot.treasures} dimensions={bfDims} />
-                      )}
-                    </CardGrid>
+            {hasLower && (
+              <div className="flex flex-1" style={{ gap: 1 }}>
+                {hasRight && (
+                  <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 1 }}>
+                    {hasBattlefield && (
+                      <div className="bg-black/30 px-3 pt-5 pb-3 relative">
+                        <span className={badgeCls}>Battlefield</span>
+                        <CardGrid columns={dims.battlefield.columns} cardWidth={bfDims.width}>
+                          {collapsedBasics.map((land) => (
+                            <BasicLandCard key={land.name} name={land.name} count={land.count} dimensions={bfDims} />
+                          ))}
+                          {snapshot.treasures > 0 && (
+                            <TreasureCard count={snapshot.treasures} dimensions={bfDims} />
+                          )}
+                        </CardGrid>
+                      </div>
+                    )}
+                    {hasSideboard && (
+                      <div className="bg-black/30 px-3 pt-5 pb-3 relative flex-1">
+                        <span className={badgeCls}>Sideboard</span>
+                        <CardGrid columns={dims.sideboard.columns} cardWidth={sideboardDims.width}>
+                          {snapshot.sideboard.map((card) => (
+                            <Card key={card.id} card={card} dimensions={sideboardDims} isCompanion={companionIds.has(card.id)} />
+                          ))}
+                        </CardGrid>
+                      </div>
+                    )}
                   </div>
                 )}
                 {hasCommandZone && (
-                  <div className={hasBattlefield ? 'flex-1 min-w-0' : 'w-full'}>
-                    <LabeledDivider label="Command Zone" />
-                    <CardGrid columns={dims.commandZone.columns} cardWidth={czDims.width}>
+                  <div className="bg-black/30 pl-4 pr-3 py-3 relative flex items-center justify-center">
+                    <span
+                      className={czBadgeCls}
+                      style={{ writingMode: 'vertical-rl', transform: 'translateY(-50%) rotate(180deg)' }}
+                    >
+                      Command Zone
+                    </span>
+                    <CardGrid columns={1} cardWidth={czDims.width}>
                       {appliedUpgrades.map((upgrade) => (
                         <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={czDims} />
                       ))}
                     </CardGrid>
                   </div>
                 )}
-              </div>
-            )}
-            {hasSideboard && (
-              <div>
-                <LabeledDivider label="Sideboard" />
-                <CardGrid columns={dims.sideboard.columns} cardWidth={sideboardDims.width}>
-                  {snapshot.sideboard.map((card) => (
-                    <Card key={card.id} card={card} dimensions={sideboardDims} isCompanion={companionIds.has(card.id)} />
-                  ))}
-                </CardGrid>
               </div>
             )}
           </div>

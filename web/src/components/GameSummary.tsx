@@ -3,8 +3,18 @@ import type { SelfPlayerView, PlayerView } from '../types'
 import { Card } from './card'
 import { UpgradeStack } from './sidebar/UpgradeStack'
 import { useGameSummaryCardSize } from '../hooks/useGameSummaryCardSize'
-import { BasicLandCard, CardGrid, LabeledDivider, TreasureCard } from './common'
+import { BasicLandCard, CardGrid, TreasureCard } from './common'
 import { getOrdinal, collapseDuplicateBasics } from '../utils/format'
+
+const badgeCls =
+  'absolute left-1/2 -translate-x-1/2 -top-[9px] z-10 ' +
+  'bg-gray-800 text-gray-400 text-[10px] uppercase tracking-widest ' +
+  'px-2.5 py-0.5 rounded-full border border-gray-600/40 whitespace-nowrap'
+
+const czBadgeCls =
+  'absolute top-1/2 -left-[9px] z-10 ' +
+  'bg-gray-800 text-gray-400 text-[10px] uppercase tracking-widest ' +
+  'py-2.5 px-0.5 rounded-full border border-gray-600/40'
 
 interface GameSummaryProps {
   player: SelfPlayerView
@@ -71,34 +81,40 @@ export function GameSummary({
 
   const hasBattlefield = battlefieldCount > 0
   const hasCommandZone = commandZoneCount > 0
-  const hasMiddle = hasBattlefield || hasCommandZone
+  const hasLower = hasBattlefield || hasSideboard || hasCommandZone
+  const hasRight = hasBattlefield || hasSideboard
 
   return (
     <div className="flex-1 flex flex-col items-center p-4 overflow-hidden">
-      <div className="text-center shrink-0">
-        <h2 className={`text-4xl font-bold mb-2 ${placementColor}`}>
-          {placementText} Place
-        </h2>
-        <p className="text-gray-400 mb-2">
-          Stage {frozenPlayer.stage} - Round {frozenPlayer.round} | {players.length} Players
+      <div className="shrink-0 text-center">
+        <div className="flex items-center justify-center gap-3">
+          <h2 className={`text-4xl font-bold ${placementColor}`}>
+            {placementText} Place
+          </h2>
+          {gameId && (
+            <button
+              className={`text-xs font-medium rounded-full px-4 py-1.5 transition-colors duration-200 ${
+                copied
+                  ? 'bg-emerald-600/80 text-emerald-100 border border-emerald-400/30'
+                  : 'bg-indigo-600/80 hover:bg-indigo-500 text-white border border-indigo-400/30'
+              }`}
+              onClick={handleShare}
+            >
+              {copied ? 'Link Copied!' : 'Share Game'}
+            </button>
+          )}
+        </div>
+        <p className="text-gray-400 text-sm mt-1 mb-3">
+          Stage {frozenPlayer.stage} &middot; Round {frozenPlayer.round} &middot; {players.length} Players
         </p>
-        {gameId && (
-          <button
-            className="text-xs bg-gray-800 border border-gray-600 text-gray-300 rounded px-3 py-1 hover:bg-gray-700 mb-4"
-            onClick={handleShare}
-          >
-            {copied ? 'Link Copied!' : 'Share Game'}
-          </button>
-        )}
-        {!gameId && <div className="mb-4" />}
       </div>
 
       <div className="max-w-5xl w-full flex-1 min-h-0">
-        <div ref={ref} className="bg-black/30 rounded-lg p-4 h-full overflow-hidden border border-gray-600/40">
-          <div className="flex flex-col gap-2">
+        <div ref={ref} className="rounded-lg bg-gray-600/40 p-[1px] h-full flex flex-col">
+          <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
             {hasHand && (
-              <div>
-                <LabeledDivider label="Hand" />
+              <div className="bg-black/30 px-3 pt-5 pb-3 relative">
+                <span className={badgeCls}>Hand</span>
                 <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
                   {frozenPlayer.hand.map((card) => (
                     <Card key={card.id} card={card} dimensions={handDims} isCompanion={companionIds.has(card.id)} />
@@ -106,41 +122,50 @@ export function GameSummary({
                 </CardGrid>
               </div>
             )}
-            {hasMiddle && (
-              <div className="flex gap-4">
-                {hasBattlefield && (
-                  <div className={hasCommandZone ? 'flex-1 min-w-0' : 'w-full'}>
-                    <LabeledDivider label="Battlefield" />
-                    <CardGrid columns={dims.battlefield.columns} cardWidth={bfDims.width}>
-                      {collapsedBasics.map((land) => (
-                        <BasicLandCard key={land.name} name={land.name} count={land.count} dimensions={bfDims} />
-                      ))}
-                      {preBattleTreasures > 0 && (
-                        <TreasureCard count={preBattleTreasures} dimensions={bfDims} />
-                      )}
-                    </CardGrid>
+            {hasLower && (
+              <div className="flex flex-1" style={{ gap: 1 }}>
+                {hasRight && (
+                  <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 1 }}>
+                    {hasBattlefield && (
+                      <div className="bg-black/30 px-3 pt-5 pb-3 relative">
+                        <span className={badgeCls}>Battlefield</span>
+                        <CardGrid columns={dims.battlefield.columns} cardWidth={bfDims.width}>
+                          {collapsedBasics.map((land) => (
+                            <BasicLandCard key={land.name} name={land.name} count={land.count} dimensions={bfDims} />
+                          ))}
+                          {preBattleTreasures > 0 && (
+                            <TreasureCard count={preBattleTreasures} dimensions={bfDims} />
+                          )}
+                        </CardGrid>
+                      </div>
+                    )}
+                    {hasSideboard && (
+                      <div className="bg-black/30 px-3 pt-5 pb-3 relative flex-1">
+                        <span className={badgeCls}>Sideboard</span>
+                        <CardGrid columns={dims.sideboard.columns} cardWidth={sideboardDims.width}>
+                          {frozenPlayer.sideboard.map((card) => (
+                            <Card key={card.id} card={card} dimensions={sideboardDims} isCompanion={companionIds.has(card.id)} />
+                          ))}
+                        </CardGrid>
+                      </div>
+                    )}
                   </div>
                 )}
                 {hasCommandZone && (
-                  <div className={hasBattlefield ? 'flex-1 min-w-0' : 'w-full'}>
-                    <LabeledDivider label="Command Zone" />
-                    <CardGrid columns={dims.commandZone.columns} cardWidth={czDims.width}>
+                  <div className="bg-black/30 pl-4 pr-3 py-3 relative flex items-center justify-center">
+                    <span
+                      className={czBadgeCls}
+                      style={{ writingMode: 'vertical-rl', transform: 'translateY(-50%) rotate(180deg)' }}
+                    >
+                      Command Zone
+                    </span>
+                    <CardGrid columns={1} cardWidth={czDims.width}>
                       {appliedUpgrades.map((upgrade) => (
                         <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={czDims} />
                       ))}
                     </CardGrid>
                   </div>
                 )}
-              </div>
-            )}
-            {hasSideboard && (
-              <div>
-                <LabeledDivider label="Sideboard" />
-                <CardGrid columns={dims.sideboard.columns} cardWidth={sideboardDims.width}>
-                  {frozenPlayer.sideboard.map((card) => (
-                    <Card key={card.id} card={card} dimensions={sideboardDims} isCompanion={companionIds.has(card.id)} />
-                  ))}
-                </CardGrid>
               </div>
             )}
           </div>
