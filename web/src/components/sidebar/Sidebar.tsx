@@ -54,7 +54,7 @@ export function Sidebar({
           {showCardsSection && (
             <div className="border-t border-gray-700 pt-4">
               <div className="flex flex-wrap gap-2">
-                {useUpgrades && (
+                {useUpgrades && allUpgrades.length > 0 && (
                   <ZoneDisplay
                     key={`upgrades-${displayPlayer.name}`}
                     title="Upgrades"
