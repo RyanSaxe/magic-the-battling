@@ -218,7 +218,7 @@ export function BattlePhase({
               >
                 {opponent_hand_revealed
                   ? opponent_zones.hand.map((card) => (
-                      <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} />
+                      <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} selected={selectedCard?.card.id === card.id} onClick={() => handleCardClick(card, 'hand')} />
                     ))
                   : Array.from({ length: oppHandCount }).map((_, i) => (
                       <CardBack key={i} dimensions={sizes.opponentHand} />

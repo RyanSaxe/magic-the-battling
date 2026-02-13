@@ -66,6 +66,12 @@ export function DraggableCard({
       style={style}
       {...listeners}
       {...attributes}
+      onClick={(e) => {
+        if (!(e.target as HTMLElement).closest('button')) {
+          onClick?.()
+        }
+      }}
+      onDoubleClick={onDoubleClick}
       onContextMenu={(e) => {
         e.preventDefault()
         onContextMenu?.(e)
@@ -73,8 +79,6 @@ export function DraggableCard({
     >
       <Card
         card={card}
-        onClick={onClick}
-        onDoubleClick={onDoubleClick}
         selected={selected}
         size={size}
         dimensions={dimensions}
