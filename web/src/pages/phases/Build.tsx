@@ -315,7 +315,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                     src={BASIC_LAND_IMAGES[name]}
                     alt={name}
                     className="rounded object-cover shadow-lg cursor-pointer"
-                    style={{ width: isMobile ? 66 : 90, height: isMobile ? 93 : 126 }}
+                    style={{ width: isMobile ? 52 : 90, height: isMobile ? 73 : 126 }}
                     title={name}
                     onClick={() => {
                       if (locked) return
