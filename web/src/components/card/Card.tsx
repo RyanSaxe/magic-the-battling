@@ -82,7 +82,7 @@ export function Card({
 
   const baseClasses = [
     'card',
-    'relative rounded-lg',
+    'relative rounded-lg overflow-hidden',
     disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
     selected && 'selected',
     tapped && 'tapped',
