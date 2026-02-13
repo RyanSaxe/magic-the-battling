@@ -3,7 +3,6 @@ import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
 import { useElementHeight } from '../../hooks/useElementHeight'
-import { POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 
 interface DraftPhaseProps {
   gameState: GameState
@@ -24,7 +23,7 @@ interface CardWithIndex {
   isInHand: boolean
 }
 
-export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseProps) {
+export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   const [selectedCard, setSelectedCard] = useState<CardWithIndex | null>(null)
 
   const { self_player } = gameState
@@ -103,21 +102,9 @@ export function DraftPhase({ gameState, actions, isMobile = false }: DraftPhaseP
       )}
 
       <div ref={separatorRef} className="flex items-center gap-3 px-2">
-        {!isMobile && (
-          <div className="flex items-center gap-2">
-            <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-14 rounded" />
-            <span className="text-xl font-bold text-purple-400">{self_player.poison}</span>
-          </div>
-        )}
         <div className="flex-1 border-t border-gray-600/40" />
         <span className="text-[10px] text-gray-500 uppercase tracking-widest">Your Pool</span>
         <div className="flex-1 border-t border-gray-600/40" />
-        {!isMobile && (
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-amber-400">{self_player.treasures}</span>
-            <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-14 rounded" />
-          </div>
-        )}
       </div>
 
       {/* Pool */}

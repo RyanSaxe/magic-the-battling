@@ -789,10 +789,6 @@ function GameContent() {
     return null;
   };
 
-  const renderHeaderContent = (): ReactNode => {
-    return null;
-  };
-
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
       <div className="game-table h-dvh overflow-hidden flex flex-col">
@@ -880,7 +876,7 @@ function GameContent() {
                       players={gameState.players}
                       currentPlayer={self_player}
                       phaseContent={renderPhaseContent()}
-                      headerContent={renderHeaderContent()}
+
                       useUpgrades={gameState.use_upgrades}
                     />
                   </div>
@@ -890,7 +886,6 @@ function GameContent() {
                   players={gameState.players}
                   currentPlayer={self_player}
                   phaseContent={renderPhaseContent()}
-                  headerContent={renderHeaderContent()}
                   useUpgrades={gameState.use_upgrades}
                 />
               )}
@@ -1034,7 +1029,6 @@ function GameContent() {
                     players={gameState.players}
                     currentPlayer={self_player}
                     phaseContent={renderPhaseContent()}
-                    headerContent={renderHeaderContent()}
                     useUpgrades={gameState.use_upgrades}
                   />
                 </div>
@@ -1044,7 +1038,6 @@ function GameContent() {
                 players={gameState.players}
                 currentPlayer={self_player}
                 phaseContent={renderPhaseContent()}
-                headerContent={renderHeaderContent()}
                 useUpgrades={gameState.use_upgrades}
               />
             )}
