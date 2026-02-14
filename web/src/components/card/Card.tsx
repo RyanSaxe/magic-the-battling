@@ -124,7 +124,7 @@ export function Card({
         onError={() => setIsLoading(false)}
         draggable={false}
       />
-      {card.flip_image_url && (
+      {card.flip_image_url && (isHovered || selected) && (
         <button
           className="absolute top-1 right-1 bg-black/60 rounded px-2 py-0.5 text-white text-xs hover:bg-black/80 transition-colors"
           onClick={(e) => {
