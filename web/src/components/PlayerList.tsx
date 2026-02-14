@@ -173,6 +173,14 @@ export function PlayerList({ players, currentPlayerName, currentPlayer, useUpgra
   const sortedOpponents = [...opponents].sort(byPlacement)
   const sortedOthers = [...others].sort(byPlacement)
 
+  useEffect(() => {
+    if (activeTab === 'opponents' && !state.revealedPlayerName && sortedOpponents.length > 0) {
+      setRevealedPlayerName(sortedOpponents[0].name)
+    } else if (activeTab === 'others' && !state.revealedPlayerName && sortedOthers.length > 0) {
+      setRevealedPlayerName(sortedOthers[0].name)
+    }
+  }, [activeTab])
+
   const appliedUpgrades = currentPlayer.upgrades.filter((u) => u.upgrade_target !== null)
   const pendingUpgrades = currentPlayer.upgrades.filter((u) => u.upgrade_target === null)
   const allUpgrades = [...appliedUpgrades, ...pendingUpgrades]
