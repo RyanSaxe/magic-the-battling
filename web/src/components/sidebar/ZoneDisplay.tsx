@@ -86,9 +86,7 @@ export function ZoneDisplay({
       >
         <div className="text-[10px] text-gray-400 uppercase mb-1">{title}</div>
         {cards.length === 0 ? (
-          <div className="w-[80px] h-[112px] border border-dashed border-gray-600 rounded flex items-center justify-center">
-            <span className="text-gray-600 text-[10px]">Empty</span>
-          </div>
+          <span className="text-gray-500 text-xs">No Cards Seen</span>
         ) : (
           <div className="flex flex-col items-center gap-0.5">
             <div
