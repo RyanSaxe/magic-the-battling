@@ -106,7 +106,7 @@ function computeSize(
     let czCellW = 0
     if (hasCommandZone) {
       const czGaps = Math.max(0, commandZoneCount - 1) * CARD_GAP
-      const czAvailH = availBelow - 2 * CZ_CELL_PAD
+      const czAvailH = availBelow - CELL_PAD_TOP - CZ_CELL_PAD
       const czCardW_fromHeight = Math.floor(
         (czAvailH - czGaps) / (commandZoneCount * ASPECT_RATIO)
       )
@@ -142,45 +142,27 @@ function computeSize(
       const rightOverhead = rightSections * (CELL_PAD_TOP + CELL_PAD) + (rightSections > 1 ? BORDER : 0)
       const sbRowGaps = hasSideboard ? Math.max(0, sr - 1) * CARD_GAP : 0
       const rightAvailForGrid = availBelow - rightOverhead
+      const totalGridRows = (hasBattlefield ? 1 : 0) + sr
 
-      let bfCardW = hasBattlefield ? Math.min(maxCardWidth, bfWidthCap) : 0
-      if (hasHand && hasBattlefield) bfCardW = Math.min(bfCardW, handCardW)
-
-      if (hasBattlefield && !hasSideboard) {
-        const bfCardW_height = rightAvailForGrid > 0
-          ? Math.floor(rightAvailForGrid / ASPECT_RATIO)
-          : 0
-        bfCardW = Math.min(bfCardW, bfCardW_height)
+      let rightCardW_height = Infinity
+      if (totalGridRows > 0 && rightAvailForGrid > 0) {
+        rightCardW_height = Math.floor(
+          (rightAvailForGrid - sbRowGaps) / (totalGridRows * ASPECT_RATIO)
+        )
       }
 
-      if (hasBattlefield && bfCardW < minCardWidth) continue
+      let rightCardW = Math.min(maxCardWidth, bfWidthCap, sbWidthCap, rightCardW_height)
 
-      let bfCardH = hasBattlefield ? Math.round(bfCardW * ASPECT_RATIO) : 0
-      let bfGridH = hasBattlefield ? bfCardH : 0
-      let bfCellH = hasBattlefield ? CELL_PAD_TOP + bfGridH + CELL_PAD : 0
-
-      let sbCardW = 0
-      if (hasSideboard) {
-        const sbAvailForGrid = rightAvailForGrid - bfGridH
-        let sbCardW_height = Infinity
-        if (sr > 0 && sbAvailForGrid > 0) {
-          sbCardW_height = Math.floor((sbAvailForGrid - sbRowGaps) / (sr * ASPECT_RATIO))
-        }
-        sbCardW = Math.min(maxCardWidth, sbWidthCap, sbCardW_height)
-        if (hasHand) sbCardW = Math.min(sbCardW, handCardW)
-
-        if (hasBattlefield && bfCardW > sbCardW) {
-          bfCardW = sbCardW
-          bfCardH = Math.round(bfCardW * ASPECT_RATIO)
-          bfGridH = bfCardH
-          bfCellH = CELL_PAD_TOP + bfGridH + CELL_PAD
-        }
+      if (hasHand && hasRight) {
+        rightCardW = Math.min(rightCardW, handCardW)
       }
 
-      if (hasSideboard && sbCardW < minCardWidth) continue
+      if (hasRight && rightCardW < minCardWidth) continue
 
-      const sbCardH = hasSideboard ? Math.round(sbCardW * ASPECT_RATIO) : 0
-      const sbGridH = hasSideboard ? sr * sbCardH + sbRowGaps : 0
+      const rightCardH = hasRight ? Math.round(rightCardW * ASPECT_RATIO) : 0
+      const bfGridH = hasBattlefield ? rightCardH : 0
+      const sbGridH = hasSideboard ? sr * rightCardH + sbRowGaps : 0
+      const bfCellH = hasBattlefield ? CELL_PAD_TOP + bfGridH + CELL_PAD : 0
       const sbCellH = hasSideboard ? CELL_PAD_TOP + sbGridH + CELL_PAD : 0
       const rightColumnH = hasRight ? bfCellH + (hasBattlefield && hasSideboard ? BORDER : 0) + sbCellH : 0
 
@@ -195,7 +177,7 @@ function computeSize(
       if (actualTotalH > availH) continue
 
       const fill = actualTotalH / availH
-      const scoreCardW = hasSideboard ? sbCardW : (hasBattlefield ? bfCardW : (hasHand ? handCardW : czCardW))
+      const scoreCardW = hasRight ? rightCardW : (hasHand ? handCardW : czCardW)
       const score = scoreCardW * Math.sqrt(fill)
 
       if (score > bestScore) {
@@ -205,10 +187,10 @@ function computeSize(
             ? { width: handCardW, height: handCardH, columns: handCols }
             : empty,
           sideboard: hasSideboard
-            ? { width: sbCardW, height: sbCardH, columns: sbCols }
+            ? { width: rightCardW, height: rightCardH, columns: sbCols }
             : empty,
           battlefield: hasBattlefield
-            ? { width: bfCardW, height: bfCardH, columns: bfCols }
+            ? { width: rightCardW, height: rightCardH, columns: bfCols }
             : empty,
           commandZone: hasCommandZone
             ? { width: czCardW, height: czCardH, columns: 1 }
