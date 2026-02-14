@@ -2,14 +2,16 @@ import type { ShareGameResponse, SelfPlayerView, PlayerView } from '../types'
 
 export function buildGameSummaryData(
   data: ShareGameResponse,
+  targetPlayer?: string,
 ): { selfPlayer: SelfPlayerView; players: PlayerView[] } | null {
-  const owner = data.players.find((p) => p.name === data.owner_name)
-  if (!owner || owner.snapshots.length === 0) return null
+  const targetName = targetPlayer ?? data.owner_name
+  const target = data.players.find((p) => p.name === targetName)
+  if (!target || target.snapshots.length === 0) return null
 
-  const lastSnap = owner.snapshots[owner.snapshots.length - 1]
+  const lastSnap = target.snapshots[target.snapshots.length - 1]
 
   const selfPlayer: SelfPlayerView = {
-    name: owner.name,
+    name: target.name,
     treasures: lastSnap.treasures,
     poison: lastSnap.poison,
     phase: 'game_over',
@@ -17,7 +19,7 @@ export function buildGameSummaryData(
     stage: lastSnap.stage,
     vanquishers: 0,
     is_ghost: false,
-    is_bot: owner.is_bot,
+    is_bot: target.is_bot,
     time_of_death: null,
     hand_count: lastSnap.hand.length,
     sideboard_count: lastSnap.sideboard.length,
@@ -32,7 +34,7 @@ export function buildGameSummaryData(
     is_most_recent_ghost: false,
     full_sideboard: [],
     command_zone: lastSnap.command_zone,
-    placement: owner.final_placement ?? 0,
+    placement: target.final_placement ?? 0,
     in_sudden_death: false,
     build_ready: false,
     hand: lastSnap.hand,
