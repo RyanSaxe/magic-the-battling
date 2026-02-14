@@ -78,10 +78,8 @@ export function ZoneDisplay({
     <>
       <button
         onClick={() => cards.length > 0 && setShowModal(true)}
-        className={`flex flex-col items-center p-2 rounded ${
-          cards.length > 0
-            ? "hover:bg-gray-700/50 cursor-pointer"
-            : "cursor-default"
+        className={`flex flex-col items-center pt-2 rounded ${
+          cards.length > 0 ? "hover:cursor-pointer" : "cursor-default"
         }`}
       >
         <div className="text-[10px] text-gray-400 uppercase mb-1">{title}</div>
@@ -89,12 +87,14 @@ export function ZoneDisplay({
           <span className="text-gray-500 text-xs">No Cards Seen</span>
         ) : (
           <div className="flex flex-col items-center gap-0.5">
-            <div
-              className="grid gap-1 grid-cols-3"
-            >
+            <div className="grid gap-1 grid-cols-3">
               {displayedCards.map((card) =>
                 showUpgradeTargets ? (
-                  <UpgradeStack key={card.id} upgrade={card} dimensions={{ width: 66, height: 92 }} />
+                  <UpgradeStack
+                    key={card.id}
+                    upgrade={card}
+                    dimensions={{ width: 66, height: 92 }}
+                  />
                 ) : (
                   <Card
                     key={card.id}

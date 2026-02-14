@@ -37,23 +37,26 @@ export function Sidebar({
 
   const companionIds = new Set(displayPlayer.command_zone.map((c) => c.id));
 
-  const showCardsSection = revealedPlayer && revealedPlayer.name !== currentPlayer.name;
+  const showCardsSection =
+    revealedPlayer && revealedPlayer.name !== currentPlayer.name;
 
   return (
     <aside className="relative w-64 h-full bg-black/30 flex flex-col overflow-hidden">
       {phaseContent ? (
-        <div className="overflow-y-auto overflow-x-hidden flex-1">{phaseContent}</div>
+        <div className="overflow-y-auto overflow-x-hidden flex-1">
+          {phaseContent}
+        </div>
       ) : (
-        <div className="p-4 overflow-auto flex-1 flex flex-col gap-3">
+        <div className="pl-4 pr-4 overflow-auto flex-1 flex flex-col">
           <PlayerList
-              players={players}
-              currentPlayerName={currentPlayer.name}
-              currentPlayer={currentPlayer}
-              useUpgrades={useUpgrades}
-            />
+            players={players}
+            currentPlayerName={currentPlayer.name}
+            currentPlayer={currentPlayer}
+            useUpgrades={useUpgrades}
+          />
           {showCardsSection && (
-            <div className="border-t border-gray-700 pt-2">
-              <div className="flex flex-wrap gap-2">
+            <div>
+              <div className="flex flex-wrap">
                 {useUpgrades && allUpgrades.length > 0 && (
                   <ZoneDisplay
                     key={`upgrades-${displayPlayer.name}`}
