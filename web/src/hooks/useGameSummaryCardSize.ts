@@ -142,26 +142,44 @@ function computeSize(
       const rightOverhead = rightSections * (CELL_PAD_TOP + CELL_PAD) + (rightSections > 1 ? BORDER : 0)
       const sbRowGaps = hasSideboard ? Math.max(0, sr - 1) * CARD_GAP : 0
       const rightAvailForGrid = availBelow - rightOverhead
-      const totalGridRows = (hasBattlefield ? 1 : 0) + sr
 
-      let rightCardW_height = Infinity
-      if (totalGridRows > 0 && rightAvailForGrid > 0) {
-        rightCardW_height = Math.floor(
-          (rightAvailForGrid - sbRowGaps) / (totalGridRows * ASPECT_RATIO)
+      if (hasRight && rightAvailForGrid <= 0) continue
+
+      // Weighted height allocation: bf gets "half a row" vs each sb row
+      const bfWeight = hasBattlefield ? 0.5 : 0
+      const totalWeight = bfWeight + sr
+      const bfAvailForGrid = totalWeight > 0
+        ? Math.floor(rightAvailForGrid * bfWeight / totalWeight)
+        : 0
+      const sbAvailForGrid = rightAvailForGrid - bfAvailForGrid
+
+      let sbCardW = 0
+      if (hasSideboard && sr > 0 && sbAvailForGrid > 0) {
+        const sbCardW_height = Math.floor(
+          (sbAvailForGrid - sbRowGaps) / (sr * ASPECT_RATIO)
         )
+        sbCardW = Math.min(maxCardWidth, sbWidthCap, sbCardW_height)
+        if (hasHand) sbCardW = Math.min(sbCardW, handCardW)
       }
+      if (hasSideboard && sbCardW < minCardWidth) continue
 
-      let rightCardW = Math.min(maxCardWidth, bfWidthCap, sbWidthCap, rightCardW_height)
-
-      if (hasHand && hasRight) {
-        rightCardW = Math.min(rightCardW, handCardW)
+      let bfCardW = 0
+      if (hasBattlefield && bfAvailForGrid > 0) {
+        const bfCardW_height = Math.floor(bfAvailForGrid / ASPECT_RATIO)
+        bfCardW = Math.min(maxCardWidth, bfWidthCap, bfCardW_height)
+        if (hasHand) bfCardW = Math.min(bfCardW, handCardW)
+        if (hasSideboard) bfCardW = Math.min(bfCardW, sbCardW)
+      } else if (hasBattlefield) {
+        bfCardW = Math.min(maxCardWidth, bfWidthCap)
+        if (hasHand) bfCardW = Math.min(bfCardW, handCardW)
+        if (hasSideboard) bfCardW = Math.min(bfCardW, sbCardW)
       }
+      if (hasBattlefield && bfCardW < minCardWidth) continue
 
-      if (hasRight && rightCardW < minCardWidth) continue
-
-      const rightCardH = hasRight ? Math.round(rightCardW * ASPECT_RATIO) : 0
-      const bfGridH = hasBattlefield ? rightCardH : 0
-      const sbGridH = hasSideboard ? sr * rightCardH + sbRowGaps : 0
+      const bfCardH = hasBattlefield ? Math.round(bfCardW * ASPECT_RATIO) : 0
+      const sbCardH = hasSideboard ? Math.round(sbCardW * ASPECT_RATIO) : 0
+      const bfGridH = hasBattlefield ? bfCardH : 0
+      const sbGridH = hasSideboard ? sr * sbCardH + sbRowGaps : 0
       const bfCellH = hasBattlefield ? CELL_PAD_TOP + bfGridH + CELL_PAD : 0
       const sbCellH = hasSideboard ? CELL_PAD_TOP + sbGridH + CELL_PAD : 0
       const rightColumnH = hasRight ? bfCellH + (hasBattlefield && hasSideboard ? BORDER : 0) + sbCellH : 0
@@ -177,7 +195,7 @@ function computeSize(
       if (actualTotalH > availH) continue
 
       const fill = actualTotalH / availH
-      const scoreCardW = hasRight ? rightCardW : (hasHand ? handCardW : czCardW)
+      const scoreCardW = hasSideboard ? sbCardW : (hasBattlefield ? bfCardW : (hasHand ? handCardW : czCardW))
       const score = scoreCardW * Math.sqrt(fill)
 
       if (score > bestScore) {
@@ -187,10 +205,10 @@ function computeSize(
             ? { width: handCardW, height: handCardH, columns: handCols }
             : empty,
           sideboard: hasSideboard
-            ? { width: rightCardW, height: rightCardH, columns: sbCols }
+            ? { width: sbCardW, height: sbCardH, columns: sbCols }
             : empty,
           battlefield: hasBattlefield
-            ? { width: rightCardW, height: rightCardH, columns: bfCols }
+            ? { width: bfCardW, height: bfCardH, columns: bfCols }
             : empty,
           commandZone: hasCommandZone
             ? { width: czCardW, height: czCardH, columns: 1 }
