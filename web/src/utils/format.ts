@@ -4,12 +4,12 @@ export function getOrdinal(n: number): string {
   return n + (suffixes[(v - 20) % 10] || suffixes[v] || suffixes[0])
 }
 
-export function getPlacementBadgeColor(position: number, total: number): string {
-  if (position === 1) return '#facc15'
-  if (position === 2) return '#9ca3af'
-  if (position === 3) return '#cd7f32'
-  if (position === total) return '#ef4444'
-  return '#6b7280'
+export function getPlacementBadgeColor(position: number, total: number): { bg: string; text: string } {
+  if (position === 1) return { bg: '#facc15', text: '#000000' }
+  if (position === 2) return { bg: '#9ca3af', text: '#000000' }
+  if (position === 3) return { bg: '#cd7f32', text: '#ffffff' }
+  if (position === total) return { bg: '#ef4444', text: '#ffffff' }
+  return { bg: '#6b7280', text: '#ffffff' }
 }
 
 export function collapseDuplicateBasics(lands: string[]): { name: string; count: number }[] {
