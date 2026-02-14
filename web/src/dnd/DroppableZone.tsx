@@ -9,6 +9,7 @@ interface DroppableZoneProps {
   zoneOwner?: ZoneOwner
   children: ReactNode
   className?: string
+  style?: React.CSSProperties
   validFromZones?: ZoneName[]
   disabled?: boolean
 }
@@ -18,6 +19,7 @@ export function DroppableZone({
   zoneOwner = 'player',
   children,
   className = '',
+  style,
   validFromZones,
   disabled = false,
 }: DroppableZoneProps) {
@@ -47,6 +49,7 @@ export function DroppableZone({
     <div
       ref={setNodeRef}
       className={`zone ${dropStateClass} ${className}`}
+      style={style}
     >
       {children}
     </div>

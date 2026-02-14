@@ -12,6 +12,7 @@ interface HandZoneProps {
   upgradedCardIds?: Set<string>;
   upgradesByCardId?: Map<string, CardType[]>;
   cardDimensions?: CardDimensions;
+  gap?: number;
 }
 
 export function HandZone({
@@ -31,26 +32,37 @@ export function HandZone({
   upgradedCardIds = new Set(),
   upgradesByCardId,
   cardDimensions,
+  gap,
 }: HandZoneProps) {
+  const zoneStyle = gap !== undefined ? { gap: Math.max(0, gap) } : undefined
+
   return (
     <DroppableZone
       zone={zone}
       validFromZones={validFromZones}
       className="hand-zone w-full h-full flex-nowrap"
+      style={zoneStyle}
     >
-      {cards.map((card) => (
-        <DraggableCard
-          key={card.id}
-          card={card}
-          zone={zone}
-          dimensions={cardDimensions}
-          selected={card.id === selectedCardId}
-          onClick={() => onCardClick?.(card)}
-          disabled={!draggable}
-          upgraded={upgradedCardIds.has(card.id)}
-          appliedUpgrades={upgradesByCardId?.get(card.id)}
-        />
-      ))}
+      {cards.map((card, i) => {
+        const isOverlapping = gap !== undefined && gap < 0
+        const zIndex = isOverlapping
+          ? card.id === selectedCardId ? cards.length + 1 : cards.length - i
+          : undefined
+        return (
+          <DraggableCard
+            key={card.id}
+            card={card}
+            zone={zone}
+            dimensions={cardDimensions}
+            selected={card.id === selectedCardId}
+            onClick={() => onCardClick?.(card)}
+            disabled={!draggable}
+            upgraded={upgradedCardIds.has(card.id)}
+            appliedUpgrades={upgradesByCardId?.get(card.id)}
+            style={{ ...(isOverlapping && i > 0 ? { marginLeft: gap } : undefined), ...(zIndex !== undefined ? { zIndex } : undefined) }}
+          />
+        )
+      })}
     </DroppableZone>
   );
 }

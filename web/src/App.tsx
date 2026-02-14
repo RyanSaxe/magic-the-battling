@@ -4,6 +4,7 @@ import { Home } from './pages/Home'
 import { Lobby } from './pages/Lobby'
 import { Game } from './pages/Game'
 import { ShareGame } from './pages/ShareGame'
+import { SummaryEmbed } from './pages/SummaryEmbed'
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/game/:gameId/lobby" element={<Lobby />} />
           <Route path="/game/:gameId/play" element={<Game />} />
+          <Route path="/game/:gameId/share/:playerName/embed" element={<SummaryEmbed />} />
           <Route path="/game/:gameId/share/:playerName" element={<ShareGame />} />
         </Routes>
       </BrowserRouter>

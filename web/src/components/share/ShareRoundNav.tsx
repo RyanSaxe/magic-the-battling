@@ -12,7 +12,7 @@ interface ShareRoundNavProps {
 }
 
 function buildRoundOptions(rounds: SharePlayerSnapshot[]): RoundOption[] {
-  const options: RoundOption[] = [{ label: 'Final Summary', value: 'final' }]
+  const options: RoundOption[] = [{ label: 'Latest', value: 'final' }]
   for (const snap of rounds) {
     options.push({
       label: `Stage ${snap.stage} - Round ${snap.round}`,
@@ -31,7 +31,7 @@ export function ShareRoundNav({ rounds, selectedRound, onSelectRound }: ShareRou
   return (
     <div className="flex items-center gap-2">
       <select
-        className="bg-gray-800 border border-gray-600 text-gray-200 rounded px-3 py-1.5 text-sm"
+        className="bg-gray-800 border border-gray-600 text-gray-200 rounded px-3 py-1.5 text-sm min-w-0"
         value={selectedRound}
         onChange={(e) => onSelectRound(e.target.value)}
       >

@@ -214,24 +214,33 @@ export function BattlePhase({
                 zone="hand"
                 zoneOwner="opponent"
                 validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
-                className="flex items-center justify-center gap-1.5 flex-nowrap w-full h-full"
+                className="hand-zone flex items-center justify-center flex-nowrap w-full h-full"
+                style={{ gap: Math.max(0, sizes.opponentHandGap) }}
               >
                 {opponent_hand_revealed
-                  ? opponent_zones.hand.map((card) => (
-                      <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} />
-                    ))
+                  ? opponent_zones.hand.map((card, i) => {
+                      const count = opponent_zones.hand.length
+                      const zIndex = sizes.opponentHandGap < 0
+                        ? selectedCard?.card.id === card.id ? count + 1 : count - i
+                        : undefined
+                      return <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} selected={selectedCard?.card.id === card.id} onClick={() => handleCardClick(card, 'hand')} style={{ ...(sizes.opponentHandGap < 0 && i > 0 ? { marginLeft: sizes.opponentHandGap } : undefined), ...(zIndex !== undefined ? { zIndex } : undefined) }} />
+                    })
                   : Array.from({ length: oppHandCount }).map((_, i) => (
-                      <CardBack key={i} dimensions={sizes.opponentHand} />
+                      <CardBack key={i} dimensions={sizes.opponentHand} style={{ ...(sizes.opponentHandGap < 0 && i > 0 ? { marginLeft: sizes.opponentHandGap } : undefined), ...(sizes.opponentHandGap < 0 ? { zIndex: oppHandCount - i } : undefined) }} />
                     ))}
               </DroppableZone>
             ) : (
-              <div className="flex items-center justify-center gap-1.5 flex-nowrap h-full">
+              <div className="hand-zone flex items-center justify-center flex-nowrap h-full" style={{ gap: Math.max(0, sizes.opponentHandGap) }}>
                 {opponent_hand_revealed
-                  ? opponent_zones.hand.map((card) => (
-                      <Card key={card.id} card={card} dimensions={sizes.opponentHand} upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} />
-                    ))
+                  ? opponent_zones.hand.map((card, i) => {
+                      const count = opponent_zones.hand.length
+                      const zIndex = sizes.opponentHandGap < 0
+                        ? count - i
+                        : undefined
+                      return <Card key={card.id} card={card} dimensions={sizes.opponentHand} upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} style={{ ...(sizes.opponentHandGap < 0 && i > 0 ? { marginLeft: sizes.opponentHandGap } : undefined), ...(zIndex !== undefined ? { zIndex } : undefined) }} />
+                    })
                   : Array.from({ length: oppHandCount }).map((_, i) => (
-                      <CardBack key={i} dimensions={sizes.opponentHand} />
+                      <CardBack key={i} dimensions={sizes.opponentHand} style={{ ...(sizes.opponentHandGap < 0 && i > 0 ? { marginLeft: sizes.opponentHandGap } : undefined), ...(sizes.opponentHandGap < 0 ? { zIndex: oppHandCount - i } : undefined) }} />
                     ))}
               </div>
             )}
@@ -320,6 +329,7 @@ export function BattlePhase({
               upgradedCardIds={upgradedCardIds}
               upgradesByCardId={upgradesByCardId}
               cardDimensions={sizes.playerHand}
+              gap={sizes.playerHandGap}
             />
           </div>
           <CompactZoneDisplay

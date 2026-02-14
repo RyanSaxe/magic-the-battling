@@ -311,7 +311,7 @@ function PlayerSelectionModal({
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    {!player.is_connected && (
+                    {!player.is_connected ? (
                       <button
                         onClick={() => handleReconnect(player.name)}
                         disabled={rejoinLoading}
@@ -319,10 +319,9 @@ function PlayerSelectionModal({
                       >
                         {rejoinLoading && rejoinName === player.name
                           ? "..."
-                          : "Reconnect"}
+                          : "Connect"}
                       </button>
-                    )}
-                    {watchablePlayers.some((p) => p.name === player.name) && (
+                    ) : watchablePlayers.some((p) => p.name === player.name) ? (
                       <button
                         onClick={() =>
                           status.auto_approve_spectators
@@ -333,7 +332,7 @@ function PlayerSelectionModal({
                       >
                         Watch
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ))}
@@ -585,11 +584,21 @@ function GameContent() {
       return null;
     }
     if (currentPhase === "eliminated") {
+      const hasWatchablePlayers = gameState.players.some(
+        (p) =>
+          !p.is_bot &&
+          p.phase !== "eliminated" &&
+          p.phase !== "awaiting_elimination" &&
+          p.phase !== "winner" &&
+          p.phase !== "game_over"
+      );
       return (
         <>
-          <button onClick={handleSpectateNewTab} className="btn btn-secondary">
-            Spectate
-          </button>
+          {hasWatchablePlayers && (
+            <button onClick={handleSpectateNewTab} className="btn btn-secondary">
+              Spectate
+            </button>
+          )}
           <button onClick={() => navigate("/")} className="btn btn-primary">
             Home
           </button>
@@ -789,10 +798,6 @@ function GameContent() {
     return null;
   };
 
-  const renderHeaderContent = (): ReactNode => {
-    return null;
-  };
-
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
       <div className="game-table h-dvh overflow-hidden flex flex-col">
@@ -880,7 +885,7 @@ function GameContent() {
                       players={gameState.players}
                       currentPlayer={self_player}
                       phaseContent={renderPhaseContent()}
-                      headerContent={renderHeaderContent()}
+
                       useUpgrades={gameState.use_upgrades}
                     />
                   </div>
@@ -890,7 +895,6 @@ function GameContent() {
                   players={gameState.players}
                   currentPlayer={self_player}
                   phaseContent={renderPhaseContent()}
-                  headerContent={renderHeaderContent()}
                   useUpgrades={gameState.use_upgrades}
                 />
               )}
@@ -1034,7 +1038,6 @@ function GameContent() {
                     players={gameState.players}
                     currentPlayer={self_player}
                     phaseContent={renderPhaseContent()}
-                    headerContent={renderHeaderContent()}
                     useUpgrades={gameState.use_upgrades}
                   />
                 </div>
@@ -1044,7 +1047,6 @@ function GameContent() {
                 players={gameState.players}
                 currentPlayer={self_player}
                 phaseContent={renderPhaseContent()}
-                headerContent={renderHeaderContent()}
                 useUpgrades={gameState.use_upgrades}
               />
             )}
@@ -1054,9 +1056,9 @@ function GameContent() {
           <div className="shrink-0 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
             <div className="flex items-center justify-center gap-3">
               {(currentPhase === "draft" || currentPhase === "build") && (
-                <div className="flex items-center gap-1.5">
-                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-8 rounded-sm" />
-                  <span className="text-base font-bold text-purple-400">{self_player.poison}</span>
+                <div className="relative">
+                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-12 rounded-sm" />
+                  <span className="absolute -bottom-1 -right-1 bg-purple-900 text-purple-300 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border border-purple-500">{self_player.poison}</span>
                 </div>
               )}
               {renderActionButtons()}
@@ -1069,9 +1071,9 @@ function GameContent() {
                 </button>
               )}
               {(currentPhase === "draft" || currentPhase === "build") && (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-base font-bold text-amber-400">{self_player.treasures}</span>
-                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-8 rounded-sm" />
+                <div className="relative">
+                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-12 rounded-sm" />
+                  <span className="absolute -bottom-1 -right-1 bg-amber-900 text-amber-300 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border border-amber-500">{self_player.treasures}</span>
                 </div>
               )}
             </div>
@@ -1089,6 +1091,9 @@ function GameContent() {
         <RulesModal
           currentPhase={currentPhase as Phase}
           onClose={() => setShowRulesModal(false)}
+          availableUpgrades={gameState.available_upgrades}
+          useUpgrades={gameState.use_upgrades}
+          cubeId={gameState.cube_id}
         />
       )}
       {actionMenuOpen && currentPhase === "battle" && current_battle && (

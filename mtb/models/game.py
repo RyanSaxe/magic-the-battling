@@ -205,6 +205,9 @@ class Player(BaseModel):
                 self.sideboard.remove(card)
                 self.hand.append(card)
 
+        if self.command_zone and any(c.id in {cz.id for cz in self.command_zone} for c in self.hand):
+            self.command_zone.clear()
+
         self.chosen_basics = self.previous_basics.copy()
 
 
@@ -222,6 +225,7 @@ class Config(BaseModel):
     use_upgrades: bool = True
     use_vanguards: bool = False
     auto_approve_spectators: bool = False
+    cube_id: str = "auto"
 
 
 class Game(BaseModel):

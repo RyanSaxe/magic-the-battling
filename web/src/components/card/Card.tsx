@@ -20,6 +20,7 @@ interface CardProps {
   isCompanion?: boolean
   upgraded?: boolean
   appliedUpgrades?: CardType[]
+  style?: React.CSSProperties
 }
 
 const sizeStyles = {
@@ -55,6 +56,7 @@ export function Card({
   isCompanion = false,
   upgraded = false,
   appliedUpgrades,
+  style: externalStyle,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -82,7 +84,7 @@ export function Card({
 
   const baseClasses = [
     'card',
-    'relative rounded-lg',
+    'relative rounded-lg overflow-hidden',
     disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
     selected && 'selected',
     tapped && 'tapped',
@@ -99,6 +101,7 @@ export function Card({
     <div
       className={baseClasses}
       style={{
+        ...externalStyle,
         width: dims.width,
         height: dims.height,
         boxShadow,
@@ -121,7 +124,7 @@ export function Card({
         onError={() => setIsLoading(false)}
         draggable={false}
       />
-      {card.flip_image_url && (
+      {card.flip_image_url && (isHovered || selected) && (
         <button
           className="absolute top-1 right-1 bg-black/60 rounded px-2 py-0.5 text-white text-xs hover:bg-black/80 transition-colors"
           onClick={(e) => {

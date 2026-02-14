@@ -177,3 +177,17 @@ class TestPlayDrawPreference:
         build.set_ready(game, player, ["Plains", "Island", "Mountain"])
 
         assert player.play_draw_preference == "play"
+
+
+def test_populate_hand_clears_companion_when_elo_adds_it(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    player = game.players[0]
+    companion = card_factory("Lurrus", "Creature", oracle_text="Companion — test", elo=9999)
+    filler = card_factory("Filler", elo=1)
+    player.sideboard.extend([companion, filler])
+    player.command_zone.append(companion.model_copy())
+
+    player.populate_hand()
+
+    assert any(c.id == companion.id for c in player.hand)
+    assert len(player.command_zone) == 0

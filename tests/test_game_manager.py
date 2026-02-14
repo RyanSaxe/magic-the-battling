@@ -3,6 +3,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from mtb.models.cards import Battler, Card
+from mtb.models.game import FakePlayer, create_game, set_battler
 from server.db.models import PlayerGameHistory
 from server.services.game_manager import GameManager
 
@@ -228,3 +230,89 @@ class TestConnectionManagerPendingConnections:
 
         cm.disconnect("game1", "player1")
         assert not cm.is_player_connected("game1", "player1")
+
+
+class TestPersistPlacementOnElimination:
+    def test_persist_player_placement_writes_to_db(self, game_manager, mock_db_session):
+        history = MagicMock(spec=PlayerGameHistory)
+        mock_query = MagicMock()
+        mock_db_session.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.first.return_value = history
+
+        game_manager._persist_player_placement(mock_db_session, "game1", "Alice", 3)
+
+        assert history.final_placement == 3
+        mock_db_session.commit.assert_called_once()
+
+    def test_persist_player_placement_noop_for_missing_history(self, game_manager, mock_db_session):
+        mock_query = MagicMock()
+        mock_db_session.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.first.return_value = None
+
+        game_manager._persist_player_placement(mock_db_session, "game1", "Alice", 3)
+
+        mock_db_session.commit.assert_not_called()
+
+    def test_check_sudden_death_ready_persists_placements(self, game_manager, mock_db_session):
+        """Mid-game eliminations in _check_sudden_death_ready should persist placement."""
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, charlie = game.players
+
+        alice.poison = 10
+        alice.phase = "awaiting_elimination"
+        bob.phase = "reward"
+        charlie.phase = "reward"
+        game.config.poison_to_lose = 10
+
+        mock_query = MagicMock()
+        mock_db_session.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.first.return_value = MagicMock(spec=PlayerGameHistory)
+
+        game_manager._check_sudden_death_ready(game, "game1", mock_db_session)
+
+        assert alice.phase == "eliminated"
+        assert alice.placement > 0
+        assert mock_db_session.commit.call_count >= 1
+
+
+class TestSelfPlayerPlacement:
+    def _make_card(self, name: str) -> Card:
+        return Card(name=name, image_url="img", id=name, type_line="Creature")
+
+    def test_get_game_state_includes_self_player_placement(self, game_manager):
+        cards = [self._make_card(f"c{i}") for i in range(50)]
+        battler = Battler(cards=cards, upgrades=[], vanguards=[])
+
+        game = create_game(["Alice"], num_players=1)
+        set_battler(game, battler)
+        game.fake_players.append(FakePlayer(name="Bot", player_history_id=1, snapshots={}))
+
+        game_manager._active_games["g1"] = game
+        game_manager._player_to_game["pid_alice"] = "g1"
+        game_manager._player_id_to_name["pid_alice"] = "Alice"
+
+        alice = game.players[0]
+        alice.placement = 2
+        alice.phase = "game_over"
+
+        state = game_manager.get_game_state("g1", "pid_alice")
+        assert state is not None
+        assert state.self_player.placement == 2
+
+    def test_placement_zero_before_game_over(self, game_manager):
+        cards = [self._make_card(f"c{i}") for i in range(50)]
+        battler = Battler(cards=cards, upgrades=[], vanguards=[])
+
+        game = create_game(["Alice"], num_players=1)
+        set_battler(game, battler)
+
+        game_manager._active_games["g1"] = game
+        game_manager._player_to_game["pid_alice"] = "g1"
+        game_manager._player_id_to_name["pid_alice"] = "Alice"
+
+        state = game_manager.get_game_state("g1", "pid_alice")
+        assert state is not None
+        assert state.self_player.placement == 0

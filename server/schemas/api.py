@@ -111,6 +111,7 @@ class GameStateResponse(BaseModel):
     available_upgrades: list[Card]
     current_battle: BattleView | None = None
     use_upgrades: bool = True
+    cube_id: str = "auto"
 
 
 class LobbyPlayer(BaseModel):

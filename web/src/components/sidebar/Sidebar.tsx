@@ -8,7 +8,6 @@ interface SidebarProps {
   players: PlayerView[];
   currentPlayer: PlayerView;
   phaseContent?: ReactNode;
-  headerContent?: ReactNode;
   useUpgrades?: boolean;
 }
 
@@ -16,7 +15,6 @@ export function Sidebar({
   players,
   currentPlayer,
   phaseContent,
-  headerContent,
   useUpgrades = true,
 }: SidebarProps) {
   const { state } = useContextStrip();
@@ -39,42 +37,45 @@ export function Sidebar({
 
   const companionIds = new Set(displayPlayer.command_zone.map((c) => c.id));
 
+  const showCardsSection =
+    revealedPlayer && revealedPlayer.name !== currentPlayer.name;
+
   return (
-    <aside className="w-64 h-full bg-black/30 flex flex-col overflow-hidden">
+    <aside className="relative w-64 h-full bg-black/30 flex flex-col overflow-hidden">
       {phaseContent ? (
-        <div className="overflow-y-auto overflow-x-hidden flex-1">{phaseContent}</div>
+        <div className="overflow-y-auto overflow-x-hidden flex-1">
+          {phaseContent}
+        </div>
       ) : (
-        <div className="p-4 overflow-auto flex-1 flex flex-col gap-4">
-          {headerContent}
+        <div className="pl-4 pr-4 overflow-auto flex-1 flex flex-col">
           <PlayerList
             players={players}
             currentPlayerName={currentPlayer.name}
+            currentPlayer={currentPlayer}
+            useUpgrades={useUpgrades}
           />
-          <div className="border-t border-gray-700 pt-4">
-            <h3 className="text-white font-medium mb-3">
-              {displayPlayer.name === currentPlayer.name
-                ? "Your Cards"
-                : `${displayPlayer.name}'s Cards`}
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {useUpgrades && (
+          {showCardsSection && (
+            <div>
+              <div className="flex flex-wrap">
+                {useUpgrades && allUpgrades.length > 0 && (
+                  <ZoneDisplay
+                    key={`upgrades-${displayPlayer.name}`}
+                    title="Upgrades"
+                    cards={allUpgrades}
+                    maxThumbnails={6}
+                    showUpgradeTargets
+                  />
+                )}
                 <ZoneDisplay
-                  key={`upgrades-${displayPlayer.name}`}
-                  title="Upgrades"
-                  cards={allUpgrades}
+                  key={`revealed-${displayPlayer.name}`}
+                  title="Seen in Battle"
+                  cards={displayPlayer.most_recently_revealed_cards}
                   maxThumbnails={6}
-                  showUpgradeTargets
+                  companionIds={companionIds}
                 />
-              )}
-              <ZoneDisplay
-                key={`revealed-${displayPlayer.name}`}
-                title="Seen in Battle"
-                cards={displayPlayer.most_recently_revealed_cards}
-                maxThumbnails={6}
-                companionIds={companionIds}
-              />
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
     </aside>

@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { Card } from '../../components/card'
 import { UpgradeStack } from '../../components/sidebar/UpgradeStack'
-import { BASIC_LANDS, BASIC_LAND_IMAGES, POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
+import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
 import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
 import { useElementHeight } from '../../hooks/useElementHeight'
 
@@ -298,53 +298,47 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
           </div>
         )}
 
-        {/* Basic lands + stats */}
-        <div className="flex items-center px-2 py-1">
-          {!isMobile && (
-            <div className="flex items-center gap-2">
-              <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-14 rounded" />
-              <span className="text-xl font-bold text-purple-400">{self_player.poison}</span>
-            </div>
-          )}
-          <div className="flex-1 flex gap-1.5 justify-center">
-            {BASIC_LANDS.map(({ name }) => {
-              const count = countBasic(name)
-              return (
-                <div key={name} className="relative">
-                  <img
-                    src={BASIC_LAND_IMAGES[name]}
-                    alt={name}
-                    className="rounded object-cover shadow-lg"
-                    style={{ width: isMobile ? 44 : 60, height: isMobile ? 62 : 84 }}
-                    title={name}
-                  />
-                  <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 bg-black/70 rounded-b py-0.5">
-                    <button
-                      onClick={() => removeBasic(name)}
-                      disabled={locked || count === 0}
-                      className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
-                    >
-                      -
-                    </button>
-                    <span className="text-white text-xs w-4 text-center">{count}</span>
-                    <button
-                      onClick={() => addBasic(name)}
-                      disabled={locked || selectedBasics.length >= 3}
-                      className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
-                    >
-                      +
-                    </button>
-                  </div>
+        {/* Basic lands */}
+        <div className="flex gap-1.5 justify-center px-2 py-1">
+          {BASIC_LANDS.map(({ name }) => {
+            const count = countBasic(name)
+            return (
+              <div key={name} className="relative">
+                <img
+                  src={BASIC_LAND_IMAGES[name]}
+                  alt={name}
+                  className="rounded object-cover shadow-lg cursor-pointer"
+                  style={{ width: isMobile ? 52 : 90, height: isMobile ? 73 : 126 }}
+                  title={name}
+                  onClick={() => {
+                    if (locked) return
+                    if (selectedBasics.length < 3) {
+                      addBasic(name)
+                    } else if (count > 0) {
+                      removeBasic(name)
+                    }
+                  }}
+                />
+                <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1 bg-black/70 rounded-b py-0.5">
+                  <button
+                    onClick={() => removeBasic(name)}
+                    disabled={locked || count === 0}
+                    className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
+                  >
+                    -
+                  </button>
+                  <span className="text-white text-xs w-4 text-center">{count}</span>
+                  <button
+                    onClick={() => addBasic(name)}
+                    disabled={locked || selectedBasics.length >= 3}
+                    className="w-5 h-5 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xs font-bold"
+                  >
+                    +
+                  </button>
                 </div>
-              )
-            })}
-          </div>
-          {!isMobile && (
-            <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-amber-400">{self_player.treasures}</span>
-              <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-14 rounded" />
-            </div>
-          )}
+              </div>
+            )
+          })}
         </div>
       </div>
 

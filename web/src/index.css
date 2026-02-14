@@ -167,6 +167,10 @@ body {
   background: rgba(34, 84, 61, 0.4);
 }
 
+.hand-zone > :hover {
+  z-index: 100 !important;
+}
+
 
 /* Counter badges */
 .counter-badge {

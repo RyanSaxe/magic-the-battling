@@ -1,22 +1,30 @@
 import type { SharePlayerData } from '../../types'
+import { getOrdinal } from '../../utils/format'
 
 interface SharePlayerToggleProps {
   players: SharePlayerData[]
   selectedPlayer: string
   ownerName: string
   onSelectPlayer: (name: string) => void
-  currentRound: string
 }
 
-function isPlayerEliminatedAtRound(
-  player: SharePlayerData,
-  roundKey: string,
-): boolean {
-  if (roundKey === 'final') return false
-  const [stageStr, roundStr] = roundKey.split('_')
-  const stage = parseInt(stageStr)
-  const round = parseInt(roundStr)
-  return !player.snapshots.some((s) => s.stage === stage && s.round === round)
+function sortByPlacement(players: SharePlayerData[]): SharePlayerData[] {
+  return [...players].sort((a, b) => {
+    if (a.final_placement != null && b.final_placement != null) {
+      return a.final_placement - b.final_placement
+    }
+    if (a.final_placement != null) return -1
+    if (b.final_placement != null) return 1
+    return 0
+  })
+}
+
+function playerLabel(player: SharePlayerData, ownerName: string): string {
+  const placement = player.final_placement
+    ? `${getOrdinal(player.final_placement)} - `
+    : ''
+  const suffix = player.name === ownerName ? ' (You)' : ''
+  return `${placement}${player.name}${suffix}`
 }
 
 export function SharePlayerToggle({
@@ -24,30 +32,20 @@ export function SharePlayerToggle({
   selectedPlayer,
   ownerName,
   onSelectPlayer,
-  currentRound,
 }: SharePlayerToggleProps) {
-  return (
-    <div className="flex gap-1 overflow-x-auto pb-1">
-      {players.map((player) => {
-        const isActive = player.name === selectedPlayer
-        const isEliminated = isPlayerEliminatedAtRound(player, currentRound)
-        const suffix = player.name === ownerName ? ' (You)' : ''
+  const sorted = sortByPlacement(players)
 
-        return (
-          <button
-            key={player.name}
-            className={[
-              'px-3 py-1 rounded text-sm whitespace-nowrap transition-colors',
-              isActive ? 'bg-amber-600 text-white' : 'bg-gray-800 border border-gray-600',
-              isEliminated && !isActive ? 'opacity-40' : '',
-              !isActive ? 'text-gray-300 hover:bg-gray-700' : '',
-            ].join(' ')}
-            onClick={() => onSelectPlayer(player.name)}
-          >
-            {player.name}{suffix}
-          </button>
-        )
-      })}
-    </div>
+  return (
+    <select
+      className="bg-gray-800 border border-gray-600 text-gray-200 rounded px-3 py-1.5 text-sm min-w-0"
+      value={selectedPlayer}
+      onChange={(e) => onSelectPlayer(e.target.value)}
+    >
+      {sorted.map((player) => (
+        <option key={player.name} value={player.name}>
+          {playerLabel(player, ownerName)}
+        </option>
+      ))}
+    </select>
   )
 }
