@@ -77,7 +77,7 @@ export function ShareGame() {
       }
       if (lastSnapshot) {
         return (
-          <div className="flex-1 min-h-0 px-4 pb-4 flex flex-col">
+          <div className="flex-1 min-h-0 px-4 pt-3 pb-4 flex flex-col">
             <ShareRoundDetail snapshot={lastSnapshot} useUpgrades={data.use_upgrades} />
           </div>
         )
@@ -91,7 +91,7 @@ export function ShareGame() {
 
     if (currentSnapshot) {
       return (
-        <div className="flex-1 min-h-0 px-4 pb-4 flex flex-col">
+        <div className="flex-1 min-h-0 px-4 pt-3 pb-4 flex flex-col">
           <ShareRoundDetail snapshot={currentSnapshot} useUpgrades={data.use_upgrades} />
         </div>
       )
