@@ -29,7 +29,7 @@ export interface GameSummaryDims {
   commandZone: SectionDims
 }
 
-function computeSize(
+export function computeSize(
   containerW: number,
   containerH: number,
   config: GameSummaryCardSizeConfig
