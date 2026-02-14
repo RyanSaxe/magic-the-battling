@@ -9,10 +9,11 @@ interface ShareRoundNavProps {
   rounds: SharePlayerSnapshot[]
   selectedRound: string
   onSelectRound: (value: string) => void
+  gameFinished?: boolean
 }
 
-function buildRoundOptions(rounds: SharePlayerSnapshot[]): RoundOption[] {
-  const options: RoundOption[] = [{ label: 'Final Summary', value: 'final' }]
+function buildRoundOptions(rounds: SharePlayerSnapshot[], gameFinished: boolean): RoundOption[] {
+  const options: RoundOption[] = [{ label: gameFinished ? 'Final Summary' : 'Latest', value: 'final' }]
   for (const snap of rounds) {
     options.push({
       label: `Stage ${snap.stage} - Round ${snap.round}`,
@@ -22,8 +23,8 @@ function buildRoundOptions(rounds: SharePlayerSnapshot[]): RoundOption[] {
   return options
 }
 
-export function ShareRoundNav({ rounds, selectedRound, onSelectRound }: ShareRoundNavProps) {
-  const options = buildRoundOptions(rounds)
+export function ShareRoundNav({ rounds, selectedRound, onSelectRound, gameFinished = true }: ShareRoundNavProps) {
+  const options = buildRoundOptions(rounds, gameFinished)
   const currentIndex = options.findIndex((o) => o.value === selectedRound)
   const hasPrev = currentIndex > 0
   const hasNext = currentIndex < options.length - 1
