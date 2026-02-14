@@ -73,6 +73,23 @@ describe('computeSize', () => {
     })
   })
 
+  describe('overflow fallback', () => {
+    it('uses best-overflow candidate instead of 30px when perfect layout barely overflows', () => {
+      const result = computeSize(300, 200, {
+        handCount: 7,
+        sideboardCount: 12,
+        battlefieldCount: 3,
+        commandZoneCount: 1,
+      })
+      for (const section of ['hand', 'sideboard', 'battlefield', 'commandZone'] as const) {
+        const { width } = result[section]
+        if (width > 0) {
+          expect(width).toBeGreaterThan(MIN_CARD_WIDTH)
+        }
+      }
+    })
+  })
+
   describe('edge cases', () => {
     it('returns minCardWidth fallback for zero-size container', () => {
       const result = computeSize(0, 0, {

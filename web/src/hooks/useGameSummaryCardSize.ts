@@ -77,6 +77,9 @@ export function computeSize(
     commandZone: empty,
   }
 
+  let bestOverflow = Infinity
+  let bestOverflowResult: GameSummaryDims = bestResult
+
   const bfCols = hasBattlefield ? battlefieldCount : 0
 
   for (let hr = hasHand ? 1 : 0; hr <= (hasHand ? handCount : 0); hr++) {
@@ -192,7 +195,27 @@ export function computeSize(
       const lowerH = Math.max(czColumnH, rightColumnH)
       const actualTotalH = handCellH + gapAfterHand + lowerH
 
-      if (actualTotalH > availH) continue
+      if (actualTotalH > availH) {
+        const overflow = actualTotalH - availH
+        if (overflow < bestOverflow) {
+          bestOverflow = overflow
+          bestOverflowResult = {
+            hand: hasHand
+              ? { width: handCardW, height: handCardH, columns: handCols }
+              : empty,
+            sideboard: hasSideboard
+              ? { width: sbCardW, height: sbCardH, columns: sbCols }
+              : empty,
+            battlefield: hasBattlefield
+              ? { width: bfCardW, height: bfCardH, columns: bfCols }
+              : empty,
+            commandZone: hasCommandZone
+              ? { width: czCardW, height: czCardH, columns: 1 }
+              : empty,
+          }
+        }
+        continue
+      }
 
       const fill = actualTotalH / availH
       const scoreCardW = hasSideboard ? sbCardW : (hasBattlefield ? bfCardW : (hasHand ? handCardW : czCardW))
@@ -219,15 +242,7 @@ export function computeSize(
   }
 
   if (bestScore < 0) {
-    const w = minCardWidth
-    const h = Math.round(w * ASPECT_RATIO)
-    const d: SectionDims = { width: w, height: h, columns: 1 }
-    return {
-      hand: hasHand ? d : empty,
-      sideboard: hasSideboard ? d : empty,
-      battlefield: hasBattlefield ? { ...d, columns: battlefieldCount } : empty,
-      commandZone: hasCommandZone ? d : empty,
-    }
+    return bestOverflowResult
   }
 
   return bestResult
