@@ -98,7 +98,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
     bottomGap: 6,
     fixedHeight,
     topMaxWidth: 200,
-    bottomMaxWidth: 120,
+    bottomMaxWidth: 180,
   })
 
   const handleUpgradeClick = (upgrade: CardType) => {
