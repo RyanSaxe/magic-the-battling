@@ -19,6 +19,9 @@ COPY web/package.json web/package-lock.json ./web/
 # Install Python dependencies
 RUN uv sync --frozen --no-dev
 
+# Install Playwright Chromium and its OS dependencies
+RUN uv run playwright install --with-deps chromium
+
 # Install Node dependencies and build frontend
 COPY web/ ./web/
 RUN cd web && npm ci && npm run build
