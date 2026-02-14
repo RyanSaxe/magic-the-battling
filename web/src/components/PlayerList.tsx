@@ -215,11 +215,11 @@ export function PlayerList({ players, currentPlayerName, currentPlayer, useUpgra
           <div className="relative flex items-center justify-center gap-6">
             <PlacementBadge player={currentPlayer} players={players} />
             <div className="relative">
-              <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-24 w-24 rounded" />
+              <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-24 rounded" />
               <span className="absolute bottom-0 right-0 bg-black/70 text-purple-400 text-xs font-bold px-1.5 py-0.5 rounded-full">{currentPlayer.poison}</span>
             </div>
             <div className="relative">
-              <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-24 w-24 rounded" />
+              <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-24 rounded" />
               <span className="absolute bottom-0 right-0 bg-black/70 text-amber-400 text-xs font-bold px-1.5 py-0.5 rounded-full">{currentPlayer.treasures}</span>
             </div>
           </div>
