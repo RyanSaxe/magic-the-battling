@@ -259,4 +259,5 @@ class ShareGameResponse(BaseModel):
     owner_name: str
     created_at: str
     use_upgrades: bool
+    game_finished: bool
     players: list[SharePlayerData]
