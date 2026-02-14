@@ -93,12 +93,12 @@ export function GameSummary({
 
   return (
     <div className="flex-1 flex flex-col items-center p-4 overflow-hidden">
-      <div className="shrink-0 text-center">
-        <div className="flex items-center justify-center gap-3">
-          <h2 className={`text-4xl font-bold ${placementColor}`}>
-            {placementText} Place
-          </h2>
-          {gameId && (
+      {gameId && (
+        <div className="shrink-0 text-center">
+          <div className="flex items-center justify-center gap-3">
+            <h2 className={`text-4xl font-bold ${placementColor}`}>
+              {placementText} Place
+            </h2>
             <button
               className={`text-xs font-medium rounded-full px-4 py-1.5 transition-colors duration-200 ${
                 copied
@@ -109,12 +109,12 @@ export function GameSummary({
             >
               {copied ? 'Link Copied!' : 'Share Game'}
             </button>
-          )}
+          </div>
+          <p className="text-gray-400 text-sm mt-1 mb-3">
+            Stage {frozenPlayer.stage} &middot; Round {frozenPlayer.round} &middot; {players.length} Players
+          </p>
         </div>
-        <p className="text-gray-400 text-sm mt-1 mb-3">
-          Stage {frozenPlayer.stage} &middot; Round {frozenPlayer.round} &middot; {players.length} Players
-        </p>
-      </div>
+      )}
 
       <div className="max-w-5xl w-full flex-1 min-h-0 flex flex-col">
         <div ref={ref} className="rounded-lg bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col">
