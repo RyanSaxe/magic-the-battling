@@ -53,8 +53,8 @@ export function ShareRoundDetail({ snapshot, useUpgrades }: ShareRoundDetailProp
         </div>
       </div>
 
-      <div className="flex-1 min-h-0">
-        <div ref={ref} className="rounded-lg bg-gray-600/40 p-[1px] h-full flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col">
+        <div ref={ref} className="rounded-lg bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col">
           <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
             {hasHand && (
               <div className="bg-black/30 px-3 pt-5 pb-3 relative">
