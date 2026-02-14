@@ -8,7 +8,8 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from server.db.database import init_db
-from server.routers import games, ws
+from server.routers import games, share_preview, ws
+from server.services.preview import preview_service
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,7 +20,9 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    await preview_service.start()
     yield
+    await preview_service.stop()
 
 
 app = FastAPI(
@@ -44,6 +47,7 @@ app.add_middleware(
 
 app.include_router(games.router)
 app.include_router(ws.router)
+app.include_router(share_preview.router)
 
 
 @app.get("/health")
