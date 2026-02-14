@@ -68,6 +68,7 @@ export function ShareGame() {
       if (gameSummaryData) {
         return (
           <GameSummary
+            key={selectedPlayer}
             player={gameSummaryData.selfPlayer}
             players={gameSummaryData.players}
             useUpgrades={data.use_upgrades}

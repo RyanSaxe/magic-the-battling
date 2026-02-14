@@ -3,7 +3,7 @@ import type { SelfPlayerView, PlayerView } from '../types'
 import { Card } from './card'
 import { UpgradeStack } from './sidebar/UpgradeStack'
 import { useGameSummaryCardSize } from '../hooks/useGameSummaryCardSize'
-import { BasicLandCard, CardGrid, TreasureCard } from './common'
+import { BasicLandCard, CardGrid, TreasureCard, PoisonCard } from './common'
 import { getOrdinal, collapseDuplicateBasics } from '../utils/format'
 
 const badgeCls =
@@ -35,6 +35,7 @@ export function GameSummary({
     round: player.round,
     name: player.name,
     preBattleTreasures: player.last_battle_result?.pre_battle_treasures ?? 0,
+    poison: player.poison,
   }))
 
   const selfPlayer = players.find((p) => p.name === frozenPlayer.name)
@@ -51,7 +52,7 @@ export function GameSummary({
   const preBattleTreasures = frozenPlayer.preBattleTreasures
 
   const collapsedBasics = collapseDuplicateBasics(frozenPlayer.chosen_basics)
-  const battlefieldCount = collapsedBasics.length + (preBattleTreasures > 0 ? 1 : 0)
+  const battlefieldCount = collapsedBasics.length + 2
   const commandZoneCount = appliedUpgrades.length
 
   const [copied, setCopied] = useState(false)
@@ -94,7 +95,7 @@ export function GameSummary({
   return (
     <div className="flex-1 flex flex-col items-center p-4 overflow-hidden">
       {gameId && (
-        <div className="shrink-0 text-center">
+        <div className="shrink-0 text-center mb-3">
           <div className="flex items-center justify-center gap-3">
             <h2 className={`text-4xl font-bold ${placementColor}`}>
               {placementText} Place
@@ -110,9 +111,6 @@ export function GameSummary({
               {copied ? 'Link Copied!' : 'Share Game'}
             </button>
           </div>
-          <p className="text-gray-400 text-sm mt-1 mb-3">
-            Stage {frozenPlayer.stage} &middot; Round {frozenPlayer.round} &middot; {players.length} Players
-          </p>
         </div>
       )}
 
@@ -140,9 +138,8 @@ export function GameSummary({
                           {collapsedBasics.map((land) => (
                             <BasicLandCard key={land.name} name={land.name} count={land.count} dimensions={bfDims} />
                           ))}
-                          {preBattleTreasures > 0 && (
-                            <TreasureCard count={preBattleTreasures} dimensions={bfDims} />
-                          )}
+                          <TreasureCard count={preBattleTreasures} dimensions={bfDims} />
+                          <PoisonCard count={frozenPlayer.poison} dimensions={bfDims} />
                         </CardGrid>
                       </div>
                     )}
