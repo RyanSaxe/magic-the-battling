@@ -337,6 +337,21 @@ class GameManager:
 
         self._schedule_cleanup(game_id)
 
+    def _persist_player_placement(self, db: Session | None, game_id: str | None, name: str, placement: int) -> None:
+        if not db or not game_id:
+            return
+        history = (
+            db.query(PlayerGameHistory)
+            .filter(
+                PlayerGameHistory.game_id == game_id,
+                PlayerGameHistory.player_name == name,
+            )
+            .first()
+        )
+        if history:
+            history.final_placement = placement
+            db.commit()
+
     def _persist_final_placements(self, db: Session, game_id: str, game: Game) -> None:
         all_participants = [(p.name, p.placement) for p in game.players if p.placement > 0]
         all_participants.extend((fp.name, fp.placement) for fp in game.fake_players if fp.placement > 0)
@@ -1964,6 +1979,7 @@ class GameManager:
         loser = random.choice(bots)
         winner_bot = bots[0] if loser is bots[1] else bots[1]
         eliminate_bot(game, loser)
+        self._persist_player_placement(db, game_id, loser.name, loser.placement)
         winner_bot.poison = game.config.poison_to_lose - 1
         winner, is_game_over = check_game_over(game)
         if is_game_over:
@@ -1979,8 +1995,10 @@ class GameManager:
         if not needs_sudden_death(game):
             for p in get_would_be_dead(game):
                 eliminate_player(game, p, p.round, p.stage)
+                self._persist_player_placement(db, game_id, p.name, p.placement)
             for bot in get_would_be_dead_bots(game):
                 eliminate_bot(game, bot)
+                self._persist_player_placement(db, game_id, bot.name, bot.placement)
 
             process_bot_eliminations(game)
             winner, is_game_over = check_game_over(game)
@@ -1999,9 +2017,11 @@ class GameManager:
         for p in get_would_be_dead(game):
             if p.name not in fighter_names:
                 eliminate_player(game, p, p.round, p.stage)
+                self._persist_player_placement(db, game_id, p.name, p.placement)
         for bot in get_would_be_dead_bots(game):
             if bot.name not in fighter_names:
                 eliminate_bot(game, bot)
+                self._persist_player_placement(db, game_id, bot.name, bot.placement)
 
         humans = [f for f in (f1, f2) if isinstance(f, Player)]
         bots = [f for f in (f1, f2) if isinstance(f, FakePlayer)]

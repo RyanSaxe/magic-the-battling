@@ -232,6 +232,52 @@ class TestConnectionManagerPendingConnections:
         assert not cm.is_player_connected("game1", "player1")
 
 
+class TestPersistPlacementOnElimination:
+    def test_persist_player_placement_writes_to_db(self, game_manager, mock_db_session):
+        history = MagicMock(spec=PlayerGameHistory)
+        mock_query = MagicMock()
+        mock_db_session.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.first.return_value = history
+
+        game_manager._persist_player_placement(mock_db_session, "game1", "Alice", 3)
+
+        assert history.final_placement == 3
+        mock_db_session.commit.assert_called_once()
+
+    def test_persist_player_placement_noop_for_missing_history(self, game_manager, mock_db_session):
+        mock_query = MagicMock()
+        mock_db_session.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.first.return_value = None
+
+        game_manager._persist_player_placement(mock_db_session, "game1", "Alice", 3)
+
+        mock_db_session.commit.assert_not_called()
+
+    def test_check_sudden_death_ready_persists_placements(self, game_manager, mock_db_session):
+        """Mid-game eliminations in _check_sudden_death_ready should persist placement."""
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, charlie = game.players
+
+        alice.poison = 10
+        alice.phase = "awaiting_elimination"
+        bob.phase = "reward"
+        charlie.phase = "reward"
+        game.config.poison_to_lose = 10
+
+        mock_query = MagicMock()
+        mock_db_session.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.first.return_value = MagicMock(spec=PlayerGameHistory)
+
+        game_manager._check_sudden_death_ready(game, "game1", mock_db_session)
+
+        assert alice.phase == "eliminated"
+        assert alice.placement > 0
+        assert mock_db_session.commit.call_count >= 1
+
+
 class TestSelfPlayerPlacement:
     def _make_card(self, name: str) -> Card:
         return Card(name=name, image_url="img", id=name, type_line="Creature")
