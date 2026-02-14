@@ -22,7 +22,8 @@ interface BattleZoneConfig {
 
 interface BattleZoneDims {
   rowHeight: number
-  handGap: number
+  playerHandGap: number
+  opponentHandGap: number
   playerHand: CardDimensions
   opponentHand: CardDimensions
   playerLands: CardDimensions
@@ -52,6 +53,38 @@ function computeZoneCards(
   return { width: cardW, height: Math.round(cardW * CARD_ASPECT_RATIO) }
 }
 
+function computeHandCards(
+  count: number,
+  rowH: number,
+  containerW: number,
+  defaultGap: number,
+  maxWidth: number,
+  minWidth: number,
+  padding: number,
+): CardDimensions & { gap: number } {
+  const baseCardW = Math.floor(rowH / CARD_ASPECT_RATIO)
+  const idealW = Math.min(baseCardW, maxWidth)
+
+  if (count <= 1) {
+    return { width: idealW, height: Math.round(idealW * CARD_ASPECT_RATIO), gap: defaultGap }
+  }
+
+  const spaceNeeded = count * idealW + (count - 1) * defaultGap + padding
+  if (spaceNeeded <= containerW) {
+    return { width: idealW, height: Math.round(idealW * CARD_ASPECT_RATIO), gap: defaultGap }
+  }
+
+  const neededGap = Math.floor((containerW - padding - count * idealW) / (count - 1))
+  const minGap = -Math.floor(idealW * 0.2)
+
+  if (neededGap >= minGap) {
+    return { width: idealW, height: Math.round(idealW * CARD_ASPECT_RATIO), gap: neededGap }
+  }
+
+  const cardW = Math.max(minWidth, Math.floor((containerW - padding - (count - 1) * minGap) / count))
+  return { width: cardW, height: Math.round(cardW * CARD_ASPECT_RATIO), gap: minGap }
+}
+
 function computeBattleZones(
   containerWidth: number,
   containerHeight: number,
@@ -78,7 +111,8 @@ function computeBattleZones(
     const fallback: CardDimensions = { width: 100, height: 140 }
     return {
       rowHeight: 0,
-      handGap,
+      playerHandGap: handGap,
+      opponentHandGap: handGap,
       playerHand: fallback, opponentHand: fallback,
       playerLands: fallback, playerNonlands: fallback,
       opponentLands: fallback, opponentNonlands: fallback,
@@ -86,15 +120,20 @@ function computeBattleZones(
   }
 
   const rowH = Math.floor(availH / NUM_ROWS)
-  const handPadding = 32
+  const handPadding = 48 // 32px from .hand-zone CSS + 16px from px-2 container
   const bfPadding = 16
   const bfWidth = containerWidth - zoneColumnWidth
+  const handWidth = containerWidth - zoneColumnWidth
+
+  const playerHandResult = computeHandCards(playerHandCount, rowH, handWidth, handGap, handMaxWidth, minCardWidth, handPadding)
+  const opponentHandResult = computeHandCards(opponentHandCount, rowH, handWidth, handGap, handMaxWidth, minCardWidth, handPadding)
 
   return {
     rowHeight: rowH,
-    handGap,
-    playerHand: computeZoneCards(playerHandCount, rowH, containerWidth, handGap, handMaxWidth, minCardWidth, handPadding),
-    opponentHand: computeZoneCards(opponentHandCount, rowH, containerWidth, handGap, handMaxWidth, minCardWidth, handPadding),
+    playerHandGap: playerHandResult.gap,
+    opponentHandGap: opponentHandResult.gap,
+    playerHand: { width: playerHandResult.width, height: playerHandResult.height },
+    opponentHand: { width: opponentHandResult.width, height: opponentHandResult.height },
     playerLands: computeZoneCards(playerLandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, minCardWidth, bfPadding),
     playerNonlands: computeZoneCards(playerNonlandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, minCardWidth, bfPadding),
     opponentLands: computeZoneCards(opponentLandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, minCardWidth, bfPadding),
@@ -105,7 +144,8 @@ function computeBattleZones(
 function dimsEqual(a: BattleZoneDims, b: BattleZoneDims): boolean {
   return (
     a.rowHeight === b.rowHeight &&
-    a.handGap === b.handGap &&
+    a.playerHandGap === b.playerHandGap &&
+    a.opponentHandGap === b.opponentHandGap &&
     a.playerHand.width === b.playerHand.width &&
     a.playerHand.height === b.playerHand.height &&
     a.opponentHand.width === b.opponentHand.width &&
@@ -149,7 +189,8 @@ export function useBattleCardSizes(config: BattleZoneConfig): [
 
   const [dims, setDims] = useState<BattleZoneDims>(() => ({
     rowHeight: 0,
-    handGap,
+    playerHandGap: handGap,
+    opponentHandGap: handGap,
     playerHand: { width: handMaxWidth, height: Math.round(handMaxWidth * CARD_ASPECT_RATIO) },
     opponentHand: { width: handMaxWidth, height: Math.round(handMaxWidth * CARD_ASPECT_RATIO) },
     playerLands: { width: battlefieldMaxWidth, height: Math.round(battlefieldMaxWidth * CARD_ASPECT_RATIO) },
