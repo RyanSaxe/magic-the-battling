@@ -98,7 +98,7 @@ export function ShareRoundDetail({ snapshot, useUpgrades }: ShareRoundDetailProp
                 {hasCommandZone && (
                   <div className="bg-black/30 px-3 pt-5 pb-3 relative flex items-center justify-center">
                     <span className={badgeCls}>CMD</span>
-                    <CardGrid columns={1} cardWidth={czDims.width}>
+                    <CardGrid columns={dims.commandZone.columns} cardWidth={czDims.width}>
                       {appliedUpgrades.map((upgrade) => (
                         <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={czDims} />
                       ))}

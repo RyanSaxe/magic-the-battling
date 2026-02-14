@@ -105,18 +105,24 @@ export function computeSize(
 
     if (hasLower && availBelow <= 0) continue
 
+    const czColVariants = hasCommandZone
+      ? Array.from({ length: Math.min(2, commandZoneCount) }, (_, i) => i + 1)
+      : [0]
+
+    for (const czc of czColVariants) {
     let czCardW = 0
     let czCellW = 0
     if (hasCommandZone) {
-      const czGaps = Math.max(0, commandZoneCount - 1) * CARD_GAP
+      const czRows = Math.ceil(commandZoneCount / czc)
+      const czGaps = Math.max(0, czRows - 1) * CARD_GAP
       const czAvailH = availBelow - CELL_PAD_TOP - CZ_CELL_PAD
       const czCardW_fromHeight = Math.floor(
-        (czAvailH - czGaps) / (commandZoneCount * ASPECT_RATIO)
+        (czAvailH - czGaps) / (czRows * ASPECT_RATIO)
       )
       const czIdealW = hasHand ? handCardW : maxCardWidth
       czCardW = Math.min(czIdealW, czCardW_fromHeight)
       if (czCardW < minCardWidth) continue
-      czCellW = czCardW + 2 * CELL_PAD
+      czCellW = czc * czCardW + (czc - 1) * CARD_GAP + 2 * CELL_PAD
     }
 
     const rightColW = hasCommandZone
@@ -188,8 +194,9 @@ export function computeSize(
       const rightColumnH = hasRight ? bfCellH + (hasBattlefield && hasSideboard ? BORDER : 0) + sbCellH : 0
 
       const czCardH = hasCommandZone ? Math.round(czCardW * ASPECT_RATIO) : 0
+      const czRows = hasCommandZone ? Math.ceil(commandZoneCount / czc) : 0
       const czColumnH = hasCommandZone
-        ? CELL_PAD_TOP + CELL_PAD + commandZoneCount * czCardH + Math.max(0, commandZoneCount - 1) * CARD_GAP
+        ? CELL_PAD_TOP + CZ_CELL_PAD + czRows * czCardH + Math.max(0, czRows - 1) * CARD_GAP
         : 0
 
       const lowerH = Math.max(czColumnH, rightColumnH)
@@ -210,7 +217,7 @@ export function computeSize(
               ? { width: bfCardW, height: bfCardH, columns: bfCols }
               : empty,
             commandZone: hasCommandZone
-              ? { width: czCardW, height: czCardH, columns: 1 }
+              ? { width: czCardW, height: czCardH, columns: czc }
               : empty,
           }
         }
@@ -234,10 +241,11 @@ export function computeSize(
             ? { width: bfCardW, height: bfCardH, columns: bfCols }
             : empty,
           commandZone: hasCommandZone
-            ? { width: czCardW, height: czCardH, columns: 1 }
+            ? { width: czCardW, height: czCardH, columns: czc }
             : empty,
         }
       }
+    }
     }
   }
 

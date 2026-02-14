@@ -73,6 +73,29 @@ describe('computeSize', () => {
     })
   })
 
+  describe('CZ multi-column', () => {
+    it('selects 2 CZ columns when height is tight with multiple CZ cards', () => {
+      const result = computeSize(1200, 460, {
+        handCount: 7,
+        sideboardCount: 12,
+        battlefieldCount: 3,
+        commandZoneCount: 4,
+      })
+      expect(result.commandZone.columns).toBe(2)
+      expect(result.commandZone.width).toBeGreaterThan(MIN_CARD_WIDTH)
+    })
+
+    it('keeps 1 CZ column when only 1 CZ card', () => {
+      const result = computeSize(1200, 700, {
+        handCount: 7,
+        sideboardCount: 12,
+        battlefieldCount: 3,
+        commandZoneCount: 1,
+      })
+      expect(result.commandZone.columns).toBe(1)
+    })
+  })
+
   describe('overflow fallback', () => {
     it('uses best-overflow candidate instead of 30px when perfect layout barely overflows', () => {
       const result = computeSize(300, 200, {
