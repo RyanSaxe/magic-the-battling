@@ -96,6 +96,19 @@ describe('computeSize', () => {
     })
   })
 
+  describe('CZ per-section overflow', () => {
+    it('prefers 2-col CZ when 1-col CZ overflows available height', () => {
+      const result = computeSize(1000, 350, {
+        handCount: 7,
+        sideboardCount: 12,
+        battlefieldCount: 3,
+        commandZoneCount: 3,
+      })
+      expect(result.commandZone.columns).toBe(2)
+      expect(result.commandZone.width).toBeGreaterThan(MIN_CARD_WIDTH)
+    })
+  })
+
   describe('overflow fallback', () => {
     it('returns non-zero dims when all layouts overflow or have below-min cards', () => {
       const result = computeSize(300, 200, {

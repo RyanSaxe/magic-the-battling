@@ -205,6 +205,5 @@ export interface ShareGameResponse {
   owner_name: string
   created_at: string
   use_upgrades: boolean
-  game_finished: boolean
   players: SharePlayerData[]
 }

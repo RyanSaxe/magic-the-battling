@@ -208,7 +208,10 @@ export function computeSize(
 
       if (actualTotalH > availH || belowMin) {
         const belowMinPenalty = belowMin ? availH * 2 : 0
-        const overflow = (actualTotalH - availH) + belowMinPenalty
+        const czOverflow = hasCommandZone ? Math.max(0, czColumnH - availBelow) : 0
+        const rightOverflow = hasRight ? Math.max(0, rightColumnH - availBelow) : 0
+        const sectionOverflow = czOverflow + rightOverflow
+        const overflow = (actualTotalH - availH) + belowMinPenalty + sectionOverflow
         if (overflow < bestOverflow) {
           bestOverflow = overflow
           bestOverflowResult = {

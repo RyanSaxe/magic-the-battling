@@ -161,11 +161,13 @@ export function GameSummary({
                 {hasCommandZone && (
                   <div className="bg-black/30 px-3 pt-5 pb-3 relative flex items-center justify-center">
                     <span className={badgeCls}>CMD</span>
-                    <CardGrid columns={dims.commandZone.columns} cardWidth={czDims.width}>
-                      {appliedUpgrades.map((upgrade) => (
-                        <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={czDims} />
-                      ))}
-                    </CardGrid>
+                    <div className="overflow-hidden">
+                      <CardGrid columns={dims.commandZone.columns} cardWidth={czDims.width}>
+                        {appliedUpgrades.map((upgrade) => (
+                          <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={czDims} />
+                        ))}
+                      </CardGrid>
+                    </div>
                   </div>
                 )}
               </div>

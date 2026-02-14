@@ -429,13 +429,11 @@ def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)
         )
 
     created_at = game_record.created_at.isoformat() if game_record.created_at else ""
-    game_finished = game_record.ended_at is not None
 
     return ShareGameResponse(
         game_id=game_id,
         owner_name=player_name,
         created_at=created_at,
         use_upgrades=use_upgrades,
-        game_finished=game_finished,
         players=players,
     )
