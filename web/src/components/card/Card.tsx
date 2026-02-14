@@ -20,6 +20,7 @@ interface CardProps {
   isCompanion?: boolean
   upgraded?: boolean
   appliedUpgrades?: CardType[]
+  style?: React.CSSProperties
 }
 
 const sizeStyles = {
@@ -55,6 +56,7 @@ export function Card({
   isCompanion = false,
   upgraded = false,
   appliedUpgrades,
+  style: externalStyle,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -99,6 +101,7 @@ export function Card({
     <div
       className={baseClasses}
       style={{
+        ...externalStyle,
         width: dims.width,
         height: dims.height,
         boxShadow,

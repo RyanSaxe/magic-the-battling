@@ -22,6 +22,7 @@ interface BattleZoneConfig {
 
 interface BattleZoneDims {
   rowHeight: number
+  handGap: number
   playerHand: CardDimensions
   opponentHand: CardDimensions
   playerLands: CardDimensions
@@ -77,6 +78,7 @@ function computeBattleZones(
     const fallback: CardDimensions = { width: 100, height: 140 }
     return {
       rowHeight: 0,
+      handGap,
       playerHand: fallback, opponentHand: fallback,
       playerLands: fallback, playerNonlands: fallback,
       opponentLands: fallback, opponentNonlands: fallback,
@@ -90,6 +92,7 @@ function computeBattleZones(
 
   return {
     rowHeight: rowH,
+    handGap,
     playerHand: computeZoneCards(playerHandCount, rowH, containerWidth, handGap, handMaxWidth, minCardWidth, handPadding),
     opponentHand: computeZoneCards(opponentHandCount, rowH, containerWidth, handGap, handMaxWidth, minCardWidth, handPadding),
     playerLands: computeZoneCards(playerLandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, minCardWidth, bfPadding),
@@ -102,6 +105,7 @@ function computeBattleZones(
 function dimsEqual(a: BattleZoneDims, b: BattleZoneDims): boolean {
   return (
     a.rowHeight === b.rowHeight &&
+    a.handGap === b.handGap &&
     a.playerHand.width === b.playerHand.width &&
     a.playerHand.height === b.playerHand.height &&
     a.opponentHand.width === b.opponentHand.width &&
@@ -145,6 +149,7 @@ export function useBattleCardSizes(config: BattleZoneConfig): [
 
   const [dims, setDims] = useState<BattleZoneDims>(() => ({
     rowHeight: 0,
+    handGap,
     playerHand: { width: handMaxWidth, height: Math.round(handMaxWidth * CARD_ASPECT_RATIO) },
     opponentHand: { width: handMaxWidth, height: Math.round(handMaxWidth * CARD_ASPECT_RATIO) },
     playerLands: { width: battlefieldMaxWidth, height: Math.round(battlefieldMaxWidth * CARD_ASPECT_RATIO) },

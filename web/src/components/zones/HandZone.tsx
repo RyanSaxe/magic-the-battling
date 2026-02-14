@@ -12,6 +12,7 @@ interface HandZoneProps {
   upgradedCardIds?: Set<string>;
   upgradesByCardId?: Map<string, CardType[]>;
   cardDimensions?: CardDimensions;
+  gap?: number;
 }
 
 export function HandZone({
@@ -31,14 +32,18 @@ export function HandZone({
   upgradedCardIds = new Set(),
   upgradesByCardId,
   cardDimensions,
+  gap,
 }: HandZoneProps) {
+  const zoneStyle = gap !== undefined ? { gap: Math.max(0, gap) } : undefined
+
   return (
     <DroppableZone
       zone={zone}
       validFromZones={validFromZones}
       className="hand-zone w-full h-full flex-nowrap"
+      style={zoneStyle}
     >
-      {cards.map((card) => (
+      {cards.map((card, i) => (
         <DraggableCard
           key={card.id}
           card={card}
@@ -49,6 +54,7 @@ export function HandZone({
           disabled={!draggable}
           upgraded={upgradedCardIds.has(card.id)}
           appliedUpgrades={upgradesByCardId?.get(card.id)}
+          style={gap !== undefined && gap < 0 && i > 0 ? { marginLeft: gap } : undefined}
         />
       ))}
     </DroppableZone>

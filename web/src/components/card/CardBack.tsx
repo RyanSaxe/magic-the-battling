@@ -6,6 +6,7 @@ interface CardBackProps {
   tapped?: boolean
   onClick?: () => void
   className?: string
+  style?: React.CSSProperties
 }
 
 const sizeStyles = {
@@ -21,6 +22,7 @@ export function CardBack({
   tapped = false,
   onClick,
   className = '',
+  style: externalStyle,
 }: CardBackProps) {
   const dims = dimensions ?? sizeStyles[size]
 
@@ -36,6 +38,7 @@ export function CardBack({
     <div
       className={baseClasses}
       style={{
+        ...externalStyle,
         width: dims.width,
         height: dims.height,
       }}

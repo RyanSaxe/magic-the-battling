@@ -23,6 +23,7 @@ interface DraggableCardProps {
   isCompanion?: boolean
   upgraded?: boolean
   appliedUpgrades?: CardType[]
+  style?: React.CSSProperties
 }
 
 export function DraggableCard({
@@ -44,6 +45,7 @@ export function DraggableCard({
   isCompanion = false,
   upgraded = false,
   appliedUpgrades,
+  style: externalStyle,
 }: DraggableCardProps) {
   const zoneId = makeZoneId(zone, zoneOwner)
   const dragData: DragData = { card, fromZone: zone, fromZoneId: zoneId, isOpponent }
@@ -54,11 +56,10 @@ export function DraggableCard({
     disabled,
   })
 
-  const style = transform
-    ? {
-        transform: CSS.Translate.toString(transform),
-      }
-    : undefined
+  const style = {
+    ...externalStyle,
+    ...(transform ? { transform: CSS.Translate.toString(transform) } : undefined),
+  }
 
   return (
     <div

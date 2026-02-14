@@ -80,6 +80,7 @@ export function BattlePhase({
     playerNonlandCount,
     opponentLandCount,
     opponentNonlandCount,
+    handGap: isMobile ? -10 : 6,
     fixedHeight,
     zoneColumnWidth,
   })
@@ -214,24 +215,25 @@ export function BattlePhase({
                 zone="hand"
                 zoneOwner="opponent"
                 validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
-                className="flex items-center justify-center gap-1.5 flex-nowrap w-full h-full"
+                className="flex items-center justify-center flex-nowrap w-full h-full"
+                style={{ gap: Math.max(0, sizes.handGap) }}
               >
                 {opponent_hand_revealed
-                  ? opponent_zones.hand.map((card) => (
-                      <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} selected={selectedCard?.card.id === card.id} onClick={() => handleCardClick(card, 'hand')} />
+                  ? opponent_zones.hand.map((card, i) => (
+                      <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} selected={selectedCard?.card.id === card.id} onClick={() => handleCardClick(card, 'hand')} style={sizes.handGap < 0 && i > 0 ? { marginLeft: sizes.handGap } : undefined} />
                     ))
                   : Array.from({ length: oppHandCount }).map((_, i) => (
-                      <CardBack key={i} dimensions={sizes.opponentHand} />
+                      <CardBack key={i} dimensions={sizes.opponentHand} style={sizes.handGap < 0 && i > 0 ? { marginLeft: sizes.handGap } : undefined} />
                     ))}
               </DroppableZone>
             ) : (
-              <div className="flex items-center justify-center gap-1.5 flex-nowrap h-full">
+              <div className="flex items-center justify-center flex-nowrap h-full" style={{ gap: Math.max(0, sizes.handGap) }}>
                 {opponent_hand_revealed
-                  ? opponent_zones.hand.map((card) => (
-                      <Card key={card.id} card={card} dimensions={sizes.opponentHand} upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} />
+                  ? opponent_zones.hand.map((card, i) => (
+                      <Card key={card.id} card={card} dimensions={sizes.opponentHand} upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} style={sizes.handGap < 0 && i > 0 ? { marginLeft: sizes.handGap } : undefined} />
                     ))
                   : Array.from({ length: oppHandCount }).map((_, i) => (
-                      <CardBack key={i} dimensions={sizes.opponentHand} />
+                      <CardBack key={i} dimensions={sizes.opponentHand} style={sizes.handGap < 0 && i > 0 ? { marginLeft: sizes.handGap } : undefined} />
                     ))}
               </div>
             )}
@@ -320,6 +322,7 @@ export function BattlePhase({
               upgradedCardIds={upgradedCardIds}
               upgradesByCardId={upgradesByCardId}
               cardDimensions={sizes.playerHand}
+              gap={sizes.handGap}
             />
           </div>
           <CompactZoneDisplay
