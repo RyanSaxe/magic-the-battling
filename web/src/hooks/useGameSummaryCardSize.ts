@@ -6,7 +6,6 @@ const BORDER = 1
 const CELL_PAD = 12
 const CELL_PAD_TOP = 20
 const CZ_CELL_PAD = 12
-const CZ_CELL_PAD_L = 16
 
 interface GameSummaryCardSizeConfig {
   handCount: number
@@ -114,7 +113,7 @@ function computeSize(
       const czIdealW = hasHand ? handCardW : maxCardWidth
       czCardW = Math.min(czIdealW, czCardW_fromHeight)
       if (czCardW < minCardWidth) continue
-      czCellW = czCardW + CZ_CELL_PAD_L + CZ_CELL_PAD
+      czCellW = czCardW + 2 * CELL_PAD
     }
 
     const rightColW = hasCommandZone
@@ -169,7 +168,7 @@ function computeSize(
 
       const czCardH = hasCommandZone ? Math.round(czCardW * ASPECT_RATIO) : 0
       const czColumnH = hasCommandZone
-        ? 2 * CZ_CELL_PAD + commandZoneCount * czCardH + Math.max(0, commandZoneCount - 1) * CARD_GAP
+        ? CELL_PAD_TOP + CELL_PAD + commandZoneCount * czCardH + Math.max(0, commandZoneCount - 1) * CARD_GAP
         : 0
 
       const lowerH = Math.max(czColumnH, rightColumnH)

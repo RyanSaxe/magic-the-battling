@@ -11,10 +11,6 @@ const badgeCls =
   'bg-gray-800 text-gray-400 text-[10px] uppercase tracking-widest ' +
   'px-2.5 py-0.5 rounded-full border border-gray-600/40 whitespace-nowrap'
 
-const czBadgeCls =
-  'absolute top-1/2 -left-[9px] z-10 ' +
-  'bg-gray-800 text-gray-400 text-[10px] uppercase tracking-widest ' +
-  'py-2.5 px-0.5 rounded-full border border-gray-600/40'
 
 interface ShareRoundDetailProps {
   snapshot: SharePlayerSnapshot
@@ -100,13 +96,8 @@ export function ShareRoundDetail({ snapshot, useUpgrades }: ShareRoundDetailProp
                   </div>
                 )}
                 {hasCommandZone && (
-                  <div className="bg-black/30 pl-4 pr-3 py-3 relative flex items-center justify-center">
-                    <span
-                      className={czBadgeCls}
-                      style={{ writingMode: 'vertical-rl', transform: 'translateY(-50%) rotate(180deg)' }}
-                    >
-                      Command Zone
-                    </span>
+                  <div className="bg-black/30 px-3 pt-5 pb-3 relative flex items-center justify-center">
+                    <span className={badgeCls}>CMD</span>
                     <CardGrid columns={1} cardWidth={czDims.width}>
                       {appliedUpgrades.map((upgrade) => (
                         <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={czDims} />
