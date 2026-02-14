@@ -170,7 +170,7 @@ export function computeSize(
         sbCardW = Math.min(maxCardWidth, sbWidthCap, sbCardW_height)
         if (hasHand) sbCardW = Math.min(sbCardW, handCardW)
       }
-      if (hasSideboard && sbCardW < minCardWidth) continue
+      if (hasSideboard && sbCardW <= 0) continue
 
       let bfCardW = 0
       if (hasBattlefield && bfAvailForGrid > 0) {
@@ -183,7 +183,7 @@ export function computeSize(
         if (hasHand) bfCardW = Math.min(bfCardW, handCardW)
         if (hasSideboard) bfCardW = Math.min(bfCardW, sbCardW)
       }
-      if (hasBattlefield && bfCardW < minCardWidth) continue
+      if (hasBattlefield && bfCardW <= 0) continue
 
       const bfCardH = hasBattlefield ? Math.round(bfCardW * ASPECT_RATIO) : 0
       const sbCardH = hasSideboard ? Math.round(sbCardW * ASPECT_RATIO) : 0
@@ -202,8 +202,13 @@ export function computeSize(
       const lowerH = Math.max(czColumnH, rightColumnH)
       const actualTotalH = handCellH + gapAfterHand + lowerH
 
-      if (actualTotalH > availH) {
-        const overflow = actualTotalH - availH
+      const belowMin =
+        (hasSideboard && sbCardW < minCardWidth) ||
+        (hasBattlefield && bfCardW < minCardWidth)
+
+      if (actualTotalH > availH || belowMin) {
+        const belowMinPenalty = belowMin ? availH * 2 : 0
+        const overflow = (actualTotalH - availH) + belowMinPenalty
         if (overflow < bestOverflow) {
           bestOverflow = overflow
           bestOverflowResult = {

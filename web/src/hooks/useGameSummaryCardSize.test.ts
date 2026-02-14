@@ -97,19 +97,28 @@ describe('computeSize', () => {
   })
 
   describe('overflow fallback', () => {
-    it('uses best-overflow candidate instead of 30px when perfect layout barely overflows', () => {
+    it('returns non-zero dims when all layouts overflow or have below-min cards', () => {
       const result = computeSize(300, 200, {
         handCount: 7,
         sideboardCount: 12,
         battlefieldCount: 3,
         commandZoneCount: 1,
       })
-      for (const section of ['hand', 'sideboard', 'battlefield', 'commandZone'] as const) {
-        const { width } = result[section]
-        if (width > 0) {
-          expect(width).toBeGreaterThan(MIN_CARD_WIDTH)
-        }
-      }
+      expect(result.hand.width).toBeGreaterThan(0)
+      expect(result.sideboard.width).toBeGreaterThan(0)
+    })
+
+    it('never returns all-zero dims for wide containers with tight height', () => {
+      const result = computeSize(1200, 500, {
+        handCount: 5,
+        sideboardCount: 8,
+        battlefieldCount: 4,
+        commandZoneCount: 2,
+      })
+      expect(result.hand.width).toBeGreaterThan(0)
+      expect(result.sideboard.width).toBeGreaterThan(0)
+      expect(result.battlefield.width).toBeGreaterThan(0)
+      expect(result.commandZone.width).toBeGreaterThan(0)
     })
   })
 
