@@ -203,7 +203,7 @@ export function PlayerList({ players, currentPlayerName, currentPlayer, useUpgra
       </div>
 
       {activeTab === 'you' && (
-        <div className="space-y-3">
+        <div className="space-y-2">
           <div className="relative flex items-center justify-center gap-6">
             <PlacementBadge player={currentPlayer} players={players} />
             <div className="relative">

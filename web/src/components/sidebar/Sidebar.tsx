@@ -44,7 +44,7 @@ export function Sidebar({
       {phaseContent ? (
         <div className="overflow-y-auto overflow-x-hidden flex-1">{phaseContent}</div>
       ) : (
-        <div className="p-4 overflow-auto flex-1 flex flex-col gap-4">
+        <div className="p-4 overflow-auto flex-1 flex flex-col gap-3">
           <PlayerList
               players={players}
               currentPlayerName={currentPlayer.name}
@@ -52,7 +52,7 @@ export function Sidebar({
               useUpgrades={useUpgrades}
             />
           {showCardsSection && (
-            <div className="border-t border-gray-700 pt-4">
+            <div className="border-t border-gray-700 pt-2">
               <div className="flex flex-wrap gap-2">
                 {useUpgrades && allUpgrades.length > 0 && (
                   <ZoneDisplay
