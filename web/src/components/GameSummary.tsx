@@ -55,10 +55,21 @@ export function GameSummary({
   const commandZoneCount = appliedUpgrades.length
 
   const [copied, setCopied] = useState(false)
-  const handleShare = useCallback(() => {
+  const handleShare = useCallback(async () => {
     if (!gameId) return
     const url = `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(frozenPlayer.name)}`
-    navigator.clipboard.writeText(url)
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      const ta = document.createElement('textarea')
+      ta.value = url
+      ta.style.position = 'fixed'
+      ta.style.opacity = '0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+    }
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }, [gameId, frozenPlayer.name])
