@@ -585,11 +585,21 @@ function GameContent() {
       return null;
     }
     if (currentPhase === "eliminated") {
+      const hasWatchablePlayers = gameState.players.some(
+        (p) =>
+          !p.is_bot &&
+          p.phase !== "eliminated" &&
+          p.phase !== "awaiting_elimination" &&
+          p.phase !== "winner" &&
+          p.phase !== "game_over"
+      );
       return (
         <>
-          <button onClick={handleSpectateNewTab} className="btn btn-secondary">
-            Spectate
-          </button>
+          {hasWatchablePlayers && (
+            <button onClick={handleSpectateNewTab} className="btn btn-secondary">
+              Spectate
+            </button>
+          )}
           <button onClick={() => navigate("/")} className="btn btn-primary">
             Home
           </button>
