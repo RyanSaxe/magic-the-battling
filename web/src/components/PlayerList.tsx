@@ -227,9 +227,9 @@ export function PlayerList({ players, currentPlayerName, currentPlayer, useUpgra
           {useUpgrades && allUpgrades.length > 0 && (
             <div>
               <div className="text-[10px] text-gray-400 uppercase mb-1">Upgrades</div>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 {allUpgrades.map((upgrade) => (
-                  <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={{ width: 109, height: 153 }} />
+                  <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={{ width: 70, height: 98 }} />
                 ))}
               </div>
             </div>

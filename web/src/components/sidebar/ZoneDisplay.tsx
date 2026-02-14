@@ -90,11 +90,11 @@ export function ZoneDisplay({
         ) : (
           <div className="flex flex-col items-center gap-0.5">
             <div
-              className={`grid gap-1 ${showUpgradeTargets ? "grid-cols-2" : "grid-cols-3"}`}
+              className="grid gap-1 grid-cols-3"
             >
               {displayedCards.map((card) =>
                 showUpgradeTargets ? (
-                  <UpgradeStack key={card.id} upgrade={card} size="xs" />
+                  <UpgradeStack key={card.id} upgrade={card} dimensions={{ width: 66, height: 92 }} />
                 ) : (
                   <Card
                     key={card.id}
