@@ -160,7 +160,11 @@ export function PlayerList({ players, currentPlayerName, currentPlayer, useUpgra
     : []
 
   const byPlacement = (a: PlayerView, b: PlayerView) => {
-    if (a.placement === 0 && b.placement === 0) return a.poison - b.poison
+    if (a.placement === 0 && b.placement === 0) {
+      const poisonDiff = a.poison - b.poison
+      if (poisonDiff !== 0) return poisonDiff
+      return a.name.localeCompare(b.name)
+    }
     if (a.placement === 0) return -1
     if (b.placement === 0) return 1
     return a.placement - b.placement
