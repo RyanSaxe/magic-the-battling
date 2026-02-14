@@ -131,6 +131,9 @@ data/
 # Don't upload vscode specs
 .vscode
 
+# Node modules
+node_modules/
+
 # Mac files
 .DS_Store
 
