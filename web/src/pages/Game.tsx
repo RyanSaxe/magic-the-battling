@@ -311,7 +311,7 @@ function PlayerSelectionModal({
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    {!player.is_connected && (
+                    {!player.is_connected ? (
                       <button
                         onClick={() => handleReconnect(player.name)}
                         disabled={rejoinLoading}
@@ -319,10 +319,9 @@ function PlayerSelectionModal({
                       >
                         {rejoinLoading && rejoinName === player.name
                           ? "..."
-                          : "Reconnect"}
+                          : "Connect"}
                       </button>
-                    )}
-                    {watchablePlayers.some((p) => p.name === player.name) && (
+                    ) : watchablePlayers.some((p) => p.name === player.name) ? (
                       <button
                         onClick={() =>
                           status.auto_approve_spectators
@@ -333,7 +332,7 @@ function PlayerSelectionModal({
                       >
                         Watch
                       </button>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ))}
