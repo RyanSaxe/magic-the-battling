@@ -99,7 +99,9 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
     )
 
 
-def _build_og_html(index_html: str, game_id: str, player_name: str, share_data: ShareGameResponse) -> str:
+def _build_og_html(
+    index_html: str, game_id: str, player_name: str, share_data: ShareGameResponse, base_url: str
+) -> str:
     owner = next((p for p in share_data.players if p.name == share_data.owner_name), None)
     placement = ""
     if owner and owner.final_placement:
@@ -108,7 +110,7 @@ def _build_og_html(index_html: str, game_id: str, player_name: str, share_data: 
 
     title = f"{placement}{player_name}'s Game | Magic: The Battling"
     description = f"Check out {player_name}'s game with {len(share_data.players)} players"
-    image_url = f"/game/{game_id}/share/{player_name}/preview.png"
+    image_url = f"{base_url}/game/{game_id}/share/{player_name}/preview.png"
 
     og_tags = f"""
     <meta property="og:title" content="{title}" />
@@ -154,7 +156,8 @@ async def share_page_with_og(
     if if_none_match and if_none_match.strip('"') == etag:
         return Response(status_code=304)
 
-    html = _build_og_html(index_html, game_id, player_name, share_data)
+    base_url = str(request.base_url).rstrip("/")
+    html = _build_og_html(index_html, game_id, player_name, share_data, base_url)
     return HTMLResponse(
         content=html,
         headers={

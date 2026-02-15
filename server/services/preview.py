@@ -4,6 +4,7 @@ import logging
 from collections import OrderedDict
 
 from playwright.async_api import Browser, async_playwright
+from playwright.async_api import Error as PlaywrightError
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,40 @@ class PreviewService:
             await self._playwright.stop()
         logger.info("Preview browser stopped")
 
+    async def _restart_browser(self) -> None:
+        logger.warning("Restarting preview browser after crash")
+        try:
+            if self._browser:
+                await self._browser.close()
+        except Exception:
+            pass
+        try:
+            if self._playwright:
+                await self._playwright.stop()
+        except Exception:
+            pass
+        self._playwright = await async_playwright().start()
+        self._browser = await self._playwright.chromium.launch(
+            args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--single-process"],
+        )
+        logger.info("Preview browser restarted")
+
+    async def _take_screenshot(self, embed_url: str) -> bytes:
+        if not self._browser:
+            raise RuntimeError("Preview browser not started")
+
+        context = await self._browser.new_context(
+            viewport={"width": SCREENSHOT_WIDTH, "height": SCREENSHOT_HEIGHT},
+            device_scale_factor=DEVICE_SCALE_FACTOR,
+        )
+        try:
+            page = await context.new_page()
+            await page.goto(embed_url, wait_until="networkidle", timeout=SCREENSHOT_TIMEOUT_MS)
+            await page.wait_for_selector("[data-embed-ready]", timeout=SCREENSHOT_TIMEOUT_MS)
+            return await page.screenshot(type="png")
+        finally:
+            await context.close()
+
     async def screenshot(self, embed_url: str, cache_key: str) -> bytes:
         cached = self.cache.get(cache_key)
         if cached:
@@ -80,20 +115,13 @@ class PreviewService:
             if cached:
                 return cached
 
-            if not self._browser:
-                raise RuntimeError("Preview browser not started")
-
-            context = await self._browser.new_context(
-                viewport={"width": SCREENSHOT_WIDTH, "height": SCREENSHOT_HEIGHT},
-                device_scale_factor=DEVICE_SCALE_FACTOR,
-            )
             try:
-                page = await context.new_page()
-                await page.goto(embed_url, wait_until="networkidle", timeout=SCREENSHOT_TIMEOUT_MS)
-                await page.wait_for_selector("[data-embed-ready]", timeout=SCREENSHOT_TIMEOUT_MS)
-                png = await page.screenshot(type="png")
-            finally:
-                await context.close()
+                png = await self._take_screenshot(embed_url)
+            except PlaywrightError as exc:
+                if "Target page, context or browser has been closed" not in str(exc):
+                    raise
+                await self._restart_browser()
+                png = await self._take_screenshot(embed_url)
 
             self.cache.put(cache_key, png)
             return png
