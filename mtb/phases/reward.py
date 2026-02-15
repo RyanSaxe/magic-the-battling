@@ -65,6 +65,36 @@ def apply_upgrade_to_card(player: Player, upgrade: Card, target: Card) -> None:
     upgrade.upgrade_target = target
 
 
+def _award_rewards(
+    game: Game,
+    player: Player,
+    opponent_name: str,
+    winner_name: str | None,
+    is_draw: bool,
+    poison_dealt: int,
+    poison_taken: int,
+) -> None:
+    player.treasures += 1
+    vanquisher_gained = is_stage_increasing(player)
+    card_gained = None
+    if vanquisher_gained:
+        player.vanquishers += 1
+    else:
+        card_gained = award_random_card(game, player)
+
+    player.last_battle_result = LastBattleResult(
+        opponent_name=opponent_name,
+        winner_name=winner_name,
+        is_draw=is_draw,
+        poison_dealt=poison_dealt,
+        poison_taken=poison_taken,
+        treasures_gained=1,
+        card_gained=card_gained,
+        vanquisher_gained=vanquisher_gained,
+        pre_battle_treasures=player.pre_battle_treasures,
+    )
+
+
 def start(game: Game, winner: Player | None, loser: Player | None, is_draw: bool = False) -> None:
     if is_draw:
         if winner is None or loser is None:
@@ -87,24 +117,14 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
         poison_taken = calculate_damage(opponent)
         poison_dealt = calculate_damage(player)
         player.poison += poison_taken
-        player.treasures += 1
-        vanquisher_gained = is_stage_increasing(player)
-        card_gained = None
-        if vanquisher_gained:
-            player.vanquishers += 1
-        else:
-            card_gained = award_random_card(game, player)
-
-        player.last_battle_result = LastBattleResult(
-            opponent_name=opponent.name,
+        _award_rewards(
+            game,
+            player,
+            opponent.name,
             winner_name=None,
             is_draw=True,
             poison_dealt=poison_dealt,
             poison_taken=poison_taken,
-            treasures_gained=1,
-            card_gained=card_gained,
-            vanquisher_gained=vanquisher_gained,
-            pre_battle_treasures=player.pre_battle_treasures,
         )
 
 
@@ -172,25 +192,14 @@ def start_rewards_only(game: Game, winner: Player, loser: Player, poison_dealt: 
     for player in (winner, loser):
         is_winner = player.name == winner.name
         opponent = loser if is_winner else winner
-
-        player.treasures += 1
-        vanquisher_gained = is_stage_increasing(player)
-        card_gained = None
-        if vanquisher_gained:
-            player.vanquishers += 1
-        else:
-            card_gained = award_random_card(game, player)
-
-        player.last_battle_result = LastBattleResult(
-            opponent_name=opponent.name,
+        _award_rewards(
+            game,
+            player,
+            opponent.name,
             winner_name=winner.name,
             is_draw=False,
             poison_dealt=poison_dealt if is_winner else 0,
             poison_taken=0 if is_winner else poison_dealt,
-            treasures_gained=1,
-            card_gained=card_gained,
-            vanquisher_gained=vanquisher_gained,
-            pre_battle_treasures=player.pre_battle_treasures,
         )
 
 
@@ -207,25 +216,14 @@ def start_rewards_draw(game: Game, player1: Player, player2: Player, p1_poison: 
         opponent = other[player.name]
         poison_taken = poison_taken_lookup[player.name]
         poison_dealt = poison_taken_lookup[opponent.name]
-
-        player.treasures += 1
-        vanquisher_gained = is_stage_increasing(player)
-        card_gained = None
-        if vanquisher_gained:
-            player.vanquishers += 1
-        else:
-            card_gained = award_random_card(game, player)
-
-        player.last_battle_result = LastBattleResult(
-            opponent_name=opponent.name,
+        _award_rewards(
+            game,
+            player,
+            opponent.name,
             winner_name=None,
             is_draw=True,
             poison_dealt=poison_dealt,
             poison_taken=poison_taken,
-            treasures_gained=1,
-            card_gained=card_gained,
-            vanquisher_gained=vanquisher_gained,
-            pre_battle_treasures=player.pre_battle_treasures,
         )
 
 
@@ -242,29 +240,19 @@ def start_rewards_single(
     if player.phase != "reward":
         raise ValueError(f"{player.name} is not in reward phase")
 
-    player.treasures += 1
-    vanquisher_gained = is_stage_increasing(player)
-    card_gained = None
-    if vanquisher_gained:
-        player.vanquishers += 1
-    else:
-        card_gained = award_random_card(game, player)
-
     if is_draw:
         winner_name = None
     else:
         winner_name = player.name if won else opponent_name
 
-    player.last_battle_result = LastBattleResult(
-        opponent_name=opponent_name,
+    _award_rewards(
+        game,
+        player,
+        opponent_name,
         winner_name=winner_name,
         is_draw=is_draw,
         poison_dealt=poison_dealt,
         poison_taken=poison_taken,
-        treasures_gained=1,
-        card_gained=card_gained,
-        vanquisher_gained=vanquisher_gained,
-        pre_battle_treasures=player.pre_battle_treasures,
     )
 
 
@@ -289,24 +277,14 @@ def start_vs_static_rewards_only(
     else:
         winner_name = opponent.name
 
-    player.treasures += 1
-    vanquisher_gained = is_stage_increasing(player)
-    card_gained = None
-    if vanquisher_gained:
-        player.vanquishers += 1
-    else:
-        card_gained = award_random_card(game, player)
-
-    player.last_battle_result = LastBattleResult(
-        opponent_name=opponent.name,
+    _award_rewards(
+        game,
+        player,
+        opponent.name,
         winner_name=winner_name,
         is_draw=is_draw,
         poison_dealt=poison_dealt,
         poison_taken=poison_taken,
-        treasures_gained=1,
-        card_gained=card_gained,
-        vanquisher_gained=vanquisher_gained,
-        pre_battle_treasures=player.pre_battle_treasures,
     )
 
     for fake in game.fake_players:
@@ -369,24 +347,14 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
         if is_draw:
             apply_bot_poison(game, opponent, calculate_damage(player))
 
-    player.treasures += 1
-    vanquisher_gained = is_stage_increasing(player)
-    card_gained = None
-    if vanquisher_gained:
-        player.vanquishers += 1
-    else:
-        card_gained = award_random_card(game, player)
-
-    player.last_battle_result = LastBattleResult(
-        opponent_name=opponent.name,
+    _award_rewards(
+        game,
+        player,
+        opponent.name,
         winner_name=winner_name,
         is_draw=is_draw,
         poison_dealt=poison_dealt,
         poison_taken=poison_taken,
-        treasures_gained=1,
-        card_gained=card_gained,
-        vanquisher_gained=vanquisher_gained,
-        pre_battle_treasures=player.pre_battle_treasures,
     )
 
     for fake in game.fake_players:
@@ -412,25 +380,14 @@ def _start_with_result(game: Game, winner: Player, loser: Player) -> None:
     for player in (winner, loser):
         is_winner = player.name == winner.name
         opponent = loser if is_winner else winner
-
-        player.treasures += 1
-        vanquisher_gained = is_stage_increasing(player)
-        card_gained = None
-        if vanquisher_gained:
-            player.vanquishers += 1
-        else:
-            card_gained = award_random_card(game, player)
-
-        player.last_battle_result = LastBattleResult(
-            opponent_name=opponent.name,
+        _award_rewards(
+            game,
+            player,
+            opponent.name,
             winner_name=winner.name,
             is_draw=False,
             poison_dealt=poison_dealt if is_winner else 0,
             poison_taken=0 if is_winner else poison_dealt,
-            treasures_gained=1,
-            card_gained=card_gained,
-            vanquisher_gained=vanquisher_gained,
-            pre_battle_treasures=player.pre_battle_treasures,
         )
 
 
