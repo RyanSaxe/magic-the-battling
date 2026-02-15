@@ -77,16 +77,24 @@ export function Home() {
         <p className="text-gray-400 text-center text-sm mb-2">
           An MtG format inspired by the autobattler genre
         </p>
-        <p className="space-y-3 pt-2 pb-2 border-b border-gray-700">
+        <div className="flex flex-wrap gap-2 justify-center pt-2 pb-2 border-b border-gray-700">
           <a
             href="https://cubecobra.com/cube/list/auto"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-amber-400 hover:text-amber-300"
+            className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 transition-colors"
           >
-            View the default card pool on CubeCobra →
+            View card pool on CubeCobra →
           </a>
-        </p>
+          <a
+            href="https://discord.gg/MKMacp9JUf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded bg-[#5865F2]/20 text-[#7289da] hover:bg-[#5865F2]/30 transition-colors"
+          >
+            Join the Discord →
+          </a>
+        </div>
         {error && (
           <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
             {error}

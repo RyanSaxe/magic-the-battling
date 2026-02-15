@@ -2,6 +2,10 @@
 
 An online application for playing [Magic: The Battling](https://cubecobra.com/cube/overview/auto), a Magic: The Gathering format that combines drafting with elimination-style battles.
 
+## Community
+
+Join the [Discord](https://discord.gg/MKMacp9JUf) to find games, give feedback, and chat about the format.
+
 ## Tech Stack
 
 - **Backend**: Python, FastAPI, SQLite
