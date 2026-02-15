@@ -50,7 +50,7 @@ class TestGhostMechanics:
         setup_battle_ready(bob)
         setup_battle_ready(charlie)
 
-        candidates = battle.get_pairing_candidates(game, bob)
+        candidates = battle.get_all_pairing_candidates(game, bob)
 
         assert alice not in candidates
         assert charlie in candidates
