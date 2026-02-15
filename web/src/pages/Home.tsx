@@ -75,7 +75,7 @@ export function Home() {
           Magic: The Battling
         </h1>
         <p className="text-gray-400 text-center text-sm mb-2">
-          An MtG format inspired by the autobattler genre
+          An MtG format inspired by autobattlers
         </p>
         <div className="flex flex-wrap gap-2 justify-center pt-2 pb-2 border-b border-gray-700">
           <a
@@ -151,7 +151,7 @@ export function Home() {
                     ))}
                   </div>
                   <p className="text-gray-500 text-sm mt-1">
-                    Bots will fill empty slots to reach this player count.
+                    Bots will fill empty slots.
                   </p>
                 </div>
 
@@ -165,7 +165,7 @@ export function Home() {
                   <div>
                     <div className="text-white">Use Upgrades</div>
                     <div className="text-gray-500 text-sm">
-                      Gain upgrades every 3 rounds to improve your cards!
+                      Upgrade a card every 3 rounds!
                     </div>
                   </div>
                 </label>
@@ -178,9 +178,9 @@ export function Home() {
                     className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
                   />
                   <div>
-                    <div className="text-white">Allow all spectators</div>
+                    <div className="text-white">Auto-Approve Spectators</div>
                     <div className="text-gray-500 text-sm">
-                      Don't require player permission for spectators to join
+                      Let anyone spectate your game
                     </div>
                   </div>
                 </label>
@@ -193,10 +193,8 @@ export function Home() {
                     className="w-5 h-5 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
                   />
                   <div>
-                    <div className="text-white">Use Vanguards</div>
-                    <div className="text-gray-500 text-sm">
-                      Choose a vanguard at game start (coming soon)
-                    </div>
+                    <div className="text-white">Play with Vanguards</div>
+                    <div className="text-gray-500 text-sm">(coming soon)</div>
                   </div>
                 </label>
               </div>
