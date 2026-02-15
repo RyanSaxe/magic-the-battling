@@ -11,11 +11,3 @@ export function getPlacementBadgeColor(position: number, total: number): { bg: s
   if (position === total) return { bg: '#ef4444', text: '#ffffff' }
   return { bg: '#6b7280', text: '#ffffff' }
 }
-
-export function collapseDuplicateBasics(lands: string[]): { name: string; count: number }[] {
-  const counts = new Map<string, number>()
-  for (const land of lands) {
-    counts.set(land, (counts.get(land) ?? 0) + 1)
-  }
-  return Array.from(counts, ([name, count]) => ({ name, count }))
-}

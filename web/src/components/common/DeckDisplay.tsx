@@ -15,7 +15,7 @@ const badgeCls =
 interface DeckDisplayProps {
   hand: CardType[]
   sideboard: CardType[]
-  collapsedBasics: { name: string; count: number }[]
+  basics: string[]
   treasures: number
   poison: number
   appliedUpgrades: CardType[]
@@ -25,13 +25,13 @@ interface DeckDisplayProps {
 export function DeckDisplay({
   hand,
   sideboard,
-  collapsedBasics,
+  basics,
   treasures,
   poison,
   appliedUpgrades,
   companionIds,
 }: DeckDisplayProps) {
-  const battlefieldCount = collapsedBasics.length + 2
+  const battlefieldCount = basics.length + 2
   const commandZoneCount = appliedUpgrades.length
 
   const hasHand = hand.length > 0
@@ -75,8 +75,8 @@ export function DeckDisplay({
                   <div className="bg-black/30 px-3 pt-5 pb-3 relative">
                     <span className={badgeCls}>Battlefield</span>
                     <CardGrid columns={dims.battlefield.columns} cardWidth={bfDims.width}>
-                      {collapsedBasics.map((land) => (
-                        <BasicLandCard key={land.name} name={land.name} count={land.count} dimensions={bfDims} />
+                      {basics.map((name, i) => (
+                        <BasicLandCard key={`${name}-${i}`} name={name} dimensions={bfDims} />
                       ))}
                       <TreasureCard count={treasures} dimensions={bfDims} />
                       <PoisonCard count={poison} dimensions={bfDims} />

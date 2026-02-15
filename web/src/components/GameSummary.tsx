@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import type { SelfPlayerView, PlayerView } from '../types'
 import { DeckDisplay } from './common'
-import { getOrdinal, collapseDuplicateBasics } from '../utils/format'
+import { getOrdinal } from '../utils/format'
 
 interface GameSummaryProps {
   player: SelfPlayerView
@@ -38,8 +38,6 @@ export function GameSummary({
 
   const appliedUpgrades = useUpgrades ? frozenPlayer.upgrades.filter((u) => u.upgrade_target !== null) : []
   const companionIds = new Set(frozenPlayer.command_zone.map((c) => c.id))
-  const collapsedBasics = collapseDuplicateBasics(frozenPlayer.chosen_basics)
-
   const [copied, setCopied] = useState(false)
   const handleShare = useCallback(async () => {
     if (!gameId) return
@@ -86,7 +84,7 @@ export function GameSummary({
         <DeckDisplay
           hand={frozenPlayer.hand}
           sideboard={frozenPlayer.sideboard}
-          collapsedBasics={collapsedBasics}
+          basics={frozenPlayer.chosen_basics}
           treasures={frozenPlayer.preBattleTreasures}
           poison={frozenPlayer.poison}
           appliedUpgrades={appliedUpgrades}
