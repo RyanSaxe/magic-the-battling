@@ -53,7 +53,7 @@ def _tag_cards_with_owner(cards: list[Card], owner_name: str) -> list[Card]:
     return cards
 
 
-def _create_zones_for_player(player: Player) -> Zones:
+def _create_zones(player: Player | StaticOpponent) -> Zones:
     basics = [_create_basic_land(name) for name in player.chosen_basics]
     treasures = [_create_treasure_token() for _ in range(player.treasures)]
     command_zone_ids = {c.id for c in player.command_zone}
@@ -311,31 +311,6 @@ def get_pairing_probabilities(game: Game, player: Player) -> dict[str, float]:
     return {candidate.name: weight for candidate, weight in zip(viable, weights, strict=True)}
 
 
-def _create_zones_for_static_opponent(opponent: StaticOpponent) -> Zones:
-    basics = [_create_basic_land(name) for name in opponent.chosen_basics]
-    treasures = [_create_treasure_token() for _ in range(opponent.treasures)]
-    command_zone_ids = {c.id for c in opponent.command_zone}
-    sideboard_display = [c for c in opponent.sideboard if c.id not in command_zone_ids]
-    submitted = opponent.hand + opponent.sideboard
-    revealed_card_ids = [c.id for c in opponent.command_zone]
-
-    _tag_cards_with_owner(opponent.hand, opponent.name)
-    _tag_cards_with_owner(opponent.sideboard, opponent.name)
-    _tag_cards_with_owner(opponent.command_zone, opponent.name)
-
-    return Zones(
-        battlefield=basics + treasures,
-        hand=opponent.hand.copy(),
-        sideboard=sideboard_display,
-        command_zone=opponent.command_zone.copy(),
-        upgrades=opponent.upgrades.copy(),
-        treasures=opponent.treasures,
-        submitted_cards=submitted,
-        original_hand_ids=[c.id for c in opponent.hand],
-        revealed_card_ids=revealed_card_ids,
-    )
-
-
 def _is_static_opponent(opponent: Player | StaticOpponent) -> TypeGuard[StaticOpponent]:
     return isinstance(opponent, StaticOpponent)
 
@@ -389,8 +364,8 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
         coin_flip_name=coin_flip_name,
         on_the_play_name=on_the_play_name,
         current_turn_name=current_turn_name,
-        player_zones=_create_zones_for_player(player),
-        opponent_zones=_create_zones_for_static_opponent(opponent),
+        player_zones=_create_zones(player),
+        opponent_zones=_create_zones(opponent),
         player_life=game.config.starting_life,
         opponent_life=game.config.starting_life,
         is_sudden_death=is_sudden_death,
@@ -440,8 +415,8 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
         coin_flip_name=coin_flip_name,
         on_the_play_name=on_the_play_name,
         current_turn_name=current_turn_name,
-        player_zones=_create_zones_for_player(player),
-        opponent_zones=_create_zones_for_player(opponent),
+        player_zones=_create_zones(player),
+        opponent_zones=_create_zones(opponent),
         player_life=game.config.starting_life,
         opponent_life=game.config.starting_life,
         is_sudden_death=is_sudden_death,
