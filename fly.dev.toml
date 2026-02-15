@@ -1,0 +1,23 @@
+app = "magic-the-battling-dev"
+primary_region = "ewr"
+
+[build]
+
+[env]
+  DATABASE_PATH = "/data/mtb.db"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[mounts]
+  source = "mtb_dev_data"
+  destination = "/data"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
