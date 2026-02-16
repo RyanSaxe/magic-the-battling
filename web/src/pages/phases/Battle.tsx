@@ -62,9 +62,12 @@ export function BattlePhase({
   const playerBf = yourZones?.battlefield ?? []
   const opponentBf = oppZones?.battlefield ?? []
 
-  const playerLandCount = countTopLevel(playerBf, playerAttachments, isLandOrTreasure)
+  const yourPoison = battle?.your_poison ?? 0
+  const opponentPoison = battle?.opponent_poison ?? 0
+
+  const playerLandCount = countTopLevel(playerBf, playerAttachments, isLandOrTreasure) + (yourPoison > 0 ? 1 : 0)
   const playerNonlandCount = countTopLevel(playerBf, playerAttachments, (c) => !isLandOrTreasure(c))
-  const opponentLandCount = countTopLevel(opponentBf, opponentAttachments, isLandOrTreasure)
+  const opponentLandCount = countTopLevel(opponentBf, opponentAttachments, isLandOrTreasure) + (opponentPoison > 0 ? 1 : 0)
   const opponentNonlandCount = countTopLevel(opponentBf, opponentAttachments, (c) => !isLandOrTreasure(c))
 
   const HAND_PADDING = 16
@@ -275,6 +278,7 @@ export function BattlePhase({
               canManipulateOpponent={canManipulateOpponent}
               upgradedCardIds={opponentUpgradedCardIds}
               upgradesByCardId={opponentUpgradesByCardId}
+              poisonCount={opponentPoison}
               cardDimensions={sizes.opponentNonlands}
               rowHeight={rowHeight}
               landCardDimensions={sizes.opponentLands}
@@ -306,6 +310,7 @@ export function BattlePhase({
               separateLands
               upgradedCardIds={upgradedCardIds}
               upgradesByCardId={upgradesByCardId}
+              poisonCount={yourPoison}
               cardDimensions={sizes.playerNonlands}
               rowHeight={rowHeight}
               landCardDimensions={sizes.playerLands}
