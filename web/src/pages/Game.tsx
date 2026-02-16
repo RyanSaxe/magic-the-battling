@@ -608,7 +608,7 @@ function GameContent() {
         return (
           <>
             {self_player.upgrades.length > 0 && (
-              <button onClick={() => setShowUpgradesModal(true)} className="btn btn-secondary">
+              <button onClick={() => setShowUpgradesModal(true)} className="btn bg-purple-600 hover:bg-purple-500 text-white">
                 View Upgrades
               </button>
             )}
@@ -644,7 +644,10 @@ function GameContent() {
         return (
           <>
             {self_player.upgrades.length > 0 && (
-              <button onClick={() => setShowUpgradesModal(true)} className="btn btn-secondary">
+              <button
+                onClick={() => setShowUpgradesModal(true)}
+                className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              >
                 {self_player.upgrades.some((u) => !u.upgrade_target) ? 'Use Upgrade' : 'View Upgrades'}
               </button>
             )}
