@@ -69,7 +69,7 @@ export function ZoneLayout({
               </div>
             )}
             {hasUpgrades && (
-              <div className="bg-black/30 px-3 pt-5 pb-3 relative flex items-center justify-center" style={{ minWidth: '5.5rem' }}>
+              <div className="bg-black/30 px-3 pt-5 pb-3 relative flex items-center justify-center" style={{ minWidth: '7rem' }}>
                 <span className={badgeCls}>{upgradesLabel}</span>
                 <div className="overflow-hidden">
                   {upgradesContent}

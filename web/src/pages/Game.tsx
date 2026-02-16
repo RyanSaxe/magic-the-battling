@@ -26,6 +26,7 @@ import type { Phase } from "../constants/rules";
 import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { UpgradesModal } from "../components/common/UpgradesModal";
+import { SubmitPopover } from "../components/common/SubmitPopover";
 import type { Card as CardType } from "../types";
 
 function CardPreviewModal({
@@ -457,6 +458,8 @@ function GameContent() {
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [showSidebarSideboard, setShowSidebarSideboard] = useState(false);
   const [showOpponentSideboard, setShowOpponentSideboard] = useState(false);
+  const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
+  const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
 
   const prevPhaseRef = useRef(gameState?.self_player.phase);
   if (gameState?.self_player.phase !== prevPhaseRef.current) {
@@ -574,6 +577,10 @@ function GameContent() {
     if (isSpectator) {
       return null;
     }
+
+    let left: ReactNode = null;
+    let right: ReactNode = null;
+
     if (currentPhase === "eliminated") {
       const hasWatchablePlayers = gameState.players.some(
         (p) =>
@@ -583,8 +590,8 @@ function GameContent() {
           p.phase !== "winner" &&
           p.phase !== "game_over"
       );
-      return (
-        <>
+      right = (
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {hasWatchablePlayers && (
             <button onClick={handleSpectateNewTab} className="btn btn-secondary">
               Spectate
@@ -593,170 +600,215 @@ function GameContent() {
           <button onClick={() => navigate("/")} className="btn btn-primary">
             Home
           </button>
-        </>
+        </div>
       );
-    }
-    if (currentPhase === "winner" || currentPhase === "game_over") {
-      return (
+    } else if (currentPhase === "winner" || currentPhase === "game_over") {
+      right = (
         <button onClick={() => navigate("/")} className="btn btn-primary">
           Home
         </button>
       );
-    }
-    switch (currentPhase) {
-      case "draft":
-        return (
-          <>
-            {self_player.upgrades.length > 0 && (
-              <button onClick={() => setShowUpgradesModal(true)} className="btn bg-purple-600 hover:bg-purple-500 text-white">
-                View Upgrades
-              </button>
-            )}
+    } else if (currentPhase === "draft") {
+      left = (
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {self_player.upgrades.length > 0 && (
+            <button onClick={() => setShowUpgradesModal(true)} className="btn bg-purple-600 hover:bg-purple-500 text-white">
+              View Upgrades
+            </button>
+          )}
+          <button
+            onClick={actions.draftRoll}
+            disabled={
+              self_player.treasures <= 0 ||
+              (self_player.current_pack?.length ?? 0) === 0
+            }
+            className="btn bg-purple-600 hover:bg-purple-500 text-white"
+          >
+            Roll for 1💰
+          </button>
+        </div>
+      );
+      right = (
+        <button onClick={actions.draftDone} className="btn btn-primary">
+          Go to Build
+        </button>
+      );
+    } else if (currentPhase === "build") {
+      if (self_player.build_ready) {
+        left = self_player.upgrades.length > 0 ? (
+          <button onClick={() => setShowUpgradesModal(true)} className="btn bg-purple-600 hover:bg-purple-500 text-white">
+            View Upgrades
+          </button>
+        ) : null;
+        right = (
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-amber-400 text-sm">Waiting...</span>
             <button
-              onClick={actions.draftRoll}
-              disabled={
-                self_player.treasures <= 0 ||
-                (self_player.current_pack?.length ?? 0) === 0
-              }
-              className="btn btn-secondary"
+              onClick={actions.buildUnready}
+              className="btn bg-gray-600 hover:bg-gray-500 text-white"
             >
-              Roll for 1💰
+              Change
             </button>
-            <button onClick={actions.draftDone} className="btn btn-primary">
-              Go to Build
-            </button>
-          </>
+          </div>
         );
-      case "build":
-        if (self_player.build_ready) {
-          return (
-            <>
-              <span className="text-amber-400 text-sm">Waiting...</span>
-              <button
-                onClick={actions.buildUnready}
-                className="btn bg-gray-600 hover:bg-gray-500 text-white"
-              >
-                Undo
-              </button>
-            </>
-          );
-        }
-        return (
-          <>
-            {self_player.upgrades.length > 0 && (
-              <button
-                onClick={() => setShowUpgradesModal(true)}
-                className="btn bg-purple-600 hover:bg-purple-500 text-white"
-              >
-                {self_player.upgrades.some((u) => !u.upgrade_target) ? 'Use Upgrade' : 'View Upgrades'}
-              </button>
-            )}
-            <span className={`text-sm ${basicsComplete ? "text-green-400" : "text-amber-400 animate-pulse"}`}>
-              {selectedBasics.length}/3 basics
-            </span>
-            <span className={`text-sm ${handFull ? "text-green-400" : "text-amber-400 animate-pulse"}`}>
-              {self_player.hand.length}/{maxHandSize} hand
-            </span>
+      } else {
+        left = self_player.upgrades.length > 0 ? (
+          <button
+            onClick={() => setShowUpgradesModal(true)}
+            className="btn bg-purple-600 hover:bg-purple-500 text-white"
+          >
+            {self_player.upgrades.some((u) => !u.upgrade_target) ? 'Use Upgrade' : 'View Upgrades'}
+          </button>
+        ) : null;
+        right = (
+          <div className="relative flex items-center gap-1.5 sm:gap-2">
             <button
-              onClick={() => actions.buildReady(selectedBasics, 'play')}
+              onClick={() => setShowSubmitHandPopover((v) => !v)}
               disabled={!canReady}
               className="btn btn-primary"
             >
-              Play
+              Submit Hand
             </button>
-            <button
-              onClick={() => actions.buildReady(selectedBasics, 'draw')}
-              disabled={!canReady}
-              className="btn btn-primary"
-            >
-              Draw
-            </button>
-          </>
+            {showSubmitHandPopover && canReady && (
+              <SubmitPopover
+                options={[
+                  {
+                    label: "Play",
+                    onClick: () => {
+                      actions.buildReady(selectedBasics, 'play');
+                      setShowSubmitHandPopover(false);
+                    },
+                    className: "btn btn-primary text-sm py-1.5",
+                  },
+                  {
+                    label: "Draw",
+                    onClick: () => {
+                      actions.buildReady(selectedBasics, 'draw');
+                      setShowSubmitHandPopover(false);
+                    },
+                    className: "btn btn-secondary text-sm py-1.5",
+                  },
+                ]}
+                onClose={() => setShowSubmitHandPopover(false)}
+              />
+            )}
+          </div>
         );
-      case "battle": {
-        if (!current_battle) return null;
-        const { opponent_name, result_submissions } = current_battle;
-        const mySubmission = result_submissions[self_player.name];
-        const opponentSubmission = result_submissions[opponent_name];
+      }
+    } else if (currentPhase === "battle") {
+      if (!current_battle) return null;
+      const { opponent_name, result_submissions } = current_battle;
+      const mySubmission = result_submissions[self_player.name];
+      const opponentSubmission = result_submissions[opponent_name];
 
-        if (mySubmission && !isChangingResult) {
-          const resultsConflict =
-            opponentSubmission && mySubmission !== opponentSubmission;
-          return (
-            <>
-              <span
-                className={`text-sm ${resultsConflict ? "text-red-400" : "text-amber-400"}`}
-              >
-                {resultsConflict ? "Results conflict!" : "Waiting..."}
-              </span>
-              <button
-                onClick={() => setIsChangingResult(true)}
-                className="btn btn-secondary"
-              >
-                Change
-              </button>
-            </>
-          );
-        }
-        return (
-          <>
+      left = (
+        <button
+          onClick={() => setActionMenuOpen(true)}
+          className="btn bg-purple-600 hover:bg-purple-500 text-white"
+        >
+          Actions
+        </button>
+      );
+
+      if (mySubmission && !isChangingResult) {
+        const resultsConflict =
+          opponentSubmission && mySubmission !== opponentSubmission;
+        right = (
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span
+              className={`text-sm ${resultsConflict ? "text-red-400" : "text-amber-400"}`}
+            >
+              {resultsConflict ? "Results conflict!" : "Waiting..."}
+            </span>
+            <button
+              onClick={() => setIsChangingResult(true)}
+              className="btn bg-gray-600 hover:bg-gray-500 text-white"
+            >
+              Change
+            </button>
+          </div>
+        );
+      } else {
+        right = (
+          <div className="relative flex items-center gap-1.5 sm:gap-2">
             {isChangingResult && (
               <button
-                onClick={() => setIsChangingResult(false)}
+                onClick={() => { setIsChangingResult(false); setShowSubmitResultPopover(false); }}
                 className="text-gray-400 text-sm hover:text-white"
               >
                 Cancel
               </button>
             )}
             <button
-              onClick={() => {
-                actions.battleSubmitResult(self_player.name);
-                setIsChangingResult(false);
-              }}
+              onClick={() => setShowSubmitResultPopover((v) => !v)}
               className="btn btn-primary"
             >
-              I Won
+              Submit Result
             </button>
-            <button
-              onClick={() => {
-                actions.battleSubmitResult("draw");
-                setIsChangingResult(false);
-              }}
-              className="btn btn-secondary"
-            >
-              Draw
-            </button>
-            <button
-              onClick={() => {
-                actions.battleSubmitResult(opponent_name);
-                setIsChangingResult(false);
-              }}
-              className="btn btn-danger"
-            >
-              I Lost
-            </button>
-          </>
+            {showSubmitResultPopover && (
+              <SubmitPopover
+                options={[
+                  {
+                    label: "I Won",
+                    onClick: () => {
+                      actions.battleSubmitResult(self_player.name);
+                      setIsChangingResult(false);
+                      setShowSubmitResultPopover(false);
+                    },
+                    className: "btn btn-primary text-sm py-1.5",
+                  },
+                  {
+                    label: "Draw",
+                    onClick: () => {
+                      actions.battleSubmitResult("draw");
+                      setIsChangingResult(false);
+                      setShowSubmitResultPopover(false);
+                    },
+                    className: "btn btn-secondary text-sm py-1.5",
+                  },
+                  {
+                    label: "I Lost",
+                    onClick: () => {
+                      actions.battleSubmitResult(opponent_name);
+                      setIsChangingResult(false);
+                      setShowSubmitResultPopover(false);
+                    },
+                    className: "btn btn-danger text-sm py-1.5",
+                  },
+                ]}
+                onClose={() => setShowSubmitResultPopover(false)}
+              />
+            )}
+          </div>
         );
       }
-      case "reward": {
-        const buttonLabel = needsUpgrade
-          ? selectedUpgradeId
-            ? "Claim & Continue"
-            : "Select Upgrade"
-          : "Continue";
-        return (
-          <button
-            onClick={handleContinue}
-            disabled={!canContinue}
-            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {buttonLabel}
-          </button>
-        );
-      }
-      default:
-        return null;
+    } else if (currentPhase === "reward") {
+      const buttonLabel = needsUpgrade
+        ? selectedUpgradeId
+          ? "Claim & Continue"
+          : "Select Upgrade"
+        : "Continue";
+      right = (
+        <button
+          onClick={handleContinue}
+          disabled={!canContinue}
+          className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {buttonLabel}
+        </button>
+      );
+    } else {
+      return null;
     }
+
+    if (!left && !right) return null;
+
+    return (
+      <>
+        <div className="flex items-center gap-1.5 sm:gap-2">{left}</div>
+        <div className="flex items-center gap-1.5 sm:gap-2">{right}</div>
+      </>
+    );
   };
 
   const handleCreateTreasure = () => {
@@ -1065,7 +1117,7 @@ function GameContent() {
         {/* Bottom Action Bar */}
         {!isSpectator && renderActionButtons() && (
           <div className={`shrink-0 bg-black/60 backdrop-blur-sm border-t border-gray-700/50 ${!sizes.isMobile ? 'pr-64' : ''}`}>
-            <div className="flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-4 timeline-actions">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-4 timeline-actions">
               {renderActionButtons()}
             </div>
           </div>
