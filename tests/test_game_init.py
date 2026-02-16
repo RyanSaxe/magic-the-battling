@@ -53,31 +53,21 @@ def test_set_battler_deals_starting_pool(card_factory):
     set_battler(game, battler)
 
     pool_size = game.config.starting_pool_size
-    hand_size = game.config.starting_stage
     for player in game.players:
-        assert len(player.hand) == hand_size
-        assert len(player.sideboard) == pool_size - hand_size
+        assert len(player.hand) == 0
+        assert len(player.sideboard) == pool_size
     assert len(game.get_battler().cards) == 30 - (2 * pool_size)
 
 
-def test_set_battler_populates_hand_by_elo(card_factory):
+def test_set_battler_populates_hand_empty(card_factory):
     game = create_game(["Alice"], num_players=1)
     cards = [card_factory(f"c{i}") for i in range(7)]
     for i, card in enumerate(cards):
-        card.elo = float(i * 10)  # c0=0, c1=10, c2=20, ..., c6=60
+        card.elo = float(i * 10)
 
     battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
     set_battler(game, battler)
 
     alice = game.players[0]
-    hand_size = game.config.starting_stage  # 3
-
-    # Hand should have the 3 highest ELO cards (c6=60, c5=50, c4=40)
-    assert len(alice.hand) == hand_size
-    hand_elos = sorted([c.elo for c in alice.hand], reverse=True)
-    assert hand_elos == [60.0, 50.0, 40.0]
-
-    # Sideboard should have the 4 lowest ELO cards
-    assert len(alice.sideboard) == 4
-    sideboard_elos = sorted([c.elo for c in alice.sideboard], reverse=True)
-    assert sideboard_elos == [30.0, 20.0, 10.0, 0.0]
+    assert len(alice.hand) == 0
+    assert len(alice.sideboard) == 7

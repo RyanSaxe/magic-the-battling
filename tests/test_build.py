@@ -179,15 +179,23 @@ class TestPlayDrawPreference:
         assert player.play_draw_preference == "play"
 
 
-def test_populate_hand_clears_companion_when_elo_adds_it(card_factory):
+def test_set_ready_rejects_underfull_hand(card_factory):
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
-    companion = card_factory("Lurrus", "Creature", oracle_text="Companion — test", elo=9999)
-    filler = card_factory("Filler", elo=1)
-    player.sideboard.extend([companion, filler])
-    player.command_zone.append(companion.model_copy())
+    player.hand.extend([card_factory(f"c{i}") for i in range(2)])
+
+    with pytest.raises(ValueError, match="Hand must have exactly"):
+        build.set_ready(game, player, ["Plains", "Island", "Mountain"])
+
+
+def test_populate_hand_moves_all_to_sideboard(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    player = game.players[0]
+    cards = [card_factory(f"c{i}") for i in range(5)]
+    player.hand.extend(cards[:3])
+    player.sideboard.extend(cards[3:])
 
     player.populate_hand()
 
-    assert any(c.id == companion.id for c in player.hand)
-    assert len(player.command_zone) == 0
+    assert len(player.hand) == 0
+    assert len(player.sideboard) == 5

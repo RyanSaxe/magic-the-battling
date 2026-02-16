@@ -369,13 +369,10 @@ def test_full_draft_flow(card_factory):
     draft.end_for_player(game, alice)
     draft.end_for_player(game, bob)
 
-    # Verify state
-    assert high_elo in alice.hand
-    assert alice_pack_card in alice.hand
-    assert mid_elo in alice.hand
-    assert low_elo in alice.sideboard
-    assert alice_pack_card_2 in alice.sideboard
-    assert bob_pack_card in bob.hand
+    # Hand starts empty; all cards in sideboard
+    assert len(alice.hand) == 0
+    assert all(c in alice.sideboard for c in [high_elo, alice_pack_card, mid_elo, low_elo, alice_pack_card_2])
+    assert bob_pack_card in bob.sideboard
     assert alice.treasures == 1
     assert bob.treasures == 1
     assert alice.phase == "build"

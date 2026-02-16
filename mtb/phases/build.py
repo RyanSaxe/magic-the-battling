@@ -71,8 +71,8 @@ def set_ready(game: Game, player: Player, basics: list[str], play_draw_preferenc
         if basic not in VALID_BASICS:
             raise ValueError(f"Invalid basic land: {basic}")
 
-    if len(player.hand) > player.hand_size:
-        raise ValueError(f"Hand size exceeds maximum of {player.hand_size}")
+    if len(player.hand) != player.hand_size:
+        raise ValueError(f"Hand must have exactly {player.hand_size} cards")
 
     player.chosen_basics = basics
     player.build_ready = True
