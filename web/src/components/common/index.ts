@@ -1,5 +1,7 @@
 export { BasicLandCard } from './BasicLandCard'
+export { BasicLandSlot } from './BasicLandSlot'
 export { CardGrid } from './CardGrid'
+export { CardSlot } from './CardSlot'
 export { LabeledDivider } from './LabeledDivider'
 export { VerticalDivider } from './VerticalDivider'
 export { TreasureCard } from './TreasureCard'
