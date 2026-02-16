@@ -17,13 +17,13 @@ import { Sidebar } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
 import { GameSummary } from "../components/GameSummary";
 import { ActionMenu } from "../components/ActionMenu";
-import { RulesModal } from "../components/RulesModal";
-import { InfoIcon } from "../components/icons";
+import { PhaseTimeline } from "../components/PhaseTimeline";
+import { PhasePopover } from "../components/PhasePopover";
 import { ContextStripProvider, useContextStrip } from "../contexts";
 import { CardPreviewContext } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
-import { PHASE_HINTS, type Phase } from "../constants/rules";
-import { POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from "../constants/assets";
+import type { Phase } from "../constants/rules";
+import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import type { Card as CardType } from "../types";
 
@@ -418,6 +418,11 @@ function SpectateRequestModal({
   );
 }
 
+const GAME_PHASES: Phase[] = ["draft", "build", "battle", "reward"];
+function isGamePhase(phase: string): phase is Phase {
+  return GAME_PHASES.includes(phase as Phase);
+}
+
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
@@ -464,19 +469,21 @@ function GameContent() {
     }
   }
 
-  // Rules modal state
-  const [showRulesModal, setShowRulesModal] = useState(false);
-  const [hasViewedRules, setHasViewedRules] = useState(
-    () => localStorage.getItem("mtb-rules-viewed") === "true",
-  );
-
-  const handleOpenRules = () => {
-    setShowRulesModal(true);
-    if (!hasViewedRules) {
-      localStorage.setItem("mtb-rules-viewed", "true");
-      setHasViewedRules(true);
-    }
-  };
+  // Phase popover state
+  const [openPopoverPhase, setOpenPopoverPhase] = useState<Phase | null>(null);
+  const autoShowPhase = useRef<string | null>(null);
+  const phase = gameState?.self_player.phase;
+  useEffect(() => {
+    if (!phase || !isGamePhase(phase) || autoShowPhase.current === phase) return;
+    autoShowPhase.current = phase;
+    const autoHints = localStorage.getItem("mtb-auto-phase-hints") !== "false";
+    if (!autoHints) return;
+    const key = `mtb-phase-seen-${phase}`;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, "true");
+    const timer = setTimeout(() => setOpenPopoverPhase(phase), 0);
+    return () => clearTimeout(timer);
+  }, [phase]);
 
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
@@ -549,18 +556,6 @@ function GameContent() {
   }
 
   const currentPhase = gameState.self_player.phase;
-
-  const phaseBadgeClass =
-    {
-      draft: "draft",
-      build: "build",
-      battle: "battle",
-      reward: "reward",
-      awaiting_elimination: "reward",
-      eliminated: "battle",
-      winner: "reward",
-      game_over: "battle",
-    }[currentPhase] || "draft";
 
   const { self_player, current_battle } = gameState;
 
@@ -807,30 +802,27 @@ function GameContent() {
             Watching {spectatingPlayer}'s game (spectator mode)
           </div>
         )}
-        {/* Header - Action Bar */}
-        <header className="flex justify-between items-center px-2 sm:px-4 py-1 sm:py-2 bg-black/30">
-          <div className="flex items-center gap-3">
-            <div className="text-sm text-gray-300">
-              Stage {self_player.stage} • Round {self_player.round}
-            </div>
-            <button
-              onClick={handleOpenRules}
-              className={`phase-badge ${phaseBadgeClass} ${!hasViewedRules ? "pulse" : ""}`}
-            >
-              {currentPhase}
-              <InfoIcon size="sm" className="ml-1.5 opacity-60" />
-            </button>
-          </div>
-          <div className="text-sm text-gray-400 italic hidden sm:block">
-            {PHASE_HINTS[currentPhase as Phase]}
-          </div>
-          <div className="flex items-center gap-2">
-            {!sizes.isMobile && renderActionButtons()}
-            {sizes.isMobile && (
-              <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-2">☰</button>
-            )}
-          </div>
-        </header>
+        {/* Header - Phase Timeline. pr-64 on desktop offsets for sidebar so timeline centers over main content */}
+        <div className={`relative z-30 ${!sizes.isMobile ? 'pr-64' : ''}`}>
+          <PhaseTimeline
+            currentPhase={currentPhase}
+            stage={self_player.stage}
+            round={self_player.round}
+            nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
+            nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+            onPhaseClick={(phase) => setOpenPopoverPhase(prev => prev === phase ? null : phase)}
+            actionButtons={renderActionButtons()}
+            hamburger={sizes.isMobile ? (
+              <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-1">☰</button>
+            ) : undefined}
+          />
+          {openPopoverPhase && (
+            <PhasePopover
+              phase={openPopoverPhase}
+              onClose={() => setOpenPopoverPhase(null)}
+            />
+          )}
+        </div>
 
         {/* Main content */}
         {currentPhase === "battle" ? (
@@ -1052,48 +1044,12 @@ function GameContent() {
             )}
           </div>
         )}
-        {sizes.isMobile && !isSpectator && (
-          <div className="shrink-0 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
-            <div className="flex items-center justify-center gap-3">
-              {(currentPhase === "draft" || currentPhase === "build") && (
-                <div className="relative">
-                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-12 rounded-sm" />
-                  <span className="absolute -bottom-1 -right-1 bg-purple-900 text-purple-300 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border border-purple-500">{self_player.poison}</span>
-                </div>
-              )}
-              {renderActionButtons()}
-              {currentPhase === "battle" && (
-                <button
-                  onClick={() => setActionMenuOpen(true)}
-                  className="btn bg-indigo-600 hover:bg-indigo-500 text-white"
-                >
-                  Actions
-                </button>
-              )}
-              {(currentPhase === "draft" || currentPhase === "build") && (
-                <div className="relative">
-                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-12 rounded-sm" />
-                  <span className="absolute -bottom-1 -right-1 bg-amber-900 text-amber-300 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border border-amber-500">{self_player.treasures}</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
       {state.previewCard && (
         <CardPreviewModal
           card={state.previewCard}
           appliedUpgrades={state.previewAppliedUpgrades}
           onClose={() => setPreviewCard(null)}
-        />
-      )}
-      {showRulesModal && (
-        <RulesModal
-          currentPhase={currentPhase as Phase}
-          onClose={() => setShowRulesModal(false)}
-          availableUpgrades={gameState.available_upgrades}
-          useUpgrades={gameState.use_upgrades}
-          cubeId={gameState.cube_id}
         />
       )}
       {actionMenuOpen && currentPhase === "battle" && current_battle && (

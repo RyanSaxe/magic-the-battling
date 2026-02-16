@@ -207,72 +207,6 @@ body {
   animation: shimmer 1.5s infinite;
 }
 
-/* Phase badges */
-.phase-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 12px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  cursor: pointer;
-  border: none;
-  transition:
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
-.phase-badge:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 12px currentColor;
-}
-
-.phase-badge:focus-visible {
-  outline: 2px solid white;
-  outline-offset: 2px;
-}
-
-@keyframes subtle-pulse {
-  0%,
-  85%,
-  100% {
-    box-shadow: none;
-  }
-  90%,
-  95% {
-    box-shadow: 0 0 8px currentColor;
-  }
-}
-
-.phase-badge.pulse {
-  animation: subtle-pulse 4s ease-in-out infinite;
-}
-
-.phase-badge.pulse:hover {
-  animation: none;
-}
-
-.phase-badge.draft {
-  background: rgba(147, 51, 234, 0.3);
-  color: #c084fc;
-}
-
-.phase-badge.build {
-  background: rgba(59, 130, 246, 0.3);
-  color: #93c5fd;
-}
-
-.phase-badge.battle {
-  background: rgba(239, 68, 68, 0.3);
-  color: #fca5a5;
-}
-
-.phase-badge.reward {
-  background: rgba(212, 175, 55, 0.3);
-  color: var(--color-gold);
-}
-
 /* Button improvements */
 .btn {
   padding: 8px 16px;
@@ -281,6 +215,11 @@ body {
   transition: all var(--transition-fast);
   cursor: pointer;
   border: none;
+}
+
+.timeline-actions .btn {
+  padding: 4px 10px;
+  font-size: 13px;
 }
 
 .btn-primary {
