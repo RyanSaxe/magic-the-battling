@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react'
 import type { Phase } from '../constants/rules'
 
 const PHASES: Phase[] = ['draft', 'build', 'battle', 'reward']
@@ -19,8 +18,7 @@ interface PhaseTimelineProps {
   nextStage: number
   nextRound: number
   onPhaseClick: (phase: Phase) => void
-  actionButtons: ReactNode
-  hamburger?: ReactNode
+  hamburger?: React.ReactNode
 }
 
 function isGamePhase(phase: string): phase is Phase {
@@ -34,14 +32,11 @@ export function PhaseTimeline({
   nextStage,
   nextRound,
   onPhaseClick,
-  actionButtons,
   hamburger,
 }: PhaseTimelineProps) {
   if (!isGamePhase(currentPhase)) {
-    return <EndStateHeader phase={currentPhase} actionButtons={actionButtons} hamburger={hamburger} />
+    return null
   }
-
-  const currentIndex = PHASES.indexOf(currentPhase)
 
   return (
     <header className="bg-black/30 py-1.5 px-2 sm:px-4">
@@ -50,6 +45,7 @@ export function PhaseTimeline({
           <span className="text-xs sm:text-sm text-gray-300 font-mono">{stage}-{round}</span>
 
           {PHASES.map((phase, index) => {
+            const currentIndex = PHASES.indexOf(currentPhase)
             const isActive = index === currentIndex
             const isCompleted = index < currentIndex
             const isUpcoming = index > currentIndex
@@ -78,37 +74,6 @@ export function PhaseTimeline({
 
         {hamburger && <div className="shrink-0">{hamburger}</div>}
       </div>
-
-      {actionButtons && (
-        <div className="flex items-center justify-center gap-1.5 sm:gap-2 mt-1 timeline-actions">
-          {actionButtons}
-        </div>
-      )}
-    </header>
-  )
-}
-
-function EndStateHeader({ phase, actionButtons, hamburger }: { phase: EndState; actionButtons: ReactNode; hamburger?: ReactNode }) {
-  const messages: Record<EndState, string> = {
-    eliminated: 'You were eliminated',
-    winner: 'You won!',
-    game_over: 'Game Over',
-    awaiting_elimination: 'Awaiting results...',
-  }
-
-  return (
-    <header className="bg-black/30 px-4 py-3">
-      <div className="flex items-center">
-        <div className="flex-1 text-center">
-          <div className="text-lg font-medium text-white">{messages[phase]}</div>
-        </div>
-        {hamburger && <div className="shrink-0">{hamburger}</div>}
-      </div>
-      {actionButtons && (
-        <div className="flex items-center justify-center gap-2 mt-2">
-          {actionButtons}
-        </div>
-      )}
     </header>
   )
 }

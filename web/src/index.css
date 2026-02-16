@@ -222,6 +222,17 @@ body {
   font-size: 13px;
 }
 
+@keyframes fade-hint {
+  0% { opacity: 0; transform: translateY(-4px); }
+  10% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.animate-fade-hint {
+  animation: fade-hint 8s ease-in-out forwards;
+}
+
 .btn-primary {
   background: linear-gradient(
     135deg,

@@ -18,9 +18,6 @@ export function Lobby() {
   const [rejoinLoading, setRejoinLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
-  const [autoPhaseHints, setAutoPhaseHints] = useState(
-    () => localStorage.getItem("mtb-auto-phase-hints") !== "false",
-  );
 
   useEffect(() => {
     if (gameState) {
@@ -247,19 +244,6 @@ export function Lobby() {
                       </p>
                     )}
                 </div>
-
-                <label className="flex items-center gap-2 text-sm text-gray-400 mb-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={autoPhaseHints}
-                    onChange={(e) => {
-                      setAutoPhaseHints(e.target.checked);
-                      localStorage.setItem("mtb-auto-phase-hints", String(e.target.checked));
-                    }}
-                    className="accent-amber-500"
-                  />
-                  Show phase hints
-                </label>
 
                 <div className="space-y-2">
                   {!isHost && (

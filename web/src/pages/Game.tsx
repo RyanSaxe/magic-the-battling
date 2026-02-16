@@ -418,11 +418,6 @@ function SpectateRequestModal({
   );
 }
 
-const GAME_PHASES: Phase[] = ["draft", "build", "battle", "reward"];
-function isGamePhase(phase: string): phase is Phase {
-  return GAME_PHASES.includes(phase as Phase);
-}
-
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
@@ -471,18 +466,19 @@ function GameContent() {
 
   // Phase popover state
   const [openPopoverPhase, setOpenPopoverPhase] = useState<Phase | null>(null);
-  const autoShowPhase = useRef<string | null>(null);
+
+  // One-time tooltip nudge on first game start
+  const [showHintTooltip, setShowHintTooltip] = useState(false);
+  const hintShownRef = useRef(false);
   const phase = gameState?.self_player.phase;
   useEffect(() => {
-    if (!phase || !isGamePhase(phase) || autoShowPhase.current === phase) return;
-    autoShowPhase.current = phase;
-    const autoHints = localStorage.getItem("mtb-auto-phase-hints") !== "false";
-    if (!autoHints) return;
-    const key = `mtb-phase-seen-${phase}`;
-    if (localStorage.getItem(key)) return;
-    localStorage.setItem(key, "true");
-    const timer = setTimeout(() => setOpenPopoverPhase(phase), 0);
-    return () => clearTimeout(timer);
+    if (hintShownRef.current || phase !== "build") return;
+    if (localStorage.getItem("mtb-hint-shown")) return;
+    hintShownRef.current = true;
+    localStorage.setItem("mtb-hint-shown", "true");
+    const showTimer = setTimeout(() => setShowHintTooltip(true), 0);
+    const hideTimer = setTimeout(() => setShowHintTooltip(false), 8000);
+    return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
   }, [phase]);
 
   // DnD setup for battle phase
@@ -811,11 +807,17 @@ function GameContent() {
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
             onPhaseClick={(phase) => setOpenPopoverPhase(prev => prev === phase ? null : phase)}
-            actionButtons={renderActionButtons()}
             hamburger={sizes.isMobile ? (
               <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-1">☰</button>
             ) : undefined}
           />
+          {showHintTooltip && (
+            <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 animate-fade-hint">
+              <div className="bg-gray-800 text-gray-200 text-xs sm:text-sm px-3 py-1.5 rounded-lg shadow-lg border border-gray-600 whitespace-nowrap">
+                <span className="mr-1">↑</span> Click a phase for details on how to play
+              </div>
+            </div>
+          )}
           {openPopoverPhase && (
             <PhasePopover
               phase={openPopoverPhase}
@@ -1042,6 +1044,14 @@ function GameContent() {
                 useUpgrades={gameState.use_upgrades}
               />
             )}
+          </div>
+        )}
+        {/* Bottom Action Bar */}
+        {!isSpectator && renderActionButtons() && (
+          <div className={`shrink-0 bg-black/60 backdrop-blur-sm border-t border-gray-700/50 ${!sizes.isMobile ? 'pr-64' : ''}`}>
+            <div className="flex items-center justify-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-4 timeline-actions">
+              {renderActionButtons()}
+            </div>
           </div>
         )}
       </div>
