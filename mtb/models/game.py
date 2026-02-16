@@ -188,9 +188,15 @@ class Player(BaseModel):
         return self.game.config.starting_stage + self.vanquishers
 
     def populate_hand(self) -> None:
-        """Move all cards to sideboard so the player builds from scratch."""
-        self.sideboard.extend(self.hand)
-        self.hand.clear()
+        """Restore previous hand cards that are still in the pool."""
+        all_cards = self.hand + self.sideboard
+        pool_by_id = {c.id: c for c in all_cards}
+
+        restored_ids = [cid for cid in self.previous_hand_ids if cid in pool_by_id]
+        restored_set = set(restored_ids[: self.hand_size])
+
+        self.hand = [pool_by_id[cid] for cid in restored_ids[: self.hand_size]]
+        self.sideboard = [c for c in all_cards if c.id not in restored_set]
         self.chosen_basics = self.previous_basics.copy()
 
 

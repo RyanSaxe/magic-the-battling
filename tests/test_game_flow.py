@@ -125,8 +125,8 @@ def test_full_round_flow_round_2(card_factory, upgrade_factory):
     assert bob.round == 3
 
 
-def test_populate_hand_clears_existing_hand(card_factory, upgrade_factory):
-    """Regression test: populate_hand should clear hand to sideboard."""
+def test_populate_hand_restores_previous_hand_ids(card_factory, upgrade_factory):
+    """Regression test: populate_hand should restore previous hand cards still in pool."""
     game = create_game(["Alice"], num_players=1)
     upgrades = [upgrade_factory(f"u{i}") for i in range(4)]
     battler = Battler(cards=[card_factory(f"c{i}") for i in range(50)], upgrades=upgrades, vanguards=[])
@@ -134,11 +134,8 @@ def test_populate_hand_clears_existing_hand(card_factory, upgrade_factory):
 
     alice = game.players[0]
     total_cards = len(alice.hand) + len(alice.sideboard)
-
-    extra_card = card_factory("extra")
-    alice.hand.append(extra_card)
+    alice.previous_hand_ids = [c.id for c in alice.hand]
 
     alice.populate_hand()
 
-    assert len(alice.hand) == 0
-    assert len(alice.sideboard) == total_cards + 1
+    assert len(alice.hand) + len(alice.sideboard) == total_cards

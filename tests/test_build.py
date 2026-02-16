@@ -188,12 +188,40 @@ def test_set_ready_rejects_underfull_hand(card_factory):
         build.set_ready(game, player, ["Plains", "Island", "Mountain"])
 
 
-def test_populate_hand_moves_all_to_sideboard(card_factory):
+def test_populate_hand_restores_previous_hand(card_factory):
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
     cards = [card_factory(f"c{i}") for i in range(5)]
     player.hand.extend(cards[:3])
     player.sideboard.extend(cards[3:])
+    player.previous_hand_ids = [cards[0].id, cards[1].id, cards[2].id]
+
+    player.populate_hand()
+
+    assert [c.id for c in player.hand] == [cards[0].id, cards[1].id, cards[2].id]
+    assert len(player.sideboard) == 2
+
+
+def test_populate_hand_skips_missing_cards(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    player = game.players[0]
+    cards = [card_factory(f"c{i}") for i in range(5)]
+    player.sideboard.extend(cards)
+    player.previous_hand_ids = [cards[0].id, "gone_card", cards[2].id]
+
+    player.populate_hand()
+
+    assert [c.id for c in player.hand] == [cards[0].id, cards[2].id]
+    assert len(player.sideboard) == 3
+
+
+def test_populate_hand_empty_previous_hand(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    player = game.players[0]
+    cards = [card_factory(f"c{i}") for i in range(5)]
+    player.hand.extend(cards[:3])
+    player.sideboard.extend(cards[3:])
+    player.previous_hand_ids = []
 
     player.populate_hand()
 
