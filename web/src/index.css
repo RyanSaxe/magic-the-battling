@@ -378,12 +378,12 @@ body {
 }
 
 .upgrade-target.phase-enlarge {
-  transform: scale(1.5);
+  transform: scale(1.5) translateY(40%);
   z-index: 20;
 }
 
 .upgrade-target.phase-glow {
-  transform: scale(1.5);
+  transform: scale(1.5) translateY(40%);
   z-index: 20;
 }
 
