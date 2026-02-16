@@ -25,6 +25,7 @@ import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
 import type { Phase } from "../constants/rules";
 import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
+import { UpgradesModal } from "../components/common/UpgradesModal";
 import type { Card as CardType } from "../types";
 
 function CardPreviewModal({
@@ -443,6 +444,7 @@ function GameContent() {
 
   // Lifted state from Build phase
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
+  const [showUpgradesModal, setShowUpgradesModal] = useState(false);
 
   // Lifted state from Reward phase
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(
@@ -556,9 +558,9 @@ function GameContent() {
   const { self_player, current_battle } = gameState;
 
   const maxHandSize = self_player.hand_size;
-  const handExceedsLimit = self_player.hand.length > maxHandSize;
+  const handFull = self_player.hand.length === maxHandSize;
   const basicsComplete = selectedBasics.length === 3;
-  const canReady = basicsComplete && !handExceedsLimit;
+  const canReady = basicsComplete && handFull;
 
   const isStageIncreasing = self_player.is_stage_increasing;
   const needsUpgrade =
@@ -607,6 +609,11 @@ function GameContent() {
       case "draft":
         return (
           <>
+            {self_player.upgrades.length > 0 && (
+              <button onClick={() => setShowUpgradesModal(true)} className="btn btn-secondary">
+                View Upgrades
+              </button>
+            )}
             <button
               onClick={actions.draftRoll}
               disabled={
@@ -638,8 +645,16 @@ function GameContent() {
         }
         return (
           <>
+            {self_player.upgrades.length > 0 && (
+              <button onClick={() => setShowUpgradesModal(true)} className="btn btn-secondary">
+                {self_player.upgrades.some((u) => !u.upgrade_target) ? 'Use Upgrade' : 'View Upgrades'}
+              </button>
+            )}
             <span className={`text-sm ${basicsComplete ? "text-green-400" : "text-amber-400 animate-pulse"}`}>
               {selectedBasics.length}/3 basics
+            </span>
+            <span className={`text-sm ${handFull ? "text-green-400" : "text-amber-400 animate-pulse"}`}>
+              {self_player.hand.length}/{maxHandSize} hand
             </span>
             <button
               onClick={() => actions.buildReady(selectedBasics, 'play')}
@@ -1085,6 +1100,15 @@ function GameContent() {
           spectatorName={pendingSpectateRequest.spectator_name}
           requestId={pendingSpectateRequest.request_id}
           onRespond={actions.spectateResponse}
+        />
+      )}
+      {showUpgradesModal && (
+        <UpgradesModal
+          upgrades={self_player.upgrades}
+          mode={currentPhase === 'build' && self_player.upgrades.some((u) => !u.upgrade_target) ? 'apply' : 'view'}
+          targets={[...self_player.hand, ...self_player.sideboard]}
+          onApply={(upgradeId, targetId) => actions.buildApplyUpgrade(upgradeId, targetId)}
+          onClose={() => setShowUpgradesModal(false)}
         />
       )}
     </CardPreviewContext.Provider>
