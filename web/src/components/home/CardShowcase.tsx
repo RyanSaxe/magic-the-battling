@@ -1,15 +1,26 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { SHOWCASE_STAGES } from '../../constants/showcaseCards'
-import type { CarouselStage } from '../../constants/showcaseCards'
+import type { Card as CardType } from '../../types'
 import { Card } from '../card/Card'
 import { BasicLandCard } from '../common/BasicLandCard'
 import { TreasureCard } from '../common/TreasureCard'
+import { UpgradeStack } from '../sidebar/UpgradeStack'
 
 const CYCLE_INTERVAL = 4000
 const FADE_DURATION = 400
-const UPGRADE_DELAY = 600
 const MAX_HAND_SIZE = 5
 const CARD_GAP = 12
+
+type UpgradePhase = 'hidden' | 'enlarge' | 'slide-in' | 'linger' | 'glow' | 'shrink' | 'done'
+
+const UPGRADE_TIMINGS = {
+  startDelay: 500,
+  enlargeDuration: 500,
+  slideInDuration: 600,
+  lingerDuration: 1000,
+  glowDuration: 600,
+  shrinkDuration: 500,
+}
 
 function computeShowcaseSizes(vw: number, vh: number) {
   const isMobile = vw < 640
@@ -39,45 +50,39 @@ function useShowcaseSizes() {
   return sizes
 }
 
-function StageContent({ stage, sizes, showUpgrade }: {
-  stage: CarouselStage
-  sizes: ReturnType<typeof useShowcaseSizes>
-  showUpgrade: boolean
+function UpgradeSourceCard({ card, dimensions, phase, targetPosition }: {
+  card: CardType
+  dimensions: { width: number; height: number }
+  phase: UpgradePhase
+  targetPosition: { centerY: number; right: number } | null
 }) {
-  const upgradeCard = stage.battlefield.upgradedCard
+  const isVisible = phase === 'slide-in' || phase === 'linger'
+  const isFading = phase === 'glow'
+
+  const enlargedWidth = Math.round(dimensions.width * 1.5)
+  const enlargedHeight = Math.round(dimensions.height * 1.5)
+
+  const centerY = targetPosition?.centerY ?? window.innerHeight / 2
+  const top = centerY - enlargedHeight / 2
+  const left = targetPosition ? targetPosition.right + 16 : window.innerWidth / 2
+
+  const style: React.CSSProperties = {
+    top,
+    left,
+    width: enlargedWidth,
+    height: enlargedHeight,
+    transform: isVisible || isFading ? 'translateX(0)' : `translateX(${window.innerWidth}px)`,
+  }
+
+  const className = [
+    'upgrade-source',
+    (isVisible || isFading) && !isFading && 'phase-slide-in',
+    isFading && 'phase-fade-out',
+  ].filter(Boolean).join(' ')
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="flex items-end justify-center gap-3">
-        {stage.hand.map((card) => (
-          <Card key={card.id} card={card} dimensions={sizes.hand} />
-        ))}
-      </div>
-
-      <div className="flex items-center justify-center gap-2">
-        {stage.battlefield.lands.map((land, i) => (
-          <BasicLandCard key={`${land}-${i}`} name={land} dimensions={sizes.field} />
-        ))}
-        {stage.battlefield.treasures > 0 && (
-          <TreasureCard count={stage.battlefield.treasures} dimensions={sizes.field} />
-        )}
-        {upgradeCard && (
-          <div className={`relative ${showUpgrade ? 'upgrade-glow-burst' : ''}`}>
-            <Card card={upgradeCard} dimensions={sizes.field} upgraded />
-            {upgradeCard.upgrade_target && (
-              <div
-                className={`absolute -top-1 -left-1 ${showUpgrade ? 'upgrade-fly-in' : 'opacity-0'}`}
-                style={{ width: sizes.field.width * 0.7, height: sizes.field.height * 0.7 }}
-              >
-                <Card card={upgradeCard.upgrade_target} dimensions={{
-                  width: Math.round(sizes.field.width * 0.7),
-                  height: Math.round(sizes.field.height * 0.7),
-                }} />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+    <div className={className} style={style}>
+      <Card card={card} dimensions={{ width: enlargedWidth, height: enlargedHeight }} />
     </div>
   )
 }
@@ -85,24 +90,52 @@ function StageContent({ stage, sizes, showUpgrade }: {
 export function CardShowcase() {
   const [currentStage, setCurrentStage] = useState(0)
   const [fading, setFading] = useState(false)
-  const [showUpgrade, setShowUpgrade] = useState(false)
+  const [upgradePhase, setUpgradePhase] = useState<UpgradePhase>('hidden')
+  const [myrUpgraded, setMyrUpgraded] = useState(false)
+  const [targetPosition, setTargetPosition] = useState<{ centerY: number; right: number } | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const stageRef = useRef(currentStage)
+  const targetCardRef = useRef<HTMLDivElement | null>(null)
   const sizes = useShowcaseSizes()
 
   useEffect(() => { stageRef.current = currentStage }, [currentStage])
 
+  const runUpgradeSequence = useCallback(() => {
+    const rect = targetCardRef.current?.getBoundingClientRect()
+    if (rect) {
+      setTargetPosition({ centerY: rect.top + rect.height / 2, right: rect.right })
+    }
+    const { startDelay, enlargeDuration, slideInDuration, lingerDuration, glowDuration, shrinkDuration } = UPGRADE_TIMINGS
+    const t1 = startDelay
+    const t2 = t1 + enlargeDuration
+    const t3 = t2 + slideInDuration
+    const t4 = t3 + lingerDuration
+    const t5 = t4 + glowDuration
+    const t6 = t5 + shrinkDuration
+
+    setTimeout(() => setUpgradePhase('enlarge'), t1)
+    setTimeout(() => setUpgradePhase('slide-in'), t2)
+    setTimeout(() => setUpgradePhase('linger'), t3)
+    setTimeout(() => {
+      setUpgradePhase('glow')
+      setMyrUpgraded(true)
+    }, t4)
+    setTimeout(() => setUpgradePhase('shrink'), t5)
+    setTimeout(() => setUpgradePhase('done'), t6)
+  }, [])
+
   const goTo = useCallback((index: number) => {
     setFading(true)
-    setShowUpgrade(false)
+    setUpgradePhase('hidden')
+    setMyrUpgraded(false)
     setTimeout(() => {
       setCurrentStage(index)
       setFading(false)
       if (index === 2) {
-        setTimeout(() => setShowUpgrade(true), UPGRADE_DELAY)
+        runUpgradeSequence()
       }
     }, FADE_DURATION)
-  }, [])
+  }, [runUpgradeSequence])
 
   const startTimer = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current)
@@ -123,6 +156,9 @@ export function CardShowcase() {
   }
 
   const stage = SHOWCASE_STAGES[currentStage]
+  const isEnlarged = upgradePhase === 'enlarge' || upgradePhase === 'slide-in' || upgradePhase === 'linger' || upgradePhase === 'glow'
+  const showSourceCard = upgradePhase === 'enlarge' || upgradePhase === 'slide-in' || upgradePhase === 'linger' || upgradePhase === 'glow'
+  const showBattlefieldStack = upgradePhase === 'done'
 
   return (
     <div className="flex flex-col items-center gap-4 flex-1 justify-center">
@@ -131,7 +167,50 @@ export function CardShowcase() {
       </p>
 
       <div className={fading ? 'carousel-fade-out' : 'carousel-fade-in'}>
-        <StageContent stage={stage} sizes={sizes} showUpgrade={showUpgrade} />
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex items-end justify-center gap-3">
+            {stage.hand.map((card) => {
+              const isTarget = stage.upgrade?.targetCardId === card.id
+              const targetClass = isTarget ? [
+                'upgrade-target',
+                isEnlarged && 'phase-enlarge',
+                upgradePhase === 'glow' && 'phase-glow',
+                upgradePhase === 'shrink' && 'phase-shrink',
+              ].filter(Boolean).join(' ') : ''
+
+              return (
+                <div
+                  key={card.id}
+                  ref={isTarget ? targetCardRef : undefined}
+                  className={targetClass}
+                >
+                  <Card
+                    card={card}
+                    dimensions={sizes.hand}
+                    upgraded={isTarget && myrUpgraded}
+                  />
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="flex items-center justify-center gap-2">
+            {stage.battlefield.lands.map((land, i) => (
+              <BasicLandCard key={`${land}-${i}`} name={land} dimensions={sizes.field} />
+            ))}
+            {stage.battlefield.treasures > 0 && (
+              <TreasureCard count={stage.battlefield.treasures} dimensions={sizes.field} />
+            )}
+            {stage.upgrade && (
+              <div
+                className="transition-opacity duration-500"
+                style={{ opacity: showBattlefieldStack ? 1 : 0 }}
+              >
+                <UpgradeStack upgrade={stage.upgrade.stackedCard} dimensions={sizes.field} />
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -146,6 +225,15 @@ export function CardShowcase() {
           />
         ))}
       </div>
+
+      {stage.upgrade && showSourceCard && (
+        <UpgradeSourceCard
+          card={stage.upgrade.upgradeCard}
+          dimensions={sizes.hand}
+          phase={upgradePhase}
+          targetPosition={targetPosition}
+        />
+      )}
     </div>
   )
 }

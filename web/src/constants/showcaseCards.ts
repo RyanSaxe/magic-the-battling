@@ -45,10 +45,17 @@ const myrWithUpgrade = makeCard(
   CARDS.immediateAction,
 )
 
+export interface UpgradeAnimation {
+  targetCardId: string
+  upgradeCard: Card
+  stackedCard: Card
+}
+
 export interface CarouselStage {
   tagline: string
   hand: Card[]
-  battlefield: { lands: string[]; treasures: number; upgradedCard?: Card }
+  battlefield: { lands: string[]; treasures: number }
+  upgrade?: UpgradeAnimation
 }
 
 export const SHOWCASE_STAGES: CarouselStage[] = [
@@ -65,6 +72,11 @@ export const SHOWCASE_STAGES: CarouselStage[] = [
   {
     tagline: 'Become unbeatable.',
     hand: [CARDS.lakeOfTheDead, CARDS.myrBattlesphere, CARDS.snuffOut, CARDS.leylineOfLifeforce, CARDS.galadrielsDismissal],
-    battlefield: { lands: ['Swamp', 'Swamp', 'Swamp'], treasures: 2, upgradedCard: myrWithUpgrade },
+    battlefield: { lands: ['Swamp', 'Swamp', 'Swamp'], treasures: 2 },
+    upgrade: {
+      targetCardId: 'showcase-myr-battlesphere',
+      upgradeCard: CARDS.immediateAction,
+      stackedCard: myrWithUpgrade,
+    },
   },
 ]
