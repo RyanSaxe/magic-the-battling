@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { Card } from '../../components/card'
 import { CardSlot } from '../../components/common/CardSlot'
@@ -8,6 +8,11 @@ import { PoisonCard } from '../../components/common/PoisonCard'
 import { CardGrid } from '../../components/common/CardGrid'
 import { ZoneLayout } from '../../components/common/ZoneLayout'
 import { useGameSummaryCardSize } from '../../hooks/useGameSummaryCardSize'
+
+type Selection =
+  | { type: 'card'; cardId: string; zone: 'hand' | 'sideboard' }
+  | { type: 'empty'; slotIndex: number }
+  | null
 
 interface BuildPhaseProps {
   gameState: GameState
@@ -31,6 +36,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
   const locked = self_player.build_ready
 
   const hasUserInteracted = useRef(false)
+  const [selection, setSelection] = useState<Selection>(null)
 
   useEffect(() => {
     if (!hasUserInteracted.current && self_player.chosen_basics?.length && selectedBasics.length === 0) {
@@ -54,16 +60,43 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
   const isCompanion = (card: CardType) => card.oracle_text?.includes('Companion —') ?? false
   const selectedCompanionId = self_player.command_zone[0]?.id ?? null
 
-  const handFull = self_player.hand.length >= maxHandSize
+  const handleEmptySlotClick = (slotIndex: number) => {
+    if (locked) return
+    if (selection?.type === 'card' && selection.zone === 'sideboard') {
+      actions.buildMove(selection.cardId, 'sideboard', 'hand')
+      setSelection(null)
+    } else if (selection?.type === 'empty' && selection.slotIndex === slotIndex) {
+      setSelection(null)
+    } else {
+      setSelection({ type: 'empty', slotIndex })
+    }
+  }
 
   const handleHandCardClick = (card: CardType) => {
     if (locked) return
-    actions.buildMove(card.id, 'hand', 'sideboard')
+    if (selection?.type === 'card' && selection.cardId === card.id) {
+      setSelection(null)
+    } else if (selection?.type === 'card' && selection.zone === 'sideboard') {
+      actions.buildSwap(card.id, 'hand', selection.cardId, 'sideboard')
+      setSelection(null)
+    } else {
+      setSelection({ type: 'card', cardId: card.id, zone: 'hand' })
+    }
   }
 
   const handleSideboardCardClick = (card: CardType) => {
-    if (locked || handFull) return
-    actions.buildMove(card.id, 'sideboard', 'hand')
+    if (locked) return
+    if (selection?.type === 'card' && selection.cardId === card.id) {
+      setSelection(null)
+    } else if (selection?.type === 'card' && selection.zone === 'hand') {
+      actions.buildSwap(selection.cardId, 'hand', card.id, 'sideboard')
+      setSelection(null)
+    } else if (selection?.type === 'empty') {
+      actions.buildMove(card.id, 'sideboard', 'hand')
+      setSelection(null)
+    } else {
+      setSelection({ type: 'card', cardId: card.id, zone: 'sideboard' })
+    }
   }
 
   const battlefieldCount = 3 + 1 + 1 // 3 basic slots + treasure + poison
@@ -80,6 +113,9 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
 
   const emptySlotLabel = isMobile ? 'Tap here and\na card below' : 'Click here and\na card below'
 
+  const isCardSelected = (cardId: string) =>
+    selection?.type === 'card' && selection.cardId === cardId
+
   const handItems = Array.from({ length: maxHandSize }, (_, i) => {
     const card = self_player.hand[i]
     if (card) {
@@ -88,6 +124,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
           <Card
             card={card}
             onClick={() => handleHandCardClick(card)}
+            selected={isCardSelected(card.id)}
             dimensions={handDims}
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={getAppliedUpgrades(card.id)}
@@ -95,7 +132,16 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
         </div>
       )
     }
-    return <CardSlot key={`empty-${i}`} label={emptySlotLabel} dimensions={handDims} />
+    const slotSelected = selection?.type === 'empty' && selection.slotIndex === i
+    return (
+      <CardSlot
+        key={`empty-${i}`}
+        label={emptySlotLabel}
+        dimensions={handDims}
+        selected={slotSelected}
+        onClick={() => handleEmptySlotClick(i)}
+      />
+    )
   })
 
   const basicSlots = Array.from({ length: 3 }, (_, i) => (
@@ -166,7 +212,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                   <Card
                     card={card}
                     onClick={() => handleSideboardCardClick(card)}
-                    glow={isActiveCompanion ? 'gold' : handFull ? 'none' : 'none'}
+                    selected={isCardSelected(card.id)}
+                    glow={isActiveCompanion ? 'gold' : 'none'}
                     dimensions={sbDims}
                     upgraded={upgradedCardIds.has(card.id)}
                     appliedUpgrades={getAppliedUpgrades(card.id)}

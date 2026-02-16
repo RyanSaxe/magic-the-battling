@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { BasicLandCard } from './BasicLandCard'
 import { CardSlot } from './CardSlot'
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from '../../constants/assets'
@@ -12,23 +13,38 @@ interface BasicLandSlotProps {
 
 export function BasicLandSlot({ selected, dimensions, onPick, isMobile = false }: BasicLandSlotProps) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLDivElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    setPos({
+      top: rect.bottom + 4,
+      left: rect.left + rect.width / 2,
+    })
+  }, [])
 
   useEffect(() => {
     if (!open) return
+    updatePosition()
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
+      const target = e.target as Node
+      if (
+        triggerRef.current?.contains(target) ||
+        popoverRef.current?.contains(target)
+      ) return
+      setOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [open])
+  }, [open, updatePosition])
 
   const emptyLabel = isMobile ? 'Tap to pick' : 'Click to pick'
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={triggerRef}>
       <div onClick={() => setOpen(true)} className="cursor-pointer">
         {selected ? (
           <BasicLandCard name={selected} dimensions={dimensions} />
@@ -36,8 +52,12 @@ export function BasicLandSlot({ selected, dimensions, onPick, isMobile = false }
           <CardSlot label={emptyLabel} dimensions={dimensions} />
         )}
       </div>
-      {open && (
-        <div className="absolute z-20 left-1/2 -translate-x-1/2 top-full mt-1 bg-gray-900 border border-gray-600 rounded-lg p-2 shadow-xl">
+      {open && createPortal(
+        <div
+          ref={popoverRef}
+          className="fixed z-50 bg-gray-900 border border-gray-600 rounded-lg p-2 shadow-xl"
+          style={{ top: pos.top, left: pos.left, transform: 'translateX(-50%)' }}
+        >
           <div className="grid grid-cols-3 gap-1.5">
             {BASIC_LANDS.map(({ name }) => (
               <button
@@ -54,7 +74,8 @@ export function BasicLandSlot({ selected, dimensions, onPick, isMobile = false }
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

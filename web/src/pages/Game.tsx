@@ -469,15 +469,13 @@ function GameContent() {
   // Phase popover state
   const [openPopoverPhase, setOpenPopoverPhase] = useState<Phase | null>(null);
 
-  // One-time tooltip nudge on first game start
+  // Tooltip nudge on first build of each game
   const [showHintTooltip, setShowHintTooltip] = useState(false);
   const hintShownRef = useRef(false);
   const phase = gameState?.self_player.phase;
   useEffect(() => {
     if (hintShownRef.current || phase !== "build") return;
-    if (localStorage.getItem("mtb-hint-shown")) return;
     hintShownRef.current = true;
-    localStorage.setItem("mtb-hint-shown", "true");
     const showTimer = setTimeout(() => setShowHintTooltip(true), 0);
     const hideTimer = setTimeout(() => setShowHintTooltip(false), 8000);
     return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
