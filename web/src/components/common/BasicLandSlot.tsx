@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { BasicLandCard } from './BasicLandCard'
 import { CardSlot } from './CardSlot'
@@ -17,18 +17,8 @@ export function BasicLandSlot({ selected, dimensions, onPick, isMobile = false }
   const popoverRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ top: 0, left: 0 })
 
-  const updatePosition = useCallback(() => {
-    if (!triggerRef.current) return
-    const rect = triggerRef.current.getBoundingClientRect()
-    setPos({
-      top: rect.bottom + 4,
-      left: rect.left + rect.width / 2,
-    })
-  }, [])
-
   useEffect(() => {
     if (!open) return
-    updatePosition()
     const handler = (e: MouseEvent) => {
       const target = e.target as Node
       if (
@@ -39,13 +29,23 @@ export function BasicLandSlot({ selected, dimensions, onPick, isMobile = false }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [open, updatePosition])
+  }, [open])
+
+  const handleOpen = () => {
+    if (!triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    setPos({
+      top: rect.bottom + 4,
+      left: rect.left + rect.width / 2,
+    })
+    setOpen(true)
+  }
 
   const emptyLabel = isMobile ? 'Tap to pick' : 'Click to pick'
 
   return (
     <div ref={triggerRef}>
-      <div onClick={() => setOpen(true)} className="cursor-pointer">
+      <div onClick={handleOpen} className="cursor-pointer">
         {selected ? (
           <BasicLandCard name={selected} dimensions={dimensions} />
         ) : (
