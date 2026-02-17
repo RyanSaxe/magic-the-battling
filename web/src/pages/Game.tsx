@@ -422,7 +422,6 @@ function SpectateRequestModal({
 
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { session, saveSession } = useSession();
 
@@ -473,18 +472,8 @@ function GameContent() {
 
   // Phase popover state
   const [openPopoverPhase, setOpenPopoverPhase] = useState<Phase | null>(null);
+  const [popoverAnchorX, setPopoverAnchorX] = useState(0);
 
-  // Tooltip nudge on first build of each game
-  const [showHintTooltip, setShowHintTooltip] = useState(false);
-  const hintShownRef = useRef(false);
-  const phase = gameState?.self_player.phase;
-  useEffect(() => {
-    if (hintShownRef.current || phase !== "build") return;
-    hintShownRef.current = true;
-    const showTimer = setTimeout(() => setShowHintTooltip(true), 0);
-    const hideTimer = setTimeout(() => setShowHintTooltip(false), 8000);
-    return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
-  }, [phase]);
 
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
@@ -593,24 +582,13 @@ function GameContent() {
           p.phase !== "winner" &&
           p.phase !== "game_over"
       );
-      right = (
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {hasWatchablePlayers && (
-            <button onClick={handleSpectateNewTab} className="btn btn-secondary">
-              Spectate
-            </button>
-          )}
-          <button onClick={() => navigate("/")} className="btn btn-primary">
-            Home
+      if (hasWatchablePlayers) {
+        right = (
+          <button onClick={handleSpectateNewTab} className="btn btn-secondary">
+            Spectate
           </button>
-        </div>
-      );
-    } else if (currentPhase === "winner" || currentPhase === "game_over") {
-      right = (
-        <button onClick={() => navigate("/")} className="btn btn-primary">
-          Home
-        </button>
-      );
+        );
+      }
     } else if (currentPhase === "draft") {
       left = (
         <div className="flex items-center gap-1.5 sm:gap-2">
@@ -870,28 +848,25 @@ function GameContent() {
           </div>
         )}
         {/* Header - Phase Timeline. pr-64 on desktop offsets for sidebar so timeline centers over main content */}
-        <div className={`relative z-30 ${!sizes.isMobile ? 'pr-64 after:absolute after:right-0 after:top-0 after:bottom-0 after:w-64 after:bg-black/30' : ''}`}>
+        <div className="relative">
           <PhaseTimeline
             currentPhase={currentPhase}
             stage={self_player.stage}
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
-            onPhaseClick={(phase) => setOpenPopoverPhase(prev => prev === phase ? null : phase)}
+            onPhaseClick={(phase, rect) => {
+              setOpenPopoverPhase(prev => prev === phase ? null : phase);
+              setPopoverAnchorX(rect.left + rect.width / 2);
+            }}
             hamburger={sizes.isMobile ? (
               <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-1">☰</button>
             ) : undefined}
           />
-          {showHintTooltip && (
-            <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-50 animate-fade-hint">
-              <div className="bg-gray-800 text-gray-200 text-xs sm:text-sm px-3 py-1.5 rounded-lg shadow-lg border border-gray-600 whitespace-nowrap">
-                <span className="mr-1">↑</span> Click a phase for details on how to play
-              </div>
-            </div>
-          )}
           {openPopoverPhase && (
             <PhasePopover
               phase={openPopoverPhase}
+              anchorX={popoverAnchorX}
               onClose={() => setOpenPopoverPhase(null)}
             />
           )}
@@ -1121,7 +1096,7 @@ function GameContent() {
           </div>
         )}
         {/* Bottom Action Bar */}
-        {!isSpectator && renderActionButtons() && (
+        {!isSpectator && (
           <div className="shrink-0 relative z-50 bg-black/30 border-t border-gray-700/50">
             <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
               {renderActionButtons()}

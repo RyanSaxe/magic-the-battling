@@ -7,6 +7,7 @@ import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
 import { buildGameSummaryData } from '../utils/share'
 import { getOrdinal, getPlacementBadgeColor } from '../utils/format'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
+import { PhaseTimeline } from '../components/PhaseTimeline'
 
 interface RoundOption {
   label: string
@@ -274,21 +275,26 @@ export function ShareGame() {
   return (
     <div className="h-dvh flex flex-col bg-gray-900 text-white overflow-hidden">
       {/* Header */}
-      <div className={`relative z-30 shrink-0 bg-black/30 border-b border-gray-700 px-4 py-2 flex items-center justify-between ${!sizes.isMobile ? 'pr-64 after:absolute after:right-0 after:top-0 after:bottom-0 after:w-64 after:bg-black/30' : ''}`}>
-        <div className="flex items-center gap-2">
-          <span className="text-amber-400 font-bold text-sm">Magic: The Battling</span>
-          {!gameFinished && (
-            <span className="text-xs text-gray-500 italic">Game in Progress</span>
-          )}
-        </div>
-        {sizes.isMobile && (
-          <button
-            onClick={() => setSidebarOpen((o) => !o)}
-            className="text-gray-300 hover:text-white text-xl px-1"
-          >
-            ☰
-          </button>
-        )}
+      <div className="relative">
+        <PhaseTimeline
+          currentPhase="game_over"
+          stage={0}
+          round={0}
+          nextStage={0}
+          nextRound={0}
+          onPhaseClick={() => {}}
+          title={
+            <span className="flex items-center gap-2">
+              <span className="text-amber-400 font-bold text-sm">Magic: The Battling</span>
+              {!gameFinished && (
+                <span className="text-xs text-gray-500 italic">Game in Progress</span>
+              )}
+            </span>
+          }
+          hamburger={sizes.isMobile ? (
+            <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-1">☰</button>
+          ) : undefined}
+        />
       </div>
 
       {/* Main + Sidebar */}
@@ -350,7 +356,7 @@ export function ShareGame() {
             )}
           </div>
 
-          {/* Right: Prev / Next / Home */}
+          {/* Right: Prev / Next */}
           <div className="flex items-center gap-2">
             <button
               className="btn btn-secondary text-sm py-1.5 disabled:opacity-30"
@@ -365,12 +371,6 @@ export function ShareGame() {
               onClick={() => hasNext && setSelectedRound(roundOptions[currentIndex + 1].value)}
             >
               Next
-            </button>
-            <button
-              className="btn btn-secondary text-sm py-1.5"
-              onClick={() => navigate('/')}
-            >
-              Home
             </button>
           </div>
         </div>
