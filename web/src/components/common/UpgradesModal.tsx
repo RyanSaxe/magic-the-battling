@@ -131,7 +131,7 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
                 </CardGrid>
               </div>
             )}
-            <hr ref={separatorRef} className="border-gray-700 my-2" />
+            <div ref={separatorRef} className="py-2 shrink-0"><hr className="border-gray-700" /></div>
             {separatorHeight > 0 && (
               <div className="flex-1 min-h-0 flex justify-center">
                 <CardGrid columns={applyDims.bottom.columns} cardWidth={targetDims.width}>
