@@ -452,6 +452,7 @@ function GameContent() {
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(
     null,
   );
+  const [selectedPoolCardId, setSelectedPoolCardId] = useState<string | null>(null);
 
   // Lifted state from Battle phase
   const [battleSelectedCard, setBattleSelectedCard] = useState<BattleSelectedCard | null>(null);
@@ -572,6 +573,7 @@ function GameContent() {
   const handleContinue = () => {
     actions.rewardDone(selectedUpgradeId ?? undefined);
     setSelectedUpgradeId(null);
+    setSelectedPoolCardId(null);
   };
 
   const renderActionButtons = (): ReactNode => {
@@ -1048,6 +1050,8 @@ function GameContent() {
                   actions={actions}
                   selectedUpgradeId={selectedUpgradeId}
                   onUpgradeSelect={setSelectedUpgradeId}
+                  selectedPoolCardId={selectedPoolCardId}
+                  onPoolCardSelect={setSelectedPoolCardId}
                 />
               )}
               {currentPhase === "awaiting_elimination" && (
@@ -1118,7 +1122,7 @@ function GameContent() {
         )}
         {/* Bottom Action Bar */}
         {!isSpectator && renderActionButtons() && (
-          <div className={`shrink-0 bg-black/60 backdrop-blur-sm border-t border-gray-700/50 ${!sizes.isMobile ? 'pr-64' : ''}`}>
+          <div className={`shrink-0 relative z-50 bg-black/60 backdrop-blur-sm border-t border-gray-700/50 ${!sizes.isMobile ? 'pr-64' : ''}`}>
             <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-4 timeline-actions">
               {renderActionButtons()}
             </div>

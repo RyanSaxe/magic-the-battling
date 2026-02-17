@@ -13,6 +13,8 @@ interface RewardPhaseProps {
   }
   selectedUpgradeId: string | null
   onUpgradeSelect: (upgradeId: string | null) => void
+  selectedPoolCardId: string | null
+  onPoolCardSelect: (cardId: string | null) => void
 }
 
 const REWARD_COMPACT_DIMS = { width: 50, height: 70 }
@@ -65,7 +67,7 @@ function RewardCard({
   )
 }
 
-export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: RewardPhaseProps) {
+export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, selectedPoolCardId, onPoolCardSelect }: RewardPhaseProps) {
   const { self_player, available_upgrades } = gameState
   const { last_battle_result } = self_player
   const isStageIncreasing = self_player.is_stage_increasing
@@ -221,7 +223,15 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
               maxWidth: '100%',
             }}>
               {poolCards.map((card) => (
-                <Card key={card.id} card={card} dimensions={poolCardDims} upgraded={upgradedCardIds.has(card.id)} appliedUpgrades={getAppliedUpgrades(card.id)} />
+                <Card
+                  key={card.id}
+                  card={card}
+                  dimensions={poolCardDims}
+                  upgraded={upgradedCardIds.has(card.id)}
+                  appliedUpgrades={getAppliedUpgrades(card.id)}
+                  selected={selectedPoolCardId === card.id}
+                  onClick={() => onPoolCardSelect(selectedPoolCardId === card.id ? null : card.id)}
+                />
               ))}
             </div>
           </div>
