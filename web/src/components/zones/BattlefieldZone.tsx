@@ -181,7 +181,7 @@ export function BattlefieldZone({
                   ))}
                 </div>
               )}
-              {poisonCount > 0 && landCardDimensions && (
+              {landCardDimensions && (
                 <PoisonCard count={poisonCount} dimensions={landCardDimensions} />
               )}
             </div>

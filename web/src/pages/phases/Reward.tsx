@@ -211,9 +211,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
 
           {/* Pool reference panel */}
           <div className="mt-3 pt-3 border-t border-amber-500/30 flex-1 min-h-0 flex flex-col">
-            <div ref={poolLabelRef} className="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center shrink-0">
-              Your Pool ({self_player.hand.length + self_player.sideboard.length} cards)
-            </div>
+            <div ref={poolLabelRef} className="shrink-0" />
             <div className="overflow-auto flex-1 min-h-0 p-1" style={{
               display: 'grid',
               gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,

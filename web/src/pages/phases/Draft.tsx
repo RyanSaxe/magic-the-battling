@@ -103,7 +103,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
 
       <div ref={separatorRef} className="flex items-center gap-3 px-2">
         <div className="flex-1 border-t border-gray-600/40" />
-        <span className="text-[10px] text-gray-500 uppercase tracking-widest">Your Pool</span>
+        <span className="text-xs text-gray-300 uppercase tracking-widest">Your Pool</span>
         <div className="flex-1 border-t border-gray-600/40" />
       </div>
 

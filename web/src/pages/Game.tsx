@@ -59,7 +59,7 @@ function CardPreviewModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60]"
       onClick={onClose}
     >
       <div
@@ -612,7 +612,7 @@ function GameContent() {
       left = (
         <div className="flex items-center gap-1.5 sm:gap-2">
           {self_player.upgrades.length > 0 && (
-            <button onClick={() => setShowUpgradesModal(true)} className="btn bg-purple-600 hover:bg-purple-500 text-white">
+            <button onClick={() => setShowUpgradesModal(true)} className="btn bg-gray-600 hover:bg-gray-500 text-white">
               View Upgrades
             </button>
           )}
@@ -636,7 +636,7 @@ function GameContent() {
     } else if (currentPhase === "build") {
       if (self_player.build_ready) {
         left = self_player.upgrades.length > 0 ? (
-          <button onClick={() => setShowUpgradesModal(true)} className="btn bg-purple-600 hover:bg-purple-500 text-white">
+          <button onClick={() => setShowUpgradesModal(true)} className="btn bg-gray-600 hover:bg-gray-500 text-white">
             View Upgrades
           </button>
         ) : null;
@@ -655,7 +655,7 @@ function GameContent() {
         left = self_player.upgrades.length > 0 ? (
           <button
             onClick={() => setShowUpgradesModal(true)}
-            className="btn bg-purple-600 hover:bg-purple-500 text-white"
+            className={`btn text-white ${self_player.upgrades.some((u) => !u.upgrade_target) ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-600 hover:bg-gray-500'}`}
           >
             {self_player.upgrades.some((u) => !u.upgrade_target) ? 'Use Upgrade' : 'View Upgrades'}
           </button>
@@ -678,7 +678,7 @@ function GameContent() {
                       actions.buildReady(selectedBasics, 'play');
                       setShowSubmitHandPopover(false);
                     },
-                    className: "btn btn-primary text-sm py-1.5",
+                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
                   },
                   {
                     label: "Draw",
@@ -686,7 +686,7 @@ function GameContent() {
                       actions.buildReady(selectedBasics, 'draw');
                       setShowSubmitHandPopover(false);
                     },
-                    className: "btn btn-secondary text-sm py-1.5",
+                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
                   },
                 ]}
                 onClose={() => setShowSubmitHandPopover(false)}
@@ -704,7 +704,7 @@ function GameContent() {
       left = (
         <button
           onClick={() => setActionMenuOpen(true)}
-          className="btn bg-purple-600 hover:bg-purple-500 text-white"
+          className="btn btn-secondary"
         >
           Actions
         </button>
@@ -755,7 +755,7 @@ function GameContent() {
                       setIsChangingResult(false);
                       setShowSubmitResultPopover(false);
                     },
-                    className: "btn btn-primary text-sm py-1.5",
+                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
                   },
                   {
                     label: "Draw",
@@ -764,7 +764,7 @@ function GameContent() {
                       setIsChangingResult(false);
                       setShowSubmitResultPopover(false);
                     },
-                    className: "btn btn-secondary text-sm py-1.5",
+                    className: "btn btn-danger text-sm py-1.5",
                   },
                   {
                     label: "I Lost",

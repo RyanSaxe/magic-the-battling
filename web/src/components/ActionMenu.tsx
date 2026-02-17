@@ -95,7 +95,7 @@ export function ActionMenu({
     <>
       <div className="fixed inset-0 z-50" onClick={onClose} />
       <div
-        className="fixed bottom-16 right-4 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-50"
+        className="fixed bottom-16 left-4 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-50"
         style={{ maxWidth: 280 }}
       >
         {card && (

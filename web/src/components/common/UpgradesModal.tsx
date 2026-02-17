@@ -3,6 +3,7 @@ import type { Card as CardType } from '../../types'
 import { Card } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { CardGrid } from './CardGrid'
+import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
 import { useGameSummaryCardSize } from '../../hooks/useGameSummaryCardSize'
 
 interface UpgradesModalProps {
@@ -41,25 +42,27 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
 
   const isApplyMode = mode === 'apply'
 
-  const [czRef, czDims] = useGameSummaryCardSize({
-    sideboardCount: isApplyMode ? upgrades.length : 0,
-    handCount: 0,
-    battlefieldCount: 0,
-    commandZoneCount: 0,
-    maxCardWidth: 150,
+  const [applyRef, applyDims] = useDualZoneCardSizes({
+    topCount: isApplyMode ? upgrades.length : 0,
+    bottomCount: isApplyMode ? targets.length : 0,
+    topGap: 6,
+    bottomGap: 6,
+    fixedHeight: 0,
+    topMaxWidth: 200,
+    bottomMaxWidth: 200,
   })
 
-  const [poolRef, poolDims] = useGameSummaryCardSize({
-    sideboardCount: isApplyMode ? targets.length : upgrades.length,
+  const [viewRef, viewDims] = useGameSummaryCardSize({
+    sideboardCount: !isApplyMode ? upgrades.length : 0,
     handCount: 0,
     battlefieldCount: 0,
     commandZoneCount: 0,
   })
 
   const upgradeDims = isApplyMode
-    ? { width: czDims.sideboard.width, height: czDims.sideboard.height }
-    : { width: poolDims.sideboard.width, height: poolDims.sideboard.height }
-  const targetDims = { width: poolDims.sideboard.width, height: poolDims.sideboard.height }
+    ? { width: applyDims.top.width, height: applyDims.top.height }
+    : { width: viewDims.sideboard.width, height: viewDims.sideboard.height }
+  const targetDims = { width: applyDims.bottom.width, height: applyDims.bottom.height }
 
   const handleConfirm = () => {
     if (!selectedUpgrade || !selectedTarget || !onApply) return
@@ -84,14 +87,14 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
 
   return (
     <div
-      className="fixed inset-0 bg-black/85 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/85 flex items-center justify-center z-50 p-2"
       onClick={onClose}
     >
       <div
         className="bg-gray-900 rounded-lg flex flex-col w-full h-full max-w-5xl overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4 py-2 shrink-0 border-b border-gray-700/50 flex justify-between items-center">
+        <div className="px-3 py-1 shrink-0 border-b border-gray-700/50 flex justify-between items-center">
           <div className="min-w-0">
             <h2 className="text-white font-semibold text-lg truncate">
               {isApplyMode ? (
@@ -111,55 +114,49 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
         </div>
 
         {isApplyMode ? (
-          <div className="flex-1 min-h-0 flex flex-col p-[1px]">
-            <div className="flex flex-1" style={{ gap: 1 }}>
-              <div ref={czRef} style={{ minWidth: '5.5rem', maxWidth: '33%' }}>
-                <div className="bg-black/30 px-3 pt-5 pb-3 h-full flex items-center justify-center">
-                  <CardGrid columns={czDims.sideboard.columns} cardWidth={upgradeDims.width}>
-                    {applied.map((upgrade) => (
-                      <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={upgradeDims} />
-                    ))}
-                    {unapplied.map((upgrade) => (
-                      <Card
-                        key={upgrade.id}
-                        card={upgrade}
-                        dimensions={upgradeDims}
-                        onClick={() => {
-                          if (selectedUpgradeId === upgrade.id) {
-                            setSelectedUpgradeId(null)
-                          } else {
-                            setSelectedUpgradeId(upgrade.id)
-                          }
-                          setSelectedTargetId(null)
-                        }}
-                        selected={selectedUpgradeId === upgrade.id}
-                      />
-                    ))}
-                  </CardGrid>
-                </div>
-              </div>
-              <div ref={poolRef} className="flex-1 min-w-0 flex flex-col" style={{ gap: 1 }}>
-                <div className="bg-black/30 px-3 pt-5 pb-3 flex-1">
-                  <CardGrid columns={poolDims.sideboard.columns} cardWidth={targetDims.width}>
-                    {targets.map((card) => (
-                      <Card
-                        key={card.id}
-                        card={card}
-                        dimensions={targetDims}
-                        onClick={selectedUpgrade ? () => handleTargetClick(card) : undefined}
-                        selected={selectedTargetId === card.id}
-                      />
-                    ))}
-                  </CardGrid>
-                </div>
-              </div>
+          <div ref={applyRef} className="flex-1 min-h-0 flex flex-col p-2">
+            <div className="shrink-0 flex justify-center">
+              <CardGrid columns={applyDims.top.columns} cardWidth={upgradeDims.width}>
+                {applied.map((upgrade) => (
+                  <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={upgradeDims} />
+                ))}
+                {unapplied.map((upgrade) => (
+                  <Card
+                    key={upgrade.id}
+                    card={upgrade}
+                    dimensions={upgradeDims}
+                    onClick={() => {
+                      if (selectedUpgradeId === upgrade.id) {
+                        setSelectedUpgradeId(null)
+                      } else {
+                        setSelectedUpgradeId(upgrade.id)
+                      }
+                      setSelectedTargetId(null)
+                    }}
+                    selected={selectedUpgradeId === upgrade.id}
+                  />
+                ))}
+              </CardGrid>
+            </div>
+            <div className="flex-1 min-h-0 flex justify-center">
+              <CardGrid columns={applyDims.bottom.columns} cardWidth={targetDims.width}>
+                {targets.map((card) => (
+                  <Card
+                    key={card.id}
+                    card={card}
+                    dimensions={targetDims}
+                    onClick={selectedUpgrade ? () => handleTargetClick(card) : undefined}
+                    selected={selectedTargetId === card.id}
+                  />
+                ))}
+              </CardGrid>
             </div>
           </div>
         ) : (
-          <div ref={poolRef} className="flex-1 min-h-0 p-[1px]">
-            <div className="bg-black/30 px-3 pt-5 pb-3 h-full">
+          <div ref={viewRef} className="flex-1 min-h-0 p-2">
+            <div className="h-full">
               {upgrades.length > 0 ? (
-                <CardGrid columns={poolDims.sideboard.columns} cardWidth={upgradeDims.width}>
+                <CardGrid columns={viewDims.sideboard.columns} cardWidth={upgradeDims.width}>
                   {upgrades.map((upgrade) =>
                     upgrade.upgrade_target ? (
                       <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={upgradeDims} />

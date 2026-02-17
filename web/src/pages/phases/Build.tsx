@@ -213,7 +213,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
                     card={card}
                     onClick={() => handleSideboardCardClick(card)}
                     selected={isCardSelected(card.id)}
-                    glow={isActiveCompanion ? 'gold' : 'none'}
+                    isCompanion={isActiveCompanion}
                     dimensions={sbDims}
                     upgraded={upgradedCardIds.has(card.id)}
                     appliedUpgrades={getAppliedUpgrades(card.id)}

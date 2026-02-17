@@ -65,9 +65,9 @@ export function BattlePhase({
   const yourPoison = battle?.your_poison ?? 0
   const opponentPoison = battle?.opponent_poison ?? 0
 
-  const playerLandCount = countTopLevel(playerBf, playerAttachments, isLandOrTreasure) + (yourPoison > 0 ? 1 : 0)
+  const playerLandCount = countTopLevel(playerBf, playerAttachments, isLandOrTreasure) + 1
   const playerNonlandCount = countTopLevel(playerBf, playerAttachments, (c) => !isLandOrTreasure(c))
-  const opponentLandCount = countTopLevel(opponentBf, opponentAttachments, isLandOrTreasure) + (opponentPoison > 0 ? 1 : 0)
+  const opponentLandCount = countTopLevel(opponentBf, opponentAttachments, isLandOrTreasure) + 1
   const opponentNonlandCount = countTopLevel(opponentBf, opponentAttachments, (c) => !isLandOrTreasure(c))
 
   const HAND_PADDING = 16
