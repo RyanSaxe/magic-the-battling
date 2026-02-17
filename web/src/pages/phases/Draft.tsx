@@ -36,6 +36,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
     topGap: 6,
     bottomGap: 6,
     fixedHeight: 65,
+    horizontalPadding: 24,
     topMaxWidth: 300,
     bottomMaxWidth: 400,
   })
@@ -43,6 +44,12 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   const upgradedCardIds = new Set(appliedUpgradesList.map((u) => u.upgrade_target!.id))
   const getAppliedUpgrades = (cardId: string) =>
     appliedUpgradesList.filter((u) => u.upgrade_target!.id === cardId)
+
+  const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
+    if (!(e.target as HTMLElement).closest('.card')) {
+      setSelectedCard(null)
+    }
+  }, [])
 
   const handleCardClick = useCallback(
     (card: CardType, index: number, zone: SelectionZone, isInHand: boolean) => {
@@ -73,7 +80,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   )
 
   return (
-    <div ref={containerRef} className="bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col h-full">
+    <div ref={containerRef} className="bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col h-full" onClick={handleBackgroundClick}>
       <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
         {/* Pool */}
         <div className="bg-black/30 px-3 pt-5 pb-3 relative">
