@@ -638,7 +638,7 @@ function GameContent() {
             onClick={() => setShowUpgradesModal(true)}
             className={`btn text-white ${self_player.upgrades.some((u) => !u.upgrade_target) ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-600 hover:bg-gray-500'}`}
           >
-            {self_player.upgrades.some((u) => !u.upgrade_target) ? 'Use Upgrade' : 'View Upgrades'}
+            {self_player.upgrades.some((u) => !u.upgrade_target) ? 'Apply Upgrade' : 'View Upgrades'}
           </button>
         ) : null;
         right = (
