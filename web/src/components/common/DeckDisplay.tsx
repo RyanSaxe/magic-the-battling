@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react'
 import type { Card as CardType } from '../../types'
 import { Card } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
@@ -29,6 +30,16 @@ export function DeckDisplay({
   companionIds,
   className,
 }: DeckDisplayProps) {
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
+  const handleCardClick = useCallback((cardId: string) => {
+    setSelectedCardId((prev) => prev === cardId ? null : cardId)
+  }, [])
+  const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
+    if (!(e.target as HTMLElement).closest('.card')) {
+      setSelectedCardId(null)
+    }
+  }, [])
+
   const battlefieldCount = basics.length + 2
   const commandZoneCount = appliedUpgrades.length
 
@@ -51,6 +62,7 @@ export function DeckDisplay({
     <ZoneLayout
       containerRef={ref}
       className={className}
+      onClick={handleBackgroundClick}
       hasHand={hasHand}
       hasBattlefield={battlefieldCount > 0}
       hasSideboard={hasSideboard}
@@ -59,7 +71,7 @@ export function DeckDisplay({
       handContent={
         <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
           {hand.map((card) => (
-            <Card key={card.id} card={card} dimensions={handDims} isCompanion={companionIds.has(card.id)} />
+            <Card key={card.id} card={card} dimensions={handDims} isCompanion={companionIds.has(card.id)} onClick={() => handleCardClick(card.id)} selected={selectedCardId === card.id} />
           ))}
         </CardGrid>
       }
@@ -77,7 +89,7 @@ export function DeckDisplay({
       sideboardContent={
         <CardGrid columns={dims.sideboard.columns} cardWidth={sideboardDims.width}>
           {sideboard.map((card) => (
-            <Card key={card.id} card={card} dimensions={sideboardDims} isCompanion={companionIds.has(card.id)} />
+            <Card key={card.id} card={card} dimensions={sideboardDims} isCompanion={companionIds.has(card.id)} onClick={() => handleCardClick(card.id)} selected={selectedCardId === card.id} />
           ))}
         </CardGrid>
       }

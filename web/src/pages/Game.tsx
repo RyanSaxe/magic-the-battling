@@ -20,90 +20,13 @@ import { ActionMenu } from "../components/ActionMenu";
 import { PhaseTimeline } from "../components/PhaseTimeline";
 import { PhasePopover } from "../components/PhasePopover";
 import { ContextStripProvider, useContextStrip } from "../contexts";
-import { CardPreviewContext } from "../components/card";
+import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
 import type { Phase } from "../constants/rules";
 import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { SubmitPopover } from "../components/common/SubmitPopover";
-import type { Card as CardType } from "../types";
-
-function CardPreviewModal({
-  card,
-  appliedUpgrades,
-  onClose,
-}: {
-  card: CardType;
-  appliedUpgrades: CardType[];
-  onClose: () => void;
-}) {
-  const [isFlipped, setIsFlipped] = useState(false);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  const getImageUrl = (c: CardType, flipped: boolean) => {
-    if (flipped && c.flip_image_url) {
-      return c.flip_image_url;
-    }
-    return c.png_url ?? c.image_url;
-  };
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60]"
-      onClick={onClose}
-    >
-      <div
-        className="relative flex gap-4 items-center max-w-[95vw] max-h-[85vh] px-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <img
-          src={getImageUrl(card, isFlipped)}
-          alt={card.name}
-          className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
-          style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
-        />
-        {appliedUpgrades.length > 0 && (
-          <>
-            <div className="text-white text-2xl font-bold shrink-0">→</div>
-            {appliedUpgrades.map((upgrade) => (
-              <img
-                key={upgrade.id}
-                src={getImageUrl(upgrade, isFlipped)}
-                alt={upgrade.name}
-                className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
-                style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
-              />
-            ))}
-          </>
-        )}
-        <button
-          className="absolute -top-4 -right-4 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/80"
-          onClick={onClose}
-        >
-          ×
-        </button>
-        {card.flip_image_url && (
-          <button
-            className="absolute top-2 right-2 bg-black/60 text-white rounded px-3 py-1 text-sm hover:bg-black/80 transition-colors"
-            onClick={() => setIsFlipped(!isFlipped)}
-          >
-            Flip
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
 
 interface SpectatorConfig {
   spectatePlayer: string;

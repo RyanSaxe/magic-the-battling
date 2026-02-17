@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getShareGame } from '../api/client'
-import type { ShareGameResponse, SharePlayerSnapshot, PlayerView } from '../types'
+import type { ShareGameResponse, SharePlayerSnapshot, PlayerView, Card as CardType } from '../types'
 import { GameSummary } from '../components/GameSummary'
 import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
 import { buildGameSummaryData } from '../utils/share'
 import { getOrdinal, getPlacementBadgeColor } from '../utils/format'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
 import { PhaseTimeline } from '../components/PhaseTimeline'
+import { CardPreviewContext, CardPreviewModal } from '../components/card'
 
 interface RoundOption {
   label: string
@@ -91,6 +92,12 @@ export function ShareGame() {
   const [selectedPlayer, setSelectedPlayer] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [roundPopoverOpen, setRoundPopoverOpen] = useState(false)
+  const [previewCard, setPreviewCardState] = useState<CardType | null>(null)
+  const [previewUpgrades, setPreviewUpgrades] = useState<CardType[]>([])
+  const setPreviewCard = useCallback((card: CardType | null, appliedUpgrades?: CardType[]) => {
+    setPreviewCardState(card)
+    setPreviewUpgrades(appliedUpgrades ?? [])
+  }, [])
 
   useEffect(() => {
     if (!gameId || !playerName) return
@@ -273,6 +280,7 @@ export function ShareGame() {
   )
 
   return (
+    <CardPreviewContext.Provider value={{ setPreviewCard }}>
     <div className="h-dvh flex flex-col bg-gray-900 text-white overflow-hidden">
       {/* Header */}
       <div className="relative">
@@ -375,6 +383,14 @@ export function ShareGame() {
           </div>
         </div>
       </div>
+      {previewCard && (
+        <CardPreviewModal
+          card={previewCard}
+          appliedUpgrades={previewUpgrades}
+          onClose={() => setPreviewCard(null)}
+        />
+      )}
     </div>
+    </CardPreviewContext.Provider>
   )
 }
