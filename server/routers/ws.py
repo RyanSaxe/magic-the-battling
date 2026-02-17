@@ -316,6 +316,7 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
                     game_id,
                     db_session,
                     play_draw_preference=payload.get("play_draw_preference", "play"),
+                    hand_order=payload.get("hand_order"),
                 )
             finally:
                 db_session.close()

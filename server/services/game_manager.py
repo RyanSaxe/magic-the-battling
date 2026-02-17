@@ -1208,9 +1208,10 @@ class GameManager:
         game_id: str | None = None,
         db: Session | None = None,
         play_draw_preference: str = "play",
+        hand_order: list[str] | None = None,
     ) -> str | None:
         try:
-            build.set_ready(game, player, basics, play_draw_preference)
+            build.set_ready(game, player, basics, play_draw_preference, hand_order=hand_order)
 
             # Handle sudden death players specially
             if player.in_sudden_death:

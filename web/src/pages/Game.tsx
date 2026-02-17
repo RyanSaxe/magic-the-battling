@@ -446,6 +446,7 @@ function GameContent() {
   // Lifted state from Build phase
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
   const [showUpgradesModal, setShowUpgradesModal] = useState(false);
+  const handSlotsRef = useRef<(string | null)[]>([]);
 
   // Lifted state from Reward phase
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(
@@ -622,7 +623,7 @@ function GameContent() {
               self_player.treasures <= 0 ||
               (self_player.current_pack?.length ?? 0) === 0
             }
-            className="btn bg-purple-600 hover:bg-purple-500 text-white"
+            className="btn bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Roll for 1💰
           </button>
@@ -675,7 +676,7 @@ function GameContent() {
                   {
                     label: "Play",
                     onClick: () => {
-                      actions.buildReady(selectedBasics, 'play');
+                      actions.buildReady(selectedBasics, 'play', handSlotsRef.current.filter((id): id is string => id !== null));
                       setShowSubmitHandPopover(false);
                     },
                     className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
@@ -683,7 +684,7 @@ function GameContent() {
                   {
                     label: "Draw",
                     onClick: () => {
-                      actions.buildReady(selectedBasics, 'draw');
+                      actions.buildReady(selectedBasics, 'draw', handSlotsRef.current.filter((id): id is string => id !== null));
                       setShowSubmitHandPopover(false);
                     },
                     className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
@@ -1037,6 +1038,7 @@ function GameContent() {
                   actions={actions}
                   selectedBasics={selectedBasics}
                   onBasicsChange={setSelectedBasics}
+                  onHandSlotsChange={(slots) => { handSlotsRef.current = slots; }}
                   isMobile={sizes.isMobile}
                 />
               )}

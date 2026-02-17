@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { GameState, Card as CardType, BuildSource } from '../../types'
 import { Card } from '../../components/card'
 import { CardSlot } from '../../components/common/CardSlot'
@@ -19,7 +19,7 @@ interface BuildPhaseProps {
   actions: {
     buildMove: (cardId: string, source: BuildSource, destination: BuildSource) => void
     buildSwap: (cardAId: string, sourceA: BuildSource, cardBId: string, sourceB: BuildSource) => void
-    buildReady: (basics: string[], playDrawPreference: 'play' | 'draw') => void
+    buildReady: (basics: string[], playDrawPreference: 'play' | 'draw', handOrder?: string[]) => void
     buildUnready: () => void
     buildApplyUpgrade: (upgradeId: string, targetCardId: string) => void
     buildSetCompanion: (cardId: string) => void
@@ -27,16 +27,69 @@ interface BuildPhaseProps {
   }
   selectedBasics: string[]
   onBasicsChange: (basics: string[]) => void
+  onHandSlotsChange?: (slots: (string | null)[]) => void
   isMobile?: boolean
 }
 
-export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange, isMobile = false }: BuildPhaseProps) {
+function syncHandSlots(
+  prevSlots: (CardType | null)[],
+  hand: CardType[],
+  maxHandSize: number,
+): (CardType | null)[] {
+  const handIds = new Set(hand.map((c) => c.id))
+  const idToCard = new Map(hand.map((c) => [c.id, c]))
+  const newSlots: (CardType | null)[] = new Array(maxHandSize).fill(null)
+
+  // Keep existing slot assignments for cards still in hand
+  for (let i = 0; i < Math.min(prevSlots.length, maxHandSize); i++) {
+    const prev = prevSlots[i]
+    if (prev && handIds.has(prev.id)) {
+      newSlots[i] = idToCard.get(prev.id)!
+      handIds.delete(prev.id)
+    }
+  }
+
+  // Place any unslotted hand cards at first empty slot
+  for (const id of handIds) {
+    const emptyIdx = newSlots.indexOf(null)
+    if (emptyIdx !== -1) {
+      newSlots[emptyIdx] = idToCard.get(id)!
+    }
+  }
+
+  return newSlots
+}
+
+export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange, onHandSlotsChange, isMobile = false }: BuildPhaseProps) {
   const { self_player } = gameState
   const maxHandSize = self_player.hand_size
   const locked = self_player.build_ready
 
   const hasUserInteracted = useRef(false)
   const [selection, setSelection] = useState<Selection>(null)
+  const [slotOrder, setSlotOrder] = useState<(string | null)[]>([])
+
+  const handSlots = useMemo(() => {
+    const result = syncHandSlots(
+      slotOrder.map((id) => (id ? self_player.hand.find((c) => c.id === id) ?? null : null)),
+      self_player.hand,
+      maxHandSize,
+    )
+    return result
+  }, [slotOrder, self_player.hand, maxHandSize])
+
+  useEffect(() => {
+    onHandSlotsChange?.(handSlots.map((c) => c?.id ?? null))
+  }, [handSlots, onHandSlotsChange])
+
+  const setSlotCard = useCallback((index: number, card: CardType) => {
+    setSlotOrder((prev) => {
+      const next = [...prev]
+      while (next.length <= index) next.push(null)
+      next[index] = card.id
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     if (!hasUserInteracted.current && self_player.chosen_basics?.length && selectedBasics.length === 0) {
@@ -63,6 +116,8 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
   const handleEmptySlotClick = (slotIndex: number) => {
     if (locked) return
     if (selection?.type === 'card' && selection.zone === 'sideboard') {
+      const card = self_player.sideboard.find((c) => c.id === selection.cardId)
+      if (card) setSlotCard(slotIndex, card)
       actions.buildMove(selection.cardId, 'sideboard', 'hand')
       setSelection(null)
     } else if (selection?.type === 'empty' && selection.slotIndex === slotIndex) {
@@ -72,11 +127,13 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
     }
   }
 
-  const handleHandCardClick = (card: CardType) => {
+  const handleHandCardClick = (card: CardType, slotIndex: number) => {
     if (locked) return
     if (selection?.type === 'card' && selection.cardId === card.id) {
       setSelection(null)
     } else if (selection?.type === 'card' && selection.zone === 'sideboard') {
+      const sideboardCard = self_player.sideboard.find((c) => c.id === selection.cardId)
+      if (sideboardCard) setSlotCard(slotIndex, sideboardCard)
       actions.buildSwap(card.id, 'hand', selection.cardId, 'sideboard')
       setSelection(null)
     } else {
@@ -89,9 +146,12 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
     if (selection?.type === 'card' && selection.cardId === card.id) {
       setSelection(null)
     } else if (selection?.type === 'card' && selection.zone === 'hand') {
+      const handSlotIndex = handSlots.findIndex((c) => c?.id === selection.cardId)
+      if (handSlotIndex !== -1) setSlotCard(handSlotIndex, card)
       actions.buildSwap(selection.cardId, 'hand', card.id, 'sideboard')
       setSelection(null)
     } else if (selection?.type === 'empty') {
+      setSlotCard(selection.slotIndex, card)
       actions.buildMove(card.id, 'sideboard', 'hand')
       setSelection(null)
     } else {
@@ -116,14 +176,13 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
   const isCardSelected = (cardId: string) =>
     selection?.type === 'card' && selection.cardId === cardId
 
-  const handItems = Array.from({ length: maxHandSize }, (_, i) => {
-    const card = self_player.hand[i]
+  const handItems = handSlots.map((card, i) => {
     if (card) {
       return (
         <div key={card.id} className="relative">
           <Card
             card={card}
-            onClick={() => handleHandCardClick(card)}
+            onClick={() => handleHandCardClick(card, i)}
             selected={isCardSelected(card.id)}
             dimensions={handDims}
             upgraded={upgradedCardIds.has(card.id)}
@@ -175,19 +234,12 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
 
       <ZoneLayout
         containerRef={containerRef}
-        className={`rounded-lg bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col m-2 transition-opacity ${locked ? 'opacity-60 pointer-events-none' : ''}`}
+        className={`rounded-lg bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col transition-opacity ${locked ? 'opacity-60 pointer-events-none' : ''}`}
         hasHand={true}
         hasBattlefield={true}
         hasSideboard={self_player.sideboard.length > 0}
         hasUpgrades={false}
-        handLabel={
-          <>
-            Hand
-            <span className={`ml-1.5 ${self_player.hand.length === maxHandSize ? 'text-green-400' : 'text-gray-500'}`}>
-              {self_player.hand.length}/{maxHandSize}
-            </span>
-          </>
-        }
+        handLabel="Hand"
         handContent={
           <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
             {handItems}

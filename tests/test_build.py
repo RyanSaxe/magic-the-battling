@@ -179,6 +179,45 @@ class TestPlayDrawPreference:
         assert player.play_draw_preference == "play"
 
 
+class TestHandOrder:
+    def test_set_ready_reorders_hand(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        cards = [card_factory(f"c{i}") for i in range(3)]
+        player.hand.extend(cards)
+
+        hand_order = [cards[2].id, cards[0].id, cards[1].id]
+        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "play", hand_order=hand_order)
+
+        assert [c.id for c in player.hand] == hand_order
+        assert player.build_ready is True
+
+    def test_set_ready_ignores_mismatched_hand_order(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        cards = [card_factory(f"c{i}") for i in range(3)]
+        player.hand.extend(cards)
+        original_order = [c.id for c in player.hand]
+
+        build.set_ready(
+            game, player, ["Plains", "Island", "Mountain"], "play", hand_order=["bad_id", cards[0].id, cards[1].id]
+        )
+
+        assert [c.id for c in player.hand] == original_order
+        assert player.build_ready is True
+
+    def test_set_ready_without_hand_order(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        cards = [card_factory(f"c{i}") for i in range(3)]
+        player.hand.extend(cards)
+        original_order = [c.id for c in player.hand]
+
+        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "play")
+
+        assert [c.id for c in player.hand] == original_order
+
+
 def test_set_ready_rejects_underfull_hand(card_factory):
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
