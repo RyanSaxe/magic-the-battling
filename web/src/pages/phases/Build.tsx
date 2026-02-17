@@ -67,6 +67,11 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
 
   const hasUserInteracted = useRef(false)
   const [selection, setSelection] = useState<Selection>(null)
+  const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
+    if (!(e.target as HTMLElement).closest('.card, .card-slot')) {
+      setSelection(null)
+    }
+  }, [])
   const [slotOrder, setSlotOrder] = useState<(string | null)[]>([])
 
   const handSlots = useMemo(() => {
@@ -235,6 +240,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
       <ZoneLayout
         containerRef={containerRef}
         className={`bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col transition-opacity ${locked ? 'opacity-60 pointer-events-none' : ''}`}
+        onClick={handleBackgroundClick}
         hasHand={true}
         hasBattlefield={true}
         hasSideboard={self_player.sideboard.length > 0}

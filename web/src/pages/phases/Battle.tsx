@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import type { GameState, Card as CardType, ZoneName, CardStateAction } from '../../types'
 import { DraggableCard, DroppableZone, type ZoneOwner } from '../../dnd'
 import { HandZone, BattlefieldZone, BattlefieldZoneColumn } from '../../components/zones'
@@ -47,6 +47,11 @@ export function BattlePhase({
   onSelectedCardChange,
 }: BattlePhaseProps) {
   const setSelectedCard = onSelectedCardChange
+  const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
+    if (!(e.target as HTMLElement).closest('.card')) {
+      setSelectedCard(null)
+    }
+  }, [setSelectedCard])
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
   const { current_battle } = gameState
@@ -190,7 +195,7 @@ export function BattlePhase({
   const bfHeight = 2 * rowHeight + BF_PADDING
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full">
+    <div ref={containerRef} className="flex flex-col h-full" onClick={handleBackgroundClick}>
         {/* Sudden Death Banner */}
         {battle.is_sudden_death && (
           <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center shrink-0">

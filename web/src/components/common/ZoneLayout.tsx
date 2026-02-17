@@ -20,6 +20,7 @@ interface ZoneLayoutProps {
   hasUpgrades: boolean
   containerRef: RefCallback<HTMLElement>
   className?: string
+  onClick?: React.MouseEventHandler<HTMLDivElement>
 }
 
 export function ZoneLayout({
@@ -37,12 +38,13 @@ export function ZoneLayout({
   hasUpgrades,
   containerRef,
   className,
+  onClick,
 }: ZoneLayoutProps) {
   const hasLower = hasBattlefield || hasSideboard || hasUpgrades
   const hasRight = hasBattlefield || hasSideboard
 
   return (
-    <div ref={containerRef} className={className ?? 'rounded-lg bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col'}>
+    <div ref={containerRef} className={className ?? 'rounded-lg bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col'} onClick={onClick}>
       <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
         {hasHand && (
           <div className="bg-black/30 px-3 pt-5 pb-3 relative">

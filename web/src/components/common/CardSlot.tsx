@@ -8,7 +8,7 @@ interface CardSlotProps {
 export function CardSlot({ label, dimensions, selected = false, onClick }: CardSlotProps) {
   return (
     <div
-      className={`flex items-center justify-center rounded border-2 border-dashed bg-black/20 ${
+      className={`card-slot flex items-center justify-center rounded border-2 border-dashed bg-black/20 ${
         selected ? 'border-amber-400 ring-2 ring-amber-400/50' : 'border-gray-600/60'
       } ${onClick ? 'cursor-pointer' : ''}`}
       style={{ width: dimensions.width, height: dimensions.height }}
