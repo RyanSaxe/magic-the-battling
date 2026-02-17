@@ -3,7 +3,7 @@ import type { ReactNode, RefCallback } from 'react'
 export const badgeCls =
   'absolute left-1/2 -translate-x-1/2 -top-[9px] z-10 ' +
   'bg-gray-800 text-gray-400 text-[10px] uppercase tracking-widest ' +
-  'px-2.5 py-0.5 rounded-full border border-gray-600/40 whitespace-nowrap'
+  'px-2.5 py-0.5 rounded-full border border-gray-600 whitespace-nowrap'
 
 interface ZoneLayoutProps {
   handContent: ReactNode

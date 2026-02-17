@@ -1,4 +1,5 @@
 import random
+from uuid import uuid4
 
 from mtb.models.cards import Card
 from mtb.models.game import Game, LastBattleResult, Player, StaticOpponent
@@ -49,7 +50,9 @@ def pick_upgrade(game: Game, player: Player, upgrade: Card) -> None:
     if upgrade not in game.available_upgrades:
         raise ValueError("Upgrade not available in this game")
 
-    player.upgrades.append(upgrade.model_copy())
+    copy = upgrade.model_copy()
+    copy.id = f"{copy.id.rsplit('-', 1)[0]}-{uuid4().hex[:8]}"
+    player.upgrades.append(copy)
 
 
 def apply_upgrade_to_card(player: Player, upgrade: Card, target: Card) -> None:

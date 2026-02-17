@@ -5,7 +5,7 @@ import type { ShareGameResponse, SharePlayerSnapshot, PlayerView } from '../type
 import { GameSummary } from '../components/GameSummary'
 import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
 import { buildGameSummaryData } from '../utils/share'
-import { PlayerRow } from '../components/PlayerList'
+import { getOrdinal, getPlacementBadgeColor } from '../utils/format'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
 
 interface RoundOption {
@@ -57,7 +57,7 @@ function RoundPopover({
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-2 left-0 bg-gray-900/95 backdrop-blur border border-gray-700 rounded-lg shadow-2xl p-2 flex flex-col gap-1 min-w-[180px] max-h-[300px] overflow-y-auto"
+      className="absolute bottom-full mb-2 left-0 z-50 bg-gray-900/95 backdrop-blur border border-gray-700 rounded-lg shadow-2xl p-2 flex flex-col gap-1 min-w-[180px] max-h-[300px] overflow-y-auto"
     >
       {options.map((opt) => (
         <button
@@ -230,19 +230,44 @@ export function ShareGame() {
 
   const renderSidebarContent = () => (
     <div className="flex flex-col gap-1 p-3">
-      {sortedPlayerViews.map((pv) => (
-        <PlayerRow
-          key={pv.name}
-          player={pv}
-          players={playerViews}
-          currentPlayerName={data.owner_name}
-          isSelected={pv.name === selectedPlayer}
-          onClick={() => {
-            setSelectedPlayer(pv.name)
-            if (sizes.isMobile) setSidebarOpen(false)
-          }}
-        />
-      ))}
+      {sortedPlayerViews.map((pv) => {
+        const isSelected = pv.name === selectedPlayer
+        const colors = pv.placement !== 0
+          ? getPlacementBadgeColor(pv.placement, playerViews.length)
+          : null
+        return (
+          <button
+            key={pv.name}
+            onClick={() => {
+              setSelectedPlayer(pv.name)
+              if (sizes.isMobile) setSidebarOpen(false)
+            }}
+            className={`flex items-center gap-2 px-3 py-2 rounded text-left text-sm transition-colors ${
+              isSelected
+                ? 'bg-amber-600/20 ring-1 ring-amber-500/50 text-white'
+                : 'text-gray-300 hover:bg-gray-700/40'
+            }`}
+          >
+            {pv.placement !== 0 && colors && (
+              <span
+                className="text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none shrink-0"
+                style={{ backgroundColor: colors.bg, color: colors.text }}
+              >
+                {getOrdinal(pv.placement)}
+              </span>
+            )}
+            <span className="truncate flex-1">
+              {pv.name}
+              {pv.name === data.owner_name && (
+                <span className="text-gray-500 ml-1">(You)</span>
+              )}
+            </span>
+            {pv.is_bot && (
+              <span className="text-[10px] text-gray-500 shrink-0">BOT</span>
+            )}
+          </button>
+        )
+      })}
     </div>
   )
 
@@ -250,27 +275,19 @@ export function ShareGame() {
     <div className="h-dvh flex flex-col bg-gray-900 text-white overflow-hidden">
       {/* Header */}
       <div className={`shrink-0 border-b border-gray-700 px-4 py-2 flex items-center justify-between ${!sizes.isMobile ? 'pr-64' : ''}`}>
-        <button
-          className="bg-gray-800 border border-gray-600 text-gray-300 rounded px-3 py-1 text-sm hover:bg-gray-700"
-          onClick={() => navigate('/')}
-        >
-          Home
-        </button>
         <div className="flex items-center gap-2">
           <span className="text-amber-400 font-bold text-sm">Magic: The Battling</span>
           {!gameFinished && (
             <span className="text-xs text-gray-500 italic">Game in Progress</span>
           )}
         </div>
-        {sizes.isMobile ? (
+        {sizes.isMobile && (
           <button
             onClick={() => setSidebarOpen((o) => !o)}
             className="text-gray-300 hover:text-white text-xl px-1"
           >
             ☰
           </button>
-        ) : (
-          <div className="w-[30px]" />
         )}
       </div>
 
@@ -333,7 +350,7 @@ export function ShareGame() {
             )}
           </div>
 
-          {/* Right: Prev / Next */}
+          {/* Right: Prev / Next / Home */}
           <div className="flex items-center gap-2">
             <button
               className="btn btn-secondary text-sm py-1.5 disabled:opacity-30"
@@ -348,6 +365,12 @@ export function ShareGame() {
               onClick={() => hasNext && setSelectedRound(roundOptions[currentIndex + 1].value)}
             >
               Next
+            </button>
+            <button
+              className="btn btn-secondary text-sm py-1.5"
+              onClick={() => navigate('/')}
+            >
+              Home
             </button>
           </div>
         </div>

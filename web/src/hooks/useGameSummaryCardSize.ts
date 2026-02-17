@@ -119,7 +119,7 @@ export function computeSize(
       const czCardW_fromHeight = Math.floor(
         (czAvailH - czGaps) / (czRows * ASPECT_RATIO)
       )
-      const czIdealW = hasHand ? handCardW : maxCardWidth
+      const czIdealW = hasHand ? Math.round(handCardW * 1.5) : maxCardWidth
       czCardW = Math.min(czIdealW, czCardW_fromHeight)
       if (czCardW < minCardWidth) continue
       czCellW = czc * czCardW + (czc - 1) * CARD_GAP + 2 * CELL_PAD
@@ -169,6 +169,7 @@ export function computeSize(
         )
         sbCardW = Math.min(maxCardWidth, sbWidthCap, sbCardW_height)
       }
+      if (hasHand) sbCardW = Math.min(sbCardW, Math.round(handCardW * 1.5))
       if (hasSideboard && sbCardW <= 0) continue
 
       let bfCardW = 0
@@ -176,9 +177,11 @@ export function computeSize(
         const bfCardW_height = Math.floor(bfAvailForGrid / ASPECT_RATIO)
         bfCardW = Math.min(maxCardWidth, bfWidthCap, bfCardW_height)
         if (hasSideboard) bfCardW = Math.min(bfCardW, sbCardW)
+        if (hasHand) bfCardW = Math.min(bfCardW, Math.round(handCardW * 1.5))
       } else if (hasBattlefield) {
         bfCardW = Math.min(maxCardWidth, bfWidthCap)
         if (hasSideboard) bfCardW = Math.min(bfCardW, sbCardW)
+        if (hasHand) bfCardW = Math.min(bfCardW, Math.round(handCardW * 1.5))
       }
       if (hasBattlefield && bfCardW <= 0) continue
 
