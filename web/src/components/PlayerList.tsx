@@ -75,7 +75,7 @@ function PairingProbability({ probability }: { probability: number | null }) {
   return <span className="text-[10px] text-blue-400">{pct}%</span>;
 }
 
-function PlayerRow({
+export function PlayerRow({
   player,
   players,
   currentPlayerName,

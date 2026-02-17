@@ -1123,7 +1123,7 @@ function GameContent() {
         {/* Bottom Action Bar */}
         {!isSpectator && renderActionButtons() && (
           <div className={`shrink-0 relative z-50 bg-black/60 backdrop-blur-sm border-t border-gray-700/50 ${!sizes.isMobile ? 'pr-64' : ''}`}>
-            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-4 timeline-actions">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
               {renderActionButtons()}
             </div>
           </div>

@@ -73,6 +73,18 @@ describe('computeSize', () => {
     })
   })
 
+  describe('sideboard sizing independence', () => {
+    it('allows sideboard cards wider than hand cards when sideboard has fewer cards', () => {
+      const result = computeSize(1200, 700, {
+        handCount: 7,
+        sideboardCount: 3,
+        battlefieldCount: 3,
+        commandZoneCount: 0,
+      })
+      expect(result.sideboard.width).toBeGreaterThan(result.hand.width)
+    })
+  })
+
   describe('CZ multi-column', () => {
     it('selects 2 CZ columns when height is tight with multiple CZ cards', () => {
       const result = computeSize(1200, 460, {

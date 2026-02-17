@@ -168,7 +168,6 @@ export function computeSize(
           (sbAvailForGrid - sbRowGaps) / (sr * ASPECT_RATIO)
         )
         sbCardW = Math.min(maxCardWidth, sbWidthCap, sbCardW_height)
-        if (hasHand) sbCardW = Math.min(sbCardW, handCardW)
       }
       if (hasSideboard && sbCardW <= 0) continue
 
@@ -176,11 +175,9 @@ export function computeSize(
       if (hasBattlefield && bfAvailForGrid > 0) {
         const bfCardW_height = Math.floor(bfAvailForGrid / ASPECT_RATIO)
         bfCardW = Math.min(maxCardWidth, bfWidthCap, bfCardW_height)
-        if (hasHand) bfCardW = Math.min(bfCardW, handCardW)
         if (hasSideboard) bfCardW = Math.min(bfCardW, sbCardW)
       } else if (hasBattlefield) {
         bfCardW = Math.min(maxCardWidth, bfWidthCap)
-        if (hasHand) bfCardW = Math.min(bfCardW, handCardW)
         if (hasSideboard) bfCardW = Math.min(bfCardW, sbCardW)
       }
       if (hasBattlefield && bfCardW <= 0) continue

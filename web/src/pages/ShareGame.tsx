@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getShareGame } from '../api/client'
-import type { ShareGameResponse, SharePlayerData, SharePlayerSnapshot } from '../types'
+import type { ShareGameResponse, SharePlayerSnapshot, PlayerView } from '../types'
 import { GameSummary } from '../components/GameSummary'
 import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
 import { buildGameSummaryData } from '../utils/share'
-import { getOrdinal, getPlacementBadgeColor } from '../utils/format'
+import { PlayerRow } from '../components/PlayerList'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
 
 interface RoundOption {
@@ -22,17 +22,6 @@ function buildRoundOptions(rounds: SharePlayerSnapshot[]): RoundOption[] {
     })
   }
   return options
-}
-
-function sortByPlacement(players: SharePlayerData[]): SharePlayerData[] {
-  return [...players].sort((a, b) => {
-    if (a.final_placement != null && b.final_placement != null) {
-      return a.final_placement - b.final_placement
-    }
-    if (a.final_placement != null) return -1
-    if (b.final_placement != null) return 1
-    return 0
-  })
 }
 
 function RoundPopover({
@@ -156,7 +145,44 @@ export function ShareGame() {
   const hasNext = currentIndex < roundOptions.length - 1
   const currentRoundLabel = roundOptions.find((o) => o.value === selectedRound)?.label ?? 'Latest'
 
-  const sortedPlayers = sortByPlacement(data.players)
+  const playerViews: PlayerView[] = data.players.map((p) => {
+    const snap = p.snapshots[p.snapshots.length - 1]
+    return {
+      name: p.name,
+      treasures: snap?.treasures ?? 0,
+      poison: p.final_poison,
+      phase: 'game_over',
+      round: snap?.round ?? 0,
+      stage: snap?.stage ?? 0,
+      vanquishers: 0,
+      is_ghost: false,
+      is_bot: p.is_bot,
+      time_of_death: null,
+      hand_count: snap?.hand.length ?? 0,
+      sideboard_count: snap?.sideboard.length ?? 0,
+      hand_size: snap?.hand.length ?? 0,
+      is_stage_increasing: false,
+      upgrades: snap?.applied_upgrades ?? [],
+      vanguard: snap?.vanguard ?? null,
+      chosen_basics: snap?.basic_lands ?? [],
+      most_recently_revealed_cards: [],
+      last_result: null,
+      pairing_probability: null,
+      is_most_recent_ghost: false,
+      full_sideboard: [],
+      command_zone: snap?.command_zone ?? [],
+      placement: p.final_placement ?? 0,
+      in_sudden_death: false,
+      build_ready: false,
+    }
+  })
+
+  const sortedPlayerViews = [...playerViews].sort((a, b) => {
+    if (a.placement !== 0 && b.placement !== 0) return a.placement - b.placement
+    if (a.placement !== 0) return -1
+    if (b.placement !== 0) return 1
+    return 0
+  })
 
   const renderContent = () => {
     if (isFinal) {
@@ -204,50 +230,19 @@ export function ShareGame() {
 
   const renderSidebarContent = () => (
     <div className="flex flex-col gap-1 p-3">
-      {sortedPlayers.map((player) => {
-        const isSelected = player.name === selectedPlayer
-        const placement = player.final_placement
-        const colors = placement != null
-          ? getPlacementBadgeColor(placement, data.players.length)
-          : null
-        return (
-          <button
-            key={player.name}
-            onClick={() => {
-              setSelectedPlayer(player.name)
-              if (sizes.isMobile) setSidebarOpen(false)
-            }}
-            className={`flex items-center gap-2 px-3 py-2 rounded text-left text-sm transition-colors ${
-              isSelected
-                ? 'bg-amber-600/20 ring-1 ring-amber-500/50 text-white'
-                : 'text-gray-300 hover:bg-gray-700/40'
-            }`}
-          >
-            {placement != null && colors && (
-              <span
-                className="text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none shrink-0"
-                style={{ backgroundColor: colors.bg, color: colors.text }}
-              >
-                {getOrdinal(placement)}
-              </span>
-            )}
-            <span className="truncate flex-1">
-              {player.name}
-              {player.name === data.owner_name && (
-                <span className="text-gray-500 ml-1">(You)</span>
-              )}
-            </span>
-            {player.is_bot && (
-              <span className="text-[10px] text-gray-500 shrink-0">BOT</span>
-            )}
-            {player.final_poison > 0 && (
-              <span className="text-[10px] text-emerald-400 shrink-0">
-                {player.final_poison}☠
-              </span>
-            )}
-          </button>
-        )
-      })}
+      {sortedPlayerViews.map((pv) => (
+        <PlayerRow
+          key={pv.name}
+          player={pv}
+          players={playerViews}
+          currentPlayerName={data.owner_name}
+          isSelected={pv.name === selectedPlayer}
+          onClick={() => {
+            setSelectedPlayer(pv.name)
+            if (sizes.isMobile) setSidebarOpen(false)
+          }}
+        />
+      ))}
     </div>
   )
 
@@ -255,26 +250,28 @@ export function ShareGame() {
     <div className="h-dvh flex flex-col bg-gray-900 text-white overflow-hidden">
       {/* Header */}
       <div className={`shrink-0 border-b border-gray-700 px-4 py-2 flex items-center justify-between ${!sizes.isMobile ? 'pr-64' : ''}`}>
-        <div className="flex items-center gap-2">
-          {sizes.isMobile && (
-            <button
-              onClick={() => setSidebarOpen((o) => !o)}
-              className="text-gray-300 hover:text-white text-xl px-1"
-            >
-              ☰
-            </button>
-          )}
-          <span className="text-amber-400 font-bold text-sm">Magic: The Battling</span>
-          {!gameFinished && (
-            <span className="text-xs text-gray-500 italic">Game in Progress</span>
-          )}
-        </div>
         <button
           className="bg-gray-800 border border-gray-600 text-gray-300 rounded px-3 py-1 text-sm hover:bg-gray-700"
           onClick={() => navigate('/')}
         >
           Home
         </button>
+        <div className="flex items-center gap-2">
+          <span className="text-amber-400 font-bold text-sm">Magic: The Battling</span>
+          {!gameFinished && (
+            <span className="text-xs text-gray-500 italic">Game in Progress</span>
+          )}
+        </div>
+        {sizes.isMobile ? (
+          <button
+            onClick={() => setSidebarOpen((o) => !o)}
+            className="text-gray-300 hover:text-white text-xl px-1"
+          >
+            ☰
+          </button>
+        ) : (
+          <div className="w-[30px]" />
+        )}
       </div>
 
       {/* Main + Sidebar */}
@@ -317,7 +314,7 @@ export function ShareGame() {
 
       {/* Bottom Bar */}
       <div className={`shrink-0 bg-black/60 backdrop-blur-sm border-t border-gray-700/50 ${!sizes.isMobile ? 'pr-64' : ''}`}>
-        <div className="flex items-center justify-between py-1.5 sm:py-2 px-4 timeline-actions">
+        <div className="flex items-center justify-between py-1.5 sm:py-2 px-1.5 timeline-actions">
           {/* Left: Round selector */}
           <div className="relative">
             <button

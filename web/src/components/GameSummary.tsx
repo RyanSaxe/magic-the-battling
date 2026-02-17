@@ -91,6 +91,7 @@ export function GameSummary({
           poison={frozenPlayer.poison}
           appliedUpgrades={appliedUpgrades}
           companionIds={companionIds}
+          className={compact ? 'bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col' : undefined}
         />
       </div>
     </div>

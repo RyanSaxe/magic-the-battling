@@ -16,6 +16,7 @@ interface DeckDisplayProps {
   poison: number
   appliedUpgrades: CardType[]
   companionIds: Set<string>
+  className?: string
 }
 
 export function DeckDisplay({
@@ -26,6 +27,7 @@ export function DeckDisplay({
   poison,
   appliedUpgrades,
   companionIds,
+  className,
 }: DeckDisplayProps) {
   const battlefieldCount = basics.length + 2
   const commandZoneCount = appliedUpgrades.length
@@ -48,6 +50,7 @@ export function DeckDisplay({
   return (
     <ZoneLayout
       containerRef={ref}
+      className={className}
       hasHand={hasHand}
       hasBattlefield={battlefieldCount > 0}
       hasSideboard={hasSideboard}
