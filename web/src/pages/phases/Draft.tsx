@@ -73,7 +73,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   )
 
   return (
-    <div ref={containerRef} className="bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col h-full overflow-hidden">
+    <div ref={containerRef} className="bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col h-full">
       <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
         {/* Pool */}
         <div className="bg-black/30 px-3 pt-5 pb-3 relative">
