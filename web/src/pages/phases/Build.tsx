@@ -234,7 +234,7 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
 
       <ZoneLayout
         containerRef={containerRef}
-        className={`rounded-lg bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col transition-opacity ${locked ? 'opacity-60 pointer-events-none' : ''}`}
+        className={`bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col transition-opacity ${locked ? 'opacity-60 pointer-events-none' : ''}`}
         hasHand={true}
         hasBattlefield={true}
         hasSideboard={self_player.sideboard.length > 0}

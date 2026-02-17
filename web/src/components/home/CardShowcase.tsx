@@ -10,6 +10,7 @@ const CYCLE_INTERVAL = 4000;
 const FADE_DURATION = 400;
 const MAX_HAND_SIZE = 5;
 const CARD_GAP = 12;
+const MOBILE_OVERLAP = 0.25;
 
 type UpgradePhase =
   | "hidden"
@@ -31,9 +32,13 @@ const UPGRADE_TIMINGS = {
 
 function computeShowcaseSizes(vw: number, vh: number) {
   const isMobile = vw < 640;
-  const availableWidth = vw - (isMobile ? 32 : 64);
+  const availableWidth = vw - (isMobile ? 16 : 64);
+  const effectiveSlots = isMobile
+    ? MAX_HAND_SIZE - (MAX_HAND_SIZE - 1) * MOBILE_OVERLAP
+    : MAX_HAND_SIZE;
   const maxWidthFromViewport = Math.floor(
-    (availableWidth - CARD_GAP * (MAX_HAND_SIZE - 1)) / MAX_HAND_SIZE,
+    (availableWidth - (isMobile ? 0 : CARD_GAP * (MAX_HAND_SIZE - 1))) /
+      effectiveSlots,
   );
   const maxHeightFromViewport = Math.round(vh * (isMobile ? 0.28 : 0.38));
   const cardHeight = Math.min(
@@ -41,12 +46,14 @@ function computeShowcaseSizes(vw: number, vh: number) {
     Math.round((maxWidthFromViewport * 7) / 5),
   );
   const cardWidth = Math.round((cardHeight * 5) / 7);
+  const handGap = isMobile ? -Math.round(cardWidth * MOBILE_OVERLAP) : CARD_GAP;
   const fieldHeight = Math.round(cardHeight * 0.55);
   const fieldWidth = Math.round((fieldHeight * 5) / 7);
 
   return {
     hand: { width: cardWidth, height: cardHeight },
     field: { width: fieldWidth, height: fieldHeight },
+    handGap,
   };
 }
 
@@ -241,8 +248,11 @@ export function CardShowcase() {
 
       <div className={fading ? "carousel-fade-out" : "carousel-fade-in"}>
         <div className="flex flex-col items-center gap-3">
-          <div className="flex items-end justify-center gap-3">
-            {stage.hand.map((card) => {
+          <div
+            className="flex items-end justify-center"
+            style={{ gap: sizes.handGap >= 0 ? sizes.handGap : 0 }}
+          >
+            {stage.hand.map((card, i) => {
               const isTarget = stage.upgrade?.targetCardId === card.id;
               const targetClass = isTarget
                 ? [
@@ -260,6 +270,19 @@ export function CardShowcase() {
                   key={card.id}
                   ref={isTarget ? targetCardRef : undefined}
                   className={targetClass}
+                  style={{
+                    ...(sizes.handGap < 0 && i > 0
+                      ? { marginLeft: sizes.handGap }
+                      : undefined),
+                    ...(sizes.handGap < 0
+                      ? {
+                          zIndex:
+                            isTarget && isEnlarged
+                              ? stage.hand.length + 1
+                              : i,
+                        }
+                      : undefined),
+                  }}
                 >
                   <Card
                     card={card}

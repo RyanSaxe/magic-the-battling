@@ -76,16 +76,6 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
     setSelectedTargetId(selectedTargetId === target.id ? null : target.id)
   }
 
-  const subtitle = isApplyMode
-    ? readyToConfirm
-      ? `Apply ${selectedUpgrade.name} to ${selectedTarget.name}?`
-      : selectedUpgrade
-        ? 'Select a card'
-        : selectedTarget
-          ? 'Select an upgrade'
-          : 'Select upgrade + card'
-    : '\u00A0'
-
   return (
     <div
       className="fixed inset-0 bg-black/85 flex items-center justify-center z-50 p-2"
@@ -104,7 +94,6 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
                 'Upgrades'
               )}
             </h2>
-            <p className="text-gray-400 text-sm">{subtitle}</p>
           </div>
           <button
             onClick={onClose}
@@ -132,7 +121,6 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
                       } else {
                         setSelectedUpgradeId(upgrade.id)
                       }
-                      setSelectedTargetId(null)
                     }}
                     selected={selectedUpgradeId === upgrade.id}
                   />
