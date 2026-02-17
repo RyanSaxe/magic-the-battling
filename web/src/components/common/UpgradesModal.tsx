@@ -107,42 +107,46 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
 
         {isApplyMode ? (
           <div ref={applyRef} className="flex-1 min-h-0 flex flex-col p-2">
-            <div className="shrink-0 flex justify-center">
-              <CardGrid columns={applyDims.top.columns} cardWidth={upgradeDims.width}>
-                {applied.map((upgrade) => (
-                  <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={upgradeDims} />
-                ))}
-                {unapplied.map((upgrade) => (
-                  <Card
-                    key={upgrade.id}
-                    card={upgrade}
-                    dimensions={upgradeDims}
-                    onClick={() => {
-                      if (selectedUpgradeId === upgrade.id) {
-                        setSelectedUpgradeId(null)
-                      } else {
-                        setSelectedUpgradeId(upgrade.id)
-                      }
-                    }}
-                    selected={selectedUpgradeId === upgrade.id}
-                  />
-                ))}
-              </CardGrid>
-            </div>
+            {separatorHeight > 0 && (
+              <div className="shrink-0 flex justify-center">
+                <CardGrid columns={applyDims.top.columns} cardWidth={upgradeDims.width}>
+                  {applied.map((upgrade) => (
+                    <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={upgradeDims} />
+                  ))}
+                  {unapplied.map((upgrade) => (
+                    <Card
+                      key={upgrade.id}
+                      card={upgrade}
+                      dimensions={upgradeDims}
+                      onClick={() => {
+                        if (selectedUpgradeId === upgrade.id) {
+                          setSelectedUpgradeId(null)
+                        } else {
+                          setSelectedUpgradeId(upgrade.id)
+                        }
+                      }}
+                      selected={selectedUpgradeId === upgrade.id}
+                    />
+                  ))}
+                </CardGrid>
+              </div>
+            )}
             <hr ref={separatorRef} className="border-gray-700 my-2" />
-            <div className="flex-1 min-h-0 flex justify-center">
-              <CardGrid columns={applyDims.bottom.columns} cardWidth={targetDims.width}>
-                {targets.map((card) => (
-                  <Card
-                    key={card.id}
-                    card={card}
-                    dimensions={targetDims}
-                    onClick={() => handleTargetClick(card)}
-                    selected={selectedTargetId === card.id}
-                  />
-                ))}
-              </CardGrid>
-            </div>
+            {separatorHeight > 0 && (
+              <div className="flex-1 min-h-0 flex justify-center">
+                <CardGrid columns={applyDims.bottom.columns} cardWidth={targetDims.width}>
+                  {targets.map((card) => (
+                    <Card
+                      key={card.id}
+                      card={card}
+                      dimensions={targetDims}
+                      onClick={() => handleTargetClick(card)}
+                      selected={selectedTargetId === card.id}
+                    />
+                  ))}
+                </CardGrid>
+              </div>
+            )}
           </div>
         ) : (
           <div ref={viewRef} className="flex-1 min-h-0 p-2">
