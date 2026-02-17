@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
-import { useElementHeight } from '../../hooks/useElementHeight'
+import { badgeCls } from '../../components/common/ZoneLayout'
 
 interface DraftPhaseProps {
   gameState: GameState
@@ -30,16 +30,14 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   const currentPack = self_player.current_pack ?? []
   const pool = [...self_player.hand, ...self_player.sideboard]
 
-  const [separatorRef, separatorHeight] = useElementHeight()
-
-  const [containerRef, { top: packCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
-    topCount: currentPack.length,
-    bottomCount: pool.length,
+  const [containerRef, { top: poolDims, bottom: packDims }] = useDualZoneCardSizes({
+    topCount: pool.length,
+    bottomCount: currentPack.length,
     topGap: 6,
     bottomGap: 6,
-    fixedHeight: separatorHeight + 16,
-    topMaxWidth: 400,
-    bottomMaxWidth: 300,
+    fixedHeight: 65,
+    topMaxWidth: 300,
+    bottomMaxWidth: 400,
   })
   const appliedUpgradesList = self_player.upgrades.filter((u) => u.upgrade_target)
   const upgradedCardIds = new Set(appliedUpgradesList.map((u) => u.upgrade_target!.id))
@@ -75,70 +73,73 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   )
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full gap-2 p-4 overflow-hidden">
-      {currentPack.length === 0 ? (
-        <div className="text-center">
-          <div className="text-gray-400 text-sm">No pack available</div>
+    <div ref={containerRef} className="bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col h-full overflow-hidden">
+      <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
+        {/* Pool */}
+        <div className="bg-black/30 px-3 pt-5 pb-3 relative">
+          <span className={badgeCls}>Pool</span>
+          {pool.length === 0 ? (
+            <div className="flex items-center justify-center">
+              <div className="text-gray-500 text-sm text-center">
+                Swap cards from the pack to build your pool
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${poolDims.columns}, ${poolDims.width}px)`,
+              gap: '6px',
+              justifyContent: 'center',
+              maxWidth: '100%',
+              overflow: 'hidden',
+            }}>
+              {pool.map((card, index) => {
+                const isInHand = self_player.hand.some((c) => c.id === card.id)
+                return (
+                  <Card
+                    key={card.id}
+                    card={card}
+                    onClick={() => handleCardClick(card, index, 'pool', isInHand)}
+                    selected={selectedCard?.card.id === card.id}
+                    dimensions={poolDims}
+                    upgraded={upgradedCardIds.has(card.id)}
+                    appliedUpgrades={getAppliedUpgrades(card.id)}
+                  />
+                )
+              })}
+            </div>
+          )}
         </div>
-      ) : separatorHeight > 0 ? (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${packCardDims.columns}, ${packCardDims.width}px)`,
-          gap: '6px',
-          justifyContent: 'center',
-          maxWidth: '100%',
-          overflow: 'hidden',
-        }}>
-          {currentPack.map((card, index) => (
-            <Card
-              key={card.id}
-              card={card}
-              onClick={() => handleCardClick(card, index, 'pack', false)}
-              selected={selectedCard?.card.id === card.id}
-              dimensions={packCardDims}
-            />
-          ))}
-        </div>
-      ) : null}
 
-      <div ref={separatorRef} className="flex items-center gap-3 px-2">
-        <div className="flex-1 border-t border-gray-600/40" />
-        <span className="text-xs text-gray-300 uppercase tracking-widest">Your Pool</span>
-        <div className="flex-1 border-t border-gray-600/40" />
+        {/* Pack */}
+        <div className="bg-black/30 px-3 pt-5 pb-3 relative flex-1">
+          <span className={badgeCls}>Pack</span>
+          {currentPack.length === 0 ? (
+            <div className="text-center">
+              <div className="text-gray-400 text-sm">No pack available</div>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${packDims.columns}, ${packDims.width}px)`,
+              gap: '6px',
+              justifyContent: 'center',
+              maxWidth: '100%',
+              overflow: 'hidden',
+            }}>
+              {currentPack.map((card, index) => (
+                <Card
+                  key={card.id}
+                  card={card}
+                  onClick={() => handleCardClick(card, index, 'pack', false)}
+                  selected={selectedCard?.card.id === card.id}
+                  dimensions={packDims}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-
-      {/* Pool */}
-      {pool.length === 0 ? (
-        <div className="flex items-center justify-center">
-          <div className="text-gray-500 text-sm text-center">
-            Swap cards from the pack to build your pool
-          </div>
-        </div>
-      ) : separatorHeight > 0 ? (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
-          gap: '6px',
-          justifyContent: 'center',
-          maxWidth: '100%',
-          overflow: 'hidden',
-        }}>
-          {pool.map((card, index) => {
-            const isInHand = self_player.hand.some((c) => c.id === card.id)
-            return (
-              <Card
-                key={card.id}
-                card={card}
-                onClick={() => handleCardClick(card, index, 'pool', isInHand)}
-                selected={selectedCard?.card.id === card.id}
-                dimensions={poolCardDims}
-                upgraded={upgradedCardIds.has(card.id)}
-                appliedUpgrades={getAppliedUpgrades(card.id)}
-              />
-            )
-          })}
-        </div>
-      ) : null}
     </div>
   )
 }
