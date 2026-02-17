@@ -100,11 +100,11 @@ export function Lobby() {
 
   return (
     <div className="game-table flex items-center justify-center p-4">
-      <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-md">
-        <h1 className="text-2xl font-bold text-white text-center mb-2">
+      <div className="bg-black/60 backdrop-blur rounded-lg px-6 py-4 w-full max-w-md">
+        <h1 className="text-xl font-bold text-white text-center mb-1">
           Game Lobby
         </h1>
-        <p className="text-gray-400 text-center text-sm mb-6">
+        <p className="text-gray-400 text-center text-xs mb-3">
           Draft, Build, Battle!{" "}
           <a
             href={`https://cubecobra.com/cube/list/${lobbyState?.cube_id ?? "auto"}`}
@@ -145,67 +145,55 @@ export function Lobby() {
 
             return (
               <>
-                <div className="bg-black/40 rounded-lg p-4 mb-6 text-center">
-                  <p className="text-gray-400 text-sm mb-2">Share this code</p>
+                <div className="bg-black/40 rounded-lg p-3 mb-4 text-center">
+                  <p className="text-gray-400 text-xs mb-1">Share this code</p>
                   <div className="flex items-center justify-center gap-3">
-                    <span className="text-3xl font-mono font-bold text-amber-400 tracking-wider">
+                    <span className="text-2xl font-mono font-bold text-amber-400 tracking-wider">
                       {lobbyState.join_code}
                     </span>
                     <button
                       onClick={copyJoinCode}
-                      className="btn btn-secondary text-sm py-1"
+                      className="btn btn-secondary text-xs py-0.5 px-2"
                     >
                       {copied ? "Copied!" : "Copy"}
                     </button>
                   </div>
-                  <p className="text-gray-500 text-sm mt-2">
-                    Target: {lobbyState.target_player_count} players
-                  </p>
                 </div>
 
-                <div className="mb-6">
-                  <h2 className="text-white font-medium mb-3">
+                <div className="mb-4">
+                  <h2 className="text-white font-medium mb-2 text-sm">
                     Players ({lobbyState.players.length}/
                     {lobbyState.target_player_count})
                   </h2>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-1.5">
                     {lobbyState.players.map((player) => (
                       <div
                         key={player.name}
-                        className="bg-black/30 p-3 rounded-lg flex items-center justify-between"
+                        className="bg-black/30 px-2.5 py-2 rounded-lg flex items-center gap-1.5 min-w-0"
                       >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`w-2 h-2 rounded-full ${
-                              player.is_ready ? "bg-green-500" : "bg-gray-500"
-                            }`}
-                          />
-                          <span className="text-white truncate max-w-[150px]">
-                            {player.name}
+                        <span
+                          className={`w-2 h-2 rounded-full shrink-0 ${
+                            player.is_ready ? "bg-green-500" : "bg-gray-500"
+                          }`}
+                        />
+                        <span className="text-white text-sm truncate">
+                          {player.name}
+                        </span>
+                        {player.is_host && (
+                          <span className="text-amber-400 text-xs shrink-0 ml-auto">
+                            Host
                           </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {player.is_host && (
-                            <span className="text-amber-400 text-sm">Host</span>
-                          )}
-                          <span
-                            className={`text-sm ${player.is_ready ? "text-green-400" : "text-gray-500"}`}
-                          >
-                            {player.is_ready ? "Ready" : "Not Ready"}
-                          </span>
-                        </div>
+                        )}
                       </div>
                     ))}
                     {botSlots > 0 &&
                       Array.from({ length: botSlots }).map((_, i) => {
                         const isSearching = availableBots === null;
                         const botAvailable = !isSearching && i < availableBots;
-                        const botUnavailable =
-                          !isSearching && i >= availableBots;
                         return (
                           <div
                             key={`bot-${i}`}
-                            className={`bg-black/20 p-3 rounded-lg flex items-center justify-between border border-dashed ${
+                            className={`bg-black/20 px-2.5 py-2 rounded-lg flex items-center gap-1.5 border border-dashed ${
                               isSearching
                                 ? "border-amber-600/50"
                                 : botAvailable
@@ -213,67 +201,55 @@ export function Lobby() {
                                   : "border-red-700/50"
                             }`}
                           >
-                            <div className="flex items-center gap-2">
-                              {isSearching ? (
-                                <svg
-                                  className="animate-spin h-3 w-3 text-amber-500"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <circle
-                                    className="opacity-25"
-                                    cx="12"
-                                    cy="12"
-                                    r="10"
-                                    stroke="currentColor"
-                                    strokeWidth="4"
-                                    fill="none"
-                                  />
-                                  <path
-                                    className="opacity-75"
-                                    fill="currentColor"
-                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                                  />
-                                </svg>
-                              ) : (
-                                <span
-                                  className={`w-2 h-2 rounded-full ${botAvailable ? "bg-cyan-600" : "bg-red-700/50"}`}
-                                />
-                              )}
-                              <span
-                                className={`italic ${isSearching ? "text-amber-400" : botAvailable ? "text-cyan-500" : "text-red-400/70"}`}
+                            {isSearching ? (
+                              <svg
+                                className="animate-spin h-3 w-3 text-amber-500 shrink-0"
+                                viewBox="0 0 24 24"
                               >
-                                Bot {i + 1}
-                              </span>
-                            </div>
-                            {isSearching && (
-                              <span className="text-amber-400/70 text-xs">
-                                Searching...
-                              </span>
+                                <circle
+                                  className="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  strokeWidth="4"
+                                  fill="none"
+                                />
+                                <path
+                                  className="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                />
+                              </svg>
+                            ) : (
+                              <span
+                                className={`w-2 h-2 rounded-full shrink-0 ${botAvailable ? "bg-cyan-600" : "bg-red-700/50"}`}
+                              />
                             )}
-                            {botUnavailable && (
-                              <span className="text-red-400/70 text-xs">
-                                No match found
-                              </span>
-                            )}
+                            <span
+                              className={`text-sm italic ${isSearching ? "text-amber-400" : botAvailable ? "text-cyan-500" : "text-red-400/70"}`}
+                            >
+                              Bot {i + 1}
+                            </span>
                           </div>
                         );
                       })}
-                    {botSlots > 0 &&
-                      availableBots !== null &&
-                      availableBots < botSlots && (
-                        <p className="text-gray-500 text-xs mt-2 px-1">
-                          Bots are past players with matching settings. Invite
-                          more players or try different game options.
-                        </p>
-                      )}
                   </div>
+                  {botSlots > 0 &&
+                    availableBots !== null &&
+                    availableBots < botSlots && (
+                      <p className="text-gray-500 text-xs mt-1.5 px-1">
+                        Bots are past players with matching settings. Invite
+                        more players or try different game options.
+                      </p>
+                    )}
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {!isHost && (
                     <button
                       onClick={() => actions.setReady(!isReady)}
-                      className={`w-full py-3 rounded font-medium transition-colors ${
+                      className={`w-full py-2 rounded font-medium transition-colors ${
                         isReady
                           ? "bg-gray-600 text-white hover:bg-gray-500"
                           : "bg-green-600 text-white hover:bg-green-500"
@@ -287,7 +263,7 @@ export function Lobby() {
                     <>
                       <button
                         onClick={() => actions.setReady(!isReady)}
-                        className={`w-full py-3 rounded font-medium transition-colors ${
+                        className={`w-full py-2 rounded font-medium transition-colors ${
                           isReady
                             ? "bg-gray-600 text-white hover:bg-gray-500"
                             : "bg-green-600 text-white hover:bg-green-500"
@@ -301,7 +277,7 @@ export function Lobby() {
                           actions.startGame();
                         }}
                         disabled={!lobbyState.can_start || startingGame}
-                        className="btn btn-primary w-full py-3"
+                        className="btn btn-primary w-full py-2"
                       >
                         {startingGame ? (
                           <span className="flex items-center justify-center gap-2">

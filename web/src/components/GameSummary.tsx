@@ -8,6 +8,7 @@ interface GameSummaryProps {
   players: PlayerView[]
   useUpgrades?: boolean
   gameId?: string
+  compact?: boolean
 }
 
 export function GameSummary({
@@ -15,6 +16,7 @@ export function GameSummary({
   players,
   useUpgrades = true,
   gameId,
+  compact = false,
 }: GameSummaryProps) {
   const [frozenPlayer] = useState(() => ({
     hand: [...player.hand],
@@ -59,7 +61,7 @@ export function GameSummary({
   }, [gameId, frozenPlayer.name])
 
   return (
-    <div className="flex-1 flex flex-col items-center p-4 overflow-hidden">
+    <div className={`flex-1 flex flex-col items-center min-h-0 ${compact ? '' : 'p-4'}`}>
       {gameId && (
         <div className="shrink-0 text-center mb-3">
           <div className="flex items-center justify-center gap-3">
@@ -80,7 +82,7 @@ export function GameSummary({
         </div>
       )}
 
-      <div className="max-w-5xl w-full flex-1 min-h-0 flex flex-col">
+      <div className={`w-full flex-1 min-h-0 flex flex-col ${compact ? '' : 'pt-2 max-w-5xl'}`}>
         <DeckDisplay
           hand={frozenPlayer.hand}
           sideboard={frozenPlayer.sideboard}
@@ -89,6 +91,7 @@ export function GameSummary({
           poison={frozenPlayer.poison}
           appliedUpgrades={appliedUpgrades}
           companionIds={companionIds}
+          className={compact ? 'bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col' : undefined}
         />
       </div>
     </div>

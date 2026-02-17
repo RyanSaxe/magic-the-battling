@@ -1,10 +1,23 @@
 export type Phase = "draft" | "build" | "battle" | "reward";
 
-export const PHASE_HINTS: Record<Phase, string> = {
-  draft: "Click on two cards to swap them",
-  build: "Click on two cards to swap them",
-  battle: "Right-click Cards on the Battlefield for actions",
-  reward: "Enjoy your rewards and continue to draft.",
+export const PHASE_CONTROLS: Record<Phase, string[]> = {
+  draft: [
+    "Click a card in the pack, then click a card in your pool to swap them",
+    "Spend treasure to reroll the pack",
+  ],
+  build: [
+    "Click a card in your hand and pool to swap them",
+    "Select 3 basic lands for your starting battlefield",
+    "Click Play or Draw when done",
+  ],
+  battle: [
+    "Right-click cards on the battlefield for actions",
+    "Drag cards between zones",
+  ],
+  reward: [
+    "Rewards are applied automatically",
+    "Continue to start the next draft",
+  ],
 };
 
 export const PHASE_RULES: Record<Phase, { title: string; rules: string[] }> = {

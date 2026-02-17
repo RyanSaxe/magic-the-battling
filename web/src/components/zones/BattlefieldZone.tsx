@@ -2,6 +2,7 @@ import type { Card as CardType, ZoneName } from "../../types";
 import type { CardDimensions } from "../../hooks/useViewportCardSizes";
 import { DraggableCard, DroppableZone } from "../../dnd";
 import { AttachedCardStack } from "../card";
+import { PoisonCard } from "../common/PoisonCard";
 
 const isLandOrTreasure = (card: CardType) =>
   card.type_line.toLowerCase().includes("land") ||
@@ -30,6 +31,7 @@ interface BattlefieldZoneProps {
   cardDimensions?: CardDimensions;
   upgradedCardIds?: Set<string>;
   upgradesByCardId?: Map<string, CardType[]>;
+  poisonCount?: number;
   rowHeight?: number;
   landCardDimensions?: CardDimensions;
   nonlandCardDimensions?: CardDimensions;
@@ -54,6 +56,7 @@ export function BattlefieldZone({
   cardDimensions,
   upgradedCardIds = new Set(),
   upgradesByCardId,
+  poisonCount = 0,
   rowHeight,
   landCardDimensions,
   nonlandCardDimensions,
@@ -177,6 +180,9 @@ export function BattlefieldZone({
                     </div>
                   ))}
                 </div>
+              )}
+              {landCardDimensions && (
+                <PoisonCard count={poisonCount} dimensions={landCardDimensions} />
               )}
             </div>
           )}

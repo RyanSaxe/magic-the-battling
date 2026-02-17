@@ -11,7 +11,7 @@ interface BattleSidebarContentProps {
   onYourLifeChange: (life: number) => void;
   onOpponentLifeChange: (life: number) => void;
   playerName: string;
-  onOpenActions?: () => void;
+  onCreateTreasure?: () => void;
 }
 
 function LifeCounter({
@@ -113,7 +113,7 @@ export function BattleSidebarContent({
   onYourLifeChange,
   onOpponentLifeChange,
   playerName,
-  onOpenActions,
+  onCreateTreasure,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
@@ -182,13 +182,13 @@ export function BattleSidebarContent({
               )}
             </div>
           )}
-          {onOpenActions && (
+          {onCreateTreasure && (
             <div className="mt-3">
               <button
-                onClick={onOpenActions}
+                onClick={onCreateTreasure}
                 className="w-full px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
               >
-                Actions
+                Create Treasure
               </button>
             </div>
           )}

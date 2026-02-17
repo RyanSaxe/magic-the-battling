@@ -21,15 +21,16 @@ def get_would_be_dead_bots(game: Game) -> list[FakePlayer]:
     return [f for f in get_live_bots(game) if f.poison >= game.config.poison_to_lose]
 
 
+def _update_ghosts(game: Game, ghost: StaticOpponent | None, ghost_bot: FakePlayer | None, remaining: int) -> None:
+    game.most_recent_ghost = ghost if remaining % 2 != 0 else None
+    game.most_recent_ghost_bot = ghost_bot if remaining % 2 != 0 else None
+
+
 def eliminate_bot(game: Game, bot: FakePlayer) -> None:
     bot.is_eliminated = True
     remaining = len(get_live_players(game)) + len(get_live_bots(game))
     bot.placement = remaining + 1
-    game.most_recent_ghost = None
-    if remaining % 2 == 0:
-        game.most_recent_ghost_bot = None
-    else:
-        game.most_recent_ghost_bot = bot
+    _update_ghosts(game, None, bot, remaining)
 
 
 def eliminate_player(game: Game, player: Player, round_num: int, stage_num: int) -> None:
@@ -37,15 +38,10 @@ def eliminate_player(game: Game, player: Player, round_num: int, stage_num: int)
     player.phase = "eliminated"
     player.elimination_round = round_num
     player.elimination_stage = stage_num
-    game.most_recent_ghost_bot = None
 
     remaining_alive = len(get_live_players(game)) + len(get_live_bots(game))
     player.placement = remaining_alive + 1
-
-    if remaining_alive % 2 == 0:
-        game.most_recent_ghost = None
-    else:
-        game.most_recent_ghost = ghost_opponent
+    _update_ghosts(game, ghost_opponent, None, remaining_alive)
 
 
 def would_be_dead_ready_for_elimination(game: Game) -> bool:

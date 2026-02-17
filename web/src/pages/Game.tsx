@@ -17,91 +17,16 @@ import { Sidebar } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
 import { GameSummary } from "../components/GameSummary";
 import { ActionMenu } from "../components/ActionMenu";
-import { RulesModal } from "../components/RulesModal";
-import { InfoIcon } from "../components/icons";
+import { PhaseTimeline } from "../components/PhaseTimeline";
+import { PhasePopover } from "../components/PhasePopover";
 import { ContextStripProvider, useContextStrip } from "../contexts";
-import { CardPreviewContext } from "../components/card";
+import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
-import { PHASE_HINTS, type Phase } from "../constants/rules";
-import { POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from "../constants/assets";
+import type { Phase } from "../constants/rules";
+import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
-import type { Card as CardType } from "../types";
-
-function CardPreviewModal({
-  card,
-  appliedUpgrades,
-  onClose,
-}: {
-  card: CardType;
-  appliedUpgrades: CardType[];
-  onClose: () => void;
-}) {
-  const [isFlipped, setIsFlipped] = useState(false);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  const getImageUrl = (c: CardType, flipped: boolean) => {
-    if (flipped && c.flip_image_url) {
-      return c.flip_image_url;
-    }
-    return c.png_url ?? c.image_url;
-  };
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-      onClick={onClose}
-    >
-      <div
-        className="relative flex gap-4 items-center max-w-[95vw] max-h-[85vh] px-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <img
-          src={getImageUrl(card, isFlipped)}
-          alt={card.name}
-          className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
-          style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
-        />
-        {appliedUpgrades.length > 0 && (
-          <>
-            <div className="text-white text-2xl font-bold shrink-0">→</div>
-            {appliedUpgrades.map((upgrade) => (
-              <img
-                key={upgrade.id}
-                src={getImageUrl(upgrade, isFlipped)}
-                alt={upgrade.name}
-                className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
-                style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
-              />
-            ))}
-          </>
-        )}
-        <button
-          className="absolute -top-4 -right-4 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/80"
-          onClick={onClose}
-        >
-          ×
-        </button>
-        {card.flip_image_url && (
-          <button
-            className="absolute top-2 right-2 bg-black/60 text-white rounded px-3 py-1 text-sm hover:bg-black/80 transition-colors"
-            onClick={() => setIsFlipped(!isFlipped)}
-          >
-            Flip
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+import { UpgradesModal } from "../components/common/UpgradesModal";
+import { SubmitPopover } from "../components/common/SubmitPopover";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -420,7 +345,6 @@ function SpectateRequestModal({
 
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { session, saveSession } = useSession();
 
@@ -443,11 +367,14 @@ function GameContent() {
 
   // Lifted state from Build phase
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
+  const [showUpgradesModal, setShowUpgradesModal] = useState(false);
+  const handSlotsRef = useRef<(string | null)[]>([]);
 
   // Lifted state from Reward phase
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(
     null,
   );
+  const [selectedPoolCardId, setSelectedPoolCardId] = useState<string | null>(null);
 
   // Lifted state from Battle phase
   const [battleSelectedCard, setBattleSelectedCard] = useState<BattleSelectedCard | null>(null);
@@ -455,6 +382,8 @@ function GameContent() {
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [showSidebarSideboard, setShowSidebarSideboard] = useState(false);
   const [showOpponentSideboard, setShowOpponentSideboard] = useState(false);
+  const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
+  const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
 
   const prevPhaseRef = useRef(gameState?.self_player.phase);
   if (gameState?.self_player.phase !== prevPhaseRef.current) {
@@ -464,19 +393,10 @@ function GameContent() {
     }
   }
 
-  // Rules modal state
-  const [showRulesModal, setShowRulesModal] = useState(false);
-  const [hasViewedRules, setHasViewedRules] = useState(
-    () => localStorage.getItem("mtb-rules-viewed") === "true",
-  );
+  // Phase popover state
+  const [openPopoverPhase, setOpenPopoverPhase] = useState<Phase | null>(null);
+  const [popoverAnchorX, setPopoverAnchorX] = useState(0);
 
-  const handleOpenRules = () => {
-    setShowRulesModal(true);
-    if (!hasViewedRules) {
-      localStorage.setItem("mtb-rules-viewed", "true");
-      setHasViewedRules(true);
-    }
-  };
 
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
@@ -550,24 +470,12 @@ function GameContent() {
 
   const currentPhase = gameState.self_player.phase;
 
-  const phaseBadgeClass =
-    {
-      draft: "draft",
-      build: "build",
-      battle: "battle",
-      reward: "reward",
-      awaiting_elimination: "reward",
-      eliminated: "battle",
-      winner: "reward",
-      game_over: "battle",
-    }[currentPhase] || "draft";
-
   const { self_player, current_battle } = gameState;
 
   const maxHandSize = self_player.hand_size;
-  const handExceedsLimit = self_player.hand.length > maxHandSize;
+  const handFull = self_player.hand.length === maxHandSize;
   const basicsComplete = selectedBasics.length === 3;
-  const canReady = basicsComplete && !handExceedsLimit;
+  const canReady = basicsComplete && handFull;
 
   const isStageIncreasing = self_player.is_stage_increasing;
   const needsUpgrade =
@@ -577,12 +485,17 @@ function GameContent() {
   const handleContinue = () => {
     actions.rewardDone(selectedUpgradeId ?? undefined);
     setSelectedUpgradeId(null);
+    setSelectedPoolCardId(null);
   };
 
   const renderActionButtons = (): ReactNode => {
     if (isSpectator) {
       return null;
     }
+
+    let left: ReactNode = null;
+    let right: ReactNode = null;
+
     if (currentPhase === "eliminated") {
       const hasWatchablePlayers = gameState.players.some(
         (p) =>
@@ -592,164 +505,214 @@ function GameContent() {
           p.phase !== "winner" &&
           p.phase !== "game_over"
       );
-      return (
-        <>
-          {hasWatchablePlayers && (
-            <button onClick={handleSpectateNewTab} className="btn btn-secondary">
-              Spectate
+      if (hasWatchablePlayers) {
+        right = (
+          <button onClick={handleSpectateNewTab} className="btn btn-secondary">
+            Spectate
+          </button>
+        );
+      }
+    } else if (currentPhase === "draft") {
+      left = (
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {self_player.upgrades.length > 0 && (
+            <button onClick={() => setShowUpgradesModal(true)} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+              View Upgrades
             </button>
           )}
-          <button onClick={() => navigate("/")} className="btn btn-primary">
-            Home
+          <button
+            onClick={actions.draftRoll}
+            disabled={
+              self_player.treasures <= 0 ||
+              (self_player.current_pack?.length ?? 0) === 0
+            }
+            className="btn bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Roll for 1💰
           </button>
-        </>
+        </div>
       );
-    }
-    if (currentPhase === "winner" || currentPhase === "game_over") {
-      return (
-        <button onClick={() => navigate("/")} className="btn btn-primary">
-          Home
+      right = (
+        <button onClick={actions.draftDone} className="btn btn-primary">
+          Go to Build
         </button>
       );
-    }
-    switch (currentPhase) {
-      case "draft":
-        return (
-          <>
+    } else if (currentPhase === "build") {
+      if (self_player.build_ready) {
+        left = self_player.upgrades.length > 0 ? (
+          <button onClick={() => setShowUpgradesModal(true)} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+            View Upgrades
+          </button>
+        ) : null;
+        right = (
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-amber-400 text-sm">Waiting...</span>
             <button
-              onClick={actions.draftRoll}
-              disabled={
-                self_player.treasures <= 0 ||
-                (self_player.current_pack?.length ?? 0) === 0
-              }
-              className="btn btn-secondary"
+              onClick={actions.buildUnready}
+              className="btn bg-gray-600 hover:bg-gray-500 text-white"
             >
-              Roll for 1💰
+              Change
             </button>
-            <button onClick={actions.draftDone} className="btn btn-primary">
-              Go to Build
-            </button>
-          </>
+          </div>
         );
-      case "build":
-        if (self_player.build_ready) {
-          return (
-            <>
-              <span className="text-amber-400 text-sm">Waiting...</span>
-              <button
-                onClick={actions.buildUnready}
-                className="btn bg-gray-600 hover:bg-gray-500 text-white"
-              >
-                Undo
-              </button>
-            </>
-          );
-        }
-        return (
-          <>
-            <span className={`text-sm ${basicsComplete ? "text-green-400" : "text-amber-400 animate-pulse"}`}>
-              {selectedBasics.length}/3 basics
+      } else {
+        left = self_player.upgrades.length > 0 ? (
+          <button
+            onClick={() => setShowUpgradesModal(true)}
+            className={`btn text-white ${self_player.upgrades.some((u) => !u.upgrade_target) ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-600 hover:bg-gray-500'}`}
+          >
+            {self_player.upgrades.some((u) => !u.upgrade_target) ? 'Apply Upgrade' : 'View Upgrades'}
+          </button>
+        ) : null;
+        right = (
+          <div className="relative flex items-center gap-1.5 sm:gap-2">
+            <button
+              onClick={() => setShowSubmitHandPopover((v) => !v)}
+              disabled={!canReady}
+              className="btn btn-primary"
+            >
+              Submit Hand
+            </button>
+            {showSubmitHandPopover && canReady && (
+              <SubmitPopover
+                options={[
+                  {
+                    label: "Play",
+                    onClick: () => {
+                      actions.buildReady(selectedBasics, 'play', handSlotsRef.current.filter((id): id is string => id !== null));
+                      setShowSubmitHandPopover(false);
+                    },
+                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                  },
+                  {
+                    label: "Draw",
+                    onClick: () => {
+                      actions.buildReady(selectedBasics, 'draw', handSlotsRef.current.filter((id): id is string => id !== null));
+                      setShowSubmitHandPopover(false);
+                    },
+                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                  },
+                ]}
+                onClose={() => setShowSubmitHandPopover(false)}
+              />
+            )}
+          </div>
+        );
+      }
+    } else if (currentPhase === "battle") {
+      if (!current_battle) return null;
+      const { opponent_name, result_submissions } = current_battle;
+      const mySubmission = result_submissions[self_player.name];
+      const opponentSubmission = result_submissions[opponent_name];
+
+      left = (
+        <button
+          onClick={() => setActionMenuOpen(true)}
+          className="btn btn-secondary"
+        >
+          Actions
+        </button>
+      );
+
+      if (mySubmission && !isChangingResult) {
+        const resultsConflict =
+          opponentSubmission && mySubmission !== opponentSubmission;
+        right = (
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span
+              className={`text-sm ${resultsConflict ? "text-red-400" : "text-amber-400"}`}
+            >
+              {resultsConflict ? "Results conflict!" : "Waiting..."}
             </span>
             <button
-              onClick={() => actions.buildReady(selectedBasics, 'play')}
-              disabled={!canReady}
-              className="btn btn-primary"
+              onClick={() => setIsChangingResult(true)}
+              className="btn bg-gray-600 hover:bg-gray-500 text-white"
             >
-              Play
+              Change
             </button>
-            <button
-              onClick={() => actions.buildReady(selectedBasics, 'draw')}
-              disabled={!canReady}
-              className="btn btn-primary"
-            >
-              Draw
-            </button>
-          </>
+          </div>
         );
-      case "battle": {
-        if (!current_battle) return null;
-        const { opponent_name, result_submissions } = current_battle;
-        const mySubmission = result_submissions[self_player.name];
-        const opponentSubmission = result_submissions[opponent_name];
-
-        if (mySubmission && !isChangingResult) {
-          const resultsConflict =
-            opponentSubmission && mySubmission !== opponentSubmission;
-          return (
-            <>
-              <span
-                className={`text-sm ${resultsConflict ? "text-red-400" : "text-amber-400"}`}
-              >
-                {resultsConflict ? "Results conflict!" : "Waiting..."}
-              </span>
-              <button
-                onClick={() => setIsChangingResult(true)}
-                className="btn btn-secondary"
-              >
-                Change
-              </button>
-            </>
-          );
-        }
-        return (
-          <>
+      } else {
+        right = (
+          <div className="relative flex items-center gap-1.5 sm:gap-2">
             {isChangingResult && (
               <button
-                onClick={() => setIsChangingResult(false)}
+                onClick={() => { setIsChangingResult(false); setShowSubmitResultPopover(false); }}
                 className="text-gray-400 text-sm hover:text-white"
               >
                 Cancel
               </button>
             )}
             <button
-              onClick={() => {
-                actions.battleSubmitResult(self_player.name);
-                setIsChangingResult(false);
-              }}
+              onClick={() => setShowSubmitResultPopover((v) => !v)}
               className="btn btn-primary"
             >
-              I Won
+              Submit Result
             </button>
-            <button
-              onClick={() => {
-                actions.battleSubmitResult("draw");
-                setIsChangingResult(false);
-              }}
-              className="btn btn-secondary"
-            >
-              Draw
-            </button>
-            <button
-              onClick={() => {
-                actions.battleSubmitResult(opponent_name);
-                setIsChangingResult(false);
-              }}
-              className="btn btn-danger"
-            >
-              I Lost
-            </button>
-          </>
+            {showSubmitResultPopover && (
+              <SubmitPopover
+                options={[
+                  {
+                    label: "I Won",
+                    onClick: () => {
+                      actions.battleSubmitResult(self_player.name);
+                      setIsChangingResult(false);
+                      setShowSubmitResultPopover(false);
+                    },
+                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                  },
+                  {
+                    label: "Draw",
+                    onClick: () => {
+                      actions.battleSubmitResult("draw");
+                      setIsChangingResult(false);
+                      setShowSubmitResultPopover(false);
+                    },
+                    className: "btn btn-danger text-sm py-1.5",
+                  },
+                  {
+                    label: "I Lost",
+                    onClick: () => {
+                      actions.battleSubmitResult(opponent_name);
+                      setIsChangingResult(false);
+                      setShowSubmitResultPopover(false);
+                    },
+                    className: "btn btn-danger text-sm py-1.5",
+                  },
+                ]}
+                onClose={() => setShowSubmitResultPopover(false)}
+              />
+            )}
+          </div>
         );
       }
-      case "reward": {
-        const buttonLabel = needsUpgrade
-          ? selectedUpgradeId
-            ? "Claim & Continue"
-            : "Select Upgrade"
-          : "Continue";
-        return (
-          <button
-            onClick={handleContinue}
-            disabled={!canContinue}
-            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {buttonLabel}
-          </button>
-        );
-      }
-      default:
-        return null;
+    } else if (currentPhase === "reward") {
+      const buttonLabel = needsUpgrade
+        ? selectedUpgradeId
+          ? "Claim & Continue"
+          : "Select Upgrade"
+        : "Continue";
+      right = (
+        <button
+          onClick={handleContinue}
+          disabled={!canContinue}
+          className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {buttonLabel}
+        </button>
+      );
+    } else {
+      return null;
     }
+
+    if (!left && !right) return null;
+
+    return (
+      <>
+        <div className="flex items-center gap-1.5 sm:gap-2">{left}</div>
+        <div className="flex items-center gap-1.5 sm:gap-2">{right}</div>
+      </>
+    );
   };
 
   const handleCreateTreasure = () => {
@@ -791,7 +754,7 @@ function GameContent() {
           onYourLifeChange={handleYourLifeChange}
           onOpponentLifeChange={handleOpponentLifeChange}
           playerName={self_player.name}
-          onOpenActions={() => setActionMenuOpen(true)}
+          onCreateTreasure={handleCreateTreasure}
         />
       );
     }
@@ -807,30 +770,30 @@ function GameContent() {
             Watching {spectatingPlayer}'s game (spectator mode)
           </div>
         )}
-        {/* Header - Action Bar */}
-        <header className="flex justify-between items-center px-2 sm:px-4 py-1 sm:py-2 bg-black/30">
-          <div className="flex items-center gap-3">
-            <div className="text-sm text-gray-300">
-              Stage {self_player.stage} • Round {self_player.round}
-            </div>
-            <button
-              onClick={handleOpenRules}
-              className={`phase-badge ${phaseBadgeClass} ${!hasViewedRules ? "pulse" : ""}`}
-            >
-              {currentPhase}
-              <InfoIcon size="sm" className="ml-1.5 opacity-60" />
-            </button>
-          </div>
-          <div className="text-sm text-gray-400 italic hidden sm:block">
-            {PHASE_HINTS[currentPhase as Phase]}
-          </div>
-          <div className="flex items-center gap-2">
-            {!sizes.isMobile && renderActionButtons()}
-            {sizes.isMobile && (
-              <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-2">☰</button>
-            )}
-          </div>
-        </header>
+        {/* Header - Phase Timeline. pr-64 on desktop offsets for sidebar so timeline centers over main content */}
+        <div className="relative">
+          <PhaseTimeline
+            currentPhase={currentPhase}
+            stage={self_player.stage}
+            round={self_player.round}
+            nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
+            nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+            onPhaseClick={(phase, rect) => {
+              setOpenPopoverPhase(prev => prev === phase ? null : phase);
+              setPopoverAnchorX(rect.left + rect.width / 2);
+            }}
+            hamburger={sizes.isMobile ? (
+              <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-1">☰</button>
+            ) : undefined}
+          />
+          {openPopoverPhase && (
+            <PhasePopover
+              phase={openPopoverPhase}
+              anchorX={popoverAnchorX}
+              onClose={() => setOpenPopoverPhase(null)}
+            />
+          )}
+        </div>
 
         {/* Main content */}
         {currentPhase === "battle" ? (
@@ -975,6 +938,7 @@ function GameContent() {
                   actions={actions}
                   selectedBasics={selectedBasics}
                   onBasicsChange={setSelectedBasics}
+                  onHandSlotsChange={(slots) => { handSlotsRef.current = slots; }}
                   isMobile={sizes.isMobile}
                 />
               )}
@@ -984,6 +948,8 @@ function GameContent() {
                   actions={actions}
                   selectedUpgradeId={selectedUpgradeId}
                   onUpgradeSelect={setSelectedUpgradeId}
+                  selectedPoolCardId={selectedPoolCardId}
+                  onPoolCardSelect={setSelectedPoolCardId}
                 />
               )}
               {currentPhase === "awaiting_elimination" && (
@@ -1052,30 +1018,11 @@ function GameContent() {
             )}
           </div>
         )}
-        {sizes.isMobile && !isSpectator && (
-          <div className="shrink-0 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
-            <div className="flex items-center justify-center gap-3">
-              {(currentPhase === "draft" || currentPhase === "build") && (
-                <div className="relative">
-                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-12 rounded-sm" />
-                  <span className="absolute -bottom-1 -right-1 bg-purple-900 text-purple-300 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border border-purple-500">{self_player.poison}</span>
-                </div>
-              )}
+        {/* Bottom Action Bar */}
+        {!isSpectator && (
+          <div className="shrink-0 relative z-50 bg-black/30 border-t border-gray-700/50">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
               {renderActionButtons()}
-              {currentPhase === "battle" && (
-                <button
-                  onClick={() => setActionMenuOpen(true)}
-                  className="btn bg-indigo-600 hover:bg-indigo-500 text-white"
-                >
-                  Actions
-                </button>
-              )}
-              {(currentPhase === "draft" || currentPhase === "build") && (
-                <div className="relative">
-                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-12 rounded-sm" />
-                  <span className="absolute -bottom-1 -right-1 bg-amber-900 text-amber-300 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border border-amber-500">{self_player.treasures}</span>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -1085,15 +1032,6 @@ function GameContent() {
           card={state.previewCard}
           appliedUpgrades={state.previewAppliedUpgrades}
           onClose={() => setPreviewCard(null)}
-        />
-      )}
-      {showRulesModal && (
-        <RulesModal
-          currentPhase={currentPhase as Phase}
-          onClose={() => setShowRulesModal(false)}
-          availableUpgrades={gameState.available_upgrades}
-          useUpgrades={gameState.use_upgrades}
-          cubeId={gameState.cube_id}
         />
       )}
       {actionMenuOpen && currentPhase === "battle" && current_battle && (
@@ -1119,6 +1057,15 @@ function GameContent() {
           spectatorName={pendingSpectateRequest.spectator_name}
           requestId={pendingSpectateRequest.request_id}
           onRespond={actions.spectateResponse}
+        />
+      )}
+      {showUpgradesModal && (
+        <UpgradesModal
+          upgrades={self_player.upgrades}
+          mode={currentPhase === 'build' && self_player.upgrades.some((u) => !u.upgrade_target) ? 'apply' : 'view'}
+          targets={[...self_player.hand, ...self_player.sideboard]}
+          onApply={(upgradeId, targetId) => actions.buildApplyUpgrade(upgradeId, targetId)}
+          onClose={() => setShowUpgradesModal(false)}
         />
       )}
     </CardPreviewContext.Provider>

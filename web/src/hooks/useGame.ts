@@ -48,8 +48,8 @@ export function useGame(
     send('build_swap', { card_a_id: cardAId, source_a: sourceA, card_b_id: cardBId, source_b: sourceB })
   }, [send])
 
-  const buildReady = useCallback((basics: string[], playDrawPreference: 'play' | 'draw') => {
-    send('build_ready', { basics, play_draw_preference: playDrawPreference })
+  const buildReady = useCallback((basics: string[], playDrawPreference: 'play' | 'draw', handOrder?: string[]) => {
+    send('build_ready', { basics, play_draw_preference: playDrawPreference, hand_order: handOrder })
   }, [send])
 
   const buildUnready = useCallback(() => {

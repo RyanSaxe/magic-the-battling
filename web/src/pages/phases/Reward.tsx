@@ -13,6 +13,8 @@ interface RewardPhaseProps {
   }
   selectedUpgradeId: string | null
   onUpgradeSelect: (upgradeId: string | null) => void
+  selectedPoolCardId: string | null
+  onPoolCardSelect: (cardId: string | null) => void
 }
 
 const REWARD_COMPACT_DIMS = { width: 50, height: 70 }
@@ -65,7 +67,7 @@ function RewardCard({
   )
 }
 
-export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: RewardPhaseProps) {
+export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, selectedPoolCardId, onPoolCardSelect }: RewardPhaseProps) {
   const { self_player, available_upgrades } = gameState
   const { last_battle_result } = self_player
   const isStageIncreasing = self_player.is_stage_increasing
@@ -88,8 +90,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
   const poolCards = [...self_player.hand, ...self_player.sideboard]
 
   const [upgradeHeaderRef, upgradeHeaderHeight] = useElementHeight()
-  const [poolLabelRef, poolLabelHeight] = useElementHeight()
-  const fixedHeight = upgradeHeaderHeight + poolLabelHeight + 44
+  const fixedHeight = upgradeHeaderHeight + 44
 
   const [dualRef, { top: upgradeCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
     topCount: available_upgrades.length,
@@ -190,43 +191,52 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect }: R
           <div ref={upgradeHeaderRef} className="text-center mb-3 shrink-0">
             <h3 className="text-lg font-bold text-amber-400">Stage Complete! Select an upgrade</h3>
           </div>
-          <div className="shrink-0" style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${upgradeCardDims.columns}, ${upgradeCardDims.width}px)`,
-            gap: '6px',
-            justifyContent: 'center',
-            maxWidth: '100%',
-            overflow: 'hidden',
-          }}>
-            {available_upgrades.map((upgrade) => (
-              <Card
-                key={upgrade.id}
-                card={upgrade}
-                dimensions={upgradeCardDims}
-                selected={selectedUpgradeId === upgrade.id}
-                onClick={() => handleUpgradeClick(upgrade)}
-              />
-            ))}
-          </div>
+          {upgradeHeaderHeight > 0 && (
+            <>
+              <div className="shrink-0" style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${upgradeCardDims.columns}, ${upgradeCardDims.width}px)`,
+                gap: '6px',
+                justifyContent: 'center',
+                maxWidth: '100%',
+                overflow: 'hidden',
+              }}>
+                {available_upgrades.map((upgrade) => (
+                  <Card
+                    key={upgrade.id}
+                    card={upgrade}
+                    dimensions={upgradeCardDims}
+                    selected={selectedUpgradeId === upgrade.id}
+                    onClick={() => handleUpgradeClick(upgrade)}
+                  />
+                ))}
+              </div>
 
-          {/* Pool reference panel */}
-          <div className="mt-3 pt-3 border-t border-amber-500/30 flex-1 min-h-0 flex flex-col">
-            <div ref={poolLabelRef} className="text-xs text-gray-400 uppercase tracking-wide mb-2 text-center shrink-0">
-              Your Pool ({self_player.hand.length + self_player.sideboard.length} cards)
-            </div>
-            <div className="overflow-auto flex-1 min-h-0 p-1" style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
-              gap: '6px',
-              justifyContent: 'center',
-              alignContent: 'start',
-              maxWidth: '100%',
-            }}>
-              {poolCards.map((card) => (
-                <Card key={card.id} card={card} dimensions={poolCardDims} upgraded={upgradedCardIds.has(card.id)} appliedUpgrades={getAppliedUpgrades(card.id)} />
-              ))}
-            </div>
-          </div>
+              {/* Pool reference panel */}
+              <div className="mt-3 pt-3 border-t border-amber-500/30 flex-1 min-h-0 flex flex-col">
+                <div className="overflow-auto flex-1 min-h-0 p-1" style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
+                  gap: '6px',
+                  justifyContent: 'center',
+                  alignContent: 'start',
+                  maxWidth: '100%',
+                }}>
+                  {poolCards.map((card) => (
+                    <Card
+                      key={card.id}
+                      card={card}
+                      dimensions={poolCardDims}
+                      upgraded={upgradedCardIds.has(card.id)}
+                      appliedUpgrades={getAppliedUpgrades(card.id)}
+                      selected={selectedPoolCardId === card.id}
+                      onClick={() => onPoolCardSelect(selectedPoolCardId === card.id ? null : card.id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -188,26 +188,15 @@ class Player(BaseModel):
         return self.game.config.starting_stage + self.vanquishers
 
     def populate_hand(self) -> None:
-        """Populate hand with previous battle cards, then fill remaining slots by ELO."""
-        self.sideboard.extend(self.hand)
-        self.hand.clear()
+        """Restore previous hand cards that are still in the pool."""
+        all_cards = self.hand + self.sideboard
+        pool_by_id = {c.id: c for c in all_cards}
 
-        for card_id in self.previous_hand_ids:
-            card = next((c for c in self.sideboard if c.id == card_id), None)
-            if card:
-                self.sideboard.remove(card)
-                self.hand.append(card)
+        restored_ids = [cid for cid in self.previous_hand_ids if cid in pool_by_id]
+        restored_set = set(restored_ids[: self.hand_size])
 
-        slots_to_fill = self.hand_size - len(self.hand)
-        if slots_to_fill > 0 and self.sideboard:
-            by_elo = sorted(self.sideboard, key=lambda c: c.elo, reverse=True)
-            for card in by_elo[:slots_to_fill]:
-                self.sideboard.remove(card)
-                self.hand.append(card)
-
-        if self.command_zone and any(c.id in {cz.id for cz in self.command_zone} for c in self.hand):
-            self.command_zone.clear()
-
+        self.hand = [pool_by_id[cid] for cid in restored_ids[: self.hand_size]]
+        self.sideboard = [c for c in all_cards if c.id not in restored_set]
         self.chosen_basics = self.previous_basics.copy()
 
 

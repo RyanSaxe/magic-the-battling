@@ -99,11 +99,11 @@ class TestPhaseValidationIntegration:
             assert state["type"] == "game_state"
             assert state["payload"]["phase"] == "build"
 
-            card = state["payload"]["self_player"]["hand"][0]
+            card = state["payload"]["self_player"]["sideboard"][0]
             ws.send_json(
                 {
                     "action": "build_move",
-                    "payload": {"card_id": card["id"], "source": "hand", "destination": "sideboard"},
+                    "payload": {"card_id": card["id"], "source": "sideboard", "destination": "hand"},
                 }
             )
 

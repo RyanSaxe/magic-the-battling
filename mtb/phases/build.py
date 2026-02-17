@@ -57,7 +57,13 @@ def swap_card(
         player.command_zone.clear()
 
 
-def set_ready(game: Game, player: Player, basics: list[str], play_draw_preference: str = "play") -> None:
+def set_ready(
+    game: Game,
+    player: Player,
+    basics: list[str],
+    play_draw_preference: str = "play",
+    hand_order: list[str] | None = None,
+) -> None:
     if player.phase != "build":
         raise ValueError("Player is not in build phase")
 
@@ -71,8 +77,15 @@ def set_ready(game: Game, player: Player, basics: list[str], play_draw_preferenc
         if basic not in VALID_BASICS:
             raise ValueError(f"Invalid basic land: {basic}")
 
-    if len(player.hand) > player.hand_size:
-        raise ValueError(f"Hand size exceeds maximum of {player.hand_size}")
+    if len(player.hand) != player.hand_size:
+        raise ValueError(f"Hand must have exactly {player.hand_size} cards")
+
+    if hand_order is not None:
+        hand_ids = {c.id for c in player.hand}
+        order_ids = set(hand_order)
+        if order_ids == hand_ids and len(hand_order) == len(player.hand):
+            id_to_card = {c.id: c for c in player.hand}
+            player.hand[:] = [id_to_card[cid] for cid in hand_order]
 
     player.chosen_basics = basics
     player.build_ready = True

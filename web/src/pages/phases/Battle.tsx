@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import type { GameState, Card as CardType, ZoneName, CardStateAction } from '../../types'
 import { DraggableCard, DroppableZone, type ZoneOwner } from '../../dnd'
 import { HandZone, BattlefieldZone, BattlefieldZoneColumn } from '../../components/zones'
@@ -47,6 +47,11 @@ export function BattlePhase({
   onSelectedCardChange,
 }: BattlePhaseProps) {
   const setSelectedCard = onSelectedCardChange
+  const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
+    if (!(e.target as HTMLElement).closest('.card')) {
+      setSelectedCard(null)
+    }
+  }, [setSelectedCard])
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
 
   const { current_battle } = gameState
@@ -62,9 +67,12 @@ export function BattlePhase({
   const playerBf = yourZones?.battlefield ?? []
   const opponentBf = oppZones?.battlefield ?? []
 
-  const playerLandCount = countTopLevel(playerBf, playerAttachments, isLandOrTreasure)
+  const yourPoison = battle?.your_poison ?? 0
+  const opponentPoison = battle?.opponent_poison ?? 0
+
+  const playerLandCount = countTopLevel(playerBf, playerAttachments, isLandOrTreasure) + 1
   const playerNonlandCount = countTopLevel(playerBf, playerAttachments, (c) => !isLandOrTreasure(c))
-  const opponentLandCount = countTopLevel(opponentBf, opponentAttachments, isLandOrTreasure)
+  const opponentLandCount = countTopLevel(opponentBf, opponentAttachments, isLandOrTreasure) + 1
   const opponentNonlandCount = countTopLevel(opponentBf, opponentAttachments, (c) => !isLandOrTreasure(c))
 
   const HAND_PADDING = 16
@@ -187,7 +195,7 @@ export function BattlePhase({
   const bfHeight = 2 * rowHeight + BF_PADDING
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full">
+    <div ref={containerRef} className="flex flex-col h-full" onClick={handleBackgroundClick}>
         {/* Sudden Death Banner */}
         {battle.is_sudden_death && (
           <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center shrink-0">
@@ -275,6 +283,7 @@ export function BattlePhase({
               canManipulateOpponent={canManipulateOpponent}
               upgradedCardIds={opponentUpgradedCardIds}
               upgradesByCardId={opponentUpgradesByCardId}
+              poisonCount={opponentPoison}
               cardDimensions={sizes.opponentNonlands}
               rowHeight={rowHeight}
               landCardDimensions={sizes.opponentLands}
@@ -306,6 +315,7 @@ export function BattlePhase({
               separateLands
               upgradedCardIds={upgradedCardIds}
               upgradesByCardId={upgradesByCardId}
+              poisonCount={yourPoison}
               cardDimensions={sizes.playerNonlands}
               rowHeight={rowHeight}
               landCardDimensions={sizes.playerLands}
