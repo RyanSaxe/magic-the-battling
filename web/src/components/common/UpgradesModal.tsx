@@ -73,7 +73,6 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
   }
 
   const handleTargetClick = (target: CardType) => {
-    if (!selectedUpgrade) return
     setSelectedTargetId(selectedTargetId === target.id ? null : target.id)
   }
 
@@ -81,8 +80,10 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
     ? readyToConfirm
       ? `Apply ${selectedUpgrade.name} to ${selectedTarget.name}?`
       : selectedUpgrade
-        ? `Now select a card from your pool`
-        : 'Select an upgrade, then click a card from your pool'
+        ? 'Select a card'
+        : selectedTarget
+          ? 'Select an upgrade'
+          : 'Select upgrade + card'
     : '\u00A0'
 
   return (
@@ -103,7 +104,7 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
                 'Upgrades'
               )}
             </h2>
-            <p className="text-gray-400 text-sm truncate">{subtitle}</p>
+            <p className="text-gray-400 text-sm">{subtitle}</p>
           </div>
           <button
             onClick={onClose}
@@ -138,6 +139,7 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
                 ))}
               </CardGrid>
             </div>
+            <hr className="border-gray-700 my-2" />
             <div className="flex-1 min-h-0 flex justify-center">
               <CardGrid columns={applyDims.bottom.columns} cardWidth={targetDims.width}>
                 {targets.map((card) => (
@@ -145,7 +147,7 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
                     key={card.id}
                     card={card}
                     dimensions={targetDims}
-                    onClick={selectedUpgrade ? () => handleTargetClick(card) : undefined}
+                    onClick={() => handleTargetClick(card)}
                     selected={selectedTargetId === card.id}
                   />
                 ))}
