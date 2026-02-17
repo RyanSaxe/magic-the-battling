@@ -61,7 +61,7 @@ export function GameSummary({
   }, [gameId, frozenPlayer.name])
 
   return (
-    <div className={`flex-1 flex flex-col items-center ${compact ? '' : 'p-4'}`}>
+    <div className={`flex-1 flex flex-col items-center min-h-0 ${compact ? '' : 'p-4'}`}>
       {gameId && (
         <div className="shrink-0 text-center mb-3">
           <div className="flex items-center justify-center gap-3">
