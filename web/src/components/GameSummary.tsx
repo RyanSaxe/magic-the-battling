@@ -82,7 +82,7 @@ export function GameSummary({
         </div>
       )}
 
-      <div className={`w-full flex-1 min-h-0 flex flex-col pt-2 ${compact ? '' : 'max-w-5xl'}`}>
+      <div className={`w-full flex-1 min-h-0 flex flex-col ${compact ? '' : 'pt-2 max-w-5xl'}`}>
         <DeckDisplay
           hand={frozenPlayer.hand}
           sideboard={frozenPlayer.sideboard}

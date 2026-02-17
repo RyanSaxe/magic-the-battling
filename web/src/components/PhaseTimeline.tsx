@@ -41,7 +41,7 @@ export function PhaseTimeline({
   return (
     <header className="bg-black/30 py-1.5 px-2 sm:px-4">
       <div className="flex items-center">
-        <div className="flex items-center gap-1 sm:gap-1.5 flex-1 justify-center min-w-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-1 justify-start min-w-0">
           <span className="text-xs sm:text-sm text-gray-300 font-mono">{stage}-{round}</span>
 
           {PHASES.map((phase, index) => {
@@ -55,7 +55,7 @@ export function PhaseTimeline({
                 <span className="text-gray-600 text-xs">→</span>
                 <button
                   onClick={() => onPhaseClick(phase)}
-                  className={`text-xs sm:text-sm font-medium capitalize transition-all cursor-pointer
+                  className={`text-xs sm:text-sm font-medium capitalize transition-colors cursor-pointer
                     ${isActive ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ''}
                     ${isCompleted ? 'text-gray-500 line-through decoration-gray-600' : ''}
                     ${isUpcoming ? 'text-gray-500' : ''}

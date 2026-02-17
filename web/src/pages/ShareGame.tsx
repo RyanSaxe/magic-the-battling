@@ -274,7 +274,7 @@ export function ShareGame() {
   return (
     <div className="h-dvh flex flex-col bg-gray-900 text-white overflow-hidden">
       {/* Header */}
-      <div className={`shrink-0 border-b border-gray-700 px-4 py-2 flex items-center justify-between ${!sizes.isMobile ? 'pr-64' : ''}`}>
+      <div className={`relative z-30 shrink-0 bg-black/30 border-b border-gray-700 px-4 py-2 flex items-center justify-between ${!sizes.isMobile ? 'pr-64 after:absolute after:right-0 after:top-0 after:bottom-0 after:w-64 after:bg-black/30' : ''}`}>
         <div className="flex items-center gap-2">
           <span className="text-amber-400 font-bold text-sm">Magic: The Battling</span>
           {!gameFinished && (
@@ -321,7 +321,7 @@ export function ShareGame() {
             </div>
           </>
         ) : (
-          <aside className="w-64 h-full bg-black/30 flex flex-col overflow-hidden">
+          <aside className="w-64 h-full bg-black/30 border-l border-gray-700 flex flex-col overflow-hidden">
             <div className="overflow-y-auto flex-1">
               {renderSidebarContent()}
             </div>
@@ -330,7 +330,7 @@ export function ShareGame() {
       </div>
 
       {/* Bottom Bar */}
-      <div className={`shrink-0 bg-black/60 backdrop-blur-sm border-t border-gray-700/50 ${!sizes.isMobile ? 'pr-64' : ''}`}>
+      <div className="shrink-0 bg-black/30 border-t border-gray-700/50">
         <div className="flex items-center justify-between py-1.5 sm:py-2 px-1.5 timeline-actions">
           {/* Left: Round selector */}
           <div className="relative">

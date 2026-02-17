@@ -853,7 +853,7 @@ function GameContent() {
           onYourLifeChange={handleYourLifeChange}
           onOpponentLifeChange={handleOpponentLifeChange}
           playerName={self_player.name}
-          onOpenActions={() => setActionMenuOpen(true)}
+          onCreateTreasure={handleCreateTreasure}
         />
       );
     }
@@ -870,7 +870,7 @@ function GameContent() {
           </div>
         )}
         {/* Header - Phase Timeline. pr-64 on desktop offsets for sidebar so timeline centers over main content */}
-        <div className={`relative z-30 ${!sizes.isMobile ? 'pr-64' : ''}`}>
+        <div className={`relative z-30 ${!sizes.isMobile ? 'pr-64 after:absolute after:right-0 after:top-0 after:bottom-0 after:w-64 after:bg-black/30' : ''}`}>
           <PhaseTimeline
             currentPhase={currentPhase}
             stage={self_player.stage}
@@ -1122,7 +1122,7 @@ function GameContent() {
         )}
         {/* Bottom Action Bar */}
         {!isSpectator && renderActionButtons() && (
-          <div className={`shrink-0 relative z-50 bg-black/60 backdrop-blur-sm border-t border-gray-700/50 ${!sizes.isMobile ? 'pr-64' : ''}`}>
+          <div className="shrink-0 relative z-50 bg-black/30 border-t border-gray-700/50">
             <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
               {renderActionButtons()}
             </div>
