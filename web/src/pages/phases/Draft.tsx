@@ -80,7 +80,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
         <div className="text-center">
           <div className="text-gray-400 text-sm">No pack available</div>
         </div>
-      ) : (
+      ) : separatorHeight > 0 ? (
         <div style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${packCardDims.columns}, ${packCardDims.width}px)`,
@@ -99,7 +99,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
             />
           ))}
         </div>
-      )}
+      ) : null}
 
       <div ref={separatorRef} className="flex items-center gap-3 px-2">
         <div className="flex-1 border-t border-gray-600/40" />
@@ -114,7 +114,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
             Swap cards from the pack to build your pool
           </div>
         </div>
-      ) : (
+      ) : separatorHeight > 0 ? (
         <div style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
@@ -138,7 +138,7 @@ export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
             )
           })}
         </div>
-      )}
+      ) : null}
     </div>
   )
 }
