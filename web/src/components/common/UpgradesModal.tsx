@@ -4,6 +4,7 @@ import { Card } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { CardGrid } from './CardGrid'
 import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
+import { useElementHeight } from '../../hooks/useElementHeight'
 import { useGameSummaryCardSize } from '../../hooks/useGameSummaryCardSize'
 
 interface UpgradesModalProps {
@@ -42,12 +43,13 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
 
   const isApplyMode = mode === 'apply'
 
+  const [separatorRef, separatorHeight] = useElementHeight()
   const [applyRef, applyDims] = useDualZoneCardSizes({
     topCount: isApplyMode ? upgrades.length : 0,
     bottomCount: isApplyMode ? targets.length : 0,
     topGap: 6,
     bottomGap: 6,
-    fixedHeight: 0,
+    fixedHeight: separatorHeight,
     topMaxWidth: 200,
     bottomMaxWidth: 200,
   })
@@ -127,7 +129,7 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }
                 ))}
               </CardGrid>
             </div>
-            <hr className="border-gray-700 my-2" />
+            <hr ref={separatorRef} className="border-gray-700 my-2" />
             <div className="flex-1 min-h-0 flex justify-center">
               <CardGrid columns={applyDims.bottom.columns} cardWidth={targetDims.width}>
                 {targets.map((card) => (
