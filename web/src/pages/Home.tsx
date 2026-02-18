@@ -1,11 +1,11 @@
-import { useState } from 'react'
-import { CardShowcase } from '../components/home/CardShowcase'
-import { CreateGameModal } from '../components/home/CreateGameModal'
-import { JoinGameModal } from '../components/home/JoinGameModal'
+import { useState } from "react";
+import { CardShowcase } from "../components/home/CardShowcase";
+import { CreateGameModal } from "../components/home/CreateGameModal";
+import { JoinGameModal } from "../components/home/JoinGameModal";
 
 export function Home() {
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showJoinModal, setShowJoinModal] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
@@ -16,7 +16,8 @@ export function Home() {
               Magic: The Battling
             </h1>
             <p className="text-gray-400 text-sm">
-              A Magic: the Gathering format inspired by the autobattler game genre
+              A Magic: the Gathering format inspired by the autobattler game
+              genre
             </p>
           </div>
           <div className="flex gap-2">
@@ -73,7 +74,7 @@ export function Home() {
         </a>
         <span className="text-gray-600">|</span>
         <a
-          href="https://discord.gg/MKMacp9JUf"
+          href="https://discord.gg/2NAjcWXNKn"
           target="_blank"
           rel="noopener noreferrer"
           className="text-[#7289da] hover:text-[#99aab5] transition-colors"
@@ -86,8 +87,12 @@ export function Home() {
         </span>
       </footer>
 
-      {showCreateModal && <CreateGameModal onClose={() => setShowCreateModal(false)} />}
-      {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
+      {showCreateModal && (
+        <CreateGameModal onClose={() => setShowCreateModal(false)} />
+      )}
+      {showJoinModal && (
+        <JoinGameModal onClose={() => setShowJoinModal(false)} />
+      )}
     </div>
-  )
+  );
 }
