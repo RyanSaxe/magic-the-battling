@@ -1,4 +1,4 @@
-interface BotIconProps {
+interface PuppetIconProps {
   size?: 'sm' | 'md' | 'lg'
   className?: string
 }
@@ -9,7 +9,7 @@ const sizes = {
   lg: 32,
 }
 
-export function BotIcon({ size = 'md', className = '' }: BotIconProps) {
+export function PuppetIcon({ size = 'md', className = '' }: PuppetIconProps) {
   const px = sizes[size]
   return (
     <svg
