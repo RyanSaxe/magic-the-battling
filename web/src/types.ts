@@ -48,7 +48,7 @@ export interface PlayerView {
   stage: number
   vanquishers: number
   is_ghost: boolean
-  is_bot: boolean
+  is_puppet: boolean
   time_of_death: number | null
   hand_count: number
   sideboard_count: number
@@ -137,7 +137,7 @@ export interface LobbyState {
   target_player_count: number
   cube_loading_status: CubeLoadingStatus
   cube_loading_error: string | null
-  available_bot_count: number | null
+  available_puppet_count: number | null
 }
 
 export interface CreateGameResponse {
@@ -161,7 +161,7 @@ export interface WebSocketMessage {
 export interface GameStatusPlayer {
   name: string
   is_connected: boolean
-  is_bot: boolean
+  is_puppet: boolean
   phase: string
 }
 
@@ -196,7 +196,7 @@ export interface SharePlayerData {
   name: string
   final_placement: number | null
   final_poison: number
-  is_bot: boolean
+  is_puppet: boolean
   snapshots: SharePlayerSnapshot[]
 }
 
