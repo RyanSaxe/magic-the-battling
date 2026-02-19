@@ -137,7 +137,7 @@ def calculate_static_opponent_damage(opponent: StaticOpponent) -> int:
 
 
 def apply_bot_poison(game: Game, opponent: StaticOpponent, poison: int) -> None:
-    for fake in game.fake_players:
+    for fake in game.puppets:
         if fake.player_history_id == opponent.source_player_history_id:
             fake.poison += poison
             break
@@ -290,7 +290,7 @@ def start_vs_static_rewards_only(
         poison_taken=poison_taken,
     )
 
-    for fake in game.fake_players:
+    for fake in game.puppets:
         if fake.player_history_id == opponent.source_player_history_id:
             fake.last_battle_result = LastBattleResult(
                 opponent_name=player.name,
@@ -360,7 +360,7 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
         poison_taken=poison_taken,
     )
 
-    for fake in game.fake_players:
+    for fake in game.puppets:
         if fake.player_history_id == opponent.source_player_history_id:
             fake.last_battle_result = LastBattleResult(
                 opponent_name=player.name,

@@ -4,7 +4,7 @@ from typing import NamedTuple
 from uuid import uuid4
 
 from mtb.models.cards import Card
-from mtb.models.game import Battle, FakePlayer, Game, LastBattleResult, Player, StaticOpponent, Zones
+from mtb.models.game import Battle, Game, LastBattleResult, Player, Puppet, StaticOpponent, Zones
 from mtb.models.types import ZoneName
 from mtb.phases.elimination import get_live_players
 
@@ -111,7 +111,7 @@ def get_all_pairing_candidates(game: Game, player: Player) -> list[PairingCandid
         and not is_in_active_battle(game, p)
     ]
 
-    for fp in game.fake_players:
+    for fp in game.puppets:
         if fp.is_eliminated:
             continue
         if _is_opponent_in_active_battle(game, fp.name):
@@ -125,31 +125,31 @@ def get_all_pairing_candidates(game: Game, player: Player) -> list[PairingCandid
         if ghost.name != player.name and not _is_opponent_in_active_battle(game, ghost.name):
             candidates.append(ghost)
 
-    if game.most_recent_ghost_bot is not None:
-        ghost_bot = game.most_recent_ghost_bot
-        if not _is_opponent_in_active_battle(game, ghost_bot.name):
-            static_opp = ghost_bot.get_opponent_for_round(player.stage, player.round)
+    if game.most_recent_ghost_puppet is not None:
+        ghost_puppet = game.most_recent_ghost_puppet
+        if not _is_opponent_in_active_battle(game, ghost_puppet.name):
+            static_opp = ghost_puppet.get_opponent_for_round(player.stage, player.round)
             if static_opp:
                 candidates.append(static_opp)
 
     return candidates
 
 
-def get_available_fake_players(game: Game) -> list[FakePlayer]:
+def get_available_fake_players(game: Game) -> list[Puppet]:
     in_battle_names = {b.opponent.name for b in game.active_battles if isinstance(b.opponent, StaticOpponent)}
     available = []
-    for fp in game.fake_players:
+    for fp in game.puppets:
         if fp.name in in_battle_names:
             continue
         if not fp.snapshots:
             continue
-        if not fp.is_eliminated or (game.most_recent_ghost_bot and fp.name == game.most_recent_ghost_bot.name):
+        if not fp.is_eliminated or (game.most_recent_ghost_puppet and fp.name == game.most_recent_ghost_puppet.name):
             available.append(fp)
     return available
 
 
-def resolve_bot_vs_bot(bot1: FakePlayer, bot2: FakePlayer, stage: int, round_num: int) -> None:
-    """Auto-resolve bot vs bot battle with random outcome."""
+def resolve_puppet_vs_puppet(bot1: Puppet, bot2: Puppet, stage: int, round_num: int) -> None:
+    """Auto-resolve puppet vs puppet battle with random outcome."""
     snap1 = bot1.get_opponent_for_round(stage, round_num)
     snap2 = bot2.get_opponent_for_round(stage, round_num)
 
@@ -182,21 +182,21 @@ def resolve_bot_vs_bot(bot1: FakePlayer, bot2: FakePlayer, stage: int, round_num
 def resolve_unpaired_bot_battles(
     game: Game, paired_bot_names: set[str], stage: int, round_num: int, num_rounds_per_stage: int
 ) -> None:
-    """Pair and resolve battles between bots that weren't paired with live players."""
-    unpaired_bots = [fp for fp in game.fake_players if not fp.is_eliminated and fp.name not in paired_bot_names]
+    """Pair and resolve battles between puppets that weren't paired with live players."""
+    unpaired_bots = [fp for fp in game.puppets if not fp.is_eliminated and fp.name not in paired_bot_names]
 
     while len(unpaired_bots) >= 2:
         bot1 = unpaired_bots.pop(0)
         bot2 = unpaired_bots.pop(0)
-        resolve_bot_vs_bot(bot1, bot2, stage, round_num)
+        resolve_puppet_vs_puppet(bot1, bot2, stage, round_num)
 
-    for fp in game.fake_players:
+    for fp in game.puppets:
         if not fp.is_eliminated and fp.name not in paired_bot_names:
-            _advance_bot_round(fp, num_rounds_per_stage)
+            _advance_puppet_round(fp, num_rounds_per_stage)
 
 
-def _advance_bot_round(bot: FakePlayer, num_rounds_per_stage: int) -> None:
-    """Advance a bot's round/stage counters."""
+def _advance_puppet_round(bot: Puppet, num_rounds_per_stage: int) -> None:
+    """Advance a puppet's round/stage counters."""
     if bot.round >= num_rounds_per_stage:
         bot.stage += 1
         bot.round = 1
@@ -264,7 +264,7 @@ def get_potential_pairing_candidates(game: Game, player: Player) -> list[Pairing
         if p.name != player.name and p.phase != "eliminated" and p.round == player.round and p.stage == player.stage
     ]
 
-    for fp in game.fake_players:
+    for fp in game.puppets:
         if fp.is_eliminated:
             continue
         static_opp = fp.get_opponent_for_round(player.stage, player.round)
@@ -276,9 +276,9 @@ def get_potential_pairing_candidates(game: Game, player: Player) -> list[Pairing
         if ghost.name != player.name:
             candidates.append(ghost)
 
-    if game.most_recent_ghost_bot is not None:
-        ghost_bot = game.most_recent_ghost_bot
-        static_opp = ghost_bot.get_opponent_for_round(player.stage, player.round)
+    if game.most_recent_ghost_puppet is not None:
+        ghost_puppet = game.most_recent_ghost_puppet
+        static_opp = ghost_puppet.get_opponent_for_round(player.stage, player.round)
         if static_opp:
             candidates.append(static_opp)
 

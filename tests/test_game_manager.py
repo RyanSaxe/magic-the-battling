@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from mtb.models.cards import Battler, Card
-from mtb.models.game import FakePlayer, create_game, set_battler
+from mtb.models.game import Puppet, create_game, set_battler
 from server.db.models import PlayerGameHistory
 from server.services.game_manager import GameManager
 
@@ -288,7 +288,7 @@ class TestSelfPlayerPlacement:
 
         game = create_game(["Alice"], num_players=1)
         set_battler(game, battler)
-        game.fake_players.append(FakePlayer(name="Bot", player_history_id=1, snapshots={}))
+        game.puppets.append(Puppet(name="Bot", player_history_id=1, snapshots={}))
 
         game_manager._active_games["g1"] = game
         game_manager._player_to_game["pid_alice"] = "g1"

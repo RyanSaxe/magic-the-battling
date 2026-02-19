@@ -1,7 +1,7 @@
 import pytest
 
 from mtb.models.cards import Battler
-from mtb.models.game import FakePlayer, StaticOpponent, create_game
+from mtb.models.game import Puppet, StaticOpponent, create_game
 from mtb.phases import reward
 
 
@@ -277,9 +277,9 @@ def test_vs_static_rewards_given_when_sudden_death_triggers_for_bots(card_factor
     game.battler = Battler(cards=[card_factory("c1")], upgrades=[], vanguards=[])
     player = game.players[0]
 
-    bot1 = FakePlayer(name="Bot1", player_history_id=1, poison=10)
-    bot2 = FakePlayer(name="Bot2", player_history_id=2, poison=10)
-    game.fake_players = [bot1, bot2]
+    bot1 = Puppet(name="Bot1", player_history_id=1, poison=10)
+    bot2 = Puppet(name="Bot2", player_history_id=2, poison=10)
+    game.puppets = [bot1, bot2]
 
     player.round = 3
     player.stage = 5

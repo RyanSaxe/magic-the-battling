@@ -11,25 +11,25 @@ import pytest
 from mtb.models.cards import Card
 from mtb.models.game import (
     BattleSnapshotData,
-    FakePlayer,
     Game,
     Player,
+    Puppet,
     StaticOpponent,
     create_game,
 )
 from mtb.phases import battle
 from mtb.phases.elimination import (
     check_game_over,
-    get_live_bots,
     get_live_players,
+    get_live_puppets,
     get_sudden_death_fighters,
     needs_sudden_death,
-    process_bot_eliminations,
+    process_puppet_eliminations,
     would_be_dead_ready_for_elimination,
 )
 from server.services.game_manager import GameManager
 
-Participant = Player | FakePlayer
+Participant = Player | Puppet
 
 PLAYER_CONFIGS = [
     pytest.param(4, 0, id="4H0B"),
@@ -61,9 +61,9 @@ def get_participant_in_sudden_death(p: Participant) -> bool:
     return p.in_sudden_death
 
 
-def create_test_bot(name: str, player_history_id: int) -> FakePlayer:
-    """Create a FakePlayer with valid snapshots for testing."""
-    bot = FakePlayer(name=name, player_history_id=player_history_id, poison=0)
+def create_test_bot(name: str, player_history_id: int) -> Puppet:
+    """Create a Puppet with valid snapshots for testing."""
+    bot = Puppet(name=name, player_history_id=player_history_id, poison=0)
     snapshot_data = BattleSnapshotData(
         hand=[Card(name=f"{name}Card", image_url="bot", id=f"bot-{player_history_id}", type_line="Creature")],
         vanguard=None,
@@ -96,9 +96,9 @@ def create_test_game(num_humans: int, num_bots: int) -> tuple[Game, GameManager,
 
     for i in range(num_bots):
         bot = create_test_bot(f"Bot{i + 1}", player_history_id=100 + i)
-        game.fake_players.append(bot)
+        game.puppets.append(bot)
 
-    participants: list[Participant] = list(game.players) + list(game.fake_players)
+    participants: list[Participant] = list(game.players) + list(game.puppets)
     return game, manager, participants
 
 
@@ -122,18 +122,18 @@ def start_battle_between(
 
     Returns None for bot-vs-bot (auto-resolved), Battle object otherwise.
     """
-    if isinstance(p1, FakePlayer) and isinstance(p2, FakePlayer):
-        battle.resolve_bot_vs_bot(p1, p2, stage, round_num)
+    if isinstance(p1, Puppet) and isinstance(p2, Puppet):
+        battle.resolve_puppet_vs_puppet(p1, p2, stage, round_num)
         return None
 
-    if isinstance(p1, FakePlayer):
+    if isinstance(p1, Puppet):
         static_p1 = p1.get_opponent_for_round(stage, round_num)
         if static_p1 is None:
             raise ValueError(f"No snapshot for {p1.name} at stage {stage}, round {round_num}")
         assert isinstance(p2, Player)
         return battle.start(game, p2, static_p1)
 
-    if isinstance(p2, FakePlayer):
+    if isinstance(p2, Puppet):
         static_p2 = p2.get_opponent_for_round(stage, round_num)
         if static_p2 is None:
             raise ValueError(f"No snapshot for {p2.name} at stage {stage}, round {round_num}")
@@ -187,7 +187,7 @@ def verify_ghost_state(game: Game, expected_ghost_name: str | None, expected_poi
 
 def count_live_participants(game: Game) -> int:
     """Count total live participants (humans + bots)."""
-    return len(get_live_players(game)) + len(get_live_bots(game))
+    return len(get_live_players(game)) + len(get_live_puppets(game))
 
 
 class TestGhostAndSuddenDeathE2E:
@@ -230,11 +230,11 @@ class TestGhostAndSuddenDeathE2E:
 
         if game.most_recent_ghost:
             assert game.most_recent_ghost.hand_revealed is True, "Ghost hand should be revealed"
-        elif game.most_recent_ghost_bot:
+        elif game.most_recent_ghost_puppet:
             pass
         else:
             raise AssertionError(
-                "Expected either most_recent_ghost or most_recent_ghost_bot to be set with 3 survivors"
+                "Expected either most_recent_ghost or most_recent_ghost_puppet to be set with 3 survivors"
             )
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
@@ -271,12 +271,12 @@ class TestGhostAndSuddenDeathE2E:
         assert count_live_participants(game) == 3, (
             f"After round 1: expected 3 survivors, got {count_live_participants(game)}"
         )
-        assert game.most_recent_ghost is not None or game.most_recent_ghost_bot is not None, (
+        assert game.most_recent_ghost is not None or game.most_recent_ghost_puppet is not None, (
             "After round 1: ghost should be set with 3 survivors"
         )
 
         # Round 2: one more participant will die
-        live_participants = get_live_players(game) + get_live_bots(game)
+        live_participants = get_live_players(game) + get_live_puppets(game)
         for p in live_participants:
             setup_participant_for_battle(p, stage=3, round_num=2)
 
@@ -287,11 +287,11 @@ class TestGhostAndSuddenDeathE2E:
         set_participant_poison(l3, 0)
 
         # Handle the special case where l1 is a bot - need to directly eliminate
-        if isinstance(l1, FakePlayer):
+        if isinstance(l1, Puppet):
             # Bot-only round 2: Manually trigger bot elimination
             # Set poison to lethal and process
             l1.poison = 10
-            process_bot_eliminations(game)
+            process_puppet_eliminations(game)
         else:
             # Human l1 will fight l2
             b3 = start_battle_between(game, l1, l2)
@@ -303,7 +303,7 @@ class TestGhostAndSuddenDeathE2E:
             f"After round 2: expected 2 survivors, got {count_live_participants(game)}"
         )
         assert game.most_recent_ghost is None, "Ghost should be None with even survivors"
-        assert game.most_recent_ghost_bot is None, "Ghost bot should be None with even survivors"
+        assert game.most_recent_ghost_puppet is None, "Ghost bot should be None with even survivors"
 
     @pytest.mark.parametrize(("num_humans", "num_bots"), PLAYER_CONFIGS)
     def test_ghost_included_in_pairing_candidates(
@@ -323,12 +323,12 @@ class TestGhostAndSuddenDeathE2E:
             ghost = StaticOpponent.from_player(p1, hand_revealed=True)
             game.most_recent_ghost = ghost
             p1.phase = "eliminated"
-        elif isinstance(p1, FakePlayer):
+        elif isinstance(p1, Puppet):
             p1.is_eliminated = True
-            game.most_recent_ghost_bot = p1
+            game.most_recent_ghost_puppet = p1
 
         live_humans = get_live_players(game)
-        assert len(live_humans) + len(get_live_bots(game)) == 3
+        assert len(live_humans) + len(get_live_puppets(game)) == 3
 
         if live_humans:
             candidates = battle.get_all_pairing_candidates(game, live_humans[0])
@@ -382,7 +382,7 @@ class TestGhostAndSuddenDeathE2E:
             p1.phase = "eliminated"
         else:
             p1.is_eliminated = True
-            game.most_recent_ghost_bot = p1
+            game.most_recent_ghost_puppet = p1
 
         set_participant_poison(p2, 9)
         set_participant_poison(p3, 9)
@@ -393,11 +393,11 @@ class TestGhostAndSuddenDeathE2E:
             h.poison = 10
             h.phase = "awaiting_elimination"
 
-        live_bots = [p for p in [p2, p3, p4] if isinstance(p, FakePlayer)]
-        for b in live_bots:
+        live_puppets = [p for p in [p2, p3, p4] if isinstance(p, Puppet)]
+        for b in live_puppets:
             b.poison = 10
 
-        if live_humans or live_bots:
+        if live_humans or live_puppets:
             assert needs_sudden_death(game), "Should need sudden death when all survivors at lethal"
 
             fighters = get_sudden_death_fighters(game)
@@ -425,7 +425,7 @@ class TestGhostAndSuddenDeathE2E:
             p1.phase = "eliminated"
         else:
             p1.is_eliminated = True
-            game.most_recent_ghost_bot = p1
+            game.most_recent_ghost_puppet = p1
 
         set_participant_poison(p2, 10)
         set_participant_poison(p3, 10)
@@ -462,14 +462,14 @@ class TestGhostAndSuddenDeathE2E:
             p1.phase = "eliminated"
         else:
             p1.is_eliminated = True
-            game.most_recent_ghost_bot = p1
+            game.most_recent_ghost_puppet = p1
 
         set_participant_poison(p2, 10)
         set_participant_poison(p3, 5)
         set_participant_poison(p4, 3)
 
         assert not needs_sudden_death(game), "Should NOT need sudden death when 2 survivors remain"
-        assert game.most_recent_ghost is not None or game.most_recent_ghost_bot is not None, (
+        assert game.most_recent_ghost is not None or game.most_recent_ghost_puppet is not None, (
             "Ghost should still exist before second elimination"
         )
 
@@ -613,7 +613,7 @@ class TestGhostAndSuddenDeathE2E:
         # Find a participant that can die without ending the game
         # (i.e., don't kill the last human)
         humans = [p for p in participants if isinstance(p, Player)]
-        bots = [p for p in participants if isinstance(p, FakePlayer)]
+        bots = [p for p in participants if isinstance(p, Puppet)]
 
         if len(humans) == 1:
             # 1H3B: A bot must die, not the human
@@ -642,41 +642,41 @@ class TestGhostAndSuddenDeathE2E:
         assert count_live_participants(game) == 3, "Should have 3 survivors after first round"
 
         # Round 2: eliminate one more (but not the last human)
-        live = get_live_players(game) + get_live_bots(game)
+        live = get_live_players(game) + get_live_puppets(game)
         for p in live:
             setup_participant_for_battle(p, stage=3, round_num=2)
 
         live_humans = [p for p in live if isinstance(p, Player)]
-        live_bots = [p for p in live if isinstance(p, FakePlayer)]
+        live_puppets = [p for p in live if isinstance(p, Puppet)]
 
         if len(live_humans) == 1:
             # Only one human left - a bot must die
-            victim2 = live_bots[0]
+            victim2 = live_puppets[0]
             survivor2 = live_humans[0]
         else:
             # Multiple humans - one can die
             victim2 = live_humans[0]
-            survivor2 = live_humans[1] if len(live_humans) > 1 else live_bots[0]
+            survivor2 = live_humans[1] if len(live_humans) > 1 else live_puppets[0]
 
         set_participant_poison(victim2, 9)
 
         if isinstance(victim2, Player) and isinstance(survivor2, Player):
             b3 = battle.start(game, victim2, survivor2)
             end_battle_with_result(manager, game, b3, get_participant_name(survivor2))
-        elif isinstance(victim2, Player) and isinstance(survivor2, FakePlayer):
+        elif isinstance(victim2, Player) and isinstance(survivor2, Puppet):
             static = survivor2.get_opponent_for_round(3, 2)
             if static:
                 b3 = battle.start(game, victim2, static)
                 end_battle_with_result(manager, game, b3, survivor2.name)
-        elif isinstance(victim2, FakePlayer) and isinstance(survivor2, Player):
+        elif isinstance(victim2, Puppet) and isinstance(survivor2, Player):
             static = victim2.get_opponent_for_round(3, 2)
             if static:
                 b3 = battle.start(game, survivor2, static)
                 end_battle_with_result(manager, game, b3, survivor2.name)
-        elif isinstance(victim2, FakePlayer) and isinstance(survivor2, FakePlayer):
+        elif isinstance(victim2, Puppet) and isinstance(survivor2, Puppet):
             # Bot vs bot - directly eliminate the victim
             victim2.poison = 10
-            process_bot_eliminations(game)
+            process_puppet_eliminations(game)
 
         manager._check_sudden_death_ready(game, "test-game", None)
 
@@ -684,7 +684,7 @@ class TestGhostAndSuddenDeathE2E:
         assert live_count == 2, f"Should have 2 survivors for finale, got {live_count}"
 
         assert game.most_recent_ghost is None, "Ghost should be cleared with even survivors"
-        assert game.most_recent_ghost_bot is None, "Ghost bot should be cleared with even survivors"
+        assert game.most_recent_ghost_puppet is None, "Ghost bot should be cleared with even survivors"
 
 
 class TestBotSpecificScenarios:
@@ -695,7 +695,7 @@ class TestBotSpecificScenarios:
         game, manager, participants = create_test_game(1, 3)
 
         human = participants[0]
-        bots = [p for p in participants if isinstance(p, FakePlayer)]
+        bots = [p for p in participants if isinstance(p, Puppet)]
         bot1, bot2, bot3 = bots[0], bots[1], bots[2]
 
         for p in participants:
@@ -711,17 +711,17 @@ class TestBotSpecificScenarios:
         manager._check_sudden_death_ready(game, "test-game", None)
 
         eliminated_bots = [b for b in bots if b.is_eliminated]
-        live_bots = [b for b in bots if not b.is_eliminated]
+        live_puppets = [b for b in bots if not b.is_eliminated]
 
         assert len(eliminated_bots) >= 1, "At least one bot should be eliminated"
-        assert len(live_bots) >= 1, "At least one bot should survive"
+        assert len(live_puppets) >= 1, "At least one bot should survive"
 
     def test_human_vs_bot_sudden_death_starts_build_phase(self, reset_singletons, mock_cube_data):
         """When human and bot are sudden death fighters, human goes to build phase."""
         game, manager, participants = create_test_game(2, 2)
 
         humans = [p for p in participants if isinstance(p, Player)]
-        bots = [p for p in participants if isinstance(p, FakePlayer)]
+        bots = [p for p in participants if isinstance(p, Puppet)]
 
         h1, h2 = humans[0], humans[1]
         b1, b2 = bots[0], bots[1]
@@ -748,7 +748,7 @@ class TestBotSpecificScenarios:
         game, _manager, participants = create_test_game(2, 2)
 
         [p for p in participants if isinstance(p, Player)]
-        bots = [p for p in participants if isinstance(p, FakePlayer)]
+        bots = [p for p in participants if isinstance(p, Puppet)]
 
         for p in participants:
             setup_participant_for_battle(p)
@@ -756,7 +756,7 @@ class TestBotSpecificScenarios:
         bot_to_eliminate = bots[0]
         bot_to_eliminate.is_eliminated = True
         bot_to_eliminate.poison = 10
-        game.most_recent_ghost_bot = bot_to_eliminate
+        game.most_recent_ghost_puppet = bot_to_eliminate
 
         live_humans = get_live_players(game)
         assert len(live_humans) == 2
@@ -772,15 +772,15 @@ class TestBotSpecificScenarios:
 class TestBotEliminations:
     """Tests for bot elimination logic."""
 
-    def test_process_bot_eliminations_counts_remaining_correctly(self, reset_singletons, mock_cube_data):
-        """Verify process_bot_eliminations correctly counts remaining participants.
+    def test_process_puppet_eliminations_counts_remaining_correctly(self, reset_singletons, mock_cube_data):
+        """Verify process_puppet_eliminations correctly counts remaining participants.
 
-        With 2 participants remaining (even number), most_recent_ghost_bot should be None.
+        With 2 participants remaining (even number), most_recent_ghost_puppet should be None.
         """
         game, _manager, participants = create_test_game(1, 3)
 
         human = participants[0]
-        bots = [p for p in participants if isinstance(p, FakePlayer)]
+        bots = [p for p in participants if isinstance(p, Puppet)]
 
         if isinstance(human, Player):
             human.phase = "eliminated"
@@ -789,14 +789,14 @@ class TestBotEliminations:
         bots[1].poison = 0
         bots[2].poison = 0
 
-        process_bot_eliminations(game)
+        process_puppet_eliminations(game)
 
         live_count = count_live_participants(game)
         assert live_count == 2, f"Expected 2 survivors, got {live_count}"
 
-        assert game.most_recent_ghost_bot is None, (
-            f"most_recent_ghost_bot should be None with even survivors, "
-            f"but is set to {game.most_recent_ghost_bot.name if game.most_recent_ghost_bot else 'None'}"
+        assert game.most_recent_ghost_puppet is None, (
+            f"most_recent_ghost_puppet should be None with even survivors, "
+            f"but is set to {game.most_recent_ghost_puppet.name if game.most_recent_ghost_puppet else 'None'}"
         )
 
 
@@ -834,7 +834,7 @@ class TestEdgeCases:
         game, manager, participants = create_test_game(3, 1)
 
         humans = [p for p in participants if isinstance(p, Player)]
-        bots = [p for p in participants if isinstance(p, FakePlayer)]
+        bots = [p for p in participants if isinstance(p, Puppet)]
 
         for p in participants:
             setup_participant_for_battle(p)
@@ -903,7 +903,7 @@ class TestDoubleDrawBotSuddenDeath:
         game, manager, participants = create_test_game(1, 3)
 
         human = next(p for p in participants if isinstance(p, Player))
-        bots = [p for p in participants if isinstance(p, FakePlayer)]
+        bots = [p for p in participants if isinstance(p, Puppet)]
         bot1, bot2, bot3 = bots
 
         for p in participants:
@@ -924,10 +924,12 @@ class TestDoubleDrawBotSuddenDeath:
 
         assert human.phase != "winner", f"Human should NOT be declared winner yet, got phase {human.phase}"
 
-        live_bots = get_live_bots(game)
-        assert len(live_bots) == 1, f"Exactly 1 bot should survive sudden death to face human, got {len(live_bots)}"
+        live_puppets = get_live_puppets(game)
+        assert len(live_puppets) == 1, (
+            f"Exactly 1 bot should survive sudden death to face human, got {len(live_puppets)}"
+        )
 
-        surviving_bot = live_bots[0]
+        surviving_bot = live_puppets[0]
         assert surviving_bot.poison == 9, f"Surviving bot should have poison reset to 9, got {surviving_bot.poison}"
 
         _, is_game_over = check_game_over(game)
@@ -947,7 +949,7 @@ class TestDoubleDrawBotSuddenDeath:
         game, manager, participants = create_test_game(1, 3)
 
         human = next(p for p in participants if isinstance(p, Player))
-        bots = [p for p in participants if isinstance(p, FakePlayer)]
+        bots = [p for p in participants if isinstance(p, Puppet)]
         bot1, bot2, bot3 = bots
 
         for p in participants:
@@ -966,9 +968,9 @@ class TestDoubleDrawBotSuddenDeath:
 
         end_battle_with_result(manager, game, b, None, check_eliminations=False)
 
-        live_bots = get_live_bots(game)
+        live_puppets = get_live_puppets(game)
         live_humans = get_live_players(game)
-        total_live = len(live_bots) + len(live_humans)
+        total_live = len(live_puppets) + len(live_humans)
 
         assert total_live == 2, f"Exactly 2 participants should remain for sudden death, got {total_live}"
 
@@ -976,7 +978,7 @@ class TestDoubleDrawBotSuddenDeath:
         assert human.in_sudden_death, "Human should have in_sudden_death flag set"
         assert human.poison == 9, f"Human poison should be reset to 9, got {human.poison}"
 
-        assert len(live_bots) == 1, "Exactly 1 bot should be in sudden death with human"
-        surviving_bot = live_bots[0]
+        assert len(live_puppets) == 1, "Exactly 1 bot should be in sudden death with human"
+        surviving_bot = live_puppets[0]
         assert surviving_bot.in_sudden_death, "Surviving bot should have in_sudden_death flag"
         assert surviving_bot.poison == 9, f"Bot poison should be reset to 9, got {surviving_bot.poison}"

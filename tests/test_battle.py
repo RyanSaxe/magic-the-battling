@@ -1,7 +1,7 @@
 import pytest
 from conftest import setup_battle_ready
 
-from mtb.models.game import FakePlayer, StaticOpponent, create_game
+from mtb.models.game import Puppet, StaticOpponent, create_game
 from mtb.phases import battle
 from server.services.game_manager import GameManager
 
@@ -93,7 +93,7 @@ def test_higher_poison_bot_goes_first(card_factory):
     alice = game.players[0]
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
 
-    fake = FakePlayer(name="Bot1", player_history_id=1)
+    fake = Puppet(name="Bot1", player_history_id=1)
     snapshot = StaticOpponent(
         name="Bot1",
         hand=[card_factory("card1")],
@@ -101,7 +101,7 @@ def test_higher_poison_bot_goes_first(card_factory):
     )
     fake.snapshots[f"{alice.stage}_1"] = snapshot
     fake.poison = 5
-    game.fake_players.append(fake)
+    game.puppets.append(fake)
 
     alice.poison = 2
     opponent = fake.get_opponent_for_round(alice.stage, 1)
@@ -539,14 +539,14 @@ class TestUnifiedPairingCandidates:
         alice = game.players[0]
         setup_battle_ready(alice)
 
-        fake = FakePlayer(name="Bot1", player_history_id=1)
+        fake = Puppet(name="Bot1", player_history_id=1)
         snapshot = StaticOpponent(
             name="Bot1",
             hand=[card_factory("card1")],
             chosen_basics=["Plains", "Island", "Mountain"],
         )
         fake.snapshots[f"{alice.stage}_1"] = snapshot
-        game.fake_players.append(fake)
+        game.puppets.append(fake)
 
         candidates = battle.get_all_pairing_candidates(game, alice)
 
@@ -589,7 +589,7 @@ class TestUnifiedPairingCandidates:
         alice = game.players[0]
         setup_battle_ready(alice)
 
-        fake = FakePlayer(name="Bot1", player_history_id=1)
+        fake = Puppet(name="Bot1", player_history_id=1)
         early_snapshot = StaticOpponent(
             name="Bot1",
             hand=[card_factory("early_card")],
@@ -602,7 +602,7 @@ class TestUnifiedPairingCandidates:
         )
         fake.snapshots["3_1"] = early_snapshot
         fake.snapshots["4_1"] = later_snapshot
-        game.fake_players.append(fake)
+        game.puppets.append(fake)
 
         candidates = battle.get_all_pairing_candidates(game, alice)
         assert candidates[0].hand[0].name == "early_card"
@@ -633,10 +633,10 @@ class TestUnifiedPairingCandidates:
             command_zone=[companion],
             chosen_basics=["Plains", "Island", "Mountain"],
         )
-        fake = FakePlayer(name="Bot1", player_history_id=1)
+        fake = Puppet(name="Bot1", player_history_id=1)
         fake.snapshots["3_3"] = prior_snapshot
         fake.snapshots["4_1"] = current_snapshot
-        game.fake_players.append(fake)
+        game.puppets.append(fake)
 
         manager = GameManager()
         player_view = manager._make_fake_player_view(fake, alice, {})
@@ -899,9 +899,9 @@ def test_companion_filtered_from_sideboard_vs_static_opponent(card_factory):
         command_zone=[companion],
         sideboard=[companion, other_sideboard],
     )
-    fake = FakePlayer(name="Bot1", player_history_id=1)
+    fake = Puppet(name="Bot1", player_history_id=1)
     fake.snapshots[f"{alice.stage}_1"] = static_opp
-    game.fake_players.append(fake)
+    game.puppets.append(fake)
 
     b = battle.start(game, alice, static_opp)
 

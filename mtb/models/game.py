@@ -2,7 +2,7 @@ import random
 import weakref
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 from mtb.models.cards import Battler, Card
 from mtb.models.types import Phase, ZoneName
@@ -74,8 +74,8 @@ class BattleSnapshotData(BaseModel):
     play_draw_preference: str | None = None
 
 
-class FakePlayer(BaseModel):
-    """Tracks a historical player across rounds in the current game."""
+class Puppet(BaseModel):
+    """Tracks a historical/puppet player across rounds in the current game."""
 
     name: str
     player_history_id: int
@@ -225,8 +225,16 @@ class Game(BaseModel):
     draft_state: DraftState | None = None
     active_battles: list["Battle"] = Field(default_factory=list)
     most_recent_ghost: StaticOpponent | None = None
-    most_recent_ghost_bot: FakePlayer | None = None
-    fake_players: list[FakePlayer] = Field(default_factory=list)
+    # TODO(v1.0): remove most_recent_ghost_bot alias once historical games are cleared on v1.0 launch
+    most_recent_ghost_puppet: Puppet | None = Field(
+        default=None,
+        validation_alias=AliasChoices("most_recent_ghost_puppet", "most_recent_ghost_bot"),
+    )
+    # TODO(v1.0): remove fake_players alias once historical games are cleared on v1.0 launch
+    puppets: list[Puppet] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("puppets", "fake_players"),
+    )
     stage: int = 3
     round: int = 1
 
