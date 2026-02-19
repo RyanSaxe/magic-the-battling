@@ -164,7 +164,7 @@ export function ShareGame() {
       stage: snap?.stage ?? 0,
       vanquishers: 0,
       is_ghost: false,
-      is_bot: p.is_bot,
+      is_puppet: p.is_puppet,
       time_of_death: null,
       hand_count: snap?.hand.length ?? 0,
       sideboard_count: snap?.sideboard.length ?? 0,
