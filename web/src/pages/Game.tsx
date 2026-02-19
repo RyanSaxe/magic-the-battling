@@ -155,7 +155,7 @@ function PlayerSelectionModal({
     );
   }
 
-  const humanPlayers = status.players.filter((p) => !p.is_bot);
+  const humanPlayers = status.players.filter((p) => !p.is_puppet);
   const watchablePlayers = humanPlayers.filter(
     (p) =>
       p.phase !== "eliminated" &&
@@ -499,7 +499,7 @@ function GameContent() {
     if (currentPhase === "eliminated") {
       const hasWatchablePlayers = gameState.players.some(
         (p) =>
-          !p.is_bot &&
+          !p.is_puppet &&
           p.phase !== "eliminated" &&
           p.phase !== "awaiting_elimination" &&
           p.phase !== "winner" &&
