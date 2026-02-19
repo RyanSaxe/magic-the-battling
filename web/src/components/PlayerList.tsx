@@ -4,7 +4,7 @@ import {
   PoisonIcon,
   MoneyBagIcon,
   GhostIcon,
-  BotIcon,
+  PuppetIcon,
   SkullIcon,
   HourglassIcon,
 } from "./icons";
@@ -95,7 +95,7 @@ export function PlayerRow({
       } ${
         player.name === currentPlayerName
           ? "bg-amber-900/30 border border-amber-700/50"
-          : player.is_bot
+          : player.is_puppet
             ? "bg-cyan-900/20 border border-cyan-800/30"
             : "bg-black/30"
       } ${player.is_ghost ? "opacity-50" : ""}`}
@@ -137,8 +137,8 @@ export function PlayerRow({
             <GhostIcon size="sm" />
           ) : player.phase === "awaiting_elimination" ? (
             <HourglassIcon size="sm" />
-          ) : player.is_bot ? (
-            <BotIcon size="sm" />
+          ) : player.is_puppet ? (
+            <PuppetIcon size="sm" />
           ) : (
             `${player.stage}-${player.round} @ ${player.phase === "build" && player.build_ready ? "ready" : player.phase}`
           )}
