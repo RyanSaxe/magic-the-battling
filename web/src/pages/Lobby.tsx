@@ -139,9 +139,9 @@ export function Lobby() {
             const botSlots =
               lobbyState.target_player_count - lobbyState.players.length;
             const allReady = lobbyState.players.every((p) => p.is_ready);
-            const availableBots = lobbyState.available_bot_count;
+            const availablePuppets = lobbyState.available_puppet_count;
             const hasEnoughBots =
-              availableBots !== null && availableBots >= botSlots;
+              availablePuppets !== null && availablePuppets >= botSlots;
 
             return (
               <>
@@ -188,11 +188,11 @@ export function Lobby() {
                     ))}
                     {botSlots > 0 &&
                       Array.from({ length: botSlots }).map((_, i) => {
-                        const isSearching = availableBots === null;
-                        const botAvailable = !isSearching && i < availableBots;
+                        const isSearching = availablePuppets === null;
+                        const botAvailable = !isSearching && i < availablePuppets;
                         return (
                           <div
-                            key={`bot-${i}`}
+                            key={`puppet-${i}`}
                             className={`bg-black/20 px-2.5 py-2 rounded-lg flex items-center gap-1.5 border border-dashed ${
                               isSearching
                                 ? "border-amber-600/50"
@@ -229,17 +229,17 @@ export function Lobby() {
                             <span
                               className={`text-sm italic ${isSearching ? "text-amber-400" : botAvailable ? "text-cyan-500" : "text-red-400/70"}`}
                             >
-                              Bot {i + 1}
+                              Puppet {i + 1}
                             </span>
                           </div>
                         );
                       })}
                   </div>
                   {botSlots > 0 &&
-                    availableBots !== null &&
-                    availableBots < botSlots && (
+                    availablePuppets !== null &&
+                    availablePuppets < botSlots && (
                       <p className="text-gray-500 text-xs mt-1.5 px-1">
-                        Bots are past players with matching settings. Invite
+                        Puppets are past players with matching settings. Invite
                         more players or try different game options.
                       </p>
                     )}
@@ -306,10 +306,10 @@ export function Lobby() {
                           "Need at least 2 players"
                         ) : !allReady ? (
                           "Waiting for all players to ready"
-                        ) : availableBots === null ? (
-                          "Searching for bots..."
+                        ) : availablePuppets === null ? (
+                          "Searching for puppets..."
                         ) : !hasEnoughBots ? (
-                          `${botSlots - availableBots} bot${botSlots - availableBots > 1 ? "s" : ""} not found - invite players`
+                          `${botSlots - availablePuppets} puppet${botSlots - availablePuppets > 1 ? "s" : ""} not found - invite players`
                         ) : (
                           "Start Game"
                         )}
