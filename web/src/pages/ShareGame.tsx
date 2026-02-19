@@ -270,8 +270,8 @@ export function ShareGame() {
                 <span className="text-gray-500 ml-1">(You)</span>
               )}
             </span>
-            {pv.is_bot && (
-              <span className="text-[10px] text-gray-500 shrink-0">BOT</span>
+            {pv.is_puppet && (
+              <span className="text-[10px] text-gray-500 shrink-0">PUPPET</span>
             )}
           </button>
         )
