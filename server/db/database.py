@@ -34,12 +34,27 @@ def _migrate(conn, table: str, column: str, col_type: str, default: str | None =
         conn.commit()
 
 
+def _migrate_rename_column(conn, table: str, old_col: str, new_col: str) -> None:
+    columns = _get_columns(conn, table)
+    if old_col in columns and new_col not in columns:
+        conn.execute(text(f"ALTER TABLE {table} RENAME COLUMN {old_col} TO {new_col}"))
+        conn.commit()
+
+
 def init_db():
+    _migrate_rename_column_pre_create()
     Base.metadata.create_all(bind=engine)
 
     with engine.connect() as conn:
         _migrate(conn, "battle_snapshots", "poison", "INTEGER")
-        _migrate(conn, "player_game_history", "is_bot", "BOOLEAN", "0")
+        _migrate(conn, "player_game_history", "is_puppet", "BOOLEAN", "0")
         _migrate(conn, "player_game_history", "source_history_id", "INTEGER")
         _migrate(conn, "player_game_history", "poison_history_json", "TEXT")
         _migrate(conn, "battle_snapshots", "play_draw_preference", "TEXT")
+
+
+def _migrate_rename_column_pre_create() -> None:
+    """Run column renames before SQLAlchemy creates tables, so existing DBs are migrated."""
+    with engine.connect() as conn:
+        _migrate_rename_column(conn, "player_game_history", "is_bot", "is_puppet")
+        _migrate_rename_column(conn, "game_players", "is_bot", "is_puppet")

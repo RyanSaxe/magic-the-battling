@@ -617,7 +617,7 @@ class GameManager:
             .filter(
                 PlayerGameHistory.game_id == game_id,
                 PlayerGameHistory.player_name == fp.name,
-                PlayerGameHistory.is_bot == True,  # noqa: E712
+                PlayerGameHistory.is_puppet == True,  # noqa: E712
             )
             .first()
         )

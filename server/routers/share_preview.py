@@ -71,7 +71,7 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
 
     players: list[SharePlayerData] = []
     for history in histories:
-        is_bot = bool(history.is_bot)
+        is_bot = bool(history.is_puppet)
         if is_bot:
             snapshots = _build_bot_snapshots(history, db)
         else:

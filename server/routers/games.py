@@ -411,7 +411,7 @@ def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)
 
     players: list[SharePlayerData] = []
     for history in histories:
-        is_bot = bool(history.is_bot)
+        is_bot = bool(history.is_puppet)
         if is_bot:
             snapshots = _build_bot_snapshots(history, db)
         else:
