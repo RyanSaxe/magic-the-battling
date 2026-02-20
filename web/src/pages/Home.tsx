@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { CardShowcase } from "../components/home/CardShowcase";
 import { CreateGameModal } from "../components/home/CreateGameModal";
 import { JoinGameModal } from "../components/home/JoinGameModal";
@@ -82,9 +83,12 @@ export function Home() {
           Discord
         </a>
         <span className="text-gray-600">|</span>
-        <span className="text-gray-500 cursor-not-allowed" title="Coming soon">
+        <Link
+          to="/rules"
+          className="text-amber-400 hover:text-amber-300 transition-colors"
+        >
           Rules
-        </span>
+        </Link>
       </footer>
 
       {showCreateModal && (
