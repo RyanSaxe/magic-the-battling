@@ -1236,8 +1236,8 @@ function GameContent() {
           onClose={() => setRulesPanelOpen(false)}
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
-          cubeId={gameState.cube_id}
           gameId={gameId}
+          useUpgrades={gameState.use_upgrades}
         />
       )}
     </CardPreviewContext.Provider>

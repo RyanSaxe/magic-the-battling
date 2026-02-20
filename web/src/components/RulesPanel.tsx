@@ -206,53 +206,57 @@ function CardsView({ gameId, which }: { gameId: string; which: 'cards' | 'upgrad
   const inputClass =
     'w-full bg-gray-800 text-white rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-gray-500'
 
+  const showFilters = which === 'cards'
+
   return (
     <div className="flex flex-col min-h-0 flex-1">
-      <div className="shrink-0 flex flex-col gap-2 pb-3">
-        <div className="grid grid-cols-3 gap-2">
-          <input
-            type="text"
-            value={searchName}
-            onChange={(e) => setSearchName(e.target.value)}
-            placeholder="Name..."
-            className={inputClass}
-          />
-          <input
-            type="text"
-            value={searchType}
-            onChange={(e) => setSearchType(e.target.value)}
-            placeholder="Type..."
-            className={inputClass}
-          />
-          <input
-            type="text"
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            placeholder="Text..."
-            className={inputClass}
-          />
-        </div>
+      {showFilters && (
+        <div className="shrink-0 flex flex-col gap-2 pb-3">
+          <div className="grid grid-cols-3 gap-2">
+            <input
+              type="text"
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              placeholder="Name..."
+              className={inputClass}
+            />
+            <input
+              type="text"
+              value={searchType}
+              onChange={(e) => setSearchType(e.target.value)}
+              placeholder="Type..."
+              className={inputClass}
+            />
+            <input
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Text..."
+              className={inputClass}
+            />
+          </div>
 
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {COLOR_CHIPS.map(({ code, label, bg, text, ring }) => (
-            <button
-              key={code}
-              onClick={() => toggleColor(code)}
-              className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${bg} ${text} ${
-                selectedColors.has(code) ? `ring-2 ${ring} scale-110` : 'opacity-50 hover:opacity-75'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {COLOR_CHIPS.map(({ code, label, bg, text, ring }) => (
+              <button
+                key={code}
+                onClick={() => toggleColor(code)}
+                className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${bg} ${text} ${
+                  selectedColors.has(code) ? `ring-2 ${ring} scale-110` : 'opacity-50 hover:opacity-75'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
 
-        <div className="text-xs text-gray-500">
-          {sorted.length === allCards.length
-            ? `${allCards.length} cards`
-            : `${sorted.length} of ${allCards.length} cards`}
+          <div className="text-xs text-gray-500">
+            {sorted.length === allCards.length
+              ? `${allCards.length} cards`
+              : `${sorted.length} of ${allCards.length} cards`}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex-1 overflow-y-auto min-h-0">
         {sorted.length === 0 ? (
@@ -290,15 +294,15 @@ const BROWSE_IDS = ['__cards__', '__upgrades__'] as const
 interface RulesPanelContentProps {
   initialDocId?: string
   initialTab?: string
-  cubeId?: string
   gameId?: string
+  useUpgrades?: boolean
 }
 
 export function RulesPanelContent({
   initialDocId = 'overview',
   initialTab,
-  cubeId,
   gameId,
+  useUpgrades,
 }: RulesPanelContentProps) {
   const [selectedDocId, setSelectedDocId] = useState(initialDocId)
   const [activeTab, setActiveTab] = useState(initialTab ?? '')
@@ -336,6 +340,38 @@ export function RulesPanelContent({
 
   const sidebar = (
     <nav className="space-y-4 py-3 px-3">
+      {gameId && (
+        <div className="border-b border-gray-700/50 pb-3">
+          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5 px-2">
+            Browse
+          </h3>
+          <div className="space-y-0.5">
+            <button
+              onClick={() => handleDocSelect('__cards__')}
+              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
+                selectedDocId === '__cards__'
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              }`}
+            >
+              Card Pool
+            </button>
+            {useUpgrades !== false && (
+              <button
+                onClick={() => handleDocSelect('__upgrades__')}
+                className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
+                  selectedDocId === '__upgrades__'
+                    ? 'bg-amber-500/20 text-amber-300'
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                }`}
+              >
+                Upgrades
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {groups.map(({ category, label, docs }) => (
         <div key={category}>
           <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5 px-2">
@@ -358,60 +394,6 @@ export function RulesPanelContent({
           </div>
         </div>
       ))}
-
-      {gameId && (
-        <div className="border-t border-gray-700/50 pt-3">
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5 px-2">
-            Browse
-          </h3>
-          <div className="space-y-0.5">
-            <button
-              onClick={() => handleDocSelect('__cards__')}
-              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
-                selectedDocId === '__cards__'
-                  ? 'bg-amber-500/20 text-amber-300'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              }`}
-            >
-              Card Pool
-            </button>
-            <button
-              onClick={() => handleDocSelect('__upgrades__')}
-              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
-                selectedDocId === '__upgrades__'
-                  ? 'bg-amber-500/20 text-amber-300'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              }`}
-            >
-              Upgrades
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="border-t border-gray-700/50 pt-3">
-        <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5 px-2">
-          External Links
-        </h3>
-        <div className="space-y-0.5">
-          <a
-            href={`https://cubecobra.com/cube/list/${cubeId ?? 'auto'}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block px-2 py-1.5 rounded text-sm text-amber-400 hover:text-amber-300 hover:bg-gray-800 transition-colors"
-          >
-            Card Pool (CubeCobra) ↗
-          </a>
-          <a
-            href="https://discord.gg/2NAjcWXNKn"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block px-2 py-1.5 rounded text-sm text-[#7289da] hover:text-[#99aab5] hover:bg-gray-800 transition-colors"
-          >
-            Discord ↗
-          </a>
-        </div>
-      </div>
     </nav>
   )
 
@@ -487,11 +469,11 @@ interface RulesPanelProps {
   onClose: () => void
   initialDocId?: string
   initialTab?: string
-  cubeId?: string
   gameId?: string
+  useUpgrades?: boolean
 }
 
-export function RulesPanel({ onClose, initialDocId, initialTab, cubeId, gameId }: RulesPanelProps) {
+export function RulesPanel({ onClose, initialDocId, initialTab, gameId, useUpgrades }: RulesPanelProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -521,8 +503,8 @@ export function RulesPanel({ onClose, initialDocId, initialTab, cubeId, gameId }
         <RulesPanelContent
           initialDocId={initialDocId}
           initialTab={initialTab}
-          cubeId={cubeId}
           gameId={gameId}
+          useUpgrades={useUpgrades}
         />
       </div>
     </div>
