@@ -199,7 +199,8 @@ export function PlayerList({
     }
     if (a.placement === 0) return -1;
     if (b.placement === 0) return 1;
-    return a.placement - b.placement;
+    if (a.placement !== b.placement) return a.placement - b.placement;
+    return a.name.localeCompare(b.name);
   };
 
   const sortedOpponents = [...opponents].sort(byPlacement);
