@@ -1024,10 +1024,10 @@ function GameContent() {
             <div className="relative flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
               {renderActionButtons()}
               {sizes.isMobile && currentPhase === 'draft' && (
-                <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none">
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-1 pointer-events-none">
                   <div className="relative">
-                    <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-7 rounded" />
-                    <span className="absolute bottom-0 right-0 bg-black/70 text-amber-400 text-[10px] font-bold px-1 py-0.5 rounded-full leading-none">
+                    <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-12 rounded-sm shadow-lg" />
+                    <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-amber-400 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
                       {self_player.treasures}
                     </span>
                   </div>
