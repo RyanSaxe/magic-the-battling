@@ -164,7 +164,7 @@ export function ShareGame() {
       stage: snap?.stage ?? 0,
       vanquishers: 0,
       is_ghost: false,
-      is_bot: p.is_bot,
+      is_puppet: p.is_puppet,
       time_of_death: null,
       hand_count: snap?.hand.length ?? 0,
       sideboard_count: snap?.sideboard.length ?? 0,
@@ -186,10 +186,13 @@ export function ShareGame() {
   })
 
   const sortedPlayerViews = [...playerViews].sort((a, b) => {
-    if (a.placement !== 0 && b.placement !== 0) return a.placement - b.placement
+    if (a.placement !== 0 && b.placement !== 0) {
+      if (a.placement !== b.placement) return a.placement - b.placement
+      return a.name.localeCompare(b.name)
+    }
     if (a.placement !== 0) return -1
     if (b.placement !== 0) return 1
-    return 0
+    return a.name.localeCompare(b.name)
   })
 
   const renderContent = () => {
@@ -270,8 +273,8 @@ export function ShareGame() {
                 <span className="text-gray-500 ml-1">(You)</span>
               )}
             </span>
-            {pv.is_bot && (
-              <span className="text-[10px] text-gray-500 shrink-0">BOT</span>
+            {pv.is_puppet && (
+              <span className="text-[10px] text-gray-500 shrink-0">PUPPET</span>
             )}
           </button>
         )

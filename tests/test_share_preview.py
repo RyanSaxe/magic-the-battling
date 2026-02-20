@@ -20,7 +20,7 @@ def _make_share_data(player_name: str = "Alice", placement: int | None = 1) -> S
                 name=player_name,
                 final_placement=placement,
                 final_poison=0,
-                is_bot=False,
+                is_puppet=False,
                 snapshots=[],
             ),
         ],

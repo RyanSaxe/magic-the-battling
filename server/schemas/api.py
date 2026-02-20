@@ -54,7 +54,7 @@ class PlayerView(BaseModel):
     stage: int
     vanquishers: int
     is_ghost: bool
-    is_bot: bool = False
+    is_puppet: bool = False
     time_of_death: int | None
     hand_count: int
     sideboard_count: int
@@ -130,7 +130,7 @@ class LobbyStateResponse(BaseModel):
     target_player_count: int = 4
     cube_loading_status: CubeLoadingStatus = "loading"
     cube_loading_error: str | None = None
-    available_bot_count: int | None = None
+    available_puppet_count: int | None = None
 
 
 class DraftSwapAction(BaseModel):
@@ -206,7 +206,7 @@ class ErrorResponse(BaseModel):
 class GameStatusPlayer(BaseModel):
     name: str
     is_connected: bool
-    is_bot: bool
+    is_puppet: bool
     phase: str
 
 
@@ -250,7 +250,7 @@ class SharePlayerData(BaseModel):
     name: str
     final_placement: int | None
     final_poison: int
-    is_bot: bool
+    is_puppet: bool
     snapshots: list[SharePlayerSnapshot]
 
 

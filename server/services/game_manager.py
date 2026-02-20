@@ -22,10 +22,10 @@ from mtb.models.game import (
     Battle,
     BattleSnapshotData,
     Config,
-    FakePlayer,
     Game,
     LastBattleResult,
     Player,
+    Puppet,
     StaticOpponent,
     Zones,
     create_game,
@@ -36,15 +36,15 @@ from mtb.phases import battle, build, draft, reward
 from mtb.phases.battle import get_pairing_probabilities
 from mtb.phases.elimination import (
     check_game_over,
-    eliminate_bot,
     eliminate_player,
-    get_live_bots,
+    eliminate_puppet,
     get_live_players,
+    get_live_puppets,
     get_sudden_death_fighters,
     get_would_be_dead,
-    get_would_be_dead_bots,
+    get_would_be_dead_puppets,
     needs_sudden_death,
-    process_bot_eliminations,
+    process_puppet_eliminations,
     setup_sudden_death_battle,
     would_be_dead_ready_for_elimination,
 )
@@ -304,7 +304,7 @@ class GameManager:
             return
 
         live_players = [p for p in game.players if p.phase != "eliminated"]
-        live_bots = [fp for fp in game.fake_players if not fp.is_eliminated]
+        live_bots = [fp for fp in game.puppets if not fp.is_eliminated]
 
         if winner:
             winner.phase = "winner"
@@ -354,7 +354,7 @@ class GameManager:
 
     def _persist_final_placements(self, db: Session, game_id: str, game: Game) -> None:
         all_participants = [(p.name, p.placement) for p in game.players if p.placement > 0]
-        all_participants.extend((fp.name, fp.placement) for fp in game.fake_players if fp.placement > 0)
+        all_participants.extend((fp.name, fp.placement) for fp in game.puppets if fp.placement > 0)
 
         for name, placement in all_participants:
             history = (
@@ -536,7 +536,7 @@ class GameManager:
 
         return result
 
-    def _load_fake_player(self, db: Session, history: PlayerGameHistory, existing_names: set[str]) -> FakePlayer:
+    def _load_fake_player(self, db: Session, history: PlayerGameHistory, existing_names: set[str]) -> Puppet:
         snapshots_dict: dict[str, StaticOpponent] = {}
         player_name = cast(str, history.player_name)
         history_id = cast(int, history.id)
@@ -549,7 +549,7 @@ class GameManager:
             static_opp = StaticOpponent.from_snapshot(snapshot_data, bot_name, history_id)
             snapshots_dict[key] = static_opp
 
-        return FakePlayer(
+        return Puppet(
             name=bot_name,
             player_history_id=history_id,
             snapshots=snapshots_dict,
@@ -610,14 +610,14 @@ class GameManager:
         db.commit()
 
     def _record_bot_poison(
-        self, db: Session, game_id: str, fp: FakePlayer, battler_elo: float, stage: int, round_num: int
+        self, db: Session, game_id: str, fp: Puppet, battler_elo: float, stage: int, round_num: int
     ) -> None:
         history = (
             db.query(PlayerGameHistory)
             .filter(
                 PlayerGameHistory.game_id == game_id,
                 PlayerGameHistory.player_name == fp.name,
-                PlayerGameHistory.is_bot == True,  # noqa: E712
+                PlayerGameHistory.is_puppet == True,  # noqa: E712
             )
             .first()
         )
@@ -629,7 +629,7 @@ class GameManager:
                 battler_elo=battler_elo,
                 max_stage=stage,
                 max_round=round_num,
-                is_bot=True,
+                is_puppet=True,
                 source_history_id=fp.player_history_id,
             )
             db.add(history)
@@ -658,13 +658,13 @@ class GameManager:
             return
 
         existing_names = {p.name for p in game.players}
-        existing_names.update(fp.name for fp in game.fake_players)
+        existing_names.update(fp.name for fp in game.puppets)
 
         histories = self._find_historical_players(db, target_elo, count, [], use_upgrades, use_vanguards, cube_id)
         for history in histories:
             fake_player = self._load_fake_player(db, history, existing_names)
             existing_names.add(fake_player.name)
-            game.fake_players.append(fake_player)
+            game.puppets.append(fake_player)
 
     def get_game(self, game_id: str) -> Game | None:
         return self._active_games.get(game_id)
@@ -832,7 +832,7 @@ class GameManager:
             target_player_count=pending.target_player_count,
             cube_loading_status=self._get_cube_loading_status(pending),
             cube_loading_error=pending.battler_error,
-            available_bot_count=bot_count,
+            available_puppet_count=bot_count,
         )
 
     def get_game_state(self, game_id: str, player_id: str) -> GameStateResponse | None:
@@ -858,12 +858,11 @@ class GameManager:
 
         probabilities = self._get_pairing_probabilities(game, player)
         most_recent_ghost_name = game.most_recent_ghost.name if game.most_recent_ghost else None
-        most_recent_ghost_bot_name = game.most_recent_ghost_bot.name if game.most_recent_ghost_bot else None
+        most_recent_ghost_puppet_name = game.most_recent_ghost_puppet.name if game.most_recent_ghost_puppet else None
 
         all_players = [self._make_player_view(p, player, probabilities, most_recent_ghost_name) for p in game.players]
         all_players.extend(
-            self._make_fake_player_view(fp, player, probabilities, most_recent_ghost_bot_name)
-            for fp in game.fake_players
+            self._make_fake_player_view(fp, player, probabilities, most_recent_ghost_puppet_name) for fp in game.puppets
         )
 
         return GameStateResponse(
@@ -927,7 +926,7 @@ class GameManager:
             other_sd_player = self._find_sudden_death_opponent(game, player)
             if other_sd_player:
                 return {other_sd_player.name: 1.0}
-            for fp in game.fake_players:
+            for fp in game.puppets:
                 if fp.in_sudden_death and not fp.is_eliminated:
                     return {fp.name: 1.0}
             return {}
@@ -944,7 +943,7 @@ class GameManager:
             return "loss"
         return "win"
 
-    def _get_fake_player_last_result(self, fake: FakePlayer) -> LastResult | None:
+    def _get_fake_player_last_result(self, fake: Puppet) -> LastResult | None:
         result = fake.last_battle_result
         if result is None:
             return None
@@ -971,7 +970,7 @@ class GameManager:
             stage=player.stage,
             vanquishers=player.vanquishers,
             is_ghost=is_eliminated,
-            is_bot=False,
+            is_puppet=False,
             time_of_death=None,
             hand_count=len(player.hand),
             sideboard_count=len(player.sideboard),
@@ -993,10 +992,10 @@ class GameManager:
 
     def _make_fake_player_view(
         self,
-        fake: FakePlayer,
+        fake: Puppet,
         viewer: Player,
         probabilities: dict[str, float],
-        most_recent_ghost_bot_name: str | None = None,
+        most_recent_ghost_puppet_name: str | None = None,
     ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
 
@@ -1030,7 +1029,7 @@ class GameManager:
                 stage=viewer.stage,
                 vanquishers=0,
                 is_ghost=fake.is_eliminated,
-                is_bot=True,
+                is_puppet=True,
                 time_of_death=None,
                 hand_count=len(snapshot.hand),
                 sideboard_count=len(snapshot.sideboard),
@@ -1042,7 +1041,7 @@ class GameManager:
                 most_recently_revealed_cards=revealed_cards,
                 last_result=last_result,
                 pairing_probability=probabilities.get(fake.name, 0.0),
-                is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
+                is_most_recent_ghost=fake.name == most_recent_ghost_puppet_name,
                 full_sideboard=snapshot.sideboard,
                 command_zone=snapshot.command_zone,
                 placement=fake.placement,
@@ -1057,7 +1056,7 @@ class GameManager:
             stage=viewer.stage,
             vanquishers=0,
             is_ghost=fake.is_eliminated,
-            is_bot=True,
+            is_puppet=True,
             time_of_death=None,
             hand_count=0,
             sideboard_count=0,
@@ -1069,7 +1068,7 @@ class GameManager:
             most_recently_revealed_cards=[],
             last_result=last_result,
             pairing_probability=probabilities.get(fake.name, 0.0),
-            is_most_recent_ghost=fake.name == most_recent_ghost_bot_name,
+            is_most_recent_ghost=fake.name == most_recent_ghost_puppet_name,
             full_sideboard=[],
             command_zone=[],
             placement=fake.placement,
@@ -1077,9 +1076,9 @@ class GameManager:
         )
 
     def _get_opponent_poison(self, opponent: StaticOpponent | Player, game: Game) -> int:
-        """Get poison for an opponent, looking up FakePlayer for StaticOpponents."""
+        """Get poison for an opponent, looking up Puppet for StaticOpponents."""
         if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
-            for fp in game.fake_players:
+            for fp in game.puppets:
                 if fp.player_history_id == opponent.source_player_history_id:
                     return fp.poison
         return opponent.poison
@@ -1232,7 +1231,7 @@ class GameManager:
 
         if other_sd_player is None:
             # Bot opponent — find by in_sudden_death flag
-            for fp in game.fake_players:
+            for fp in game.puppets:
                 if fp.in_sudden_death and not fp.is_eliminated:
                     static_opp = fp.get_opponent_for_round(player.stage, player.round)
                     if static_opp:
@@ -1309,7 +1308,7 @@ class GameManager:
             battler_elo = game.battler.elo or 1200.0
             for player in live_players:
                 self._record_snapshot(db, game_id, player, battler_elo)
-            for fp in game.fake_players:
+            for fp in game.puppets:
                 if not fp.is_eliminated:
                     self._record_bot_poison(db, game_id, fp, battler_elo, stage, round_num)
 
@@ -1324,7 +1323,7 @@ class GameManager:
                 paired.add(player.name)
                 paired.add(opponent.name)
                 if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
-                    for fp in game.fake_players:
+                    for fp in game.puppets:
                         if fp.player_history_id == opponent.source_player_history_id:
                             paired_bot_names.add(fp.name)
                             break
@@ -1464,12 +1463,12 @@ class GameManager:
     def _is_finale(self, game: Game) -> bool:
         """Check if we're in the finale (only 2 participants alive)."""
         live_humans = get_live_players(game)
-        live_bots = get_live_bots(game)
+        live_bots = get_live_puppets(game)
         return len(live_humans) + len(live_bots) == 2
 
-    def _get_fake_player_for_opponent(self, game: Game, opponent: StaticOpponent) -> FakePlayer | None:
-        """Get the FakePlayer corresponding to a StaticOpponent, if any."""
-        for fake in game.fake_players:
+    def _get_fake_player_for_opponent(self, game: Game, opponent: StaticOpponent) -> Puppet | None:
+        """Get the Puppet corresponding to a StaticOpponent, if any."""
+        for fake in game.puppets:
             if fake.player_history_id == opponent.source_player_history_id:
                 return fake
         return None
@@ -1479,7 +1478,7 @@ class GameManager:
         game: Game,
         player: Player,
         opponent: StaticOpponent,
-        fake_player: FakePlayer,
+        fake_player: Puppet,
         player_at_lethal: bool,
         bot_at_lethal: bool,
         winner_name: str | None,
@@ -1536,11 +1535,11 @@ class GameManager:
                 poison_taken=poison_dealt,
             )
             eliminate_player(game, player, player.round, player.stage)
-            process_bot_eliminations(game)
+            process_puppet_eliminations(game)
             self.complete_game(game_id or "", None, db)
             return "game_over"
 
-        process_bot_eliminations(game)
+        process_puppet_eliminations(game)
         winner, is_game_over = check_game_over(game)
         if is_game_over and winner is not None:
             reward.set_last_battle_result_no_rewards(
@@ -1637,7 +1636,7 @@ class GameManager:
             return self._check_sudden_death_ready(game, game_id, db)
 
         # All other paths: eliminate bots normally
-        process_bot_eliminations(game)
+        process_puppet_eliminations(game)
 
         if is_finale:
             # Player at lethal = eliminated
@@ -1852,7 +1851,7 @@ class GameManager:
             return self._check_sudden_death_ready(game, game_id, db)
 
         # Neither at lethal - both get rewards
-        process_bot_eliminations(game)
+        process_puppet_eliminations(game)
         player.phase = "reward"
         opponent.phase = "reward"
         if is_draw:
@@ -1938,7 +1937,7 @@ class GameManager:
         opponent_at_lethal = opponent.poison >= game.config.poison_to_lose
 
         if is_finale:
-            process_bot_eliminations(game)
+            process_puppet_eliminations(game)
             return self._handle_pvp_finale(
                 game,
                 player,
@@ -1973,15 +1972,15 @@ class GameManager:
             db,
         )
 
-    def _resolve_bot_vs_bot_sudden_death(
-        self, game: Game, bots: list[FakePlayer], game_id: str | None, db: Session | None
+    def _resolve_puppet_vs_puppet_sudden_death(
+        self, game: Game, bots: list[Puppet], game_id: str | None, db: Session | None
     ) -> str | None:
-        """Resolve sudden death between two bots by randomly eliminating one."""
+        """Resolve sudden death between two puppets by randomly eliminating one."""
         loser = random.choice(bots)
-        winner_bot = bots[0] if loser is bots[1] else bots[1]
-        eliminate_bot(game, loser)
+        winner_puppet = bots[0] if loser is bots[1] else bots[1]
+        eliminate_puppet(game, loser)
         self._persist_player_placement(db, game_id, loser.name, loser.placement)
-        winner_bot.poison = game.config.poison_to_lose - 1
+        winner_puppet.poison = game.config.poison_to_lose - 1
         winner, is_game_over = check_game_over(game)
         if is_game_over:
             self.complete_game(game_id or "", winner, db)
@@ -1997,11 +1996,11 @@ class GameManager:
             for p in get_would_be_dead(game):
                 eliminate_player(game, p, p.round, p.stage)
                 self._persist_player_placement(db, game_id, p.name, p.placement)
-            for bot in get_would_be_dead_bots(game):
-                eliminate_bot(game, bot)
-                self._persist_player_placement(db, game_id, bot.name, bot.placement)
+            for puppet in get_would_be_dead_puppets(game):
+                eliminate_puppet(game, puppet)
+                self._persist_player_placement(db, game_id, puppet.name, puppet.placement)
 
-            process_bot_eliminations(game)
+            process_puppet_eliminations(game)
             winner, is_game_over = check_game_over(game)
             if is_game_over:
                 self.complete_game(game_id or "", winner, db)
@@ -2019,13 +2018,13 @@ class GameManager:
             if p.name not in fighter_names:
                 eliminate_player(game, p, p.round, p.stage)
                 self._persist_player_placement(db, game_id, p.name, p.placement)
-        for bot in get_would_be_dead_bots(game):
-            if bot.name not in fighter_names:
-                eliminate_bot(game, bot)
-                self._persist_player_placement(db, game_id, bot.name, bot.placement)
+        for puppet in get_would_be_dead_puppets(game):
+            if puppet.name not in fighter_names:
+                eliminate_puppet(game, puppet)
+                self._persist_player_placement(db, game_id, puppet.name, puppet.placement)
 
         humans = [f for f in (f1, f2) if isinstance(f, Player)]
-        bots = [f for f in (f1, f2) if isinstance(f, FakePlayer)]
+        puppets = [f for f in (f1, f2) if isinstance(f, Puppet)]
 
         if len(humans) == 2:
             setup_sudden_death_battle(game, humans[0], humans[1])
@@ -2035,15 +2034,15 @@ class GameManager:
             humans[1].in_sudden_death = True
             return "sudden_death"
 
-        if len(bots) == 2:
-            return self._resolve_bot_vs_bot_sudden_death(game, bots, game_id, db)
+        if len(puppets) == 2:
+            return self._resolve_puppet_vs_puppet_sudden_death(game, puppets, game_id, db)
 
-        # Human vs Bot
+        # Human vs Puppet
         human = humans[0]
-        bot = bots[0]
-        setup_sudden_death_battle(game, human, bot)
+        puppet = puppets[0]
+        setup_sudden_death_battle(game, human, puppet)
         human.in_sudden_death = True
-        bot.in_sudden_death = True
+        puppet.in_sudden_death = True
         human.phase = "build"
         return "sudden_death"
 
@@ -2092,10 +2091,10 @@ class GameManager:
         except ValueError as e:
             return str(e)
 
-        self._advance_bot_if_needed(game, opponent_name)
+        self._advance_puppet_if_needed(game, opponent_name)
 
         if not get_would_be_dead(game):
-            process_bot_eliminations(game)
+            process_puppet_eliminations(game)
         winner, is_game_over = check_game_over(game)
         if is_game_over:
             self.complete_game(game_id or "", winner, db)
@@ -2108,12 +2107,12 @@ class GameManager:
 
         return None
 
-    def _advance_bot_if_needed(self, game: Game, opponent_name: str | None) -> None:
-        """Advance a bot's round/stage if the opponent was a bot."""
+    def _advance_puppet_if_needed(self, game: Game, opponent_name: str | None) -> None:
+        """Advance a puppet's round/stage if the opponent was a puppet."""
         if not opponent_name:
             return
 
-        for fp in game.fake_players:
+        for fp in game.puppets:
             if fp.name == opponent_name and not fp.is_eliminated:
                 num_rounds = game.config.num_rounds_per_stage
                 if fp.round >= num_rounds:
