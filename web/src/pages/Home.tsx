@@ -68,7 +68,7 @@ export function Home() {
           href="https://cubecobra.com/cube/overview/auto"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-amber-400 hover:text-amber-300 transition-colors"
+          className="text-[#7289da] hover:text-[#99aab5] transition-colors"
         >
           Follow on Cube Cobra
         </a>
