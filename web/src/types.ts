@@ -18,6 +18,8 @@ export interface Card {
   elo: number | null
   upgrade_target: Card | null
   oracle_text: string | null
+  colors: string[]
+  cmc: number
 }
 
 export interface Zones {

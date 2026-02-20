@@ -1,4 +1,4 @@
-import type { CreateGameResponse, JoinGameResponse, GameStatusResponse, SpectateRequestStatus, ShareGameResponse } from '../types'
+import type { Card, CreateGameResponse, JoinGameResponse, GameStatusResponse, SpectateRequestStatus, ShareGameResponse } from '../types'
 
 const API_BASE = '/api'
 
@@ -105,6 +105,19 @@ export async function getSpectateRequestStatus(
   const response = await fetch(`${API_BASE}/games/${gameId}/spectate-request/${requestId}`)
   if (!response.ok) {
     throw new Error(await getErrorMessage(response, 'Failed to get spectate status'))
+  }
+  return response.json()
+}
+
+export interface GameCardsResponse {
+  cards: Card[]
+  upgrades: Card[]
+}
+
+export async function getGameCards(gameId: string): Promise<GameCardsResponse> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/cards`)
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, 'Failed to load card pool'))
   }
   return response.json()
 }
