@@ -3,7 +3,6 @@ import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
 import { badgeCls } from '../../components/common/ZoneLayout'
-import { MoneyBagIcon, PoisonIcon } from '../../components/icons'
 
 interface DraftPhaseProps {
   gameState: GameState
@@ -24,7 +23,7 @@ interface CardWithIndex {
   isInHand: boolean
 }
 
-export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
+export function DraftPhase({ gameState, actions }: DraftPhaseProps) {
   const [selectedCard, setSelectedCard] = useState<CardWithIndex | null>(null)
 
   const { self_player } = gameState
@@ -82,16 +81,6 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
 
   return (
     <div ref={containerRef} className="bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col h-full" onClick={handleBackgroundClick}>
-      {isMobile && (
-        <div className="flex items-center gap-4 px-3 py-1 bg-black/20 shrink-0 text-xs">
-          <span className="flex items-center gap-1 text-amber-400">
-            <MoneyBagIcon size="sm" /> {self_player.treasures}
-          </span>
-          <span className="flex items-center gap-1 text-purple-400">
-            <PoisonIcon size="sm" /> {self_player.poison}
-          </span>
-        </div>
-      )}
       <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
         {/* Pool */}
         <div className="bg-black/30 px-3 pt-5 pb-3 relative">

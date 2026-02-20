@@ -23,7 +23,7 @@ import { ContextStripProvider, useContextStrip } from "../contexts";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
 import type { Phase } from "../constants/rules";
-import { POISON_COUNTER_IMAGE } from "../constants/assets";
+import { POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { SubmitPopover } from "../components/common/SubmitPopover";
@@ -1021,8 +1021,18 @@ function GameContent() {
         {/* Bottom Action Bar */}
         {!isSpectator && (
           <div className="shrink-0 relative z-50 bg-black/30 border-t border-gray-700/50">
-            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
+            <div className="relative flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
               {renderActionButtons()}
+              {sizes.isMobile && currentPhase === 'draft' && (
+                <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none">
+                  <div className="relative">
+                    <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-7 rounded" />
+                    <span className="absolute bottom-0 right-0 bg-black/70 text-amber-400 text-[10px] font-bold px-1 py-0.5 rounded-full leading-none">
+                      {self_player.treasures}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
