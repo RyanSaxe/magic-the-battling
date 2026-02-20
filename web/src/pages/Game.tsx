@@ -471,6 +471,9 @@ function GameContent() {
         }
       };
       map['Enter'] = () => actions.draftDone();
+      map['u'] = () => {
+        if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+      };
     } else if (phase === 'build') {
       if (showSubmitHandPopover) {
         const basicsComplete = selectedBasics.length === 3;

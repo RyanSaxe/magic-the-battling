@@ -14,6 +14,7 @@ export const PHASE_HOTKEYS: Record<string, HotkeyEntry[]> = {
   ],
   draft: [
     { key: 'R', description: 'Reroll pack (costs 1 treasure)' },
+    { key: 'U', description: 'View upgrades' },
     { key: 'Enter', description: 'Done drafting → go to Build' },
   ],
   build: [
