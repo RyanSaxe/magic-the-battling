@@ -1,7 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import type { SelfPlayerView, PlayerView } from '../types'
 import { DeckDisplay } from './common'
 import { getOrdinal } from '../utils/format'
+import { ShareModal } from './ShareModal'
 
 interface GameSummaryProps {
   player: SelfPlayerView
@@ -40,40 +41,14 @@ export function GameSummary({
 
   const appliedUpgrades = useUpgrades ? frozenPlayer.upgrades.filter((u) => u.upgrade_target !== null) : []
   const companionIds = new Set(frozenPlayer.command_zone.map((c) => c.id))
-  const [copied, setCopied] = useState(false)
-  const handleShare = useCallback(async () => {
-    if (!gameId) return
-    const url = `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(frozenPlayer.name)}`
-    const shareText = isWinner
-      ? 'Just won a game of Magic: The Battling! Check out the game:'
-      : `Just finished ${placementText} in Magic: The Battling! Check out the game:`
+  const [shareOpen, setShareOpen] = useState(false)
 
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Magic: The Battling', text: shareText, url })
-      } catch (e) {
-        if (e instanceof Error && e.name === 'AbortError') return
-        throw e
-      }
-    } else {
-      const clipboardText = `${shareText}\n${url}`
-      try {
-        await navigator.clipboard.writeText(clipboardText)
-      } catch {
-        const ta = document.createElement('textarea')
-        ta.value = clipboardText
-        ta.style.position = 'fixed'
-        ta.style.opacity = '0'
-        document.body.appendChild(ta)
-        ta.select()
-        document.execCommand('copy')
-        document.body.removeChild(ta)
-      }
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-    window.open(url, '_blank')
-  }, [gameId, frozenPlayer.name, isWinner, placementText])
+  const shareUrl = gameId
+    ? `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(frozenPlayer.name)}`
+    : ''
+  const shareText = isWinner
+    ? 'Just won a game of Magic: The Battling! Check out the game:'
+    : `Just finished ${placementText} in Magic: The Battling! Check out the game:`
 
   return (
     <div className={`flex-1 flex flex-col items-center min-h-0 ${compact ? '' : 'p-4'}`}>
@@ -84,14 +59,10 @@ export function GameSummary({
               {placementText} Place
             </h2>
             <button
-              className={`text-xs font-medium rounded-full px-4 py-1.5 transition-colors duration-200 ${
-                copied
-                  ? 'bg-emerald-600/80 text-emerald-100 border border-emerald-400/30'
-                  : 'bg-indigo-600/80 hover:bg-indigo-500 text-white border border-indigo-400/30'
-              }`}
-              onClick={handleShare}
+              className="text-xs font-medium rounded-full px-4 py-1.5 transition-colors duration-200 bg-indigo-600/80 hover:bg-indigo-500 text-white border border-indigo-400/30 cursor-pointer"
+              onClick={() => setShareOpen(true)}
             >
-              {copied ? 'Link Copied!' : 'Share Game'}
+              Share Game
             </button>
           </div>
         </div>
@@ -109,6 +80,10 @@ export function GameSummary({
           className={compact ? 'bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col' : undefined}
         />
       </div>
+
+      {shareOpen && (
+        <ShareModal url={shareUrl} shareText={shareText} onClose={() => setShareOpen(false)} />
+      )}
     </div>
   )
 }
