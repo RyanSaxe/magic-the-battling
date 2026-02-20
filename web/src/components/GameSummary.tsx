@@ -44,21 +44,36 @@ export function GameSummary({
   const handleShare = useCallback(async () => {
     if (!gameId) return
     const url = `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(frozenPlayer.name)}`
-    try {
-      await navigator.clipboard.writeText(url)
-    } catch {
-      const ta = document.createElement('textarea')
-      ta.value = url
-      ta.style.position = 'fixed'
-      ta.style.opacity = '0'
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
+    const shareText = isWinner
+      ? 'Just won a game of Magic: The Battling! Check out the game:'
+      : `Just finished ${placementText} in Magic: The Battling! Check out the game:`
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Magic: The Battling', text: shareText, url })
+      } catch (e) {
+        if (e instanceof Error && e.name === 'AbortError') return
+        throw e
+      }
+    } else {
+      const clipboardText = `${shareText}\n${url}`
+      try {
+        await navigator.clipboard.writeText(clipboardText)
+      } catch {
+        const ta = document.createElement('textarea')
+        ta.value = clipboardText
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     }
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }, [gameId, frozenPlayer.name])
+    window.open(url, '_blank')
+  }, [gameId, frozenPlayer.name, isWinner, placementText])
 
   return (
     <div className={`flex-1 flex flex-col items-center min-h-0 ${compact ? '' : 'p-4'}`}>
