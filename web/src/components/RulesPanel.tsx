@@ -258,7 +258,7 @@ function CardsView({ gameId, which }: { gameId: string; which: 'cards' | 'upgrad
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto min-h-0">
+      <div className="flex-1 overflow-y-auto min-h-0 pb-3">
         {sorted.length === 0 ? (
           <div className="text-gray-500 text-center py-8">No cards match</div>
         ) : (
@@ -541,7 +541,7 @@ export function RulesPanel({ onClose, initialDocId, initialTab, gameId, useUpgra
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 rounded-lg w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden"
+        className="bg-gray-900 rounded-lg w-full max-w-4xl h-[calc(100dvh-2rem)] sm:h-auto sm:max-h-[85vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-2.5 border-b border-gray-700/50 flex justify-between items-center shrink-0">
