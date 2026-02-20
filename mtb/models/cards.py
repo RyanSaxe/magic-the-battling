@@ -19,6 +19,8 @@ class Card(BaseModel):
     upgrade_target: "Card | None" = None
     oracle_text: str | None = None
     original_owner: str | None = None
+    colors: list[str] = Field(default_factory=list)
+    cmc: float = 0.0
 
     # vanguard specific properties
     life_modifier: int | None = None

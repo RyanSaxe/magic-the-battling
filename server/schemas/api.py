@@ -233,6 +233,11 @@ class SpectateRequestStatus(BaseModel):
     player_id: str | None = None
 
 
+class GameCardsResponse(BaseModel):
+    cards: list[Card]
+    upgrades: list[Card]
+
+
 class SharePlayerSnapshot(BaseModel):
     stage: int
     round: int
