@@ -59,7 +59,7 @@ export function GameSummary({
               {placementText} Place
             </h2>
             <button
-              className="text-xs font-medium rounded-full px-4 py-1.5 transition-colors duration-200 bg-indigo-600/80 hover:bg-indigo-500 text-white border border-indigo-400/30"
+              className="text-xs font-medium rounded-full px-4 py-1.5 transition-colors duration-200 bg-indigo-600/80 hover:bg-indigo-500 text-white border border-indigo-400/30 cursor-pointer"
               onClick={() => setShareOpen(true)}
             >
               Share Game
