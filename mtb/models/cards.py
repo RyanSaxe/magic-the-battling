@@ -51,6 +51,8 @@ class Battler(BaseModel):
     upgrades: list[Card]
     vanguards: list[Card]
     elo: float = 0.0
+    original_cards: list[Card] = Field(default_factory=list)
+    original_upgrades: list[Card] = Field(default_factory=list)
 
     def shuffle(self) -> None:
         random.shuffle(self.cards)
@@ -95,4 +97,11 @@ def build_battler(
         raise ValueError(f"Cube '{battler_id}' contains no playable cards after filtering")
 
     elo = sum(card.elo for card in cards) / len(cards)
-    return Battler(cards=cards, upgrades=upgrades, vanguards=vanguards, elo=elo)
+    return Battler(
+        cards=cards,
+        upgrades=upgrades,
+        vanguards=vanguards,
+        elo=elo,
+        original_cards=list(cards),
+        original_upgrades=list(upgrades),
+    )

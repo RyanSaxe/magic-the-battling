@@ -185,7 +185,10 @@ def get_game_cards(game_id: str):
     if not battler:
         raise HTTPException(status_code=404, detail="Card pool not available")
 
-    return GameCardsResponse(cards=battler.cards, upgrades=battler.upgrades)
+    return GameCardsResponse(
+        cards=battler.original_cards or battler.cards,
+        upgrades=battler.original_upgrades or battler.upgrades,
+    )
 
 
 @router.post("/{game_id}/start", response_model=StartGameResponse)
