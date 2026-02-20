@@ -204,7 +204,7 @@ function CardsView({ gameId, which }: { gameId: string; which: 'cards' | 'upgrad
   }
 
   const inputClass =
-    'w-full bg-gray-800 text-white rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-gray-500'
+    'w-full bg-gray-800 text-white rounded px-3 py-1.5 text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-gray-500'
 
   const showFilters = which === 'cards'
 
