@@ -108,11 +108,21 @@ const COLOR_CHIPS: { code: string; label: string; bg: string; text: string; ring
   { code: 'C', label: 'C', bg: 'bg-gray-500', text: 'text-white', ring: 'ring-gray-400' },
 ]
 
+const COLOR_ORDER = ['W', 'U', 'B', 'R', 'G']
+
+function colorSortKey(colors: string[]): number {
+  if (colors.length === 0) return 100
+  const minIndex = Math.min(...colors.map((c) => COLOR_ORDER.indexOf(c)).filter((i) => i >= 0))
+  return colors.length * 10 + (minIndex >= 0 ? minIndex : 9)
+}
+
 function CardsView({ gameId, which }: { gameId: string; which: 'cards' | 'upgrades' }) {
   const [data, setData] = useState<GameCardsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
+  const [searchName, setSearchName] = useState('')
+  const [searchType, setSearchType] = useState('')
+  const [searchText, setSearchText] = useState('')
   const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set())
   const [previewCard, setPreviewCard] = useState<Card | null>(null)
   const cacheRef = useRef<GameCardsResponse | null>(null)
@@ -154,82 +164,115 @@ function CardsView({ gameId, which }: { gameId: string; which: 'cards' | 'upgrad
   }
 
   const allCards = which === 'cards' ? data?.cards ?? [] : data?.upgrades ?? []
-  const query = search.toLowerCase()
+  const nameLower = searchName.toLowerCase()
+  const typeLower = searchType.toLowerCase()
+  const textLower = searchText.toLowerCase()
 
   const filtered = allCards.filter((card) => {
-    if (query) {
-      const matchesSearch =
-        card.name.toLowerCase().includes(query) ||
-        card.type_line.toLowerCase().includes(query) ||
-        (card.oracle_text?.toLowerCase().includes(query) ?? false)
-      if (!matchesSearch) return false
-    }
+    if (nameLower && !card.name.toLowerCase().includes(nameLower)) return false
+    if (typeLower && !card.type_line.toLowerCase().includes(typeLower)) return false
+    if (textLower && !(card.oracle_text?.toLowerCase().includes(textLower) ?? false)) return false
     if (selectedColors.size > 0) {
       if (selectedColors.has('C')) {
-        if (card.colors.length === 0) return true
+        if (card.colors.length !== 0) return false
+      } else {
+        for (const c of selectedColors) {
+          if (!card.colors.includes(c)) return false
+        }
       }
-      if (card.colors.some((c) => selectedColors.has(c))) return true
-      return false
     }
     return true
   })
 
+  const sorted = [...filtered].sort((a, b) => {
+    const colorA = colorSortKey(a.colors)
+    const colorB = colorSortKey(b.colors)
+    if (colorA !== colorB) return colorA - colorB
+    if (a.cmc !== b.cmc) return a.cmc - b.cmc
+    return a.name.localeCompare(b.name)
+  })
+
   const toggleColor = (code: string) => {
     setSelectedColors((prev) => {
+      if (code === 'C') return prev.has('C') ? new Set() : new Set(['C'])
       const next = new Set(prev)
+      next.delete('C')
       if (next.has(code)) next.delete(code)
       else next.add(code)
       return next
     })
   }
 
+  const inputClass =
+    'w-full bg-gray-800 text-white rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-gray-500'
+
   return (
-    <div className="flex flex-col gap-3">
-      <input
-        type="text"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Search cards..."
-        className="w-full bg-gray-800 text-white rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-gray-500"
-      />
+    <div className="flex flex-col min-h-0 flex-1">
+      <div className="shrink-0 flex flex-col gap-2 pb-3">
+        <div className="grid grid-cols-3 gap-2">
+          <input
+            type="text"
+            value={searchName}
+            onChange={(e) => setSearchName(e.target.value)}
+            placeholder="Name..."
+            className={inputClass}
+          />
+          <input
+            type="text"
+            value={searchType}
+            onChange={(e) => setSearchType(e.target.value)}
+            placeholder="Type..."
+            className={inputClass}
+          />
+          <input
+            type="text"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="Text..."
+            className={inputClass}
+          />
+        </div>
 
-      <div className="flex items-center gap-1.5 flex-wrap">
-        {COLOR_CHIPS.map(({ code, label, bg, text, ring }) => (
-          <button
-            key={code}
-            onClick={() => toggleColor(code)}
-            className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${bg} ${text} ${
-              selectedColors.has(code) ? `ring-2 ${ring} scale-110` : 'opacity-50 hover:opacity-75'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="text-xs text-gray-500">
-        {filtered.length === allCards.length
-          ? `${allCards.length} cards`
-          : `${filtered.length} of ${allCards.length} cards`}
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className="text-gray-500 text-center py-8">No cards match</div>
-      ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-          {filtered.map((card) => (
-            <img
-              key={card.id}
-              src={card.image_url}
-              alt={card.name}
-              title={card.name}
-              className="cursor-pointer hover:brightness-125 transition-all"
-              style={{ borderRadius: 'var(--card-border-radius)' }}
-              onClick={() => setPreviewCard(card)}
-            />
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {COLOR_CHIPS.map(({ code, label, bg, text, ring }) => (
+            <button
+              key={code}
+              onClick={() => toggleColor(code)}
+              className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${bg} ${text} ${
+                selectedColors.has(code) ? `ring-2 ${ring} scale-110` : 'opacity-50 hover:opacity-75'
+              }`}
+            >
+              {label}
+            </button>
           ))}
         </div>
-      )}
+
+        <div className="text-xs text-gray-500">
+          {sorted.length === allCards.length
+            ? `${allCards.length} cards`
+            : `${sorted.length} of ${allCards.length} cards`}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {sorted.length === 0 ? (
+          <div className="text-gray-500 text-center py-8">No cards match</div>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+            {sorted.map((card) => (
+              <img
+                key={card.id}
+                src={card.image_url}
+                alt={card.name}
+                title={card.name}
+                className="cursor-pointer hover:brightness-125 transition-all"
+                style={{ borderRadius: 'var(--card-border-radius)' }}
+                onClick={() => setPreviewCard(card)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       {previewCard && (
         <CardPreviewModal
@@ -398,17 +441,13 @@ export function RulesPanelContent({
         </div>
 
         {isBrowseView && gameId ? (
-          <>
-            <div className="px-4 pt-3">
-              <h2 className="text-lg font-semibold text-white mb-2">{currentTitle}</h2>
-            </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              <CardsView
-                gameId={gameId}
-                which={selectedDocId === '__cards__' ? 'cards' : 'upgrades'}
-              />
-            </div>
-          </>
+          <div className="flex flex-col flex-1 min-h-0 px-4 pt-3">
+            <h2 className="text-lg font-semibold text-white mb-2 shrink-0">{currentTitle}</h2>
+            <CardsView
+              gameId={gameId}
+              which={selectedDocId === '__cards__' ? 'cards' : 'upgrades'}
+            />
+          </div>
         ) : doc && (
           <>
             {/* Doc heading + tabs */}
