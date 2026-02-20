@@ -92,8 +92,8 @@ export function CompactZoneDisplay({
                 dimensions={{ width: cardW, height: cardH }}
                 disabled={!allowInteraction}
                 isOpponent={isOpponent}
-                onCardHover={!isOpponent ? onCardHover : undefined}
-                onCardHoverEnd={!isOpponent ? onCardHoverEnd : undefined}
+                onCardHover={allowInteraction ? onCardHover : undefined}
+                onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
               />
             )}
           </div>
@@ -109,6 +109,8 @@ export function CompactZoneDisplay({
           allowInteraction={allowInteraction}
           isOpponent={isOpponent}
           onClose={() => setShowModal(false)}
+          onCardHover={onCardHover}
+          onCardHoverEnd={onCardHoverEnd}
         />
       )}
     </>

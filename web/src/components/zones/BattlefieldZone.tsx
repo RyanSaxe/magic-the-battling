@@ -135,8 +135,8 @@ export function BattlefieldZone({
           isOpponent={isOpponent}
           upgraded={upgradedCardIds.has(card.id)}
           appliedUpgrades={upgradesByCardId?.get(card.id)}
-          onCardHover={!isOpponent ? onCardHover : undefined}
-          onCardHoverEnd={!isOpponent ? onCardHoverEnd : undefined}
+          onCardHover={allowInteraction ? onCardHover : undefined}
+          onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
         />
       </div>
     );

@@ -38,8 +38,8 @@ export function BattlefieldZoneColumn({
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
         validFromZones={VALID_FROM_ZONES}
-        onCardHover={!isOpponent ? onCardHover : undefined}
-        onCardHoverEnd={!isOpponent ? onCardHoverEnd : undefined}
+        onCardHover={onCardHover}
+        onCardHoverEnd={onCardHoverEnd}
       />
       <CompactZoneDisplay
         title="Exile"
@@ -50,8 +50,8 @@ export function BattlefieldZoneColumn({
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
         validFromZones={VALID_FROM_ZONES}
-        onCardHover={!isOpponent ? onCardHover : undefined}
-        onCardHoverEnd={!isOpponent ? onCardHoverEnd : undefined}
+        onCardHover={onCardHover}
+        onCardHoverEnd={onCardHoverEnd}
       />
     </div>
   )

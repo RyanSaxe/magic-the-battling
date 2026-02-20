@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Card as CardType, ZoneName } from '../../types'
 import { Card } from '../card'
 import { DraggableCard, DroppableZone } from '../../dnd'
@@ -30,6 +30,8 @@ export function ZoneModal({
   allowInteraction,
   isOpponent,
   onClose,
+  onCardHover,
+  onCardHoverEnd,
 }: {
   title: string
   zone: ZoneName
@@ -37,8 +39,14 @@ export function ZoneModal({
   allowInteraction: boolean
   isOpponent: boolean
   onClose: () => void
+  onCardHover?: (cardId: string, zone: ZoneName) => void
+  onCardHoverEnd?: () => void
 }) {
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+
+  useEffect(() => {
+    return () => { onCardHoverEnd?.() }
+  }, [onCardHoverEnd])
 
   return (
     <div
@@ -64,7 +72,7 @@ export function ZoneModal({
           <div className="flex flex-wrap gap-2">
             {cards.map((card) =>
               allowInteraction ? (
-                <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} size="sm" isOpponent={isOpponent} />
+                <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} size="sm" isOpponent={isOpponent} onCardHover={onCardHover} onCardHoverEnd={onCardHoverEnd} />
               ) : (
                 <Card key={card.id} card={card} size="sm" />
               )

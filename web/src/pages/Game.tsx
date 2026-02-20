@@ -399,9 +399,12 @@ function GameContent() {
   const [rulesPanelTarget, setRulesPanelTarget] = useState<RulesPanelTarget | undefined>(undefined);
 
   // Hover tracking for hotkeys
-  const [hoveredCard, setHoveredCard] = useState<{ id: string; zone: ZoneName } | null>(null);
+  const [hoveredCard, setHoveredCard] = useState<{ id: string; zone: ZoneName; owner: 'player' | 'opponent' } | null>(null);
   const handleCardHover = (cardId: string, zone: ZoneName) => {
-    setHoveredCard({ id: cardId, zone });
+    setHoveredCard({ id: cardId, zone, owner: 'player' });
+  };
+  const handleOpponentCardHover = (cardId: string, zone: ZoneName) => {
+    setHoveredCard({ id: cardId, zone, owner: 'opponent' });
   };
   const handleCardHoverEnd = () => setHoveredCard(null);
 
@@ -495,7 +498,7 @@ function GameContent() {
           }
         };
       }
-      map['v'] = () => {
+      map['u'] = () => {
         if (sp.upgrades.length > 0) setShowUpgradesModal(true);
       };
       if (hoveredCard && sp.upgrades.some((u) => !u.upgrade_target)) {
@@ -524,9 +527,10 @@ function GameContent() {
         map['Enter'] = () => setShowSubmitResultPopover(false);
       } else {
         if (hoveredCard && !hoveredCard.zone.startsWith('command')) {
+          const ownerZones = hoveredCard.owner === 'player' ? cb.your_zones : cb.opponent_zones;
           map['t'] = () => {
             if (hoveredCard.zone === 'battlefield') {
-              const tapped = cb.your_zones.tapped_card_ids?.includes(hoveredCard.id);
+              const tapped = ownerZones.tapped_card_ids?.includes(hoveredCard.id);
               actions.battleUpdateCardState(tapped ? 'untap' : 'tap', hoveredCard.id);
             }
           };
@@ -535,7 +539,7 @@ function GameContent() {
           for (const [key, toZone] of Object.entries(moveZones)) {
             map[key] = () => {
               if (toZone !== hoveredCard.zone) {
-                actions.battleMove(hoveredCard.id, hoveredCard.zone, toZone as ZoneName, 'player', 'player');
+                actions.battleMove(hoveredCard.id, hoveredCard.zone, toZone as ZoneName, hoveredCard.owner, hoveredCard.owner);
               }
             };
           }
@@ -984,6 +988,7 @@ function GameContent() {
                   selectedCard={battleSelectedCard}
                   onSelectedCardChange={setBattleSelectedCard}
                   onCardHover={handleCardHover}
+                  onOpponentCardHover={handleOpponentCardHover}
                   onCardHoverEnd={handleCardHoverEnd}
                 />
               </main>
@@ -1033,7 +1038,7 @@ function GameContent() {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {current_battle.your_zones.sideboard.map((card) => (
-                      <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" />
+                      <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
                     ))}
                   </div>
                 </div>
@@ -1068,6 +1073,8 @@ function GameContent() {
                         zoneOwner="opponent"
                         size="sm"
                         isOpponent
+                        onCardHover={handleOpponentCardHover}
+                        onCardHoverEnd={handleCardHoverEnd}
                       />
                     ))}
                   </div>
