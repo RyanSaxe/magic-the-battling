@@ -3,7 +3,7 @@ import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
 import { badgeCls } from '../../components/common/ZoneLayout'
-import { TREASURE_TOKEN_IMAGE } from '../../constants/assets'
+import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
 
 interface DraftPhaseProps {
   gameState: GameState
@@ -122,14 +122,24 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
         {/* Pack */}
         <div className="bg-black/30 px-3 pt-5 pb-3 relative flex-1">
           {isMobile && (
-            <div className="absolute bottom-2 left-2 pointer-events-none z-10">
-              <div className="relative">
-                <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-12 rounded-sm shadow-lg" />
-                <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-amber-400 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
-                  {self_player.treasures}
-                </span>
+            <>
+              <div className="absolute bottom-2 left-2 pointer-events-none z-10">
+                <div className="relative">
+                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-12 rounded-sm shadow-lg" />
+                  <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-amber-400 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+                    {self_player.treasures}
+                  </span>
+                </div>
               </div>
-            </div>
+              <div className="absolute bottom-2 right-2 pointer-events-none z-10">
+                <div className="relative">
+                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-12 rounded-sm shadow-lg" />
+                  <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-purple-400 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+                    {self_player.poison}
+                  </span>
+                </div>
+              </div>
+            </>
           )}
           <span className={badgeCls}>Pack</span>
           {currentPack.length === 0 ? (
