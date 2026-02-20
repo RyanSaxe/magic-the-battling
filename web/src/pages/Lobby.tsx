@@ -27,13 +27,13 @@ export function Lobby() {
     (p) => p.player_id === session?.playerId,
   );
   const lobbyHotkeyMap: Record<string, () => void> = {
-    '?': () => setShowRulesPanel(true),
+    "?": () => setShowRulesPanel(true),
   };
   if (lobbyState && currentPlayer && !showRulesPanel) {
     const isHost = currentPlayer.is_host;
     const isReady = currentPlayer.is_ready;
-    lobbyHotkeyMap['r'] = () => actions.setReady(!isReady);
-    lobbyHotkeyMap['Enter'] = () => {
+    lobbyHotkeyMap["r"] = () => actions.setReady(!isReady);
+    lobbyHotkeyMap["Enter"] = () => {
       if (isHost && lobbyState.can_start && !startingGame) {
         setStartingGame(true);
         actions.startGame();
@@ -211,7 +211,8 @@ export function Lobby() {
                     {botSlots > 0 &&
                       Array.from({ length: botSlots }).map((_, i) => {
                         const isSearching = availablePuppets === null;
-                        const botAvailable = !isSearching && i < availablePuppets;
+                        const botAvailable =
+                          !isSearching && i < availablePuppets;
                         return (
                           <div
                             key={`puppet-${i}`}
@@ -271,11 +272,17 @@ export function Lobby() {
                         onClick={() => setShowPuppetExplainer((v) => !v)}
                         className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
                       >
-                        {showPuppetExplainer ? '▾' : '▸'} What are puppets?
+                        {showPuppetExplainer ? "▾" : "▸"} What are puppets?
                       </button>
                       {showPuppetExplainer && (
                         <p className="text-gray-500 text-xs mt-1 pl-3">
-                          Puppets are AI-controlled players built from recordings of past human games with matching settings. They replay real decisions, so each puppet plays like an actual person did.
+                          Puppets are players built from recordings of past
+                          human games. This way, you play against realistic
+                          opponents even when you don't have enough players.
+                          Note that, unlike playing against humans, puppets will
+                          have their hand revealed and you will need to decide
+                          who would have won in a hypothetical match-up to
+                          determine the winner of each game.
                         </p>
                       )}
                     </div>
