@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import type { Phase } from '../constants/rules'
+import type { Phase } from '../constants/phases'
 
 const PHASES: Phase[] = ['draft', 'build', 'battle', 'reward']
 
@@ -26,12 +26,25 @@ interface PhaseTimelineProps {
   nextStage: number
   nextRound: number
   onPhaseClick: (phase: Phase, rect: DOMRect) => void
+  onHelpClick?: () => void
   hamburger?: React.ReactNode
   title?: React.ReactNode
 }
 
 function isGamePhase(phase: string): phase is Phase {
   return PHASES.includes(phase as Phase)
+}
+
+function HelpButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="text-gray-400 hover:text-white text-sm w-5 h-5 flex items-center justify-center rounded-full border border-gray-600 hover:border-gray-400 transition-colors"
+      title="Help"
+    >
+      ?
+    </button>
+  )
 }
 
 function HomeButton() {
@@ -53,6 +66,7 @@ export function PhaseTimeline({
   nextStage,
   nextRound,
   onPhaseClick,
+  onHelpClick,
   hamburger,
   title,
 }: PhaseTimelineProps) {
@@ -64,6 +78,7 @@ export function PhaseTimeline({
             {title ?? END_STATE_LABELS[currentPhase]}
           </span>
           <div className="flex items-center gap-1">
+            {onHelpClick && <HelpButton onClick={onHelpClick} />}
             <HomeButton />
             {hamburger && <div className="shrink-0">{hamburger}</div>}
           </div>
@@ -107,6 +122,7 @@ export function PhaseTimeline({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          {onHelpClick && <HelpButton onClick={onHelpClick} />}
           <div className="hidden sm:block"><HomeButton /></div>
           {hamburger && <div className="shrink-0">{hamburger}</div>}
         </div>
