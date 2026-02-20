@@ -18,18 +18,15 @@ import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent
 import { GameSummary } from "../components/GameSummary";
 import { ActionMenu } from "../components/ActionMenu";
 import { PhaseTimeline } from "../components/PhaseTimeline";
-import { PhasePopover } from "../components/PhasePopover";
+import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { ContextStripProvider, useContextStrip } from "../contexts";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
-import type { Phase } from "../constants/phases";
 import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { SubmitPopover } from "../components/common/SubmitPopover";
 import { useHotkeys } from "../hooks/useHotkeys";
-import { HotkeysModal } from "../components/HotkeysModal";
-import { HelpDrawer } from "../components/HelpDrawer";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -397,13 +394,9 @@ function GameContent() {
     }
   }
 
-  // Phase popover state
-  const [openPopoverPhase, setOpenPopoverPhase] = useState<Phase | null>(null);
-  const [popoverAnchorX, setPopoverAnchorX] = useState(0);
-
-  // Help UI state
-  const [showHotkeysModal, setShowHotkeysModal] = useState(false);
-  const [showHelpDrawer, setShowHelpDrawer] = useState(false);
+  // Rules panel state
+  const [rulesPanelOpen, setRulesPanelOpen] = useState(false);
+  const [rulesPanelTarget, setRulesPanelTarget] = useState<RulesPanelTarget | undefined>(undefined);
 
   // Hover tracking for hotkeys
   const [hoveredCard, setHoveredCard] = useState<{ id: string; zone: ZoneName } | null>(null);
@@ -450,9 +443,19 @@ function GameContent() {
   };
 
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
-  const modalOpen = showHotkeysModal || showHelpDrawer || showUpgradesModal || actionMenuOpen;
+  const modalOpen = rulesPanelOpen || showUpgradesModal || actionMenuOpen;
   const hotkeyMap: Record<string, () => void> = (() => {
-    const map: Record<string, () => void> = { '?': () => setShowHotkeysModal(true) };
+    const currentPhaseId = gameState?.self_player.phase;
+    const map: Record<string, () => void> = {
+      '?': () => {
+        setRulesPanelTarget(
+          currentPhaseId && ['draft', 'build', 'battle', 'reward'].includes(currentPhaseId)
+            ? { docId: currentPhaseId, tab: 'controls' }
+            : undefined,
+        );
+        setRulesPanelOpen(true);
+      },
+    };
     if (!gameState || isSpectator || modalOpen) return map;
 
     const { self_player: sp, current_battle: cb } = gameState;
@@ -929,22 +932,14 @@ function GameContent() {
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
-            onPhaseClick={(phase, rect) => {
-              setOpenPopoverPhase(prev => prev === phase ? null : phase);
-              setPopoverAnchorX(rect.left + rect.width / 2);
+            onOpenRules={(target) => {
+              setRulesPanelTarget(target);
+              setRulesPanelOpen(true);
             }}
-            onHelpClick={() => setShowHelpDrawer(true)}
             hamburger={sizes.isMobile ? (
               <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-1">☰</button>
             ) : undefined}
           />
-          {openPopoverPhase && (
-            <PhasePopover
-              phase={openPopoverPhase}
-              anchorX={popoverAnchorX}
-              onClose={() => setOpenPopoverPhase(null)}
-            />
-          )}
         </div>
 
         {/* Main content */}
@@ -1225,14 +1220,14 @@ function GameContent() {
           initialTargetId={upgradeInitialTargetId}
         />
       )}
-      {showHotkeysModal && (
-        <HotkeysModal onClose={() => setShowHotkeysModal(false)} />
+      {rulesPanelOpen && (
+        <RulesPanel
+          onClose={() => setRulesPanelOpen(false)}
+          initialDocId={rulesPanelTarget?.docId}
+          initialTab={rulesPanelTarget?.tab}
+          cubeId={gameState.cube_id}
+        />
       )}
-      <HelpDrawer
-        open={showHelpDrawer}
-        onClose={() => setShowHelpDrawer(false)}
-        cubeId={gameState.cube_id}
-      />
     </CardPreviewContext.Provider>
   );
 }

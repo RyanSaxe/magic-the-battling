@@ -4,7 +4,7 @@ import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { rejoinGame } from "../api/client";
 import { useHotkeys } from "../hooks/useHotkeys";
-import { HotkeysModal } from "../components/HotkeysModal";
+import { RulesPanel } from "../components/RulesPanel";
 
 export function Lobby() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -20,16 +20,16 @@ export function Lobby() {
   const [rejoinLoading, setRejoinLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
-  const [showHotkeysModal, setShowHotkeysModal] = useState(false);
+  const [showRulesPanel, setShowRulesPanel] = useState(false);
   const [showPuppetExplainer, setShowPuppetExplainer] = useState(false);
 
   const currentPlayer = lobbyState?.players.find(
     (p) => p.player_id === session?.playerId,
   );
   const lobbyHotkeyMap: Record<string, () => void> = {
-    '?': () => setShowHotkeysModal(true),
+    '?': () => setShowRulesPanel(true),
   };
-  if (lobbyState && currentPlayer && !showHotkeysModal) {
+  if (lobbyState && currentPlayer && !showRulesPanel) {
     const isHost = currentPlayer.is_host;
     const isReady = currentPlayer.is_ready;
     lobbyHotkeyMap['r'] = () => actions.setReady(!isReady);
@@ -42,7 +42,7 @@ export function Lobby() {
       }
     };
   }
-  useHotkeys(lobbyHotkeyMap, !!session && !showHotkeysModal);
+  useHotkeys(lobbyHotkeyMap, !!session && !showRulesPanel);
 
   useEffect(() => {
     if (gameState) {
@@ -358,8 +358,8 @@ export function Lobby() {
             );
           })()}
       </div>
-      {showHotkeysModal && (
-        <HotkeysModal onClose={() => setShowHotkeysModal(false)} />
+      {showRulesPanel && (
+        <RulesPanel onClose={() => setShowRulesPanel(false)} />
       )}
     </div>
   );

@@ -8,6 +8,7 @@ export interface DocMeta {
 export interface ParsedDoc {
   meta: DocMeta
   sections: Record<string, string>
+  sectionOrder: string[]
   body: string
 }
 
@@ -28,14 +29,16 @@ export function parseDoc(raw: string): ParsedDoc {
   }
 
   const sections: Record<string, string> = {}
+  const sectionOrder: string[] = []
   const parts = body.split(/^## /m)
   for (const part of parts.slice(1)) {
     const nlIdx = part.indexOf('\n')
     const heading = part.slice(0, nlIdx).trim().toLowerCase()
     sections[heading] = part.slice(nlIdx + 1).trim()
+    sectionOrder.push(heading)
   }
 
-  return { meta, sections, body }
+  return { meta, sections, sectionOrder, body }
 }
 
 export function extractBullets(section: string): string[] {

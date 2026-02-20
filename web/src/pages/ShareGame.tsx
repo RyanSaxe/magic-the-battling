@@ -293,7 +293,7 @@ export function ShareGame() {
           round={0}
           nextStage={0}
           nextRound={0}
-          onPhaseClick={() => {}}
+          onOpenRules={() => {}}
           title={
             <span className="flex items-center gap-2">
               <span className="text-amber-400 font-bold text-sm">Magic: The Battling</span>
