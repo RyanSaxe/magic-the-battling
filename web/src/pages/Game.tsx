@@ -1233,6 +1233,7 @@ function GameContent() {
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
           cubeId={gameState.cube_id}
+          gameId={gameId}
         />
       )}
     </CardPreviewContext.Provider>

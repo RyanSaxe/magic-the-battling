@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { DOCS, type DocEntry } from '../docs'
 import { DocRenderer } from './DocRenderer'
 import { PHASE_HOTKEYS, type HotkeyEntry } from '../constants/hotkeys'
+import { getGameCards, type GameCardsResponse } from '../api/client'
+import { CardPreviewModal } from './card/CardPreviewModal'
+import type { Card } from '../types'
 
 export interface RulesPanelTarget {
   docId: string
@@ -96,16 +99,162 @@ function TabContent({ doc, tab }: { doc: DocEntry; tab: string }) {
   return <DocRenderer content={sectionContent} />
 }
 
+const COLOR_CHIPS: { code: string; label: string; bg: string; text: string; ring: string }[] = [
+  { code: 'W', label: 'W', bg: 'bg-amber-100', text: 'text-amber-900', ring: 'ring-amber-300' },
+  { code: 'U', label: 'U', bg: 'bg-blue-500', text: 'text-white', ring: 'ring-blue-400' },
+  { code: 'B', label: 'B', bg: 'bg-purple-900', text: 'text-gray-200', ring: 'ring-purple-500' },
+  { code: 'R', label: 'R', bg: 'bg-red-600', text: 'text-white', ring: 'ring-red-400' },
+  { code: 'G', label: 'G', bg: 'bg-green-600', text: 'text-white', ring: 'ring-green-400' },
+  { code: 'C', label: 'C', bg: 'bg-gray-500', text: 'text-white', ring: 'ring-gray-400' },
+]
+
+function CardsView({ gameId, which }: { gameId: string; which: 'cards' | 'upgrades' }) {
+  const [data, setData] = useState<GameCardsResponse | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
+  const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set())
+  const [previewCard, setPreviewCard] = useState<Card | null>(null)
+  const cacheRef = useRef<GameCardsResponse | null>(null)
+
+  useEffect(() => {
+    if (cacheRef.current) {
+      setData(cacheRef.current)
+      setLoading(false)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    getGameCards(gameId)
+      .then((result) => {
+        if (cancelled) return
+        cacheRef.current = result
+        setData(result)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        setError(err instanceof Error ? err.message : 'Failed to load cards')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [gameId])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full" />
+      </div>
+    )
+  }
+
+  if (error) {
+    return <div className="text-red-400 text-center py-8">{error}</div>
+  }
+
+  const allCards = which === 'cards' ? data?.cards ?? [] : data?.upgrades ?? []
+  const query = search.toLowerCase()
+
+  const filtered = allCards.filter((card) => {
+    if (query) {
+      const matchesSearch =
+        card.name.toLowerCase().includes(query) ||
+        card.type_line.toLowerCase().includes(query) ||
+        (card.oracle_text?.toLowerCase().includes(query) ?? false)
+      if (!matchesSearch) return false
+    }
+    if (selectedColors.size > 0) {
+      if (selectedColors.has('C')) {
+        if (card.colors.length === 0) return true
+      }
+      if (card.colors.some((c) => selectedColors.has(c))) return true
+      return false
+    }
+    return true
+  })
+
+  const toggleColor = (code: string) => {
+    setSelectedColors((prev) => {
+      const next = new Set(prev)
+      if (next.has(code)) next.delete(code)
+      else next.add(code)
+      return next
+    })
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <input
+        type="text"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search cards..."
+        className="w-full bg-gray-800 text-white rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder-gray-500"
+      />
+
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {COLOR_CHIPS.map(({ code, label, bg, text, ring }) => (
+          <button
+            key={code}
+            onClick={() => toggleColor(code)}
+            className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${bg} ${text} ${
+              selectedColors.has(code) ? `ring-2 ${ring} scale-110` : 'opacity-50 hover:opacity-75'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="text-xs text-gray-500">
+        {filtered.length === allCards.length
+          ? `${allCards.length} cards`
+          : `${filtered.length} of ${allCards.length} cards`}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="text-gray-500 text-center py-8">No cards match</div>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+          {filtered.map((card) => (
+            <img
+              key={card.id}
+              src={card.image_url}
+              alt={card.name}
+              title={card.name}
+              className="rounded cursor-pointer hover:brightness-125 transition-all"
+              onClick={() => setPreviewCard(card)}
+            />
+          ))}
+        </div>
+      )}
+
+      {previewCard && (
+        <CardPreviewModal
+          card={previewCard}
+          appliedUpgrades={[]}
+          onClose={() => setPreviewCard(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+const BROWSE_IDS = ['__cards__', '__upgrades__'] as const
+
 interface RulesPanelContentProps {
   initialDocId?: string
   initialTab?: string
   cubeId?: string
+  gameId?: string
 }
 
 export function RulesPanelContent({
   initialDocId = 'overview',
   initialTab,
   cubeId,
+  gameId,
 }: RulesPanelContentProps) {
   const [selectedDocId, setSelectedDocId] = useState(initialDocId)
   const [activeTab, setActiveTab] = useState(initialTab ?? '')
@@ -119,20 +268,27 @@ export function RulesPanelContent({
     setActiveTab(initialTab ?? '')
   }, [initialTab])
 
-  const doc = DOCS.find((d) => d.id === selectedDocId) ?? DOCS[0]
-  const tabs = doc.parsed.sectionOrder
+  const isBrowseView = (BROWSE_IDS as readonly string[]).includes(selectedDocId)
+  const doc = isBrowseView ? null : (DOCS.find((d) => d.id === selectedDocId) ?? DOCS[0])
+  const tabs = doc?.parsed.sectionOrder ?? []
   const showTabs = tabs.length > 1
 
   const resolvedTab = activeTab && tabs.includes(activeTab) ? activeTab : tabs[0] ?? ''
 
   const handleDocSelect = (id: string) => {
     setSelectedDocId(id)
-    const newDoc = DOCS.find((d) => d.id === id)
-    setActiveTab(newDoc?.parsed.sectionOrder[0] ?? '')
+    if (!(BROWSE_IDS as readonly string[]).includes(id)) {
+      const newDoc = DOCS.find((d) => d.id === id)
+      setActiveTab(newDoc?.parsed.sectionOrder[0] ?? '')
+    }
     setMobileNavOpen(false)
   }
 
   const groups = groupedDocs()
+
+  const currentTitle = isBrowseView
+    ? (selectedDocId === '__cards__' ? 'Card Pool' : 'Upgrades')
+    : (doc?.parsed.meta.title ?? '')
 
   const sidebar = (
     <nav className="space-y-4 py-3 px-3">
@@ -158,6 +314,36 @@ export function RulesPanelContent({
           </div>
         </div>
       ))}
+
+      {gameId && (
+        <div className="border-t border-gray-700/50 pt-3">
+          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5 px-2">
+            Browse
+          </h3>
+          <div className="space-y-0.5">
+            <button
+              onClick={() => handleDocSelect('__cards__')}
+              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
+                selectedDocId === '__cards__'
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              }`}
+            >
+              Card Pool
+            </button>
+            <button
+              onClick={() => handleDocSelect('__upgrades__')}
+              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
+                selectedDocId === '__upgrades__'
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              }`}
+            >
+              Upgrades
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="border-t border-gray-700/50 pt-3">
         <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5 px-2">
@@ -200,7 +386,7 @@ export function RulesPanelContent({
             onClick={() => setMobileNavOpen((v) => !v)}
             className="flex items-center gap-2 text-sm text-gray-300 hover:text-white w-full"
           >
-            <span className="truncate">{doc.parsed.meta.title}</span>
+            <span className="truncate">{currentTitle}</span>
             <span className="text-gray-500 shrink-0">{mobileNavOpen ? '▴' : '▾'}</span>
           </button>
           {mobileNavOpen && (
@@ -210,32 +396,48 @@ export function RulesPanelContent({
           )}
         </div>
 
-        {/* Doc heading + tabs */}
-        <div className="px-4 pt-3">
-          <h2 className="text-lg font-semibold text-white mb-2">{doc.parsed.meta.title}</h2>
-          {showTabs && (
-            <div className="flex gap-1 border-b border-gray-700/50 -mx-4 px-4">
-              {tabs.map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`px-3 py-1.5 text-sm capitalize transition-colors border-b-2 -mb-px ${
-                    tab === resolvedTab
-                      ? 'text-amber-400 border-amber-400'
-                      : 'text-gray-400 border-transparent hover:text-gray-200'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
+        {isBrowseView && gameId ? (
+          <>
+            <div className="px-4 pt-3">
+              <h2 className="text-lg font-semibold text-white mb-2">{currentTitle}</h2>
             </div>
-          )}
-        </div>
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              <CardsView
+                gameId={gameId}
+                which={selectedDocId === '__cards__' ? 'cards' : 'upgrades'}
+              />
+            </div>
+          </>
+        ) : doc && (
+          <>
+            {/* Doc heading + tabs */}
+            <div className="px-4 pt-3">
+              <h2 className="text-lg font-semibold text-white mb-2">{doc.parsed.meta.title}</h2>
+              {showTabs && (
+                <div className="flex gap-1 border-b border-gray-700/50 -mx-4 px-4">
+                  {tabs.map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-3 py-1.5 text-sm capitalize transition-colors border-b-2 -mb-px ${
+                        tab === resolvedTab
+                          ? 'text-amber-400 border-amber-400'
+                          : 'text-gray-400 border-transparent hover:text-gray-200'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-        {/* Tab content */}
-        <div className="flex-1 overflow-y-auto px-4 py-3">
-          <TabContent doc={doc} tab={resolvedTab} />
-        </div>
+            {/* Tab content */}
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+              <TabContent doc={doc} tab={resolvedTab} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -246,9 +448,10 @@ interface RulesPanelProps {
   initialDocId?: string
   initialTab?: string
   cubeId?: string
+  gameId?: string
 }
 
-export function RulesPanel({ onClose, initialDocId, initialTab, cubeId }: RulesPanelProps) {
+export function RulesPanel({ onClose, initialDocId, initialTab, cubeId, gameId }: RulesPanelProps) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -279,6 +482,7 @@ export function RulesPanel({ onClose, initialDocId, initialTab, cubeId }: RulesP
           initialDocId={initialDocId}
           initialTab={initialTab}
           cubeId={cubeId}
+          gameId={gameId}
         />
       </div>
     </div>

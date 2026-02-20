@@ -366,7 +366,7 @@ export function Lobby() {
           })()}
       </div>
       {showRulesPanel && (
-        <RulesPanel onClose={() => setShowRulesPanel(false)} />
+        <RulesPanel onClose={() => setShowRulesPanel(false)} gameId={gameId} />
       )}
     </div>
   );
