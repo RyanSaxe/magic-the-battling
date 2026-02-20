@@ -13,11 +13,12 @@ interface UpgradesModalProps {
   targets?: CardType[]
   onApply?: (upgradeId: string, targetId: string) => void
   onClose: () => void
+  initialTargetId?: string
 }
 
-export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose }: UpgradesModalProps) {
+export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, initialTargetId }: UpgradesModalProps) {
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(null)
-  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null)
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(initialTargetId ?? null)
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

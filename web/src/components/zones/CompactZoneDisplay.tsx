@@ -16,6 +16,8 @@ interface CompactZoneDisplayProps {
   isOpponent?: boolean
   canManipulateOpponent?: boolean
   validFromZones: ZoneName[]
+  onCardHover?: (cardId: string, zone: ZoneName) => void
+  onCardHoverEnd?: () => void
 }
 
 export function CompactZoneDisplay({
@@ -27,6 +29,8 @@ export function CompactZoneDisplay({
   isOpponent = false,
   canManipulateOpponent = false,
   validFromZones,
+  onCardHover,
+  onCardHoverEnd,
 }: CompactZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -88,6 +92,8 @@ export function CompactZoneDisplay({
                 dimensions={{ width: cardW, height: cardH }}
                 disabled={!allowInteraction}
                 isOpponent={isOpponent}
+                onCardHover={!isOpponent ? onCardHover : undefined}
+                onCardHoverEnd={!isOpponent ? onCardHoverEnd : undefined}
               />
             )}
           </div>

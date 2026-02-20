@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import type { GameState, Card as CardType, BuildSource } from '../../types'
+import type { GameState, Card as CardType, BuildSource, ZoneName } from '../../types'
 import { Card } from '../../components/card'
 import { CardSlot } from '../../components/common/CardSlot'
 import { BasicLandSlot } from '../../components/common/BasicLandSlot'
@@ -28,6 +28,8 @@ interface BuildPhaseProps {
   selectedBasics: string[]
   onBasicsChange: (basics: string[]) => void
   onHandSlotsChange?: (slots: (string | null)[]) => void
+  onCardHover?: (cardId: string, zone: ZoneName) => void
+  onCardHoverEnd?: () => void
   isMobile?: boolean
 }
 
@@ -60,7 +62,7 @@ function syncHandSlots(
   return newSlots
 }
 
-export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange, onHandSlotsChange, isMobile = false }: BuildPhaseProps) {
+export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange, onHandSlotsChange, onCardHover, onCardHoverEnd, isMobile = false }: BuildPhaseProps) {
   const { self_player } = gameState
   const maxHandSize = self_player.hand_size
   const locked = self_player.build_ready
@@ -184,7 +186,12 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
   const handItems = handSlots.map((card, i) => {
     if (card) {
       return (
-        <div key={card.id} className="relative">
+        <div
+          key={card.id}
+          className="relative"
+          onMouseEnter={onCardHover ? () => onCardHover(card.id, 'hand') : undefined}
+          onMouseLeave={onCardHoverEnd}
+        >
           <Card
             card={card}
             onClick={() => handleHandCardClick(card, i)}
@@ -266,7 +273,12 @@ export function BuildPhase({ gameState, actions, selectedBasics, onBasicsChange,
               const cardIsCompanion = isCompanion(card)
               const isActiveCompanion = card.id === selectedCompanionId
               return (
-                <div key={card.id} className="relative">
+                <div
+                  key={card.id}
+                  className="relative"
+                  onMouseEnter={onCardHover ? () => onCardHover(card.id, 'sideboard') : undefined}
+                  onMouseLeave={onCardHoverEnd}
+                >
                   <Card
                     card={card}
                     onClick={() => handleSideboardCardClick(card)}

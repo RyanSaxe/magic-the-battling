@@ -11,6 +11,8 @@ interface DraggableCardProps {
   onClick?: () => void
   onDoubleClick?: () => void
   onContextMenu?: (e: React.MouseEvent) => void
+  onCardHover?: (cardId: string, zone: ZoneName) => void
+  onCardHoverEnd?: () => void
   selected?: boolean
   size?: 'xs' | 'sm' | 'md' | 'lg'
   dimensions?: { width: number; height: number }
@@ -33,6 +35,8 @@ export function DraggableCard({
   onClick,
   onDoubleClick,
   onContextMenu,
+  onCardHover,
+  onCardHoverEnd,
   selected,
   size = 'md',
   dimensions,
@@ -73,6 +77,8 @@ export function DraggableCard({
         }
       }}
       onDoubleClick={onDoubleClick}
+      onMouseEnter={onCardHover ? () => onCardHover(card.id, zone) : undefined}
+      onMouseLeave={onCardHoverEnd}
       onContextMenu={(e) => {
         e.preventDefault()
         onContextMenu?.(e)

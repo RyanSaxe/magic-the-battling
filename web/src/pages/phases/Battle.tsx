@@ -28,6 +28,8 @@ interface BattlePhaseProps {
   isMobile?: boolean
   selectedCard: BattleSelectedCard | null
   onSelectedCardChange: (card: BattleSelectedCard | null) => void
+  onCardHover?: (cardId: string, zone: ZoneName) => void
+  onCardHoverEnd?: () => void
 }
 
 const isLandOrTreasure = (card: CardType) =>
@@ -45,6 +47,8 @@ export function BattlePhase({
   isMobile = false,
   selectedCard,
   onSelectedCardChange,
+  onCardHover,
+  onCardHoverEnd,
 }: BattlePhaseProps) {
   const setSelectedCard = onSelectedCardChange
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
@@ -308,6 +312,8 @@ export function BattlePhase({
               onCardClick={(card) => handleCardClick(card, 'battlefield')}
               onCardDoubleClick={handleCardDoubleClick}
               onCardContextMenu={(e, card) => handleContextMenu(e, card, 'battlefield')}
+              onCardHover={onCardHover}
+              onCardHoverEnd={onCardHoverEnd}
               tappedCardIds={tappedCardIds}
               faceDownCardIds={faceDownCardIds}
               counters={counters}
@@ -326,6 +332,8 @@ export function BattlePhase({
             zones={your_zones}
             rowHeight={rowHeight}
             columnWidth={zoneColumnWidth}
+            onCardHover={onCardHover}
+            onCardHoverEnd={onCardHoverEnd}
           />
         </div>
 
@@ -336,6 +344,8 @@ export function BattlePhase({
               cards={your_zones.hand}
               selectedCardId={selectedCard?.card.id}
               onCardClick={(card) => handleCardClick(card, 'hand')}
+              onCardHover={onCardHover}
+              onCardHoverEnd={onCardHoverEnd}
               upgradedCardIds={upgradedCardIds}
               upgradesByCardId={upgradesByCardId}
               cardDimensions={sizes.playerHand}
@@ -349,6 +359,8 @@ export function BattlePhase({
             height={handHeight}
             width={zoneColumnWidth}
             validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+            onCardHover={onCardHover}
+            onCardHoverEnd={onCardHoverEnd}
           />
         </div>
 

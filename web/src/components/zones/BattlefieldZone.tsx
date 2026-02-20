@@ -18,6 +18,8 @@ interface BattlefieldZoneProps {
   onCardClick?: (card: CardType) => void;
   onCardDoubleClick?: (card: CardType) => void;
   onCardContextMenu?: (e: React.MouseEvent, card: CardType) => void;
+  onCardHover?: (cardId: string, zone: ZoneName) => void;
+  onCardHoverEnd?: () => void;
   tappedCardIds?: Set<string>;
   faceDownCardIds?: Set<string>;
   counters?: Record<string, Record<string, number>>;
@@ -43,6 +45,8 @@ export function BattlefieldZone({
   onCardClick,
   onCardDoubleClick,
   onCardContextMenu,
+  onCardHover,
+  onCardHoverEnd,
   tappedCardIds = new Set(),
   faceDownCardIds = new Set(),
   counters = {},
@@ -131,6 +135,8 @@ export function BattlefieldZone({
           isOpponent={isOpponent}
           upgraded={upgradedCardIds.has(card.id)}
           appliedUpgrades={upgradesByCardId?.get(card.id)}
+          onCardHover={!isOpponent ? onCardHover : undefined}
+          onCardHoverEnd={!isOpponent ? onCardHoverEnd : undefined}
         />
       </div>
     );
