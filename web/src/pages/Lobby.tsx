@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { rejoinGame } from "../api/client";
+import { useHotkeys } from "../hooks/useHotkeys";
+import { HotkeysModal } from "../components/HotkeysModal";
 
 export function Lobby() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -18,6 +20,29 @@ export function Lobby() {
   const [rejoinLoading, setRejoinLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
+  const [showHotkeysModal, setShowHotkeysModal] = useState(false);
+  const [showPuppetExplainer, setShowPuppetExplainer] = useState(false);
+
+  const currentPlayer = lobbyState?.players.find(
+    (p) => p.player_id === session?.playerId,
+  );
+  const lobbyHotkeyMap: Record<string, () => void> = {
+    '?': () => setShowHotkeysModal(true),
+  };
+  if (lobbyState && currentPlayer && !showHotkeysModal) {
+    const isHost = currentPlayer.is_host;
+    const isReady = currentPlayer.is_ready;
+    lobbyHotkeyMap['r'] = () => actions.setReady(!isReady);
+    lobbyHotkeyMap['Enter'] = () => {
+      if (isHost && lobbyState.can_start && !startingGame) {
+        setStartingGame(true);
+        actions.startGame();
+      } else {
+        actions.setReady(!isReady);
+      }
+    };
+  }
+  useHotkeys(lobbyHotkeyMap, !!session && !showHotkeysModal);
 
   useEffect(() => {
     if (gameState) {
@@ -131,9 +156,6 @@ export function Lobby() {
 
         {lobbyState &&
           (() => {
-            const currentPlayer = lobbyState.players.find(
-              (p) => p.player_id === session?.playerId,
-            );
             const isHost = currentPlayer?.is_host ?? false;
             const isReady = currentPlayer?.is_ready ?? false;
             const botSlots =
@@ -243,6 +265,21 @@ export function Lobby() {
                         more players or try different game options.
                       </p>
                     )}
+                  {botSlots > 0 && (
+                    <div className="mt-2 px-1">
+                      <button
+                        onClick={() => setShowPuppetExplainer((v) => !v)}
+                        className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
+                      >
+                        {showPuppetExplainer ? '▾' : '▸'} What are puppets?
+                      </button>
+                      {showPuppetExplainer && (
+                        <p className="text-gray-500 text-xs mt-1 pl-3">
+                          Puppets are AI-controlled players built from recordings of past human games with matching settings. They replay real decisions, so each puppet plays like an actual person did.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -321,6 +358,9 @@ export function Lobby() {
             );
           })()}
       </div>
+      {showHotkeysModal && (
+        <HotkeysModal onClose={() => setShowHotkeysModal(false)} />
+      )}
     </div>
   );
 }

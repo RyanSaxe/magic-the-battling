@@ -8,7 +8,7 @@ import {
   createSpectateRequest,
   getSpectateRequestStatus,
 } from "../api/client";
-import type { GameStatusResponse } from "../types";
+import type { GameStatusResponse, ZoneName } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
 import { BattlePhase, type BattleSelectedCard } from "./phases/Battle";
@@ -22,11 +22,14 @@ import { PhasePopover } from "../components/PhasePopover";
 import { ContextStripProvider, useContextStrip } from "../contexts";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
-import type { Phase } from "../constants/rules";
+import type { Phase } from "../constants/phases";
 import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { SubmitPopover } from "../components/common/SubmitPopover";
+import { useHotkeys } from "../hooks/useHotkeys";
+import { HotkeysModal } from "../components/HotkeysModal";
+import { HelpDrawer } from "../components/HelpDrawer";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -368,6 +371,7 @@ function GameContent() {
   // Lifted state from Build phase
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
   const [showUpgradesModal, setShowUpgradesModal] = useState(false);
+  const [upgradeInitialTargetId, setUpgradeInitialTargetId] = useState<string | undefined>(undefined);
   const handSlotsRef = useRef<(string | null)[]>([]);
 
   // Lifted state from Reward phase
@@ -397,6 +401,16 @@ function GameContent() {
   const [openPopoverPhase, setOpenPopoverPhase] = useState<Phase | null>(null);
   const [popoverAnchorX, setPopoverAnchorX] = useState(0);
 
+  // Help UI state
+  const [showHotkeysModal, setShowHotkeysModal] = useState(false);
+  const [showHelpDrawer, setShowHelpDrawer] = useState(false);
+
+  // Hover tracking for hotkeys
+  const [hoveredCard, setHoveredCard] = useState<{ id: string; zone: ZoneName } | null>(null);
+  const handleCardHover = (cardId: string, zone: ZoneName) => {
+    setHoveredCard({ id: cardId, zone });
+  };
+  const handleCardHoverEnd = () => setHoveredCard(null);
 
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
@@ -434,6 +448,142 @@ function GameContent() {
     url.searchParams.set("spectate", "true");
     window.open(url.toString(), '_blank');
   };
+
+  // Hotkeys — must be before early returns to satisfy rules-of-hooks
+  const modalOpen = showHotkeysModal || showHelpDrawer || showUpgradesModal || actionMenuOpen;
+  const hotkeyMap: Record<string, () => void> = (() => {
+    const map: Record<string, () => void> = { '?': () => setShowHotkeysModal(true) };
+    if (!gameState || isSpectator || modalOpen) return map;
+
+    const { self_player: sp, current_battle: cb } = gameState;
+    const phase = sp.phase;
+
+    if (phase === 'draft') {
+      map['r'] = () => {
+        if (sp.treasures > 0 && (sp.current_pack?.length ?? 0) > 0) {
+          actions.draftRoll();
+        }
+      };
+      map['Enter'] = () => actions.draftDone();
+    } else if (phase === 'build') {
+      if (showSubmitHandPopover) {
+        const basicsComplete = selectedBasics.length === 3;
+        const handFull = sp.hand.length === sp.hand_size;
+        const canReady = basicsComplete && handFull;
+        if (canReady) {
+          map['p'] = () => {
+            actions.buildReady(selectedBasics, 'play', handSlotsRef.current.filter((id): id is string => id !== null));
+            setShowSubmitHandPopover(false);
+          };
+          map['d'] = () => {
+            actions.buildReady(selectedBasics, 'draw', handSlotsRef.current.filter((id): id is string => id !== null));
+            setShowSubmitHandPopover(false);
+          };
+        }
+        map['Enter'] = () => setShowSubmitHandPopover(false);
+      } else {
+        map['Enter'] = () => {
+          if (sp.build_ready) {
+            actions.buildUnready();
+          } else {
+            const basicsComplete = selectedBasics.length === 3;
+            const handFull = sp.hand.length === sp.hand_size;
+            if (basicsComplete && handFull) setShowSubmitHandPopover(true);
+          }
+        };
+      }
+      map['v'] = () => {
+        if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+      };
+      if (hoveredCard && sp.upgrades.some((u) => !u.upgrade_target)) {
+        map['u'] = () => {
+          setUpgradeInitialTargetId(hoveredCard.id);
+          setShowUpgradesModal(true);
+        };
+      }
+    } else if (phase === 'battle' && cb) {
+      if (showSubmitResultPopover) {
+        map['w'] = () => {
+          actions.battleSubmitResult(sp.name);
+          setIsChangingResult(false);
+          setShowSubmitResultPopover(false);
+        };
+        map['d'] = () => {
+          actions.battleSubmitResult("draw");
+          setIsChangingResult(false);
+          setShowSubmitResultPopover(false);
+        };
+        map['l'] = () => {
+          actions.battleSubmitResult(cb.opponent_name);
+          setIsChangingResult(false);
+          setShowSubmitResultPopover(false);
+        };
+        map['Enter'] = () => setShowSubmitResultPopover(false);
+      } else {
+        if (hoveredCard && !hoveredCard.zone.startsWith('command')) {
+          map['t'] = () => {
+            if (hoveredCard.zone === 'battlefield') {
+              const tapped = cb.your_zones.tapped_card_ids?.includes(hoveredCard.id);
+              actions.battleUpdateCardState(tapped ? 'untap' : 'tap', hoveredCard.id);
+            }
+          };
+          map['f'] = () => actions.battleUpdateCardState('flip', hoveredCard.id);
+          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile' } as const;
+          for (const [key, toZone] of Object.entries(moveZones)) {
+            map[key] = () => {
+              if (toZone !== hoveredCard.zone) {
+                actions.battleMove(hoveredCard.id, hoveredCard.zone, toZone as ZoneName, 'player', 'player');
+              }
+            };
+          }
+          map['u'] = () => {
+            if (!cb) return;
+            const battlefieldIds = new Set(cb.your_zones.battlefield.map(c => c.id));
+            for (const cardId of cb.your_zones.tapped_card_ids || []) {
+              if (battlefieldIds.has(cardId)) actions.battleUpdateCardState('untap', cardId);
+            }
+          };
+          map['p'] = () => actions.battlePassTurn();
+        } else {
+          map['u'] = () => {
+            if (!cb) return;
+            const battlefieldIds = new Set(cb.your_zones.battlefield.map(c => c.id));
+            for (const cardId of cb.your_zones.tapped_card_ids || []) {
+              if (battlefieldIds.has(cardId)) actions.battleUpdateCardState('untap', cardId);
+            }
+          };
+          map['p'] = () => actions.battlePassTurn();
+          map['t'] = () => actions.battleUpdateCardState("create_treasure", "", {});
+        }
+        map['Enter'] = () => {
+          const mySubmission = cb.result_submissions[sp.name];
+          if (mySubmission && !isChangingResult) {
+            setIsChangingResult(true);
+          } else {
+            setShowSubmitResultPopover(true);
+          }
+        };
+        map['v'] = () => {
+          if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+        };
+      }
+    } else if (phase === 'reward') {
+      map['Enter'] = () => {
+        const isStageIncreasing = sp.is_stage_increasing;
+        const needsUpgrade = isStageIncreasing && gameState.available_upgrades.length > 0;
+        const canCont = !needsUpgrade || !!selectedUpgradeId;
+        if (canCont) {
+          actions.rewardDone(selectedUpgradeId ?? undefined);
+          setSelectedUpgradeId(null);
+          setSelectedPoolCardId(null);
+        }
+      };
+    }
+
+    return map;
+  })();
+
+  useHotkeys(hotkeyMap, !modalOpen);
 
   if (!session || isSpectateMode) {
     return (
@@ -743,6 +893,7 @@ function GameContent() {
     }
   };
 
+
   const renderPhaseContent = (): ReactNode => {
     if (currentPhase === "battle" && current_battle) {
       return (
@@ -782,6 +933,7 @@ function GameContent() {
               setOpenPopoverPhase(prev => prev === phase ? null : phase);
               setPopoverAnchorX(rect.left + rect.width / 2);
             }}
+            onHelpClick={() => setShowHelpDrawer(true)}
             hamburger={sizes.isMobile ? (
               <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-1">☰</button>
             ) : undefined}
@@ -836,6 +988,8 @@ function GameContent() {
                   isMobile={sizes.isMobile}
                   selectedCard={battleSelectedCard}
                   onSelectedCardChange={setBattleSelectedCard}
+                  onCardHover={handleCardHover}
+                  onCardHoverEnd={handleCardHoverEnd}
                 />
               </main>
               {sizes.isMobile ? (
@@ -939,6 +1093,8 @@ function GameContent() {
                   selectedBasics={selectedBasics}
                   onBasicsChange={setSelectedBasics}
                   onHandSlotsChange={(slots) => { handSlotsRef.current = slots; }}
+                  onCardHover={handleCardHover}
+                  onCardHoverEnd={handleCardHoverEnd}
                   isMobile={sizes.isMobile}
                 />
               )}
@@ -1065,9 +1221,18 @@ function GameContent() {
           mode={currentPhase === 'build' && self_player.upgrades.some((u) => !u.upgrade_target) ? 'apply' : 'view'}
           targets={[...self_player.hand, ...self_player.sideboard]}
           onApply={(upgradeId, targetId) => actions.buildApplyUpgrade(upgradeId, targetId)}
-          onClose={() => setShowUpgradesModal(false)}
+          onClose={() => { setShowUpgradesModal(false); setUpgradeInitialTargetId(undefined); }}
+          initialTargetId={upgradeInitialTargetId}
         />
       )}
+      {showHotkeysModal && (
+        <HotkeysModal onClose={() => setShowHotkeysModal(false)} />
+      )}
+      <HelpDrawer
+        open={showHelpDrawer}
+        onClose={() => setShowHelpDrawer(false)}
+        cubeId={gameState.cube_id}
+      />
     </CardPreviewContext.Provider>
   );
 }
