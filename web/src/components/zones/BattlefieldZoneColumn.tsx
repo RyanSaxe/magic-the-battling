@@ -11,6 +11,8 @@ interface BattlefieldZoneColumnProps {
   canManipulateOpponent?: boolean
   rowHeight: number
   columnWidth: number
+  onCardHover?: (cardId: string, zone: ZoneName) => void
+  onCardHoverEnd?: () => void
 }
 
 export function BattlefieldZoneColumn({
@@ -19,6 +21,8 @@ export function BattlefieldZoneColumn({
   canManipulateOpponent = false,
   rowHeight,
   columnWidth,
+  onCardHover,
+  onCardHoverEnd,
 }: BattlefieldZoneColumnProps) {
   return (
     <div
@@ -34,6 +38,8 @@ export function BattlefieldZoneColumn({
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
         validFromZones={VALID_FROM_ZONES}
+        onCardHover={onCardHover}
+        onCardHoverEnd={onCardHoverEnd}
       />
       <CompactZoneDisplay
         title="Exile"
@@ -44,6 +50,8 @@ export function BattlefieldZoneColumn({
         isOpponent={isOpponent}
         canManipulateOpponent={canManipulateOpponent}
         validFromZones={VALID_FROM_ZONES}
+        onCardHover={onCardHover}
+        onCardHoverEnd={onCardHoverEnd}
       />
     </div>
   )

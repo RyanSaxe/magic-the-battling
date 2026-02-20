@@ -10,6 +10,7 @@ from server.db.models import GameRecord, PlayerGameHistory
 from server.schemas.api import (
     CreateGameRequest,
     CreateGameResponse,
+    GameCardsResponse,
     GameStateResponse,
     GameStatusPlayer,
     GameStatusResponse,
@@ -168,6 +169,26 @@ def get_lobby(game_id: str):
     if not lobby:
         raise HTTPException(status_code=404, detail="Game not found")
     return lobby
+
+
+@router.get("/{game_id}/cards", response_model=GameCardsResponse)
+def get_game_cards(game_id: str):
+    pending = game_manager.get_pending_game(game_id)
+    game = game_manager.get_game(game_id)
+
+    battler = None
+    if pending and pending.battler:
+        battler = pending.battler
+    elif game and game.battler:
+        battler = game.battler
+
+    if not battler:
+        raise HTTPException(status_code=404, detail="Card pool not available")
+
+    return GameCardsResponse(
+        cards=battler.original_cards or battler.cards,
+        upgrades=battler.original_upgrades or battler.upgrades,
+    )
 
 
 @router.post("/{game_id}/start", response_model=StartGameResponse)

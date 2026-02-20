@@ -28,6 +28,9 @@ interface BattlePhaseProps {
   isMobile?: boolean
   selectedCard: BattleSelectedCard | null
   onSelectedCardChange: (card: BattleSelectedCard | null) => void
+  onCardHover?: (cardId: string, zone: ZoneName) => void
+  onOpponentCardHover?: (cardId: string, zone: ZoneName) => void
+  onCardHoverEnd?: () => void
 }
 
 const isLandOrTreasure = (card: CardType) =>
@@ -45,6 +48,9 @@ export function BattlePhase({
   isMobile = false,
   selectedCard,
   onSelectedCardChange,
+  onCardHover,
+  onOpponentCardHover,
+  onCardHoverEnd,
 }: BattlePhaseProps) {
   const setSelectedCard = onSelectedCardChange
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
@@ -231,7 +237,7 @@ export function BattlePhase({
                       const zIndex = sizes.opponentHandGap < 0
                         ? selectedCard?.card.id === card.id ? count + 1 : count - i
                         : undefined
-                      return <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} selected={selectedCard?.card.id === card.id} onClick={() => handleCardClick(card, 'hand')} style={{ ...(sizes.opponentHandGap < 0 && i > 0 ? { marginLeft: sizes.opponentHandGap } : undefined), ...(zIndex !== undefined ? { zIndex } : undefined) }} />
+                      return <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} selected={selectedCard?.card.id === card.id} onClick={() => handleCardClick(card, 'hand')} onCardHover={onOpponentCardHover} onCardHoverEnd={onCardHoverEnd} style={{ ...(sizes.opponentHandGap < 0 && i > 0 ? { marginLeft: sizes.opponentHandGap } : undefined), ...(zIndex !== undefined ? { zIndex } : undefined) }} />
                     })
                   : Array.from({ length: oppHandCount }).map((_, i) => (
                       <CardBack key={i} dimensions={sizes.opponentHand} style={{ ...(sizes.opponentHandGap < 0 && i > 0 ? { marginLeft: sizes.opponentHandGap } : undefined), ...(sizes.opponentHandGap < 0 ? { zIndex: oppHandCount - i } : undefined) }} />
@@ -262,6 +268,8 @@ export function BattlePhase({
             isOpponent
             canManipulateOpponent={canManipulateOpponent}
             validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+            onCardHover={onOpponentCardHover}
+            onCardHoverEnd={onCardHoverEnd}
           />
         </div>
 
@@ -274,6 +282,8 @@ export function BattlePhase({
               onCardClick={(card) => handleCardClick(card, 'battlefield')}
               onCardDoubleClick={canManipulateOpponent ? handleOpponentCardDoubleClick : undefined}
               onCardContextMenu={canManipulateOpponent ? (e, card) => handleOpponentContextMenu(e, card, 'battlefield') : undefined}
+              onCardHover={onOpponentCardHover}
+              onCardHoverEnd={onCardHoverEnd}
               tappedCardIds={opponentTappedIds}
               faceDownCardIds={opponentFaceDownIds}
               counters={opponentCounters}
@@ -296,6 +306,8 @@ export function BattlePhase({
             canManipulateOpponent={canManipulateOpponent}
             rowHeight={rowHeight}
             columnWidth={zoneColumnWidth}
+            onCardHover={onOpponentCardHover}
+            onCardHoverEnd={onCardHoverEnd}
           />
         </div>
 
@@ -308,6 +320,8 @@ export function BattlePhase({
               onCardClick={(card) => handleCardClick(card, 'battlefield')}
               onCardDoubleClick={handleCardDoubleClick}
               onCardContextMenu={(e, card) => handleContextMenu(e, card, 'battlefield')}
+              onCardHover={onCardHover}
+              onCardHoverEnd={onCardHoverEnd}
               tappedCardIds={tappedCardIds}
               faceDownCardIds={faceDownCardIds}
               counters={counters}
@@ -326,6 +340,8 @@ export function BattlePhase({
             zones={your_zones}
             rowHeight={rowHeight}
             columnWidth={zoneColumnWidth}
+            onCardHover={onCardHover}
+            onCardHoverEnd={onCardHoverEnd}
           />
         </div>
 
@@ -336,6 +352,8 @@ export function BattlePhase({
               cards={your_zones.hand}
               selectedCardId={selectedCard?.card.id}
               onCardClick={(card) => handleCardClick(card, 'hand')}
+              onCardHover={onCardHover}
+              onCardHoverEnd={onCardHoverEnd}
               upgradedCardIds={upgradedCardIds}
               upgradesByCardId={upgradesByCardId}
               cardDimensions={sizes.playerHand}
@@ -349,6 +367,8 @@ export function BattlePhase({
             height={handHeight}
             width={zoneColumnWidth}
             validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+            onCardHover={onCardHover}
+            onCardHoverEnd={onCardHoverEnd}
           />
         </div>
 

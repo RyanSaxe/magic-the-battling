@@ -38,8 +38,8 @@ function RewardCard({
         <img
           src={imageUrl}
           alt={label}
-          className="rounded object-cover shadow-lg shrink-0"
-          style={{ width: REWARD_COMPACT_DIMS.width, height: REWARD_COMPACT_DIMS.height }}
+          className="object-cover shadow-lg shrink-0"
+          style={{ width: REWARD_COMPACT_DIMS.width, height: REWARD_COMPACT_DIMS.height, borderRadius: 'var(--card-border-radius)' }}
         />
         <div>
           <div className="text-white text-sm font-medium">{label}</div>
@@ -56,8 +56,8 @@ function RewardCard({
       <img
         src={imageUrl}
         alt={label}
-        className="rounded-lg object-cover shadow-lg"
-        style={{ width: dims.width, height: dims.height }}
+        className="object-cover shadow-lg"
+        style={{ width: dims.width, height: dims.height, borderRadius: 'var(--card-border-radius)' }}
       />
       <div className="text-center">
         <div className="text-white font-medium">{label}</div>

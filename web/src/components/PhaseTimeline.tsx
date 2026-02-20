@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
-import type { Phase } from '../constants/rules'
+import type { Phase } from '../constants/phases'
+import type { RulesPanelTarget } from './RulesPanel'
 
 const PHASES: Phase[] = ['draft', 'build', 'battle', 'reward']
 
@@ -25,13 +26,26 @@ interface PhaseTimelineProps {
   round: number
   nextStage: number
   nextRound: number
-  onPhaseClick: (phase: Phase, rect: DOMRect) => void
+  onOpenRules?: (target?: RulesPanelTarget) => void
   hamburger?: React.ReactNode
   title?: React.ReactNode
 }
 
 function isGamePhase(phase: string): phase is Phase {
   return PHASES.includes(phase as Phase)
+}
+
+function RulesButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="btn btn-secondary text-xs sm:text-sm"
+      title="Rules & Help"
+    >
+      <span className="hidden sm:inline">Rules</span>
+      <span className="sm:hidden">?</span>
+    </button>
+  )
 }
 
 function HomeButton() {
@@ -52,18 +66,19 @@ export function PhaseTimeline({
   round,
   nextStage,
   nextRound,
-  onPhaseClick,
+  onOpenRules,
   hamburger,
   title,
 }: PhaseTimelineProps) {
   if (!isGamePhase(currentPhase)) {
     return (
-      <header className="bg-black/30 py-1.5 px-2 sm:px-4 border-b border-gray-700/50">
+      <header className="bg-black/30 py-1.5 sm:py-2 px-1.5 border-b border-gray-700/50">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-300">
             {title ?? END_STATE_LABELS[currentPhase]}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 timeline-actions">
+            {onOpenRules && <RulesButton onClick={() => onOpenRules()} />}
             <HomeButton />
             {hamburger && <div className="shrink-0">{hamburger}</div>}
           </div>
@@ -73,7 +88,7 @@ export function PhaseTimeline({
   }
 
   return (
-    <header className="bg-black/30 py-1.5 px-2 sm:px-4 border-b border-gray-700/50">
+    <header className="bg-black/30 py-1.5 sm:py-2 px-1.5 border-b border-gray-700/50">
       <div className="flex items-center">
         <div className="flex items-center gap-1 sm:gap-1.5 flex-1 justify-start min-w-0">
           <span className="text-xs sm:text-sm text-gray-300 font-mono">{stage}-{round}</span>
@@ -88,7 +103,7 @@ export function PhaseTimeline({
               <div key={phase} className="flex items-center gap-1 sm:gap-1.5">
                 <span className="text-gray-600 text-xs">→</span>
                 <button
-                  onClick={(e) => onPhaseClick(phase, e.currentTarget.getBoundingClientRect())}
+                  onClick={() => onOpenRules?.({ docId: phase })}
                   className={`text-xs sm:text-sm font-medium capitalize transition-colors cursor-pointer
                     ${isActive ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ''}
                     ${isCompleted ? 'text-gray-500 line-through decoration-gray-600' : ''}
@@ -106,7 +121,8 @@ export function PhaseTimeline({
           <span className="text-xs sm:text-sm text-gray-500 font-mono">{nextStage}-{nextRound}</span>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 timeline-actions">
+          {onOpenRules && <RulesButton onClick={() => onOpenRules()} />}
           <div className="hidden sm:block"><HomeButton /></div>
           {hamburger && <div className="shrink-0">{hamburger}</div>}
         </div>

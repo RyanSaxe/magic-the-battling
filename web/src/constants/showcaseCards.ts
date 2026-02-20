@@ -24,6 +24,8 @@ function makeCard(id: string, name: string, imageUrl: string, upgradeTarget?: Ca
     elo: null,
     upgrade_target: upgradeTarget ?? null,
     oracle_text: null,
+    colors: [],
+    cmc: 0,
   }
 }
 

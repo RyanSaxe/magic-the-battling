@@ -30,6 +30,7 @@
   --zone-hand: rgba(30, 58, 95, 0.3);
 
   /* Card dimensions */
+  --card-border-radius: 5% / 3.5%;
   --card-width-sm: 80px;
   --card-height-sm: 112px;
   --card-width-md: 130px;
@@ -67,12 +68,12 @@ body {
   transition:
     transform var(--transition-normal),
     box-shadow var(--transition-normal);
-  border-radius: 8px;
+  border-radius: var(--card-border-radius);
   touch-action: manipulation;
 }
 
 .card img {
-  border-radius: 8px;
+  border-radius: var(--card-border-radius);
 }
 
 .card.tapped {

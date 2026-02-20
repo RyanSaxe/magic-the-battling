@@ -936,6 +936,45 @@ class TestSuddenDeathRegressions:
         assert elimination.would_be_dead_ready_for_elimination(game) is False
 
 
+class TestCompleteGamePlacement:
+    """Regression tests: remaining participants ranked by poison, not all tied."""
+
+    def test_complete_game_ranks_puppets_by_poison_no_winner(self):
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        alice.phase = "eliminated"
+        alice.placement = 4
+
+        bot1 = Puppet(name="Bot1", player_history_id=1, poison=7)
+        bot2 = Puppet(name="Bot2", player_history_id=2, poison=3)
+        bot3 = Puppet(name="Bot3", player_history_id=3, poison=5)
+        game.puppets.extend([bot1, bot2, bot3])
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+        manager.complete_game("test", winner=None)
+
+        assert bot2.placement == 1  # lowest poison
+        assert bot3.placement == 2
+        assert bot1.placement == 3  # highest poison
+
+    def test_complete_game_ranks_remaining_by_poison_with_winner(self):
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+
+        bot1 = Puppet(name="Bot1", player_history_id=1, poison=7)
+        bot2 = Puppet(name="Bot2", player_history_id=2, poison=3)
+        game.puppets.extend([bot1, bot2])
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+        manager.complete_game("test", winner=alice)
+
+        assert alice.placement == 1
+        assert bot2.placement == 2  # lower poison
+        assert bot1.placement == 3  # higher poison
+
+
 class TestBotSuddenDeath:
     """Tests for sudden death calculations that include bots."""
 

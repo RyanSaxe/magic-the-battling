@@ -25,7 +25,7 @@ export function Home() {
               onClick={() => setShowCreateModal(true)}
               className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
             >
-              Create Game
+              Play Game
             </button>
             <button
               onClick={() => setShowJoinModal(true)}
@@ -47,7 +47,7 @@ export function Home() {
               onClick={() => setShowCreateModal(true)}
               className="btn btn-primary py-2 px-5 font-semibold animate-gentle-glow"
             >
-              Create Game
+              Play Game
             </button>
             <button
               onClick={() => setShowJoinModal(true)}
@@ -65,12 +65,12 @@ export function Home() {
 
       <footer className="shrink-0 flex items-center justify-center gap-4 px-4 sm:px-6 py-3 text-sm">
         <a
-          href="https://cubecobra.com/cube/list/auto"
+          href="https://cubecobra.com/cube/overview/auto"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-amber-400 hover:text-amber-300 transition-colors"
+          className="text-[#7289da] hover:text-[#99aab5] transition-colors"
         >
-          Card List
+          Follow on Cube Cobra
         </a>
         <span className="text-gray-600">|</span>
         <a
@@ -79,12 +79,8 @@ export function Home() {
           rel="noopener noreferrer"
           className="text-[#7289da] hover:text-[#99aab5] transition-colors"
         >
-          Discord
+          Join the Discord
         </a>
-        <span className="text-gray-600">|</span>
-        <span className="text-gray-500 cursor-not-allowed" title="Coming soon">
-          Rules
-        </span>
       </footer>
 
       {showCreateModal && (

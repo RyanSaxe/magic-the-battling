@@ -16,6 +16,8 @@ interface CompactZoneDisplayProps {
   isOpponent?: boolean
   canManipulateOpponent?: boolean
   validFromZones: ZoneName[]
+  onCardHover?: (cardId: string, zone: ZoneName) => void
+  onCardHoverEnd?: () => void
 }
 
 export function CompactZoneDisplay({
@@ -27,6 +29,8 @@ export function CompactZoneDisplay({
   isOpponent = false,
   canManipulateOpponent = false,
   validFromZones,
+  onCardHover,
+  onCardHoverEnd,
 }: CompactZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -75,8 +79,8 @@ export function CompactZoneDisplay({
               <img
                 src={nextCard.image_url}
                 alt=""
-                className="absolute rounded"
-                style={{ width: cardW, height: cardH }}
+                className="absolute"
+                style={{ width: cardW, height: cardH, borderRadius: 'var(--card-border-radius)' }}
                 draggable={false}
               />
             )}
@@ -88,6 +92,8 @@ export function CompactZoneDisplay({
                 dimensions={{ width: cardW, height: cardH }}
                 disabled={!allowInteraction}
                 isOpponent={isOpponent}
+                onCardHover={allowInteraction ? onCardHover : undefined}
+                onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
               />
             )}
           </div>
@@ -103,6 +109,8 @@ export function CompactZoneDisplay({
           allowInteraction={allowInteraction}
           isOpponent={isOpponent}
           onClose={() => setShowModal(false)}
+          onCardHover={onCardHover}
+          onCardHoverEnd={onCardHoverEnd}
         />
       )}
     </>

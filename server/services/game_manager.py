@@ -313,13 +313,17 @@ class GameManager:
         remaining_no_placement = [
             p for p in live_players if p.placement == 0 and p.name != (winner.name if winner else "")
         ]
-        for p in remaining_no_placement:
-            p.placement = 2
-            p.phase = "game_over"
+        unplaced_bots = [fp for fp in live_bots if fp.placement == 0]
 
-        for fp in live_bots:
-            if fp.placement == 0:
-                fp.placement = 2
+        all_unplaced: list[Player | Puppet] = list(remaining_no_placement) + list(unplaced_bots)
+        all_unplaced.sort(key=lambda p: p.poison)
+
+        start = 2 if winner else 1
+        for i, participant in enumerate(all_unplaced):
+            participant.placement = start + i
+
+        for p in remaining_no_placement:
+            p.phase = "game_over"
 
         for player in game.players:
             if player.phase not in ("winner", "eliminated", "game_over"):

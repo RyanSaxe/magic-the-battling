@@ -30,6 +30,8 @@ export function ZoneModal({
   allowInteraction,
   isOpponent,
   onClose,
+  onCardHover,
+  onCardHoverEnd,
 }: {
   title: string
   zone: ZoneName
@@ -37,13 +39,20 @@ export function ZoneModal({
   allowInteraction: boolean
   isOpponent: boolean
   onClose: () => void
+  onCardHover?: (cardId: string, zone: ZoneName) => void
+  onCardHoverEnd?: () => void
 }) {
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+
+  const handleClose = () => {
+    onCardHoverEnd?.()
+    onClose()
+  }
 
   return (
     <div
       className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
@@ -52,7 +61,7 @@ export function ZoneModal({
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-white font-medium">{title}</h3>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-white"
           >
             ✕
@@ -64,7 +73,7 @@ export function ZoneModal({
           <div className="flex flex-wrap gap-2">
             {cards.map((card) =>
               allowInteraction ? (
-                <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} size="sm" isOpponent={isOpponent} />
+                <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} size="sm" isOpponent={isOpponent} onCardHover={onCardHover} onCardHoverEnd={onCardHoverEnd} />
               ) : (
                 <Card key={card.id} card={card} size="sm" />
               )
