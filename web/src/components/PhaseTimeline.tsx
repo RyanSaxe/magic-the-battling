@@ -26,7 +26,7 @@ interface PhaseTimelineProps {
   round: number
   nextStage: number
   nextRound: number
-  onOpenRules: (target?: RulesPanelTarget) => void
+  onOpenRules?: (target?: RulesPanelTarget) => void
   hamburger?: React.ReactNode
   title?: React.ReactNode
 }
@@ -78,7 +78,7 @@ export function PhaseTimeline({
             {title ?? END_STATE_LABELS[currentPhase]}
           </span>
           <div className="flex items-center gap-1 timeline-actions">
-            <RulesButton onClick={() => onOpenRules()} />
+            {onOpenRules && <RulesButton onClick={() => onOpenRules()} />}
             <HomeButton />
             {hamburger && <div className="shrink-0">{hamburger}</div>}
           </div>
@@ -103,7 +103,7 @@ export function PhaseTimeline({
               <div key={phase} className="flex items-center gap-1 sm:gap-1.5">
                 <span className="text-gray-600 text-xs">→</span>
                 <button
-                  onClick={() => onOpenRules({ docId: phase })}
+                  onClick={() => onOpenRules?.({ docId: phase })}
                   className={`text-xs sm:text-sm font-medium capitalize transition-colors cursor-pointer
                     ${isActive ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ''}
                     ${isCompleted ? 'text-gray-500 line-through decoration-gray-600' : ''}
@@ -122,7 +122,7 @@ export function PhaseTimeline({
         </div>
 
         <div className="flex items-center gap-1 shrink-0 timeline-actions">
-          <RulesButton onClick={() => onOpenRules()} />
+          {onOpenRules && <RulesButton onClick={() => onOpenRules()} />}
           <div className="hidden sm:block"><HomeButton /></div>
           {hamburger && <div className="shrink-0">{hamburger}</div>}
         </div>
