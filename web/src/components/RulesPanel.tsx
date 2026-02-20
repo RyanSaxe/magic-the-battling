@@ -299,22 +299,27 @@ interface RulesPanelContentProps {
 }
 
 export function RulesPanelContent({
-  initialDocId = 'overview',
+  initialDocId,
   initialTab,
   gameId,
   useUpgrades,
 }: RulesPanelContentProps) {
-  const [selectedDocId, setSelectedDocId] = useState(initialDocId)
+  const [selectedDocId, setSelectedDocId] = useState(initialDocId ?? 'overview')
   const [activeTab, setActiveTab] = useState(initialTab ?? '')
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [mobileView, setMobileView] = useState<'nav' | 'content'>(initialDocId ? 'content' : 'nav')
+  const [prevInitialDocId, setPrevInitialDocId] = useState(initialDocId)
+  const [prevInitialTab, setPrevInitialTab] = useState(initialTab)
 
-  useEffect(() => {
-    setSelectedDocId(initialDocId)
-  }, [initialDocId])
+  if (initialDocId !== prevInitialDocId) {
+    setPrevInitialDocId(initialDocId)
+    setSelectedDocId(initialDocId ?? 'overview')
+    if (initialDocId) setMobileView('content')
+  }
 
-  useEffect(() => {
+  if (initialTab !== prevInitialTab) {
+    setPrevInitialTab(initialTab)
     setActiveTab(initialTab ?? '')
-  }, [initialTab])
+  }
 
   const isBrowseView = (BROWSE_IDS as readonly string[]).includes(selectedDocId)
   const doc = isBrowseView ? null : (DOCS.find((d) => d.id === selectedDocId) ?? DOCS[0])
@@ -329,7 +334,7 @@ export function RulesPanelContent({
       const newDoc = DOCS.find((d) => d.id === id)
       setActiveTab(newDoc?.parsed.sectionOrder[0] ?? '')
     }
-    setMobileNavOpen(false)
+    setMobileView('content')
   }
 
   const groups = groupedDocs()
@@ -397,6 +402,84 @@ export function RulesPanelContent({
     </nav>
   )
 
+  const navItems = (
+    <>
+      {gameId && (
+        <div className="border-b border-gray-700/50">
+          <div className="px-4 pt-3 pb-1 text-xs font-medium text-gray-400 uppercase tracking-wide">Browse</div>
+          <button
+            onClick={() => handleDocSelect('__cards__')}
+            className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <span>Card Pool</span>
+            <span className="text-gray-500">›</span>
+          </button>
+          {useUpgrades !== false && (
+            <button
+              onClick={() => handleDocSelect('__upgrades__')}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+            >
+              <span>Upgrades</span>
+              <span className="text-gray-500">›</span>
+            </button>
+          )}
+        </div>
+      )}
+      {groups.map(({ category, label, docs }) => (
+        <div key={category}>
+          <div className="px-4 pt-3 pb-1 text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</div>
+          {docs.map((d) => (
+            <button
+              key={d.id}
+              onClick={() => handleDocSelect(d.id)}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
+            >
+              <span>{d.parsed.meta.title}</span>
+              <span className="text-gray-500">›</span>
+            </button>
+          ))}
+        </div>
+      ))}
+    </>
+  )
+
+  const contentArea = isBrowseView && gameId ? (
+    <div className="flex flex-col flex-1 min-h-0 px-4 pt-3">
+      <h2 className="text-lg font-semibold text-white mb-2 shrink-0 hidden sm:block">{currentTitle}</h2>
+      <CardsView
+        gameId={gameId}
+        which={selectedDocId === '__cards__' ? 'cards' : 'upgrades'}
+      />
+    </div>
+  ) : doc ? (
+    <>
+      <div className="px-4 pt-3">
+        <h2 className="text-lg font-semibold text-white mb-2 hidden sm:block">{doc.parsed.meta.title}</h2>
+        {showTabs && (
+          <div className="flex gap-1 border-b border-gray-700/50 -mx-4 px-4">
+            {tabs.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-3 py-1.5 text-sm capitalize transition-colors border-b-2 -mb-px ${
+                  tab === resolvedTab
+                    ? 'text-amber-400 border-amber-400'
+                    : 'text-gray-400 border-transparent hover:text-gray-200'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        <TabContent doc={doc} tab={resolvedTab} />
+      </div>
+    </>
+  ) : null
+
   return (
     <div className="flex flex-1 min-h-0">
       {/* Desktop sidebar */}
@@ -406,60 +489,30 @@ export function RulesPanelContent({
 
       {/* Content area */}
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
-        {/* Mobile nav toggle */}
-        <div className="sm:hidden px-4 py-2 border-b border-gray-700/50">
-          <button
-            onClick={() => setMobileNavOpen((v) => !v)}
-            className="flex items-center gap-2 text-sm text-gray-300 hover:text-white w-full"
-          >
-            <span className="truncate">{currentTitle}</span>
-            <span className="text-gray-500 shrink-0">{mobileNavOpen ? '▴' : '▾'}</span>
-          </button>
-          {mobileNavOpen && (
-            <div className="mt-2 bg-gray-800 rounded-lg border border-gray-700 max-h-[50vh] overflow-y-auto">
-              {sidebar}
-            </div>
-          )}
+        {/* Mobile: nav list when mobileView === 'nav' */}
+        <div className={`sm:hidden ${mobileView === 'nav' ? 'flex-1 overflow-y-auto' : 'hidden'}`}>
+          {navItems}
         </div>
 
-        {isBrowseView && gameId ? (
-          <div className="flex flex-col flex-1 min-h-0 px-4 pt-3">
-            <h2 className="text-lg font-semibold text-white mb-2 shrink-0">{currentTitle}</h2>
-            <CardsView
-              gameId={gameId}
-              which={selectedDocId === '__cards__' ? 'cards' : 'upgrades'}
-            />
+        {/* Mobile: back header when mobileView === 'content' */}
+        {mobileView === 'content' && (
+          <div className="sm:hidden relative px-3 py-2 border-b border-gray-700/50 flex items-center">
+            <button
+              onClick={() => setMobileView('nav')}
+              className="text-sm text-gray-400 hover:text-white shrink-0 z-10"
+            >
+              ← Back
+            </button>
+            <span className="absolute inset-0 flex items-center justify-center text-sm text-white font-medium pointer-events-none truncate px-16">
+              {currentTitle}
+            </span>
           </div>
-        ) : doc && (
-          <>
-            {/* Doc heading + tabs */}
-            <div className="px-4 pt-3">
-              <h2 className="text-lg font-semibold text-white mb-2">{doc.parsed.meta.title}</h2>
-              {showTabs && (
-                <div className="flex gap-1 border-b border-gray-700/50 -mx-4 px-4">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`px-3 py-1.5 text-sm capitalize transition-colors border-b-2 -mb-px ${
-                        tab === resolvedTab
-                          ? 'text-amber-400 border-amber-400'
-                          : 'text-gray-400 border-transparent hover:text-gray-200'
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Tab content */}
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-              <TabContent doc={doc} tab={resolvedTab} />
-            </div>
-          </>
         )}
+
+        {/* Content: hidden on mobile when showing nav, always visible on desktop */}
+        <div className={`flex-1 flex flex-col min-h-0 ${mobileView === 'nav' ? 'hidden sm:flex' : ''}`}>
+          {contentArea}
+        </div>
       </div>
     </div>
   )
