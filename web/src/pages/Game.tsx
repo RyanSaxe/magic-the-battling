@@ -526,7 +526,7 @@ function GameContent() {
         };
         map['Enter'] = () => setShowSubmitResultPopover(false);
       } else {
-        if (hoveredCard && !hoveredCard.zone.startsWith('command')) {
+        if (hoveredCard) {
           const ownerZones = hoveredCard.owner === 'player' ? cb.your_zones : cb.opponent_zones;
           map['t'] = () => {
             if (hoveredCard.zone === 'battlefield') {

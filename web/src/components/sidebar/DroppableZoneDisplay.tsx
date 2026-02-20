@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import type { Card as CardType, ZoneName } from '../../types'
 import { Card } from '../card'
 import { DraggableCard, DroppableZone } from '../../dnd'
@@ -44,14 +44,15 @@ export function ZoneModal({
 }) {
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
-  useEffect(() => {
-    return () => { onCardHoverEnd?.() }
-  }, [onCardHoverEnd])
+  const handleClose = () => {
+    onCardHoverEnd?.()
+    onClose()
+  }
 
   return (
     <div
       className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
@@ -60,7 +61,7 @@ export function ZoneModal({
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-white font-medium">{title}</h3>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-white"
           >
             ✕
