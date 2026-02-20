@@ -79,8 +79,8 @@ export function CompactZoneDisplay({
               <img
                 src={nextCard.image_url}
                 alt=""
-                className="absolute rounded"
-                style={{ width: cardW, height: cardH }}
+                className="absolute"
+                style={{ width: cardW, height: cardH, borderRadius: 'var(--card-border-radius)' }}
                 draggable={false}
               />
             )}

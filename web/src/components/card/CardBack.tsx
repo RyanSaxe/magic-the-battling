@@ -28,7 +28,7 @@ export function CardBack({
 
   const baseClasses = [
     'card card-on-table',
-    'relative rounded-lg overflow-hidden',
+    'relative overflow-hidden',
     onClick && 'cursor-pointer',
     tapped && 'tapped',
     className,

@@ -223,7 +223,8 @@ function CardsView({ gameId, which }: { gameId: string; which: 'cards' | 'upgrad
               src={card.image_url}
               alt={card.name}
               title={card.name}
-              className="rounded cursor-pointer hover:brightness-125 transition-all"
+              className="cursor-pointer hover:brightness-125 transition-all"
+              style={{ borderRadius: 'var(--card-border-radius)' }}
               onClick={() => setPreviewCard(card)}
             />
           ))}

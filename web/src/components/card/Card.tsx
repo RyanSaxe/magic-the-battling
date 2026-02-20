@@ -84,7 +84,7 @@ export function Card({
 
   const baseClasses = [
     'card',
-    'relative rounded-lg overflow-hidden',
+    'relative overflow-hidden',
     disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
     selected && 'selected',
     tapped && 'tapped',
@@ -119,7 +119,7 @@ export function Card({
       <img
         src={imageUrl}
         alt={card.name}
-        className={`w-full h-full object-cover rounded-lg ${isLoading ? 'invisible' : ''}`}
+        className={`w-full h-full object-cover ${isLoading ? 'invisible' : ''}`}
         onLoad={() => setIsLoading(false)}
         onError={() => setIsLoading(false)}
         draggable={false}

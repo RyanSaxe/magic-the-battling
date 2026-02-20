@@ -68,7 +68,8 @@ export function BasicLandSlot({ selected, dimensions, onPick, isMobile = false }
                 <img
                   src={BASIC_LAND_IMAGES[name]}
                   alt={name}
-                  className="w-10 h-14 rounded object-cover"
+                  className="w-10 h-14 object-cover"
+                  style={{ borderRadius: 'var(--card-border-radius)' }}
                 />
                 <span className="text-[9px] text-gray-400">{name}</span>
               </button>

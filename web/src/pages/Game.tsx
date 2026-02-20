@@ -539,7 +539,11 @@ function GameContent() {
           for (const [key, toZone] of Object.entries(moveZones)) {
             map[key] = () => {
               if (toZone !== hoveredCard.zone) {
+                const zoneCards = ownerZones[hoveredCard.zone];
+                const idx = zoneCards.findIndex(c => c.id === hoveredCard.id);
                 actions.battleMove(hoveredCard.id, hoveredCard.zone, toZone as ZoneName, hoveredCard.owner, hoveredCard.owner);
+                const nextCard = zoneCards[idx + 1] ?? zoneCards[idx - 1] ?? null;
+                setHoveredCard(nextCard ? { id: nextCard.id, zone: hoveredCard.zone, owner: hoveredCard.owner } : null);
               }
             };
           }

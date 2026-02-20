@@ -277,12 +277,10 @@ export function Lobby() {
                       {showPuppetExplainer && (
                         <p className="text-gray-500 text-xs mt-1 pl-3">
                           Puppets are players built from recordings of past
-                          human games. This way, you play against realistic
-                          opponents even when you don't have enough players.
-                          Note that, unlike playing against humans, puppets will
-                          have their hand revealed and you will need to decide
-                          who would have won in a hypothetical match-up to
-                          determine the winner of each game.
+                          human games. Puppets will have their hand revealed and
+                          you will need to decide who would have won in a
+                          hypothetical match-up to determine the winner of each
+                          battle.
                         </p>
                       )}
                     </div>

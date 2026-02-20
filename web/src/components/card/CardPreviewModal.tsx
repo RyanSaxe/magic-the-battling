@@ -39,8 +39,8 @@ export function CardPreviewModal({ card, appliedUpgrades, onClose }: CardPreview
         <img
           src={getImageUrl(card, isFlipped)}
           alt={card.name}
-          className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
-          style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
+          className="max-h-[80vh] min-w-0 shrink shadow-2xl"
+          style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw`, borderRadius: 'var(--card-border-radius)' }}
         />
         {appliedUpgrades.length > 0 && (
           <>
@@ -50,8 +50,8 @@ export function CardPreviewModal({ card, appliedUpgrades, onClose }: CardPreview
                 key={upgrade.id}
                 src={getImageUrl(upgrade, isFlipped)}
                 alt={upgrade.name}
-                className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
-                style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
+                className="max-h-[80vh] min-w-0 shrink shadow-2xl"
+                style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw`, borderRadius: 'var(--card-border-radius)' }}
               />
             ))}
           </>

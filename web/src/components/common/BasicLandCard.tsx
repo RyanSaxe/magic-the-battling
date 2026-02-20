@@ -11,7 +11,7 @@ export function BasicLandCard({
   if (!src) return null
 
   return (
-    <div className="relative rounded overflow-hidden" style={{ width: dimensions.width, height: dimensions.height }}>
+    <div className="relative overflow-hidden" style={{ width: dimensions.width, height: dimensions.height, borderRadius: 'var(--card-border-radius)' }}>
       <img src={src} className="w-full h-full object-cover" alt={name} />
     </div>
   )
