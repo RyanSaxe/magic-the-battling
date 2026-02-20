@@ -39,11 +39,11 @@ function RulesButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="text-gray-400 hover:text-white text-sm transition-colors"
+      className="btn btn-secondary text-xs sm:text-sm"
       title="Rules & Help"
     >
       <span className="hidden sm:inline">Rules</span>
-      <span className="sm:hidden w-5 h-5 flex items-center justify-center rounded-full border border-gray-600 hover:border-gray-400">?</span>
+      <span className="sm:hidden">?</span>
     </button>
   )
 }
@@ -77,7 +77,7 @@ export function PhaseTimeline({
           <span className="text-sm font-medium text-gray-300">
             {title ?? END_STATE_LABELS[currentPhase]}
           </span>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 timeline-actions">
             <RulesButton onClick={() => onOpenRules()} />
             <HomeButton />
             {hamburger && <div className="shrink-0">{hamburger}</div>}
@@ -121,7 +121,7 @@ export function PhaseTimeline({
           <span className="text-xs sm:text-sm text-gray-500 font-mono">{nextStage}-{nextRound}</span>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 timeline-actions">
           <RulesButton onClick={() => onOpenRules()} />
           <div className="hidden sm:block"><HomeButton /></div>
           {hamburger && <div className="shrink-0">{hamburger}</div>}
