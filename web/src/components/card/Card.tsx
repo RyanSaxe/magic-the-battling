@@ -1,7 +1,7 @@
-import { useState, useContext } from 'react'
+import { useState, useContext, useEffect } from 'react'
 import type { Card as CardType } from '../../types'
-import { CardBack } from './CardBack'
 import { CardPreviewContext } from './CardPreviewContext'
+import { CARD_BACK_IMAGE } from '../../constants/assets'
 
 interface CardProps {
   card: CardType
@@ -20,6 +20,7 @@ interface CardProps {
   isCompanion?: boolean
   upgraded?: boolean
   appliedUpgrades?: CardType[]
+  canPeekFaceDown?: boolean
   style?: React.CSSProperties
 }
 
@@ -56,6 +57,7 @@ export function Card({
   isCompanion = false,
   upgraded = false,
   appliedUpgrades,
+  canPeekFaceDown = true,
   style: externalStyle,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
@@ -64,20 +66,30 @@ export function Card({
 
   const previewContext = useContext(CardPreviewContext)
 
-  if (faceDown) {
-    return (
-      <CardBack
-        size={size}
-        dimensions={dimensions}
-        tapped={tapped}
-        onClick={onClick}
-        className={className}
-      />
-    )
-  }
+  useEffect(() => {
+    if (!isHovered || !previewContext) return
+    if (faceDown && !canPeekFaceDown) return
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'z' || e.key === 'Z') {
+        if (card.upgrade_target) {
+          previewContext.setPreviewCard(card.upgrade_target, [card])
+        } else {
+          previewContext.setPreviewCard(card, appliedUpgrades)
+        }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isHovered, previewContext, card, appliedUpgrades, faceDown, canPeekFaceDown])
 
-  const normalUrl = showFlip && card.flip_image_url ? card.flip_image_url : card.image_url
-  const pngUrl = showFlip && card.flip_png_url ? card.flip_png_url : card.png_url
+  const normalUrl = faceDown
+    ? CARD_BACK_IMAGE
+    : (showFlip && card.flip_image_url ? card.flip_image_url : card.image_url)
+  const pngUrl = faceDown
+    ? null
+    : (showFlip && card.flip_png_url ? card.flip_png_url : card.png_url)
   const imageUrl = isHovered && pngUrl ? pngUrl : normalUrl
 
   const dims = dimensions ?? sizeStyles[size]
@@ -124,7 +136,7 @@ export function Card({
         onError={() => setIsLoading(false)}
         draggable={false}
       />
-      {card.flip_image_url && (isHovered || selected) && (
+      {card.flip_image_url && !faceDown && (isHovered || selected) && (
         <button
           className="absolute top-1 right-1 bg-black/60 rounded px-2 py-0.5 text-white text-xs hover:bg-black/80 transition-colors"
           onClick={(e) => {
@@ -135,7 +147,7 @@ export function Card({
           Flip
         </button>
       )}
-      {previewContext && (isHovered || selected) && (
+      {previewContext && (!faceDown || canPeekFaceDown) && (isHovered || selected) && (
         <button
           className="absolute top-1 left-1 bg-black/60 rounded p-1 text-white hover:bg-black/80 transition-colors"
           onClick={(e) => {

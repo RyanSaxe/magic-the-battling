@@ -36,6 +36,7 @@ export function GameDndProvider({
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   const [activeFromZone, setActiveFromZone] = useState<ZoneName | null>(null);
   const [activeFromZoneId, setActiveFromZoneId] = useState<string | null>(null);
+  const [activeFaceDown, setActiveFaceDown] = useState(false);
 
   const mouseSensor = useSensor(MouseSensor, {
     activationConstraint: {
@@ -60,6 +61,7 @@ export function GameDndProvider({
       setActiveCard(data.card);
       setActiveFromZone(data.fromZone);
       setActiveFromZoneId(data.fromZoneId);
+      setActiveFaceDown(data.faceDown ?? false);
     }
   }
 
@@ -86,12 +88,14 @@ export function GameDndProvider({
     setActiveCard(null);
     setActiveFromZone(null);
     setActiveFromZoneId(null);
+    setActiveFaceDown(false);
   }
 
   function handleDragCancel() {
     setActiveCard(null);
     setActiveFromZone(null);
     setActiveFromZoneId(null);
+    setActiveFaceDown(false);
   }
 
   return (
@@ -112,6 +116,7 @@ export function GameDndProvider({
               card={activeCard}
               size="md"
               className="drag-overlay"
+              faceDown={activeFaceDown}
             />
           )}
         </DragOverlay>

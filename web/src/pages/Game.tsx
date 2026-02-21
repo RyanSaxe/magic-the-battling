@@ -538,7 +538,20 @@ function GameContent() {
               actions.battleUpdateCardState(tapped ? 'untap' : 'tap', hoveredCard.id);
             }
           };
-          map['f'] = () => actions.battleUpdateCardState('flip', hoveredCard.id);
+          map['f'] = () => {
+            const ownerZones = hoveredCard.owner === 'player' ? cb.your_zones : cb.opponent_zones;
+            const isFaceDown = ownerZones.face_down_card_ids?.includes(hoveredCard.id);
+            if (isFaceDown) {
+              actions.battleUpdateCardState('face_down', hoveredCard.id);
+            } else {
+              const card = ownerZones[hoveredCard.zone]?.find((c: { id: string }) => c.id === hoveredCard.id);
+              if (card?.flip_image_url) {
+                actions.battleUpdateCardState('flip', hoveredCard.id);
+              } else {
+                actions.battleUpdateCardState('face_down', hoveredCard.id);
+              }
+            }
+          };
           const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile' } as const;
           for (const [key, toZone] of Object.entries(moveZones)) {
             map[key] = () => {

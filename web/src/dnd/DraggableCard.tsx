@@ -25,6 +25,7 @@ interface DraggableCardProps {
   isCompanion?: boolean
   upgraded?: boolean
   appliedUpgrades?: CardType[]
+  canPeekFaceDown?: boolean
   style?: React.CSSProperties
 }
 
@@ -49,10 +50,11 @@ export function DraggableCard({
   isCompanion = false,
   upgraded = false,
   appliedUpgrades,
+  canPeekFaceDown,
   style: externalStyle,
 }: DraggableCardProps) {
   const zoneId = makeZoneId(zone, zoneOwner)
-  const dragData: DragData = { card, fromZone: zone, fromZoneId: zoneId, isOpponent }
+  const dragData: DragData = { card, fromZone: zone, fromZoneId: zoneId, isOpponent, faceDown }
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `${zoneId}-${card.id}`,
@@ -97,6 +99,7 @@ export function DraggableCard({
         isCompanion={isCompanion}
         upgraded={upgraded}
         appliedUpgrades={appliedUpgrades}
+        canPeekFaceDown={canPeekFaceDown}
       />
     </div>
   )

@@ -37,6 +37,7 @@ interface BattlefieldZoneProps {
   rowHeight?: number;
   landCardDimensions?: CardDimensions;
   nonlandCardDimensions?: CardDimensions;
+  canPeekFaceDown?: boolean;
 }
 
 export function BattlefieldZone({
@@ -64,6 +65,7 @@ export function BattlefieldZone({
   rowHeight,
   landCardDimensions,
   nonlandCardDimensions,
+  canPeekFaceDown,
 }: BattlefieldZoneProps) {
   const allowInteraction = !isOpponent || canManipulateOpponent;
   const attachedCardIds = new Set(Object.values(attachments).flat());
@@ -135,6 +137,7 @@ export function BattlefieldZone({
           isOpponent={isOpponent}
           upgraded={upgradedCardIds.has(card.id)}
           appliedUpgrades={upgradesByCardId?.get(card.id)}
+          canPeekFaceDown={canPeekFaceDown}
           onCardHover={allowInteraction ? onCardHover : undefined}
           onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
         />

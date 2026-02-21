@@ -9,6 +9,7 @@ export const PHASE_HOTKEYS: Record<string, HotkeyEntry[]> = {
     { key: '?', description: 'Open/close guide' },
     { key: 'Enter', description: 'Advance phase or confirm (some phases require a follow-up key)' },
     { key: 'Escape', description: 'Close panels and modals' },
+    { key: 'Z', description: 'Zoom (preview card)' },
   ],
   lobby: [
     { key: 'Enter', description: 'Toggle ready / Start game (host)' },
