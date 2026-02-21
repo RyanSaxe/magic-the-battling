@@ -545,7 +545,7 @@ export function RulesPanel({ onClose, initialDocId, initialTab, gameId, useUpgra
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-2.5 border-b border-gray-700/50 flex justify-between items-center shrink-0">
-          <h2 className="text-white font-semibold">Rules & Help</h2>
+          <h2 className="text-white font-semibold">Guide</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white text-2xl leading-none p-1"

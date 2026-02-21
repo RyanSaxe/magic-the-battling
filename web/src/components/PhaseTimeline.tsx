@@ -40,9 +40,9 @@ function RulesButton({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       className="btn btn-secondary text-xs sm:text-sm"
-      title="Rules & Help"
+      title="Guide"
     >
-      <span className="hidden sm:inline">Rules</span>
+      <span className="hidden sm:inline">Guide</span>
       <span className="sm:hidden">?</span>
     </button>
   )

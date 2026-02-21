@@ -6,7 +6,7 @@ export interface HotkeyEntry {
 
 export const PHASE_HOTKEYS: Record<string, HotkeyEntry[]> = {
   global: [
-    { key: '?', description: 'Open rules' },
+    { key: '?', description: 'Open/close guide' },
   ],
   lobby: [
     { key: 'Enter', description: 'Toggle ready / Start game (host)' },
