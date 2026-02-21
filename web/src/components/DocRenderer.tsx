@@ -1,9 +1,14 @@
-import Markdown from 'react-markdown'
+import Markdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
 import { useDocNav } from '../contexts/DocNavContext'
 import { PHASE_HOTKEYS } from '../constants/hotkeys'
 import { HotkeyRow } from './HotkeyRow'
+
+function urlTransform(url: string) {
+  if (url.startsWith('doc:')) return url
+  return defaultUrlTransform(url)
+}
 
 const HOTKEY_RE = /\{\{hotkeys:(\w[\w-]*)\}\}/
 
@@ -106,7 +111,7 @@ export function DocRenderer({ content, className }: DocRendererProps) {
         }
         if (!segment) return null
         return (
-          <Markdown key={i} remarkPlugins={[remarkGfm]} components={components}>
+          <Markdown key={i} remarkPlugins={[remarkGfm]} urlTransform={urlTransform} components={components}>
             {segment}
           </Markdown>
         )
