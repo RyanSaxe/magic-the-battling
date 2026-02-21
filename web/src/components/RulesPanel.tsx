@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { DOCS, type DocEntry } from '../docs'
 import { DocRenderer } from './DocRenderer'
 import { PHASE_HOTKEYS } from '../constants/hotkeys'
 import { HotkeyRow } from './HotkeyRow'
 import { getGameCards, type GameCardsResponse } from '../api/client'
 import { CardPreviewModal } from './card/CardPreviewModal'
+import { DocNavContext } from '../contexts/DocNavContext'
 import type { Card } from '../types'
 
 export interface RulesPanelTarget {
@@ -317,6 +318,13 @@ export function RulesPanelContent({
     setMobileView('content')
   }
 
+  const docNav = useMemo(() => ({
+    navigate: (docId: string, tab?: string) => {
+      handleDocSelect(docId)
+      if (tab) setActiveTab(tab)
+    },
+  }), [])
+
   const groups = groupedDocs()
 
   const currentTitle = isBrowseView
@@ -461,40 +469,42 @@ export function RulesPanelContent({
   ) : null
 
   return (
-    <div className="flex flex-1 min-h-0">
-      {/* Desktop sidebar */}
-      <div className="hidden sm:block w-[200px] shrink-0 border-r border-gray-700/50 overflow-y-auto">
-        {sidebar}
-      </div>
-
-      {/* Content area */}
-      <div className="flex-1 flex flex-col min-h-0 min-w-0">
-        {/* Mobile: nav list when mobileView === 'nav' */}
-        <div className={`sm:hidden ${mobileView === 'nav' ? 'flex-1 overflow-y-auto' : 'hidden'}`}>
-          {navItems}
+    <DocNavContext.Provider value={docNav}>
+      <div className="flex flex-1 min-h-0">
+        {/* Desktop sidebar */}
+        <div className="hidden sm:block w-[200px] shrink-0 border-r border-gray-700/50 overflow-y-auto">
+          {sidebar}
         </div>
 
-        {/* Mobile: back header when mobileView === 'content' */}
-        {mobileView === 'content' && (
-          <div className="sm:hidden relative px-3 py-2 border-b border-gray-700/50 flex items-center">
-            <button
-              onClick={() => setMobileView('nav')}
-              className="text-sm text-gray-400 hover:text-white shrink-0 z-10"
-            >
-              ← Back
-            </button>
-            <span className="absolute inset-0 flex items-center justify-center text-sm text-white font-medium pointer-events-none truncate px-16">
-              {currentTitle}
-            </span>
+        {/* Content area */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+          {/* Mobile: nav list when mobileView === 'nav' */}
+          <div className={`sm:hidden ${mobileView === 'nav' ? 'flex-1 overflow-y-auto' : 'hidden'}`}>
+            {navItems}
           </div>
-        )}
 
-        {/* Content: hidden on mobile when showing nav, always visible on desktop */}
-        <div className={`flex-1 flex flex-col min-h-0 ${mobileView === 'nav' ? 'hidden sm:flex' : ''}`}>
-          {contentArea}
+          {/* Mobile: back header when mobileView === 'content' */}
+          {mobileView === 'content' && (
+            <div className="sm:hidden relative px-3 py-2 border-b border-gray-700/50 flex items-center">
+              <button
+                onClick={() => setMobileView('nav')}
+                className="text-sm text-gray-400 hover:text-white shrink-0 z-10"
+              >
+                ← Back
+              </button>
+              <span className="absolute inset-0 flex items-center justify-center text-sm text-white font-medium pointer-events-none truncate px-16">
+                {currentTitle}
+              </span>
+            </div>
+          )}
+
+          {/* Content: hidden on mobile when showing nav, always visible on desktop */}
+          <div className={`flex-1 flex flex-col min-h-0 ${mobileView === 'nav' ? 'hidden sm:flex' : ''}`}>
+            {contentArea}
+          </div>
         </div>
       </div>
-    </div>
+    </DocNavContext.Provider>
   )
 }
 

@@ -1,46 +1,11 @@
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
+import { useDocNav } from '../contexts/DocNavContext'
+import { PHASE_HOTKEYS } from '../constants/hotkeys'
+import { HotkeyRow } from './HotkeyRow'
 
-const components: Components = {
-  h2: ({ children }) => (
-    <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mt-4 mb-1 first:mt-0">
-      {children}
-    </h2>
-  ),
-  h3: ({ children }) => (
-    <h3 className="text-sm font-medium text-gray-300 mt-3 mb-1">{children}</h3>
-  ),
-  p: ({ children }) => (
-    <p className="text-sm text-gray-300 mb-2">{children}</p>
-  ),
-  ul: ({ children }) => (
-    <ul className="space-y-0.5 mb-2">{children}</ul>
-  ),
-  li: ({ children }) => (
-    <li className="flex gap-2 text-sm text-gray-300">
-      <span className="text-amber-400 shrink-0">•</span>
-      <span>{children}</span>
-    </li>
-  ),
-  table: ({ children }) => (
-    <table className="w-full text-sm text-gray-300 mb-2">{children}</table>
-  ),
-  th: ({ children }) => (
-    <th className="text-left text-gray-400 font-medium pb-1 pr-3">{children}</th>
-  ),
-  td: ({ children }) => (
-    <td className="pb-1 pr-3">{children}</td>
-  ),
-  strong: ({ children }) => (
-    <strong className="text-white font-medium">{children}</strong>
-  ),
-  a: ({ href, children }) => (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 transition-colors">
-      {children}
-    </a>
-  ),
-}
+const HOTKEY_RE = /\{\{hotkeys:(\w[\w-]*)\}\}/
 
 interface DocRendererProps {
   content: string
@@ -48,11 +13,104 @@ interface DocRendererProps {
 }
 
 export function DocRenderer({ content, className }: DocRendererProps) {
+  const docNav = useDocNav()
+
+  const components: Components = {
+    h2: ({ children }) => (
+      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mt-4 mb-1 first:mt-0">
+        {children}
+      </h2>
+    ),
+    h3: ({ children }) => (
+      <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mt-3 mb-1">
+        {children}
+      </h3>
+    ),
+    p: ({ children }) => (
+      <p className="text-sm text-gray-300 mb-2">{children}</p>
+    ),
+    ul: ({ children }) => (
+      <ul className="space-y-0.5 mb-2">{children}</ul>
+    ),
+    li: ({ children }) => (
+      <li className="flex gap-2 text-sm text-gray-300">
+        <span className="text-amber-400 shrink-0">•</span>
+        <span>{children}</span>
+      </li>
+    ),
+    table: ({ children }) => (
+      <table className="w-full text-sm text-gray-300 mb-2">{children}</table>
+    ),
+    th: ({ children }) => (
+      <th className="text-left text-gray-400 font-medium pb-1 pr-3">{children}</th>
+    ),
+    td: ({ children }) => (
+      <td className="pb-1 pr-3">{children}</td>
+    ),
+    strong: ({ children }) => (
+      <strong className="text-white font-medium">{children}</strong>
+    ),
+    a: ({ href, children }) => {
+      if (href?.startsWith('doc:')) {
+        const rest = href.slice(4)
+        const [docId, tab] = rest.split('#')
+        return (
+          <button
+            onClick={() => docNav.navigate(docId, tab)}
+            className="text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+          >
+            {children}
+          </button>
+        )
+      }
+      return (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 transition-colors">
+          {children}
+        </a>
+      )
+    },
+  }
+
+  const segments = content.split(HOTKEY_RE)
+
   return (
     <div className={className}>
-      <Markdown remarkPlugins={[remarkGfm]} components={components}>
-        {content}
-      </Markdown>
+      {segments.map((segment, i) => {
+        if (i % 2 === 1) {
+          const key = segment
+          const hotkeys = PHASE_HOTKEYS[key] ?? []
+          const hoverHotkeys = PHASE_HOTKEYS[`${key}-hover`] ?? []
+          return (
+            <div key={i} className="space-y-4">
+              {hotkeys.length > 0 && (
+                <div className="space-y-1.5">
+                  {hotkeys.map((entry) => (
+                    <HotkeyRow key={entry.key} entry={entry} />
+                  ))}
+                </div>
+              )}
+              {hoverHotkeys.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+                    When Hovering a Card
+                  </h3>
+                  <div className="space-y-1.5">
+                    {hoverHotkeys.map((entry) => (
+                      <HotkeyRow key={entry.key} entry={entry} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        }
+        if (!segment) return null
+        return (
+          <Markdown key={i} remarkPlugins={[remarkGfm]} components={components}>
+            {segment}
+          </Markdown>
+        )
+      })}
     </div>
   )
 }
