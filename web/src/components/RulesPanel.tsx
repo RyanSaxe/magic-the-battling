@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { DOCS, type DocEntry } from '../docs'
 import { DocRenderer } from './DocRenderer'
-import { PHASE_HOTKEYS, type HotkeyEntry } from '../constants/hotkeys'
+import { PHASE_HOTKEYS } from '../constants/hotkeys'
+import { HotkeyRow } from './HotkeyRow'
 import { getGameCards, type GameCardsResponse } from '../api/client'
 import { CardPreviewModal } from './card/CardPreviewModal'
 import type { Card } from '../types'
@@ -27,27 +28,6 @@ function groupedDocs() {
       (a, b) => (a.parsed.meta.order ?? 99) - (b.parsed.meta.order ?? 99),
     ),
   }))
-}
-
-function HotkeyRow({ entry, indent }: { entry: HotkeyEntry; indent?: boolean }) {
-  return (
-    <>
-      <div className={`flex items-center gap-3 ${indent ? 'pl-6' : ''}`}>
-        <kbd className="bg-gray-700 text-gray-200 font-mono text-xs px-2 py-0.5 rounded border border-gray-600 min-w-[2rem] text-center shrink-0">
-          {indent ? `→ ${entry.key}` : entry.key}
-        </kbd>
-        <span className="text-sm text-gray-300">{entry.description}</span>
-      </div>
-      {entry.subActions?.map((sub) => (
-        <div key={sub.key} className="flex items-center gap-3 pl-6">
-          <kbd className="bg-gray-700 text-gray-200 font-mono text-xs px-2 py-0.5 rounded border border-gray-600 min-w-[2rem] text-center shrink-0">
-            → {sub.key}
-          </kbd>
-          <span className="text-sm text-gray-400">{sub.description}</span>
-        </div>
-      ))}
-    </>
-  )
 }
 
 function ControlsTab({ phase }: { phase: string }) {
