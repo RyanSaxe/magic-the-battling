@@ -53,7 +53,7 @@ export function ZoneModal({
   if (allowInteraction) {
     return (
       <DndPanel
-        title={`${title} (${cards.length})`}
+        title={title}
         count={cards.length}
         onClose={handleClose}
       >

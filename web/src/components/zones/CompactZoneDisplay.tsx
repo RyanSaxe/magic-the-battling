@@ -103,7 +103,7 @@ export function CompactZoneDisplay({
 
       {showModal && (
         <ZoneModal
-          title={`${title} (${cards.length})`}
+          title={title}
           zone={zone}
           cards={cards}
           allowInteraction={allowInteraction}
