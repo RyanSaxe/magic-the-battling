@@ -237,7 +237,7 @@ export function BattlePhase({
                       const zIndex = sizes.opponentHandGap < 0
                         ? selectedCard?.card.id === card.id ? count + 1 : count - i
                         : undefined
-                      return <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} selected={selectedCard?.card.id === card.id} onClick={() => handleCardClick(card, 'hand')} onCardHover={onOpponentCardHover} onCardHoverEnd={onCardHoverEnd} style={{ ...(sizes.opponentHandGap < 0 && i > 0 ? { marginLeft: sizes.opponentHandGap } : undefined), ...(zIndex !== undefined ? { zIndex } : undefined) }} />
+                      return <DraggableCard key={card.id} card={card} zone="hand" zoneOwner="opponent" dimensions={sizes.opponentHand} isOpponent upgraded={opponentUpgradedCardIds.has(card.id)} appliedUpgrades={opponentUpgradesByCardId.get(card.id)} canPeekFaceDown={opponent_hand_revealed} selected={selectedCard?.card.id === card.id} onClick={() => handleCardClick(card, 'hand')} onCardHover={onOpponentCardHover} onCardHoverEnd={onCardHoverEnd} style={{ ...(sizes.opponentHandGap < 0 && i > 0 ? { marginLeft: sizes.opponentHandGap } : undefined), ...(zIndex !== undefined ? { zIndex } : undefined) }} />
                     })
                   : Array.from({ length: oppHandCount }).map((_, i) => (
                       <CardBack key={i} dimensions={sizes.opponentHand} style={{ ...(sizes.opponentHandGap < 0 && i > 0 ? { marginLeft: sizes.opponentHandGap } : undefined), ...(sizes.opponentHandGap < 0 ? { zIndex: oppHandCount - i } : undefined) }} />
@@ -270,11 +270,12 @@ export function BattlePhase({
             validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
             onCardHover={onOpponentCardHover}
             onCardHoverEnd={onCardHoverEnd}
+            canPeekFaceDown={opponent_hand_revealed}
           />
         </div>
 
         {/* Opponent's battlefield */}
-        <div className="flex shrink-0 battlefield opacity-80 overflow-hidden" style={{ height: bfHeight }}>
+        <div className="flex shrink-0 battlefield overflow-hidden" style={{ height: bfHeight }}>
           <div className="relative flex-1 min-w-0">
             <BattlefieldZone
               cards={opponent_zones.battlefield}
@@ -298,6 +299,7 @@ export function BattlePhase({
               rowHeight={rowHeight}
               landCardDimensions={sizes.opponentLands}
               nonlandCardDimensions={sizes.opponentNonlands}
+              canPeekFaceDown={opponent_hand_revealed}
             />
           </div>
           <BattlefieldZoneColumn
@@ -308,6 +310,7 @@ export function BattlePhase({
             columnWidth={zoneColumnWidth}
             onCardHover={onOpponentCardHover}
             onCardHoverEnd={onCardHoverEnd}
+            canPeekFaceDown={opponent_hand_revealed}
           />
         </div>
 
