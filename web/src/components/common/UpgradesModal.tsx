@@ -17,7 +17,11 @@ interface UpgradesModalProps {
 }
 
 export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, initialTargetId }: UpgradesModalProps) {
-  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(null)
+  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(() => {
+    if (mode !== 'apply') return null
+    const unapplied = upgrades.filter((u) => !u.upgrade_target)
+    return unapplied.length === 1 ? unapplied[0].id : null
+  })
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(initialTargetId ?? null)
 
   useEffect(() => {
