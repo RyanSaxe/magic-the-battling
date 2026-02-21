@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Card as CardType, ZoneName } from '../../types'
 import { DraggableCard, DroppableZone } from '../../dnd'
 import { Card } from '../card'
+import { DndPanel } from '../common/DndPanel'
 
 interface PileZoneProps {
   zone: 'graveyard' | 'exile'
@@ -50,9 +51,35 @@ export function PileZone({
   }
 
   if (isExpanded) {
+    const zoneName = zone === 'graveyard' ? 'Graveyard' : 'Exile'
+
+    if (draggable && allowInteraction) {
+      return (
+        <DndPanel
+          title={`${zoneName} (${cards.length})`}
+          count={cards.length}
+          onClose={() => setIsExpanded(false)}
+        >
+          {(dims) =>
+            cards.map((card) => (
+              <DraggableCard
+                key={card.id}
+                card={card}
+                zone={zone}
+                zoneOwner={zoneOwner}
+                dimensions={dims}
+                selected={card.id === selectedCardId}
+                onClick={() => onCardClick?.(card)}
+              />
+            ))
+          }
+        </DndPanel>
+      )
+    }
+
     return (
       <div
-        className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-8"
+        className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-8"
         onClick={() => setIsExpanded(false)}
       >
         <div
@@ -61,7 +88,7 @@ export function PileZone({
         >
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-white font-medium">
-              {zone === 'graveyard' ? 'Graveyard' : 'Exile'} ({cards.length})
+              {zoneName} ({cards.length})
             </h3>
             <button
               onClick={() => setIsExpanded(false)}
@@ -72,25 +99,13 @@ export function PileZone({
           </div>
           <div className="flex flex-wrap gap-1.5">
             {cards.map((card) => (
-              draggable && allowInteraction ? (
-                <DraggableCard
-                  key={card.id}
-                  card={card}
-                  zone={zone}
-                  zoneOwner={zoneOwner}
-                  size="sm"
-                  selected={card.id === selectedCardId}
-                  onClick={() => onCardClick?.(card)}
-                />
-              ) : (
-                <Card
-                  key={card.id}
-                  card={card}
-                  size="sm"
-                  selected={card.id === selectedCardId}
-                  onClick={() => onCardClick?.(card)}
-                />
-              )
+              <Card
+                key={card.id}
+                card={card}
+                size="sm"
+                selected={card.id === selectedCardId}
+                onClick={() => onCardClick?.(card)}
+              />
             ))}
           </div>
         </div>

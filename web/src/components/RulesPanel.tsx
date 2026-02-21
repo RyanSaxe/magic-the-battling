@@ -527,11 +527,11 @@ export function RulesPanel({ onClose, initialDocId, initialTab, gameId, useUpgra
 
   return (
     <div
-      className="fixed inset-0 bg-black/85 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 sm:p-8"
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 rounded-lg w-full max-w-4xl h-[calc(100dvh-2rem)] sm:h-auto sm:max-h-[85vh] flex flex-col overflow-hidden"
+        className="bg-gray-900 rounded-lg w-full h-[calc(100dvh-2rem)] sm:h-[calc(100dvh-4rem)] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-2.5 border-b border-gray-700/50 flex justify-between items-center shrink-0">

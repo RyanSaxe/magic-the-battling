@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Card as CardType, ZoneName } from '../../types'
 import { Card } from '../card'
 import { DraggableCard, DroppableZone } from '../../dnd'
+import { DndPanel } from '../common/DndPanel'
 
 type CardSize = 'xs' | 'sm'
 
@@ -49,9 +50,25 @@ export function ZoneModal({
     onClose()
   }
 
+  if (allowInteraction) {
+    return (
+      <DndPanel
+        title={`${title} (${cards.length})`}
+        count={cards.length}
+        onClose={handleClose}
+      >
+        {(dims) =>
+          cards.map((card) => (
+            <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} dimensions={dims} isOpponent={isOpponent} onCardHover={onCardHover} onCardHoverEnd={onCardHoverEnd} />
+          ))
+        }
+      </DndPanel>
+    )
+  }
+
   return (
     <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
       onClick={handleClose}
     >
       <div
@@ -71,13 +88,9 @@ export function ZoneModal({
           <div className="text-gray-500 text-center py-4">No cards</div>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {cards.map((card) =>
-              allowInteraction ? (
-                <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} size="sm" isOpponent={isOpponent} onCardHover={onCardHover} onCardHoverEnd={onCardHoverEnd} />
-              ) : (
-                <Card key={card.id} card={card} size="sm" />
-              )
-            )}
+            {cards.map((card) => (
+              <Card key={card.id} card={card} size="sm" />
+            ))}
           </div>
         )}
       </div>

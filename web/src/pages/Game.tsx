@@ -25,6 +25,7 @@ import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
 import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { UpgradesModal } from "../components/common/UpgradesModal";
+import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
 import { useHotkeys } from "../hooks/useHotkeys";
 
@@ -318,8 +319,8 @@ function SpectateRequestModal({
   onRespond: (requestId: string, allowed: boolean) => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 max-w-sm">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-sm mx-4">
         <h2 className="text-xl text-white mb-4">Spectate Request</h2>
         <p className="text-gray-300 mb-6">
           <strong>{spectatorName}</strong> wants to watch your game.
@@ -1024,69 +1025,39 @@ function GameContent() {
               )}
             </div>
             {showSidebarSideboard && current_battle && (
-              <div
-                className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-                onClick={() => setShowSidebarSideboard(false)}
+              <DndPanel
+                title={`Your Sideboard (${current_battle.your_zones.sideboard.length})`}
+                count={current_battle.your_zones.sideboard.length}
+                onClose={() => setShowSidebarSideboard(false)}
               >
-                <div
-                  className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-white font-medium">
-                      Your Sideboard ({current_battle.your_zones.sideboard.length})
-                    </h3>
-                    <button
-                      onClick={() => setShowSidebarSideboard(false)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {current_battle.your_zones.sideboard.map((card) => (
-                      <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
-                    ))}
-                  </div>
-                </div>
-              </div>
+                {(dims) =>
+                  current_battle.your_zones.sideboard.map((card) => (
+                    <DraggableCard key={card.id} card={card} zone="sideboard" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
+                  ))
+                }
+              </DndPanel>
             )}
             {showOpponentSideboard && current_battle && current_battle.opponent_full_sideboard && (
-              <div
-                className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-                onClick={() => setShowOpponentSideboard(false)}
+              <DndPanel
+                title={`${current_battle.opponent_name}'s Sideboard (${current_battle.opponent_full_sideboard.length})`}
+                count={current_battle.opponent_full_sideboard.length}
+                onClose={() => setShowOpponentSideboard(false)}
               >
-                <div
-                  className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-white font-medium">
-                      {current_battle.opponent_name}'s Full Sideboard ({current_battle.opponent_full_sideboard.length})
-                    </h3>
-                    <button
-                      onClick={() => setShowOpponentSideboard(false)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {current_battle.opponent_full_sideboard.map((card) => (
-                      <DraggableCard
-                        key={card.id}
-                        card={card}
-                        zone="sideboard"
-                        zoneOwner="opponent"
-                        size="sm"
-                        isOpponent
-                        onCardHover={handleOpponentCardHover}
-                        onCardHoverEnd={handleCardHoverEnd}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
+                {(dims) =>
+                  current_battle.opponent_full_sideboard!.map((card) => (
+                    <DraggableCard
+                      key={card.id}
+                      card={card}
+                      zone="sideboard"
+                      zoneOwner="opponent"
+                      dimensions={dims}
+                      isOpponent
+                      onCardHover={handleOpponentCardHover}
+                      onCardHoverEnd={handleCardHoverEnd}
+                    />
+                  ))
+                }
+              </DndPanel>
             )}
           </GameDndProvider>
         ) : (
@@ -1210,8 +1181,8 @@ function GameContent() {
           onMove={(cardId, fromZone, toZone, fromOwner, toOwner) => actions.battleMove(cardId, fromZone, toZone, fromOwner, toOwner)}
           onUntapAll={handleUntapAll}
           onUntapOpponentAll={handleUntapOpponentAll}
-          onShowSideboard={() => { setShowSidebarSideboard(true); setActionMenuOpen(false); }}
-          onShowOpponentSideboard={() => { setShowOpponentSideboard(true); setActionMenuOpen(false); }}
+          onShowSideboard={() => { setShowSidebarSideboard(true); setShowOpponentSideboard(false); setActionMenuOpen(false); }}
+          onShowOpponentSideboard={() => { setShowOpponentSideboard(true); setShowSidebarSideboard(false); setActionMenuOpen(false); }}
           onCreateTreasure={handleCreateTreasure}
           onPassTurn={handlePassTurn}
           onClose={() => setActionMenuOpen(false)}
