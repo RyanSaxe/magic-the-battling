@@ -19,6 +19,9 @@ export function bestFit(
     return { width: maxWidth, height: Math.round(maxWidth * CARD_ASPECT_RATIO), rows: 1, columns: 1 }
   }
 
+  let bestScore = -1
+  let bestResult: ZoneDims | null = null
+
   for (let rows = 1; rows <= count; rows++) {
     const cardsPerRow = Math.ceil(count / rows)
     const hGaps = gap * Math.max(0, cardsPerRow - 1)
@@ -26,14 +29,28 @@ export function bestFit(
 
     if (naturalWidth < minWidth) continue
 
-    const cardWidth = Math.floor(Math.min(maxWidth, naturalWidth))
-    const cardHeight = Math.round(cardWidth * CARD_ASPECT_RATIO)
-    const totalHeight = rows * cardHeight + gap * (rows - 1)
+    let cardWidth = Math.floor(Math.min(maxWidth, naturalWidth))
+    let cardHeight = Math.round(cardWidth * CARD_ASPECT_RATIO)
+    let totalHeight = rows * cardHeight + gap * (rows - 1)
 
-    if (totalHeight <= availHeight) {
-      return { width: cardWidth, height: cardHeight, rows, columns: cardsPerRow }
+    if (totalHeight > availHeight) {
+      const vGaps = gap * (rows - 1)
+      const maxWidthFromHeight = Math.floor((availHeight - vGaps) / (rows * CARD_ASPECT_RATIO))
+      if (maxWidthFromHeight < minWidth) continue
+      cardWidth = maxWidthFromHeight
+      cardHeight = Math.round(cardWidth * CARD_ASPECT_RATIO)
+      totalHeight = rows * cardHeight + vGaps
+    }
+
+    const fill = Math.min(1, totalHeight / availHeight)
+    const score = cardWidth * Math.sqrt(fill)
+    if (score > bestScore) {
+      bestScore = score
+      bestResult = { width: cardWidth, height: cardHeight, rows, columns: cardsPerRow }
     }
   }
+
+  if (bestResult) return bestResult
 
   return { width: minWidth, height: Math.round(minWidth * CARD_ASPECT_RATIO), rows: 1, columns: count }
 }
