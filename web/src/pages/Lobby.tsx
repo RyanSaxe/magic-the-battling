@@ -280,7 +280,7 @@ export function Lobby() {
                     <div className="mt-2 px-1">
                       <button
                         onClick={() => setShowPuppetExplainer((v) => !v)}
-                        className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
+                        className={`${availablePuppets === null ? 'text-amber-400' : hasEnoughBots ? 'text-cyan-500' : 'text-red-400/70'} hover:text-gray-300 text-xs transition-colors`}
                       >
                         {showPuppetExplainer ? "▾" : "▸"} What are puppets?
                       </button>
