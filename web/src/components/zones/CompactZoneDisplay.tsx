@@ -18,6 +18,7 @@ interface CompactZoneDisplayProps {
   validFromZones: ZoneName[]
   onCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
+  canPeekFaceDown?: boolean
 }
 
 export function CompactZoneDisplay({
@@ -31,6 +32,7 @@ export function CompactZoneDisplay({
   validFromZones,
   onCardHover,
   onCardHoverEnd,
+  canPeekFaceDown,
 }: CompactZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -73,7 +75,7 @@ export function CompactZoneDisplay({
           }`}
           style={{ width, height }}
         >
-          {isOpponent && label}
+          {!isOpponent && label}
           <div className="flex-1 flex items-center justify-center min-h-0 relative">
             {nextCard && (
               <img
@@ -94,10 +96,11 @@ export function CompactZoneDisplay({
                 isOpponent={isOpponent}
                 onCardHover={allowInteraction ? onCardHover : undefined}
                 onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
+                canPeekFaceDown={canPeekFaceDown}
               />
             )}
           </div>
-          {!isOpponent && label}
+          {isOpponent && label}
         </div>
       </DroppableZone>
 
