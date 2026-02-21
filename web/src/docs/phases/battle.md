@@ -20,15 +20,15 @@ The battle phase is where you play a quick mini-game of magic with a few modifie
 ### Before the Battle Starts
 
 - All basic lands selected during the build phase start on the battlefield untapped.
-- All treasures a player has at the beginning of the battle phase will start on their battlefield.
-- All poison counters a player has is attached to them during the battle.
-- The player with the most poison counters gets their choice of play/draw. If players are tied, the choosing player is selected randomly.
+- All [treasures](doc:treasures) a player has at the beginning of the battle phase will start on their battlefield.
+- All [poison counters](doc:poison) a player has is attached to them during the battle.
+- The player with the most [poison counters](doc:poison) gets their choice of play/draw. If players are tied, the choosing player is selected randomly.
 - Each player's starting hand and sideboard become exactly what was selected during the build phase.
 
 ### After the Battle Ends
 
-- The losing player(s) get N poison counters, where N is 1 + the number of upgrades their opponent has applied. If you are not playing with upgrades, N is Fibonacci(stage - 2).
-- Each player keeps up to 5 treasures that are still on their battlefield and discards the rest.
+- The losing player(s) get N [poison counters](doc:poison), where N is 1 + the number of [upgrades](doc:upgrades) their opponent has applied. If you are not playing with upgrades, N is Fibonacci(stage - 2).
+- Each player keeps up to 5 [treasures](doc:treasures) that are still on their battlefield and discards the rest.
 
 ## Controls
 
