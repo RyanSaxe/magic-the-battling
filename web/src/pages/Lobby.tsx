@@ -50,12 +50,22 @@ export function Lobby() {
     }
   }, [gameState, gameId, navigate]);
 
-  const copyJoinCode = () => {
-    if (lobbyState?.join_code) {
-      navigator.clipboard.writeText(lobbyState.join_code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  const copyJoinCode = async () => {
+    if (!lobbyState?.join_code) return;
+    try {
+      await navigator.clipboard.writeText(lobbyState.join_code);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = lobbyState.join_code;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
     }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleRejoin = async () => {
