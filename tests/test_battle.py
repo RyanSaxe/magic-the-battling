@@ -743,6 +743,22 @@ class TestOpponentZoneManipulation:
         assert zones == b.opponent_zones
         assert is_opponent
 
+    def test_get_zones_for_card_finds_opponent_card_vs_player(self, card_factory):
+        """get_zones_for_card finds card in opponent zones when opponent is a Player (PvP)."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        opp_card = card_factory("OppCard")
+        bob.hand = [opp_card]
+
+        b = battle.start(game, alice, bob)
+
+        zones, is_opponent = battle.get_zones_for_card(b, alice, opp_card.id)
+        assert zones == b.opponent_zones
+        assert is_opponent
+
     def test_get_zones_for_card_raises_if_not_found(self, card_factory):
         """get_zones_for_card raises ValueError if card not in any zones."""
         game = create_game(["Alice", "Bob"], num_players=2)
@@ -845,8 +861,8 @@ class TestOpponentZoneManipulation:
         assert island not in b.opponent_zones.battlefield
         assert island in b.opponent_zones.graveyard
 
-    def test_update_card_state_does_not_work_on_pvp_opponent(self, card_factory):
-        """update_card_state cannot modify opponent's cards in PvP battle."""
+    def test_update_card_state_works_on_pvp_opponent(self, card_factory):
+        """update_card_state can modify opponent's cards in PvP battle."""
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         setup_battle_ready(alice)
@@ -857,10 +873,9 @@ class TestOpponentZoneManipulation:
 
         b = battle.start(game, alice, bob)
 
-        # Alice tries to tap Bob's card - should fail
         result = battle.update_card_state(b, alice, "tap", opp_card.id)
-        assert not result
-        assert opp_card.id not in b.opponent_zones.tapped_card_ids
+        assert result
+        assert opp_card.id in b.opponent_zones.tapped_card_ids
 
 
 def test_companion_filtered_from_sideboard_in_battle(card_factory):

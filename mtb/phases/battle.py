@@ -656,7 +656,7 @@ _SEARCHABLE_ZONES: list[ZoneName] = ["battlefield", "hand", "graveyard", "exile"
 def get_zones_for_card(battle: Battle, player: Player, card_id: str) -> tuple[Zones, bool]:
     """Find zones containing card. Returns (zones, is_opponent_zones).
 
-    Searches player's zones first, then opponent zones if opponent is StaticOpponent.
+    Searches player's zones first, then opponent zones.
     Raises ValueError if card not found.
     """
     player_zones = get_zones_for_player(battle, player)
@@ -669,13 +669,12 @@ def get_zones_for_card(battle: Battle, player: Player, card_id: str) -> tuple[Zo
     if any(c.id == card_id for c in player_zones.spawned_tokens):
         return player_zones, False
 
-    if isinstance(battle.opponent, StaticOpponent):
-        opp_zones = battle.opponent_zones if player.name == battle.player.name else battle.player_zones
-        for zone_name in _SEARCHABLE_ZONES:
-            if any(c.id == card_id for c in opp_zones.get_zone(zone_name)):
-                return opp_zones, True
-        if any(c.id == card_id for c in opp_zones.spawned_tokens):
+    opp_zones = battle.opponent_zones if player.name == battle.player.name else battle.player_zones
+    for zone_name in _SEARCHABLE_ZONES:
+        if any(c.id == card_id for c in opp_zones.get_zone(zone_name)):
             return opp_zones, True
+    if any(c.id == card_id for c in opp_zones.spawned_tokens):
+        return opp_zones, True
 
     raise ValueError(f"Card {card_id} not found")
 
