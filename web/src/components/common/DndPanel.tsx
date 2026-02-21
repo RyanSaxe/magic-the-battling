@@ -75,7 +75,7 @@ export function DndPanel({ title, count, onClose, children }: DndPanelProps) {
       className={`fixed top-0 left-0 right-0 sm:left-auto sm:!max-h-none sm:!h-full sm:w-64 bg-gray-900 border-b sm:border-b-0 sm:border-l border-gray-700 z-50 flex flex-col${mobileHeight == null ? ' max-h-[50vh]' : ''}`}
       style={mobileHeight != null ? { height: mobileHeight } : undefined}
     >
-      <div className="px-3 py-2 border-b border-gray-700/50 flex justify-between items-center shrink-0">
+      <div className="px-1.5 py-1.5 sm:py-2 border-b border-gray-700/50 flex justify-between items-center shrink-0">
         <h3 className="text-white font-medium text-sm">{title}</h3>
         <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">
           &times;
