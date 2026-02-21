@@ -221,7 +221,7 @@ export function BattlePhase({
         )}
 
         {/* Opponent's hand */}
-        <div className="flex shrink-0 overflow-hidden" style={{ height: handHeight, background: 'rgba(34, 84, 61, 0.4)' }}>
+        <div id="opponent-hand" className="flex shrink-0 overflow-hidden" style={{ height: handHeight, background: 'rgba(34, 84, 61, 0.4)' }}>
           <div className="relative flex-1 min-w-0 px-2">
             {canManipulateOpponent ? (
               <DroppableZone
