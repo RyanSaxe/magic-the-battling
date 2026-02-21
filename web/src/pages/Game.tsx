@@ -382,8 +382,8 @@ function GameContent() {
   const [battleSelectedCard, setBattleSelectedCard] = useState<BattleSelectedCard | null>(null);
   const [isChangingResult, setIsChangingResult] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
-  const [showSidebarSideboard, setShowSidebarSideboard] = useState(false);
-  const [showOpponentSideboard, setShowOpponentSideboard] = useState(false);
+  type ActiveDndPanel = 'sideboard' | 'opponentSideboard' | 'graveyard' | 'exile' | null;
+  const [activeDndPanel, setActiveDndPanel] = useState<ActiveDndPanel>(null);
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
 
@@ -569,6 +569,15 @@ function GameContent() {
           };
           map['p'] = () => actions.battlePassTurn();
           map['t'] = () => actions.battleUpdateCardState("create_treasure", "", {});
+          map['g'] = () => {
+            if (cb.your_zones.graveyard.length > 0) setActiveDndPanel(activeDndPanel === 'graveyard' ? null : 'graveyard');
+          };
+          map['e'] = () => {
+            if (cb.your_zones.exile.length > 0) setActiveDndPanel(activeDndPanel === 'exile' ? null : 'exile');
+          };
+          map['s'] = () => {
+            if (cb.your_zones.sideboard.length > 0) setActiveDndPanel(activeDndPanel === 'sideboard' ? null : 'sideboard');
+          };
         }
         map['Enter'] = () => {
           const mySubmission = cb.result_submissions[sp.name];
@@ -1024,11 +1033,11 @@ function GameContent() {
                 />
               )}
             </div>
-            {showSidebarSideboard && current_battle && (
+            {activeDndPanel === 'sideboard' && current_battle && (
               <DndPanel
-                title={`Your Sideboard (${current_battle.your_zones.sideboard.length})`}
+                title="Your Sideboard"
                 count={current_battle.your_zones.sideboard.length}
-                onClose={() => setShowSidebarSideboard(false)}
+                onClose={() => setActiveDndPanel(null)}
               >
                 {(dims) =>
                   current_battle.your_zones.sideboard.map((card) => (
@@ -1037,11 +1046,11 @@ function GameContent() {
                 }
               </DndPanel>
             )}
-            {showOpponentSideboard && current_battle && current_battle.opponent_full_sideboard && (
+            {activeDndPanel === 'opponentSideboard' && current_battle && current_battle.opponent_full_sideboard && (
               <DndPanel
-                title={`${current_battle.opponent_name}'s Sideboard (${current_battle.opponent_full_sideboard.length})`}
+                title={`${current_battle.opponent_name}'s Sideboard`}
                 count={current_battle.opponent_full_sideboard.length}
-                onClose={() => setShowOpponentSideboard(false)}
+                onClose={() => setActiveDndPanel(null)}
               >
                 {(dims) =>
                   current_battle.opponent_full_sideboard!.map((card) => (
@@ -1055,6 +1064,32 @@ function GameContent() {
                       onCardHover={handleOpponentCardHover}
                       onCardHoverEnd={handleCardHoverEnd}
                     />
+                  ))
+                }
+              </DndPanel>
+            )}
+            {activeDndPanel === 'graveyard' && current_battle && (
+              <DndPanel
+                title="Graveyard"
+                count={current_battle.your_zones.graveyard.length}
+                onClose={() => setActiveDndPanel(null)}
+              >
+                {(dims) =>
+                  current_battle.your_zones.graveyard.map((card) => (
+                    <DraggableCard key={card.id} card={card} zone="graveyard" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
+                  ))
+                }
+              </DndPanel>
+            )}
+            {activeDndPanel === 'exile' && current_battle && (
+              <DndPanel
+                title="Exile"
+                count={current_battle.your_zones.exile.length}
+                onClose={() => setActiveDndPanel(null)}
+              >
+                {(dims) =>
+                  current_battle.your_zones.exile.map((card) => (
+                    <DraggableCard key={card.id} card={card} zone="exile" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
                   ))
                 }
               </DndPanel>
@@ -1181,8 +1216,8 @@ function GameContent() {
           onMove={(cardId, fromZone, toZone, fromOwner, toOwner) => actions.battleMove(cardId, fromZone, toZone, fromOwner, toOwner)}
           onUntapAll={handleUntapAll}
           onUntapOpponentAll={handleUntapOpponentAll}
-          onShowSideboard={() => { setShowSidebarSideboard(true); setShowOpponentSideboard(false); setActionMenuOpen(false); }}
-          onShowOpponentSideboard={() => { setShowOpponentSideboard(true); setShowSidebarSideboard(false); setActionMenuOpen(false); }}
+          onShowSideboard={() => { setActiveDndPanel('sideboard'); setActionMenuOpen(false); }}
+          onShowOpponentSideboard={() => { setActiveDndPanel('opponentSideboard'); setActionMenuOpen(false); }}
           onCreateTreasure={handleCreateTreasure}
           onPassTurn={handlePassTurn}
           onClose={() => setActionMenuOpen(false)}
