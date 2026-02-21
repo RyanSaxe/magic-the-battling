@@ -272,15 +272,16 @@ export function Lobby() {
                     availablePuppets !== null &&
                     availablePuppets < botSlots && (
                       <p className="text-gray-500 text-xs mt-1.5 px-1">
-                        Puppets are past players with matching settings. Invite
-                        more players or try different game options.
+                        Not enough games have been played with cubes like this
+                        one at these settings to play with this many puppets.
+                        Invite human players to join.
                       </p>
                     )}
                   {botSlots > 0 && (
                     <div className="mt-2 px-1">
                       <button
                         onClick={() => setShowPuppetExplainer((v) => !v)}
-                        className={`${availablePuppets === null ? 'text-amber-400' : hasEnoughBots ? 'text-cyan-500' : 'text-red-400/70'} hover:text-gray-300 text-xs transition-colors`}
+                        className={`${availablePuppets === null ? "text-amber-400" : hasEnoughBots ? "text-cyan-500" : "text-red-400/70"} hover:text-gray-300 text-xs transition-colors`}
                       >
                         {showPuppetExplainer ? "▾" : "▸"} What are puppets?
                       </button>
