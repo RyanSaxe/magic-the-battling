@@ -18,6 +18,7 @@ interface DraggableCardProps {
   dimensions?: { width: number; height: number }
   tapped?: boolean
   faceDown?: boolean
+  flipped?: boolean
   counters?: Record<string, number>
   glow?: 'none' | 'gold' | 'green' | 'red'
   disabled?: boolean
@@ -43,6 +44,7 @@ export function DraggableCard({
   dimensions,
   tapped,
   faceDown,
+  flipped,
   counters,
   glow,
   disabled = false,
@@ -93,6 +95,7 @@ export function DraggableCard({
         dimensions={dimensions}
         tapped={tapped}
         faceDown={faceDown}
+        flipped={flipped}
         counters={counters}
         glow={glow}
         dragging={isDragging}

@@ -118,12 +118,10 @@ export function ActionMenu({
               />
             )}
 
-            {onBattlefield && (
-              <MenuItem
-                label={isFaceDown ? 'Turn Face Up' : 'Turn Face Down'}
-                onClick={() => handleAction('face_down')}
-              />
-            )}
+            <MenuItem
+              label={isFaceDown ? 'Turn Face Up' : 'Turn Face Down'}
+              onClick={() => handleAction('face_down')}
+            />
 
             <MenuDivider />
 

@@ -12,6 +12,7 @@ interface CardProps {
   dimensions?: { width: number; height: number }
   tapped?: boolean
   faceDown?: boolean
+  flipped?: boolean
   counters?: Record<string, number>
   glow?: 'none' | 'gold' | 'green' | 'red'
   dragging?: boolean
@@ -49,6 +50,7 @@ export function Card({
   dimensions,
   tapped = false,
   faceDown = false,
+  flipped = false,
   counters,
   glow = 'none',
   dragging = false,
@@ -84,12 +86,13 @@ export function Card({
     return () => window.removeEventListener('keydown', handler)
   }, [isHovered, previewContext, card, appliedUpgrades, faceDown, canPeekFaceDown])
 
+  const effectiveFlip = flipped !== showFlip
   const normalUrl = faceDown
     ? CARD_BACK_IMAGE
-    : (showFlip && card.flip_image_url ? card.flip_image_url : card.image_url)
+    : (effectiveFlip && card.flip_image_url ? card.flip_image_url : card.image_url)
   const pngUrl = faceDown
     ? null
-    : (showFlip && card.flip_png_url ? card.flip_png_url : card.png_url)
+    : (effectiveFlip && card.flip_png_url ? card.flip_png_url : card.png_url)
   const imageUrl = isHovered && pngUrl ? pngUrl : normalUrl
 
   const dims = dimensions ?? sizeStyles[size]

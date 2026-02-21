@@ -22,6 +22,7 @@ interface BattlefieldZoneProps {
   onCardHoverEnd?: () => void;
   tappedCardIds?: Set<string>;
   faceDownCardIds?: Set<string>;
+  flippedCardIds?: Set<string>;
   counters?: Record<string, Record<string, number>>;
   attachments?: Record<string, string[]>;
   validFromZones?: ZoneName[];
@@ -50,6 +51,7 @@ export function BattlefieldZone({
   onCardHoverEnd,
   tappedCardIds = new Set(),
   faceDownCardIds = new Set(),
+  flippedCardIds = new Set(),
   counters = {},
   attachments = {},
   validFromZones = ["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone"],
@@ -130,6 +132,7 @@ export function BattlefieldZone({
           selected={card.id === selectedCardId}
           tapped={tappedCardIds.has(card.id)}
           faceDown={faceDownCardIds.has(card.id)}
+          flipped={flippedCardIds.has(card.id)}
           counters={counters[card.id]}
           onClick={() => onCardClick?.(card)}
           onDoubleClick={() => onCardDoubleClick?.(card)}
