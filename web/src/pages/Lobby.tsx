@@ -5,14 +5,18 @@ import { useGame } from "../hooks/useGame";
 import { rejoinGame } from "../api/client";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { RulesPanel } from "../components/RulesPanel";
+import { useToast } from "../contexts";
 
 export function Lobby() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   const { session, saveSession } = useSession();
-  const { lobbyState, gameState, isConnected, actions, error } = useGame(
+  const { addToast } = useToast();
+  const { lobbyState, gameState, isConnected, actions } = useGame(
     gameId ?? null,
     session?.sessionId ?? null,
+    null,
+    addToast,
   );
 
   const [rejoinName, setRejoinName] = useState("");
@@ -155,12 +159,6 @@ export function Lobby() {
         {!isConnected && (
           <div className="bg-amber-900/50 text-amber-200 p-3 rounded mb-4">
             Connecting...
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
-            {error}
           </div>
         )}
 
