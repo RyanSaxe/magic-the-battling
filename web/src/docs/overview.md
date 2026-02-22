@@ -11,6 +11,8 @@ The way the format works, like an autobattler, is players alternate between [dra
 
 The set of cards you draft from is called a "battler". [Click here to view the cards in the battler you are currently playing](docs:__cards__).
 
+If you have questions about the game, feedback you want to give, ideas you want to share, or even just a community to play with: [join the discord!](https://discord.gg/2NAjcWXNKn)
+
 ## Vision
 
 While this is an online game, the most important aspect of the design is that it can be played in person with your own curated collection of Magic cards. This should be a game that you could play for cube night, just like a novelty cube.
