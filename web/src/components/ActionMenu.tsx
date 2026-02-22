@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
+import { useFaceDown } from '../contexts/faceDownState'
 import type { BattleSelectedCard } from '../pages/phases/Battle'
 
 interface ActionMenuProps {
@@ -77,14 +78,14 @@ export function ActionMenu({
   const card = selectedCard?.card
   const zone = selectedCard?.zone
   const onBattlefield = zone === 'battlefield'
+  const isFaceDown = useFaceDown(card?.id ?? '')
+  const isScrubbed = !card?.name
 
   const tappedCardIds = new Set(battle.your_zones.tapped_card_ids || [])
-  const faceDownCardIds = new Set(battle.your_zones.face_down_card_ids || [])
   const counters = card ? (battle.your_zones.counters?.[card.id] || {}) : {}
   const attachments = battle.your_zones.attachments || {}
 
   const isTapped = card ? tappedCardIds.has(card.id) : false
-  const isFaceDown = card ? faceDownCardIds.has(card.id) : false
   const hasFlip = !!card?.flip_image_url
   const hasTokens = (card?.tokens?.length ?? 0) > 0
   const hasCounters = Object.keys(counters).length > 0
@@ -111,17 +112,19 @@ export function ActionMenu({
               />
             )}
 
-            {hasFlip && (
+            {hasFlip && !isScrubbed && (
               <MenuItem
                 label="Flip"
                 onClick={() => handleAction('flip')}
               />
             )}
 
-            <MenuItem
-              label={isFaceDown ? 'Turn Face Up' : 'Turn Face Down'}
-              onClick={() => handleAction('face_down')}
-            />
+            {!isScrubbed && (
+              <MenuItem
+                label={isFaceDown ? 'Turn Face Up' : 'Turn Face Down'}
+                onClick={() => handleAction('face_down')}
+              />
+            )}
 
             <MenuDivider />
 

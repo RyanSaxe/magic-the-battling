@@ -131,7 +131,7 @@ export function BattlefieldZone({
           counters={counters[card.id]}
           onClick={() => onCardClick?.(card)}
           onDoubleClick={() => onCardDoubleClick?.(card)}
-          disabled={!draggable || !allowInteraction}
+          disabled={!draggable || !allowInteraction || !card.name}
           isOpponent={isOpponent}
           upgraded={upgradedCardIds.has(card.id)}
           appliedUpgrades={upgradesByCardId?.get(card.id)}
