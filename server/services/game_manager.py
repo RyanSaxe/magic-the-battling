@@ -1148,7 +1148,10 @@ class GameManager:
             scrubbed_tapped_ids = _remap_id_list(opponent_zones.tapped_card_ids, reverse_map)
             scrubbed_flipped_ids = _remap_id_list(opponent_zones.flipped_card_ids, reverse_map)
             scrubbed_counters = _remap_id_dict(opponent_zones.counters, reverse_map)
-            scrubbed_attachments = _remap_id_dict(opponent_zones.attachments, reverse_map)
+            scrubbed_attachments = {
+                reverse_map.get(k, k): [reverse_map.get(v, v) for v in vs]
+                for k, vs in opponent_zones.attachments.items()
+            }
             b._face_down_id_map = id_map
         else:
             scrubbed_bf = opponent_zones.battlefield
