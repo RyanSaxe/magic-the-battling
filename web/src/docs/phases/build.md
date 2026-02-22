@@ -8,8 +8,9 @@ order: 2
 
 The build phase is where you decide the best starting hand you can build from your pool, which you will use in the next [battle phase](doc:battle). Remember, your basic lands and treasures start untapped on the battlefield.
 
-> [!HINT]
-> Look at the "Opponents" sidebar tab. This will show you not just which your next opponent might be, but their most recently revealed cards, their [upgrades](doc:upgrades), and the probability of facing them!
+:::tip
+Look at the "Opponents" sidebar tab. This will show you not just which your next opponent might be, but their most recently revealed cards, their [upgrades](doc:upgrades), and the probability of facing them!
+:::
 
 ## Rules
 

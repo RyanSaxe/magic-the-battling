@@ -1,5 +1,7 @@
 import Markdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkDirective from 'remark-directive'
+import remarkCalloutDirectives from '@microflash/remark-callout-directives'
 import type { Components } from 'react-markdown'
 import { useDocNav } from '../contexts/DocNavContext'
 import { PHASE_HOTKEYS } from '../constants/hotkeys'
@@ -8,6 +10,15 @@ import { HotkeyRow } from './HotkeyRow'
 function urlTransform(url: string) {
   if (url.startsWith('doc:')) return url
   return defaultUrlTransform(url)
+}
+
+const calloutOptions = {
+  callouts: {
+    tip: {
+      title: 'Tip',
+      hint: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg>',
+    },
+  },
 }
 
 const HOTKEY_RE = /\{\{hotkeys:(\w[\w-]*)\}\}/
@@ -111,7 +122,7 @@ export function DocRenderer({ content, className }: DocRendererProps) {
         }
         if (!segment) return null
         return (
-          <Markdown key={i} remarkPlugins={[remarkGfm]} urlTransform={urlTransform} components={components}>
+          <Markdown key={i} remarkPlugins={[remarkGfm, remarkDirective, [remarkCalloutDirectives, calloutOptions]]} urlTransform={urlTransform} components={components}>
             {segment}
           </Markdown>
         )
