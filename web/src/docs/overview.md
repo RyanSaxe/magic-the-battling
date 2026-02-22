@@ -7,7 +7,7 @@ order: 1
 
 > Magic: the Battling is a Magic: the Gathering format inspired by the autobattler game genre.
 
-The way the format works, like an autobattler, is players alternate between [drafting](doc:draft) cards and playing a short game of magic (called a [battle](doc:battle)). After each [battle](doc:battle), the loser gets [poison](doc:poison) counter(s). Then all players [draft](doc:draft) again. This loop continues until only one player remains as the winner.
+The way the format works, like an autobattler, is players alternate between [drafting](doc:draft) cards and playing a short game of magic (called a [battle](doc:battle)). After each [battle](doc:battle), the loser gets [poison](doc:game-pieces#poison) counter(s). Then all players [draft](doc:draft) again. This loop continues until only one player remains as the winner.
 
 The set of cards you draft from is called a "battler". [Click here to view the cards in the battler you are currently playing](docs:__cards__).
 

@@ -24,4 +24,4 @@ Look at the numbers in the top left of the screen (3-1 at game start). This is t
 - Click any two cards to swap them.
 - Click the roll button on the bottom left to discard this pack and see a new one.
 - Click the button on the bottom right to go to the [build phase](doc:build). But be careful, as you cannot go back phases.
-- If you have [upgrades](doc:upgrades), you can click the button on the bottom left to view them.
+- If you have [upgrades](doc:game-pieces#upgrades), you can click the button on the bottom left to view them.

@@ -9,7 +9,7 @@ order: 3
 The battle phase is where you play a quick mini-game of magic with a few modified rules.
 
 :::tip
-Be very mindful of when to use [treasures](doc:treasures) to try and win a game. Remember these are the economic unit of the game, and spending them wisely is what separates good and great players! Especially because, for the final battle, having the most treasures can be a huge advantage that opens doors for drastically different hands.
+Be very mindful of when to use [treasures](doc:game-pieces#treasures) to try and win a game. Remember these are the economic unit of the game, and spending them wisely is what separates good and great players! Especially because, for the final battle, having the most treasures can be a huge advantage that opens doors for drastically different hands.
 :::
 
 ## Rules
@@ -24,15 +24,15 @@ Be very mindful of when to use [treasures](doc:treasures) to try and win a game.
 ### Before the Battle Starts
 
 - All basic lands selected during the build phase start on the battlefield untapped.
-- All [treasures](doc:treasures) a player has at the beginning of the battle phase will start on their battlefield.
-- All [poison counters](doc:poison) a player has is attached to them during the battle.
-- The player with the most [poison counters](doc:poison) gets their choice of play/draw. If players are tied, the choosing player is selected randomly. In the [finals](doc:finals), the loser of the previous game chooses instead.
+- All [treasures](doc:game-pieces#treasures) a player has at the beginning of the battle phase will start on their battlefield.
+- All [poison counters](doc:game-pieces#poison) a player has is attached to them during the battle.
+- The player with the most [poison counters](doc:game-pieces#poison) gets their choice of play/draw. If players are tied, the choosing player is selected randomly. In the [finals](doc:winning-the-game#finals), the loser of the previous game chooses instead.
 - Each player's starting hand and sideboard become exactly what was selected during the build phase.
 
 ### After the Battle Ends
 
-- The losing player(s) get N [poison counters](doc:poison), where N is 1 + the number of [upgrades](doc:upgrades) their opponent has applied. If you are not playing with upgrades, N is Fibonacci(stage - 2).
-- Each player keeps up to 5 [treasures](doc:treasures) that are still on their battlefield and discards the rest.
+- The losing player(s) get N [poison counters](doc:game-pieces#poison), where N is 1 + the number of [upgrades](doc:game-pieces#upgrades) their opponent has applied. If you are not playing with upgrades, N is Fibonacci(stage - 2).
+- Each player keeps up to 5 [treasures](doc:game-pieces#treasures) that are still on their battlefield and discards the rest.
 
 ## Controls
 
