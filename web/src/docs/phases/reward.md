@@ -5,14 +5,21 @@ order: 4
 ---
 
 ## Overview
-Collect rewards after your battle.
+
+You made it to the end of the round. Enjoy your rewards!
+
+:::note
+In the current game rules, there is no difference in rewards for the winner of the battle.
+:::
 
 ## Rules
-- +1 treasure.
-- +1 random card.
-- Every third battle, the random card is replaced with an upgrade.
-- Every third battle, you receive a Vanquisher card (increases your hand size by 1).
+
+- Every player always gets +1 [treasure](doc:treasures).
+- For the first and second round of every stage, every player gets +1 random card from the [battler](doc:__cards__).
+- For the third and final round of every stage, the random card is replaced with a Vanquisher card (increases hand size by 1).
+- For the third and final round of every stage, if you are playing with [upgrades](doc:upgrades), you get to select one to add to your pool.
 
 ## Controls
-- Rewards are applied automatically
-- Continue to start the next draft
+
+- Click the button on the bottom right to go to the [draft phase](doc:draft)
+- If you're playing with [upgrades](doc:upgrades), on the third and final round of the stage, you must select your upgrade to move onto the [draft phase](doc:draft)
