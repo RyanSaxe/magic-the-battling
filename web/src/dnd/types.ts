@@ -19,6 +19,7 @@ export interface DragData {
   fromZone: ZoneName
   fromZoneId: string
   isOpponent?: boolean
+  faceDown?: boolean
 }
 
 export interface DropData {

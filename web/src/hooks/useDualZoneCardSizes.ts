@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useLayoutEffect } from 'react'
-
-const CARD_ASPECT_RATIO = 7 / 5
+import { CARD_ASPECT_RATIO, bestFit, type ZoneDims } from './cardSizeUtils'
 
 interface DualZoneConfig {
   topCount: number
@@ -14,47 +13,9 @@ interface DualZoneConfig {
   minCardWidth?: number
 }
 
-interface ZoneDims {
-  width: number
-  height: number
-  rows: number
-  columns: number
-}
-
 interface DualZoneDims {
   top: ZoneDims
   bottom: ZoneDims
-}
-
-function bestFit(
-  count: number,
-  availWidth: number,
-  availHeight: number,
-  gap: number,
-  maxWidth: number,
-  minWidth: number
-): ZoneDims {
-  if (count === 0) {
-    return { width: maxWidth, height: Math.round(maxWidth * CARD_ASPECT_RATIO), rows: 1, columns: 1 }
-  }
-
-  for (let rows = 1; rows <= count; rows++) {
-    const cardsPerRow = Math.ceil(count / rows)
-    const hGaps = gap * Math.max(0, cardsPerRow - 1)
-    const naturalWidth = (availWidth - hGaps) / cardsPerRow
-
-    if (naturalWidth < minWidth) continue
-
-    const cardWidth = Math.floor(Math.min(maxWidth, naturalWidth))
-    const cardHeight = Math.round(cardWidth * CARD_ASPECT_RATIO)
-    const totalHeight = rows * cardHeight + gap * (rows - 1)
-
-    if (totalHeight <= availHeight) {
-      return { width: cardWidth, height: cardHeight, rows, columns: cardsPerRow }
-    }
-  }
-
-  return { width: minWidth, height: Math.round(minWidth * CARD_ASPECT_RATIO), rows: 1, columns: count }
 }
 
 const DEFAULT_DIMS: ZoneDims = { width: 100, height: 140, rows: 1, columns: 1 }

@@ -17,7 +17,11 @@ interface UpgradesModalProps {
 }
 
 export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, initialTargetId }: UpgradesModalProps) {
-  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(null)
+  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(() => {
+    if (mode !== 'apply') return null
+    const unapplied = upgrades.filter((u) => !u.upgrade_target)
+    return unapplied.length === 1 ? unapplied[0].id : null
+  })
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(initialTargetId ?? null)
 
   useEffect(() => {
@@ -81,11 +85,11 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
 
   return (
     <div
-      className="fixed inset-0 bg-black/85 flex items-center justify-center z-50 p-2"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 sm:p-8"
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 rounded-lg flex flex-col w-full h-full max-w-5xl overflow-hidden relative"
+        className="bg-gray-900 rounded-lg flex flex-col w-full h-[calc(100dvh-2rem)] sm:h-[calc(100dvh-4rem)] overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-3 py-1 shrink-0 border-b border-gray-700/50 flex justify-between items-center">

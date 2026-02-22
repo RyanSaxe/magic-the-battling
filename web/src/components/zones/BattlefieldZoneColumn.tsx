@@ -13,6 +13,7 @@ interface BattlefieldZoneColumnProps {
   columnWidth: number
   onCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
+  canPeekFaceDown?: boolean
 }
 
 export function BattlefieldZoneColumn({
@@ -23,6 +24,7 @@ export function BattlefieldZoneColumn({
   columnWidth,
   onCardHover,
   onCardHoverEnd,
+  canPeekFaceDown,
 }: BattlefieldZoneColumnProps) {
   return (
     <div
@@ -40,6 +42,7 @@ export function BattlefieldZoneColumn({
         validFromZones={VALID_FROM_ZONES}
         onCardHover={onCardHover}
         onCardHoverEnd={onCardHoverEnd}
+        canPeekFaceDown={canPeekFaceDown}
       />
       <CompactZoneDisplay
         title="Exile"
@@ -52,6 +55,7 @@ export function BattlefieldZoneColumn({
         validFromZones={VALID_FROM_ZONES}
         onCardHover={onCardHover}
         onCardHoverEnd={onCardHoverEnd}
+        canPeekFaceDown={canPeekFaceDown}
       />
     </div>
   )

@@ -20,11 +20,13 @@ import { ActionMenu } from "../components/ActionMenu";
 import { PhaseTimeline } from "../components/PhaseTimeline";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { ContextStripProvider, useContextStrip } from "../contexts";
+import { FaceDownProvider } from "../contexts/FaceDownContext";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
 import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { UpgradesModal } from "../components/common/UpgradesModal";
+import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
 import { useHotkeys } from "../hooks/useHotkeys";
 
@@ -318,8 +320,8 @@ function SpectateRequestModal({
   onRespond: (requestId: string, allowed: boolean) => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 max-w-sm">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-sm mx-4">
         <h2 className="text-xl text-white mb-4">Spectate Request</h2>
         <p className="text-gray-300 mb-6">
           <strong>{spectatorName}</strong> wants to watch your game.
@@ -381,8 +383,8 @@ function GameContent() {
   const [battleSelectedCard, setBattleSelectedCard] = useState<BattleSelectedCard | null>(null);
   const [isChangingResult, setIsChangingResult] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
-  const [showSidebarSideboard, setShowSidebarSideboard] = useState(false);
-  const [showOpponentSideboard, setShowOpponentSideboard] = useState(false);
+  type ActiveDndPanel = 'sideboard' | 'opponentSideboard' | 'graveyard' | 'exile' | null;
+  const [activeDndPanel, setActiveDndPanel] = useState<ActiveDndPanel>(null);
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
 
@@ -537,7 +539,21 @@ function GameContent() {
               actions.battleUpdateCardState(tapped ? 'untap' : 'tap', hoveredCard.id);
             }
           };
-          map['f'] = () => actions.battleUpdateCardState('flip', hoveredCard.id);
+          map['f'] = () => {
+            if (hoveredCard.owner === 'opponent' && !cb.can_manipulate_opponent) return;
+            const ownerZones = hoveredCard.owner === 'player' ? cb.your_zones : cb.opponent_zones;
+            const isFaceDown = ownerZones.face_down_card_ids?.includes(hoveredCard.id);
+            if (isFaceDown) {
+              actions.battleUpdateCardState('face_down', hoveredCard.id);
+            } else {
+              const card = ownerZones[hoveredCard.zone]?.find((c: { id: string }) => c.id === hoveredCard.id);
+              if (card?.flip_image_url) {
+                actions.battleUpdateCardState('flip', hoveredCard.id);
+              } else {
+                actions.battleUpdateCardState('face_down', hoveredCard.id);
+              }
+            }
+          };
           const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile' } as const;
           for (const [key, toZone] of Object.entries(moveZones)) {
             map[key] = () => {
@@ -568,6 +584,15 @@ function GameContent() {
           };
           map['p'] = () => actions.battlePassTurn();
           map['t'] = () => actions.battleUpdateCardState("create_treasure", "", {});
+          map['g'] = () => {
+            if (cb.your_zones.graveyard.length > 0) setActiveDndPanel(activeDndPanel === 'graveyard' ? null : 'graveyard');
+          };
+          map['e'] = () => {
+            if (cb.your_zones.exile.length > 0) setActiveDndPanel(activeDndPanel === 'exile' ? null : 'exile');
+          };
+          map['s'] = () => {
+            if (cb.your_zones.sideboard.length > 0) setActiveDndPanel(activeDndPanel === 'sideboard' ? null : 'sideboard');
+          };
         }
         map['Enter'] = () => {
           const mySubmission = cb.result_submissions[sp.name];
@@ -908,6 +933,14 @@ function GameContent() {
   };
 
 
+  const allFaceDownIds = (() => {
+    if (!current_battle) return new Set<string>()
+    const ids = new Set<string>()
+    for (const id of current_battle.your_zones.face_down_card_ids ?? []) ids.add(id)
+    for (const id of current_battle.opponent_zones.face_down_card_ids ?? []) ids.add(id)
+    return ids
+  })()
+
   const renderPhaseContent = (): ReactNode => {
     if (currentPhase === "battle" && current_battle) {
       return (
@@ -955,6 +988,7 @@ function GameContent() {
 
         {/* Main content */}
         {currentPhase === "battle" ? (
+          <FaceDownProvider value={{ faceDownCardIds: allFaceDownIds }}>
           <GameDndProvider
             onCardMove={handleCardMove}
             validDropZones={getValidDropZones}
@@ -1023,72 +1057,69 @@ function GameContent() {
                 />
               )}
             </div>
-            {showSidebarSideboard && current_battle && (
-              <div
-                className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-                onClick={() => setShowSidebarSideboard(false)}
+            {activeDndPanel === 'sideboard' && current_battle && (
+              <DndPanel
+                title="Your Sideboard"
+                count={current_battle.your_zones.sideboard.length}
+                onClose={() => setActiveDndPanel(null)}
               >
-                <div
-                  className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-white font-medium">
-                      Your Sideboard ({current_battle.your_zones.sideboard.length})
-                    </h3>
-                    <button
-                      onClick={() => setShowSidebarSideboard(false)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {current_battle.your_zones.sideboard.map((card) => (
-                      <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
-                    ))}
-                  </div>
-                </div>
-              </div>
+                {(dims) =>
+                  current_battle.your_zones.sideboard.map((card) => (
+                    <DraggableCard key={card.id} card={card} zone="sideboard" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
+                  ))
+                }
+              </DndPanel>
             )}
-            {showOpponentSideboard && current_battle && current_battle.opponent_full_sideboard && (
-              <div
-                className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-                onClick={() => setShowOpponentSideboard(false)}
+            {activeDndPanel === 'opponentSideboard' && current_battle && current_battle.opponent_full_sideboard && (
+              <DndPanel
+                title={`${current_battle.opponent_name}'s Sideboard`}
+                count={current_battle.opponent_full_sideboard.length}
+                onClose={() => setActiveDndPanel(null)}
               >
-                <div
-                  className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-white font-medium">
-                      {current_battle.opponent_name}'s Full Sideboard ({current_battle.opponent_full_sideboard.length})
-                    </h3>
-                    <button
-                      onClick={() => setShowOpponentSideboard(false)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {current_battle.opponent_full_sideboard.map((card) => (
-                      <DraggableCard
-                        key={card.id}
-                        card={card}
-                        zone="sideboard"
-                        zoneOwner="opponent"
-                        size="sm"
-                        isOpponent
-                        onCardHover={handleOpponentCardHover}
-                        onCardHoverEnd={handleCardHoverEnd}
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
+                {(dims) =>
+                  current_battle.opponent_full_sideboard!.map((card) => (
+                    <DraggableCard
+                      key={card.id}
+                      card={card}
+                      zone="sideboard"
+                      zoneOwner="opponent"
+                      dimensions={dims}
+                      isOpponent
+                      onCardHover={handleOpponentCardHover}
+                      onCardHoverEnd={handleCardHoverEnd}
+                    />
+                  ))
+                }
+              </DndPanel>
+            )}
+            {activeDndPanel === 'graveyard' && current_battle && (
+              <DndPanel
+                title="Graveyard"
+                count={current_battle.your_zones.graveyard.length}
+                onClose={() => setActiveDndPanel(null)}
+              >
+                {(dims) =>
+                  current_battle.your_zones.graveyard.map((card) => (
+                    <DraggableCard key={card.id} card={card} zone="graveyard" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
+                  ))
+                }
+              </DndPanel>
+            )}
+            {activeDndPanel === 'exile' && current_battle && (
+              <DndPanel
+                title="Exile"
+                count={current_battle.your_zones.exile.length}
+                onClose={() => setActiveDndPanel(null)}
+              >
+                {(dims) =>
+                  current_battle.your_zones.exile.map((card) => (
+                    <DraggableCard key={card.id} card={card} zone="exile" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
+                  ))
+                }
+              </DndPanel>
             )}
           </GameDndProvider>
+          </FaceDownProvider>
         ) : (
           <div className="flex-1 flex min-h-0">
             <main className="flex-1 flex flex-col min-h-0 min-w-0">
@@ -1210,8 +1241,8 @@ function GameContent() {
           onMove={(cardId, fromZone, toZone, fromOwner, toOwner) => actions.battleMove(cardId, fromZone, toZone, fromOwner, toOwner)}
           onUntapAll={handleUntapAll}
           onUntapOpponentAll={handleUntapOpponentAll}
-          onShowSideboard={() => { setShowSidebarSideboard(true); setActionMenuOpen(false); }}
-          onShowOpponentSideboard={() => { setShowOpponentSideboard(true); setActionMenuOpen(false); }}
+          onShowSideboard={() => { setActiveDndPanel('sideboard'); setActionMenuOpen(false); }}
+          onShowOpponentSideboard={() => { setActiveDndPanel('opponentSideboard'); setActionMenuOpen(false); }}
           onCreateTreasure={handleCreateTreasure}
           onPassTurn={handlePassTurn}
           onClose={() => setActionMenuOpen(false)}

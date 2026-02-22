@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { DOCS, type DocEntry } from '../docs'
 import { DocRenderer } from './DocRenderer'
-import { PHASE_HOTKEYS, type HotkeyEntry } from '../constants/hotkeys'
+import { PHASE_HOTKEYS } from '../constants/hotkeys'
+import { HotkeyRow } from './HotkeyRow'
 import { getGameCards, type GameCardsResponse } from '../api/client'
 import { CardPreviewModal } from './card/CardPreviewModal'
+import { DocNavContext } from '../contexts/DocNavContext'
 import type { Card } from '../types'
 
 export interface RulesPanelTarget {
@@ -27,27 +29,6 @@ function groupedDocs() {
       (a, b) => (a.parsed.meta.order ?? 99) - (b.parsed.meta.order ?? 99),
     ),
   }))
-}
-
-function HotkeyRow({ entry, indent }: { entry: HotkeyEntry; indent?: boolean }) {
-  return (
-    <>
-      <div className={`flex items-center gap-3 ${indent ? 'pl-6' : ''}`}>
-        <kbd className="bg-gray-700 text-gray-200 font-mono text-xs px-2 py-0.5 rounded border border-gray-600 min-w-[2rem] text-center shrink-0">
-          {indent ? `→ ${entry.key}` : entry.key}
-        </kbd>
-        <span className="text-sm text-gray-300">{entry.description}</span>
-      </div>
-      {entry.subActions?.map((sub) => (
-        <div key={sub.key} className="flex items-center gap-3 pl-6">
-          <kbd className="bg-gray-700 text-gray-200 font-mono text-xs px-2 py-0.5 rounded border border-gray-600 min-w-[2rem] text-center shrink-0">
-            → {sub.key}
-          </kbd>
-          <span className="text-sm text-gray-400">{sub.description}</span>
-        </div>
-      ))}
-    </>
-  )
 }
 
 function ControlsTab({ phase }: { phase: string }) {
@@ -337,6 +318,13 @@ export function RulesPanelContent({
     setMobileView('content')
   }
 
+  const docNav = useMemo(() => ({
+    navigate: (docId: string, tab?: string) => {
+      handleDocSelect(docId)
+      if (tab) setActiveTab(tab)
+    },
+  }), [])
+
   const groups = groupedDocs()
 
   const currentTitle = isBrowseView
@@ -481,40 +469,42 @@ export function RulesPanelContent({
   ) : null
 
   return (
-    <div className="flex flex-1 min-h-0">
-      {/* Desktop sidebar */}
-      <div className="hidden sm:block w-[200px] shrink-0 border-r border-gray-700/50 overflow-y-auto">
-        {sidebar}
-      </div>
-
-      {/* Content area */}
-      <div className="flex-1 flex flex-col min-h-0 min-w-0">
-        {/* Mobile: nav list when mobileView === 'nav' */}
-        <div className={`sm:hidden ${mobileView === 'nav' ? 'flex-1 overflow-y-auto' : 'hidden'}`}>
-          {navItems}
+    <DocNavContext.Provider value={docNav}>
+      <div className="flex flex-1 min-h-0">
+        {/* Desktop sidebar */}
+        <div className="hidden sm:block w-[200px] shrink-0 border-r border-gray-700/50 overflow-y-auto">
+          {sidebar}
         </div>
 
-        {/* Mobile: back header when mobileView === 'content' */}
-        {mobileView === 'content' && (
-          <div className="sm:hidden relative px-3 py-2 border-b border-gray-700/50 flex items-center">
-            <button
-              onClick={() => setMobileView('nav')}
-              className="text-sm text-gray-400 hover:text-white shrink-0 z-10"
-            >
-              ← Back
-            </button>
-            <span className="absolute inset-0 flex items-center justify-center text-sm text-white font-medium pointer-events-none truncate px-16">
-              {currentTitle}
-            </span>
+        {/* Content area */}
+        <div className="flex-1 flex flex-col min-h-0 min-w-0">
+          {/* Mobile: nav list when mobileView === 'nav' */}
+          <div className={`sm:hidden ${mobileView === 'nav' ? 'flex-1 overflow-y-auto' : 'hidden'}`}>
+            {navItems}
           </div>
-        )}
 
-        {/* Content: hidden on mobile when showing nav, always visible on desktop */}
-        <div className={`flex-1 flex flex-col min-h-0 ${mobileView === 'nav' ? 'hidden sm:flex' : ''}`}>
-          {contentArea}
+          {/* Mobile: back header when mobileView === 'content' */}
+          {mobileView === 'content' && (
+            <div className="sm:hidden relative px-3 py-2 border-b border-gray-700/50 flex items-center">
+              <button
+                onClick={() => setMobileView('nav')}
+                className="text-sm text-gray-400 hover:text-white shrink-0 z-10"
+              >
+                ← Back
+              </button>
+              <span className="absolute inset-0 flex items-center justify-center text-sm text-white font-medium pointer-events-none truncate px-16">
+                {currentTitle}
+              </span>
+            </div>
+          )}
+
+          {/* Content: hidden on mobile when showing nav, always visible on desktop */}
+          <div className={`flex-1 flex flex-col min-h-0 ${mobileView === 'nav' ? 'hidden sm:flex' : ''}`}>
+            {contentArea}
+          </div>
         </div>
       </div>
-    </div>
+    </DocNavContext.Provider>
   )
 }
 
@@ -537,15 +527,15 @@ export function RulesPanel({ onClose, initialDocId, initialTab, gameId, useUpgra
 
   return (
     <div
-      className="fixed inset-0 bg-black/85 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 sm:p-8"
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 rounded-lg w-full max-w-4xl h-[calc(100dvh-2rem)] sm:h-auto sm:max-h-[85vh] flex flex-col overflow-hidden"
+        className="bg-gray-900 rounded-lg w-full h-[calc(100dvh-2rem)] sm:h-[calc(100dvh-4rem)] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-4 py-2.5 border-b border-gray-700/50 flex justify-between items-center shrink-0">
-          <h2 className="text-white font-semibold">Rules & Help</h2>
+          <h2 className="text-white font-semibold">Guide</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white text-2xl leading-none p-1"

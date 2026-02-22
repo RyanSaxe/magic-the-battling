@@ -2,7 +2,7 @@ import random
 import weakref
 from typing import Any
 
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, PrivateAttr
 
 from mtb.models.cards import Battler, Card
 from mtb.models.types import Phase, ZoneName
@@ -306,6 +306,7 @@ class Battle(BaseModel):
     player_life: int = 20
     opponent_life: int = 20
     is_sudden_death: bool = False
+    _face_down_id_map: dict[str, str] = PrivateAttr(default_factory=dict)
 
 
 def create_game(player_names: list[str], num_players: int, config: Config | None = None) -> Game:

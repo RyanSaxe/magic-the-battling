@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Card as CardType, ZoneName } from '../../types'
 import { DraggableCard, DroppableZone, useGameDnd } from '../../dnd'
+import { Card } from '../card'
 import { ZoneModal } from '../sidebar/DroppableZoneDisplay'
 import { makeZoneId } from '../../dnd/types'
 
@@ -18,6 +19,7 @@ interface CompactZoneDisplayProps {
   validFromZones: ZoneName[]
   onCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
+  canPeekFaceDown?: boolean
 }
 
 export function CompactZoneDisplay({
@@ -31,6 +33,7 @@ export function CompactZoneDisplay({
   validFromZones,
   onCardHover,
   onCardHoverEnd,
+  canPeekFaceDown,
 }: CompactZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -73,16 +76,12 @@ export function CompactZoneDisplay({
           }`}
           style={{ width, height }}
         >
-          {isOpponent && label}
+          {!isOpponent && label}
           <div className="flex-1 flex items-center justify-center min-h-0 relative">
             {nextCard && (
-              <img
-                src={nextCard.image_url}
-                alt=""
-                className="absolute"
-                style={{ width: cardW, height: cardH, borderRadius: 'var(--card-border-radius)' }}
-                draggable={false}
-              />
+              <div className="absolute">
+                <Card card={nextCard} dimensions={{ width: cardW, height: cardH }} />
+              </div>
             )}
             {topCard && (
               <DraggableCard
@@ -94,16 +93,17 @@ export function CompactZoneDisplay({
                 isOpponent={isOpponent}
                 onCardHover={allowInteraction ? onCardHover : undefined}
                 onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
+                canPeekFaceDown={canPeekFaceDown}
               />
             )}
           </div>
-          {!isOpponent && label}
+          {isOpponent && label}
         </div>
       </DroppableZone>
 
       {showModal && (
         <ZoneModal
-          title={`${title} (${cards.length})`}
+          title={title}
           zone={zone}
           cards={cards}
           allowInteraction={allowInteraction}

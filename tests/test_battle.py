@@ -743,6 +743,22 @@ class TestOpponentZoneManipulation:
         assert zones == b.opponent_zones
         assert is_opponent
 
+    def test_get_zones_for_card_finds_opponent_card_vs_player(self, card_factory):
+        """get_zones_for_card finds card in opponent zones when opponent is a Player (PvP)."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        opp_card = card_factory("OppCard")
+        bob.hand = [opp_card]
+
+        b = battle.start(game, alice, bob)
+
+        zones, is_opponent = battle.get_zones_for_card(b, alice, opp_card.id)
+        assert zones == b.opponent_zones
+        assert is_opponent
+
     def test_get_zones_for_card_raises_if_not_found(self, card_factory):
         """get_zones_for_card raises ValueError if card not in any zones."""
         game = create_game(["Alice", "Bob"], num_players=2)
@@ -845,8 +861,8 @@ class TestOpponentZoneManipulation:
         assert island not in b.opponent_zones.battlefield
         assert island in b.opponent_zones.graveyard
 
-    def test_update_card_state_does_not_work_on_pvp_opponent(self, card_factory):
-        """update_card_state cannot modify opponent's cards in PvP battle."""
+    def test_update_card_state_works_on_pvp_opponent(self, card_factory):
+        """update_card_state can modify opponent's cards in PvP battle."""
         game = create_game(["Alice", "Bob"], num_players=2)
         alice, bob = game.players
         setup_battle_ready(alice)
@@ -857,10 +873,9 @@ class TestOpponentZoneManipulation:
 
         b = battle.start(game, alice, bob)
 
-        # Alice tries to tap Bob's card - should fail
         result = battle.update_card_state(b, alice, "tap", opp_card.id)
-        assert not result
-        assert opp_card.id not in b.opponent_zones.tapped_card_ids
+        assert result
+        assert opp_card.id in b.opponent_zones.tapped_card_ids
 
 
 def test_companion_filtered_from_sideboard_in_battle(card_factory):
@@ -1137,3 +1152,209 @@ class TestPlayDrawPreference:
 
         b = battle.start(game, alice, bob)
         assert b.current_turn_name == b.on_the_play_name
+
+
+class TestFaceDownScrubbing:
+    def test_pvp_face_down_cards_scrubbed_in_battle_view(self, card_factory):
+        """In PvP, opponent face-down cards should have scrubbed data and opaque IDs."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        creature = card_factory("SecretCreature", "Creature")
+        bob.hand = [creature]
+
+        b = battle.start(game, alice, bob)
+        battle.move_zone(b, bob, creature, "hand", "battlefield")
+        battle.update_card_state(b, bob, "face_down", creature.id)
+
+        manager = GameManager()
+        view = manager._make_battle_view(b, alice, game)
+
+        face_down_bf = [c for c in view.opponent_zones.battlefield if c.id in view.opponent_zones.face_down_card_ids]
+        assert len(face_down_bf) == 1
+        scrubbed = face_down_bf[0]
+        assert scrubbed.name == ""
+        assert scrubbed.image_url == ""
+        assert scrubbed.id != creature.id
+
+    def test_pvp_face_down_opaque_id_not_scryfall_uuid(self, card_factory):
+        """Opaque IDs should not be the original Scryfall UUID."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        creature = card_factory("SecretCreature", "Creature")
+        bob.hand = [creature]
+
+        b = battle.start(game, alice, bob)
+        battle.move_zone(b, bob, creature, "hand", "battlefield")
+        battle.update_card_state(b, bob, "face_down", creature.id)
+
+        manager = GameManager()
+        view = manager._make_battle_view(b, alice, game)
+
+        all_bf_ids = {c.id for c in view.opponent_zones.battlefield}
+        assert creature.id not in all_bf_ids
+
+    def test_pvp_face_down_opaque_id_translated_for_card_state(self, card_factory):
+        """Opaque IDs from scrubbed view should resolve via handle_battle_update_card_state."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        creature = card_factory("SecretCreature", "Creature")
+        bob.hand = [creature]
+
+        b = battle.start(game, alice, bob)
+        battle.move_zone(b, bob, creature, "hand", "battlefield")
+        battle.update_card_state(b, bob, "face_down", creature.id)
+
+        manager = GameManager()
+        view = manager._make_battle_view(b, alice, game)
+
+        opaque_id = view.opponent_zones.face_down_card_ids[0]
+        assert opaque_id != creature.id
+
+        result = manager.handle_battle_update_card_state(game, alice, "tap", opaque_id)
+        assert result
+        assert creature.id in b.opponent_zones.tapped_card_ids
+
+    def test_static_opponent_face_down_not_scrubbed(self, card_factory):
+        """Against StaticOpponent, face-down cards should preserve real data."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        creature = card_factory("SecretCreature", "Creature")
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[creature],
+            chosen_basics=["Plains", "Island", "Mountain"],
+        )
+
+        b = battle.start(game, alice, static_opp)
+        battle.move_zone(b, static_opp, creature, "hand", "battlefield")
+        battle.update_card_state(b, alice, "face_down", creature.id)
+
+        manager = GameManager()
+        view = manager._make_battle_view(b, alice, game)
+
+        face_down_bf = [c for c in view.opponent_zones.battlefield if c.id in view.opponent_zones.face_down_card_ids]
+        assert len(face_down_bf) == 1
+        assert face_down_bf[0].id == creature.id
+        assert face_down_bf[0].name == "SecretCreature"
+
+    def test_can_manipulate_opponent_true_for_static(self, card_factory):
+        """BattleView.can_manipulate_opponent should be True against StaticOpponent."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[card_factory("card1")],
+            chosen_basics=["Plains", "Island", "Mountain"],
+        )
+
+        b = battle.start(game, alice, static_opp)
+        manager = GameManager()
+        view = manager._make_battle_view(b, alice, game)
+        assert view.can_manipulate_opponent is True
+
+    def test_can_manipulate_opponent_false_for_pvp(self):
+        """BattleView.can_manipulate_opponent should be False in PvP."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        b = battle.start(game, alice, bob)
+        manager = GameManager()
+        view = manager._make_battle_view(b, alice, game)
+        assert view.can_manipulate_opponent is False
+
+    def test_pvp_scrubbing_remaps_tapped_and_counters(self, card_factory):
+        """Scrubbing should also remap tapped_card_ids and counters for face-down cards."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        creature = card_factory("SecretCreature", "Creature")
+        bob.hand = [creature]
+
+        b = battle.start(game, alice, bob)
+        battle.move_zone(b, bob, creature, "hand", "battlefield")
+        battle.update_card_state(b, bob, "face_down", creature.id)
+        battle.update_card_state(b, bob, "tap", creature.id)
+        battle.update_card_state(b, bob, "counter", creature.id, {"counter_type": "+1/+1", "delta": 1})
+
+        manager = GameManager()
+        view = manager._make_battle_view(b, alice, game)
+
+        assert creature.id not in view.opponent_zones.tapped_card_ids
+        assert creature.id not in view.opponent_zones.counters
+        opaque_id = view.opponent_zones.face_down_card_ids[0]
+        assert opaque_id in view.opponent_zones.tapped_card_ids
+        assert opaque_id in view.opponent_zones.counters
+
+
+class TestFaceDownRevealed:
+    def test_face_down_adds_to_revealed_card_ids(self, card_factory):
+        """Turning a card face-down should add it to revealed_card_ids."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        creature = card_factory("Creature", "Creature")
+        alice.hand = [creature]
+
+        b = battle.start(game, alice, bob)
+        battle.move_zone(b, alice, creature, "hand", "battlefield")
+        battle.update_card_state(b, alice, "face_down", creature.id)
+
+        assert creature.id in b.player_zones.revealed_card_ids
+
+    def test_face_down_revealed_shows_in_most_recently_revealed(self, card_factory):
+        """A face-down card should appear in most_recently_revealed_cards after battle ends."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        creature = card_factory("Creature", "Creature")
+        alice.hand = [creature]
+
+        b = battle.start(game, alice, bob)
+        battle.move_zone(b, alice, creature, "hand", "battlefield")
+        battle.update_card_state(b, alice, "face_down", creature.id)
+
+        battle.submit_result(b, alice, "Alice")
+        battle.submit_result(b, bob, "Alice")
+        battle.end(game, b)
+
+        assert creature in alice.most_recently_revealed_cards
+
+    def test_face_up_toggle_does_not_double_add(self, card_factory):
+        """Toggling face-down off then on again should not duplicate in revealed_card_ids."""
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        creature = card_factory("Creature", "Creature")
+        alice.hand = [creature]
+
+        b = battle.start(game, alice, bob)
+        battle.move_zone(b, alice, creature, "hand", "battlefield")
+
+        battle.update_card_state(b, alice, "face_down", creature.id)
+        battle.update_card_state(b, alice, "face_down", creature.id)
+        battle.update_card_state(b, alice, "face_down", creature.id)
+
+        assert b.player_zones.revealed_card_ids.count(creature.id) == 1

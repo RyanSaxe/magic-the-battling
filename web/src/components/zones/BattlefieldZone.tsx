@@ -21,7 +21,7 @@ interface BattlefieldZoneProps {
   onCardHover?: (cardId: string, zone: ZoneName) => void;
   onCardHoverEnd?: () => void;
   tappedCardIds?: Set<string>;
-  faceDownCardIds?: Set<string>;
+  flippedCardIds?: Set<string>;
   counters?: Record<string, Record<string, number>>;
   attachments?: Record<string, string[]>;
   validFromZones?: ZoneName[];
@@ -37,6 +37,7 @@ interface BattlefieldZoneProps {
   rowHeight?: number;
   landCardDimensions?: CardDimensions;
   nonlandCardDimensions?: CardDimensions;
+  canPeekFaceDown?: boolean;
 }
 
 export function BattlefieldZone({
@@ -48,7 +49,7 @@ export function BattlefieldZone({
   onCardHover,
   onCardHoverEnd,
   tappedCardIds = new Set(),
-  faceDownCardIds = new Set(),
+  flippedCardIds = new Set(),
   counters = {},
   attachments = {},
   validFromZones = ["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone"],
@@ -64,6 +65,7 @@ export function BattlefieldZone({
   rowHeight,
   landCardDimensions,
   nonlandCardDimensions,
+  canPeekFaceDown,
 }: BattlefieldZoneProps) {
   const allowInteraction = !isOpponent || canManipulateOpponent;
   const attachedCardIds = new Set(Object.values(attachments).flat());
@@ -93,10 +95,8 @@ export function BattlefieldZone({
           attachedCards={attachedCards}
           dimensions={resolvedDims}
           parentTapped={tappedCardIds.has(card.id)}
-          parentFaceDown={faceDownCardIds.has(card.id)}
           parentCounters={counters[card.id]}
           attachedTappedIds={tappedCardIds}
-          attachedFaceDownIds={faceDownCardIds}
           attachedCounters={counters}
           selectedCardId={selectedCardId}
           onCardClick={onCardClick}
@@ -127,14 +127,15 @@ export function BattlefieldZone({
           dimensions={resolvedDims}
           selected={card.id === selectedCardId}
           tapped={tappedCardIds.has(card.id)}
-          faceDown={faceDownCardIds.has(card.id)}
+          flipped={flippedCardIds.has(card.id)}
           counters={counters[card.id]}
           onClick={() => onCardClick?.(card)}
           onDoubleClick={() => onCardDoubleClick?.(card)}
-          disabled={!draggable || !allowInteraction}
+          disabled={!draggable || !allowInteraction || !card.name}
           isOpponent={isOpponent}
           upgraded={upgradedCardIds.has(card.id)}
           appliedUpgrades={upgradesByCardId?.get(card.id)}
+          canPeekFaceDown={canPeekFaceDown}
           onCardHover={allowInteraction ? onCardHover : undefined}
           onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
         />

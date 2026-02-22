@@ -100,6 +100,7 @@ class BattleView(BaseModel):
     opponent_life: int = 20
     is_sudden_death: bool = False
     opponent_full_sideboard: list[Card] = []
+    can_manipulate_opponent: bool = False
 
 
 class GameStateResponse(BaseModel):

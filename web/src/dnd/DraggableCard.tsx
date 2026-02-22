@@ -2,6 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import type { Card as CardType, ZoneName } from '../types'
 import { Card } from '../components/card'
+import { useFaceDown } from '../contexts/faceDownState'
 import { makeZoneId, type DragData, type ZoneOwner } from './types'
 
 interface DraggableCardProps {
@@ -18,6 +19,7 @@ interface DraggableCardProps {
   dimensions?: { width: number; height: number }
   tapped?: boolean
   faceDown?: boolean
+  flipped?: boolean
   counters?: Record<string, number>
   glow?: 'none' | 'gold' | 'green' | 'red'
   disabled?: boolean
@@ -25,6 +27,7 @@ interface DraggableCardProps {
   isCompanion?: boolean
   upgraded?: boolean
   appliedUpgrades?: CardType[]
+  canPeekFaceDown?: boolean
   style?: React.CSSProperties
 }
 
@@ -42,6 +45,7 @@ export function DraggableCard({
   dimensions,
   tapped,
   faceDown,
+  flipped,
   counters,
   glow,
   disabled = false,
@@ -49,10 +53,14 @@ export function DraggableCard({
   isCompanion = false,
   upgraded = false,
   appliedUpgrades,
+  canPeekFaceDown,
   style: externalStyle,
 }: DraggableCardProps) {
+  const contextFaceDown = useFaceDown(card.id)
+  const effectiveFaceDown = faceDown || contextFaceDown
+
   const zoneId = makeZoneId(zone, zoneOwner)
-  const dragData: DragData = { card, fromZone: zone, fromZoneId: zoneId, isOpponent }
+  const dragData: DragData = { card, fromZone: zone, fromZoneId: zoneId, isOpponent, faceDown: effectiveFaceDown }
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `${zoneId}-${card.id}`,
@@ -91,12 +99,14 @@ export function DraggableCard({
         dimensions={dimensions}
         tapped={tapped}
         faceDown={faceDown}
+        flipped={flipped}
         counters={counters}
         glow={glow}
         dragging={isDragging}
         isCompanion={isCompanion}
         upgraded={upgraded}
         appliedUpgrades={appliedUpgrades}
+        canPeekFaceDown={canPeekFaceDown}
       />
     </div>
   )
