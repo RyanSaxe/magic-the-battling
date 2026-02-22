@@ -72,7 +72,7 @@ export function PhaseTimeline({
 }: PhaseTimelineProps) {
   if (!isGamePhase(currentPhase)) {
     return (
-      <header className="bg-black/30 py-1.5 sm:py-2 px-1.5 border-b border-gray-700/50">
+      <header className="bg-black/30 py-1.5 sm:py-2 pl-2 pr-1.5 border-b border-gray-700/50">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-300">
             {title ?? END_STATE_LABELS[currentPhase]}
@@ -88,7 +88,7 @@ export function PhaseTimeline({
   }
 
   return (
-    <header className="bg-black/30 py-1.5 sm:py-2 px-1.5 border-b border-gray-700/50">
+    <header className="bg-black/30 py-1.5 sm:py-2 pl-2 pr-1.5 border-b border-gray-700/50">
       <div className="flex items-center">
         <div className="flex items-center gap-1 sm:gap-1.5 flex-1 justify-start min-w-0">
           <span className="text-xs sm:text-sm text-gray-300 font-mono">{stage}-{round}</span>
