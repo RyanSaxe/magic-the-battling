@@ -2,6 +2,7 @@ import Markdown, { defaultUrlTransform } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkDirective from 'remark-directive'
 import remarkCalloutDirectives from '@microflash/remark-callout-directives'
+import rehypeRaw from 'rehype-raw'
 import type { Components } from 'react-markdown'
 import { useDocNav } from '../contexts/DocNavContext'
 import { PHASE_HOTKEYS } from '../constants/hotkeys'
@@ -122,7 +123,7 @@ export function DocRenderer({ content, className }: DocRendererProps) {
         }
         if (!segment) return null
         return (
-          <Markdown key={i} remarkPlugins={[remarkGfm, remarkDirective, [remarkCalloutDirectives, calloutOptions]]} urlTransform={urlTransform} components={components}>
+          <Markdown key={i} remarkPlugins={[remarkGfm, remarkDirective, [remarkCalloutDirectives, calloutOptions]]} rehypePlugins={[rehypeRaw]} urlTransform={urlTransform} components={components}>
             {segment}
           </Markdown>
         )
