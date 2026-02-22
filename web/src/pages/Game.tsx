@@ -981,7 +981,7 @@ function GameContent() {
               setRulesPanelOpen(true);
             }}
             hamburger={sizes.isMobile ? (
-              <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-1">☰</button>
+              <button onClick={() => setSidebarOpen(o => !o)} className="btn btn-secondary text-xs sm:text-sm">☰</button>
             ) : undefined}
           />
         </div>
