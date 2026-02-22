@@ -1,7 +1,7 @@
 import pytest
 from conftest import setup_battle_ready
 
-from mtb.models.game import Puppet, StaticOpponent, create_game
+from mtb.models.game import LastBattleResult, Puppet, StaticOpponent, create_game
 from mtb.phases import battle
 from server.services.game_manager import GameManager
 
@@ -1358,3 +1358,81 @@ class TestFaceDownRevealed:
         battle.update_card_state(b, alice, "face_down", creature.id)
 
         assert b.player_zones.revealed_card_ids.count(creature.id) == 1
+
+
+class TestFinalsCoinFlip:
+    def test_finals_game1_uses_poison(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+        alice.poison = 5
+        bob.poison = 2
+
+        b = battle.start(game, alice, bob)
+
+        assert b.coin_flip_name == alice.name
+
+    def test_finals_loser_gets_coin_flip(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+        alice.poison = 2
+        bob.poison = 5
+        alice.last_battle_result = LastBattleResult(opponent_name="Bob", winner_name="Bob")
+
+        b = battle.start(game, alice, bob)
+
+        assert b.coin_flip_name == alice.name
+
+    def test_finals_draw_falls_back_to_poison(self):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+        alice.poison = 2
+        bob.poison = 5
+        alice.last_battle_result = LastBattleResult(opponent_name="Bob", winner_name=None, is_draw=True)
+
+        b = battle.start(game, alice, bob)
+
+        assert b.coin_flip_name == bob.name
+
+    def test_non_finals_ignores_last_result(self):
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, charlie = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+        setup_battle_ready(charlie)
+        alice.poison = 2
+        bob.poison = 5
+        alice.last_battle_result = LastBattleResult(opponent_name="Bob", winner_name="Bob")
+
+        b = battle.start(game, alice, bob)
+
+        assert b.coin_flip_name == bob.name
+
+    def test_finals_vs_static_loser_gets_coin_flip(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+        alice.poison = 2
+
+        fake = Puppet(name="Bot1", player_history_id=1)
+        snapshot = StaticOpponent(
+            name="Bot1",
+            hand=[card_factory("card1")],
+            chosen_basics=["Plains", "Island", "Mountain"],
+            poison=5,
+        )
+        fake.snapshots[f"{alice.stage}_1"] = snapshot
+        game.puppets.append(fake)
+
+        alice.last_battle_result = LastBattleResult(opponent_name="Bot1", winner_name="Bot1")
+
+        opponent = fake.get_opponent_for_round(alice.stage, 1)
+        assert opponent is not None
+        b = battle.start(game, alice, opponent)
+
+        assert b.coin_flip_name == alice.name

@@ -26,7 +26,7 @@ Be very mindful of when to use [treasures](doc:treasures) to try and win a game.
 - All basic lands selected during the build phase start on the battlefield untapped.
 - All [treasures](doc:treasures) a player has at the beginning of the battle phase will start on their battlefield.
 - All [poison counters](doc:poison) a player has is attached to them during the battle.
-- The player with the most [poison counters](doc:poison) gets their choice of play/draw. If players are tied, the choosing player is selected randomly.
+- The player with the most [poison counters](doc:poison) gets their choice of play/draw. If players are tied, the choosing player is selected randomly. In the [finals](doc:finals), the loser of the previous game chooses instead.
 - Each player's starting hand and sideboard become exactly what was selected during the build phase.
 
 ### After the Battle Ends

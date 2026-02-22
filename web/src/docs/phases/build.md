@@ -17,7 +17,7 @@ Look at the "Opponents" sidebar tab. This will show you the probability of facin
 - The three basic lands you select, along with your treasures, will start on the battlefield untapped in the upcoming [battle phase](doc:battle).
 - Your hand size is always equal to the current stage, which you can see in the upper left corner.
 - Your opponent will be randomly be chosen from three other players at your table. If you faced one of them in the previous battle, your odds of facing versus that player is only 10%.
-- For the upcoming [battle phase](doc:battle), the player with the most poison will get their selected choice of play or draw.
+- For the upcoming [battle phase](doc:battle), the player with the most [poison](doc:poison) will get their selected choice of play or draw. In the [finals](doc:finals), this rule changes — the loser of the previous game chooses instead.
 - Once you apply an upgrade, that action can never be undone. Choose carefully.
 
 ## Controls
