@@ -7,10 +7,8 @@ interface AttachedCardStackProps {
   size?: 'xs' | 'sm' | 'md' | 'lg'
   dimensions?: { width: number; height: number }
   parentTapped?: boolean
-  parentFaceDown?: boolean
   parentCounters?: Record<string, number>
   attachedTappedIds?: Set<string>
-  attachedFaceDownIds?: Set<string>
   attachedCounters?: Record<string, Record<string, number>>
   selectedCardId?: string
   onCardClick?: (card: CardType) => void
@@ -28,10 +26,8 @@ export function AttachedCardStack({
   size = 'md',
   dimensions,
   parentTapped = false,
-  parentFaceDown = false,
   parentCounters,
   attachedTappedIds = new Set(),
-  attachedFaceDownIds = new Set(),
   attachedCounters = {},
   selectedCardId,
   onCardClick,
@@ -69,7 +65,6 @@ export function AttachedCardStack({
               size={size}
               dimensions={dimensions}
               tapped={attachedTappedIds.has(card.id)}
-              faceDown={attachedFaceDownIds.has(card.id)}
               counters={attachedCounters[card.id]}
               selected={card.id === selectedCardId}
               onClick={() => onCardClick?.(card)}
@@ -94,7 +89,6 @@ export function AttachedCardStack({
           size={size}
           dimensions={dimensions}
           tapped={parentTapped}
-          faceDown={parentFaceDown}
           counters={parentCounters}
           selected={parentCard.id === selectedCardId}
           onClick={() => onCardClick?.(parentCard)}

@@ -20,6 +20,7 @@ import { ActionMenu } from "../components/ActionMenu";
 import { PhaseTimeline } from "../components/PhaseTimeline";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { ContextStripProvider, useContextStrip } from "../contexts";
+import { FaceDownProvider } from "../contexts/FaceDownContext";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
 import { POISON_COUNTER_IMAGE } from "../constants/assets";
@@ -539,6 +540,7 @@ function GameContent() {
             }
           };
           map['f'] = () => {
+            if (hoveredCard.owner === 'opponent' && !cb.can_manipulate_opponent) return;
             const ownerZones = hoveredCard.owner === 'player' ? cb.your_zones : cb.opponent_zones;
             const isFaceDown = ownerZones.face_down_card_ids?.includes(hoveredCard.id);
             if (isFaceDown) {
@@ -931,6 +933,14 @@ function GameContent() {
   };
 
 
+  const allFaceDownIds = (() => {
+    if (!current_battle) return new Set<string>()
+    const ids = new Set<string>()
+    for (const id of current_battle.your_zones.face_down_card_ids ?? []) ids.add(id)
+    for (const id of current_battle.opponent_zones.face_down_card_ids ?? []) ids.add(id)
+    return ids
+  })()
+
   const renderPhaseContent = (): ReactNode => {
     if (currentPhase === "battle" && current_battle) {
       return (
@@ -978,6 +988,7 @@ function GameContent() {
 
         {/* Main content */}
         {currentPhase === "battle" ? (
+          <FaceDownProvider value={{ faceDownCardIds: allFaceDownIds }}>
           <GameDndProvider
             onCardMove={handleCardMove}
             validDropZones={getValidDropZones}
@@ -1108,6 +1119,7 @@ function GameContent() {
               </DndPanel>
             )}
           </GameDndProvider>
+          </FaceDownProvider>
         ) : (
           <div className="flex-1 flex min-h-0">
             <main className="flex-1 flex flex-col min-h-0 min-w-0">

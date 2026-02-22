@@ -21,7 +21,6 @@ interface BattlefieldZoneProps {
   onCardHover?: (cardId: string, zone: ZoneName) => void;
   onCardHoverEnd?: () => void;
   tappedCardIds?: Set<string>;
-  faceDownCardIds?: Set<string>;
   flippedCardIds?: Set<string>;
   counters?: Record<string, Record<string, number>>;
   attachments?: Record<string, string[]>;
@@ -50,7 +49,6 @@ export function BattlefieldZone({
   onCardHover,
   onCardHoverEnd,
   tappedCardIds = new Set(),
-  faceDownCardIds = new Set(),
   flippedCardIds = new Set(),
   counters = {},
   attachments = {},
@@ -97,10 +95,8 @@ export function BattlefieldZone({
           attachedCards={attachedCards}
           dimensions={resolvedDims}
           parentTapped={tappedCardIds.has(card.id)}
-          parentFaceDown={faceDownCardIds.has(card.id)}
           parentCounters={counters[card.id]}
           attachedTappedIds={tappedCardIds}
-          attachedFaceDownIds={faceDownCardIds}
           attachedCounters={counters}
           selectedCardId={selectedCardId}
           onCardClick={onCardClick}
@@ -131,7 +127,6 @@ export function BattlefieldZone({
           dimensions={resolvedDims}
           selected={card.id === selectedCardId}
           tapped={tappedCardIds.has(card.id)}
-          faceDown={faceDownCardIds.has(card.id)}
           flipped={flippedCardIds.has(card.id)}
           counters={counters[card.id]}
           onClick={() => onCardClick?.(card)}

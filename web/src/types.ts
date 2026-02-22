@@ -108,6 +108,7 @@ export interface BattleView {
   opponent_life: number
   is_sudden_death: boolean
   opponent_full_sideboard: Card[]
+  can_manipulate_opponent: boolean
 }
 
 export interface GameState {

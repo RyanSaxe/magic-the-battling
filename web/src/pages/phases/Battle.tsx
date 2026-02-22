@@ -114,13 +114,11 @@ export function BattlePhase({
   const canManipulateOpponent = true
 
   const tappedCardIds = new Set(your_zones.tapped_card_ids || [])
-  const faceDownCardIds = new Set(your_zones.face_down_card_ids || [])
   const flippedCardIds = new Set(your_zones.flipped_card_ids || [])
   const counters = your_zones.counters || {}
   const attachments = your_zones.attachments || {}
 
   const opponentTappedIds = new Set(opponent_zones.tapped_card_ids || [])
-  const opponentFaceDownIds = new Set(opponent_zones.face_down_card_ids || [])
   const opponentFlippedIds = new Set(opponent_zones.flipped_card_ids || [])
   const opponentCounters = opponent_zones.counters || {}
 
@@ -288,7 +286,6 @@ export function BattlePhase({
               onCardHover={onOpponentCardHover}
               onCardHoverEnd={onCardHoverEnd}
               tappedCardIds={opponentTappedIds}
-              faceDownCardIds={opponentFaceDownIds}
               flippedCardIds={opponentFlippedIds}
               counters={opponentCounters}
               attachments={opponent_zones.attachments || {}}
@@ -329,7 +326,6 @@ export function BattlePhase({
               onCardHover={onCardHover}
               onCardHoverEnd={onCardHoverEnd}
               tappedCardIds={tappedCardIds}
-              faceDownCardIds={faceDownCardIds}
               flippedCardIds={flippedCardIds}
               counters={counters}
               attachments={attachments}
@@ -364,7 +360,6 @@ export function BattlePhase({
               onCardHoverEnd={onCardHoverEnd}
               upgradedCardIds={upgradedCardIds}
               upgradesByCardId={upgradesByCardId}
-              faceDownCardIds={faceDownCardIds}
               cardDimensions={sizes.playerHand}
               gap={sizes.playerHandGap}
             />
@@ -389,11 +384,11 @@ export function BattlePhase({
             zone={contextMenu.zone}
             isTapped={contextMenu.isOpponent ? opponentTappedIds.has(contextMenu.card.id) : tappedCardIds.has(contextMenu.card.id)}
             isFlipped={contextMenu.isOpponent ? opponentFlippedIds.has(contextMenu.card.id) : flippedCardIds.has(contextMenu.card.id)}
-            isFaceDown={contextMenu.isOpponent ? opponentFaceDownIds.has(contextMenu.card.id) : faceDownCardIds.has(contextMenu.card.id)}
             counters={contextMenu.isOpponent ? opponentCounters[contextMenu.card.id] || {} : counters[contextMenu.card.id] || {}}
             isAttached={contextMenu.isOpponent ? isOpponentCardAttached(contextMenu.card.id) : isCardAttached(contextMenu.card.id)}
             battlefieldCards={contextMenu.isOpponent ? opponent_zones.battlefield : your_zones.battlefield}
             isOpponent={contextMenu.isOpponent}
+            canManipulateOpponent={battle.can_manipulate_opponent}
             onAction={handleContextMenuAction}
             onMove={handleContextMenuMove}
             onClose={() => setContextMenu(null)}

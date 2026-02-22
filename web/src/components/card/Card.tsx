@@ -1,6 +1,7 @@
 import { useState, useContext, useEffect } from 'react'
 import type { Card as CardType } from '../../types'
 import { CardPreviewContext } from './CardPreviewContext'
+import { useFaceDown } from '../../contexts/faceDownState'
 import { CARD_BACK_IMAGE } from '../../constants/assets'
 
 interface CardProps {
@@ -66,11 +67,14 @@ export function Card({
   const [isLoading, setIsLoading] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
 
+  const contextFaceDown = useFaceDown(card.id)
+  const effectiveFaceDown = faceDown || contextFaceDown
+
   const previewContext = useContext(CardPreviewContext)
 
   useEffect(() => {
     if (!isHovered || !previewContext) return
-    if (faceDown && !canPeekFaceDown) return
+    if (effectiveFaceDown && !canPeekFaceDown) return
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
@@ -84,13 +88,13 @@ export function Card({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isHovered, previewContext, card, appliedUpgrades, faceDown, canPeekFaceDown])
+  }, [isHovered, previewContext, card, appliedUpgrades, effectiveFaceDown, canPeekFaceDown])
 
   const effectiveFlip = flipped !== showFlip
-  const normalUrl = faceDown
+  const normalUrl = effectiveFaceDown
     ? CARD_BACK_IMAGE
     : (effectiveFlip && card.flip_image_url ? card.flip_image_url : card.image_url)
-  const pngUrl = faceDown
+  const pngUrl = effectiveFaceDown
     ? null
     : (effectiveFlip && card.flip_png_url ? card.flip_png_url : card.png_url)
   const imageUrl = isHovered && pngUrl ? pngUrl : normalUrl
@@ -139,7 +143,7 @@ export function Card({
         onError={() => setIsLoading(false)}
         draggable={false}
       />
-      {card.flip_image_url && !faceDown && (isHovered || selected) && (
+      {card.flip_image_url && !effectiveFaceDown && (isHovered || selected) && (
         <button
           className="absolute top-1 right-1 bg-black/60 rounded px-2 py-0.5 text-white text-xs hover:bg-black/80 transition-colors"
           onClick={(e) => {
@@ -150,7 +154,7 @@ export function Card({
           Flip
         </button>
       )}
-      {previewContext && (!faceDown || canPeekFaceDown) && (isHovered || selected) && (
+      {previewContext && (!effectiveFaceDown || canPeekFaceDown) && (isHovered || selected) && (
         <button
           className="absolute top-1 left-1 bg-black/60 rounded p-1 text-white hover:bg-black/80 transition-colors"
           onClick={(e) => {

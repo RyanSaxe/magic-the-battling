@@ -7,6 +7,7 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
+from uuid import uuid4
 
 from sqlalchemy import true as sql_true
 from sqlalchemy.orm import Session, joinedload
@@ -16,6 +17,7 @@ from mtb.models.cards import (
     DEFAULT_UPGRADES_ID,
     DEFAULT_VANGUARD_ID,
     Battler,
+    Card,
     build_battler,
 )
 from mtb.models.game import (
@@ -64,6 +66,26 @@ from server.services.session_manager import session_manager
 logger = logging.getLogger(__name__)
 
 
+def _scrub_face_down_cards(cards: list[Card], face_down_ids: set[str], id_map: dict[str, str]) -> list[Card]:
+    result = []
+    for card in cards:
+        if card.id in face_down_ids:
+            opaque_id = str(uuid4())
+            id_map[opaque_id] = card.id
+            result.append(Card(id=opaque_id, name="", image_url="", type_line=""))
+        else:
+            result.append(card)
+    return result
+
+
+def _remap_id_list(ids: list[str], reverse_map: dict[str, str]) -> list[str]:
+    return [reverse_map.get(real_id, real_id) for real_id in ids]
+
+
+def _remap_id_dict[T](d: dict[str, T], reverse_map: dict[str, str]) -> dict[str, T]:
+    return {reverse_map.get(k, k): v for k, v in d.items()}
+
+
 @dataclass
 class PendingSpectateRequest:
     request_id: str
@@ -93,6 +115,22 @@ class PendingGame:
     battler_loading: bool = False
     battler_error: str | None = None
     _loading_task: asyncio.Task | None = field(default=None, repr=False)
+
+
+def _transfer_card_state(card_id: str, from_zones: Zones, to_zones: Zones) -> None:
+    if card_id in from_zones.face_down_card_ids:
+        from_zones.face_down_card_ids.remove(card_id)
+        to_zones.face_down_card_ids.append(card_id)
+    if card_id in from_zones.tapped_card_ids:
+        from_zones.tapped_card_ids.remove(card_id)
+        to_zones.tapped_card_ids.append(card_id)
+    if card_id in from_zones.flipped_card_ids:
+        from_zones.flipped_card_ids.remove(card_id)
+        to_zones.flipped_card_ids.append(card_id)
+    if card_id in from_zones.counters:
+        to_zones.counters[card_id] = from_zones.counters.pop(card_id)
+    if card_id in from_zones.attachments:
+        del from_zones.attachments[card_id]
 
 
 class GameManager:
@@ -1095,24 +1133,53 @@ class GameManager:
 
         opponent_obj = b.opponent if is_player else b.player
         hand_revealed = isinstance(opponent_obj, StaticOpponent) and opponent_obj.hand_revealed
+        is_pvp = not isinstance(opponent_obj, StaticOpponent)
+        face_down_ids = set(opponent_zones.face_down_card_ids)
+
+        if is_pvp and face_down_ids:
+            id_map: dict[str, str] = {}
+            scrubbed_bf = _scrub_face_down_cards(opponent_zones.battlefield, face_down_ids, id_map)
+            scrubbed_gy = _scrub_face_down_cards(opponent_zones.graveyard, face_down_ids, id_map)
+            scrubbed_exile = _scrub_face_down_cards(opponent_zones.exile, face_down_ids, id_map)
+            scrubbed_cz = _scrub_face_down_cards(opponent_zones.command_zone, face_down_ids, id_map)
+            scrubbed_tokens = _scrub_face_down_cards(opponent_zones.spawned_tokens, face_down_ids, id_map)
+            reverse_map = {real: opaque for opaque, real in id_map.items()}
+            scrubbed_face_down_ids = _remap_id_list(opponent_zones.face_down_card_ids, reverse_map)
+            scrubbed_tapped_ids = _remap_id_list(opponent_zones.tapped_card_ids, reverse_map)
+            scrubbed_flipped_ids = _remap_id_list(opponent_zones.flipped_card_ids, reverse_map)
+            scrubbed_counters = _remap_id_dict(opponent_zones.counters, reverse_map)
+            scrubbed_attachments = _remap_id_dict(opponent_zones.attachments, reverse_map)
+            b._face_down_id_map = id_map
+        else:
+            scrubbed_bf = opponent_zones.battlefield
+            scrubbed_gy = opponent_zones.graveyard
+            scrubbed_exile = opponent_zones.exile
+            scrubbed_cz = opponent_zones.command_zone
+            scrubbed_tokens = opponent_zones.spawned_tokens
+            scrubbed_face_down_ids = opponent_zones.face_down_card_ids
+            scrubbed_tapped_ids = opponent_zones.tapped_card_ids
+            scrubbed_flipped_ids = opponent_zones.flipped_card_ids
+            scrubbed_counters = opponent_zones.counters
+            scrubbed_attachments = opponent_zones.attachments
+            b._face_down_id_map = {}
 
         hidden_opponent = Zones(
-            battlefield=opponent_zones.battlefield,
-            graveyard=opponent_zones.graveyard,
-            exile=opponent_zones.exile,
+            battlefield=scrubbed_bf,
+            graveyard=scrubbed_gy,
+            exile=scrubbed_exile,
             hand=opponent_zones.hand if hand_revealed else [],
             sideboard=[],
             upgrades=opponent_zones.upgrades,
-            command_zone=opponent_zones.command_zone,
+            command_zone=scrubbed_cz,
             library=[],
             treasures=opponent_zones.treasures,
             submitted_cards=[],
-            tapped_card_ids=opponent_zones.tapped_card_ids,
-            flipped_card_ids=opponent_zones.flipped_card_ids,
-            face_down_card_ids=opponent_zones.face_down_card_ids,
-            counters=opponent_zones.counters,
-            attachments=opponent_zones.attachments,
-            spawned_tokens=opponent_zones.spawned_tokens,
+            tapped_card_ids=scrubbed_tapped_ids,
+            flipped_card_ids=scrubbed_flipped_ids,
+            face_down_card_ids=scrubbed_face_down_ids,
+            counters=scrubbed_counters,
+            attachments=scrubbed_attachments,
+            spawned_tokens=scrubbed_tokens,
         )
 
         your_poison = b.player.poison if is_player else self._get_opponent_poison(b.opponent, game)
@@ -1138,6 +1205,7 @@ class GameManager:
             opponent_life=opponent_life,
             is_sudden_death=b.is_sudden_death,
             opponent_full_sideboard=full_sideboard,
+            can_manipulate_opponent=isinstance(opponent_obj, StaticOpponent),
         )
 
     def handle_draft_swap(
@@ -1385,6 +1453,7 @@ class GameManager:
             if player.name not in (b.player.name, b.opponent.name):
                 continue
 
+            card_id = b._face_down_id_map.get(card_id, card_id)
             from_zones = self._get_zones_for_owner(b, player, from_owner)
             to_zones = self._get_zones_for_owner(b, player, to_owner)
 
@@ -1400,6 +1469,8 @@ class GameManager:
 
             from_list.remove(card)
             to_zones.get_zone(to_zone).append(card)
+            if from_zones is not to_zones:
+                _transfer_card_state(card_id, from_zones, to_zones)
             self._track_revealed_card(b, card, from_zones, to_zone)
             return True
         return False
@@ -1441,6 +1512,7 @@ class GameManager:
     ) -> bool:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
+                card_id = b._face_down_id_map.get(card_id, card_id)
                 return battle.update_card_state(b, player, action_type, card_id, data)
         return False
 

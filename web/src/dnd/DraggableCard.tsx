@@ -2,6 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import type { Card as CardType, ZoneName } from '../types'
 import { Card } from '../components/card'
+import { useFaceDown } from '../contexts/faceDownState'
 import { makeZoneId, type DragData, type ZoneOwner } from './types'
 
 interface DraggableCardProps {
@@ -55,8 +56,11 @@ export function DraggableCard({
   canPeekFaceDown,
   style: externalStyle,
 }: DraggableCardProps) {
+  const contextFaceDown = useFaceDown(card.id)
+  const effectiveFaceDown = faceDown || contextFaceDown
+
   const zoneId = makeZoneId(zone, zoneOwner)
-  const dragData: DragData = { card, fromZone: zone, fromZoneId: zoneId, isOpponent, faceDown }
+  const dragData: DragData = { card, fromZone: zone, fromZoneId: zoneId, isOpponent, faceDown: effectiveFaceDown }
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `${zoneId}-${card.id}`,

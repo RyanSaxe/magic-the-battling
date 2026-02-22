@@ -413,7 +413,7 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
     return battle
 
 
-def get_zones_for_player(battle: Battle, player: Player) -> Zones:
+def get_zones_for_player(battle: Battle, player: Player | StaticOpponent) -> Zones:
     if player.name == battle.player.name:
         return battle.player_zones
     elif player.name == battle.opponent.name:
@@ -425,7 +425,9 @@ def get_zones_for_player(battle: Battle, player: Player) -> Zones:
 REVEALED_ZONES: set[ZoneName] = {"battlefield", "graveyard", "exile", "command_zone"}
 
 
-def move_zone(battle: Battle, player: Player, card: Card, from_zone: ZoneName, to_zone: ZoneName) -> None:
+def move_zone(
+    battle: Battle, player: Player | StaticOpponent, card: Card, from_zone: ZoneName, to_zone: ZoneName
+) -> None:
     if from_zone == to_zone:
         return
 
@@ -576,6 +578,16 @@ def _handle_toggle(attr: str) -> "CardStateHandler":
     return handler
 
 
+def _handle_face_down(zones: Zones, card_id: str, _data: dict) -> bool:
+    if card_id in zones.face_down_card_ids:
+        zones.face_down_card_ids.remove(card_id)
+    else:
+        zones.face_down_card_ids.append(card_id)
+        if card_id not in zones.revealed_card_ids:
+            zones.revealed_card_ids.append(card_id)
+    return True
+
+
 def _handle_counter(zones: Zones, card_id: str, data: dict) -> bool:
     counter_type = data.get("counter_type", "+1/+1")
     delta = data.get("delta", 1)
@@ -641,7 +653,7 @@ _CARD_STATE_HANDLERS: dict[str, CardStateHandler] = {
     "tap": _handle_tap,
     "untap": _handle_untap,
     "flip": _handle_toggle("flipped_card_ids"),
-    "face_down": _handle_toggle("face_down_card_ids"),
+    "face_down": _handle_face_down,
     "counter": _handle_counter,
     "attach": _handle_attach,
     "detach": _handle_detach,

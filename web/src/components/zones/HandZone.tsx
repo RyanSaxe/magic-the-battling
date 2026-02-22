@@ -14,7 +14,6 @@ interface HandZoneProps {
   zone?: ZoneName;
   upgradedCardIds?: Set<string>;
   upgradesByCardId?: Map<string, CardType[]>;
-  faceDownCardIds?: Set<string>;
   cardDimensions?: CardDimensions;
   gap?: number;
 }
@@ -38,7 +37,6 @@ export function HandZone({
   zone = "hand",
   upgradedCardIds = new Set(),
   upgradesByCardId,
-  faceDownCardIds,
   cardDimensions,
   gap,
 }: HandZoneProps) {
@@ -65,7 +63,6 @@ export function HandZone({
             selected={card.id === selectedCardId}
             onClick={() => onCardClick?.(card)}
             onContextMenu={onCardContextMenu ? (e) => onCardContextMenu(e, card) : undefined}
-            faceDown={faceDownCardIds?.has(card.id)}
             disabled={!draggable}
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={upgradesByCardId?.get(card.id)}
