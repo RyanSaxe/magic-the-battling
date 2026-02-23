@@ -4,7 +4,7 @@ import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { rejoinGame } from "../api/client";
 import { useHotkeys } from "../hooks/useHotkeys";
-import { RulesPanel, RulesPanelTarget } from "../components/RulesPanel";
+import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
 
 export function Lobby() {
@@ -165,34 +165,44 @@ export function Lobby() {
               setShowRulesPanel(true);
             };
 
+            const cubeReady =
+              lobbyState.cube_loading_status === "ready";
+            const pillBase =
+              "px-3 py-1 rounded-full text-xs transition-all border";
+            const pillActive =
+              `${pillBase} bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20 hover:text-white cursor-pointer`;
+            const pillDisabled =
+              `${pillBase} bg-white/[0.02] border-white/5 text-gray-500 cursor-default`;
+
             return (
               <>
-                <p className="text-gray-400 text-center text-xs mb-3">
+                <div className="flex items-center justify-center gap-2 mb-3">
                   <span
-                    onClick={() => openGuide({ docId: "__cards__" })}
-                    className="text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                    onClick={cubeReady ? () => openGuide({ docId: "__cards__" }) : undefined}
+                    className={cubeReady ? pillActive : pillDisabled}
                   >
-                    Card Pool
+                    {cubeReady ? "Card Pool" : (
+                      <span className="flex items-center gap-1.5">
+                        <span className="inline-block w-2.5 h-2.5 border border-gray-500 border-t-transparent rounded-full animate-spin" />
+                        Cards
+                      </span>
+                    )}
                   </span>
                   {botSlots > 0 && (
-                    <>
-                      <span className="text-gray-600"> · </span>
-                      <span
-                        onClick={() => openGuide({ docId: "non-human-players", tab: "puppets" })}
-                        className="text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
-                      >
-                        Puppets?
-                      </span>
-                    </>
+                    <span
+                      onClick={() => openGuide({ docId: "non-human-players", tab: "puppets" })}
+                      className={pillActive}
+                    >
+                      Puppets?
+                    </span>
                   )}
-                  <span className="text-gray-600"> · </span>
                   <span
                     onClick={() => openGuide(undefined)}
-                    className="text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+                    className={pillActive}
                   >
                     How to Play?
                   </span>
-                </p>
+                </div>
                 <div className="bg-black/40 rounded-lg p-3 mb-4 text-center">
                   <p className="text-gray-400 text-xs mb-1">Share this code</p>
                   <div className="flex items-center justify-center gap-3">
