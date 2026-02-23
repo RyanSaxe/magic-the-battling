@@ -11,9 +11,10 @@ interface SpectatorConfig {
 export function useGame(
   gameId: string | null,
   sessionId: string | null,
-  spectatorConfig?: SpectatorConfig | null
+  spectatorConfig?: SpectatorConfig | null,
+  onServerError?: (message: string) => void
 ) {
-  const { isConnected, gameState, lobbyState, error, send, pendingSpectateRequest, clearSpectateRequest } = useWebSocket(gameId, sessionId, spectatorConfig)
+  const { isConnected, gameState, lobbyState, send, pendingSpectateRequest, clearSpectateRequest } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError)
 
   const startGame = useCallback(() => {
     send('start_game')
@@ -113,7 +114,6 @@ export function useGame(
     isConnected,
     gameState,
     lobbyState,
-    error,
     pendingSpectateRequest,
     actions: {
       startGame,

@@ -14,12 +14,11 @@ export interface RulesPanelTarget {
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  'getting-started': 'Getting Started',
-  phases: 'Game Phases',
-  concepts: 'Concepts',
+  'getting-started': 'The Game',
+  phases: 'Phases',
 }
 
-const CATEGORY_ORDER = ['getting-started', 'phases', 'concepts']
+const CATEGORY_ORDER = ['getting-started', 'phases']
 
 function groupedDocs() {
   return CATEGORY_ORDER.map((cat) => ({

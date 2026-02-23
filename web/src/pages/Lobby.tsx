@@ -4,15 +4,19 @@ import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { rejoinGame } from "../api/client";
 import { useHotkeys } from "../hooks/useHotkeys";
-import { RulesPanel } from "../components/RulesPanel";
+import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
+import { useToast } from "../contexts";
 
 export function Lobby() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   const { session, saveSession } = useSession();
-  const { lobbyState, gameState, isConnected, actions, error } = useGame(
+  const { addToast } = useToast();
+  const { lobbyState, gameState, isConnected, actions } = useGame(
     gameId ?? null,
     session?.sessionId ?? null,
+    null,
+    addToast,
   );
 
   const [rejoinName, setRejoinName] = useState("");
@@ -21,7 +25,9 @@ export function Lobby() {
   const [copied, setCopied] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
   const [showRulesPanel, setShowRulesPanel] = useState(false);
-  const [showPuppetExplainer, setShowPuppetExplainer] = useState(false);
+  const [rulesPanelTarget, setRulesPanelTarget] = useState<
+    RulesPanelTarget | undefined
+  >(undefined);
 
   const currentPlayer = lobbyState?.players.find(
     (p) => p.player_id === session?.playerId,
@@ -139,28 +145,9 @@ export function Lobby() {
         <h1 className="text-xl font-bold text-white text-center mb-1">
           Game Lobby
         </h1>
-        <p className="text-gray-400 text-center text-xs mb-3">
-          Draft, Build, Battle!{" "}
-          <a
-            href={`https://cubecobra.com/cube/list/${lobbyState?.cube_id ?? "auto"}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-amber-400 hover:text-amber-300"
-          >
-            View card pool
-          </a>
-          .
-        </p>
-
         {!isConnected && (
           <div className="bg-amber-900/50 text-amber-200 p-3 rounded mb-4">
             Connecting...
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
-            {error}
           </div>
         )}
 
@@ -175,8 +162,57 @@ export function Lobby() {
             const hasEnoughBots =
               availablePuppets !== null && availablePuppets >= botSlots;
 
+            const openGuide = (target?: RulesPanelTarget) => {
+              setRulesPanelTarget(target);
+              setShowRulesPanel(true);
+            };
+
+            const cubeReady = lobbyState.cube_loading_status === "ready";
+            const pillBase =
+              "px-3 py-1 rounded-full text-xs transition-all border";
+            const pillActive = `${pillBase} bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20 hover:text-white cursor-pointer`;
+            const pillDisabled = `${pillBase} bg-white/[0.02] border-white/5 text-gray-500 cursor-default`;
+
             return (
               <>
+                <div className="flex items-center justify-center gap-2 mb-3">
+                  <span
+                    onClick={
+                      cubeReady
+                        ? () => openGuide({ docId: "__cards__" })
+                        : undefined
+                    }
+                    className={cubeReady ? pillActive : pillDisabled}
+                  >
+                    {cubeReady ? (
+                      "Card Pool"
+                    ) : (
+                      <span className="flex items-center gap-1.5">
+                        <span className="inline-block w-2.5 h-2.5 border border-gray-500 border-t-transparent rounded-full animate-spin" />
+                        Cards
+                      </span>
+                    )}
+                  </span>
+                  {botSlots > 0 && (
+                    <span
+                      onClick={() =>
+                        openGuide({
+                          docId: "non-human-players",
+                          tab: "puppets",
+                        })
+                      }
+                      className={pillActive}
+                    >
+                      What are Puppets?
+                    </span>
+                  )}
+                  <span
+                    onClick={() => openGuide(undefined)}
+                    className={pillActive}
+                  >
+                    Game Guide
+                  </span>
+                </div>
                 <div className="bg-black/40 rounded-lg p-3 mb-4 text-center">
                   <p className="text-gray-400 text-xs mb-1">Share this code</p>
                   <div className="flex items-center justify-center gap-3">
@@ -277,25 +313,6 @@ export function Lobby() {
                         Invite human players to join.
                       </p>
                     )}
-                  {botSlots > 0 && (
-                    <div className="mt-2 px-1">
-                      <button
-                        onClick={() => setShowPuppetExplainer((v) => !v)}
-                        className={`${availablePuppets === null ? "text-amber-400" : hasEnoughBots ? "text-cyan-500" : "text-red-400/70"} hover:text-gray-300 text-xs transition-colors`}
-                      >
-                        {showPuppetExplainer ? "▾" : "▸"} What are puppets?
-                      </button>
-                      {showPuppetExplainer && (
-                        <p className="text-gray-500 text-xs mt-1 pl-3">
-                          Puppets are players built from recordings of past
-                          human games. Puppets will have their hand revealed and
-                          you will need to decide who would have won in a
-                          hypothetical match-up to determine the winner of each
-                          battle.
-                        </p>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -375,7 +392,12 @@ export function Lobby() {
           })()}
       </div>
       {showRulesPanel && (
-        <RulesPanel onClose={() => setShowRulesPanel(false)} gameId={gameId} />
+        <RulesPanel
+          onClose={() => setShowRulesPanel(false)}
+          initialDocId={rulesPanelTarget?.docId}
+          initialTab={rulesPanelTarget?.tab}
+          gameId={gameId}
+        />
       )}
     </div>
   );

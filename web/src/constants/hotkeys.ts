@@ -29,7 +29,9 @@ export const PHASE_HOTKEYS: Record<string, HotkeyEntry[]> = {
         { key: 'D', description: 'Draw (second turn)' },
       ],
     },
-    { key: 'U', description: 'Upgrades' },
+    { key: 'U', description: 'Upgrades', subActions: [
+      { key: 'Enter', description: 'Confirm upgrade application' },
+    ]},
   ],
   battle: [
     { key: 'U', description: 'Untap all permanents' },
@@ -45,6 +47,9 @@ export const PHASE_HOTKEYS: Record<string, HotkeyEntry[]> = {
       ],
     },
     { key: 'V', description: 'View upgrades' },
+    { key: 'G', description: 'Toggle graveyard panel' },
+    { key: 'E', description: 'Toggle exile panel' },
+    { key: 'S', description: 'Toggle sideboard panel' },
   ],
   reward: [
     { key: 'Enter', description: 'Continue / Claim & Continue' },
@@ -54,7 +59,7 @@ export const PHASE_HOTKEYS: Record<string, HotkeyEntry[]> = {
   ],
   'battle-hover': [
     { key: 'T', description: 'Tap / Untap' },
-    { key: 'F', description: 'Flip' },
+    { key: 'F', description: 'Flip / Face down / Face up' },
     { key: 'G', description: 'Move to graveyard' },
     { key: 'H', description: 'Move to hand' },
     { key: 'B', description: 'Move to battlefield' },

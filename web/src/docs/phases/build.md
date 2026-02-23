@@ -6,22 +6,24 @@ order: 2
 
 ## Overview
 
-The build phase is where you decide the best starting hand you can build from your pool, which you will use in the next [battle phase](doc:battle). Remember, your basic lands and treasures start untapped on the battlefield.
+The build phase is where you decide the best starting hand you can build from your pool, which you will use in the next [battle phase](doc:battle).
 
-> [!HINT]
-> Look at the "Opponents" sidebar tab. This will show you not just which your next opponent might be, but their most recently revealed cards, their [upgrades](doc:upgrades), and the probability of facing them!
+:::tip
+Look at the "Opponents" sidebar tab. This will show you the probability of facing other players as well as all the public data about them ([treasures](doc:game-pieces#treasures), [poison](doc:game-pieces#poison), [upgrades](doc:game-pieces#upgrades), and even what cards they cast in their most recent [battle](doc:battle)).
+:::
 
 ## Rules
 
-- Click a card in your hand and pool to swap them.
-- Select exactly 3 basic lands to start on the battlefield untapped.
-- Your hand size is always equal to your stage.
-- Click ready when satisfied with your hand configuration.
-- Your opponent will be randomly chosed from three other players at your table. If you faced one of them in the previous battle, your odds of facing versus that player is only 10%.
+- The three basic lands you select, along with your treasures, will start on the battlefield untapped in the upcoming [battle phase](doc:battle).
+- Your hand size is always equal to the current stage, which you can see in the upper left corner.
+- Your opponent will be randomly be chosen from three other players at your table. If you faced one of them in the previous battle, your odds of facing versus that player is only 10%.
+- For the upcoming [battle phase](doc:battle), the player with the most [poison](doc:game-pieces#poison) will get their selected choice of play or draw. In the [finals](doc:winning-the-game#finals), this rule changes — the loser of the previous game chooses instead.
+- Once you apply an upgrade, that action can never be undone. Choose carefully.
 
 ## Controls
 
-- Click a card in your hand and pool to swap them
-- Click a basic land in order to change it
+- Click a card in your hand and pool to swap them.
+- Click a basic land in order to change it.
 - Once you are ready, click submit in the bottom right. Then, you must select whether your hand would prefer to play or draw.
-- If you have any [upgrades](doc:upgrades) you want to apply.
+- To view or apply any [upgrades](doc:game-pieces#upgrades), click the button on the bottom left.
+- If you have a companion in your pool, there will be a button to select them as a companion from your sideboard. Clicking that same button will deselect the companion. Note that the game does not verify if that selection is legal, so remember to deselect when you change your hand.

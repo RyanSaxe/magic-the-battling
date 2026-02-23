@@ -316,17 +316,44 @@ def start(game: Game, player: Player, opponent: Player | StaticOpponent, is_sudd
     return _start_vs_player(game, player, opponent, is_sudden_death)
 
 
+def _is_finale(game: Game) -> bool:
+    live_humans = [p for p in game.players if p.phase != "eliminated"]
+    live_bots = [f for f in game.puppets if not f.is_eliminated]
+    return len(live_humans) + len(live_bots) == 2
+
+
+def _determine_coin_flip(
+    game: Game,
+    player_name: str,
+    player_poison: int,
+    player_last_result: LastBattleResult | None,
+    opponent_name: str,
+    opponent_poison: int,
+) -> str:
+    if (
+        _is_finale(game)
+        and player_last_result is not None
+        and player_last_result.opponent_name == opponent_name
+        and not player_last_result.is_draw
+    ):
+        if player_last_result.winner_name == player_name:
+            return opponent_name
+        return player_name
+
+    if player_poison > opponent_poison:
+        return player_name
+    elif opponent_poison > player_poison:
+        return opponent_name
+    return random.choice([player_name, opponent_name])
+
+
 def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_sudden_death: bool) -> Battle:
     if not is_sudden_death and player.phase != "battle":
         raise ValueError("Player is not in battle phase")
 
-    opponent_poison = opponent.poison
-    if player.poison > opponent_poison:
-        coin_flip_name = player.name
-    elif opponent_poison > player.poison:
-        coin_flip_name = opponent.name
-    else:
-        coin_flip_name = random.choice([player.name, opponent.name])
+    coin_flip_name = _determine_coin_flip(
+        game, player.name, player.poison, player.last_battle_result, opponent.name, opponent.poison
+    )
 
     winner_pref = player.play_draw_preference if coin_flip_name == player.name else opponent.play_draw_preference
     if winner_pref == "draw":
@@ -370,13 +397,9 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
         if not can_start_pairing(game, player.round, player.stage):
             raise ValueError("Cannot start pairing yet - not all players are ready")
 
-    opponent_poison = opponent.poison
-    if player.poison > opponent_poison:
-        coin_flip_name = player.name
-    elif opponent_poison > player.poison:
-        coin_flip_name = opponent.name
-    else:
-        coin_flip_name = random.choice([player.name, opponent.name])
+    coin_flip_name = _determine_coin_flip(
+        game, player.name, player.poison, player.last_battle_result, opponent.name, opponent.poison
+    )
 
     winner_pref = player.play_draw_preference if coin_flip_name == player.name else opponent.play_draw_preference
     if winner_pref == "draw":

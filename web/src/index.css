@@ -240,6 +240,17 @@ body {
   animation: fade-hint 8s ease-in-out forwards;
 }
 
+@keyframes toast-fade {
+  0% { opacity: 0; transform: translateY(-8px); }
+  8% { opacity: 1; transform: translateY(0); }
+  85% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.animate-toast-fade {
+  animation: toast-fade 5s ease-in-out forwards;
+}
+
 .btn-primary {
   background: linear-gradient(
     135deg,
@@ -376,4 +387,80 @@ body {
   opacity: 0;
   transform: translateX(0) !important;
   transition: opacity 500ms ease-out;
+}
+
+/* Callout styles */
+.callout {
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-left: 3px solid;
+}
+
+.callout-note {
+  background: rgba(59, 130, 246, 0.1);
+  border-left-color: #3b82f6;
+}
+
+.callout-note .callout-indicator { color: #60a5fa; }
+
+.callout-warn {
+  background: rgba(234, 179, 8, 0.1);
+  border-left-color: #eab308;
+}
+
+.callout-warn .callout-indicator { color: #facc15; }
+
+.callout-deter {
+  background: rgba(239, 68, 68, 0.1);
+  border-left-color: #ef4444;
+}
+
+.callout-deter .callout-indicator { color: #f87171; }
+
+.callout-commend {
+  background: rgba(34, 197, 94, 0.1);
+  border-left-color: #22c55e;
+}
+
+.callout-commend .callout-indicator { color: #4ade80; }
+
+.callout-tip {
+  background: rgba(245, 158, 11, 0.1);
+  border-left-color: #f59e0b;
+}
+
+.callout-tip .callout-indicator { color: #fbbf24; }
+
+.callout-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.callout-hint {
+  display: flex;
+  align-items: center;
+}
+
+.callout-hint svg {
+  width: 16px;
+  height: 16px;
+}
+
+.callout-title {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.callout-content {
+  font-size: 13px;
+  color: #d1d5db;
+}
+
+.callout-content p {
+  margin: 0;
 }

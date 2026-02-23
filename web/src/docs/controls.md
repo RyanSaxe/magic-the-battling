@@ -1,6 +1,6 @@
 ---
 title: Controls
-order: 3
+order: 2
 ---
 
 ## Overview
@@ -11,8 +11,8 @@ Each phase has its own set of controls and hotkeys:
 
 - [Draft Phase controls](doc:draft#controls) — picking cards and rerolling packs
 - [Build Phase controls](doc:build#controls) — constructing your hand and applying upgrades
-- [Battle Phase controls](doc:battle#controls) — drag-and-drop, tapping, and zone management
-- [Reward Phase controls](doc:reward#controls) — claiming rewards and continuing
+- [Battle Phase controls](doc:battle#controls) — drag-and-drop and game-actions
+- [Reward Phase controls](doc:reward#controls) — claiming your rewards
 
 ## Shortcuts
 

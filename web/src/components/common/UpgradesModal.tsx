@@ -34,11 +34,16 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
         } else {
           onClose()
         }
+      } else if (e.key === 'Enter' && selectedUpgradeId && selectedTargetId && onApply) {
+        onApply(selectedUpgradeId, selectedTargetId)
+        setSelectedUpgradeId(null)
+        setSelectedTargetId(null)
+        onClose()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose, selectedUpgradeId, selectedTargetId])
+  }, [onClose, onApply, selectedUpgradeId, selectedTargetId])
 
   const applied = upgrades.filter((u) => u.upgrade_target)
   const unapplied = upgrades.filter((u) => !u.upgrade_target)

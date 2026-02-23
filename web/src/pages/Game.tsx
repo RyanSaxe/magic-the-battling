@@ -19,7 +19,7 @@ import { GameSummary } from "../components/GameSummary";
 import { ActionMenu } from "../components/ActionMenu";
 import { PhaseTimeline } from "../components/PhaseTimeline";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
-import { ContextStripProvider, useContextStrip } from "../contexts";
+import { ContextStripProvider, useContextStrip, useToast } from "../contexts";
 import { FaceDownProvider } from "../contexts/FaceDownContext";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
@@ -357,11 +357,13 @@ function GameContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isSpectateMode = searchParams.get("spectate") === "true";
+  const { addToast } = useToast();
 
-  const { gameState, isConnected, actions, error, pendingSpectateRequest } = useGame(
+  const { gameState, isConnected, actions, pendingSpectateRequest } = useGame(
     gameId ?? null,
     isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
+    addToast,
   );
   const { state, setPreviewCard } = useContextStrip();
 
@@ -637,14 +639,6 @@ function GameContent() {
     return (
       <div className="game-table flex items-center justify-center">
         <div className="text-white">Connecting...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="game-table flex items-center justify-center">
-        <div className="text-red-400">{error}</div>
       </div>
     );
   }
@@ -981,7 +975,7 @@ function GameContent() {
               setRulesPanelOpen(true);
             }}
             hamburger={sizes.isMobile ? (
-              <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-1">☰</button>
+              <button onClick={() => setSidebarOpen(o => !o)} className="btn btn-secondary text-xs sm:text-sm">☰</button>
             ) : undefined}
           />
         </div>
