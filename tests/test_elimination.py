@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 from conftest import setup_battle_ready
 
 from mtb.models.cards import Battler, Card
-from mtb.models.game import BattleSnapshotData, DraftState, FakePlayer, StaticOpponent, create_game
+from mtb.models.game import BattleSnapshotData, DraftState, Puppet, StaticOpponent, create_game
 from mtb.phases import battle, elimination, reward
 from server.db.models import PlayerGameHistory
 from server.services.game_manager import GameManager
@@ -50,7 +50,7 @@ class TestGhostMechanics:
         setup_battle_ready(bob)
         setup_battle_ready(charlie)
 
-        candidates = battle.get_pairing_candidates(game, bob)
+        candidates = battle.get_all_pairing_candidates(game, bob)
 
         assert alice not in candidates
         assert charlie in candidates
@@ -290,12 +290,12 @@ class TestBotBattleFlow:
             treasures=1,
         )
         static_opp = StaticOpponent.from_snapshot(snapshot, "BotPlayer", 1)
-        bot = FakePlayer(
+        bot = Puppet(
             name="BotPlayer (Bot)",
             player_history_id=1,
             snapshots={"3_1": static_opp},
         )
-        game.fake_players.append(bot)
+        game.puppets.append(bot)
 
         b = battle.start(game, alice, static_opp)
 
@@ -334,12 +334,12 @@ class TestBotBattleFlow:
             treasures=1,
         )
         static_opp = StaticOpponent.from_snapshot(snapshot, "BotPlayer", 1)
-        bot = FakePlayer(
+        bot = Puppet(
             name="BotPlayer (Bot)",
             player_history_id=1,
             snapshots={"3_1": static_opp},
         )
-        game.fake_players.append(bot)
+        game.puppets.append(bot)
 
         b = battle.start(game, alice, static_opp)
 
@@ -398,9 +398,9 @@ class TestUniquePlayerNames:
 
             fake_player = manager._load_fake_player(MagicMock(), mock_history, existing_names)
             existing_names.add(fake_player.name)
-            game.fake_players.append(fake_player)
+            game.puppets.append(fake_player)
 
-        names = [fp.name for fp in game.fake_players]
+        names = [fp.name for fp in game.puppets]
         assert len(names) == len(set(names))
         assert "Bob" in names
         assert "Bob (2)" in names
@@ -431,8 +431,8 @@ class TestBotGameOver:
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
 
-        bot = FakePlayer(name="Bot", player_history_id=1, snapshots={})
-        game.fake_players.append(bot)
+        bot = Puppet(name="Bot", player_history_id=1, snapshots={})
+        game.puppets.append(bot)
 
         alice.poison = 5
         bot.poison = 3
@@ -447,8 +447,8 @@ class TestBotGameOver:
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
 
-        bot = FakePlayer(name="Bot", player_history_id=1, snapshots={}, is_eliminated=True)
-        game.fake_players.append(bot)
+        bot = Puppet(name="Bot", player_history_id=1, snapshots={}, is_eliminated=True)
+        game.puppets.append(bot)
 
         winner, is_game_over = elimination.check_game_over(game)
 
@@ -460,8 +460,8 @@ class TestBotGameOver:
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
 
-        bot = FakePlayer(name="Bot", player_history_id=1, snapshots={})
-        game.fake_players.append(bot)
+        bot = Puppet(name="Bot", player_history_id=1, snapshots={})
+        game.puppets.append(bot)
 
         alice.phase = "eliminated"
         alice.poison = 10
@@ -475,10 +475,10 @@ class TestBotGameOver:
         """Bot should be eliminated when poison >= threshold."""
         game = create_game(["Alice"], num_players=1)
 
-        bot = FakePlayer(name="Bot", player_history_id=1, snapshots={}, poison=10)
-        game.fake_players.append(bot)
+        bot = Puppet(name="Bot", player_history_id=1, snapshots={}, poison=10)
+        game.puppets.append(bot)
 
-        eliminated = elimination.process_bot_eliminations(game)
+        eliminated = elimination.process_puppet_eliminations(game)
 
         assert len(eliminated) == 1
         assert bot.is_eliminated is True
@@ -487,10 +487,10 @@ class TestBotGameOver:
         """Bot should not be eliminated when poison < threshold."""
         game = create_game(["Alice"], num_players=1)
 
-        bot = FakePlayer(name="Bot", player_history_id=1, snapshots={}, poison=9)
-        game.fake_players.append(bot)
+        bot = Puppet(name="Bot", player_history_id=1, snapshots={}, poison=9)
+        game.puppets.append(bot)
 
-        eliminated = elimination.process_bot_eliminations(game)
+        eliminated = elimination.process_puppet_eliminations(game)
 
         assert len(eliminated) == 0
         assert bot.is_eliminated is False
@@ -690,8 +690,8 @@ class TestFinaleVsBot:
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
 
-        bot = FakePlayer(name="BotPlayer", player_history_id=1, poison=5)
-        game.fake_players.append(bot)
+        bot = Puppet(name="BotPlayer", player_history_id=1, poison=5)
+        game.puppets.append(bot)
 
         snapshot = BattleSnapshotData(
             hand=[Card(name="BotCard", image_url="bot", id="bot", type_line="Creature")],
@@ -727,8 +727,8 @@ class TestFinaleVsBot:
         alice = game.players[0]
         alice.poison = 9  # Will go to 10+ with bot damage
 
-        bot = FakePlayer(name="BotPlayer", player_history_id=1, poison=9)
-        game.fake_players.append(bot)
+        bot = Puppet(name="BotPlayer", player_history_id=1, poison=9)
+        game.puppets.append(bot)
 
         snapshot = BattleSnapshotData(
             hand=[Card(name="BotCard", image_url="bot", id="bot", type_line="Creature")],
@@ -871,8 +871,8 @@ class TestSuddenDeathRegressions:
         game = create_game(["Alice"], num_players=1)
         alice = game.players[0]
 
-        bot = FakePlayer(name="BotPlayer", player_history_id=1, poison=9)
-        game.fake_players.append(bot)
+        bot = Puppet(name="BotPlayer", player_history_id=1, poison=9)
+        game.puppets.append(bot)
 
         snapshot = BattleSnapshotData(
             hand=[Card(name="BotCard", image_url="bot", id="bot", type_line="Creature")],
@@ -936,6 +936,45 @@ class TestSuddenDeathRegressions:
         assert elimination.would_be_dead_ready_for_elimination(game) is False
 
 
+class TestCompleteGamePlacement:
+    """Regression tests: remaining participants ranked by poison, not all tied."""
+
+    def test_complete_game_ranks_puppets_by_poison_no_winner(self):
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        alice.phase = "eliminated"
+        alice.placement = 4
+
+        bot1 = Puppet(name="Bot1", player_history_id=1, poison=7)
+        bot2 = Puppet(name="Bot2", player_history_id=2, poison=3)
+        bot3 = Puppet(name="Bot3", player_history_id=3, poison=5)
+        game.puppets.extend([bot1, bot2, bot3])
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+        manager.complete_game("test", winner=None)
+
+        assert bot2.placement == 1  # lowest poison
+        assert bot3.placement == 2
+        assert bot1.placement == 3  # highest poison
+
+    def test_complete_game_ranks_remaining_by_poison_with_winner(self):
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+
+        bot1 = Puppet(name="Bot1", player_history_id=1, poison=7)
+        bot2 = Puppet(name="Bot2", player_history_id=2, poison=3)
+        game.puppets.extend([bot1, bot2])
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+        manager.complete_game("test", winner=alice)
+
+        assert alice.placement == 1
+        assert bot2.placement == 2  # lower poison
+        assert bot1.placement == 3  # higher poison
+
+
 class TestBotSuddenDeath:
     """Tests for sudden death calculations that include bots."""
 
@@ -945,9 +984,9 @@ class TestBotSuddenDeath:
         alice = game.players[0]
         alice.poison = 10
 
-        bot1 = FakePlayer(name="Bot1", player_history_id=1, poison=11)
-        bot2 = FakePlayer(name="Bot2", player_history_id=2, poison=12)
-        game.fake_players.extend([bot1, bot2])
+        bot1 = Puppet(name="Bot1", player_history_id=1, poison=11)
+        bot2 = Puppet(name="Bot2", player_history_id=2, poison=12)
+        game.puppets.extend([bot1, bot2])
 
         assert elimination.needs_sudden_death(game) is True
 
@@ -957,9 +996,9 @@ class TestBotSuddenDeath:
         alice = game.players[0]
         alice.poison = 10
 
-        bot1 = FakePlayer(name="Bot1", player_history_id=1, poison=5)
-        bot2 = FakePlayer(name="Bot2", player_history_id=2, poison=3)
-        game.fake_players.extend([bot1, bot2])
+        bot1 = Puppet(name="Bot1", player_history_id=1, poison=5)
+        bot2 = Puppet(name="Bot2", player_history_id=2, poison=3)
+        game.puppets.extend([bot1, bot2])
 
         assert elimination.needs_sudden_death(game) is False
 
@@ -969,9 +1008,9 @@ class TestBotSuddenDeath:
         alice = game.players[0]
         alice.poison = 10
 
-        bot1 = FakePlayer(name="Bot1", player_history_id=1, poison=11)
-        bot2 = FakePlayer(name="Bot2", player_history_id=2, poison=12)
-        game.fake_players.extend([bot1, bot2])
+        bot1 = Puppet(name="Bot1", player_history_id=1, poison=11)
+        bot2 = Puppet(name="Bot2", player_history_id=2, poison=12)
+        game.puppets.extend([bot1, bot2])
 
         fighters = elimination.get_sudden_death_fighters(game)
         assert fighters is not None
@@ -986,9 +1025,9 @@ class TestBotSuddenDeath:
         alice = game.players[0]
         alice.phase = "eliminated"
 
-        bot1 = FakePlayer(name="Bot1", player_history_id=1, poison=10)
-        bot2 = FakePlayer(name="Bot2", player_history_id=2, poison=11)
-        game.fake_players.extend([bot1, bot2])
+        bot1 = Puppet(name="Bot1", player_history_id=1, poison=10)
+        bot2 = Puppet(name="Bot2", player_history_id=2, poison=11)
+        game.puppets.extend([bot1, bot2])
 
         manager = GameManager()
         manager._active_games["test"] = game
@@ -1011,9 +1050,9 @@ class TestBotSuddenDeath:
         alice.hand = [Card(name="Test1", image_url="test", id="t1", type_line="Creature")]
         alice.chosen_basics = ["Plains", "Island", "Mountain"]
 
-        bot1 = FakePlayer(name="Bot1", player_history_id=1, poison=11)
-        bot2 = FakePlayer(name="Bot2", player_history_id=2, poison=12)
-        game.fake_players.extend([bot1, bot2])
+        bot1 = Puppet(name="Bot1", player_history_id=1, poison=11)
+        bot2 = Puppet(name="Bot2", player_history_id=2, poison=12)
+        game.puppets.extend([bot1, bot2])
 
         manager = GameManager()
         manager._active_games["test"] = game
@@ -1037,8 +1076,8 @@ class TestBotSuddenDeath:
         alice.hand = [Card(name="Test1", image_url="test", id="t1", type_line="Creature")]
         alice.chosen_basics = ["Plains", "Island", "Mountain"]
 
-        bot1 = FakePlayer(name="Bot1", player_history_id=1, poison=11)
-        game.fake_players.append(bot1)
+        bot1 = Puppet(name="Bot1", player_history_id=1, poison=11)
+        game.puppets.append(bot1)
 
         manager = GameManager()
         manager._active_games["test"] = game

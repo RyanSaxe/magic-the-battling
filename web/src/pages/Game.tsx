@@ -8,7 +8,7 @@ import {
   createSpectateRequest,
   getSpectateRequestStatus,
 } from "../api/client";
-import type { GameStatusResponse } from "../types";
+import type { GameStatusResponse, ZoneName } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
 import { BattlePhase, type BattleSelectedCard } from "./phases/Battle";
@@ -17,91 +17,18 @@ import { Sidebar } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
 import { GameSummary } from "../components/GameSummary";
 import { ActionMenu } from "../components/ActionMenu";
-import { RulesModal } from "../components/RulesModal";
-import { InfoIcon } from "../components/icons";
-import { ContextStripProvider, useContextStrip } from "../contexts";
-import { CardPreviewContext } from "../components/card";
+import { PhaseTimeline } from "../components/PhaseTimeline";
+import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
+import { ContextStripProvider, useContextStrip, useToast } from "../contexts";
+import { FaceDownProvider } from "../contexts/FaceDownContext";
+import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
-import { PHASE_HINTS, type Phase } from "../constants/rules";
-import { POISON_COUNTER_IMAGE, TREASURE_TOKEN_IMAGE } from "../constants/assets";
+import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
-import type { Card as CardType } from "../types";
-
-function CardPreviewModal({
-  card,
-  appliedUpgrades,
-  onClose,
-}: {
-  card: CardType;
-  appliedUpgrades: CardType[];
-  onClose: () => void;
-}) {
-  const [isFlipped, setIsFlipped] = useState(false);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  const getImageUrl = (c: CardType, flipped: boolean) => {
-    if (flipped && c.flip_image_url) {
-      return c.flip_image_url;
-    }
-    return c.png_url ?? c.image_url;
-  };
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-      onClick={onClose}
-    >
-      <div
-        className="relative flex gap-4 items-center max-w-[95vw] max-h-[85vh] px-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <img
-          src={getImageUrl(card, isFlipped)}
-          alt={card.name}
-          className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
-          style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
-        />
-        {appliedUpgrades.length > 0 && (
-          <>
-            <div className="text-white text-2xl font-bold shrink-0">→</div>
-            {appliedUpgrades.map((upgrade) => (
-              <img
-                key={upgrade.id}
-                src={getImageUrl(upgrade, isFlipped)}
-                alt={upgrade.name}
-                className="max-h-[80vh] min-w-0 shrink rounded-lg shadow-2xl"
-                style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw` }}
-              />
-            ))}
-          </>
-        )}
-        <button
-          className="absolute -top-4 -right-4 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/80"
-          onClick={onClose}
-        >
-          ×
-        </button>
-        {card.flip_image_url && (
-          <button
-            className="absolute top-2 right-2 bg-black/60 text-white rounded px-3 py-1 text-sm hover:bg-black/80 transition-colors"
-            onClick={() => setIsFlipped(!isFlipped)}
-          >
-            Flip
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+import { UpgradesModal } from "../components/common/UpgradesModal";
+import { DndPanel } from "../components/common/DndPanel";
+import { SubmitPopover } from "../components/common/SubmitPopover";
+import { useHotkeys } from "../hooks/useHotkeys";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -230,7 +157,7 @@ function PlayerSelectionModal({
     );
   }
 
-  const humanPlayers = status.players.filter((p) => !p.is_bot);
+  const humanPlayers = status.players.filter((p) => !p.is_puppet);
   const watchablePlayers = humanPlayers.filter(
     (p) =>
       p.phase !== "eliminated" &&
@@ -393,8 +320,8 @@ function SpectateRequestModal({
   onRespond: (requestId: string, allowed: boolean) => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 max-w-sm">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-sm mx-4">
         <h2 className="text-xl text-white mb-4">Spectate Request</h2>
         <p className="text-gray-300 mb-6">
           <strong>{spectatorName}</strong> wants to watch your game.
@@ -420,7 +347,6 @@ function SpectateRequestModal({
 
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { session, saveSession } = useSession();
 
@@ -431,11 +357,13 @@ function GameContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isSpectateMode = searchParams.get("spectate") === "true";
+  const { addToast } = useToast();
 
-  const { gameState, isConnected, actions, error, pendingSpectateRequest } = useGame(
+  const { gameState, isConnected, actions, pendingSpectateRequest } = useGame(
     gameId ?? null,
     isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
+    addToast,
   );
   const { state, setPreviewCard } = useContextStrip();
 
@@ -443,18 +371,24 @@ function GameContent() {
 
   // Lifted state from Build phase
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
+  const [showUpgradesModal, setShowUpgradesModal] = useState(false);
+  const [upgradeInitialTargetId, setUpgradeInitialTargetId] = useState<string | undefined>(undefined);
+  const handSlotsRef = useRef<(string | null)[]>([]);
 
   // Lifted state from Reward phase
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(
     null,
   );
+  const [selectedPoolCardId, setSelectedPoolCardId] = useState<string | null>(null);
 
   // Lifted state from Battle phase
   const [battleSelectedCard, setBattleSelectedCard] = useState<BattleSelectedCard | null>(null);
   const [isChangingResult, setIsChangingResult] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
-  const [showSidebarSideboard, setShowSidebarSideboard] = useState(false);
-  const [showOpponentSideboard, setShowOpponentSideboard] = useState(false);
+  type ActiveDndPanel = 'sideboard' | 'opponentSideboard' | 'graveyard' | 'exile' | null;
+  const [activeDndPanel, setActiveDndPanel] = useState<ActiveDndPanel>(null);
+  const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
+  const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
 
   const prevPhaseRef = useRef(gameState?.self_player.phase);
   if (gameState?.self_player.phase !== prevPhaseRef.current) {
@@ -464,19 +398,19 @@ function GameContent() {
     }
   }
 
-  // Rules modal state
-  const [showRulesModal, setShowRulesModal] = useState(false);
-  const [hasViewedRules, setHasViewedRules] = useState(
-    () => localStorage.getItem("mtb-rules-viewed") === "true",
-  );
+  // Rules panel state
+  const [rulesPanelOpen, setRulesPanelOpen] = useState(false);
+  const [rulesPanelTarget, setRulesPanelTarget] = useState<RulesPanelTarget | undefined>(undefined);
 
-  const handleOpenRules = () => {
-    setShowRulesModal(true);
-    if (!hasViewedRules) {
-      localStorage.setItem("mtb-rules-viewed", "true");
-      setHasViewedRules(true);
-    }
+  // Hover tracking for hotkeys
+  const [hoveredCard, setHoveredCard] = useState<{ id: string; zone: ZoneName; owner: 'player' | 'opponent' } | null>(null);
+  const handleCardHover = (cardId: string, zone: ZoneName) => {
+    setHoveredCard({ id: cardId, zone, owner: 'player' });
   };
+  const handleOpponentCardHover = (cardId: string, zone: ZoneName) => {
+    setHoveredCard({ id: cardId, zone, owner: 'opponent' });
+  };
+  const handleCardHoverEnd = () => setHoveredCard(null);
 
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
@@ -515,6 +449,183 @@ function GameContent() {
     window.open(url.toString(), '_blank');
   };
 
+  // Hotkeys — must be before early returns to satisfy rules-of-hooks
+  const modalOpen = rulesPanelOpen || showUpgradesModal || actionMenuOpen;
+  const hotkeyMap: Record<string, () => void> = (() => {
+    const currentPhaseId = gameState?.self_player.phase;
+    const map: Record<string, () => void> = {
+      '?': () => {
+        setRulesPanelTarget(
+          currentPhaseId && ['draft', 'build', 'battle', 'reward'].includes(currentPhaseId)
+            ? { docId: currentPhaseId, tab: 'controls' }
+            : undefined,
+        );
+        setRulesPanelOpen(true);
+      },
+    };
+    if (!gameState || isSpectator || modalOpen) return map;
+
+    const { self_player: sp, current_battle: cb } = gameState;
+    const phase = sp.phase;
+
+    if (phase === 'draft') {
+      map['r'] = () => {
+        if (sp.treasures > 0 && (sp.current_pack?.length ?? 0) > 0) {
+          actions.draftRoll();
+        }
+      };
+      map['Enter'] = () => actions.draftDone();
+      map['u'] = () => {
+        if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+      };
+    } else if (phase === 'build') {
+      if (showSubmitHandPopover) {
+        const basicsComplete = selectedBasics.length === 3;
+        const handFull = sp.hand.length === sp.hand_size;
+        const canReady = basicsComplete && handFull;
+        if (canReady) {
+          map['p'] = () => {
+            actions.buildReady(selectedBasics, 'play', handSlotsRef.current.filter((id): id is string => id !== null));
+            setShowSubmitHandPopover(false);
+          };
+          map['d'] = () => {
+            actions.buildReady(selectedBasics, 'draw', handSlotsRef.current.filter((id): id is string => id !== null));
+            setShowSubmitHandPopover(false);
+          };
+        }
+        map['Enter'] = () => setShowSubmitHandPopover(false);
+      } else {
+        map['Enter'] = () => {
+          if (sp.build_ready) {
+            actions.buildUnready();
+          } else {
+            const basicsComplete = selectedBasics.length === 3;
+            const handFull = sp.hand.length === sp.hand_size;
+            if (basicsComplete && handFull) setShowSubmitHandPopover(true);
+          }
+        };
+      }
+      map['u'] = () => {
+        if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+      };
+      if (hoveredCard && sp.upgrades.some((u) => !u.upgrade_target)) {
+        map['u'] = () => {
+          setUpgradeInitialTargetId(hoveredCard.id);
+          setShowUpgradesModal(true);
+        };
+      }
+    } else if (phase === 'battle' && cb) {
+      if (showSubmitResultPopover) {
+        map['w'] = () => {
+          actions.battleSubmitResult(sp.name);
+          setIsChangingResult(false);
+          setShowSubmitResultPopover(false);
+        };
+        map['d'] = () => {
+          actions.battleSubmitResult("draw");
+          setIsChangingResult(false);
+          setShowSubmitResultPopover(false);
+        };
+        map['l'] = () => {
+          actions.battleSubmitResult(cb.opponent_name);
+          setIsChangingResult(false);
+          setShowSubmitResultPopover(false);
+        };
+        map['Enter'] = () => setShowSubmitResultPopover(false);
+      } else {
+        if (hoveredCard) {
+          const ownerZones = hoveredCard.owner === 'player' ? cb.your_zones : cb.opponent_zones;
+          map['t'] = () => {
+            if (hoveredCard.zone === 'battlefield') {
+              const tapped = ownerZones.tapped_card_ids?.includes(hoveredCard.id);
+              actions.battleUpdateCardState(tapped ? 'untap' : 'tap', hoveredCard.id);
+            }
+          };
+          map['f'] = () => {
+            if (hoveredCard.owner === 'opponent' && !cb.can_manipulate_opponent) return;
+            const ownerZones = hoveredCard.owner === 'player' ? cb.your_zones : cb.opponent_zones;
+            const isFaceDown = ownerZones.face_down_card_ids?.includes(hoveredCard.id);
+            if (isFaceDown) {
+              actions.battleUpdateCardState('face_down', hoveredCard.id);
+            } else {
+              const card = ownerZones[hoveredCard.zone]?.find((c: { id: string }) => c.id === hoveredCard.id);
+              if (card?.flip_image_url) {
+                actions.battleUpdateCardState('flip', hoveredCard.id);
+              } else {
+                actions.battleUpdateCardState('face_down', hoveredCard.id);
+              }
+            }
+          };
+          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile' } as const;
+          for (const [key, toZone] of Object.entries(moveZones)) {
+            map[key] = () => {
+              if (toZone !== hoveredCard.zone) {
+                const zoneCards = ownerZones[hoveredCard.zone];
+                const idx = zoneCards.findIndex(c => c.id === hoveredCard.id);
+                actions.battleMove(hoveredCard.id, hoveredCard.zone, toZone as ZoneName, hoveredCard.owner, hoveredCard.owner);
+                const nextCard = zoneCards[idx + 1] ?? zoneCards[idx - 1] ?? null;
+                setHoveredCard(nextCard ? { id: nextCard.id, zone: hoveredCard.zone, owner: hoveredCard.owner } : null);
+              }
+            };
+          }
+          map['u'] = () => {
+            if (!cb) return;
+            const battlefieldIds = new Set(cb.your_zones.battlefield.map(c => c.id));
+            for (const cardId of cb.your_zones.tapped_card_ids || []) {
+              if (battlefieldIds.has(cardId)) actions.battleUpdateCardState('untap', cardId);
+            }
+          };
+          map['p'] = () => actions.battlePassTurn();
+        } else {
+          map['u'] = () => {
+            if (!cb) return;
+            const battlefieldIds = new Set(cb.your_zones.battlefield.map(c => c.id));
+            for (const cardId of cb.your_zones.tapped_card_ids || []) {
+              if (battlefieldIds.has(cardId)) actions.battleUpdateCardState('untap', cardId);
+            }
+          };
+          map['p'] = () => actions.battlePassTurn();
+          map['t'] = () => actions.battleUpdateCardState("create_treasure", "", {});
+          map['g'] = () => {
+            if (cb.your_zones.graveyard.length > 0) setActiveDndPanel(activeDndPanel === 'graveyard' ? null : 'graveyard');
+          };
+          map['e'] = () => {
+            if (cb.your_zones.exile.length > 0) setActiveDndPanel(activeDndPanel === 'exile' ? null : 'exile');
+          };
+          map['s'] = () => {
+            if (cb.your_zones.sideboard.length > 0) setActiveDndPanel(activeDndPanel === 'sideboard' ? null : 'sideboard');
+          };
+        }
+        map['Enter'] = () => {
+          const mySubmission = cb.result_submissions[sp.name];
+          if (mySubmission && !isChangingResult) {
+            setIsChangingResult(true);
+          } else {
+            setShowSubmitResultPopover(true);
+          }
+        };
+        map['v'] = () => {
+          if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+        };
+      }
+    } else if (phase === 'reward') {
+      map['Enter'] = () => {
+        const isStageIncreasing = sp.is_stage_increasing;
+        const needsUpgrade = isStageIncreasing && gameState.available_upgrades.length > 0;
+        const canCont = !needsUpgrade || !!selectedUpgradeId;
+        if (canCont) {
+          actions.rewardDone(selectedUpgradeId ?? undefined);
+          setSelectedUpgradeId(null);
+          setSelectedPoolCardId(null);
+        }
+      };
+    }
+
+    return map;
+  })();
+
+  useHotkeys(hotkeyMap, !modalOpen);
+
   if (!session || isSpectateMode) {
     return (
       <PlayerSelectionModal
@@ -532,14 +643,6 @@ function GameContent() {
     );
   }
 
-  if (error) {
-    return (
-      <div className="game-table flex items-center justify-center">
-        <div className="text-red-400">{error}</div>
-      </div>
-    );
-  }
-
   if (!gameState) {
     return (
       <div className="game-table flex items-center justify-center">
@@ -550,24 +653,12 @@ function GameContent() {
 
   const currentPhase = gameState.self_player.phase;
 
-  const phaseBadgeClass =
-    {
-      draft: "draft",
-      build: "build",
-      battle: "battle",
-      reward: "reward",
-      awaiting_elimination: "reward",
-      eliminated: "battle",
-      winner: "reward",
-      game_over: "battle",
-    }[currentPhase] || "draft";
-
   const { self_player, current_battle } = gameState;
 
   const maxHandSize = self_player.hand_size;
-  const handExceedsLimit = self_player.hand.length > maxHandSize;
+  const handFull = self_player.hand.length === maxHandSize;
   const basicsComplete = selectedBasics.length === 3;
-  const canReady = basicsComplete && !handExceedsLimit;
+  const canReady = basicsComplete && handFull;
 
   const isStageIncreasing = self_player.is_stage_increasing;
   const needsUpgrade =
@@ -577,179 +668,234 @@ function GameContent() {
   const handleContinue = () => {
     actions.rewardDone(selectedUpgradeId ?? undefined);
     setSelectedUpgradeId(null);
+    setSelectedPoolCardId(null);
   };
 
   const renderActionButtons = (): ReactNode => {
     if (isSpectator) {
       return null;
     }
+
+    let left: ReactNode = null;
+    let right: ReactNode = null;
+
     if (currentPhase === "eliminated") {
       const hasWatchablePlayers = gameState.players.some(
         (p) =>
-          !p.is_bot &&
+          !p.is_puppet &&
           p.phase !== "eliminated" &&
           p.phase !== "awaiting_elimination" &&
           p.phase !== "winner" &&
           p.phase !== "game_over"
       );
-      return (
-        <>
-          {hasWatchablePlayers && (
-            <button onClick={handleSpectateNewTab} className="btn btn-secondary">
-              Spectate
+      if (hasWatchablePlayers) {
+        right = (
+          <button onClick={handleSpectateNewTab} className="btn btn-secondary">
+            Spectate
+          </button>
+        );
+      }
+    } else if (currentPhase === "draft") {
+      left = (
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {self_player.upgrades.length > 0 && (
+            <button onClick={() => setShowUpgradesModal(true)} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+              View Upgrades
             </button>
           )}
-          <button onClick={() => navigate("/")} className="btn btn-primary">
-            Home
+          <button
+            onClick={actions.draftRoll}
+            disabled={
+              self_player.treasures <= 0 ||
+              (self_player.current_pack?.length ?? 0) === 0
+            }
+            className="btn bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Roll for 1💰
           </button>
-        </>
+        </div>
       );
-    }
-    if (currentPhase === "winner" || currentPhase === "game_over") {
-      return (
-        <button onClick={() => navigate("/")} className="btn btn-primary">
-          Home
+      right = (
+        <button onClick={actions.draftDone} className="btn btn-primary">
+          Go to Build
         </button>
       );
-    }
-    switch (currentPhase) {
-      case "draft":
-        return (
-          <>
+    } else if (currentPhase === "build") {
+      if (self_player.build_ready) {
+        left = self_player.upgrades.length > 0 ? (
+          <button onClick={() => setShowUpgradesModal(true)} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+            View Upgrades
+          </button>
+        ) : null;
+        right = (
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-amber-400 text-sm">Waiting...</span>
             <button
-              onClick={actions.draftRoll}
-              disabled={
-                self_player.treasures <= 0 ||
-                (self_player.current_pack?.length ?? 0) === 0
-              }
-              className="btn btn-secondary"
+              onClick={actions.buildUnready}
+              className="btn bg-gray-600 hover:bg-gray-500 text-white"
             >
-              Roll for 1💰
+              Change
             </button>
-            <button onClick={actions.draftDone} className="btn btn-primary">
-              Go to Build
-            </button>
-          </>
+          </div>
         );
-      case "build":
-        if (self_player.build_ready) {
-          return (
-            <>
-              <span className="text-amber-400 text-sm">Waiting...</span>
-              <button
-                onClick={actions.buildUnready}
-                className="btn bg-gray-600 hover:bg-gray-500 text-white"
-              >
-                Undo
-              </button>
-            </>
-          );
-        }
-        return (
-          <>
-            <span className={`text-sm ${basicsComplete ? "text-green-400" : "text-amber-400 animate-pulse"}`}>
-              {selectedBasics.length}/3 basics
+      } else {
+        left = self_player.upgrades.length > 0 ? (
+          <button
+            onClick={() => setShowUpgradesModal(true)}
+            className={`btn text-white ${self_player.upgrades.some((u) => !u.upgrade_target) ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-600 hover:bg-gray-500'}`}
+          >
+            {self_player.upgrades.some((u) => !u.upgrade_target) ? 'Apply Upgrade' : 'View Upgrades'}
+          </button>
+        ) : null;
+        right = (
+          <div className="relative flex items-center gap-1.5 sm:gap-2">
+            <button
+              onClick={() => setShowSubmitHandPopover((v) => !v)}
+              disabled={!canReady}
+              className="btn btn-primary"
+            >
+              Submit Hand
+            </button>
+            {showSubmitHandPopover && canReady && (
+              <SubmitPopover
+                options={[
+                  {
+                    label: "Play",
+                    onClick: () => {
+                      actions.buildReady(selectedBasics, 'play', handSlotsRef.current.filter((id): id is string => id !== null));
+                      setShowSubmitHandPopover(false);
+                    },
+                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                  },
+                  {
+                    label: "Draw",
+                    onClick: () => {
+                      actions.buildReady(selectedBasics, 'draw', handSlotsRef.current.filter((id): id is string => id !== null));
+                      setShowSubmitHandPopover(false);
+                    },
+                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                  },
+                ]}
+                onClose={() => setShowSubmitHandPopover(false)}
+              />
+            )}
+          </div>
+        );
+      }
+    } else if (currentPhase === "battle") {
+      if (!current_battle) return null;
+      const { opponent_name, result_submissions } = current_battle;
+      const mySubmission = result_submissions[self_player.name];
+      const opponentSubmission = result_submissions[opponent_name];
+
+      left = (
+        <button
+          onClick={() => setActionMenuOpen(true)}
+          className="btn btn-secondary"
+        >
+          Actions
+        </button>
+      );
+
+      if (mySubmission && !isChangingResult) {
+        const resultsConflict =
+          opponentSubmission && mySubmission !== opponentSubmission;
+        right = (
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span
+              className={`text-sm ${resultsConflict ? "text-red-400" : "text-amber-400"}`}
+            >
+              {resultsConflict ? "Results conflict!" : "Waiting..."}
             </span>
             <button
-              onClick={() => actions.buildReady(selectedBasics, 'play')}
-              disabled={!canReady}
-              className="btn btn-primary"
+              onClick={() => setIsChangingResult(true)}
+              className="btn bg-gray-600 hover:bg-gray-500 text-white"
             >
-              Play
+              Change
             </button>
-            <button
-              onClick={() => actions.buildReady(selectedBasics, 'draw')}
-              disabled={!canReady}
-              className="btn btn-primary"
-            >
-              Draw
-            </button>
-          </>
+          </div>
         );
-      case "battle": {
-        if (!current_battle) return null;
-        const { opponent_name, result_submissions } = current_battle;
-        const mySubmission = result_submissions[self_player.name];
-        const opponentSubmission = result_submissions[opponent_name];
-
-        if (mySubmission && !isChangingResult) {
-          const resultsConflict =
-            opponentSubmission && mySubmission !== opponentSubmission;
-          return (
-            <>
-              <span
-                className={`text-sm ${resultsConflict ? "text-red-400" : "text-amber-400"}`}
-              >
-                {resultsConflict ? "Results conflict!" : "Waiting..."}
-              </span>
-              <button
-                onClick={() => setIsChangingResult(true)}
-                className="btn btn-secondary"
-              >
-                Change
-              </button>
-            </>
-          );
-        }
-        return (
-          <>
+      } else {
+        right = (
+          <div className="relative flex items-center gap-1.5 sm:gap-2">
             {isChangingResult && (
               <button
-                onClick={() => setIsChangingResult(false)}
+                onClick={() => { setIsChangingResult(false); setShowSubmitResultPopover(false); }}
                 className="text-gray-400 text-sm hover:text-white"
               >
                 Cancel
               </button>
             )}
             <button
-              onClick={() => {
-                actions.battleSubmitResult(self_player.name);
-                setIsChangingResult(false);
-              }}
+              onClick={() => setShowSubmitResultPopover((v) => !v)}
               className="btn btn-primary"
             >
-              I Won
+              Submit Result
             </button>
-            <button
-              onClick={() => {
-                actions.battleSubmitResult("draw");
-                setIsChangingResult(false);
-              }}
-              className="btn btn-secondary"
-            >
-              Draw
-            </button>
-            <button
-              onClick={() => {
-                actions.battleSubmitResult(opponent_name);
-                setIsChangingResult(false);
-              }}
-              className="btn btn-danger"
-            >
-              I Lost
-            </button>
-          </>
+            {showSubmitResultPopover && (
+              <SubmitPopover
+                options={[
+                  {
+                    label: "I Won",
+                    onClick: () => {
+                      actions.battleSubmitResult(self_player.name);
+                      setIsChangingResult(false);
+                      setShowSubmitResultPopover(false);
+                    },
+                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                  },
+                  {
+                    label: "Draw",
+                    onClick: () => {
+                      actions.battleSubmitResult("draw");
+                      setIsChangingResult(false);
+                      setShowSubmitResultPopover(false);
+                    },
+                    className: "btn btn-danger text-sm py-1.5",
+                  },
+                  {
+                    label: "I Lost",
+                    onClick: () => {
+                      actions.battleSubmitResult(opponent_name);
+                      setIsChangingResult(false);
+                      setShowSubmitResultPopover(false);
+                    },
+                    className: "btn btn-danger text-sm py-1.5",
+                  },
+                ]}
+                onClose={() => setShowSubmitResultPopover(false)}
+              />
+            )}
+          </div>
         );
       }
-      case "reward": {
-        const buttonLabel = needsUpgrade
-          ? selectedUpgradeId
-            ? "Claim & Continue"
-            : "Select Upgrade"
-          : "Continue";
-        return (
-          <button
-            onClick={handleContinue}
-            disabled={!canContinue}
-            className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {buttonLabel}
-          </button>
-        );
-      }
-      default:
-        return null;
+    } else if (currentPhase === "reward") {
+      const buttonLabel = needsUpgrade
+        ? selectedUpgradeId
+          ? "Claim & Continue"
+          : "Select Upgrade"
+        : "Continue";
+      right = (
+        <button
+          onClick={handleContinue}
+          disabled={!canContinue}
+          className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {buttonLabel}
+        </button>
+      );
+    } else {
+      return null;
     }
+
+    if (!left && !right) return null;
+
+    return (
+      <>
+        <div className="flex items-center gap-1.5 sm:gap-2">{left}</div>
+        <div className="flex items-center gap-1.5 sm:gap-2">{right}</div>
+      </>
+    );
   };
 
   const handleCreateTreasure = () => {
@@ -780,6 +926,15 @@ function GameContent() {
     }
   };
 
+
+  const allFaceDownIds = (() => {
+    if (!current_battle) return new Set<string>()
+    const ids = new Set<string>()
+    for (const id of current_battle.your_zones.face_down_card_ids ?? []) ids.add(id)
+    for (const id of current_battle.opponent_zones.face_down_card_ids ?? []) ids.add(id)
+    return ids
+  })()
+
   const renderPhaseContent = (): ReactNode => {
     if (currentPhase === "battle" && current_battle) {
       return (
@@ -791,7 +946,7 @@ function GameContent() {
           onYourLifeChange={handleYourLifeChange}
           onOpponentLifeChange={handleOpponentLifeChange}
           playerName={self_player.name}
-          onOpenActions={() => setActionMenuOpen(true)}
+          onCreateTreasure={handleCreateTreasure}
         />
       );
     }
@@ -807,33 +962,27 @@ function GameContent() {
             Watching {spectatingPlayer}'s game (spectator mode)
           </div>
         )}
-        {/* Header - Action Bar */}
-        <header className="flex justify-between items-center px-2 sm:px-4 py-1 sm:py-2 bg-black/30">
-          <div className="flex items-center gap-3">
-            <div className="text-sm text-gray-300">
-              Stage {self_player.stage} • Round {self_player.round}
-            </div>
-            <button
-              onClick={handleOpenRules}
-              className={`phase-badge ${phaseBadgeClass} ${!hasViewedRules ? "pulse" : ""}`}
-            >
-              {currentPhase}
-              <InfoIcon size="sm" className="ml-1.5 opacity-60" />
-            </button>
-          </div>
-          <div className="text-sm text-gray-400 italic hidden sm:block">
-            {PHASE_HINTS[currentPhase as Phase]}
-          </div>
-          <div className="flex items-center gap-2">
-            {!sizes.isMobile && renderActionButtons()}
-            {sizes.isMobile && (
-              <button onClick={() => setSidebarOpen(o => !o)} className="text-gray-300 hover:text-white text-xl px-2">☰</button>
-            )}
-          </div>
-        </header>
+        {/* Header - Phase Timeline. pr-64 on desktop offsets for sidebar so timeline centers over main content */}
+        <div className="relative">
+          <PhaseTimeline
+            currentPhase={currentPhase}
+            stage={self_player.stage}
+            round={self_player.round}
+            nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
+            nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+            onOpenRules={(target) => {
+              setRulesPanelTarget(target);
+              setRulesPanelOpen(true);
+            }}
+            hamburger={sizes.isMobile ? (
+              <button onClick={() => setSidebarOpen(o => !o)} className="btn btn-secondary text-xs sm:text-sm">☰</button>
+            ) : undefined}
+          />
+        </div>
 
         {/* Main content */}
         {currentPhase === "battle" ? (
+          <FaceDownProvider value={{ faceDownCardIds: allFaceDownIds }}>
           <GameDndProvider
             onCardMove={handleCardMove}
             validDropZones={getValidDropZones}
@@ -873,6 +1022,9 @@ function GameContent() {
                   isMobile={sizes.isMobile}
                   selectedCard={battleSelectedCard}
                   onSelectedCardChange={setBattleSelectedCard}
+                  onCardHover={handleCardHover}
+                  onOpponentCardHover={handleOpponentCardHover}
+                  onCardHoverEnd={handleCardHoverEnd}
                 />
               </main>
               {sizes.isMobile ? (
@@ -899,70 +1051,69 @@ function GameContent() {
                 />
               )}
             </div>
-            {showSidebarSideboard && current_battle && (
-              <div
-                className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-                onClick={() => setShowSidebarSideboard(false)}
+            {activeDndPanel === 'sideboard' && current_battle && (
+              <DndPanel
+                title="Your Sideboard"
+                count={current_battle.your_zones.sideboard.length}
+                onClose={() => setActiveDndPanel(null)}
               >
-                <div
-                  className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-white font-medium">
-                      Your Sideboard ({current_battle.your_zones.sideboard.length})
-                    </h3>
-                    <button
-                      onClick={() => setShowSidebarSideboard(false)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {current_battle.your_zones.sideboard.map((card) => (
-                      <DraggableCard key={card.id} card={card} zone="sideboard" size="sm" />
-                    ))}
-                  </div>
-                </div>
-              </div>
+                {(dims) =>
+                  current_battle.your_zones.sideboard.map((card) => (
+                    <DraggableCard key={card.id} card={card} zone="sideboard" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
+                  ))
+                }
+              </DndPanel>
             )}
-            {showOpponentSideboard && current_battle && current_battle.opponent_full_sideboard && (
-              <div
-                className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-                onClick={() => setShowOpponentSideboard(false)}
+            {activeDndPanel === 'opponentSideboard' && current_battle && current_battle.opponent_full_sideboard && (
+              <DndPanel
+                title={`${current_battle.opponent_name}'s Sideboard`}
+                count={current_battle.opponent_full_sideboard.length}
+                onClose={() => setActiveDndPanel(null)}
               >
-                <div
-                  className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-white font-medium">
-                      {current_battle.opponent_name}'s Full Sideboard ({current_battle.opponent_full_sideboard.length})
-                    </h3>
-                    <button
-                      onClick={() => setShowOpponentSideboard(false)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {current_battle.opponent_full_sideboard.map((card) => (
-                      <DraggableCard
-                        key={card.id}
-                        card={card}
-                        zone="sideboard"
-                        zoneOwner="opponent"
-                        size="sm"
-                        isOpponent
-                      />
-                    ))}
-                  </div>
-                </div>
-              </div>
+                {(dims) =>
+                  current_battle.opponent_full_sideboard!.map((card) => (
+                    <DraggableCard
+                      key={card.id}
+                      card={card}
+                      zone="sideboard"
+                      zoneOwner="opponent"
+                      dimensions={dims}
+                      isOpponent
+                      onCardHover={handleOpponentCardHover}
+                      onCardHoverEnd={handleCardHoverEnd}
+                    />
+                  ))
+                }
+              </DndPanel>
+            )}
+            {activeDndPanel === 'graveyard' && current_battle && (
+              <DndPanel
+                title="Graveyard"
+                count={current_battle.your_zones.graveyard.length}
+                onClose={() => setActiveDndPanel(null)}
+              >
+                {(dims) =>
+                  current_battle.your_zones.graveyard.map((card) => (
+                    <DraggableCard key={card.id} card={card} zone="graveyard" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
+                  ))
+                }
+              </DndPanel>
+            )}
+            {activeDndPanel === 'exile' && current_battle && (
+              <DndPanel
+                title="Exile"
+                count={current_battle.your_zones.exile.length}
+                onClose={() => setActiveDndPanel(null)}
+              >
+                {(dims) =>
+                  current_battle.your_zones.exile.map((card) => (
+                    <DraggableCard key={card.id} card={card} zone="exile" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
+                  ))
+                }
+              </DndPanel>
             )}
           </GameDndProvider>
+          </FaceDownProvider>
         ) : (
           <div className="flex-1 flex min-h-0">
             <main className="flex-1 flex flex-col min-h-0 min-w-0">
@@ -975,6 +1126,9 @@ function GameContent() {
                   actions={actions}
                   selectedBasics={selectedBasics}
                   onBasicsChange={setSelectedBasics}
+                  onHandSlotsChange={(slots) => { handSlotsRef.current = slots; }}
+                  onCardHover={handleCardHover}
+                  onCardHoverEnd={handleCardHoverEnd}
                   isMobile={sizes.isMobile}
                 />
               )}
@@ -984,6 +1138,8 @@ function GameContent() {
                   actions={actions}
                   selectedUpgradeId={selectedUpgradeId}
                   onUpgradeSelect={setSelectedUpgradeId}
+                  selectedPoolCardId={selectedPoolCardId}
+                  onPoolCardSelect={setSelectedPoolCardId}
                 />
               )}
               {currentPhase === "awaiting_elimination" && (
@@ -1052,30 +1208,11 @@ function GameContent() {
             )}
           </div>
         )}
-        {sizes.isMobile && !isSpectator && (
-          <div className="shrink-0 bg-black/80 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
-            <div className="flex items-center justify-center gap-3">
-              {(currentPhase === "draft" || currentPhase === "build") && (
-                <div className="relative">
-                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-12 rounded-sm" />
-                  <span className="absolute -bottom-1 -right-1 bg-purple-900 text-purple-300 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border border-purple-500">{self_player.poison}</span>
-                </div>
-              )}
+        {/* Bottom Action Bar */}
+        {!isSpectator && (
+          <div className="shrink-0 relative z-50 bg-black/30 border-t border-gray-700/50">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
               {renderActionButtons()}
-              {currentPhase === "battle" && (
-                <button
-                  onClick={() => setActionMenuOpen(true)}
-                  className="btn bg-indigo-600 hover:bg-indigo-500 text-white"
-                >
-                  Actions
-                </button>
-              )}
-              {(currentPhase === "draft" || currentPhase === "build") && (
-                <div className="relative">
-                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-12 rounded-sm" />
-                  <span className="absolute -bottom-1 -right-1 bg-amber-900 text-amber-300 text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center border border-amber-500">{self_player.treasures}</span>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -1085,15 +1222,6 @@ function GameContent() {
           card={state.previewCard}
           appliedUpgrades={state.previewAppliedUpgrades}
           onClose={() => setPreviewCard(null)}
-        />
-      )}
-      {showRulesModal && (
-        <RulesModal
-          currentPhase={currentPhase as Phase}
-          onClose={() => setShowRulesModal(false)}
-          availableUpgrades={gameState.available_upgrades}
-          useUpgrades={gameState.use_upgrades}
-          cubeId={gameState.cube_id}
         />
       )}
       {actionMenuOpen && currentPhase === "battle" && current_battle && (
@@ -1107,8 +1235,8 @@ function GameContent() {
           onMove={(cardId, fromZone, toZone, fromOwner, toOwner) => actions.battleMove(cardId, fromZone, toZone, fromOwner, toOwner)}
           onUntapAll={handleUntapAll}
           onUntapOpponentAll={handleUntapOpponentAll}
-          onShowSideboard={() => { setShowSidebarSideboard(true); setActionMenuOpen(false); }}
-          onShowOpponentSideboard={() => { setShowOpponentSideboard(true); setActionMenuOpen(false); }}
+          onShowSideboard={() => { setActiveDndPanel('sideboard'); setActionMenuOpen(false); }}
+          onShowOpponentSideboard={() => { setActiveDndPanel('opponentSideboard'); setActionMenuOpen(false); }}
           onCreateTreasure={handleCreateTreasure}
           onPassTurn={handlePassTurn}
           onClose={() => setActionMenuOpen(false)}
@@ -1119,6 +1247,25 @@ function GameContent() {
           spectatorName={pendingSpectateRequest.spectator_name}
           requestId={pendingSpectateRequest.request_id}
           onRespond={actions.spectateResponse}
+        />
+      )}
+      {showUpgradesModal && (
+        <UpgradesModal
+          upgrades={self_player.upgrades}
+          mode={currentPhase === 'build' && self_player.upgrades.some((u) => !u.upgrade_target) ? 'apply' : 'view'}
+          targets={[...self_player.hand, ...self_player.sideboard]}
+          onApply={(upgradeId, targetId) => actions.buildApplyUpgrade(upgradeId, targetId)}
+          onClose={() => { setShowUpgradesModal(false); setUpgradeInitialTargetId(undefined); }}
+          initialTargetId={upgradeInitialTargetId}
+        />
+      )}
+      {rulesPanelOpen && (
+        <RulesPanel
+          onClose={() => setRulesPanelOpen(false)}
+          initialDocId={rulesPanelTarget?.docId}
+          initialTab={rulesPanelTarget?.tab}
+          gameId={gameId}
+          useUpgrades={gameState.use_upgrades}
         />
       )}
     </CardPreviewContext.Provider>

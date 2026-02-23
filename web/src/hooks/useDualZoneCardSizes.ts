@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useLayoutEffect } from 'react'
-
-const CARD_ASPECT_RATIO = 7 / 5
+import { CARD_ASPECT_RATIO, bestFit, type ZoneDims } from './cardSizeUtils'
 
 interface DualZoneConfig {
   topCount: number
@@ -8,16 +7,10 @@ interface DualZoneConfig {
   topGap?: number
   bottomGap?: number
   fixedHeight?: number
+  horizontalPadding?: number
   topMaxWidth?: number
   bottomMaxWidth?: number
   minCardWidth?: number
-}
-
-interface ZoneDims {
-  width: number
-  height: number
-  rows: number
-  columns: number
 }
 
 interface DualZoneDims {
@@ -25,47 +18,16 @@ interface DualZoneDims {
   bottom: ZoneDims
 }
 
-function bestFit(
-  count: number,
-  availWidth: number,
-  availHeight: number,
-  gap: number,
-  maxWidth: number,
-  minWidth: number
-): ZoneDims {
-  if (count === 0) {
-    return { width: maxWidth, height: Math.round(maxWidth * CARD_ASPECT_RATIO), rows: 1, columns: 1 }
-  }
-
-  for (let rows = 1; rows <= count; rows++) {
-    const cardsPerRow = Math.ceil(count / rows)
-    const hGaps = gap * Math.max(0, cardsPerRow - 1)
-    const naturalWidth = (availWidth - hGaps) / cardsPerRow
-
-    if (naturalWidth < minWidth) continue
-
-    const cardWidth = Math.floor(Math.min(maxWidth, naturalWidth))
-    const cardHeight = Math.round(cardWidth * CARD_ASPECT_RATIO)
-    const totalHeight = rows * cardHeight + gap * (rows - 1)
-
-    if (totalHeight <= availHeight) {
-      return { width: cardWidth, height: cardHeight, rows, columns: cardsPerRow }
-    }
-  }
-
-  return { width: minWidth, height: Math.round(minWidth * CARD_ASPECT_RATIO), rows: 1, columns: count }
-}
-
 const DEFAULT_DIMS: ZoneDims = { width: 100, height: 140, rows: 1, columns: 1 }
 
 function computeDualZone(
   containerWidth: number,
   containerHeight: number,
-  config: Required<Pick<DualZoneConfig, 'topCount' | 'bottomCount' | 'topGap' | 'bottomGap' | 'fixedHeight' | 'topMaxWidth' | 'bottomMaxWidth' | 'minCardWidth'>>
+  config: Required<Pick<DualZoneConfig, 'topCount' | 'bottomCount' | 'topGap' | 'bottomGap' | 'fixedHeight' | 'horizontalPadding' | 'topMaxWidth' | 'bottomMaxWidth' | 'minCardWidth'>>
 ): DualZoneDims {
-  const { topCount, bottomCount, topGap, bottomGap, fixedHeight, topMaxWidth, bottomMaxWidth, minCardWidth } = config
+  const { topCount, bottomCount, topGap, bottomGap, fixedHeight, horizontalPadding, topMaxWidth, bottomMaxWidth, minCardWidth } = config
   const availHeight = containerHeight - fixedHeight
-  const availWidth = containerWidth
+  const availWidth = containerWidth - horizontalPadding
 
   if (availHeight <= 0 || availWidth <= 0) {
     return { top: DEFAULT_DIMS, bottom: DEFAULT_DIMS }
@@ -158,12 +120,13 @@ export function useDualZoneCardSizes(config: DualZoneConfig): [
     topGap = 6,
     bottomGap = 6,
     fixedHeight = 0,
+    horizontalPadding = 0,
     topMaxWidth = 400,
     bottomMaxWidth = 300,
     minCardWidth = 40,
   } = config
 
-  const resolved = { topCount, bottomCount, topGap, bottomGap, fixedHeight, topMaxWidth, bottomMaxWidth, minCardWidth }
+  const resolved = { topCount, bottomCount, topGap, bottomGap, fixedHeight, horizontalPadding, topMaxWidth, bottomMaxWidth, minCardWidth }
 
   const [dims, setDims] = useState<DualZoneDims>(() => ({
     top: { width: minCardWidth, height: Math.round(minCardWidth * CARD_ASPECT_RATIO), rows: 1, columns: 1 },
@@ -178,7 +141,7 @@ export function useDualZoneCardSizes(config: DualZoneConfig): [
       return computeDualZone(containerWidth, containerHeight, resolved)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [topCount, bottomCount, topGap, bottomGap, fixedHeight, topMaxWidth, bottomMaxWidth, minCardWidth]
+    [topCount, bottomCount, topGap, bottomGap, fixedHeight, horizontalPadding, topMaxWidth, bottomMaxWidth, minCardWidth]
   )
 
   const refCallback = useCallback(

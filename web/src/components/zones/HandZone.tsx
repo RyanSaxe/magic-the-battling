@@ -6,6 +6,9 @@ interface HandZoneProps {
   cards: CardType[];
   selectedCardId?: string;
   onCardClick?: (card: CardType) => void;
+  onCardHover?: (cardId: string, zone: ZoneName) => void;
+  onCardHoverEnd?: () => void;
+  onCardContextMenu?: (e: React.MouseEvent, card: CardType) => void;
   validFromZones?: ZoneName[];
   draggable?: boolean;
   zone?: ZoneName;
@@ -19,6 +22,9 @@ export function HandZone({
   cards,
   selectedCardId,
   onCardClick,
+  onCardHover,
+  onCardHoverEnd,
+  onCardContextMenu,
   validFromZones = [
     "hand",
     "battlefield",
@@ -56,9 +62,12 @@ export function HandZone({
             dimensions={cardDimensions}
             selected={card.id === selectedCardId}
             onClick={() => onCardClick?.(card)}
+            onContextMenu={onCardContextMenu ? (e) => onCardContextMenu(e, card) : undefined}
             disabled={!draggable}
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={upgradesByCardId?.get(card.id)}
+            onCardHover={onCardHover}
+            onCardHoverEnd={onCardHoverEnd}
             style={{ ...(isOverlapping && i > 0 ? { marginLeft: gap } : undefined), ...(zIndex !== undefined ? { zIndex } : undefined) }}
           />
         )

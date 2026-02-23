@@ -7,10 +7,8 @@ interface AttachedCardStackProps {
   size?: 'xs' | 'sm' | 'md' | 'lg'
   dimensions?: { width: number; height: number }
   parentTapped?: boolean
-  parentFaceDown?: boolean
   parentCounters?: Record<string, number>
   attachedTappedIds?: Set<string>
-  attachedFaceDownIds?: Set<string>
   attachedCounters?: Record<string, Record<string, number>>
   selectedCardId?: string
   onCardClick?: (card: CardType) => void
@@ -20,7 +18,15 @@ interface AttachedCardStackProps {
   upgradesByCardId?: Map<string, CardType[]>
 }
 
-const ATTACHMENT_OFFSET = 20
+const PEEK_FRACTION = 0.15
+const ASPECT_RATIO = 7 / 5
+
+const SIZE_DIMENSIONS: Record<string, { width: number; height: number }> = {
+  xs: { width: 50, height: 70 },
+  sm: { width: 80, height: 112 },
+  md: { width: 130, height: 182 },
+  lg: { width: 200, height: 280 },
+}
 
 export function AttachedCardStack({
   parentCard,
@@ -28,10 +34,8 @@ export function AttachedCardStack({
   size = 'md',
   dimensions,
   parentTapped = false,
-  parentFaceDown = false,
   parentCounters,
   attachedTappedIds = new Set(),
-  attachedFaceDownIds = new Set(),
   attachedCounters = {},
   selectedCardId,
   onCardClick,
@@ -40,49 +44,55 @@ export function AttachedCardStack({
   upgradedCardIds = new Set(),
   upgradesByCardId,
 }: AttachedCardStackProps) {
-  const totalOffset = attachedCards.length * ATTACHMENT_OFFSET
+  const baseDims = dimensions ?? SIZE_DIMENSIONS[size]
+  const n = attachedCards.length
+
+  const scaledHeight = Math.round(baseDims.height / (1 + n * PEEK_FRACTION))
+  const scaledWidth = Math.round(scaledHeight / ASPECT_RATIO)
+  const offset = Math.round(scaledHeight * PEEK_FRACTION)
+  const leftOffset = Math.round((baseDims.width - scaledWidth) / 2)
+  const scaledDims = { width: scaledWidth, height: scaledHeight }
 
   return (
     <div
       className="relative"
-      style={{ marginTop: totalOffset }}
+      style={{ width: baseDims.width, height: baseDims.height }}
     >
-      {attachedCards.map((card, index) => {
-        const offset = (attachedCards.length - index) * ATTACHMENT_OFFSET
-        return (
-          <div
-            key={card.id}
-            className="absolute"
-            style={{
-              top: -offset,
-              left: 0,
-              zIndex: index,
-            }}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              onCardContextMenu?.(e, card)
-            }}
-          >
-            <Card
-              card={card}
-              size={size}
-              dimensions={dimensions}
-              tapped={attachedTappedIds.has(card.id)}
-              faceDown={attachedFaceDownIds.has(card.id)}
-              counters={attachedCounters[card.id]}
-              selected={card.id === selectedCardId}
-              onClick={() => onCardClick?.(card)}
-              onDoubleClick={() => onCardDoubleClick?.(card)}
-              upgraded={upgradedCardIds.has(card.id)}
-              appliedUpgrades={upgradesByCardId?.get(card.id)}
-            />
-          </div>
-        )
-      })}
+      {attachedCards.map((card, index) => (
+        <div
+          key={card.id}
+          className="absolute"
+          style={{
+            top: index * offset,
+            left: leftOffset,
+            zIndex: index,
+          }}
+          onContextMenu={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onCardContextMenu?.(e, card)
+          }}
+        >
+          <Card
+            card={card}
+            dimensions={scaledDims}
+            tapped={attachedTappedIds.has(card.id)}
+            counters={attachedCounters[card.id]}
+            selected={card.id === selectedCardId}
+            onClick={() => onCardClick?.(card)}
+            onDoubleClick={() => onCardDoubleClick?.(card)}
+            upgraded={upgradedCardIds.has(card.id)}
+            appliedUpgrades={upgradesByCardId?.get(card.id)}
+          />
+        </div>
+      ))}
       <div
-        className="relative"
-        style={{ zIndex: attachedCards.length }}
+        className="absolute"
+        style={{
+          top: n * offset,
+          left: leftOffset,
+          zIndex: n,
+        }}
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
@@ -91,10 +101,8 @@ export function AttachedCardStack({
       >
         <Card
           card={parentCard}
-          size={size}
-          dimensions={dimensions}
+          dimensions={scaledDims}
           tapped={parentTapped}
-          faceDown={parentFaceDown}
           counters={parentCounters}
           selected={parentCard.id === selectedCardId}
           onClick={() => onCardClick?.(parentCard)}

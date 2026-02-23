@@ -11,9 +11,10 @@ interface SpectatorConfig {
 export function useGame(
   gameId: string | null,
   sessionId: string | null,
-  spectatorConfig?: SpectatorConfig | null
+  spectatorConfig?: SpectatorConfig | null,
+  onServerError?: (message: string) => void
 ) {
-  const { isConnected, gameState, lobbyState, error, send, pendingSpectateRequest, clearSpectateRequest } = useWebSocket(gameId, sessionId, spectatorConfig)
+  const { isConnected, gameState, lobbyState, send, pendingSpectateRequest, clearSpectateRequest } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError)
 
   const startGame = useCallback(() => {
     send('start_game')
@@ -48,8 +49,8 @@ export function useGame(
     send('build_swap', { card_a_id: cardAId, source_a: sourceA, card_b_id: cardBId, source_b: sourceB })
   }, [send])
 
-  const buildReady = useCallback((basics: string[], playDrawPreference: 'play' | 'draw') => {
-    send('build_ready', { basics, play_draw_preference: playDrawPreference })
+  const buildReady = useCallback((basics: string[], playDrawPreference: 'play' | 'draw', handOrder?: string[]) => {
+    send('build_ready', { basics, play_draw_preference: playDrawPreference, hand_order: handOrder })
   }, [send])
 
   const buildUnready = useCallback(() => {
@@ -113,7 +114,6 @@ export function useGame(
     isConnected,
     gameState,
     lobbyState,
-    error,
     pendingSpectateRequest,
     actions: {
       startGame,

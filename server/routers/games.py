@@ -10,6 +10,7 @@ from server.db.models import GameRecord, PlayerGameHistory
 from server.schemas.api import (
     CreateGameRequest,
     CreateGameResponse,
+    GameCardsResponse,
     GameStateResponse,
     GameStatusPlayer,
     GameStatusResponse,
@@ -170,6 +171,26 @@ def get_lobby(game_id: str):
     return lobby
 
 
+@router.get("/{game_id}/cards", response_model=GameCardsResponse)
+def get_game_cards(game_id: str):
+    pending = game_manager.get_pending_game(game_id)
+    game = game_manager.get_game(game_id)
+
+    battler = None
+    if pending and pending.battler:
+        battler = pending.battler
+    elif game and game.battler:
+        battler = game.battler
+
+    if not battler:
+        raise HTTPException(status_code=404, detail="Card pool not available")
+
+    return GameCardsResponse(
+        cards=battler.original_cards or battler.cards,
+        upgrades=battler.original_upgrades or battler.upgrades,
+    )
+
+
 @router.post("/{game_id}/start", response_model=StartGameResponse)
 def start_game(game_id: str):
     pending = game_manager.get_pending_game(game_id)
@@ -223,7 +244,7 @@ def get_game_status(game_id: str):
                 GameStatusPlayer(
                     name=name,
                     is_connected=player_id in connected_player_ids,
-                    is_bot=False,
+                    is_puppet=False,
                     phase="lobby",
                 )
             )
@@ -242,7 +263,7 @@ def get_game_status(game_id: str):
                 GameStatusPlayer(
                     name=player.name,
                     is_connected=player_id in connected_player_ids if player_id else False,
-                    is_bot=False,
+                    is_puppet=False,
                     phase=player.phase,
                 )
             )
@@ -250,10 +271,10 @@ def get_game_status(game_id: str):
             GameStatusPlayer(
                 name=fake.name,
                 is_connected=True,
-                is_bot=True,
+                is_puppet=True,
                 phase="battle" if not fake.is_eliminated else "eliminated",
             )
-            for fake in game.fake_players
+            for fake in game.puppets
         )
 
         phases = {p.phase for p in game.players if p.phase != "eliminated"}
@@ -287,7 +308,7 @@ async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
         player_exists = target_name in pending.player_names
     elif game:
         player_exists = any(p.name == target_name for p in game.players)
-        player_exists = player_exists or any(f.name == target_name for f in game.fake_players)
+        player_exists = player_exists or any(f.name == target_name for f in game.puppets)
 
     if not player_exists:
         raise HTTPException(status_code=404, detail="Target player not found")
@@ -349,7 +370,7 @@ def _build_human_snapshots(history: PlayerGameHistory) -> list[SharePlayerSnapsh
     return snapshots
 
 
-def _build_bot_snapshots(history: PlayerGameHistory, db: Session) -> list[SharePlayerSnapshot]:
+def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[SharePlayerSnapshot]:
     source = (
         db.query(PlayerGameHistory)
         .options(joinedload(PlayerGameHistory.snapshots))
@@ -411,9 +432,9 @@ def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)
 
     players: list[SharePlayerData] = []
     for history in histories:
-        is_bot = bool(history.is_bot)
-        if is_bot:
-            snapshots = _build_bot_snapshots(history, db)
+        is_puppet = bool(history.is_puppet)
+        if is_puppet:
+            snapshots = _build_puppet_snapshots(history, db)
         else:
             snapshots = _build_human_snapshots(history)
 
@@ -423,7 +444,7 @@ def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)
                 name=str(history.player_name),
                 final_placement=cast(int, history.final_placement) if history.final_placement is not None else None,
                 final_poison=final_poison,
-                is_bot=is_bot,
+                is_puppet=is_puppet,
                 snapshots=snapshots,
             )
         )

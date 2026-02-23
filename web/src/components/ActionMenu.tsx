@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
+import { useFaceDown } from '../contexts/faceDownState'
 import type { BattleSelectedCard } from '../pages/phases/Battle'
 
 interface ActionMenuProps {
@@ -77,14 +78,14 @@ export function ActionMenu({
   const card = selectedCard?.card
   const zone = selectedCard?.zone
   const onBattlefield = zone === 'battlefield'
+  const isFaceDown = useFaceDown(card?.id ?? '')
+  const isScrubbed = !card?.name
 
   const tappedCardIds = new Set(battle.your_zones.tapped_card_ids || [])
-  const faceDownCardIds = new Set(battle.your_zones.face_down_card_ids || [])
   const counters = card ? (battle.your_zones.counters?.[card.id] || {}) : {}
   const attachments = battle.your_zones.attachments || {}
 
   const isTapped = card ? tappedCardIds.has(card.id) : false
-  const isFaceDown = card ? faceDownCardIds.has(card.id) : false
   const hasFlip = !!card?.flip_image_url
   const hasTokens = (card?.tokens?.length ?? 0) > 0
   const hasCounters = Object.keys(counters).length > 0
@@ -95,7 +96,7 @@ export function ActionMenu({
     <>
       <div className="fixed inset-0 z-50" onClick={onClose} />
       <div
-        className="fixed bottom-16 right-4 sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-50"
+        className="fixed bottom-16 left-4 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-50"
         style={{ maxWidth: 280 }}
       >
         {card && (
@@ -111,14 +112,14 @@ export function ActionMenu({
               />
             )}
 
-            {hasFlip && (
+            {hasFlip && !isScrubbed && (
               <MenuItem
                 label="Flip"
                 onClick={() => handleAction('flip')}
               />
             )}
 
-            {onBattlefield && (
+            {!isScrubbed && (
               <MenuItem
                 label={isFaceDown ? 'Turn Face Up' : 'Turn Face Down'}
                 onClick={() => handleAction('face_down')}

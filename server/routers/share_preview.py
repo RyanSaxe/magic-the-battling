@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from server.db import database
 from server.db.models import GameRecord, PlayerGameHistory
-from server.routers.games import _build_bot_snapshots, _build_human_snapshots
+from server.routers.games import _build_human_snapshots, _build_puppet_snapshots
 from server.schemas.api import ShareGameResponse, SharePlayerData
 from server.services.preview import preview_service
 
@@ -71,9 +71,9 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
 
     players: list[SharePlayerData] = []
     for history in histories:
-        is_bot = bool(history.is_bot)
-        if is_bot:
-            snapshots = _build_bot_snapshots(history, db)
+        is_puppet = bool(history.is_puppet)
+        if is_puppet:
+            snapshots = _build_puppet_snapshots(history, db)
         else:
             snapshots = _build_human_snapshots(history)
 
@@ -83,7 +83,7 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
                 name=str(history.player_name),
                 final_placement=cast(int, history.final_placement) if history.final_placement is not None else None,
                 final_poison=final_poison,
-                is_bot=is_bot,
+                is_puppet=is_puppet,
                 snapshots=snapshots,
             )
         )

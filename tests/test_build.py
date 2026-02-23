@@ -179,15 +179,90 @@ class TestPlayDrawPreference:
         assert player.play_draw_preference == "play"
 
 
-def test_populate_hand_clears_companion_when_elo_adds_it(card_factory):
+class TestHandOrder:
+    def test_set_ready_reorders_hand(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        cards = [card_factory(f"c{i}") for i in range(3)]
+        player.hand.extend(cards)
+
+        hand_order = [cards[2].id, cards[0].id, cards[1].id]
+        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "play", hand_order=hand_order)
+
+        assert [c.id for c in player.hand] == hand_order
+        assert player.build_ready is True
+
+    def test_set_ready_ignores_mismatched_hand_order(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        cards = [card_factory(f"c{i}") for i in range(3)]
+        player.hand.extend(cards)
+        original_order = [c.id for c in player.hand]
+
+        build.set_ready(
+            game, player, ["Plains", "Island", "Mountain"], "play", hand_order=["bad_id", cards[0].id, cards[1].id]
+        )
+
+        assert [c.id for c in player.hand] == original_order
+        assert player.build_ready is True
+
+    def test_set_ready_without_hand_order(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        cards = [card_factory(f"c{i}") for i in range(3)]
+        player.hand.extend(cards)
+        original_order = [c.id for c in player.hand]
+
+        build.set_ready(game, player, ["Plains", "Island", "Mountain"], "play")
+
+        assert [c.id for c in player.hand] == original_order
+
+
+def test_set_ready_rejects_underfull_hand(card_factory):
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
-    companion = card_factory("Lurrus", "Creature", oracle_text="Companion — test", elo=9999)
-    filler = card_factory("Filler", elo=1)
-    player.sideboard.extend([companion, filler])
-    player.command_zone.append(companion.model_copy())
+    player.hand.extend([card_factory(f"c{i}") for i in range(2)])
+
+    with pytest.raises(ValueError, match="Hand must have exactly"):
+        build.set_ready(game, player, ["Plains", "Island", "Mountain"])
+
+
+def test_populate_hand_restores_previous_hand(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    player = game.players[0]
+    cards = [card_factory(f"c{i}") for i in range(5)]
+    player.hand.extend(cards[:3])
+    player.sideboard.extend(cards[3:])
+    player.previous_hand_ids = [cards[0].id, cards[1].id, cards[2].id]
 
     player.populate_hand()
 
-    assert any(c.id == companion.id for c in player.hand)
-    assert len(player.command_zone) == 0
+    assert [c.id for c in player.hand] == [cards[0].id, cards[1].id, cards[2].id]
+    assert len(player.sideboard) == 2
+
+
+def test_populate_hand_skips_missing_cards(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    player = game.players[0]
+    cards = [card_factory(f"c{i}") for i in range(5)]
+    player.sideboard.extend(cards)
+    player.previous_hand_ids = [cards[0].id, "gone_card", cards[2].id]
+
+    player.populate_hand()
+
+    assert [c.id for c in player.hand] == [cards[0].id, cards[2].id]
+    assert len(player.sideboard) == 3
+
+
+def test_populate_hand_empty_previous_hand(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    player = game.players[0]
+    cards = [card_factory(f"c{i}") for i in range(5)]
+    player.hand.extend(cards[:3])
+    player.sideboard.extend(cards[3:])
+    player.previous_hand_ids = []
+
+    player.populate_hand()
+
+    assert len(player.hand) == 0
+    assert len(player.sideboard) == 5

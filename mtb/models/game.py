@@ -2,7 +2,7 @@ import random
 import weakref
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, PrivateAttr
 
 from mtb.models.cards import Battler, Card
 from mtb.models.types import Phase, ZoneName
@@ -74,8 +74,8 @@ class BattleSnapshotData(BaseModel):
     play_draw_preference: str | None = None
 
 
-class FakePlayer(BaseModel):
-    """Tracks a historical player across rounds in the current game."""
+class Puppet(BaseModel):
+    """Tracks a historical/puppet player across rounds in the current game."""
 
     name: str
     player_history_id: int
@@ -188,26 +188,15 @@ class Player(BaseModel):
         return self.game.config.starting_stage + self.vanquishers
 
     def populate_hand(self) -> None:
-        """Populate hand with previous battle cards, then fill remaining slots by ELO."""
-        self.sideboard.extend(self.hand)
-        self.hand.clear()
+        """Restore previous hand cards that are still in the pool."""
+        all_cards = self.hand + self.sideboard
+        pool_by_id = {c.id: c for c in all_cards}
 
-        for card_id in self.previous_hand_ids:
-            card = next((c for c in self.sideboard if c.id == card_id), None)
-            if card:
-                self.sideboard.remove(card)
-                self.hand.append(card)
+        restored_ids = [cid for cid in self.previous_hand_ids if cid in pool_by_id]
+        restored_set = set(restored_ids[: self.hand_size])
 
-        slots_to_fill = self.hand_size - len(self.hand)
-        if slots_to_fill > 0 and self.sideboard:
-            by_elo = sorted(self.sideboard, key=lambda c: c.elo, reverse=True)
-            for card in by_elo[:slots_to_fill]:
-                self.sideboard.remove(card)
-                self.hand.append(card)
-
-        if self.command_zone and any(c.id in {cz.id for cz in self.command_zone} for c in self.hand):
-            self.command_zone.clear()
-
+        self.hand = [pool_by_id[cid] for cid in restored_ids[: self.hand_size]]
+        self.sideboard = [c for c in all_cards if c.id not in restored_set]
         self.chosen_basics = self.previous_basics.copy()
 
 
@@ -236,8 +225,16 @@ class Game(BaseModel):
     draft_state: DraftState | None = None
     active_battles: list["Battle"] = Field(default_factory=list)
     most_recent_ghost: StaticOpponent | None = None
-    most_recent_ghost_bot: FakePlayer | None = None
-    fake_players: list[FakePlayer] = Field(default_factory=list)
+    # TODO(v1.0): remove most_recent_ghost_bot alias once historical games are cleared on v1.0 launch
+    most_recent_ghost_puppet: Puppet | None = Field(
+        default=None,
+        validation_alias=AliasChoices("most_recent_ghost_puppet", "most_recent_ghost_bot"),
+    )
+    # TODO(v1.0): remove fake_players alias once historical games are cleared on v1.0 launch
+    puppets: list[Puppet] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("puppets", "fake_players"),
+    )
     stage: int = 3
     round: int = 1
 
@@ -309,6 +306,7 @@ class Battle(BaseModel):
     player_life: int = 20
     opponent_life: int = 20
     is_sudden_death: bool = False
+    _face_down_id_map: dict[str, str] = PrivateAttr(default_factory=dict)
 
 
 def create_game(player_names: list[str], num_players: int, config: Config | None = None) -> Game:

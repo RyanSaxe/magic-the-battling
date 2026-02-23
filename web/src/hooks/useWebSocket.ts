@@ -10,7 +10,6 @@ interface WebSocketState {
   isConnected: boolean
   gameState: GameState | null
   lobbyState: LobbyState | null
-  error: string | null
   pendingSpectateRequest: SpectateRequest | null
 }
 
@@ -22,13 +21,13 @@ interface SpectatorConfig {
 export function useWebSocket(
   gameId: string | null,
   sessionId: string | null,
-  spectatorConfig?: SpectatorConfig | null
+  spectatorConfig?: SpectatorConfig | null,
+  onServerError?: (message: string) => void
 ) {
   const [state, setState] = useState<WebSocketState>({
     isConnected: false,
     gameState: null,
     lobbyState: null,
-    error: null,
     pendingSpectateRequest: null,
   })
 
@@ -36,6 +35,10 @@ export function useWebSocket(
   const reconnectTimeoutRef = useRef<number | null>(null)
   const reconnectAttempts = useRef(0)
   const isClosingRef = useRef(false)
+  const onServerErrorRef = useRef(onServerError)
+  useEffect(() => {
+    onServerErrorRef.current = onServerError
+  }, [onServerError])
 
   useEffect(() => {
     if (!gameId || !sessionId) return
@@ -57,7 +60,7 @@ export function useWebSocket(
       const ws = new WebSocket(url)
 
       ws.onopen = () => {
-        setState(s => ({ ...s, isConnected: true, error: null }))
+        setState(s => ({ ...s, isConnected: true }))
         reconnectAttempts.current = 0
       }
 
@@ -68,7 +71,7 @@ export function useWebSocket(
         } else if (message.type === 'lobby_state') {
           setState(s => ({ ...s, lobbyState: message.payload }))
         } else if (message.type === 'error') {
-          setState(s => ({ ...s, error: message.payload.message }))
+          onServerErrorRef.current?.(message.payload.message)
         } else if (message.type === 'spectate_request') {
           setState(s => ({ ...s, pendingSpectateRequest: message.payload }))
         }
@@ -86,7 +89,7 @@ export function useWebSocket(
       }
 
       ws.onerror = () => {
-        setState(s => ({ ...s, error: 'WebSocket connection error' }))
+        onServerErrorRef.current?.('WebSocket connection error')
       }
 
       wsRef.current = ws

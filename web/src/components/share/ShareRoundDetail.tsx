@@ -19,6 +19,7 @@ export function ShareRoundDetail({ snapshot, useUpgrades }: ShareRoundDetailProp
         poison={snapshot.poison}
         appliedUpgrades={appliedUpgrades}
         companionIds={companionIds}
+        className="bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col"
       />
     </div>
   )

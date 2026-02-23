@@ -28,6 +28,8 @@ def get_card_from_scryfall(card_id: str) -> Card:
         type_line=card_json["type_line"],
         id=card_json["id"],
         oracle_text=oracle_text,
+        colors=card_json.get("colors", []),
+        cmc=card_json.get("cmc", 0),
     )
 
     if card.type_line == "Vanguard":

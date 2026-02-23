@@ -2,6 +2,7 @@ import type { Card as CardType, ZoneName } from "../../types";
 import type { CardDimensions } from "../../hooks/useViewportCardSizes";
 import { DraggableCard, DroppableZone } from "../../dnd";
 import { AttachedCardStack } from "../card";
+import { PoisonCard } from "../common/PoisonCard";
 
 const isLandOrTreasure = (card: CardType) =>
   card.type_line.toLowerCase().includes("land") ||
@@ -17,8 +18,10 @@ interface BattlefieldZoneProps {
   onCardClick?: (card: CardType) => void;
   onCardDoubleClick?: (card: CardType) => void;
   onCardContextMenu?: (e: React.MouseEvent, card: CardType) => void;
+  onCardHover?: (cardId: string, zone: ZoneName) => void;
+  onCardHoverEnd?: () => void;
   tappedCardIds?: Set<string>;
-  faceDownCardIds?: Set<string>;
+  flippedCardIds?: Set<string>;
   counters?: Record<string, Record<string, number>>;
   attachments?: Record<string, string[]>;
   validFromZones?: ZoneName[];
@@ -30,9 +33,11 @@ interface BattlefieldZoneProps {
   cardDimensions?: CardDimensions;
   upgradedCardIds?: Set<string>;
   upgradesByCardId?: Map<string, CardType[]>;
+  poisonCount?: number;
   rowHeight?: number;
   landCardDimensions?: CardDimensions;
   nonlandCardDimensions?: CardDimensions;
+  canPeekFaceDown?: boolean;
 }
 
 export function BattlefieldZone({
@@ -41,8 +46,10 @@ export function BattlefieldZone({
   onCardClick,
   onCardDoubleClick,
   onCardContextMenu,
+  onCardHover,
+  onCardHoverEnd,
   tappedCardIds = new Set(),
-  faceDownCardIds = new Set(),
+  flippedCardIds = new Set(),
   counters = {},
   attachments = {},
   validFromZones = ["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone"],
@@ -54,9 +61,11 @@ export function BattlefieldZone({
   cardDimensions,
   upgradedCardIds = new Set(),
   upgradesByCardId,
+  poisonCount = 0,
   rowHeight,
   landCardDimensions,
   nonlandCardDimensions,
+  canPeekFaceDown,
 }: BattlefieldZoneProps) {
   const allowInteraction = !isOpponent || canManipulateOpponent;
   const attachedCardIds = new Set(Object.values(attachments).flat());
@@ -86,10 +95,8 @@ export function BattlefieldZone({
           attachedCards={attachedCards}
           dimensions={resolvedDims}
           parentTapped={tappedCardIds.has(card.id)}
-          parentFaceDown={faceDownCardIds.has(card.id)}
           parentCounters={counters[card.id]}
           attachedTappedIds={tappedCardIds}
-          attachedFaceDownIds={faceDownCardIds}
           attachedCounters={counters}
           selectedCardId={selectedCardId}
           onCardClick={onCardClick}
@@ -120,14 +127,17 @@ export function BattlefieldZone({
           dimensions={resolvedDims}
           selected={card.id === selectedCardId}
           tapped={tappedCardIds.has(card.id)}
-          faceDown={faceDownCardIds.has(card.id)}
+          flipped={flippedCardIds.has(card.id)}
           counters={counters[card.id]}
           onClick={() => onCardClick?.(card)}
           onDoubleClick={() => onCardDoubleClick?.(card)}
-          disabled={!draggable || !allowInteraction}
+          disabled={!draggable || !allowInteraction || !card.name}
           isOpponent={isOpponent}
           upgraded={upgradedCardIds.has(card.id)}
           appliedUpgrades={upgradesByCardId?.get(card.id)}
+          canPeekFaceDown={canPeekFaceDown}
+          onCardHover={allowInteraction ? onCardHover : undefined}
+          onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
         />
       </div>
     );
@@ -177,6 +187,9 @@ export function BattlefieldZone({
                     </div>
                   ))}
                 </div>
+              )}
+              {landCardDimensions && (
+                <PoisonCard count={poisonCount} dimensions={landCardDimensions} />
               )}
             </div>
           )}

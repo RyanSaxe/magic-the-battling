@@ -61,9 +61,9 @@ if static_dir.exists():
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-    @app.get("/vite.svg")
-    async def vite_svg():
-        return FileResponse(static_dir / "vite.svg")
+    @app.get("/favicon.svg")
+    async def favicon():
+        return FileResponse(static_dir / "favicon.svg")
 
     @app.get("/{path:path}")
     async def spa_fallback(path: str):

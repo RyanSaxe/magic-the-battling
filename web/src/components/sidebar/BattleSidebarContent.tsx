@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { BattleView, Card as CardType } from "../../types";
 import { UpgradeStack } from "./UpgradeStack";
 import { POISON_COUNTER_IMAGE } from "../../constants/assets";
@@ -11,7 +11,7 @@ interface BattleSidebarContentProps {
   onYourLifeChange: (life: number) => void;
   onOpponentLifeChange: (life: number) => void;
   playerName: string;
-  onOpenActions?: () => void;
+  onCreateTreasure?: () => void;
 }
 
 function LifeCounter({
@@ -83,6 +83,31 @@ function LifeCounter({
   );
 }
 
+const ASPECT_RATIO = 7 / 5
+const GAP = 8
+const PADDING = 12
+const MIN_DIMS = { width: 50, height: 70 }
+const MAX_DIMS = { width: 130, height: 182 }
+
+function computeUpgradeDims(
+  count: number,
+  container: { width: number; height: number } | null,
+): { width: number; height: number } {
+  if (!container || count === 0) return MIN_DIMS
+  const availW = container.width - PADDING * 2
+  const availH = container.height - PADDING
+  let w = Math.floor((availW - GAP * (count - 1)) / count)
+  let h = Math.round(w * ASPECT_RATIO)
+  if (h > availH) {
+    h = availH
+    w = Math.round(h / ASPECT_RATIO)
+  }
+  return {
+    width: Math.max(MIN_DIMS.width, Math.min(MAX_DIMS.width, w)),
+    height: Math.max(MIN_DIMS.height, Math.min(MAX_DIMS.height, Math.round(w * ASPECT_RATIO))),
+  }
+}
+
 function PlayerSection({
   upgrades,
   isReversed = false,
@@ -90,15 +115,33 @@ function PlayerSection({
   upgrades: CardType[];
   isReversed?: boolean;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerDims, setContainerDims] = useState<{ width: number; height: number } | null>(null)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const obs = new ResizeObserver(() => {
+      setContainerDims({ width: el.clientWidth, height: el.clientHeight })
+    })
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
   const appliedUpgrades = upgrades.filter((u) => u.upgrade_target);
 
   if (appliedUpgrades.length === 0) return null;
 
+  const dims = computeUpgradeDims(appliedUpgrades.length, containerDims)
+
   return (
-    <div className={`flex flex-col ${isReversed ? 'justify-end' : 'justify-start'} h-full`}>
+    <div
+      ref={containerRef}
+      className={`flex flex-col ${isReversed ? 'justify-end' : 'justify-start'} h-full`}
+    >
       <div className="flex gap-2 flex-wrap justify-center">
         {appliedUpgrades.map((upgrade) => (
-          <UpgradeStack key={upgrade.id} upgrade={upgrade} size="xs" />
+          <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={dims} />
         ))}
       </div>
     </div>
@@ -113,7 +156,7 @@ export function BattleSidebarContent({
   onYourLifeChange,
   onOpponentLifeChange,
   playerName,
-  onOpenActions,
+  onCreateTreasure,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
@@ -182,13 +225,13 @@ export function BattleSidebarContent({
               )}
             </div>
           )}
-          {onOpenActions && (
+          {onCreateTreasure && (
             <div className="mt-3">
               <button
-                onClick={onOpenActions}
+                onClick={onCreateTreasure}
                 className="w-full px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
               >
-                Actions
+                Create Treasure
               </button>
             </div>
           )}

@@ -1,5 +1,6 @@
 export { Card } from './Card'
 export { CardBack } from './CardBack'
 export { CardPreviewContext } from './CardPreviewContext'
+export { CardPreviewModal } from './CardPreviewModal'
 export { CardActionMenu } from './CardActionMenu'
 export { AttachedCardStack } from './AttachedCardStack'

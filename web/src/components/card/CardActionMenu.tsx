@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../../types'
+import { useFaceDown } from '../../contexts/faceDownState'
 
 interface CardActionMenuProps {
   card: CardType
@@ -7,11 +8,11 @@ interface CardActionMenuProps {
   zone: ZoneName
   isTapped: boolean
   isFlipped: boolean
-  isFaceDown: boolean
   counters: Record<string, number>
   isAttached: boolean
   battlefieldCards: CardType[]
   isOpponent?: boolean
+  canManipulateOpponent?: boolean
   onAction: (action: CardStateAction, data?: Record<string, unknown>) => void
   onMove: (toZone: ZoneName) => void
   onClose: () => void
@@ -27,15 +28,16 @@ export function CardActionMenu({
   zone,
   isTapped,
   isFlipped,
-  isFaceDown,
   counters,
   isAttached,
   battlefieldCards,
   isOpponent = false,
+  canManipulateOpponent = true,
   onAction,
   onMove,
   onClose,
 }: CardActionMenuProps) {
+  const isFaceDown = useFaceDown(card.id)
   const [submenu, setSubmenu] = useState<Submenu>('none')
 
   const menuRef = useCallback((node: HTMLDivElement | null) => {
@@ -60,6 +62,7 @@ export function CardActionMenu({
   }, [position])
 
   const onBattlefield = zone === 'battlefield'
+  const hideFaceControls = isOpponent && !canManipulateOpponent
   const hasFlip = !!card.flip_image_url
   const hasTokens = card.tokens.length > 0
   const hasCounters = Object.keys(counters).length > 0
@@ -107,21 +110,21 @@ export function CardActionMenu({
           </>
         )}
 
-        {hasFlip && (
+        {hasFlip && !hideFaceControls && (
           <MenuItem
             label={isFlipped ? 'Flip to Front' : 'Flip to Back'}
             onClick={() => handleAction('flip')}
           />
         )}
 
-        {onBattlefield && (
+        {!hideFaceControls && (
           <MenuItem
             label={isFaceDown ? 'Turn Face Up' : 'Turn Face Down'}
             onClick={() => handleAction('face_down')}
           />
         )}
 
-        {(hasFlip || onBattlefield) && <MenuDivider />}
+        <MenuDivider />
 
         {onBattlefield && (
           <>

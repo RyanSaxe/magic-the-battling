@@ -1,35 +1,36 @@
 import random
 
-from mtb.models.game import FakePlayer, Game, Player, StaticOpponent
+from mtb.models.game import Game, Player, Puppet, StaticOpponent
 
-Participant = Player | FakePlayer
+Participant = Player | Puppet
 
 
 def get_live_players(game: Game) -> list[Player]:
     return [p for p in game.players if p.phase != "eliminated"]
 
 
-def get_live_bots(game: Game) -> list[FakePlayer]:
-    return [f for f in game.fake_players if not f.is_eliminated]
+def get_live_puppets(game: Game) -> list[Puppet]:
+    return [f for f in game.puppets if not f.is_eliminated]
 
 
 def get_would_be_dead(game: Game) -> list[Player]:
     return [p for p in get_live_players(game) if p.poison >= game.config.poison_to_lose]
 
 
-def get_would_be_dead_bots(game: Game) -> list[FakePlayer]:
-    return [f for f in get_live_bots(game) if f.poison >= game.config.poison_to_lose]
+def get_would_be_dead_puppets(game: Game) -> list[Puppet]:
+    return [f for f in get_live_puppets(game) if f.poison >= game.config.poison_to_lose]
 
 
-def eliminate_bot(game: Game, bot: FakePlayer) -> None:
-    bot.is_eliminated = True
-    remaining = len(get_live_players(game)) + len(get_live_bots(game))
-    bot.placement = remaining + 1
-    game.most_recent_ghost = None
-    if remaining % 2 == 0:
-        game.most_recent_ghost_bot = None
-    else:
-        game.most_recent_ghost_bot = bot
+def _update_ghosts(game: Game, ghost: StaticOpponent | None, ghost_puppet: Puppet | None, remaining: int) -> None:
+    game.most_recent_ghost = ghost if remaining % 2 != 0 else None
+    game.most_recent_ghost_puppet = ghost_puppet if remaining % 2 != 0 else None
+
+
+def eliminate_puppet(game: Game, puppet: Puppet) -> None:
+    puppet.is_eliminated = True
+    remaining = len(get_live_players(game)) + len(get_live_puppets(game))
+    puppet.placement = remaining + 1
+    _update_ghosts(game, None, puppet, remaining)
 
 
 def eliminate_player(game: Game, player: Player, round_num: int, stage_num: int) -> None:
@@ -37,15 +38,10 @@ def eliminate_player(game: Game, player: Player, round_num: int, stage_num: int)
     player.phase = "eliminated"
     player.elimination_round = round_num
     player.elimination_stage = stage_num
-    game.most_recent_ghost_bot = None
 
-    remaining_alive = len(get_live_players(game)) + len(get_live_bots(game))
+    remaining_alive = len(get_live_players(game)) + len(get_live_puppets(game))
     player.placement = remaining_alive + 1
-
-    if remaining_alive % 2 == 0:
-        game.most_recent_ghost = None
-    else:
-        game.most_recent_ghost = ghost_opponent
+    _update_ghosts(game, ghost_opponent, None, remaining_alive)
 
 
 def would_be_dead_ready_for_elimination(game: Game) -> bool:
@@ -60,12 +56,12 @@ def would_be_dead_ready_for_elimination(game: Game) -> bool:
 
 def needs_sudden_death(game: Game) -> bool:
     would_die_humans = get_would_be_dead(game)
-    would_die_bots = get_would_be_dead_bots(game)
-    total_would_die = len(would_die_humans) + len(would_die_bots)
+    would_die_puppets = get_would_be_dead_puppets(game)
+    total_would_die = len(would_die_humans) + len(would_die_puppets)
 
     live = get_live_players(game)
-    live_bots = get_live_bots(game)
-    survivors = (len(live) + len(live_bots)) - total_would_die
+    live_puppets = get_live_puppets(game)
+    survivors = (len(live) + len(live_puppets)) - total_would_die
 
     return survivors < 2 and total_would_die >= 2
 
@@ -79,7 +75,7 @@ def get_sudden_death_fighters(game: Game) -> tuple[Participant, Participant] | N
     if not needs_sudden_death(game):
         return None
 
-    would_die: list[Participant] = list(get_would_be_dead(game)) + list(get_would_be_dead_bots(game))
+    would_die: list[Participant] = list(get_would_be_dead(game)) + list(get_would_be_dead_puppets(game))
     fighters = select_sudden_death_fighters(would_die)
     return fighters[0], fighters[1]
 
@@ -114,13 +110,13 @@ def process_eliminations(game: Game, round_num: int, stage_num: int) -> list[Pla
     return eliminated
 
 
-def process_bot_eliminations(game: Game) -> list[FakePlayer]:
-    """Eliminate bots at or above poison threshold."""
-    eliminated: list[FakePlayer] = []
-    for fake in game.fake_players:
-        if not fake.is_eliminated and fake.poison >= game.config.poison_to_lose:
-            eliminate_bot(game, fake)
-            eliminated.append(fake)
+def process_puppet_eliminations(game: Game) -> list[Puppet]:
+    """Eliminate puppets at or above poison threshold."""
+    eliminated: list[Puppet] = []
+    for puppet in game.puppets:
+        if not puppet.is_eliminated and puppet.poison >= game.config.poison_to_lose:
+            eliminate_puppet(game, puppet)
+            eliminated.append(puppet)
     return eliminated
 
 
@@ -130,16 +126,16 @@ def check_game_over(game: Game) -> tuple[Player | None, bool]:
 
     Game over conditions:
     - 0 humans alive -> game over, no winner (None, True)
-    - 1 human alive + 0 bots alive -> human wins (winner, True)
+    - 1 human alive + 0 puppets alive -> human wins (winner, True)
     - 2+ humans alive -> game continues (None, False)
-    - 1 human alive + bots still alive -> game continues (None, False)
+    - 1 human alive + puppets still alive -> game continues (None, False)
     """
     live_humans = get_live_players(game)
-    live_bots = get_live_bots(game)
+    live_puppets = get_live_puppets(game)
 
     if len(live_humans) == 0:
         return (None, True)
-    elif len(live_humans) == 1 and len(live_bots) == 0:
+    elif len(live_humans) == 1 and len(live_puppets) == 0:
         return (live_humans[0], True)
     else:
         return (None, False)

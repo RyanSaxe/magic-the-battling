@@ -4,7 +4,7 @@ import {
   PoisonIcon,
   MoneyBagIcon,
   GhostIcon,
-  BotIcon,
+  PuppetIcon,
   SkullIcon,
   HourglassIcon,
 } from "./icons";
@@ -75,7 +75,7 @@ function PairingProbability({ probability }: { probability: number | null }) {
   return <span className="text-[10px] text-blue-400">{pct}%</span>;
 }
 
-function PlayerRow({
+export function PlayerRow({
   player,
   players,
   currentPlayerName,
@@ -95,54 +95,58 @@ function PlayerRow({
       } ${
         player.name === currentPlayerName
           ? "bg-amber-900/30 border border-amber-700/50"
-          : player.is_bot
+          : player.is_puppet
             ? "bg-cyan-900/20 border border-cyan-800/30"
             : "bg-black/30"
       } ${player.is_ghost ? "opacity-50" : ""}`}
       onClick={onClick}
     >
       <PlacementBadge player={player} players={players} />
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-white font-medium truncate max-w-[120px]">
-          {player.name}
-        </span>
-        <ResultBadge
-          result={player.last_result}
-          inSuddenDeath={player.in_sudden_death}
-        />
-      </div>
-      <div className="flex items-center justify-between text-xs">
-        <div className="flex items-center gap-4">
-          <span
-            className="flex items-center gap-1 text-purple-400"
-            title="Poison"
-          >
-            <PoisonIcon size="sm" /> {player.poison}
-          </span>
-          <span
-            className="flex items-center gap-1 text-amber-400"
-            title="Treasures"
-          >
-            <MoneyBagIcon size="sm" /> {player.treasures}
-          </span>
-          {player.name !== currentPlayerName &&
-            (!player.is_ghost || player.is_most_recent_ghost) && (
-              <PairingProbability probability={player.pairing_probability} />
-            )}
+      <div className="flex gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="mb-1">
+            <span className="text-white font-medium truncate block">
+              {player.name}
+            </span>
+          </div>
+          <div className="flex items-center gap-4 text-xs">
+            <span
+              className="flex items-center gap-1 text-purple-400"
+              title="Poison"
+            >
+              <PoisonIcon size="sm" /> {player.poison}
+            </span>
+            <span
+              className="flex items-center gap-1 text-amber-400"
+              title="Treasures"
+            >
+              <MoneyBagIcon size="sm" /> {player.treasures}
+            </span>
+            {player.name !== currentPlayerName &&
+              (!player.is_ghost || player.is_most_recent_ghost) && (
+                <PairingProbability probability={player.pairing_probability} />
+              )}
+          </div>
         </div>
-        <span className="text-gray-500">
-          {player.is_ghost && !player.is_most_recent_ghost ? (
-            <SkullIcon size="sm" />
-          ) : player.is_most_recent_ghost ? (
-            <GhostIcon size="sm" />
-          ) : player.phase === "awaiting_elimination" ? (
-            <HourglassIcon size="sm" />
-          ) : player.is_bot ? (
-            <BotIcon size="sm" />
-          ) : (
-            `${player.stage}-${player.round} @ ${player.phase === "build" && player.build_ready ? "ready" : player.phase}`
-          )}
-        </span>
+        <div className="flex flex-col items-center justify-between shrink-0">
+          <ResultBadge
+            result={player.last_result}
+            inSuddenDeath={player.in_sudden_death}
+          />
+          <span className="text-gray-500 text-xs">
+            {player.is_ghost && !player.is_most_recent_ghost ? (
+              <SkullIcon size="sm" />
+            ) : player.is_most_recent_ghost ? (
+              <GhostIcon size="sm" />
+            ) : player.phase === "awaiting_elimination" ? (
+              <HourglassIcon size="sm" />
+            ) : player.is_puppet ? (
+              <PuppetIcon size="sm" />
+            ) : (
+              `${player.stage}-${player.round} @ ${player.phase === "build" && player.build_ready ? "ready" : player.phase}`
+            )}
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -199,7 +203,8 @@ export function PlayerList({
     }
     if (a.placement === 0) return -1;
     if (b.placement === 0) return 1;
-    return a.placement - b.placement;
+    if (a.placement !== b.placement) return a.placement - b.placement;
+    return a.name.localeCompare(b.name);
   };
 
   const sortedOpponents = [...opponents].sort(byPlacement);

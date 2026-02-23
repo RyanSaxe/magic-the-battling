@@ -139,3 +139,5 @@ node_modules/
 
 # Vite cache
 web/.vite/
+
+backlog/

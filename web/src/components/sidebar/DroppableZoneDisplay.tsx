@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Card as CardType, ZoneName } from '../../types'
 import { Card } from '../card'
 import { DraggableCard, DroppableZone } from '../../dnd'
+import { DndPanel } from '../common/DndPanel'
 
 type CardSize = 'xs' | 'sm'
 
@@ -30,6 +31,8 @@ export function ZoneModal({
   allowInteraction,
   isOpponent,
   onClose,
+  onCardHover,
+  onCardHoverEnd,
 }: {
   title: string
   zone: ZoneName
@@ -37,13 +40,36 @@ export function ZoneModal({
   allowInteraction: boolean
   isOpponent: boolean
   onClose: () => void
+  onCardHover?: (cardId: string, zone: ZoneName) => void
+  onCardHoverEnd?: () => void
 }) {
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
+  const handleClose = () => {
+    onCardHoverEnd?.()
+    onClose()
+  }
+
+  if (allowInteraction) {
+    return (
+      <DndPanel
+        title={title}
+        count={cards.length}
+        onClose={handleClose}
+      >
+        {(dims) =>
+          cards.map((card) => (
+            <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} dimensions={dims} isOpponent={isOpponent} onCardHover={onCardHover} onCardHoverEnd={onCardHoverEnd} />
+          ))
+        }
+      </DndPanel>
+    )
+  }
+
   return (
     <div
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50"
-      onClick={onClose}
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+      onClick={handleClose}
     >
       <div
         className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
@@ -52,7 +78,7 @@ export function ZoneModal({
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-white font-medium">{title}</h3>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-400 hover:text-white"
           >
             ✕
@@ -62,13 +88,9 @@ export function ZoneModal({
           <div className="text-gray-500 text-center py-4">No cards</div>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {cards.map((card) =>
-              allowInteraction ? (
-                <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} size="sm" isOpponent={isOpponent} />
-              ) : (
-                <Card key={card.id} card={card} size="sm" />
-              )
-            )}
+            {cards.map((card) => (
+              <Card key={card.id} card={card} size="sm" />
+            ))}
           </div>
         )}
       </div>
