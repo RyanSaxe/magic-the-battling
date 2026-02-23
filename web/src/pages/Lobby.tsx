@@ -25,7 +25,9 @@ export function Lobby() {
   const [copied, setCopied] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
   const [showRulesPanel, setShowRulesPanel] = useState(false);
-  const [rulesPanelTarget, setRulesPanelTarget] = useState<RulesPanelTarget | undefined>(undefined);
+  const [rulesPanelTarget, setRulesPanelTarget] = useState<
+    RulesPanelTarget | undefined
+  >(undefined);
 
   const currentPlayer = lobbyState?.players.find(
     (p) => p.player_id === session?.playerId,
@@ -165,23 +167,26 @@ export function Lobby() {
               setShowRulesPanel(true);
             };
 
-            const cubeReady =
-              lobbyState.cube_loading_status === "ready";
+            const cubeReady = lobbyState.cube_loading_status === "ready";
             const pillBase =
               "px-3 py-1 rounded-full text-xs transition-all border";
-            const pillActive =
-              `${pillBase} bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20 hover:text-white cursor-pointer`;
-            const pillDisabled =
-              `${pillBase} bg-white/[0.02] border-white/5 text-gray-500 cursor-default`;
+            const pillActive = `${pillBase} bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20 hover:text-white cursor-pointer`;
+            const pillDisabled = `${pillBase} bg-white/[0.02] border-white/5 text-gray-500 cursor-default`;
 
             return (
               <>
                 <div className="flex items-center justify-center gap-2 mb-3">
                   <span
-                    onClick={cubeReady ? () => openGuide({ docId: "__cards__" }) : undefined}
+                    onClick={
+                      cubeReady
+                        ? () => openGuide({ docId: "__cards__" })
+                        : undefined
+                    }
                     className={cubeReady ? pillActive : pillDisabled}
                   >
-                    {cubeReady ? "Card Pool" : (
+                    {cubeReady ? (
+                      "Card Pool"
+                    ) : (
                       <span className="flex items-center gap-1.5">
                         <span className="inline-block w-2.5 h-2.5 border border-gray-500 border-t-transparent rounded-full animate-spin" />
                         Cards
@@ -190,17 +195,22 @@ export function Lobby() {
                   </span>
                   {botSlots > 0 && (
                     <span
-                      onClick={() => openGuide({ docId: "non-human-players", tab: "puppets" })}
+                      onClick={() =>
+                        openGuide({
+                          docId: "non-human-players",
+                          tab: "puppets",
+                        })
+                      }
                       className={pillActive}
                     >
-                      Puppets?
+                      What are Puppets?
                     </span>
                   )}
                   <span
                     onClick={() => openGuide(undefined)}
                     className={pillActive}
                   >
-                    How to Play?
+                    Game Guide
                   </span>
                 </div>
                 <div className="bg-black/40 rounded-lg p-3 mb-4 text-center">
