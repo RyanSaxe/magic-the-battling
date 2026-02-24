@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
-import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
+import { useCardLayout } from '../../hooks/useCardLayout'
 import { badgeCls } from '../../components/common/ZoneLayout'
 import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
 
@@ -31,15 +31,14 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
   const currentPack = self_player.current_pack ?? []
   const pool = [...self_player.hand, ...self_player.sideboard]
 
-  const [containerRef, { top: poolDims, bottom: packDims }] = useDualZoneCardSizes({
-    topCount: pool.length,
-    bottomCount: currentPack.length,
-    topGap: 6,
-    bottomGap: 6,
+  const [containerRef, { pool: poolDims, pack: packDims }] = useCardLayout({
+    zones: {
+      pool: { count: pool.length, maxCardWidth: 300 },
+      pack: { count: currentPack.length, maxCardWidth: 400 },
+    },
+    layout: { top: ['pool'], bottomLeft: ['pack'] },
     fixedHeight: 65,
-    horizontalPadding: 24,
-    topMaxWidth: 300,
-    bottomMaxWidth: 400,
+    padding: 24,
   })
   const appliedUpgradesList = self_player.upgrades.filter((u) => u.upgrade_target)
   const upgradedCardIds = new Set(appliedUpgradesList.map((u) => u.upgrade_target!.id))
