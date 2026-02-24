@@ -195,7 +195,7 @@ function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="w-9 h-9 shrink-0 rounded-lg bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all flex items-center justify-center"
+      className="px-2.5 self-stretch shrink-0 rounded-lg bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all flex items-center justify-center"
       title="Advanced Options"
     >
       ⚙
@@ -524,7 +524,7 @@ export function Play() {
                 <button
                   onClick={handleCreateLobby}
                   disabled={!nameValid || friendsLoading}
-                  className="btn btn-primary flex-1 py-2 animate-gentle-glow"
+                  className="btn btn-primary flex-1 py-2"
                 >
                   {friendsLoading ? "Creating..." : "Create Lobby"}
                 </button>
@@ -551,7 +551,7 @@ export function Play() {
             <button
               onClick={handleCreateLobby}
               disabled={!nameValid || friendsLoading}
-              className="btn btn-primary flex-1 py-2 animate-gentle-glow"
+              className="btn btn-primary flex-1 py-2"
             >
               {friendsLoading ? "Creating..." : "Create Lobby"}
             </button>
