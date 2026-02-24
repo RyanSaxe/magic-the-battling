@@ -4,10 +4,12 @@ import { createGame } from "../api/client";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
+import { PuppetIcon } from "../components/icons/PuppetIcon";
 import type { LobbyState } from "../types";
 
 type SoloPhase = "idle" | "loading" | "not-enough-puppets" | "starting";
 type OpponentCount = 1 | 3 | 5 | 7;
+type Tab = "friends" | "solo";
 const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
 
 function useSoloLobbyWatcher(
@@ -65,18 +67,261 @@ function useSoloLobbyWatcher(
   return { reset };
 }
 
+function useRandomMtgName(): [string, (v: string) => void] {
+  const [name, setName] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(
+      "https://api.scryfall.com/cards/random?q=is:legendary+t:creature",
+      { signal: controller.signal },
+    )
+      .then((r) => r.json())
+      .then((card) => {
+        const firstName = card.name.split(",")[0].split(" ")[0];
+        setName(firstName);
+      })
+      .catch(() => {
+        setName("Player" + String(Math.floor(1000 + Math.random() * 9000)));
+      });
+    return () => controller.abort();
+  }, []);
+
+  return [name, setName];
+}
+
+function AdvancedOptions({
+  cubeId,
+  setCubeId,
+  useUpgrades,
+  setUseUpgrades,
+  children,
+}: {
+  cubeId: string;
+  setCubeId: (v: string) => void;
+  useUpgrades: boolean;
+  setUseUpgrades: (v: boolean) => void;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-3 border-t border-gray-700 pt-3 mt-3">
+      <div>
+        <label className="block text-gray-300 text-sm mb-1">
+          CubeCobra ID
+        </label>
+        <input
+          type="text"
+          value={cubeId}
+          onChange={(e) => setCubeId(e.target.value)}
+          className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+          placeholder="auto"
+        />
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={useUpgrades}
+          onChange={(e) => setUseUpgrades(e.target.checked)}
+          className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
+        />
+        <span className="text-white text-sm">Upgrades</span>
+        <span className="text-gray-500 text-xs">
+          — upgrade a card every 3 rounds
+        </span>
+      </label>
+
+      {children}
+    </div>
+  );
+}
+
+function FriendsContent({
+  nameValid,
+  friendsLoading,
+  showAdvanced,
+  setShowAdvanced,
+  cubeId,
+  setCubeId,
+  useUpgrades,
+  setUseUpgrades,
+  autoApproveSpectators,
+  setAutoApproveSpectators,
+  onCreateLobby,
+}: {
+  nameValid: boolean;
+  friendsLoading: boolean;
+  showAdvanced: boolean;
+  setShowAdvanced: (v: boolean) => void;
+  cubeId: string;
+  setCubeId: (v: string) => void;
+  useUpgrades: boolean;
+  setUseUpgrades: (v: boolean) => void;
+  autoApproveSpectators: boolean;
+  setAutoApproveSpectators: (v: boolean) => void;
+  onCreateLobby: () => void;
+}) {
+  return (
+    <>
+      <div className="text-2xl mb-2">
+        <svg
+          className="w-7 h-7 text-amber-400"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+          />
+        </svg>
+      </div>
+      <h2 className="text-lg font-semibold text-white mb-1">
+        Play with Friends
+      </h2>
+      <p className="text-gray-400 text-sm mb-3">
+        Create a lobby, share a code, invite players.
+      </p>
+
+      <button
+        type="button"
+        onClick={() => setShowAdvanced(!showAdvanced)}
+        className="text-sm text-gray-400 hover:text-gray-300 transition-colors mb-1"
+      >
+        {showAdvanced ? "\u25BE Advanced Options" : "\u25B8 Advanced Options"}
+      </button>
+
+      {showAdvanced && (
+        <AdvancedOptions
+          cubeId={cubeId}
+          setCubeId={setCubeId}
+          useUpgrades={useUpgrades}
+          setUseUpgrades={setUseUpgrades}
+        >
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoApproveSpectators}
+              onChange={(e) => setAutoApproveSpectators(e.target.checked)}
+              className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
+            />
+            <span className="text-white text-sm">Open Spectating</span>
+            <span className="text-gray-500 text-xs">
+              — let anyone watch
+            </span>
+          </label>
+        </AdvancedOptions>
+      )}
+
+      <button
+        onClick={onCreateLobby}
+        disabled={!nameValid || friendsLoading}
+        className="btn btn-primary w-full py-2 animate-gentle-glow mt-3"
+      >
+        {friendsLoading ? "Creating..." : "Create Lobby"}
+      </button>
+    </>
+  );
+}
+
+function SoloContent({
+  nameValid,
+  showAdvanced,
+  setShowAdvanced,
+  cubeId,
+  setCubeId,
+  useUpgrades,
+  setUseUpgrades,
+  opponents,
+  setOpponents,
+  onStartSolo,
+}: {
+  nameValid: boolean;
+  showAdvanced: boolean;
+  setShowAdvanced: (v: boolean) => void;
+  cubeId: string;
+  setCubeId: (v: string) => void;
+  useUpgrades: boolean;
+  setUseUpgrades: (v: boolean) => void;
+  opponents: OpponentCount;
+  setOpponents: (v: OpponentCount) => void;
+  onStartSolo: () => void;
+}) {
+  return (
+    <>
+      <div className="text-2xl mb-2">
+        <PuppetIcon size="lg" className="text-cyan-400" />
+      </div>
+      <h2 className="text-lg font-semibold text-white mb-1">Play Solo</h2>
+      <p className="text-gray-400 text-sm mb-3">
+        Battle recorded hands face-up. You decide who wins each battle.
+      </p>
+
+      <button
+        type="button"
+        onClick={() => setShowAdvanced(!showAdvanced)}
+        className="text-sm text-gray-400 hover:text-gray-300 transition-colors mb-1"
+      >
+        {showAdvanced ? "\u25BE Advanced Options" : "\u25B8 Advanced Options"}
+      </button>
+
+      {showAdvanced && (
+        <AdvancedOptions
+          cubeId={cubeId}
+          setCubeId={setCubeId}
+          useUpgrades={useUpgrades}
+          setUseUpgrades={setUseUpgrades}
+        >
+          <div>
+            <label className="block text-gray-300 text-sm mb-1">
+              Opponents
+            </label>
+            <div className="flex gap-1.5">
+              {OPPONENT_OPTIONS.map((count) => (
+                <button
+                  key={count}
+                  onClick={() => setOpponents(count)}
+                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                    opponents === count
+                      ? "bg-amber-500 text-black"
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  }`}
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+          </div>
+        </AdvancedOptions>
+      )}
+
+      <button
+        onClick={onStartSolo}
+        disabled={!nameValid}
+        className="btn btn-primary w-full py-2 mt-3"
+      >
+        Start Game
+      </button>
+    </>
+  );
+}
+
 export function Play() {
   const navigate = useNavigate();
   const { saveSession } = useSession();
   const { addToast } = useToast();
 
-  const [playerName, setPlayerName] = useState("");
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [playerName, setPlayerName] = useRandomMtgName();
+  const [showFriendsAdvanced, setShowFriendsAdvanced] = useState(false);
+  const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
   const [cubeId, setCubeId] = useState("auto");
   const [useUpgrades, setUseUpgrades] = useState(true);
   const [opponents, setOpponents] = useState<OpponentCount>(3);
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState<Tab>("friends");
 
   const [friendsLoading, setFriendsLoading] = useState(false);
 
@@ -270,19 +515,68 @@ export function Play() {
     );
   }
 
+  const friendsContent = (
+    <FriendsContent
+      nameValid={nameValid}
+      friendsLoading={friendsLoading}
+      showAdvanced={showFriendsAdvanced}
+      setShowAdvanced={setShowFriendsAdvanced}
+      cubeId={cubeId}
+      setCubeId={setCubeId}
+      useUpgrades={useUpgrades}
+      setUseUpgrades={setUseUpgrades}
+      autoApproveSpectators={autoApproveSpectators}
+      setAutoApproveSpectators={setAutoApproveSpectators}
+      onCreateLobby={handleCreateLobby}
+    />
+  );
+
+  const soloContent = (
+    <SoloContent
+      nameValid={nameValid}
+      showAdvanced={showSoloAdvanced}
+      setShowAdvanced={setShowSoloAdvanced}
+      cubeId={cubeId}
+      setCubeId={setCubeId}
+      useUpgrades={useUpgrades}
+      setUseUpgrades={setUseUpgrades}
+      opponents={opponents}
+      setOpponents={setOpponents}
+      onStartSolo={() => handleStartSolo()}
+    />
+  );
+
   return (
     <div className="game-table h-dvh flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
-        <button
-          onClick={() => navigate("/")}
-          className="text-gray-400 hover:text-white transition-colors mb-6 text-sm"
-        >
-          &larr; Back to Home
-        </button>
+        <div className="mb-2">
+          <button
+            onClick={() => navigate("/")}
+            className="w-7 h-7 rounded-full bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            title="Back to Home"
+          >
+            &larr;
+          </button>
+        </div>
 
-        <h1 className="text-2xl font-bold text-white text-center mb-6">
+        <h1 className="text-2xl font-bold text-white text-center mb-4">
           How do you want to play?
         </h1>
+
+        <div className="mb-4">
+          <label className="block text-gray-400 text-sm mb-1">Your Name</label>
+          <input
+            type="text"
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            onKeyDown={(e) =>
+              e.key === "Enter" && nameValid && handleCreateLobby()
+            }
+            className="w-full bg-black/40 border border-white/10 text-white rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            placeholder="Enter your name"
+            autoFocus
+          />
+        </div>
 
         {error && (
           <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4 text-sm text-center">
@@ -290,158 +584,43 @@ export function Play() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
-            <div className="text-2xl mb-2">
-              <svg
-                className="w-7 h-7 text-amber-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-lg font-semibold text-white mb-1">
-              Play with Friends
-            </h2>
-            <p className="text-gray-400 text-sm flex-1 mb-4">
-              Create a lobby, share a code, invite players.
-            </p>
+        {/* Mobile: tabs */}
+        <div className="sm:hidden">
+          <div className="flex gap-1 border-b border-gray-700/50 mb-4">
             <button
-              onClick={handleCreateLobby}
-              disabled={!nameValid || friendsLoading}
-              className="btn btn-primary w-full py-2 animate-gentle-glow"
+              onClick={() => setActiveTab("friends")}
+              className={`flex-1 pb-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === "friends"
+                  ? "text-amber-400 border-amber-400"
+                  : "text-gray-400 border-transparent hover:text-gray-200"
+              }`}
             >
-              {friendsLoading ? "Creating..." : "Create Lobby"}
+              Play with Friends
+            </button>
+            <button
+              onClick={() => setActiveTab("solo")}
+              className={`flex-1 pb-2 text-sm font-medium border-b-2 transition-colors ${
+                activeTab === "solo"
+                  ? "text-amber-400 border-amber-400"
+                  : "text-gray-400 border-transparent hover:text-gray-200"
+              }`}
+            >
+              Play Solo
             </button>
           </div>
-
-          <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
-            <div className="text-2xl mb-2">
-              <svg
-                className="w-7 h-7 text-cyan-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                />
-              </svg>
-            </div>
-            <h2 className="text-lg font-semibold text-white mb-1">
-              Solo vs Puppets
-            </h2>
-            <p className="text-gray-400 text-sm flex-1 mb-4">
-              Battle recorded hands face-up. You decide who wins each battle.
-            </p>
-            <button
-              onClick={() => handleStartSolo()}
-              disabled={!nameValid}
-              className="btn btn-primary w-full py-2"
-            >
-              Start Solo
-            </button>
+          <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10">
+            {activeTab === "friends" ? friendsContent : soloContent}
           </div>
         </div>
 
-        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10">
-          <div className="mb-4">
-            <label className="block text-gray-300 text-sm mb-1">
-              Your Name
-            </label>
-            <input
-              type="text"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && nameValid && handleCreateLobby()}
-              className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
-              placeholder="Enter your name"
-              autoFocus
-            />
+        {/* Desktop: side-by-side cards */}
+        <div className="hidden sm:grid sm:grid-cols-2 gap-4">
+          <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
+            {friendsContent}
           </div>
-
-          <button
-            type="button"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="text-sm text-gray-400 hover:text-gray-300 transition-colors"
-          >
-            {showAdvanced ? "\u25BE Advanced Options" : "\u25B8 Advanced Options"}
-          </button>
-
-          {showAdvanced && (
-            <div className="space-y-3 border-t border-gray-700 pt-3 mt-3">
-              <div>
-                <label className="block text-gray-300 text-sm mb-1">
-                  CubeCobra ID
-                </label>
-                <input
-                  type="text"
-                  value={cubeId}
-                  onChange={(e) => setCubeId(e.target.value)}
-                  className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  placeholder="auto"
-                />
-              </div>
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useUpgrades}
-                  onChange={(e) => setUseUpgrades(e.target.checked)}
-                  className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
-                />
-                <span className="text-white text-sm">Upgrades</span>
-                <span className="text-gray-500 text-xs">
-                  — upgrade a card every 3 rounds
-                </span>
-              </label>
-
-              <div>
-                <label className="block text-gray-300 text-sm mb-1">
-                  Opponents{" "}
-                  <span className="text-gray-500 text-xs">(solo only)</span>
-                </label>
-                <div className="flex gap-1.5">
-                  {OPPONENT_OPTIONS.map((count) => (
-                    <button
-                      key={count}
-                      onClick={() => setOpponents(count)}
-                      className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                        opponents === count
-                          ? "bg-amber-500 text-black"
-                          : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                      }`}
-                    >
-                      {count}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={autoApproveSpectators}
-                  onChange={(e) => setAutoApproveSpectators(e.target.checked)}
-                  className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
-                />
-                <span className="text-white text-sm">Open Spectating</span>
-                <span className="text-gray-500 text-xs">
-                  — let anyone watch (friends only)
-                </span>
-              </label>
-            </div>
-          )}
+          <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
+            {soloContent}
+          </div>
         </div>
       </div>
     </div>
