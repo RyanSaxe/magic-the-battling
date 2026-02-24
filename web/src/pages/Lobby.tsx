@@ -157,12 +157,18 @@ export function Lobby() {
   if (!cubeReady) {
     return (
       <div className="game-table flex items-center justify-center p-4">
-        <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-md text-center">
-          {!isConnected && (
-            <div className="bg-amber-900/50 text-amber-200 p-3 rounded mb-4">
-              Connecting...
+        {!isConnected && (
+          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+            <div className="bg-gray-950/90 backdrop-blur-sm border border-gray-700/50 border-l-[3px] border-l-amber-500 rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
+              <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <span className="text-sm text-gray-200">Reconnecting...</span>
             </div>
-          )}
+          </div>
+        )}
+        <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-md text-center">
           <div className="flex justify-center mb-4">
             <svg
               className="animate-spin h-8 w-8 text-amber-400"
@@ -197,6 +203,17 @@ export function Lobby() {
 
   return (
     <div className="game-table flex items-center justify-center p-4">
+      {!isConnected && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-gray-950/90 backdrop-blur-sm border border-gray-700/50 border-l-[3px] border-l-amber-500 rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
+            <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <span className="text-sm text-gray-200">Reconnecting...</span>
+          </div>
+        </div>
+      )}
       <div className="bg-black/60 backdrop-blur rounded-lg px-6 py-4 w-full max-w-md">
         <div className="flex items-center justify-between mb-1">
           <div className="w-7" />
@@ -214,11 +231,6 @@ export function Lobby() {
             ?
           </button>
         </div>
-        {!isConnected && (
-          <div className="bg-amber-900/50 text-amber-200 p-3 rounded mb-4">
-            Connecting...
-          </div>
-        )}
 
         {lobbyState &&
           (() => {

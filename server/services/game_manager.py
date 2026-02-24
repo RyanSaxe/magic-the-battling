@@ -142,6 +142,7 @@ class GameManager:
         self._player_id_to_name: dict[str, str] = {}
         self._join_code_to_game: dict[str, str] = {}
         self._cleanup_tasks: dict[str, asyncio.Task] = {}
+        self._pending_disconnect_tasks: dict[str, asyncio.Task] = {}
         self._spectate_requests: dict[str, PendingSpectateRequest] = {}
 
     def create_game(
@@ -800,6 +801,39 @@ class GameManager:
             del self._pending_games[game_id]
 
         return True
+
+    def schedule_pending_disconnect(
+        self,
+        game_id: str,
+        player_id: str,
+        on_removed: Callable[[], Coroutine[Any, Any, None]] | None = None,
+        delay: float = 600.0,
+    ) -> None:
+        key = f"{game_id}:{player_id}"
+        if existing := self._pending_disconnect_tasks.get(key):
+            existing.cancel()
+
+        pending = self._pending_games.get(game_id)
+        if pending and not pending.is_started and player_id in pending.player_ids:
+            pending.player_ready[player_id] = False
+
+        async def remove_after_delay():
+            await asyncio.sleep(delay)
+            removed = self.remove_player_from_pending(game_id, player_id)
+            self._pending_disconnect_tasks.pop(key, None)
+            if removed and on_removed:
+                await on_removed()
+
+        try:
+            loop = asyncio.get_running_loop()
+            self._pending_disconnect_tasks[key] = loop.create_task(remove_after_delay())
+        except RuntimeError:
+            pass
+
+    def cancel_pending_disconnect(self, game_id: str, player_id: str) -> None:
+        key = f"{game_id}:{player_id}"
+        if task := self._pending_disconnect_tasks.pop(key, None):
+            task.cancel()
 
     def add_puppet(self, game_id: str, player_id: str) -> bool:
         pending = self._pending_games.get(game_id)

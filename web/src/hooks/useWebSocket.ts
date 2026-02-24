@@ -93,11 +93,7 @@ export function useWebSocket(
         }
       }
 
-      ws.onerror = () => {
-        if (!isClosingRef.current) {
-          onServerErrorRef.current?.('WebSocket connection error')
-        }
-      }
+      ws.onerror = () => {}
 
       wsRef.current = ws
     }

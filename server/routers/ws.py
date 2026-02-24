@@ -221,6 +221,7 @@ async def websocket_endpoint(
         await websocket.close(code=4004, reason="Game not found")
         return
 
+    game_manager.cancel_pending_disconnect(game_id, player_id)
     await connection_manager.connect(game_id, player_id, websocket)
 
     try:
@@ -242,7 +243,11 @@ async def websocket_endpoint(
 
     except WebSocketDisconnect:
         connection_manager.disconnect(game_id, player_id)
-        game_manager.remove_player_from_pending(game_id, player_id)
+        game_manager.schedule_pending_disconnect(
+            game_id,
+            player_id,
+            on_removed=lambda: connection_manager.broadcast_lobby_state(game_id),
+        )
         await connection_manager.broadcast_lobby_state(game_id)
 
 
