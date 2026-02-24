@@ -195,7 +195,7 @@ function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="px-2.5 self-stretch shrink-0 rounded-lg bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all flex items-center justify-center"
+      className="px-3.5 self-stretch shrink-0 rounded-lg bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all flex items-center justify-center text-lg"
       title="Advanced Options"
     >
       ⚙
@@ -437,7 +437,7 @@ export function Play() {
 
   return (
     <div className="game-table h-dvh flex flex-col sm:justify-center p-4">
-      <div className="shrink-0 w-full max-w-2xl mx-auto">
+      <div className="shrink-0 w-full max-w-5xl mx-auto">
         <div className="mb-2">
           <button
             onClick={() => navigate("/")}
@@ -475,7 +475,7 @@ export function Play() {
       </div>
 
       {/* Mobile: stacked cards, inactive always on top */}
-      <div className="sm:hidden flex-1 flex flex-col gap-3 w-full max-w-2xl mx-auto min-h-0">
+      <div className="sm:hidden flex-1 flex flex-col gap-3 w-full max-w-5xl mx-auto min-h-0">
         {activeMode === "solo" ? (
           <>
             {inactiveCard(
@@ -488,8 +488,8 @@ export function Play() {
                 <PuppetIcon size="lg" className="text-cyan-400" />
                 <h2 className="text-lg font-semibold text-white">Play Solo</h2>
               </div>
-              <p className="text-gray-400 text-sm">
-                Battle recorded hands face-up. You decide who wins each battle.
+              <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
+                Battle against puppets: opponents built from real games. Their cards are face up, and you decide who wins each battle.
               </p>
               <div className="mt-auto flex gap-2 pt-4">
                 <button
@@ -512,13 +512,13 @@ export function Play() {
             )}
             <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 border-l-2 border-l-amber-400 flex flex-col">
               <div className="flex items-center gap-3 mb-2">
-                <FriendsIcon />
+                <FriendsIcon className="w-8 h-8 text-amber-400" />
                 <h2 className="text-lg font-semibold text-white">
                   Play with Friends
                 </h2>
               </div>
-              <p className="text-gray-400 text-sm">
-                Create a lobby, share a code, invite players.
+              <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
+                Create a lobby and share a code to draft, build, and battle with friends. Compete head-to-head in rounds to see who built the best deck.
               </p>
               <div className="mt-auto flex gap-2 pt-4">
                 <button
@@ -536,16 +536,16 @@ export function Play() {
       </div>
 
       {/* Desktop: side-by-side cards */}
-      <div className="hidden sm:grid sm:grid-cols-2 gap-4 w-full max-w-2xl mx-auto">
+      <div className="hidden sm:grid sm:grid-cols-2 gap-4 w-full max-w-5xl mx-auto">
         <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
           <div className="text-2xl mb-2">
-            <FriendsIcon />
+            <FriendsIcon className="w-8 h-8 text-amber-400" />
           </div>
           <h2 className="text-lg font-semibold text-white mb-1">
             Play with Friends
           </h2>
-          <p className="text-gray-400 text-sm">
-            Create a lobby, share a code, invite players.
+          <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
+            Create a lobby and share a code to draft, build, and battle with friends. Compete head-to-head in rounds to see who built the best deck.
           </p>
           <div className="mt-auto flex gap-2 pt-4">
             <button
@@ -563,8 +563,8 @@ export function Play() {
             <PuppetIcon size="lg" className="text-cyan-400" />
           </div>
           <h2 className="text-lg font-semibold text-white mb-1">Play Solo</h2>
-          <p className="text-gray-400 text-sm">
-            Battle recorded hands face-up. You decide who wins each battle.
+          <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
+            Battle against puppets: opponents built from real games. Their cards are face up, and you decide who wins each battle.
           </p>
           <div className="mt-auto flex gap-2 pt-4">
             <button
