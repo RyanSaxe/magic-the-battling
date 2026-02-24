@@ -406,9 +406,7 @@ export function Play() {
           <h2 className="text-lg font-semibold text-white mb-2">
             Setting up solo game...
           </h2>
-          <p className="text-gray-400 text-sm">
-            {loadingMessage}
-          </p>
+          <p className="text-gray-400 text-sm">{loadingMessage}</p>
           <button
             onClick={handleCancelSolo}
             className="btn btn-secondary py-2 px-6 mt-6"
@@ -489,7 +487,9 @@ export function Play() {
                 <h2 className="text-lg font-semibold text-white">Play Solo</h2>
               </div>
               <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-                Battle against puppets: opponents built from real games. Their cards are face up, and you decide who wins each battle.
+                Battle against builds that real players piloted to strong
+                finishes. Their cards are face up, and you decide who wins each
+                battle.
               </p>
               <div className="mt-auto flex gap-2 pt-4">
                 <button
@@ -518,7 +518,8 @@ export function Play() {
                 </h2>
               </div>
               <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-                Create a lobby and share a code to draft, build, and battle with friends. Compete head-to-head in rounds to see who built the best deck.
+                Compete head-to-head with your friends to see who can navigate
+                from random cards to a completely unbeatable starting hand.
               </p>
               <div className="mt-auto flex gap-2 pt-4">
                 <button
@@ -545,7 +546,9 @@ export function Play() {
             Play with Friends
           </h2>
           <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-            Create a lobby and share a code to draft, build, and battle with friends. Compete head-to-head in rounds to see who built the best deck.
+            Create a lobby and share a code to draft, build, and battle with
+            friends. Compete head-to-head in rounds to see who built the best
+            deck.
           </p>
           <div className="mt-auto flex gap-2 pt-4">
             <button
@@ -564,7 +567,8 @@ export function Play() {
           </div>
           <h2 className="text-lg font-semibold text-white mb-1">Play Solo</h2>
           <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-            Battle against puppets: opponents built from real games. Their cards are face up, and you decide who wins each battle.
+            Battle against puppets: opponents built from real games. Their cards
+            are face up, and you decide who wins each battle.
           </p>
           <div className="mt-auto flex gap-2 pt-4">
             <button
