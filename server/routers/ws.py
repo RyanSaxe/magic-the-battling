@@ -256,7 +256,7 @@ def _validate_action_phase(action: str, player) -> str | None:
     return None
 
 
-async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_id: str, websocket: WebSocket) -> bool:
+async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_id: str, websocket: WebSocket) -> bool:  # noqa: PLR0912
     if action == "set_ready":
         is_ready = payload.get("is_ready", True)
         if game_manager.set_player_ready(game_id, player_id, is_ready):
@@ -281,6 +281,33 @@ async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_
             await connection_manager.broadcast_game_state(game_id)
         else:
             await connection_manager.send_error(websocket, "Failed to start game")
+        return True
+
+    if action == "add_puppet":
+        if game_manager.add_puppet(game_id, player_id):
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, "Cannot add puppet")
+        return True
+
+    if action == "remove_puppet":
+        if game_manager.remove_puppet(game_id, player_id):
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, "Cannot remove puppet")
+        return True
+
+    if action == "kick_player":
+        target_id = payload.get("target_player_id", "")
+        if game_manager.kick_player(game_id, player_id, target_id):
+            kicked_ws = connection_manager._connections.get(game_id, {}).get(target_id)
+            if kicked_ws:
+                await kicked_ws.send_json({"type": "kicked", "payload": {}})
+                await kicked_ws.close(code=4005, reason="Kicked by host")
+                connection_manager.disconnect(game_id, target_id)
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, "Cannot kick player")
         return True
 
     return False

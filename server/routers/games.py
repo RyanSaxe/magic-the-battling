@@ -55,6 +55,7 @@ async def create_game(request: CreateGameRequest):
         target_player_count=request.target_player_count,
         auto_approve_spectators=request.auto_approve_spectators,
     )
+    pending.puppet_count = request.puppet_count
     session_manager.update_game_id(session.session_id, pending.game_id)
 
     async def broadcast_lobby():

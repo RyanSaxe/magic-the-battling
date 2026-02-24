@@ -138,6 +138,7 @@ export interface LobbyState {
   can_start: boolean
   is_started: boolean
   target_player_count: number
+  puppet_count: number
   cube_loading_status: CubeLoadingStatus
   cube_loading_error: string | null
   available_puppet_count: number | null

@@ -111,6 +111,7 @@ class PendingGame:
     target_player_count: int = 4
     auto_approve_spectators: bool = False
     player_ready: dict[str, bool] = field(default_factory=dict)
+    puppet_count: int = 0
     battler: Battler | None = None
     battler_loading: bool = False
     battler_error: str | None = None
@@ -194,6 +195,10 @@ class GameManager:
         if player_name in pending.player_names:
             return None
 
+        total = len(pending.player_names) + pending.puppet_count
+        if total >= 8:
+            return None
+
         pending.player_names.append(player_name)
         pending.player_ids.append(player_id)
         pending.player_ready[player_id] = False
@@ -224,8 +229,12 @@ class GameManager:
         if player_id != pending.host_player_id:
             return False, "Only the host can start the game"
 
-        if pending.target_player_count < 2:
+        total = len(pending.player_names) + pending.puppet_count
+        if total < 2:
             return False, "Need at least 2 players"
+
+        if total % 2 != 0:
+            return False, "Need an even number of players"
 
         all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
         if not all_ready:
@@ -235,10 +244,12 @@ class GameManager:
 
     def start_game(self, game_id: str, db: Session | None = None) -> Game | None:
         pending = self._pending_games.get(game_id)
-        if not pending or pending.target_player_count < 2:
+        total = len(pending.player_names) + pending.puppet_count if pending else 0
+        if not pending or total < 2:
             return None
 
         pending.is_started = True
+        pending.target_player_count = total
 
         config = Config(
             use_upgrades=pending.use_upgrades,
@@ -263,11 +274,16 @@ class GameManager:
             db.add(game_record)
             db.commit()
 
-            num_fakes_needed = pending.target_player_count - len(pending.player_names)
-            if num_fakes_needed > 0:
+            if pending.puppet_count > 0:
                 target_elo = battler.elo or 1200.0
                 self.load_fake_players_for_game(
-                    db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards, pending.cube_id
+                    db,
+                    game,
+                    pending.puppet_count,
+                    target_elo,
+                    pending.use_upgrades,
+                    pending.use_vanguards,
+                    pending.cube_id,
                 )
 
         self._active_games[game_id] = game
@@ -277,7 +293,8 @@ class GameManager:
 
     async def start_game_async(self, game_id: str, db: Session | None = None) -> Game | None:
         pending = self._pending_games.get(game_id)
-        if not pending or pending.target_player_count < 2:
+        total = len(pending.player_names) + pending.puppet_count if pending else 0
+        if not pending or total < 2:
             return None
 
         if pending._loading_task and not pending._loading_task.done():
@@ -299,6 +316,7 @@ class GameManager:
                 return None
 
         pending.is_started = True
+        pending.target_player_count = total
 
         config = Config(
             use_upgrades=pending.use_upgrades,
@@ -323,11 +341,16 @@ class GameManager:
             db.add(game_record)
             db.commit()
 
-            num_fakes_needed = pending.target_player_count - len(pending.player_names)
-            if num_fakes_needed > 0:
+            if pending.puppet_count > 0:
                 target_elo = battler.elo or 1200.0
                 self.load_fake_players_for_game(
-                    db, game, num_fakes_needed, target_elo, pending.use_upgrades, pending.use_vanguards, pending.cube_id
+                    db,
+                    game,
+                    pending.puppet_count,
+                    target_elo,
+                    pending.use_upgrades,
+                    pending.use_vanguards,
+                    pending.cube_id,
                 )
 
         self._active_games[game_id] = game
@@ -778,6 +801,50 @@ class GameManager:
 
         return True
 
+    def add_puppet(self, game_id: str, player_id: str) -> bool:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.is_started:
+            return False
+        if player_id != pending.host_player_id:
+            return False
+        total = len(pending.player_names) + pending.puppet_count
+        if total >= 8:
+            return False
+        available = self._count_available_bots(pending)
+        if available is None or available <= pending.puppet_count:
+            return False
+        pending.puppet_count += 1
+        return True
+
+    def remove_puppet(self, game_id: str, player_id: str) -> bool:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.is_started:
+            return False
+        if player_id != pending.host_player_id:
+            return False
+        if pending.puppet_count <= 0:
+            return False
+        pending.puppet_count -= 1
+        return True
+
+    def kick_player(self, game_id: str, host_player_id: str, target_player_id: str) -> bool:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.is_started:
+            return False
+        if host_player_id != pending.host_player_id:
+            return False
+        if target_player_id == pending.host_player_id:
+            return False
+        if target_player_id not in pending.player_ids:
+            return False
+        idx = pending.player_ids.index(target_player_id)
+        pending.player_names.pop(idx)
+        pending.player_ids.pop(idx)
+        pending.player_ready.pop(target_player_id, None)
+        self._player_to_game.pop(target_player_id, None)
+        self._player_id_to_name.pop(target_player_id, None)
+        return True
+
     def get_player_id_by_name(self, game_id: str, player_name: str) -> str | None:
         for player_id, name in self._player_id_to_name.items():
             if name == player_name and self._player_to_game.get(player_id) == game_id:
@@ -829,14 +896,15 @@ class GameManager:
         if pending.battler is None:
             return None
 
+        max_puppets = 8 - len(pending.player_names)
+        if max_puppets <= 0:
+            return 0
+
         db_session = db.SessionLocal()
         try:
             target_elo = pending.battler.elo or 1200.0
-            num_needed = pending.target_player_count - len(pending.player_names)
-            if num_needed <= 0:
-                return 0
             histories = self._find_historical_players(
-                db_session, target_elo, num_needed, [], pending.use_upgrades, pending.use_vanguards, pending.cube_id
+                db_session, target_elo, max_puppets, [], pending.use_upgrades, pending.use_vanguards, pending.cube_id
             )
             return len(histories)
         finally:
@@ -860,10 +928,10 @@ class GameManager:
             )
 
         all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
-        num_bots_needed = pending.target_player_count - len(pending.player_names)
-        bot_count = self._count_available_bots(pending) if num_bots_needed > 0 else 0
-        has_enough_bots = num_bots_needed <= 0 or (bot_count is not None and bot_count >= num_bots_needed)
-        can_start = pending.target_player_count >= 2 and all_ready and has_enough_bots
+        total = len(pending.player_names) + pending.puppet_count
+        available = self._count_available_bots(pending)
+        has_enough_bots = pending.puppet_count == 0 or (available is not None and available >= pending.puppet_count)
+        can_start = total >= 2 and total % 2 == 0 and all_ready and has_enough_bots
 
         return LobbyStateResponse(
             game_id=game_id,
@@ -871,10 +939,11 @@ class GameManager:
             players=players,
             can_start=can_start,
             is_started=pending.is_started,
-            target_player_count=pending.target_player_count,
+            target_player_count=total,
+            puppet_count=pending.puppet_count,
             cube_loading_status=self._get_cube_loading_status(pending),
             cube_loading_error=pending.battler_error,
-            available_puppet_count=bot_count,
+            available_puppet_count=available,
         )
 
     def get_game_state(self, game_id: str, player_id: str) -> GameStateResponse | None:
