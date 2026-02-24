@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CardShowcase } from "../components/home/CardShowcase";
 import { JoinGameModal } from "../components/home/JoinGameModal";
+import { prefetchLegendaryName } from "../utils/prefetchName";
 
 export function Home() {
   const navigate = useNavigate();
   const [showJoinModal, setShowJoinModal] = useState(false);
+
+  useEffect(() => {
+    prefetchLegendaryName();
+  }, []);
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">

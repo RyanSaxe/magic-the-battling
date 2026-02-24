@@ -148,9 +148,13 @@ export function Lobby() {
     );
   }
 
-  const cubeReady = lobbyState?.cube_loading_status === "ready";
+  if (!lobbyState) {
+    return <div className="game-table h-dvh" />;
+  }
 
-  if (lobbyState && !cubeReady) {
+  const cubeReady = lobbyState.cube_loading_status === "ready";
+
+  if (!cubeReady) {
     return (
       <div className="game-table flex items-center justify-center p-4">
         <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-md text-center">
