@@ -487,9 +487,9 @@ export function Play() {
                 <h2 className="text-lg font-semibold text-white">Play Solo</h2>
               </div>
               <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-                Battle against builds that real players piloted to strong
-                finishes. Their cards are face up, and you decide who wins each
-                battle.
+                Battle against hands that real players piloted to strong
+                finishes. Their cards are face up, and you decide who would win
+                each battle.
               </p>
               <div className="mt-auto flex gap-2 pt-4">
                 <button
