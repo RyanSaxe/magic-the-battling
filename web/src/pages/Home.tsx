@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { CardShowcase } from "../components/home/CardShowcase";
-import { CreateGameModal } from "../components/home/CreateGameModal";
 import { JoinGameModal } from "../components/home/JoinGameModal";
+import { prefetchLegendaryName } from "../utils/prefetchName";
 
 export function Home() {
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const navigate = useNavigate();
   const [showJoinModal, setShowJoinModal] = useState(false);
+
+  useEffect(() => {
+    prefetchLegendaryName();
+  }, []);
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
@@ -22,7 +27,7 @@ export function Home() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => navigate("/play")}
               className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
             >
               Play Game
@@ -44,7 +49,7 @@ export function Home() {
           </p>
           <div className="flex gap-3 mt-2 justify-center">
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => navigate("/play")}
               className="btn btn-primary py-2 px-5 font-semibold animate-gentle-glow"
             >
               Play Game
@@ -83,9 +88,6 @@ export function Home() {
         </a>
       </footer>
 
-      {showCreateModal && (
-        <CreateGameModal onClose={() => setShowCreateModal(false)} />
-      )}
       {showJoinModal && (
         <JoinGameModal onClose={() => setShowJoinModal(false)} />
       )}

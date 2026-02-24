@@ -48,10 +48,11 @@ class ConnectionManager:
         self._connections[game_id][player_id] = websocket
         self._pending_connections[game_id].discard(player_id)
 
-    def disconnect(self, game_id: str, player_id: str):
+    def disconnect(self, game_id: str, player_id: str, websocket: WebSocket):
         logger.debug("Disconnect called for game_id=%s, player_id=%s", game_id, player_id)
         if game_id in self._connections:
-            self._connections[game_id].pop(player_id, None)
+            if self._connections[game_id].get(player_id) is websocket:
+                self._connections[game_id].pop(player_id, None)
             remaining = len(self._connections[game_id])
             logger.debug("Remaining connections for game_id=%s: %d", game_id, remaining)
             if not self._connections[game_id]:
@@ -83,10 +84,11 @@ class ConnectionManager:
 
     async def send_to_player(self, game_id: str, player_id: str, message: dict):
         if game_id in self._connections and player_id in self._connections[game_id]:
+            ws = self._connections[game_id][player_id]
             try:
-                await self._connections[game_id][player_id].send_json(message)
+                await ws.send_json(message)
             except Exception:
-                self.disconnect(game_id, player_id)
+                self.disconnect(game_id, player_id, ws)
 
     async def broadcast_game_state(self, game_id: str):
         if game_id not in self._connections:
@@ -103,7 +105,7 @@ class ConnectionManager:
                         }
                     )
                 except Exception:
-                    self.disconnect(game_id, player_id)
+                    self.disconnect(game_id, player_id, websocket)
 
         for player_id, spectator_list in self._spectators.get(game_id, {}).items():
             state = game_manager.get_game_state(game_id, player_id)
@@ -131,7 +133,7 @@ class ConnectionManager:
                     }
                 )
             except Exception:
-                self.disconnect(game_id, player_id)
+                self.disconnect(game_id, player_id, websocket)
 
     async def send_error(self, websocket: WebSocket, message: str):
         await websocket.send_json(
@@ -162,7 +164,7 @@ class ConnectionManager:
                         }
                     )
                 except Exception:
-                    self.disconnect(game_id, player_id)
+                    self.disconnect(game_id, player_id, websocket)
 
 
 connection_manager = ConnectionManager()
@@ -221,6 +223,7 @@ async def websocket_endpoint(
         await websocket.close(code=4004, reason="Game not found")
         return
 
+    game_manager.cancel_pending_disconnect(game_id, player_id)
     await connection_manager.connect(game_id, player_id, websocket)
 
     try:
@@ -241,8 +244,12 @@ async def websocket_endpoint(
             await handle_message(game_id, player_id, data, websocket)
 
     except WebSocketDisconnect:
-        connection_manager.disconnect(game_id, player_id)
-        game_manager.remove_player_from_pending(game_id, player_id)
+        connection_manager.disconnect(game_id, player_id, websocket)
+        game_manager.schedule_pending_disconnect(
+            game_id,
+            player_id,
+            on_removed=lambda: connection_manager.broadcast_lobby_state(game_id),
+        )
         await connection_manager.broadcast_lobby_state(game_id)
 
 
@@ -256,7 +263,7 @@ def _validate_action_phase(action: str, player) -> str | None:
     return None
 
 
-async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_id: str, websocket: WebSocket) -> bool:
+async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_id: str, websocket: WebSocket) -> bool:  # noqa: PLR0912
     if action == "set_ready":
         is_ready = payload.get("is_ready", True)
         if game_manager.set_player_ready(game_id, player_id, is_ready):
@@ -281,6 +288,33 @@ async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_
             await connection_manager.broadcast_game_state(game_id)
         else:
             await connection_manager.send_error(websocket, "Failed to start game")
+        return True
+
+    if action == "add_puppet":
+        if game_manager.add_puppet(game_id, player_id):
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, "Cannot add puppet")
+        return True
+
+    if action == "remove_puppet":
+        if game_manager.remove_puppet(game_id, player_id):
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, "Cannot remove puppet")
+        return True
+
+    if action == "kick_player":
+        target_id = payload.get("target_player_id", "")
+        if game_manager.kick_player(game_id, player_id, target_id):
+            kicked_ws = connection_manager._connections.get(game_id, {}).get(target_id)
+            if kicked_ws:
+                await kicked_ws.send_json({"type": "kicked", "payload": {}})
+                await kicked_ws.close(code=4005, reason="Kicked by host")
+                connection_manager.disconnect(game_id, target_id, kicked_ws)
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, "Cannot kick player")
         return True
 
     return False

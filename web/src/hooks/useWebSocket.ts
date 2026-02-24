@@ -11,6 +11,7 @@ interface WebSocketState {
   gameState: GameState | null
   lobbyState: LobbyState | null
   pendingSpectateRequest: SpectateRequest | null
+  kicked: boolean
 }
 
 interface SpectatorConfig {
@@ -29,6 +30,7 @@ export function useWebSocket(
     gameState: null,
     lobbyState: null,
     pendingSpectateRequest: null,
+    kicked: false,
   })
 
   const wsRef = useRef<WebSocket | null>(null)
@@ -74,6 +76,9 @@ export function useWebSocket(
           onServerErrorRef.current?.(message.payload.message)
         } else if (message.type === 'spectate_request') {
           setState(s => ({ ...s, pendingSpectateRequest: message.payload }))
+        } else if (message.type === 'kicked') {
+          isClosingRef.current = true
+          setState(s => ({ ...s, kicked: true }))
         }
       }
 
@@ -88,9 +93,7 @@ export function useWebSocket(
         }
       }
 
-      ws.onerror = () => {
-        onServerErrorRef.current?.('WebSocket connection error')
-      }
+      ws.onerror = () => {}
 
       wsRef.current = ws
     }
