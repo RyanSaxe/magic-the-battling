@@ -16,7 +16,6 @@ interface BattleZoneConfig {
   fixedHeight?: number
   handMaxWidth?: number
   battlefieldMaxWidth?: number
-  minCardWidth?: number
   zoneColumnWidth?: number
 }
 
@@ -38,7 +37,6 @@ function computeZoneCards(
   containerW: number,
   gap: number,
   maxWidth: number,
-  minWidth: number,
   padding: number,
 ): CardDimensions {
   const baseCardW = Math.floor(rowH / CARD_ASPECT_RATIO)
@@ -49,7 +47,7 @@ function computeZoneCards(
   }
 
   const horizontalCap = Math.floor((containerW - padding - (count - 1) * gap) / count)
-  const cardW = Math.max(minWidth, Math.min(baseCardW, horizontalCap, maxWidth))
+  const cardW = Math.max(1, Math.min(baseCardW, horizontalCap, maxWidth))
   return { width: cardW, height: Math.round(cardW * CARD_ASPECT_RATIO) }
 }
 
@@ -59,7 +57,6 @@ function computeHandCards(
   containerW: number,
   defaultGap: number,
   maxWidth: number,
-  minWidth: number,
   padding: number,
 ): CardDimensions & { gap: number } {
   const baseCardW = Math.floor(rowH / CARD_ASPECT_RATIO)
@@ -81,11 +78,11 @@ function computeHandCards(
     return { width: idealW, height: Math.round(idealW * CARD_ASPECT_RATIO), gap: neededGap }
   }
 
-  const cardW = Math.max(minWidth, Math.floor((containerW - padding - (count - 1) * minGap) / count))
+  const cardW = Math.max(1, Math.floor((containerW - padding - (count - 1) * minGap) / count))
   return { width: cardW, height: Math.round(cardW * CARD_ASPECT_RATIO), gap: minGap }
 }
 
-function computeBattleZones(
+export function computeBattleZones(
   containerWidth: number,
   containerHeight: number,
   config: Required<Pick<BattleZoneConfig,
@@ -93,7 +90,7 @@ function computeBattleZones(
     'playerLandCount' | 'playerNonlandCount' |
     'opponentLandCount' | 'opponentNonlandCount' |
     'handGap' | 'battlefieldGap' | 'fixedHeight' |
-    'handMaxWidth' | 'battlefieldMaxWidth' | 'minCardWidth' |
+    'handMaxWidth' | 'battlefieldMaxWidth' |
     'zoneColumnWidth'
   >>
 ): BattleZoneDims {
@@ -102,7 +99,7 @@ function computeBattleZones(
     playerLandCount, playerNonlandCount,
     opponentLandCount, opponentNonlandCount,
     handGap, battlefieldGap, fixedHeight,
-    handMaxWidth, battlefieldMaxWidth, minCardWidth,
+    handMaxWidth, battlefieldMaxWidth,
     zoneColumnWidth,
   } = config
 
@@ -125,8 +122,8 @@ function computeBattleZones(
   const bfWidth = containerWidth - zoneColumnWidth
   const handWidth = containerWidth - zoneColumnWidth
 
-  const playerHandResult = computeHandCards(playerHandCount, rowH, handWidth, handGap, handMaxWidth, minCardWidth, handPadding)
-  const opponentHandResult = computeHandCards(opponentHandCount, rowH, handWidth, handGap, handMaxWidth, minCardWidth, handPadding)
+  const playerHandResult = computeHandCards(playerHandCount, rowH, handWidth, handGap, handMaxWidth, handPadding)
+  const opponentHandResult = computeHandCards(opponentHandCount, rowH, handWidth, handGap, handMaxWidth, handPadding)
 
   return {
     rowHeight: rowH,
@@ -134,10 +131,10 @@ function computeBattleZones(
     opponentHandGap: opponentHandResult.gap,
     playerHand: { width: playerHandResult.width, height: playerHandResult.height },
     opponentHand: { width: opponentHandResult.width, height: opponentHandResult.height },
-    playerLands: computeZoneCards(playerLandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, minCardWidth, bfPadding),
-    playerNonlands: computeZoneCards(playerNonlandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, minCardWidth, bfPadding),
-    opponentLands: computeZoneCards(opponentLandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, minCardWidth, bfPadding),
-    opponentNonlands: computeZoneCards(opponentNonlandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, minCardWidth, bfPadding),
+    playerLands: computeZoneCards(playerLandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, bfPadding),
+    playerNonlands: computeZoneCards(playerNonlandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, bfPadding),
+    opponentLands: computeZoneCards(opponentLandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, bfPadding),
+    opponentNonlands: computeZoneCards(opponentNonlandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, bfPadding),
   }
 }
 
@@ -174,7 +171,6 @@ export function useBattleCardSizes(config: BattleZoneConfig): [
     fixedHeight = 0,
     handMaxWidth = 400,
     battlefieldMaxWidth = 300,
-    minCardWidth = 40,
     zoneColumnWidth = 0,
   } = config
 
@@ -183,7 +179,7 @@ export function useBattleCardSizes(config: BattleZoneConfig): [
     playerLandCount, playerNonlandCount,
     opponentLandCount, opponentNonlandCount,
     handGap, battlefieldGap, fixedHeight,
-    handMaxWidth, battlefieldMaxWidth, minCardWidth,
+    handMaxWidth, battlefieldMaxWidth,
     zoneColumnWidth,
   }
 
@@ -212,7 +208,7 @@ export function useBattleCardSizes(config: BattleZoneConfig): [
       playerLandCount, playerNonlandCount,
       opponentLandCount, opponentNonlandCount,
       handGap, battlefieldGap, fixedHeight,
-      handMaxWidth, battlefieldMaxWidth, minCardWidth,
+      handMaxWidth, battlefieldMaxWidth,
       zoneColumnWidth,
     ]
   )
