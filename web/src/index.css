@@ -464,3 +464,14 @@ body {
 .callout-content p {
   margin: 0;
 }
+
+/* Hints banner crossfade */
+.hint-fade-in {
+  opacity: 1;
+  transition: opacity 200ms ease-out;
+}
+
+.hint-fade-out {
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
