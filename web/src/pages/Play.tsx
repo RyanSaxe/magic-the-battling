@@ -323,16 +323,6 @@ export function Play() {
 
   const nameValid = playerName.trim().length > 0;
 
-  const loadingMessage = (() => {
-    if (soloPhase === "navigating") return "Starting game...";
-    const cubeReady = lobbyState?.cube_loading_status === "ready";
-    if (!cubeReady) return "Loading card pool...";
-    if (soloPhase === "starting") {
-      return `Finding puppet opponents... Found ${lobbyState?.available_puppet_count ?? 0} of ${opponents}`;
-    }
-    return "Preparing...";
-  })();
-
   const soloLoading = soloPhase !== "idle" && soloPhase !== "not-enough-puppets";
 
   const inactiveCard = (
@@ -419,7 +409,7 @@ export function Play() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    {loadingMessage}
+                    Loading...
                   </button>
                 ) : (
                   <>
