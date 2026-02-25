@@ -89,7 +89,7 @@ export function computeLayout(
     sectionPadTop = 0,
     sectionPadBottom = 0,
     sectionGap = 0,
-    minCardWidth = 30,
+    minCardWidth = 1,
     maxCardWidth = 200,
   } = config;
 
@@ -355,16 +355,7 @@ export function computeLayout(
           (isTop ? 0 : sectionPadV) +
           columnGap +
           fillTotalH;
-        const fill = Math.min(
-          1,
-          (pGridH +
-            Object.values(fillDims).reduce(
-              (s, d) => s + d.rows * d.height,
-              0,
-            )) /
-            gridAvailH,
-        );
-        const score = pW * Math.sqrt(fill) * Math.pow(0.83, pRows - 1);
+        const score = pW * Math.pow(0.90, pRows - 1);
 
         let actualBRCardW = brCardW;
         let actualBRRows = 0;
@@ -555,14 +546,7 @@ export function computeLayout(
           }
           if (!fillOK) continue;
 
-          const totalUsedH =
-            primaryH +
-            Object.values(fillDims).reduce(
-              (s, d) => s + d.rows * d.height + sectionPadV,
-              0,
-            );
-          const fill = Math.min(1, totalUsedH / gridAvailH);
-          const score = Math.min(aW, bW) * Math.sqrt(fill) * Math.pow(0.83, aRows + bRows - 2);
+          const score = Math.min(aW, bW) * Math.pow(0.90, aRows + bRows - 2);
 
           let actualBRCardW2 = brCardW;
           let actualBRRows2 = 0;
