@@ -200,6 +200,24 @@ describe('computeLayout', () => {
     })
   })
 
+  describe('row penalty (anti-flicker)', () => {
+    it('fewer rows win at crossover boundary where fill is slightly better with more rows', () => {
+      const result = computeLayout(1000, 400, {
+        zones: {
+          cards: { count: 8 },
+        },
+        layout: { top: ['cards'] },
+      })
+      const result2 = computeLayout(1001, 400, {
+        zones: {
+          cards: { count: 8 },
+        },
+        layout: { top: ['cards'] },
+      })
+      expect(result.cards.rows).toBe(result2.cards.rows)
+    })
+  })
+
   describe('edge cases', () => {
     it('returns defaults for zero container', () => {
       const result = computeLayout(0, 0, {
