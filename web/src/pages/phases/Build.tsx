@@ -209,12 +209,17 @@ export function BuildPhase({
     }
   };
 
+  const [stableSBCount, setStableSBCount] = useState(self_player.sideboard.length);
+  if (self_player.sideboard.length > stableSBCount) {
+    setStableSBCount(self_player.sideboard.length);
+  }
+
   const battlefieldCount = 3 + 1 + 1; // 3 basic slots + treasure + poison
   const [containerRef, dims] = useCardLayout({
     zones: {
       hand: { count: maxHandSize },
       battlefield: { count: battlefieldCount, priority: "fill", maxRows: 1 },
-      sideboard: { count: self_player.sideboard.length },
+      sideboard: { count: stableSBCount },
     },
     layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
     ...ZONE_LAYOUT_PADDING,

@@ -355,7 +355,8 @@ export function computeLayout(
           (isTop ? 0 : sectionPadV) +
           columnGap +
           fillTotalH;
-        const score = pW * Math.pow(0.90, pRows - 1);
+        const fill = Math.min(1, totalH / availH);
+        const score = pW * Math.sqrt(fill) * Math.pow(0.90, pRows - 1);
 
         let actualBRCardW = brCardW;
         let actualBRRows = 0;
@@ -546,7 +547,18 @@ export function computeLayout(
           }
           if (!fillOK) continue;
 
-          const score = Math.min(aW, bW) * Math.pow(0.90, aRows + bRows - 2);
+          const fillTotalH2 = Object.values(fillDims).reduce(
+            (s, d) => s + d.rows * d.height + vGaps({ gap: fillBL[0]?.gap ?? 6 } as ResolvedZone, d.rows),
+            0,
+          ) + Math.max(0, fillBL.length - 1) * sectionGap + fillBL.length * sectionPadV;
+          const totalH2 = (pAIsTop ? sectionPadV + aGridH : 0)
+            + (pBIsTop ? sectionPadV + bGridH : 0)
+            + columnGap
+            + (!pAIsTop ? aGridH + sectionPadV : 0)
+            + (!pBIsTop ? bGridH + sectionPadV : 0)
+            + fillTotalH2;
+          const fill2 = Math.min(1, totalH2 / availH);
+          const score = Math.min(aW, bW) * Math.sqrt(fill2) * Math.pow(0.90, aRows + bRows - 2);
 
           let actualBRCardW2 = brCardW;
           let actualBRRows2 = 0;
