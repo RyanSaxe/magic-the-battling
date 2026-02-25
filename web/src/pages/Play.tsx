@@ -386,15 +386,15 @@ export function Play() {
               <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
               "Play with Friends",
             )}
-            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 border-l-2 border-l-amber-400 flex flex-col">
+            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
               <div className="flex items-center gap-3 mb-2">
                 <PuppetIcon size="lg" className="text-cyan-400" />
                 <h2 className="text-lg font-semibold text-white">Play Solo</h2>
               </div>
               <div className="flex-1 flex items-center justify-center">
-                <p className="foil-text italic text-gray-200 text-base text-center leading-relaxed px-2">
-                  Battle against hands that real players piloted to strong
-                  finishes. Their cards are face up, and you decide who would win
+                <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                  <span className="text-amber-400/70">Battle against hands that real players piloted to strong
+                  finishes.</span>{" "}Their cards are face up, and you decide who would win
                   each battle.
                 </p>
               </div>
@@ -432,7 +432,7 @@ export function Play() {
               <PuppetIcon size="sm" className="text-cyan-400 shrink-0" />,
               "Play Solo",
             )}
-            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 border-l-2 border-l-amber-400 flex flex-col">
+            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
               <div className="flex items-center gap-3 mb-2">
                 <FriendsIcon className="w-8 h-8 text-amber-400" />
                 <h2 className="text-lg font-semibold text-white">
@@ -440,8 +440,8 @@ export function Play() {
                 </h2>
               </div>
               <div className="flex-1 flex items-center justify-center">
-                <p className="foil-text italic text-gray-200 text-base text-center leading-relaxed px-2">
-                  Compete head-to-head with your friends to see who can navigate
+                <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                  <span className="text-amber-400/70">Compete head-to-head with your friends</span>{" "}to see who can navigate
                   from random cards to a completely unbeatable starting hand.
                 </p>
               </div>
@@ -469,10 +469,12 @@ export function Play() {
           <h2 className="text-lg font-semibold text-white mb-1">
             Play with Friends
           </h2>
-          <p className="foil-text italic text-gray-200 text-base text-center leading-relaxed px-2 py-2">
-            Compete head-to-head with your friends to see who can navigate from
-            random cards to a completely unbeatable starting hand.
-          </p>
+          <div className="flex-1 flex items-center">
+            <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+              <span className="text-amber-400/70">Compete head-to-head with your friends</span>{" "}to see who can navigate from
+              random cards to a completely unbeatable starting hand.
+            </p>
+          </div>
           <div className="mt-auto flex gap-2 pt-4">
             <button
               onClick={handleCreateLobby}
@@ -489,10 +491,12 @@ export function Play() {
             <PuppetIcon size="lg" className="text-cyan-400" />
           </div>
           <h2 className="text-lg font-semibold text-white mb-1">Play Solo</h2>
-          <p className="foil-text italic text-gray-200 text-base text-center leading-relaxed px-2 py-2">
-            Battle against hands that real players piloted to strong finishes.
-            Their cards are face up, and you decide who would win each battle.
-          </p>
+          <div className="flex-1 flex items-center">
+            <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+              <span className="text-amber-400/70">Battle against hands that real players piloted to strong
+              finishes.</span>{" "}Their cards are face up, and you decide who would win each battle.
+            </p>
+          </div>
           <div className="mt-auto flex gap-2 pt-4 relative z-50">
             {soloLoading ? (
               <button
