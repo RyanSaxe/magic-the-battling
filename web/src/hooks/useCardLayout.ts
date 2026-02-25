@@ -202,12 +202,11 @@ export function computeLayout(
       const brZone = brZones[0];
       const brRows = Math.ceil(brZone.count / brCols);
       const brVG = vGaps(brZone, brRows);
-      const brAvailH = availH - columnGap - topOverhead - brOverhead;
+      const brAvailH = availH - columnGap - topOverhead - blOverhead - brOverhead;
       const brCardWFromH = Math.floor(
         (brAvailH - brVG) / (brRows * CARD_ASPECT_RATIO),
       );
-      const brIdealW =
-        allPrimary.length > 0 ? Math.round(maxCardWidth * 1.5) : maxCardWidth;
+      const brIdealW = maxCardWidth;
       brCardW = Math.min(brIdealW, brCardWFromH, brZone.maxCardWidth);
       if (brCardW < minCardWidth) continue;
       brCellW = brCols * brCardW + (brCols - 1) * brZone.gap + 2 * sectionPadH;
