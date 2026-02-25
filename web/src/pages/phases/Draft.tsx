@@ -33,8 +33,8 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
 
   const [containerRef, { pool: poolDims, pack: packDims }] = useCardLayout({
     zones: {
-      pool: { count: pool.length, maxCardWidth: 300 },
-      pack: { count: currentPack.length, maxCardWidth: 400 },
+      pool: { count: pool.length, maxCardWidth: 300, weight: 1 },
+      pack: { count: currentPack.length, maxCardWidth: 400, weight: 2 },
     },
     layout: { top: ['pool'], bottomLeft: ['pack'] },
     fixedHeight: 65,
