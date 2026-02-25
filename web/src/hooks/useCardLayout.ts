@@ -194,22 +194,27 @@ export function computeLayout(
       )
     : [0];
 
+  function sizeBR(brColCount: number, brAvailableH: number) {
+    const brZone = brZones[0];
+    const brRowCount = Math.ceil(brZone.count / brColCount);
+    const brVG = vGaps(brZone, brRowCount);
+    const brWFromH = Math.floor(
+      (brAvailableH - brVG) / (brRowCount * CARD_ASPECT_RATIO),
+    );
+    const brW = Math.min(maxCardWidth, brWFromH, brZone.maxCardWidth);
+    return { brW, brRowCount, brZone };
+  }
+
   for (const brCols of brColVariants) {
     let brCardW = 0;
     let brCellW = 0;
 
     if (hasBR) {
-      const brZone = brZones[0];
-      const brRows = Math.ceil(brZone.count / brCols);
-      const brVG = vGaps(brZone, brRows);
-      const brAvailH = availH - columnGap - topOverhead - blOverhead - brOverhead;
-      const brCardWFromH = Math.floor(
-        (brAvailH - brVG) / (brRows * CARD_ASPECT_RATIO),
-      );
-      const brIdealW = maxCardWidth;
-      brCardW = Math.min(brIdealW, brCardWFromH, brZone.maxCardWidth);
+      const budgetH = availH - columnGap - topOverhead - brOverhead;
+      const { brW } = sizeBR(brCols, budgetH);
+      brCardW = brW;
       if (brCardW < minCardWidth) continue;
-      brCellW = brCols * brCardW + (brCols - 1) * brZone.gap + 2 * sectionPadH;
+      brCellW = brCols * brCardW + (brCols - 1) * brZones[0].gap + 2 * sectionPadH;
     }
 
     const blAvailW = hasBR
@@ -361,6 +366,16 @@ export function computeLayout(
         );
         const score = pW * Math.sqrt(fill) * Math.pow(0.83, pRows - 1);
 
+        let actualBRCardW = brCardW;
+        let actualBRRows = 0;
+        if (hasBR) {
+          const topActualH = isTop ? pGridH + sectionPadV : topOverhead;
+          const brActualAvailH = availH - topActualH - columnGap - brOverhead;
+          const sized = sizeBR(brCols, brActualAvailH);
+          actualBRCardW = Math.max(minCardWidth, sized.brW);
+          actualBRRows = sized.brRowCount;
+        }
+
         if (totalH > availH) {
           const overflow = totalH - availH;
           if (overflow < bestOverflow) {
@@ -374,11 +389,10 @@ export function computeLayout(
             };
             for (const [fid, fd] of Object.entries(fillDims)) r[fid] = fd;
             if (hasBR) {
-              const brZone = brZones[0];
-              r[brZone.id] = {
-                width: brCardW,
-                height: Math.round(brCardW * CARD_ASPECT_RATIO),
-                rows: Math.ceil(brZone.count / brCols),
+              r[brZones[0].id] = {
+                width: actualBRCardW,
+                height: Math.round(actualBRCardW * CARD_ASPECT_RATIO),
+                rows: actualBRRows,
                 columns: brCols,
               };
             }
@@ -398,11 +412,10 @@ export function computeLayout(
           };
           for (const [fid, fd] of Object.entries(fillDims)) r[fid] = fd;
           if (hasBR) {
-            const brZone = brZones[0];
-            r[brZone.id] = {
-              width: brCardW,
-              height: Math.round(brCardW * CARD_ASPECT_RATIO),
-              rows: Math.ceil(brZone.count / brCols),
+            r[brZones[0].id] = {
+              width: actualBRCardW,
+              height: Math.round(actualBRCardW * CARD_ASPECT_RATIO),
+              rows: actualBRRows,
               columns: brCols,
             };
           }
@@ -551,6 +564,17 @@ export function computeLayout(
           const fill = Math.min(1, totalUsedH / gridAvailH);
           const score = Math.min(aW, bW) * Math.sqrt(fill) * Math.pow(0.83, aRows + bRows - 2);
 
+          let actualBRCardW2 = brCardW;
+          let actualBRRows2 = 0;
+          if (hasBR) {
+            const topGridH2 = pAIsTop ? aRows * aCardH + vGaps(pA, aRows) : (pBIsTop ? bRows * bCardH + vGaps(pB, bRows) : 0);
+            const topActualH2 = topGridH2 > 0 ? topGridH2 + sectionPadV : topOverhead;
+            const brActualAvailH2 = availH - topActualH2 - columnGap - brOverhead;
+            const sized2 = sizeBR(brCols, brActualAvailH2);
+            actualBRCardW2 = Math.max(minCardWidth, sized2.brW);
+            actualBRRows2 = sized2.brRowCount;
+          }
+
           if (score > bestScore) {
             bestScore = score;
             const r = makeDefaults(zoneIds);
@@ -568,11 +592,10 @@ export function computeLayout(
             };
             for (const [fid, fd] of Object.entries(fillDims)) r[fid] = fd;
             if (hasBR) {
-              const brZone = brZones[0];
-              r[brZone.id] = {
-                width: brCardW,
-                height: Math.round(brCardW * CARD_ASPECT_RATIO),
-                rows: Math.ceil(brZone.count / brCols),
+              r[brZones[0].id] = {
+                width: actualBRCardW2,
+                height: Math.round(actualBRCardW2 * CARD_ASPECT_RATIO),
+                rows: actualBRRows2,
                 columns: brCols,
               };
             }

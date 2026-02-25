@@ -135,6 +135,26 @@ describe('computeLayout', () => {
       expect(result.commandZone.width).toBeGreaterThan(MIN_CARD_WIDTH)
     })
 
+    it('CZ cards do not overflow when top zone takes significant height', () => {
+      const result = computeLayout(1100, 700, {
+        zones: {
+          hand: { count: 5 },
+          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          sideboard: { count: 8 },
+          commandZone: { count: 3 },
+        },
+        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        ...ZONE_LAYOUT_PADDING,
+      })
+      const handH = result.hand.rows * result.hand.height + (result.hand.rows - 1) * 6
+      const topH = handH + ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom
+      const bottomH = 700 - topH - ZONE_LAYOUT_PADDING.sectionGap
+      const czTotalH = result.commandZone.rows * result.commandZone.height
+        + (result.commandZone.rows - 1) * 6
+        + ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom
+      expect(czTotalH).toBeLessThanOrEqual(bottomH)
+    })
+
     it('keeps 1 CZ column when only 1 CZ card', () => {
       const result = computeLayout(1200, 700, {
         zones: {
