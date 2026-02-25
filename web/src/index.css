@@ -475,3 +475,25 @@ body {
   opacity: 0;
   transition: opacity 200ms ease-out;
 }
+
+/* Foil shimmer for mode description text */
+@keyframes foil-shimmer {
+  0%, 100% { background-position: 200% center; }
+  50% { background-position: -200% center; }
+}
+
+.foil-text {
+  background: linear-gradient(
+    90deg,
+    currentColor 0%,
+    currentColor 40%,
+    var(--color-gold) 50%,
+    currentColor 60%,
+    currentColor 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: foil-shimmer 8s ease-in-out infinite;
+}

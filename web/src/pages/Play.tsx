@@ -391,9 +391,8 @@ export function Play() {
                 <PuppetIcon size="lg" className="text-cyan-400" />
                 <h2 className="text-lg font-semibold text-white">Play Solo</h2>
               </div>
-              <div className="text-center px-2">
-                <span className="text-2xl text-amber-500/60 leading-none block">{"\u201C"}</span>
-                <p className="italic text-gray-300/90 text-sm leading-relaxed">
+              <div className="flex-1 flex items-center justify-center">
+                <p className="foil-text italic text-gray-200 text-base text-center leading-relaxed px-2">
                   Battle against hands that real players piloted to strong
                   finishes. Their cards are face up, and you decide who would win
                   each battle.
@@ -440,9 +439,8 @@ export function Play() {
                   Play with Friends
                 </h2>
               </div>
-              <div className="text-center px-2">
-                <span className="text-2xl text-amber-500/60 leading-none block">{"\u201C"}</span>
-                <p className="italic text-gray-300/90 text-sm leading-relaxed">
+              <div className="flex-1 flex items-center justify-center">
+                <p className="foil-text italic text-gray-200 text-base text-center leading-relaxed px-2">
                   Compete head-to-head with your friends to see who can navigate
                   from random cards to a completely unbeatable starting hand.
                 </p>
@@ -471,13 +469,10 @@ export function Play() {
           <h2 className="text-lg font-semibold text-white mb-1">
             Play with Friends
           </h2>
-          <div className="text-center px-2">
-            <span className="text-2xl text-amber-500/60 leading-none block">{"\u201C"}</span>
-            <p className="italic text-gray-300/90 text-sm leading-relaxed">
-              Compete head-to-head with your friends to see who can navigate from
-              random cards to a completely unbeatable starting hand.
-            </p>
-          </div>
+          <p className="foil-text italic text-gray-200 text-base text-center leading-relaxed px-2 py-2">
+            Compete head-to-head with your friends to see who can navigate from
+            random cards to a completely unbeatable starting hand.
+          </p>
           <div className="mt-auto flex gap-2 pt-4">
             <button
               onClick={handleCreateLobby}
@@ -494,13 +489,10 @@ export function Play() {
             <PuppetIcon size="lg" className="text-cyan-400" />
           </div>
           <h2 className="text-lg font-semibold text-white mb-1">Play Solo</h2>
-          <div className="text-center px-2">
-            <span className="text-2xl text-amber-500/60 leading-none block">{"\u201C"}</span>
-            <p className="italic text-gray-300/90 text-sm leading-relaxed">
-              Battle against hands that real players piloted to strong finishes.
-              Their cards are face up, and you decide who would win each battle.
-            </p>
-          </div>
+          <p className="foil-text italic text-gray-200 text-base text-center leading-relaxed px-2 py-2">
+            Battle against hands that real players piloted to strong finishes.
+            Their cards are face up, and you decide who would win each battle.
+          </p>
           <div className="mt-auto flex gap-2 pt-4 relative z-50">
             {soloLoading ? (
               <button
@@ -511,7 +503,7 @@ export function Play() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                {loadingMessage}
+                Loading...
               </button>
             ) : (
               <>
