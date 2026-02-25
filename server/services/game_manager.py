@@ -979,6 +979,8 @@ class GameManager:
             cube_loading_status=self._get_cube_loading_status(pending),
             cube_loading_error=pending.battler_error,
             available_puppet_count=available,
+            cube_id=pending.cube_id,
+            use_upgrades=pending.use_upgrades,
         )
 
     def get_game_state(self, game_id: str, player_id: str) -> GameStateResponse | None:

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { createGame } from "../api/client";
+import { createGame, warmCubeCache } from "../api/client";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
 import { PuppetIcon } from "../components/icons/PuppetIcon";
+import { HintsBanner } from "../components/common/HintsBanner";
 import { getLegendaryName } from "../utils/prefetchName";
 import type { LobbyState } from "../types";
 
@@ -20,7 +21,7 @@ const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
 
 function useSoloLobbyWatcher(
   lobbyState: LobbyState | null,
-  soloGameId: string | null,
+  pendingGameId: string | null,
   soloPhaseRef: React.RefObject<SoloPhase>,
   opponents: OpponentCount,
   actions: { setReady: (r: boolean) => void; startGame: () => void },
@@ -39,7 +40,7 @@ function useSoloLobbyWatcher(
   }, []);
 
   useEffect(() => {
-    if (!soloGameId || !lobbyState) return;
+    if (!pendingGameId || !lobbyState) return;
 
     const cubeJustReady =
       lobbyState.cube_loading_status === "ready" &&
@@ -70,7 +71,7 @@ function useSoloLobbyWatcher(
       actions.startGame();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lobbyState, soloGameId]);
+  }, [lobbyState, pendingGameId]);
 
   return { reset };
 }
@@ -215,15 +216,14 @@ export function Play() {
   const [useUpgrades, setUseUpgrades] = useState(true);
   const [opponents, setOpponents] = useState<OpponentCount>(3);
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
-  const [error, setError] = useState("");
   const [activeMode, setActiveMode] = useState<ActiveMode>("solo");
 
   const [friendsLoading, setFriendsLoading] = useState(false);
 
   const [soloPhase, setSoloPhase] = useState<SoloPhase>("idle");
   const soloPhaseRef = useRef<SoloPhase>("idle");
-  const [soloGameId, setSoloGameId] = useState<string | null>(null);
-  const [soloSessionId, setSoloSessionId] = useState<string | null>(null);
+  const [pendingGameId, setPendingGameId] = useState<string | null>(null);
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [maxAvailablePuppets, setMaxAvailablePuppets] = useState<number | null>(
     null,
   );
@@ -234,15 +234,15 @@ export function Play() {
   }, []);
 
   const { lobbyState, gameState, actions } = useGame(
-    soloGameId,
-    soloSessionId,
+    pendingGameId,
+    pendingSessionId,
     null,
     addToast,
   );
 
   const { reset: resetWatcher } = useSoloLobbyWatcher(
     lobbyState,
-    soloGameId,
+    pendingGameId,
     soloPhaseRef,
     opponents,
     actions,
@@ -255,18 +255,31 @@ export function Play() {
   );
 
   useEffect(() => {
-    if (gameState && soloGameId) {
-      navigate(`/game/${soloGameId}/play`);
+    if (gameState && pendingGameId) {
+      navigate(`/game/${pendingGameId}/play`);
     }
-  }, [gameState, soloGameId, navigate]);
+  }, [gameState, pendingGameId, navigate]);
+
+  useEffect(() => {
+    if (
+      friendsLoading &&
+      pendingGameId &&
+      lobbyState?.cube_loading_status === "ready"
+    ) {
+      navigate(`/game/${pendingGameId}/lobby`);
+    }
+  }, [friendsLoading, pendingGameId, lobbyState?.cube_loading_status, navigate]);
+
+  useEffect(() => {
+    warmCubeCache(cubeId || "auto");
+  }, [cubeId]);
 
   const handleCreateLobby = async () => {
     if (!playerName.trim()) {
-      setError("Please enter your name");
+      addToast("Please enter your name", "error");
       return;
     }
     setFriendsLoading(true);
-    setError("");
     try {
       const response = await createGame(playerName, {
         cubeId: cubeId || "auto",
@@ -274,9 +287,13 @@ export function Play() {
         autoApproveSpectators,
       });
       saveSession(response.session_id, response.player_id);
-      navigate(`/game/${response.game_id}/lobby`);
+      setPendingGameId(response.game_id);
+      setPendingSessionId(response.session_id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create game");
+      addToast(
+        err instanceof Error ? err.message : "Failed to create game",
+        "error",
+      );
       setFriendsLoading(false);
     }
   };
@@ -284,11 +301,10 @@ export function Play() {
   const handleStartSolo = async (opponentOverride?: OpponentCount) => {
     const count = opponentOverride ?? opponents;
     if (!playerName.trim()) {
-      setError("Please enter your name");
+      addToast("Please enter your name", "error");
       return;
     }
     updateSoloPhase("loading");
-    setError("");
     resetWatcher();
     try {
       const targetCount = count + 1;
@@ -299,18 +315,27 @@ export function Play() {
         puppetCount: count,
       });
       saveSession(response.session_id, response.player_id);
-      setSoloGameId(response.game_id);
-      setSoloSessionId(response.session_id);
+      setPendingGameId(response.game_id);
+      setPendingSessionId(response.session_id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create game");
+      addToast(
+        err instanceof Error ? err.message : "Failed to create game",
+        "error",
+      );
       updateSoloPhase("idle");
     }
   };
 
+  const handleCancelFriends = () => {
+    setFriendsLoading(false);
+    setPendingGameId(null);
+    setPendingSessionId(null);
+  };
+
   const handleCancelSolo = () => {
     updateSoloPhase("idle");
-    setSoloGameId(null);
-    setSoloSessionId(null);
+    setPendingGameId(null);
+    setPendingSessionId(null);
     setMaxAvailablePuppets(null);
     resetWatcher();
   };
@@ -321,102 +346,8 @@ export function Play() {
 
   const nameValid = playerName.trim().length > 0;
 
-  const loadingMessage = (() => {
-    if (soloPhase === "navigating") return "Starting game...";
-    const cubeReady = lobbyState?.cube_loading_status === "ready";
-    if (!cubeReady) return "Loading card pool...";
-    if (soloPhase === "starting") {
-      return `Finding puppet opponents... Found ${lobbyState?.available_puppet_count ?? 0} of ${opponents}`;
-    }
-    return "Preparing...";
-  })();
-
-  if (soloPhase === "not-enough-puppets") {
-    return (
-      <div className="game-table h-dvh flex items-center justify-center p-4">
-        <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-md text-center">
-          <h2 className="text-xl font-bold text-white mb-4">
-            Not enough puppet data
-          </h2>
-          <p className="text-gray-300 mb-6">
-            You requested {opponents} opponent{opponents > 1 && "s"}, but only{" "}
-            {maxAvailablePuppets} {maxAvailablePuppets === 1 ? "is" : "are"}{" "}
-            available for this cube.
-          </p>
-          {validRecoveryCounts.length > 0 ? (
-            <>
-              <p className="text-gray-400 text-sm mb-3">Play with:</p>
-              <RecoveryOpponentPicker
-                counts={validRecoveryCounts}
-                onSelect={(count) => {
-                  updateSoloPhase("idle");
-                  setSoloGameId(null);
-                  setSoloSessionId(null);
-                  handleStartSolo(count);
-                }}
-              />
-            </>
-          ) : (
-            <p className="text-gray-400 text-sm mb-4">
-              No puppet data exists for this cube yet. Play with friends to
-              generate data.
-            </p>
-          )}
-          <button
-            onClick={handleCancelSolo}
-            className="btn btn-secondary py-2 px-6 mt-4"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (
-    soloPhase === "loading" ||
-    soloPhase === "starting" ||
-    soloPhase === "navigating" ||
-    (gameState && soloGameId)
-  ) {
-    return (
-      <div className="game-table h-dvh flex items-center justify-center p-4">
-        <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-md text-center">
-          <div className="flex justify-center mb-4">
-            <svg
-              className="animate-spin h-8 w-8 text-amber-400"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-                fill="none"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              />
-            </svg>
-          </div>
-          <h2 className="text-lg font-semibold text-white mb-2">
-            Setting up solo game...
-          </h2>
-          <p className="text-gray-400 text-sm">{loadingMessage}</p>
-          <button
-            onClick={handleCancelSolo}
-            className="btn btn-secondary py-2 px-6 mt-6"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const soloLoading =
+    soloPhase !== "idle" && soloPhase !== "not-enough-puppets";
 
   const inactiveCard = (
     mode: ActiveMode,
@@ -425,7 +356,7 @@ export function Play() {
   ) => (
     <button
       onClick={() => setActiveMode(mode)}
-      className="shrink-0 bg-black/60 backdrop-blur rounded-lg px-4 py-3 border border-white/10 flex items-center gap-3 w-full text-left hover:bg-black/50 transition-colors"
+      className="shrink-0 bg-black/60 backdrop-blur rounded-lg px-4 py-3 border border-black/40 flex items-center gap-3 w-full text-left hover:bg-black/50 transition-colors"
     >
       {icon}
       <span className="text-white font-medium text-sm">{label}</span>
@@ -461,15 +392,13 @@ export function Play() {
             }
             disabled={nameLoading}
             placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-            className="w-full bg-black/40 border border-white/10 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+            className="w-full bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
           />
         </div>
 
-        {error && (
-          <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4 text-sm text-center">
-            {error}
-          </div>
-        )}
+        <div className="mb-4">
+          <HintsBanner />
+        </div>
       </div>
 
       {/* Mobile: stacked cards, inactive always on top */}
@@ -481,25 +410,56 @@ export function Play() {
               <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
               "Play with Friends",
             )}
-            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 border-l-2 border-l-amber-400 flex flex-col">
+            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
               <div className="flex items-center gap-3 mb-2">
                 <PuppetIcon size="lg" className="text-cyan-400" />
                 <h2 className="text-lg font-semibold text-white">Play Solo</h2>
               </div>
-              <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-                Battle against hands that real players piloted to strong
-                finishes. Their cards are face up, and you decide who would win
-                each battle.
-              </p>
-              <div className="mt-auto flex gap-2 pt-4">
-                <button
-                  onClick={() => handleStartSolo()}
-                  disabled={!nameValid}
-                  className="btn btn-primary flex-1 py-2"
-                >
-                  Start Game
-                </button>
-                <GearButton onClick={() => setShowSoloAdvanced(true)} />
+              <div className="flex-1 flex items-center justify-center">
+                <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                  <span className="text-amber-400/70">
+                    Battle hands that real players piloted
+                  </span>{" "}
+                  to strong finishes. Their cards are face up, and you decide
+                  who wins.
+                </p>
+              </div>
+              <div className="mt-auto flex gap-2 pt-4 relative z-50">
+                {soloLoading ? (
+                  <button
+                    onClick={handleCancelSolo}
+                    className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
+                  >
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    Loading...
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => handleStartSolo()}
+                      disabled={!nameValid}
+                      className="btn btn-primary flex-1 py-2"
+                    >
+                      Start Game
+                    </button>
+                    <GearButton onClick={() => setShowSoloAdvanced(true)} />
+                  </>
+                )}
               </div>
             </div>
           </>
@@ -510,26 +470,46 @@ export function Play() {
               <PuppetIcon size="sm" className="text-cyan-400 shrink-0" />,
               "Play Solo",
             )}
-            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 border-l-2 border-l-amber-400 flex flex-col">
+            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
               <div className="flex items-center gap-3 mb-2">
                 <FriendsIcon className="w-8 h-8 text-amber-400" />
                 <h2 className="text-lg font-semibold text-white">
                   Play with Friends
                 </h2>
               </div>
-              <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-                Compete head-to-head with your friends to see who can navigate
-                from random cards to a completely unbeatable starting hand.
-              </p>
-              <div className="mt-auto flex gap-2 pt-4">
-                <button
-                  onClick={handleCreateLobby}
-                  disabled={!nameValid || friendsLoading}
-                  className="btn btn-primary flex-1 py-2"
-                >
-                  {friendsLoading ? "Creating..." : "Create Lobby"}
-                </button>
-                <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+              <div className="flex-1 flex items-center justify-center">
+                <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                  <span className="text-amber-400/70">
+                    Can you draft an unbeatable hand?
+                  </span>{" "}
+                  Compete with your friends to see who can turn trash into
+                  treasure!{" "}
+                </p>
+              </div>
+              <div className="mt-auto flex gap-2 pt-4 relative z-50">
+                {friendsLoading ? (
+                  <button
+                    onClick={handleCancelFriends}
+                    className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
+                  >
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Loading...
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleCreateLobby}
+                      disabled={!nameValid}
+                      className="btn btn-primary flex-1 py-2"
+                    >
+                      Create Lobby
+                    </button>
+                    <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+                  </>
+                )}
               </div>
             </div>
           </>
@@ -538,46 +518,97 @@ export function Play() {
 
       {/* Desktop: side-by-side cards */}
       <div className="hidden sm:grid sm:grid-cols-2 gap-4 w-full max-w-5xl mx-auto">
-        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
-          <div className="text-2xl mb-2">
+        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
+          <div className="flex items-center gap-3 mb-2">
             <FriendsIcon className="w-8 h-8 text-amber-400" />
+            <h2 className="text-lg font-semibold text-white">
+              Play with Friends
+            </h2>
           </div>
-          <h2 className="text-lg font-semibold text-white mb-1">
-            Play with Friends
-          </h2>
-          <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-            Compete head-to-head with your friends to see who can navigate from
-            random cards to a completely unbeatable starting hand.
-          </p>
-          <div className="mt-auto flex gap-2 pt-4">
-            <button
-              onClick={handleCreateLobby}
-              disabled={!nameValid || friendsLoading}
-              className="btn btn-primary flex-1 py-2"
-            >
-              {friendsLoading ? "Creating..." : "Create Lobby"}
-            </button>
-            <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+          <div className="flex-1 flex items-center">
+            <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+              <span className="text-amber-400/70">
+                Can you draft an unbeatable hand?
+              </span>{" "}
+              Compete with your friends to see who can turn trash into
+              treasure!{" "}
+            </p>
+          </div>
+          <div className="mt-auto flex gap-2 pt-4 relative z-50">
+            {friendsLoading ? (
+              <button
+                onClick={handleCancelFriends}
+                className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
+              >
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Loading...
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleCreateLobby}
+                  disabled={!nameValid}
+                  className="btn btn-primary flex-1 py-2"
+                >
+                  Create Lobby
+                </button>
+                <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+              </>
+            )}
           </div>
         </div>
-        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
-          <div className="text-2xl mb-2">
+        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
+          <div className="flex items-center gap-3 mb-2">
             <PuppetIcon size="lg" className="text-cyan-400" />
+            <h2 className="text-lg font-semibold text-white">Play Solo</h2>
           </div>
-          <h2 className="text-lg font-semibold text-white mb-1">Play Solo</h2>
-          <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-            Battle against hands that real players piloted to strong finishes.
-            Their cards are face up, and you decide who would win each battle.
-          </p>
-          <div className="mt-auto flex gap-2 pt-4">
-            <button
-              onClick={() => handleStartSolo()}
-              disabled={!nameValid}
-              className="btn btn-primary flex-1 py-2"
-            >
-              Start Game
-            </button>
-            <GearButton onClick={() => setShowSoloAdvanced(true)} />
+          <div className="flex-1 flex items-center">
+            <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+              <span className="text-amber-400/70">
+                Battle hands that real players piloted
+              </span>{" "}
+              to strong finishes. Their cards are face up, and you decide wins.
+            </p>
+          </div>
+          <div className="mt-auto flex gap-2 pt-4 relative z-50">
+            {soloLoading ? (
+              <button
+                onClick={handleCancelSolo}
+                className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
+              >
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Loading...
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleStartSolo()}
+                  disabled={!nameValid}
+                  className="btn btn-primary flex-1 py-2"
+                >
+                  Start Game
+                </button>
+                <GearButton onClick={() => setShowSoloAdvanced(true)} />
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -636,6 +667,57 @@ export function Play() {
             </div>
           </div>
         </AdvancedOptionsModal>
+      )}
+
+      {(soloLoading || friendsLoading) && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40"
+          onClick={soloLoading ? handleCancelSolo : handleCancelFriends}
+        />
+      )}
+
+      {soloPhase === "not-enough-puppets" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={handleCancelSolo}
+          />
+          <div className="relative bg-gray-900 border border-white/10 rounded-lg p-8 w-full max-w-md text-center">
+            <h2 className="text-xl font-bold text-white mb-4">
+              Not enough puppet data
+            </h2>
+            <p className="text-gray-300 mb-6">
+              You requested {opponents} opponent{opponents > 1 && "s"}, but only{" "}
+              {maxAvailablePuppets} {maxAvailablePuppets === 1 ? "is" : "are"}{" "}
+              available for this cube.
+            </p>
+            {validRecoveryCounts.length > 0 ? (
+              <>
+                <p className="text-gray-400 text-sm mb-3">Play with:</p>
+                <RecoveryOpponentPicker
+                  counts={validRecoveryCounts}
+                  onSelect={(count) => {
+                    updateSoloPhase("idle");
+                    setPendingGameId(null);
+                    setPendingSessionId(null);
+                    handleStartSolo(count);
+                  }}
+                />
+              </>
+            ) : (
+              <p className="text-gray-400 text-sm mb-4">
+                No puppet data exists for this cube yet. Play with friends to
+                generate data.
+              </p>
+            )}
+            <button
+              onClick={handleCancelSolo}
+              className="btn btn-secondary py-2 px-6 mt-4"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

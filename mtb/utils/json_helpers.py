@@ -6,6 +6,7 @@ import threading
 import time
 from collections import OrderedDict
 from collections.abc import Coroutine
+from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
 import httpx
@@ -17,6 +18,12 @@ _CACHE_MAX = 1024  # max entries to keep in memory
 
 
 T = TypeVar("T")
+
+
+@dataclass
+class _CacheEntry:
+    data: Any
+    etag: str | None = field(default=None)
 
 
 class _AsyncRuntime:
@@ -51,7 +58,7 @@ class _JsonService:
     def __init__(self) -> None:
         self._runtime = _AsyncRuntime()
         self._client = httpx.AsyncClient(timeout=_TIMEOUT)
-        self._cache: OrderedDict[str, Any] = OrderedDict()
+        self._cache: OrderedDict[str, _CacheEntry] = OrderedDict()
         self._cache_max = _CACHE_MAX
         self._lock = asyncio.Lock()
         self._rate_lock = asyncio.Lock()
@@ -61,12 +68,15 @@ class _JsonService:
     def get_json(self, url: str) -> Any:
         return self._runtime.run(self._get_json(url))
 
+    def revalidate(self, url: str) -> None:
+        self._runtime.run(self._revalidate(url))
+
     async def _get_json(self, url: str) -> Any:
         async with self._lock:
-            cached = self._cache.get(url)
-            if cached is not None:
+            entry = self._cache.get(url)
+            if entry is not None:
                 self._cache.move_to_end(url)
-                return cached
+                return entry.data
 
             task = self._inflight.get(url)
             if task is None:
@@ -75,23 +85,53 @@ class _JsonService:
 
         return await task
 
+    async def _revalidate(self, url: str) -> None:
+        async with self._lock:
+            entry = self._cache.get(url)
+
+        if entry is None:
+            await self._get_json(url)
+            return
+
+        if not entry.etag:
+            return
+
+        async with self._rate_lock:
+            now = time.monotonic()
+            wait = _MIN_INTERVAL - (now - self._last_call)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last_call = time.monotonic()
+
+        try:
+            response = await self._client.get(url, headers={"If-None-Match": entry.etag})
+            if response.status_code == 304:
+                return
+            response.raise_for_status()
+            new_entry = _CacheEntry(data=response.json(), etag=response.headers.get("etag"))
+            async with self._lock:
+                self._cache[url] = new_entry
+                self._cache.move_to_end(url)
+        except Exception:
+            pass
+
     async def _fetch_and_store(self, url: str) -> Any:
         try:
-            data = await self._rate_limited_fetch(url)
+            data, etag = await self._rate_limited_fetch(url)
         except Exception:
             async with self._lock:
                 self._inflight.pop(url, None)
             raise
 
         async with self._lock:
-            self._cache[url] = data
+            self._cache[url] = _CacheEntry(data=data, etag=etag)
             self._cache.move_to_end(url)
             if len(self._cache) > self._cache_max:
                 self._cache.popitem(last=False)
             self._inflight.pop(url, None)
         return data
 
-    async def _rate_limited_fetch(self, url: str) -> Any:
+    async def _rate_limited_fetch(self, url: str) -> tuple[Any, str | None]:
         async with self._rate_lock:
             now = time.monotonic()
             wait = _MIN_INTERVAL - (now - self._last_call)
@@ -101,7 +141,7 @@ class _JsonService:
 
         response = await self._client.get(url)
         response.raise_for_status()
-        return response.json()
+        return response.json(), response.headers.get("etag")
 
     async def _close(self) -> None:
         await self._client.aclose()
@@ -138,3 +178,7 @@ atexit.register(stop_worker)
 
 def get_json(url: str) -> Any:
     return _get_service().get_json(url)
+
+
+def revalidate_json(url: str) -> None:
+    _get_service().revalidate(url)
