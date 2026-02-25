@@ -21,7 +21,7 @@ const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
 
 function useSoloLobbyWatcher(
   lobbyState: LobbyState | null,
-  soloGameId: string | null,
+  pendingGameId: string | null,
   soloPhaseRef: React.RefObject<SoloPhase>,
   opponents: OpponentCount,
   actions: { setReady: (r: boolean) => void; startGame: () => void },
@@ -40,7 +40,7 @@ function useSoloLobbyWatcher(
   }, []);
 
   useEffect(() => {
-    if (!soloGameId || !lobbyState) return;
+    if (!pendingGameId || !lobbyState) return;
 
     const cubeJustReady =
       lobbyState.cube_loading_status === "ready" &&
@@ -71,7 +71,7 @@ function useSoloLobbyWatcher(
       actions.startGame();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lobbyState, soloGameId]);
+  }, [lobbyState, pendingGameId]);
 
   return { reset };
 }
@@ -222,8 +222,8 @@ export function Play() {
 
   const [soloPhase, setSoloPhase] = useState<SoloPhase>("idle");
   const soloPhaseRef = useRef<SoloPhase>("idle");
-  const [soloGameId, setSoloGameId] = useState<string | null>(null);
-  const [soloSessionId, setSoloSessionId] = useState<string | null>(null);
+  const [pendingGameId, setPendingGameId] = useState<string | null>(null);
+  const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
   const [maxAvailablePuppets, setMaxAvailablePuppets] = useState<number | null>(
     null,
   );
@@ -234,15 +234,15 @@ export function Play() {
   }, []);
 
   const { lobbyState, gameState, actions } = useGame(
-    soloGameId,
-    soloSessionId,
+    pendingGameId,
+    pendingSessionId,
     null,
     addToast,
   );
 
   const { reset: resetWatcher } = useSoloLobbyWatcher(
     lobbyState,
-    soloGameId,
+    pendingGameId,
     soloPhaseRef,
     opponents,
     actions,
@@ -255,10 +255,20 @@ export function Play() {
   );
 
   useEffect(() => {
-    if (gameState && soloGameId) {
-      navigate(`/game/${soloGameId}/play`);
+    if (gameState && pendingGameId) {
+      navigate(`/game/${pendingGameId}/play`);
     }
-  }, [gameState, soloGameId, navigate]);
+  }, [gameState, pendingGameId, navigate]);
+
+  useEffect(() => {
+    if (
+      friendsLoading &&
+      pendingGameId &&
+      lobbyState?.cube_loading_status === "ready"
+    ) {
+      navigate(`/game/${pendingGameId}/lobby`);
+    }
+  }, [friendsLoading, pendingGameId, lobbyState?.cube_loading_status, navigate]);
 
   useEffect(() => {
     warmCubeCache(cubeId || "auto");
@@ -277,7 +287,8 @@ export function Play() {
         autoApproveSpectators,
       });
       saveSession(response.session_id, response.player_id);
-      navigate(`/game/${response.game_id}/lobby`);
+      setPendingGameId(response.game_id);
+      setPendingSessionId(response.session_id);
     } catch (err) {
       addToast(
         err instanceof Error ? err.message : "Failed to create game",
@@ -304,8 +315,8 @@ export function Play() {
         puppetCount: count,
       });
       saveSession(response.session_id, response.player_id);
-      setSoloGameId(response.game_id);
-      setSoloSessionId(response.session_id);
+      setPendingGameId(response.game_id);
+      setPendingSessionId(response.session_id);
     } catch (err) {
       addToast(
         err instanceof Error ? err.message : "Failed to create game",
@@ -315,10 +326,16 @@ export function Play() {
     }
   };
 
+  const handleCancelFriends = () => {
+    setFriendsLoading(false);
+    setPendingGameId(null);
+    setPendingSessionId(null);
+  };
+
   const handleCancelSolo = () => {
     updateSoloPhase("idle");
-    setSoloGameId(null);
-    setSoloSessionId(null);
+    setPendingGameId(null);
+    setPendingSessionId(null);
     setMaxAvailablePuppets(null);
     resetWatcher();
   };
@@ -472,7 +489,7 @@ export function Play() {
               <div className="mt-auto flex gap-2 pt-4 relative z-50">
                 {friendsLoading ? (
                   <button
-                    onClick={() => setFriendsLoading(false)}
+                    onClick={handleCancelFriends}
                     className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
                   >
                     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -520,7 +537,7 @@ export function Play() {
           <div className="mt-auto flex gap-2 pt-4 relative z-50">
             {friendsLoading ? (
               <button
-                onClick={() => setFriendsLoading(false)}
+                onClick={handleCancelFriends}
                 className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
               >
                 <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
@@ -655,7 +672,7 @@ export function Play() {
       {(soloLoading || friendsLoading) && (
         <div
           className="fixed inset-0 z-40 bg-black/40"
-          onClick={soloLoading ? handleCancelSolo : () => setFriendsLoading(false)}
+          onClick={soloLoading ? handleCancelSolo : handleCancelFriends}
         />
       )}
 
@@ -681,8 +698,8 @@ export function Play() {
                   counts={validRecoveryCounts}
                   onSelect={(count) => {
                     updateSoloPhase("idle");
-                    setSoloGameId(null);
-                    setSoloSessionId(null);
+                    setPendingGameId(null);
+                    setPendingSessionId(null);
                     handleStartSolo(count);
                   }}
                 />
