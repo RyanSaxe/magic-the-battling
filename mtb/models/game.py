@@ -67,6 +67,7 @@ class BattleSnapshotData(BaseModel):
     vanguard: Card | None
     basic_lands: list[str]
     applied_upgrades: list[Card]
+    upgrades: list[Card] = Field(default_factory=list)
     treasures: int
     sideboard: list[Card] = Field(default_factory=list)
     command_zone: list[Card] = Field(default_factory=list)

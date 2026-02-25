@@ -39,7 +39,7 @@ export function GameSummary({
   const placementText = getOrdinal(displayPlacement)
   const placementColor = isWinner ? 'text-amber-400' : 'text-gray-300'
 
-  const appliedUpgrades = useUpgrades ? frozenPlayer.upgrades.filter((u) => u.upgrade_target !== null) : []
+  const upgrades = useUpgrades ? frozenPlayer.upgrades : []
   const companionIds = new Set(frozenPlayer.command_zone.map((c) => c.id))
   const [shareOpen, setShareOpen] = useState(false)
 
@@ -75,7 +75,7 @@ export function GameSummary({
           basics={frozenPlayer.chosen_basics}
           treasures={frozenPlayer.preBattleTreasures}
           poison={frozenPlayer.poison}
-          appliedUpgrades={appliedUpgrades}
+          upgrades={upgrades}
           companionIds={companionIds}
           className={compact ? 'bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col' : undefined}
         />

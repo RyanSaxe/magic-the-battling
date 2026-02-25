@@ -248,6 +248,7 @@ class SharePlayerSnapshot(BaseModel):
     sideboard: list[Card]
     command_zone: list[Card]
     applied_upgrades: list[Card]
+    upgrades: list[Card] = Field(default_factory=list)
     basic_lands: list[str]
     treasures: int
     poison: int

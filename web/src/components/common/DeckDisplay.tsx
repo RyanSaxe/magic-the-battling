@@ -15,7 +15,7 @@ interface DeckDisplayProps {
   basics: string[]
   treasures: number
   poison: number
-  appliedUpgrades: CardType[]
+  upgrades: CardType[]
   companionIds: Set<string>
   className?: string
 }
@@ -26,7 +26,7 @@ export function DeckDisplay({
   basics,
   treasures,
   poison,
-  appliedUpgrades,
+  upgrades,
   companionIds,
   className,
 }: DeckDisplayProps) {
@@ -41,7 +41,7 @@ export function DeckDisplay({
   }, [])
 
   const battlefieldCount = basics.length + 2
-  const commandZoneCount = appliedUpgrades.length
+  const commandZoneCount = upgrades.length
 
   const hasHand = hand.length > 0
   const hasSideboard = sideboard.length > 0
@@ -100,7 +100,7 @@ export function DeckDisplay({
       upgradesLabel="Upgrades"
       upgradesContent={
         <CardGrid columns={dims.commandZone.columns} cardWidth={czDims.width}>
-          {appliedUpgrades.map((upgrade) => (
+          {upgrades.map((upgrade) => (
             <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={czDims} />
           ))}
         </CardGrid>
