@@ -359,7 +359,7 @@ export function computeLayout(
             )) /
             gridAvailH,
         );
-        const score = pW * Math.sqrt(fill) * Math.pow(0.98, pRows - 1);
+        const score = pW * Math.sqrt(fill) * Math.pow(0.83, pRows - 1);
 
         if (totalH > availH) {
           const overflow = totalH - availH;
@@ -549,7 +549,7 @@ export function computeLayout(
               0,
             );
           const fill = Math.min(1, totalUsedH / gridAvailH);
-          const score = Math.min(aW, bW) * Math.sqrt(fill) * Math.pow(0.98, aRows + bRows - 2);
+          const score = Math.min(aW, bW) * Math.sqrt(fill) * Math.pow(0.83, aRows + bRows - 2);
 
           if (score > bestScore) {
             bestScore = score;
