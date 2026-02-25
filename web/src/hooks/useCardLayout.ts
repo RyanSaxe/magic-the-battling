@@ -7,7 +7,6 @@ export interface ZoneSpec {
   maxCardWidth?: number;
   maxRows?: number;
   priority?: "primary" | "fill";
-  weight?: number;
 }
 
 export interface CardLayoutConfig {
@@ -45,7 +44,6 @@ interface ResolvedZone {
   maxCardWidth: number;
   maxRows: number;
   priority: "primary" | "fill";
-  weight: number;
 }
 
 function resolveZone(
@@ -60,7 +58,6 @@ function resolveZone(
     maxCardWidth: spec.maxCardWidth ?? globalMax,
     maxRows: spec.maxRows ?? Infinity,
     priority: spec.priority ?? "primary",
-    weight: spec.weight ?? 1,
   };
 }
 
@@ -561,10 +558,7 @@ export function computeLayout(
             + (!pBIsTop ? bGridH + sectionPadV : 0)
             + fillTotalH2;
           const fill2 = Math.min(1, totalH2 / availH);
-          const wA = pA.weight, wB = pB.weight;
-          const wSum = wA + wB;
-          const sizeScore = Math.pow(Math.pow(aW, wA) * Math.pow(bW, wB), 1 / wSum);
-          const score = sizeScore * Math.sqrt(fill2) * Math.pow(0.90, aRows + bRows - 2);
+          const score = Math.min(aW, bW) * Math.sqrt(fill2) * Math.pow(0.90, aRows + bRows - 2);
 
           let actualBRCardW2 = brCardW;
           let actualBRRows2 = 0;
@@ -633,20 +627,12 @@ export function computeLayout(
       gridRows: number;
     }
 
-    const smallestPrimaryW = allPrimary.reduce((min, z) => {
-      const w = chosen[z.id]?.width ?? Infinity;
-      return w > 0 && w < min ? w : min;
-    }, Infinity);
-
     let scalable: ScalableZone[] = stackedIds.map((id) => {
       const zone = allZones.get(id)!;
       const d = chosen[id];
       const isTop = topIds.includes(id);
       const zAvailW = isTop ? topAvailWFinal : blAvailWFinal;
-      let ceiling = widthCap(zone, zAvailW, d.rows);
-      if (zone.priority === 'fill' && smallestPrimaryW < Infinity) {
-        ceiling = Math.min(ceiling, smallestPrimaryW);
-      }
+      const ceiling = widthCap(zone, zAvailW, d.rows);
       return {
         id,
         zone,
@@ -696,18 +682,6 @@ export function computeLayout(
 
       slack -= heightRecovered;
       if (!anyHitCeiling) break;
-
-      const updatedSmallestPrimary = allPrimary.reduce((min, z) => {
-        const w = chosen[z.id]?.width ?? Infinity;
-        return w > 0 && w < min ? w : min;
-      }, Infinity);
-      for (const sz of scalable) {
-        if (sz.zone.priority === 'fill' && updatedSmallestPrimary < Infinity) {
-          sz.ceiling = Math.min(widthCap(sz.zone, topIds.includes(sz.id) ? topAvailWFinal : blAvailWFinal, sz.dims.rows), updatedSmallestPrimary);
-          sz.headroom = sz.ceiling - sz.dims.width;
-        }
-      }
-
       scalable = scalable.filter((s) => s.headroom > 0);
     }
   }

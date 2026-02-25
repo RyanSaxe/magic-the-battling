@@ -212,9 +212,9 @@ export function BuildPhase({
   const battlefieldCount = 3 + 1 + 1; // 3 basic slots + treasure + poison
   const [containerRef, dims] = useCardLayout({
     zones: {
-      hand: { count: maxHandSize, weight: 2 },
+      hand: { count: maxHandSize },
       battlefield: { count: battlefieldCount, priority: "fill", maxRows: 1 },
-      sideboard: { count: self_player.sideboard.length, weight: 1 },
+      sideboard: { count: self_player.sideboard.length },
     },
     layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
     ...ZONE_LAYOUT_PADDING,
