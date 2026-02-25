@@ -478,8 +478,8 @@ body {
 
 /* Foil shimmer for mode description text */
 @keyframes foil-shimmer {
-  0%, 100% { background-position: 200% center; }
-  50% { background-position: -200% center; }
+  0% { background-position: 200% center; }
+  100% { background-position: -200% center; }
 }
 
 .foil-text {
@@ -495,5 +495,5 @@ body {
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: foil-shimmer 8s ease-in-out infinite;
+  animation: foil-shimmer 14s linear infinite;
 }
