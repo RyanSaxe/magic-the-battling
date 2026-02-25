@@ -652,6 +652,7 @@ class GameManager:
             vanguard=player.vanguard.model_copy() if player.vanguard else None,
             basic_lands=player.chosen_basics.copy(),
             applied_upgrades=[u.model_copy() for u in player.upgrades if u.upgrade_target is not None],
+            upgrades=[u.model_copy() for u in player.upgrades],
             treasures=player.treasures,
             sideboard=[c.model_copy() for c in player.sideboard],
             command_zone=[c.model_copy() for c in player.command_zone],

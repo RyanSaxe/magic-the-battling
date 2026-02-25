@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import type { Card as CardType } from '../../types'
 import { Card } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
-import { useGameSummaryCardSize } from '../../hooks/useGameSummaryCardSize'
+import { useCardLayout, ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
 import { BasicLandCard } from './BasicLandCard'
 import { CardGrid } from './CardGrid'
 import { TreasureCard } from './TreasureCard'
@@ -15,7 +15,7 @@ interface DeckDisplayProps {
   basics: string[]
   treasures: number
   poison: number
-  appliedUpgrades: CardType[]
+  upgrades: CardType[]
   companionIds: Set<string>
   className?: string
 }
@@ -26,7 +26,7 @@ export function DeckDisplay({
   basics,
   treasures,
   poison,
-  appliedUpgrades,
+  upgrades,
   companionIds,
   className,
 }: DeckDisplayProps) {
@@ -41,16 +41,20 @@ export function DeckDisplay({
   }, [])
 
   const battlefieldCount = basics.length + 2
-  const commandZoneCount = appliedUpgrades.length
+  const commandZoneCount = upgrades.length
 
   const hasHand = hand.length > 0
   const hasSideboard = sideboard.length > 0
 
-  const [ref, dims] = useGameSummaryCardSize({
-    handCount: hasHand ? hand.length : 0,
-    sideboardCount: sideboard.length,
-    battlefieldCount,
-    commandZoneCount,
+  const [ref, dims] = useCardLayout({
+    zones: {
+      hand: { count: hasHand ? hand.length : 0 },
+      battlefield: { count: battlefieldCount, priority: 'fill', maxRows: 1 },
+      sideboard: { count: sideboard.length },
+      commandZone: { count: commandZoneCount },
+    },
+    layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+    ...ZONE_LAYOUT_PADDING,
   })
 
   const handDims = { width: dims.hand.width, height: dims.hand.height }
@@ -96,7 +100,7 @@ export function DeckDisplay({
       upgradesLabel="Upgrades"
       upgradesContent={
         <CardGrid columns={dims.commandZone.columns} cardWidth={czDims.width}>
-          {appliedUpgrades.map((upgrade) => (
+          {upgrades.map((upgrade) => (
             <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={czDims} />
           ))}
         </CardGrid>

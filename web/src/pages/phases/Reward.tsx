@@ -2,7 +2,7 @@ import { Card } from '../../components/card'
 import { THE_VANQUISHER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import type { GameState, Card as CardType } from '../../types'
 import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
-import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
+import { useCardLayout } from '../../hooks/useCardLayout'
 import { useElementHeight } from '../../hooks/useElementHeight'
 
 interface RewardPhaseProps {
@@ -92,14 +92,13 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
   const [upgradeHeaderRef, upgradeHeaderHeight] = useElementHeight()
   const fixedHeight = upgradeHeaderHeight + 44
 
-  const [dualRef, { top: upgradeCardDims, bottom: poolCardDims }] = useDualZoneCardSizes({
-    topCount: available_upgrades.length,
-    bottomCount: poolCards.length,
-    topGap: 6,
-    bottomGap: 6,
+  const [dualRef, { upgrades: upgradeCardDims, pool: poolCardDims }] = useCardLayout({
+    zones: {
+      upgrades: { count: available_upgrades.length, maxCardWidth: 200 },
+      pool: { count: poolCards.length, maxCardWidth: 180 },
+    },
+    layout: { top: ['upgrades'], bottomLeft: ['pool'] },
     fixedHeight,
-    topMaxWidth: 200,
-    bottomMaxWidth: 180,
   })
 
   const handleUpgradeClick = (upgrade: CardType) => {

@@ -7,7 +7,7 @@ interface ShareRoundDetailProps {
 }
 
 export function ShareRoundDetail({ snapshot, useUpgrades }: ShareRoundDetailProps) {
-  const appliedUpgrades = useUpgrades ? snapshot.applied_upgrades.filter((u) => u.upgrade_target !== null) : []
+  const upgrades = useUpgrades ? (snapshot.upgrades ?? snapshot.applied_upgrades) : []
   const companionIds = new Set(snapshot.command_zone.map((c) => c.id))
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -17,7 +17,7 @@ export function ShareRoundDetail({ snapshot, useUpgrades }: ShareRoundDetailProp
         basics={snapshot.basic_lands}
         treasures={snapshot.treasures}
         poison={snapshot.poison}
-        appliedUpgrades={appliedUpgrades}
+        upgrades={upgrades}
         companionIds={companionIds}
         className="bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col"
       />

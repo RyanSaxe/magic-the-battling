@@ -190,6 +190,7 @@ export interface SharePlayerSnapshot {
   sideboard: Card[]
   command_zone: Card[]
   applied_upgrades: Card[]
+  upgrades?: Card[]
   basic_lands: string[]
   treasures: number
   poison: number
