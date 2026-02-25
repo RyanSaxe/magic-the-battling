@@ -486,11 +486,14 @@ export function Play() {
                 <PuppetIcon size="lg" className="text-cyan-400" />
                 <h2 className="text-lg font-semibold text-white">Play Solo</h2>
               </div>
-              <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-                Battle against hands that real players piloted to strong
-                finishes. Their cards are face up, and you decide who would win
-                each battle.
-              </p>
+              <div className="text-center px-2">
+                <span className="text-2xl text-amber-500/60 leading-none block">{"\u201C"}</span>
+                <p className="italic text-gray-300/90 text-sm leading-relaxed">
+                  Battle against hands that real players piloted to strong
+                  finishes. Their cards are face up, and you decide who would win
+                  each battle.
+                </p>
+              </div>
               <div className="mt-auto flex gap-2 pt-4">
                 <button
                   onClick={() => handleStartSolo()}
@@ -517,10 +520,13 @@ export function Play() {
                   Play with Friends
                 </h2>
               </div>
-              <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-                Compete head-to-head with your friends to see who can navigate
-                from random cards to a completely unbeatable starting hand.
-              </p>
+              <div className="text-center px-2">
+                <span className="text-2xl text-amber-500/60 leading-none block">{"\u201C"}</span>
+                <p className="italic text-gray-300/90 text-sm leading-relaxed">
+                  Compete head-to-head with your friends to see who can navigate
+                  from random cards to a completely unbeatable starting hand.
+                </p>
+              </div>
               <div className="mt-auto flex gap-2 pt-4">
                 <button
                   onClick={handleCreateLobby}
@@ -545,10 +551,13 @@ export function Play() {
           <h2 className="text-lg font-semibold text-white mb-1">
             Play with Friends
           </h2>
-          <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-            Compete head-to-head with your friends to see who can navigate from
-            random cards to a completely unbeatable starting hand.
-          </p>
+          <div className="text-center px-2">
+            <span className="text-2xl text-amber-500/60 leading-none block">{"\u201C"}</span>
+            <p className="italic text-gray-300/90 text-sm leading-relaxed">
+              Compete head-to-head with your friends to see who can navigate from
+              random cards to a completely unbeatable starting hand.
+            </p>
+          </div>
           <div className="mt-auto flex gap-2 pt-4">
             <button
               onClick={handleCreateLobby}
@@ -565,10 +574,13 @@ export function Play() {
             <PuppetIcon size="lg" className="text-cyan-400" />
           </div>
           <h2 className="text-lg font-semibold text-white mb-1">Play Solo</h2>
-          <p className="border-l-2 border-amber-500/60 pl-3 italic text-gray-300 text-sm">
-            Battle against hands that real players piloted to strong finishes.
-            Their cards are face up, and you decide who would win each battle.
-          </p>
+          <div className="text-center px-2">
+            <span className="text-2xl text-amber-500/60 leading-none block">{"\u201C"}</span>
+            <p className="italic text-gray-300/90 text-sm leading-relaxed">
+              Battle against hands that real players piloted to strong finishes.
+              Their cards are face up, and you decide who would win each battle.
+            </p>
+          </div>
           <div className="mt-auto flex gap-2 pt-4">
             <button
               onClick={() => handleStartSolo()}
