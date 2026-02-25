@@ -6,6 +6,7 @@ import { rejoinGame } from "../api/client";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
+import { HintsBanner } from "../components/common/HintsBanner";
 
 export function Lobby() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -456,6 +457,10 @@ export function Lobby() {
                       )}
                     </button>
                   )}
+                </div>
+
+                <div className="mt-4">
+                  <HintsBanner />
                 </div>
               </>
             );

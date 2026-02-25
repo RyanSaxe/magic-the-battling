@@ -5,6 +5,7 @@ import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
 import { PuppetIcon } from "../components/icons/PuppetIcon";
+import { HintsBanner } from "../components/common/HintsBanner";
 import { getLegendaryName } from "../utils/prefetchName";
 import type { LobbyState } from "../types";
 
@@ -470,6 +471,10 @@ export function Play() {
             {error}
           </div>
         )}
+
+        <div className="mb-4">
+          <HintsBanner />
+        </div>
       </div>
 
       {/* Mobile: stacked cards, inactive always on top */}
