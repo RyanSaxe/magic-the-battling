@@ -279,7 +279,10 @@ export function Play() {
       saveSession(response.session_id, response.player_id);
       navigate(`/game/${response.game_id}/lobby`);
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to create game", "error");
+      addToast(
+        err instanceof Error ? err.message : "Failed to create game",
+        "error",
+      );
       setFriendsLoading(false);
     }
   };
@@ -304,7 +307,10 @@ export function Play() {
       setSoloGameId(response.game_id);
       setSoloSessionId(response.session_id);
     } catch (err) {
-      addToast(err instanceof Error ? err.message : "Failed to create game", "error");
+      addToast(
+        err instanceof Error ? err.message : "Failed to create game",
+        "error",
+      );
       updateSoloPhase("idle");
     }
   };
@@ -323,7 +329,8 @@ export function Play() {
 
   const nameValid = playerName.trim().length > 0;
 
-  const soloLoading = soloPhase !== "idle" && soloPhase !== "not-enough-puppets";
+  const soloLoading =
+    soloPhase !== "idle" && soloPhase !== "not-enough-puppets";
 
   const inactiveCard = (
     mode: ActiveMode,
@@ -332,7 +339,7 @@ export function Play() {
   ) => (
     <button
       onClick={() => setActiveMode(mode)}
-      className="shrink-0 bg-black/60 backdrop-blur rounded-lg px-4 py-3 border border-white/10 flex items-center gap-3 w-full text-left hover:bg-black/50 transition-colors"
+      className="shrink-0 bg-black/60 backdrop-blur rounded-lg px-4 py-3 border border-black/40 flex items-center gap-3 w-full text-left hover:bg-black/50 transition-colors"
     >
       {icon}
       <span className="text-white font-medium text-sm">{label}</span>
@@ -368,7 +375,7 @@ export function Play() {
             }
             disabled={nameLoading}
             placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-            className="w-full bg-black/40 border border-white/10 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+            className="w-full bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
           />
         </div>
 
@@ -386,16 +393,18 @@ export function Play() {
               <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
               "Play with Friends",
             )}
-            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
+            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
               <div className="flex items-center gap-3 mb-2">
                 <PuppetIcon size="lg" className="text-cyan-400" />
                 <h2 className="text-lg font-semibold text-white">Play Solo</h2>
               </div>
               <div className="flex-1 flex items-center justify-center">
                 <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                  <span className="text-amber-400/70">Battle against hands that real players piloted to strong
-                  finishes.</span>{" "}Their cards are face up, and you decide who would win
-                  each battle.
+                  <span className="text-amber-400/70">
+                    Battle hands that real players piloted
+                  </span>{" "}
+                  to strong finishes. Their cards are face up, and you decide
+                  who wins.
                 </p>
               </div>
               <div className="mt-auto flex gap-2 pt-4 relative z-50">
@@ -405,8 +414,20 @@ export function Play() {
                     className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
                   >
                     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        fill="none"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
                     </svg>
                     Loading...
                   </button>
@@ -432,7 +453,7 @@ export function Play() {
               <PuppetIcon size="sm" className="text-cyan-400 shrink-0" />,
               "Play Solo",
             )}
-            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
+            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
               <div className="flex items-center gap-3 mb-2">
                 <FriendsIcon className="w-8 h-8 text-amber-400" />
                 <h2 className="text-lg font-semibold text-white">
@@ -441,19 +462,37 @@ export function Play() {
               </div>
               <div className="flex-1 flex items-center justify-center">
                 <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                  <span className="text-amber-400/70">Compete head-to-head with your friends</span>{" "}to see who can navigate
-                  from random cards to a completely unbeatable starting hand.
+                  <span className="text-amber-400/70">
+                    Can you draft an unbeatable hand?
+                  </span>{" "}
+                  Compete with your friends to see who can turn trash into
+                  treasure!{" "}
                 </p>
               </div>
-              <div className="mt-auto flex gap-2 pt-4">
-                <button
-                  onClick={handleCreateLobby}
-                  disabled={!nameValid || friendsLoading}
-                  className="btn btn-primary flex-1 py-2"
-                >
-                  {friendsLoading ? "Creating..." : "Create Lobby"}
-                </button>
-                <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+              <div className="mt-auto flex gap-2 pt-4 relative z-50">
+                {friendsLoading ? (
+                  <button
+                    onClick={() => setFriendsLoading(false)}
+                    className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
+                  >
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Loading...
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={handleCreateLobby}
+                      disabled={!nameValid}
+                      className="btn btn-primary flex-1 py-2"
+                    >
+                      Create Lobby
+                    </button>
+                    <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+                  </>
+                )}
               </div>
             </div>
           </>
@@ -462,39 +501,59 @@ export function Play() {
 
       {/* Desktop: side-by-side cards */}
       <div className="hidden sm:grid sm:grid-cols-2 gap-4 w-full max-w-5xl mx-auto">
-        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
-          <div className="text-2xl mb-2">
+        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
+          <div className="flex items-center gap-3 mb-2">
             <FriendsIcon className="w-8 h-8 text-amber-400" />
+            <h2 className="text-lg font-semibold text-white">
+              Play with Friends
+            </h2>
           </div>
-          <h2 className="text-lg font-semibold text-white mb-1">
-            Play with Friends
-          </h2>
           <div className="flex-1 flex items-center">
             <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-              <span className="text-amber-400/70">Compete head-to-head with your friends</span>{" "}to see who can navigate from
-              random cards to a completely unbeatable starting hand.
+              <span className="text-amber-400/70">
+                Can you draft an unbeatable hand?
+              </span>{" "}
+              Compete with your friends to see who can turn trash into
+              treasure!{" "}
             </p>
           </div>
-          <div className="mt-auto flex gap-2 pt-4">
-            <button
-              onClick={handleCreateLobby}
-              disabled={!nameValid || friendsLoading}
-              className="btn btn-primary flex-1 py-2"
-            >
-              {friendsLoading ? "Creating..." : "Create Lobby"}
-            </button>
-            <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+          <div className="mt-auto flex gap-2 pt-4 relative z-50">
+            {friendsLoading ? (
+              <button
+                onClick={() => setFriendsLoading(false)}
+                className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
+              >
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Loading...
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleCreateLobby}
+                  disabled={!nameValid}
+                  className="btn btn-primary flex-1 py-2"
+                >
+                  Create Lobby
+                </button>
+                <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+              </>
+            )}
           </div>
         </div>
-        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-white/10 flex flex-col">
-          <div className="text-2xl mb-2">
+        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
+          <div className="flex items-center gap-3 mb-2">
             <PuppetIcon size="lg" className="text-cyan-400" />
+            <h2 className="text-lg font-semibold text-white">Play Solo</h2>
           </div>
-          <h2 className="text-lg font-semibold text-white mb-1">Play Solo</h2>
           <div className="flex-1 flex items-center">
             <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-              <span className="text-amber-400/70">Battle against hands that real players piloted to strong
-              finishes.</span>{" "}Their cards are face up, and you decide who would win each battle.
+              <span className="text-amber-400/70">
+                Battle hands that real players piloted
+              </span>{" "}
+              to strong finishes. Their cards are face up, and you decide wins.
             </p>
           </div>
           <div className="mt-auto flex gap-2 pt-4 relative z-50">
@@ -504,8 +563,20 @@ export function Play() {
                 className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
               >
                 <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    fill="none"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
                 </svg>
                 Loading...
               </button>
@@ -581,10 +652,10 @@ export function Play() {
         </AdvancedOptionsModal>
       )}
 
-      {soloLoading && (
+      {(soloLoading || friendsLoading) && (
         <div
           className="fixed inset-0 z-40 bg-black/40"
-          onClick={handleCancelSolo}
+          onClick={soloLoading ? handleCancelSolo : () => setFriendsLoading(false)}
         />
       )}
 
