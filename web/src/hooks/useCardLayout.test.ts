@@ -238,6 +238,44 @@ describe('computeLayout', () => {
     })
   })
 
+  describe('scale-up pass', () => {
+    it('grows zones to fill slack height without exceeding caps', () => {
+      const tall = computeLayout(800, 900, {
+        zones: {
+          hand: { count: 5, maxCardWidth: 200 },
+          sideboard: { count: 8, maxCardWidth: 200 },
+        },
+        layout: { top: ['hand'], bottomLeft: ['sideboard'] },
+        ...ZONE_LAYOUT_PADDING,
+      })
+      const short = computeLayout(800, 500, {
+        zones: {
+          hand: { count: 5, maxCardWidth: 200 },
+          sideboard: { count: 8, maxCardWidth: 200 },
+        },
+        layout: { top: ['hand'], bottomLeft: ['sideboard'] },
+        ...ZONE_LAYOUT_PADDING,
+      })
+      expect(tall.hand.width).toBeGreaterThanOrEqual(short.hand.width)
+      expect(tall.sideboard.width).toBeGreaterThanOrEqual(short.sideboard.width)
+      expect(tall.hand.width).toBeLessThanOrEqual(200)
+      expect(tall.sideboard.width).toBeLessThanOrEqual(200)
+    })
+
+    it('respects per-zone maxCardWidth ceilings independently', () => {
+      const result = computeLayout(800, 900, {
+        zones: {
+          hand: { count: 5, maxCardWidth: 120 },
+          sideboard: { count: 8, maxCardWidth: 300 },
+        },
+        layout: { top: ['hand'], bottomLeft: ['sideboard'] },
+        ...ZONE_LAYOUT_PADDING,
+      })
+      expect(result.hand.width).toBeLessThanOrEqual(120)
+      expect(result.sideboard.width).toBeLessThanOrEqual(300)
+    })
+  })
+
   describe('edge cases', () => {
     it('returns defaults for zero container', () => {
       const result = computeLayout(0, 0, {
