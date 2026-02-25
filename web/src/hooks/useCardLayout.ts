@@ -590,7 +590,91 @@ export function computeLayout(
     }
   }
 
-  return bestScore < 0 ? bestOverflowResult : bestResult;
+  const chosen = bestScore < 0 ? bestOverflowResult : bestResult;
+
+  const stackedIds = [...topIds, ...blIds].filter(
+    (id) => (chosen[id]?.width ?? 0) > 0,
+  );
+
+  if (stackedIds.length > 0) {
+    const blAvailWFinal = hasBR
+      ? availW - (chosen[brIds[0]]
+          ? chosen[brIds[0]].columns * chosen[brIds[0]].width +
+            (chosen[brIds[0]].columns - 1) * (brZones[0]?.gap ?? 6) +
+            2 * sectionPadH
+          : 0) - lrGap - 2 * sectionPadH
+      : availW - 2 * sectionPadH;
+    const topAvailWFinal = availW - 2 * sectionPadH;
+
+    interface ScalableZone {
+      id: string;
+      zone: ResolvedZone;
+      dims: ZoneDims;
+      ceiling: number;
+      headroom: number;
+      gridRows: number;
+    }
+
+    let scalable: ScalableZone[] = stackedIds.map((id) => {
+      const zone = allZones.get(id)!;
+      const d = chosen[id];
+      const isTop = topIds.includes(id);
+      const zAvailW = isTop ? topAvailWFinal : blAvailWFinal;
+      const ceiling = widthCap(zone, zAvailW, d.rows);
+      return {
+        id,
+        zone,
+        dims: d,
+        ceiling,
+        headroom: ceiling - d.width,
+        gridRows: d.rows,
+      };
+    });
+
+    const usedH = stackedIds.reduce((sum, id) => {
+      const d = chosen[id];
+      const zone = allZones.get(id)!;
+      return sum + d.rows * d.height + vGaps(zone, d.rows);
+    }, 0)
+      + topOverhead + blOverhead + columnGap
+      + Math.max(0, blIds.filter((id) => (chosen[id]?.width ?? 0) > 0).length - 1) * sectionGap;
+
+    let slack = availH - usedH;
+
+    while (slack > CARD_ASPECT_RATIO && scalable.some((s) => s.headroom > 0)) {
+      const growable = scalable.filter((s) => s.headroom > 0);
+      const totalGrowRows = growable.reduce((s, z) => s + z.gridRows, 0);
+
+      const extraWPerRow = slack / (totalGrowRows * CARD_ASPECT_RATIO);
+
+      let anyHitCeiling = false;
+      let heightRecovered = 0;
+
+      for (const sz of growable) {
+        const desiredW = sz.dims.width + extraWPerRow;
+        const newW = Math.min(sz.ceiling, Math.floor(desiredW));
+        if (newW <= sz.dims.width) continue;
+
+        const wasAtCeiling = newW >= sz.ceiling;
+        if (wasAtCeiling) anyHitCeiling = true;
+
+        const oldGridH = sz.dims.rows * sz.dims.height + vGaps(sz.zone, sz.dims.rows);
+        const newH = Math.round(newW * CARD_ASPECT_RATIO);
+        const newGridH = sz.dims.rows * newH + vGaps(sz.zone, sz.dims.rows);
+        heightRecovered += newGridH - oldGridH;
+
+        sz.dims = { width: newW, height: newH, rows: sz.dims.rows, columns: sz.dims.columns };
+        sz.headroom = sz.ceiling - newW;
+        chosen[sz.id] = sz.dims;
+      }
+
+      slack -= heightRecovered;
+      if (!anyHitCeiling) break;
+      scalable = scalable.filter((s) => s.headroom > 0);
+    }
+  }
+
+  return chosen;
 }
 
 function dimsEqual(a: CardLayoutResult, b: CardLayoutResult): boolean {
