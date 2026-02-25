@@ -131,3 +131,16 @@ export async function getShareGame(gameId: string, playerName: string): Promise<
   }
   return response.json()
 }
+
+let _lastWarmTime = 0
+
+export function warmCubeCache(cubeId: string): void {
+  const now = Date.now()
+  if (now - _lastWarmTime < 30_000) return
+  _lastWarmTime = now
+  fetch(`${API_BASE}/games/cubes/warm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cube_id: cubeId }),
+  }).catch(() => {})
+}

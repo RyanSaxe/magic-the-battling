@@ -2,9 +2,11 @@ import json
 from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from mtb.models.game import BattleSnapshotData
+from mtb.utils.json_helpers import get_json, revalidate_json
 from server.db import database
 from server.db.models import GameRecord, PlayerGameHistory
 from server.schemas.api import (
@@ -69,6 +71,20 @@ async def create_game(request: CreateGameRequest):
         session_id=session.session_id,
         player_id=session.player_id,
     )
+
+
+class WarmCubeRequest(BaseModel):
+    cube_id: str
+
+
+@router.post("/cubes/warm")
+def warm_cube_cache(request: WarmCubeRequest):
+    url = f"https://cubecobra.com/cube/api/cubejson/{request.cube_id}"
+    try:
+        revalidate_json(url)
+    except Exception:
+        get_json(url)
+    return {"status": "ok"}
 
 
 @router.post("/join", response_model=JoinGameResponse)

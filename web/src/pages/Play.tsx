@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { createGame } from "../api/client";
+import { createGame, warmCubeCache } from "../api/client";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
@@ -259,6 +259,10 @@ export function Play() {
       navigate(`/game/${soloGameId}/play`);
     }
   }, [gameState, soloGameId, navigate]);
+
+  useEffect(() => {
+    warmCubeCache(cubeId || "auto");
+  }, [cubeId]);
 
   const handleCreateLobby = async () => {
     if (!playerName.trim()) {
