@@ -166,8 +166,8 @@ export function Lobby() {
           </div>
         </div>
       )}
-      <div className="bg-black/60 backdrop-blur rounded-lg px-6 py-4 w-full max-w-md">
-        <div className="flex items-center justify-between mb-1">
+      <div className="bg-black/60 backdrop-blur rounded-lg border border-black/40 p-5 w-full max-w-md sm:max-w-2xl">
+        <div className="flex items-center justify-between mb-3">
           <div className="w-7" />
           <h1 className="text-xl font-bold text-white text-center">
             Game Lobby
@@ -217,9 +217,9 @@ export function Lobby() {
               return null;
             })();
 
-            return (
+            const leftColumn = (
               <>
-                <div className="bg-black/40 rounded-lg p-3 mb-4 text-center">
+                <div className="description-panel rounded-lg p-3 mb-4 text-center">
                   <p className="text-gray-400 text-xs mb-1">Share this code</p>
                   <div className="flex items-center justify-center gap-3">
                     <span className="text-2xl font-mono font-bold text-amber-400 tracking-wider">
@@ -234,15 +234,36 @@ export function Lobby() {
                   </div>
                 </div>
 
+                <div className="flex items-center justify-center gap-2 text-xs text-gray-500 mb-4">
+                  <span>
+                    Cube: {lobbyState.cube_id}
+                  </span>
+                  <span>&middot;</span>
+                  <span>
+                    Upgrades: {lobbyState.use_upgrades ? "On" : "Off"}
+                  </span>
+                  <span>&middot;</span>
+                  <button
+                    onClick={() => openGuide({ docId: "__cards__" })}
+                    className="text-amber-500/70 hover:text-amber-400 transition-colors"
+                  >
+                    Browse Cards
+                  </button>
+                </div>
+
+                <div className="mb-4">
+                  <HintsBanner />
+                </div>
+
                 <div className="mb-4">
                   <h2 className="text-white font-medium mb-2 text-sm">
                     Players ({total})
                   </h2>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-2 gap-2">
                     {lobbyState.players.map((player) => (
                       <div
                         key={player.player_id}
-                        className="bg-black/30 px-2.5 py-2 rounded-lg flex items-center gap-1.5 min-w-0"
+                        className="bg-black/30 border border-white/5 px-3 py-2.5 rounded-lg flex items-center gap-2 min-w-0"
                       >
                         <span
                           className={`w-2 h-2 rounded-full shrink-0 ${
@@ -277,7 +298,7 @@ export function Lobby() {
                         return (
                           <div
                             key={`puppet-${i}`}
-                            className={`bg-black/20 px-2.5 py-2 rounded-lg flex items-center gap-1.5 border border-dashed ${
+                            className={`bg-black/20 px-3 py-2.5 rounded-lg flex items-center gap-2 border border-dashed ${
                               isSearching
                                 ? "border-amber-600/50"
                                 : botAvailable
@@ -330,8 +351,8 @@ export function Lobby() {
                   </div>
                 </div>
 
-                {isHost && (
-                  <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-3 mb-4 sm:mb-0">
+                  {isHost && (
                     <button
                       onClick={() => actions.addPuppet()}
                       disabled={!canAddPuppet}
@@ -339,6 +360,8 @@ export function Lobby() {
                     >
                       + Add Puppet
                     </button>
+                  )}
+                  {puppetCount > 0 && (
                     <button
                       onClick={() =>
                         openGuide({
@@ -350,70 +373,77 @@ export function Lobby() {
                     >
                       What are Puppets?
                     </button>
-                  </div>
-                )}
+                  )}
+                </div>
+              </>
+            );
 
+            const rightColumn = (
+              <div className="space-y-2">
                 {startMessage && (
-                  <p className="text-gray-500 text-xs mb-3 text-center">
+                  <p className="text-gray-500 text-xs mb-1 text-center">
                     {startMessage}
                   </p>
                 )}
 
-                <div className="space-y-2">
+                <button
+                  onClick={() => actions.setReady(!isReady)}
+                  className={`btn w-full py-2 ${
+                    isReady
+                      ? "bg-gray-600 text-white hover:bg-gray-500"
+                      : "bg-green-600 text-white hover:bg-green-500"
+                  }`}
+                >
+                  {isReady ? "Unready" : "Ready"}
+                </button>
+
+                {isHost && (
                   <button
-                    onClick={() => actions.setReady(!isReady)}
-                    className={`w-full py-2 rounded font-medium transition-colors ${
-                      isReady
-                        ? "bg-gray-600 text-white hover:bg-gray-500"
-                        : "bg-green-600 text-white hover:bg-green-500"
-                    }`}
+                    onClick={() => {
+                      setStartingGame(true);
+                      actions.startGame();
+                    }}
+                    disabled={!lobbyState.can_start || startingGame}
+                    className="btn btn-primary w-full py-2"
                   >
-                    {isReady ? "Unready" : "Ready"}
+                    {startingGame ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg
+                          className="animate-spin h-5 w-5"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        Starting...
+                      </span>
+                    ) : (
+                      "Start Game"
+                    )}
                   </button>
+                )}
+              </div>
+            );
 
-                  {isHost && (
-                    <button
-                      onClick={() => {
-                        setStartingGame(true);
-                        actions.startGame();
-                      }}
-                      disabled={!lobbyState.can_start || startingGame}
-                      className="btn btn-primary w-full py-2"
-                    >
-                      {startingGame ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <svg
-                            className="animate-spin h-5 w-5"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                              fill="none"
-                            />
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                            />
-                          </svg>
-                          Starting...
-                        </span>
-                      ) : (
-                        "Start Game"
-                      )}
-                    </button>
-                  )}
+            return (
+              <div className="sm:grid sm:grid-cols-[1fr_auto] sm:gap-6">
+                <div>{leftColumn}</div>
+                <div className="sm:w-48 sm:flex sm:flex-col sm:justify-end">
+                  {rightColumn}
                 </div>
-
-                <div className="mt-4">
-                  <HintsBanner />
-                </div>
-              </>
+              </div>
             );
           })()}
       </div>

@@ -134,6 +134,8 @@ class LobbyStateResponse(BaseModel):
     cube_loading_status: CubeLoadingStatus = "loading"
     cube_loading_error: str | None = None
     available_puppet_count: int | None = None
+    cube_id: str = "auto"
+    use_upgrades: bool = True
 
 
 class DraftSwapAction(BaseModel):
