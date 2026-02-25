@@ -636,7 +636,9 @@ export function useCardLayout(
 
   const update = useCallback(
     (w: number, h: number) => {
-      const next = compute(w, h);
+      const qW = Math.floor(w / 4) * 4;
+      const qH = Math.floor(h / 4) * 4;
+      const next = compute(qW, qH);
       setDims((prev) => (dimsEqual(prev, next) ? prev : next));
     },
     [compute],
