@@ -11,18 +11,29 @@ logger = logging.getLogger(__name__)
 WS_COMPRESSION_ENABLED = os.environ.get("MTB_COMPRESS_WS", "1") == "1"
 
 
+class _PhaseStats:
+    __slots__ = ("bytes", "msgs")
+
+    def __init__(self):
+        self.bytes = 0
+        self.msgs = 0
+
+
 class RoundEgressTracker:
     def __init__(self):
-        self._data: dict[tuple[str, str], dict[str, int]] = {}
+        self._data: dict[tuple[str, str], dict[str, _PhaseStats]] = {}
+
+    def _ensure_key(self, key: tuple[str, str]) -> dict[str, _PhaseStats]:
+        if key not in self._data:
+            self._data[key] = {p: _PhaseStats() for p in ("draft", "build", "battle", "spectate")}
+        return self._data[key]
 
     def record(self, game_id: str, player_name: str, phase: str, raw_bytes: int, *, spectator: bool = False):
-        key = (game_id, player_name)
-        if key not in self._data:
-            self._data[key] = {"draft": 0, "build": 0, "battle": 0, "spectate": 0}
-        if spectator:
-            self._data[key]["spectate"] += raw_bytes
-        elif phase in ("draft", "build", "battle"):
-            self._data[key][phase] += raw_bytes
+        bucket = self._ensure_key((game_id, player_name))
+        target = "spectate" if spectator else phase
+        if target in bucket:
+            bucket[target].bytes += raw_bytes
+            bucket[target].msgs += 1
 
     def flush(self, game_id: str, player_name: str, stage: int, round_num: int):
         key = (game_id, player_name)
@@ -30,15 +41,20 @@ class RoundEgressTracker:
         if not data:
             return
         logger.info(
-            "Round egress: game=%s player=%s stage=%d round=%d draft=%d KB build=%d KB battle=%d KB spectate=%d KB",
+            "Round egress: game=%s player=%s stage=%d round=%d "
+            "draft=%dKB/%dm build=%dKB/%dm battle=%dKB/%dm spectate=%dKB/%dm",
             game_id,
             player_name,
             stage,
             round_num,
-            data["draft"] // 1024,
-            data["build"] // 1024,
-            data["battle"] // 1024,
-            data["spectate"] // 1024,
+            data["draft"].bytes // 1024,
+            data["draft"].msgs,
+            data["build"].bytes // 1024,
+            data["build"].msgs,
+            data["battle"].bytes // 1024,
+            data["battle"].msgs,
+            data["spectate"].bytes // 1024,
+            data["spectate"].msgs,
         )
 
 
