@@ -7,6 +7,7 @@ import { useToast } from "../contexts";
 import { PuppetIcon } from "../components/icons/PuppetIcon";
 import { HintsBanner } from "../components/common/HintsBanner";
 import { getLegendaryName } from "../utils/prefetchName";
+import { FaDiscord } from "react-icons/fa6";
 import type { LobbyState } from "../types";
 
 type SoloPhase =
@@ -365,22 +366,65 @@ export function Play() {
   );
 
   return (
-    <div className="game-table h-dvh flex flex-col sm:justify-center p-4">
-      <div className="shrink-0 w-full max-w-5xl mx-auto">
-        <div className="mb-2">
-          <button
-            onClick={() => navigate("/")}
-            className="w-7 h-7 rounded-full bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all text-sm flex items-center justify-center"
-            title="Back to Home"
-          >
-            ←
-          </button>
+    <div className="game-table h-dvh flex flex-col overflow-hidden">
+      <header className="shrink-0 px-4 sm:px-6 py-3">
+        <div className="hidden sm:flex items-center justify-between">
+          <div>
+            <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
+              Magic: The Battling
+            </h1>
+            <p className="text-gray-400 text-sm">
+              A Magic: the Gathering format inspired by the autobattler game
+              genre
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigate("/")}
+              className="btn btn-secondary py-2 px-4"
+            >
+              Home
+            </button>
+            <a
+              href="https://discord.gg/2NAjcWXNKn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary py-2 px-4 flex items-center gap-2"
+            >
+              <FaDiscord className="w-4 h-4" />
+              Discord
+            </a>
+          </div>
         </div>
+        <div className="sm:hidden text-center">
+          <h1 className="hero-title text-2xl font-bold tracking-tight">
+            Magic: The Battling
+          </h1>
+          <p className="text-gray-400 text-xs">
+            Inspired by the autobattler game genre
+          </p>
+          <div className="flex justify-center mt-2 gap-3">
+            <button
+              onClick={() => navigate("/")}
+              className="btn btn-secondary py-2 px-5"
+            >
+              Home
+            </button>
+            <a
+              href="https://discord.gg/2NAjcWXNKn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary py-2 px-5 flex items-center gap-2"
+            >
+              <FaDiscord className="w-4 h-4" />
+              Discord
+            </a>
+          </div>
+        </div>
+      </header>
 
-        <h1 className="text-2xl font-bold text-white text-center mb-4">
-          How do you want to play?
-        </h1>
-
+      <main className="flex-1 flex flex-col sm:justify-center min-h-0 px-4">
+      <div className="shrink-0 w-full max-w-5xl mx-auto">
         <div className="mb-4">
           <label className="block text-gray-400 text-sm mb-1">Your Name</label>
           <input
@@ -396,9 +440,6 @@ export function Play() {
           />
         </div>
 
-        <div className="mb-4">
-          <HintsBanner />
-        </div>
       </div>
 
       {/* Mobile: stacked cards, inactive always on top */}
@@ -425,41 +466,24 @@ export function Play() {
                 </p>
               </div>
               <div className="mt-auto flex gap-2 pt-4 relative z-50">
-                {soloLoading ? (
-                  <button
-                    onClick={handleCancelSolo}
-                    className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
-                  >
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                        fill="none"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    Loading...
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => handleStartSolo()}
-                      disabled={!nameValid}
-                      className="btn btn-primary flex-1 py-2"
-                    >
-                      Start Game
-                    </button>
-                    <GearButton onClick={() => setShowSoloAdvanced(true)} />
-                  </>
-                )}
+                <button
+                  onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
+                  disabled={soloLoading ? false : !nameValid}
+                  className={`flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                >
+                  {soloLoading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Loading...
+                    </>
+                  ) : (
+                    "Start Game"
+                  )}
+                </button>
+                <GearButton onClick={() => setShowSoloAdvanced(true)} />
               </div>
             </div>
           </>
@@ -487,29 +511,24 @@ export function Play() {
                 </p>
               </div>
               <div className="mt-auto flex gap-2 pt-4 relative z-50">
-                {friendsLoading ? (
-                  <button
-                    onClick={handleCancelFriends}
-                    className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
-                  >
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Loading...
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={handleCreateLobby}
-                      disabled={!nameValid}
-                      className="btn btn-primary flex-1 py-2"
-                    >
-                      Create Lobby
-                    </button>
-                    <GearButton onClick={() => setShowFriendsAdvanced(true)} />
-                  </>
-                )}
+                <button
+                  onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
+                  disabled={friendsLoading ? false : !nameValid}
+                  className={`flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                >
+                  {friendsLoading ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Loading...
+                    </>
+                  ) : (
+                    "Create Lobby"
+                  )}
+                </button>
+                <GearButton onClick={() => setShowFriendsAdvanced(true)} />
               </div>
             </div>
           </>
@@ -535,29 +554,24 @@ export function Play() {
             </p>
           </div>
           <div className="mt-auto flex gap-2 pt-4 relative z-50">
-            {friendsLoading ? (
-              <button
-                onClick={handleCancelFriends}
-                className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
-              >
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Loading...
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={handleCreateLobby}
-                  disabled={!nameValid}
-                  className="btn btn-primary flex-1 py-2"
-                >
-                  Create Lobby
-                </button>
-                <GearButton onClick={() => setShowFriendsAdvanced(true)} />
-              </>
-            )}
+            <button
+              onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
+              disabled={friendsLoading ? false : !nameValid}
+              className={`flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+            >
+              {friendsLoading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Loading...
+                </>
+              ) : (
+                "Create Lobby"
+              )}
+            </button>
+            <GearButton onClick={() => setShowFriendsAdvanced(true)} />
           </div>
         </div>
         <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
@@ -574,44 +588,32 @@ export function Play() {
             </p>
           </div>
           <div className="mt-auto flex gap-2 pt-4 relative z-50">
-            {soloLoading ? (
-              <button
-                onClick={handleCancelSolo}
-                className="btn btn-secondary flex-1 py-2 flex items-center justify-center gap-2"
-              >
-                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                    fill="none"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  />
-                </svg>
-                Loading...
-              </button>
-            ) : (
-              <>
-                <button
-                  onClick={() => handleStartSolo()}
-                  disabled={!nameValid}
-                  className="btn btn-primary flex-1 py-2"
-                >
-                  Start Game
-                </button>
-                <GearButton onClick={() => setShowSoloAdvanced(true)} />
-              </>
-            )}
+            <button
+              onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
+              disabled={soloLoading ? false : !nameValid}
+              className={`flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+            >
+              {soloLoading ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Loading...
+                </>
+              ) : (
+                "Start Game"
+              )}
+            </button>
+            <GearButton onClick={() => setShowSoloAdvanced(true)} />
           </div>
         </div>
       </div>
+
+      <div className="shrink-0 w-full max-w-5xl mx-auto mt-3 mb-4">
+        <HintsBanner variant="dark" />
+      </div>
+      </main>
 
       {showFriendsAdvanced && (
         <AdvancedOptionsModal

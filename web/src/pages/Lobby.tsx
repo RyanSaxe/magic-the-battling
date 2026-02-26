@@ -166,9 +166,15 @@ export function Lobby() {
           </div>
         </div>
       )}
-      <div className="bg-black/60 backdrop-blur rounded-lg border border-black/40 p-5 w-full max-w-md">
+      <div className="bg-black/60 backdrop-blur rounded-lg border border-black/40 p-4 w-full max-w-md">
         <div className="flex items-center justify-between mb-3">
-          <div className="w-7" />
+          <button
+            onClick={() => navigate("/")}
+            className="w-7 h-7 rounded-full bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            title="Home"
+          >
+            ⌂
+          </button>
           <h1 className="text-xl font-bold text-white text-center">
             Game Lobby
           </h1>
@@ -219,11 +225,7 @@ export function Lobby() {
 
             return (
               <>
-                <div className="mb-4">
-                  <HintsBanner />
-                </div>
-
-                <div className="description-panel rounded-lg p-3 mb-4 text-center">
+                <div className="description-panel rounded-lg p-3 mb-3 text-center">
                   <p className="text-gray-400 text-xs mb-1">Share this code</p>
                   <div className="flex items-center justify-center gap-3">
                     <span className="text-2xl font-mono font-bold text-amber-400 tracking-wider">
@@ -236,37 +238,75 @@ export function Lobby() {
                       {copied ? "Copied!" : "Copy"}
                     </button>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-2 text-xs text-gray-500 mb-4">
-                  <span>
-                    Cube:{" "}
-                    <a
-                      href={`https://cubecobra.com/cube/overview/${lobbyState.cube_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-amber-500 hover:text-amber-400 transition-colors"
+                  <div className="border-t border-white/5 mt-2 pt-2 flex items-center justify-center gap-2 text-xs text-gray-500">
+                    <span>
+                      Cube:{" "}
+                      <a
+                        href={`https://cubecobra.com/cube/overview/${lobbyState.cube_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-amber-500 hover:text-amber-400 transition-colors"
+                      >
+                        {lobbyState.cube_id}
+                      </a>
+                    </span>
+                    <span>&middot;</span>
+                    <span>
+                      Upgrades: {lobbyState.use_upgrades ? "On" : "Off"}
+                    </span>
+                    <span>&middot;</span>
+                    <button
+                      onClick={() => openGuide({ docId: "__cards__" })}
+                      className="text-amber-500/70 hover:text-amber-400 transition-colors"
                     >
-                      {lobbyState.cube_id}
-                    </a>
-                  </span>
-                  <span>&middot;</span>
-                  <span>
-                    Upgrades: {lobbyState.use_upgrades ? "On" : "Off"}
-                  </span>
-                  <span>&middot;</span>
-                  <button
-                    onClick={() => openGuide({ docId: "__cards__" })}
-                    className="text-amber-500/70 hover:text-amber-400 transition-colors"
-                  >
-                    Browse Cards
-                  </button>
+                      Browse Cards
+                    </button>
+                  </div>
                 </div>
 
-                <div className="mb-4">
-                  <h2 className="text-white font-medium mb-2 text-sm">
-                    Players ({total})
-                  </h2>
+                <div className="bg-black/20 rounded-lg border border-white/5 p-3 mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-white font-medium text-sm">
+                      Players ({total})
+                    </h2>
+                    {isHost ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => actions.addPuppet()}
+                          disabled={!canAddPuppet}
+                          className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                        >
+                          + Add Puppet
+                        </button>
+                        <button
+                          onClick={() =>
+                            openGuide({
+                              docId: "non-human-players",
+                              tab: "puppets",
+                            })
+                          }
+                          className="w-5 h-5 rounded-full bg-white/10 border border-white/15 text-gray-400 hover:bg-white/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
+                          title="What are Puppets?"
+                        >
+                          ?
+                        </button>
+                      </div>
+                    ) : (
+                      puppetCount > 0 && (
+                        <button
+                          onClick={() =>
+                            openGuide({
+                              docId: "non-human-players",
+                              tab: "puppets",
+                            })
+                          }
+                          className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
+                        >
+                          What are Puppets?
+                        </button>
+                      )
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     {lobbyState.players.map((player) => (
                       <div
@@ -359,32 +399,7 @@ export function Lobby() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 mb-4">
-                  {isHost && (
-                    <button
-                      onClick={() => actions.addPuppet()}
-                      disabled={!canAddPuppet}
-                      className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
-                    >
-                      + Add Puppet
-                    </button>
-                  )}
-                  {puppetCount > 0 && (
-                    <button
-                      onClick={() =>
-                        openGuide({
-                          docId: "non-human-players",
-                          tab: "puppets",
-                        })
-                      }
-                      className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
-                    >
-                      What are Puppets?
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-2">
+                <div className="space-y-2 mb-3">
                   {startMessage && (
                     <p className="text-gray-500 text-xs mb-1 text-center">
                       {startMessage}
@@ -440,6 +455,8 @@ export function Lobby() {
                     </button>
                   )}
                 </div>
+
+                <HintsBanner />
               </>
             );
           })()}

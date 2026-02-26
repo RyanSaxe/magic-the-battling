@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { FaDiscord } from "react-icons/fa6";
 import { CardShowcase } from "../components/home/CardShowcase";
 import { JoinGameModal } from "../components/home/JoinGameModal";
 import { prefetchLegendaryName } from "../utils/prefetchName";
@@ -38,6 +39,15 @@ export function Home() {
             >
               Join Game
             </button>
+            <a
+              href="https://discord.gg/2NAjcWXNKn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary py-2 px-4 flex items-center gap-2"
+            >
+              <FaDiscord className="w-4 h-4" />
+              Discord
+            </a>
           </div>
         </div>
         <div className="sm:hidden text-center">
@@ -60,6 +70,15 @@ export function Home() {
             >
               Join Game
             </button>
+            <a
+              href="https://discord.gg/2NAjcWXNKn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary py-2 px-5 flex items-center gap-2"
+            >
+              <FaDiscord className="w-4 h-4" />
+              Discord
+            </a>
           </div>
         </div>
       </header>
@@ -67,26 +86,6 @@ export function Home() {
       <main className="flex-1 flex flex-col items-center justify-center min-h-0 px-4">
         <CardShowcase />
       </main>
-
-      <footer className="shrink-0 flex items-center justify-center gap-4 px-4 sm:px-6 py-3 text-sm">
-        <a
-          href="https://cubecobra.com/cube/overview/auto"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[#7289da] hover:text-[#99aab5] transition-colors"
-        >
-          Follow on Cube Cobra
-        </a>
-        <span className="text-gray-600">|</span>
-        <a
-          href="https://discord.gg/2NAjcWXNKn"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[#7289da] hover:text-[#99aab5] transition-colors"
-        >
-          Join the Discord
-        </a>
-      </footer>
 
       {showJoinModal && (
         <JoinGameModal onClose={() => setShowJoinModal(false)} />
