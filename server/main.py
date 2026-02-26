@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 
 from server.db.database import init_db
+from server.monitoring import start_monitoring, stop_monitoring
 from server.routers import games, share_preview, ws
 from server.services.preview import preview_service
 
@@ -22,7 +23,9 @@ logging.basicConfig(
 async def lifespan(app: FastAPI):
     init_db()
     await preview_service.start()
+    start_monitoring()
     yield
+    stop_monitoring()
     await preview_service.stop()
 
 
