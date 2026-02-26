@@ -61,6 +61,7 @@ def main():
         uvicorn_cmd,
         cwd=project_root,
         start_new_session=True,
+        env={**os.environ, "MTB_COMPRESS_WS": "0"},
     )
 
     processes = [backend]

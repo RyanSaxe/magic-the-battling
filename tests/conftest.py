@@ -17,6 +17,11 @@ from server.services.game_manager import GameManager
 from server.services.session_manager import SessionManager
 
 
+@pytest.fixture(autouse=True)
+def _disable_ws_compression(monkeypatch):
+    monkeypatch.setattr("server.compression.WS_COMPRESSION_ENABLED", False)
+
+
 def setup_battle_ready(player: Player, basics: list[str] | None = None) -> None:
     """Set up a player as ready for battle phase."""
     player.phase = "battle"
