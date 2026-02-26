@@ -4,7 +4,7 @@ import { GAME_HINTS } from "../../constants/hints";
 const CYCLE_INTERVAL = 8000;
 const FADE_DURATION = 200;
 
-export function HintsBanner() {
+export function HintsBanner({ variant = "default" }: { variant?: "default" | "dark" } = {}) {
   const [index, setIndex] = useState(
     () => Math.floor(Math.random() * GAME_HINTS.length),
   );
@@ -43,8 +43,13 @@ export function HintsBanner() {
     goTo((index + 1) % GAME_HINTS.length);
   };
 
+  const wrapperClass = variant === "dark"
+    ? "rounded-md border-l-[3px] border-l-amber-500 bg-black/40 flex items-center gap-2 !mb-0 py-1.5 px-3"
+    : "callout callout-tip flex items-center gap-2 !mb-0 !py-1.5";
+
   return (
-    <div className="flex items-center gap-2 w-full">
+    <div className={wrapperClass}>
+      <span className="text-amber-400 font-medium text-xs shrink-0">Tip:</span>
       <button
         onClick={prev}
         className="text-gray-500 hover:text-gray-300 transition-colors text-sm shrink-0"
@@ -52,14 +57,11 @@ export function HintsBanner() {
       >
         ‹
       </button>
-      <div className="relative flex-1 h-5 sm:h-10 overflow-hidden">
-        <p
-          className={`absolute inset-0 flex items-center justify-center text-center text-xs text-gray-400 leading-tight ${visible ? "hint-fade-in" : "hint-fade-out"}`}
-        >
-          <span className="text-amber-500/80 font-medium mr-1.5">Tip:</span>
-          {GAME_HINTS[index]}
-        </p>
-      </div>
+      <p
+        className={`flex-1 text-center text-xs text-gray-300 leading-tight ${visible ? "hint-fade-in" : "hint-fade-out"}`}
+      >
+        {GAME_HINTS[index]}
+      </p>
       <button
         onClick={next}
         className="text-gray-500 hover:text-gray-300 transition-colors text-sm shrink-0"
