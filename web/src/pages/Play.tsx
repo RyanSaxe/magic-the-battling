@@ -396,9 +396,6 @@ export function Play() {
           />
         </div>
 
-        <div className="mb-4">
-          <HintsBanner />
-        </div>
       </div>
 
       {/* Mobile: stacked cards, inactive always on top */}
@@ -611,6 +608,10 @@ export function Play() {
             )}
           </div>
         </div>
+      </div>
+
+      <div className="shrink-0 w-full max-w-5xl mx-auto mt-3">
+        <HintsBanner variant="dark" />
       </div>
 
       {showFriendsAdvanced && (
