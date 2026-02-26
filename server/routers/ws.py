@@ -114,7 +114,7 @@ class ConnectionManager:
             if state:
                 for ws in list(spectator_list):
                     try:
-                        await send_ws(ws, {"type": "game_state", "payload": state.model_dump()})
+                        await send_ws(ws, {"type": "game_state", "payload": state.model_dump()}, spectator=True)
                     except Exception:
                         self.disconnect_spectator(game_id, player_id, ws)
 
@@ -193,7 +193,7 @@ async def _handle_spectator_connection(
 
     state = game_manager.get_game_state(game_id, target_player_id)
     if state:
-        await send_ws(websocket, {"type": "game_state", "payload": state.model_dump()})
+        await send_ws(websocket, {"type": "game_state", "payload": state.model_dump()}, spectator=True)
 
     try:
         while True:
