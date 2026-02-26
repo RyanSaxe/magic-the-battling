@@ -66,32 +66,46 @@ export function useWebSocket(
         reconnectAttempts.current = 0
       }
 
-      ws.onmessage = async (event) => {
-        try {
-          let message
-          if (event.data instanceof Blob) {
-            const ds = new DecompressionStream('gzip')
-            const decompressed = event.data.stream().pipeThrough(ds)
-            const text = await new Response(decompressed).text()
-            message = JSON.parse(text)
-          } else {
-            message = JSON.parse(event.data)
+      const messageQueue: MessageEvent[] = []
+      let processing = false
+
+      async function processQueue() {
+        if (processing) return
+        processing = true
+        while (messageQueue.length > 0) {
+          const ev = messageQueue.shift()!
+          try {
+            let message
+            if (ev.data instanceof Blob) {
+              const ds = new DecompressionStream('gzip')
+              const decompressed = ev.data.stream().pipeThrough(ds)
+              const text = await new Response(decompressed).text()
+              message = JSON.parse(text)
+            } else {
+              message = JSON.parse(ev.data)
+            }
+            if (message.type === 'game_state') {
+              setState(s => ({ ...s, gameState: message.payload, lobbyState: null }))
+            } else if (message.type === 'lobby_state') {
+              setState(s => ({ ...s, lobbyState: message.payload }))
+            } else if (message.type === 'error') {
+              onServerErrorRef.current?.(message.payload.message)
+            } else if (message.type === 'spectate_request') {
+              setState(s => ({ ...s, pendingSpectateRequest: message.payload }))
+            } else if (message.type === 'kicked') {
+              isClosingRef.current = true
+              setState(s => ({ ...s, kicked: true }))
+            }
+          } catch (err) {
+            console.error('Failed to process WebSocket message:', err)
           }
-          if (message.type === 'game_state') {
-            setState(s => ({ ...s, gameState: message.payload, lobbyState: null }))
-          } else if (message.type === 'lobby_state') {
-            setState(s => ({ ...s, lobbyState: message.payload }))
-          } else if (message.type === 'error') {
-            onServerErrorRef.current?.(message.payload.message)
-          } else if (message.type === 'spectate_request') {
-            setState(s => ({ ...s, pendingSpectateRequest: message.payload }))
-          } else if (message.type === 'kicked') {
-            isClosingRef.current = true
-            setState(s => ({ ...s, kicked: true }))
-          }
-        } catch (err) {
-          console.error('Failed to process WebSocket message:', err)
         }
+        processing = false
+      }
+
+      ws.onmessage = (event) => {
+        messageQueue.push(event)
+        processQueue()
       }
 
       ws.onclose = () => {
