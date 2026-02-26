@@ -7,6 +7,7 @@ import { useToast } from "../contexts";
 import { PuppetIcon } from "../components/icons/PuppetIcon";
 import { HintsBanner } from "../components/common/HintsBanner";
 import { getLegendaryName } from "../utils/prefetchName";
+import { FaDiscord } from "react-icons/fa6";
 import type { LobbyState } from "../types";
 
 type SoloPhase =
@@ -377,12 +378,23 @@ export function Play() {
               genre
             </p>
           </div>
-          <button
-            onClick={() => navigate("/")}
-            className="btn btn-secondary py-2 px-4"
-          >
-            Home
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => navigate("/")}
+              className="btn btn-secondary py-2 px-4"
+            >
+              Home
+            </button>
+            <a
+              href="https://discord.gg/2NAjcWXNKn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary py-2 px-4 flex items-center gap-2"
+            >
+              <FaDiscord className="w-4 h-4" />
+              Discord
+            </a>
+          </div>
         </div>
         <div className="sm:hidden text-center">
           <h1 className="hero-title text-2xl font-bold tracking-tight">
@@ -391,13 +403,22 @@ export function Play() {
           <p className="text-gray-400 text-xs">
             Inspired by the autobattler game genre
           </p>
-          <div className="flex justify-center mt-2">
+          <div className="flex justify-center mt-2 gap-3">
             <button
               onClick={() => navigate("/")}
               className="btn btn-secondary py-2 px-5"
             >
               Home
             </button>
+            <a
+              href="https://discord.gg/2NAjcWXNKn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary py-2 px-5 flex items-center gap-2"
+            >
+              <FaDiscord className="w-4 h-4" />
+              Discord
+            </a>
           </div>
         </div>
       </header>
@@ -589,30 +610,10 @@ export function Play() {
         </div>
       </div>
 
-      <div className="shrink-0 w-full max-w-5xl mx-auto mt-3">
+      <div className="shrink-0 w-full max-w-5xl mx-auto mt-3 mb-4">
         <HintsBanner variant="dark" />
       </div>
       </main>
-
-      <footer className="shrink-0 flex items-center justify-center gap-4 px-4 sm:px-6 py-3 text-sm">
-        <a
-          href="https://cubecobra.com/cube/overview/auto"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[#7289da] hover:text-[#99aab5] transition-colors"
-        >
-          Follow on Cube Cobra
-        </a>
-        <span className="text-gray-600">|</span>
-        <a
-          href="https://discord.gg/2NAjcWXNKn"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[#7289da] hover:text-[#99aab5] transition-colors"
-        >
-          Join the Discord
-        </a>
-      </footer>
 
       {showFriendsAdvanced && (
         <AdvancedOptionsModal
