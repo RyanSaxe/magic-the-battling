@@ -4,6 +4,7 @@ from collections import defaultdict
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 import server.db.database as db
+from server.compression import send_ws
 from server.services.game_manager import game_manager
 from server.services.session_manager import session_manager
 
@@ -86,7 +87,7 @@ class ConnectionManager:
         if game_id in self._connections and player_id in self._connections[game_id]:
             ws = self._connections[game_id][player_id]
             try:
-                await ws.send_json(message)
+                await send_ws(ws, message)
             except Exception:
                 self.disconnect(game_id, player_id, ws)
 
@@ -98,11 +99,12 @@ class ConnectionManager:
             state = game_manager.get_game_state(game_id, player_id)
             if state:
                 try:
-                    await websocket.send_json(
+                    await send_ws(
+                        websocket,
                         {
                             "type": "game_state",
                             "payload": state.model_dump(),
-                        }
+                        },
                     )
                 except Exception:
                     self.disconnect(game_id, player_id, websocket)
@@ -112,7 +114,7 @@ class ConnectionManager:
             if state:
                 for ws in list(spectator_list):
                     try:
-                        await ws.send_json({"type": "game_state", "payload": state.model_dump()})
+                        await send_ws(ws, {"type": "game_state", "payload": state.model_dump()}, spectator=True)
                     except Exception:
                         self.disconnect_spectator(game_id, player_id, ws)
 
@@ -126,21 +128,23 @@ class ConnectionManager:
 
         for player_id, websocket in list(self._connections[game_id].items()):
             try:
-                await websocket.send_json(
+                await send_ws(
+                    websocket,
                     {
                         "type": "lobby_state",
                         "payload": lobby.model_dump(),
-                    }
+                    },
                 )
             except Exception:
                 self.disconnect(game_id, player_id, websocket)
 
     async def send_error(self, websocket: WebSocket, message: str):
-        await websocket.send_json(
+        await send_ws(
+            websocket,
             {
                 "type": "error",
                 "payload": {"message": message},
-            }
+            },
         )
 
     async def broadcast_game_over(self, game_id: str, winner_name: str | None):
@@ -151,17 +155,19 @@ class ConnectionManager:
             state = game_manager.get_game_state(game_id, player_id)
             if state:
                 try:
-                    await websocket.send_json(
+                    await send_ws(
+                        websocket,
                         {
                             "type": "game_over",
                             "payload": {"winner_name": winner_name},
-                        }
+                        },
                     )
-                    await websocket.send_json(
+                    await send_ws(
+                        websocket,
                         {
                             "type": "game_state",
                             "payload": state.model_dump(),
-                        }
+                        },
                     )
                 except Exception:
                     self.disconnect(game_id, player_id, websocket)
@@ -187,7 +193,7 @@ async def _handle_spectator_connection(
 
     state = game_manager.get_game_state(game_id, target_player_id)
     if state:
-        await websocket.send_json({"type": "game_state", "payload": state.model_dump()})
+        await send_ws(websocket, {"type": "game_state", "payload": state.model_dump()}, spectator=True)
 
     try:
         while True:
@@ -232,11 +238,12 @@ async def websocket_endpoint(
         elif game:
             state = game_manager.get_game_state(game_id, player_id)
             if state:
-                await websocket.send_json(
+                await send_ws(
+                    websocket,
                     {
                         "type": "game_state",
                         "payload": state.model_dump(),
-                    }
+                    },
                 )
 
         while True:
@@ -309,7 +316,7 @@ async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_
         if game_manager.kick_player(game_id, player_id, target_id):
             kicked_ws = connection_manager._connections.get(game_id, {}).get(target_id)
             if kicked_ws:
-                await kicked_ws.send_json({"type": "kicked", "payload": {}})
+                await send_ws(kicked_ws, {"type": "kicked", "payload": {}})
                 await kicked_ws.close(code=4005, reason="Kicked by host")
                 connection_manager.disconnect(game_id, target_id, kicked_ws)
             await connection_manager.broadcast_lobby_state(game_id)

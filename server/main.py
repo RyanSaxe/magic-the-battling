@@ -6,8 +6,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.gzip import GZipMiddleware
 
 from server.db.database import init_db
+from server.monitoring import start_monitoring, stop_monitoring
 from server.routers import games, share_preview, ws
 from server.services.preview import preview_service
 
@@ -21,7 +23,9 @@ logging.basicConfig(
 async def lifespan(app: FastAPI):
     init_db()
     await preview_service.start()
+    start_monitoring()
     yield
+    stop_monitoring()
     await preview_service.stop()
 
 
@@ -32,6 +36,7 @@ app = FastAPI(
     version="0.1.0",
 )
 
+app.add_middleware(GZipMiddleware, minimum_size=500)  # type: ignore[arg-type]
 app.add_middleware(
     CORSMiddleware,  # type: ignore[arg-type]
     allow_origins=[
