@@ -166,7 +166,7 @@ export function Lobby() {
           </div>
         </div>
       )}
-      <div className="bg-black/60 backdrop-blur rounded-lg border border-black/40 p-5 w-full max-w-md sm:max-w-2xl">
+      <div className="bg-black/60 backdrop-blur rounded-lg border border-black/40 p-5 w-full max-w-md">
         <div className="flex items-center justify-between mb-3">
           <div className="w-7" />
           <h1 className="text-xl font-bold text-white text-center">
@@ -205,7 +205,7 @@ export function Lobby() {
               if (startingGame) return null;
               if (total < 2) return "Need at least 2 players";
               if (total % 2 !== 0)
-                return `Start requires even number of players (currently ${total} \u2014 add or remove 1)`;
+                return `Odd player count (${total})`;
               if (!lobbyState.players.every((p) => p.is_ready))
                 return "Waiting for all players to ready";
               if (
@@ -217,8 +217,12 @@ export function Lobby() {
               return null;
             })();
 
-            const leftColumn = (
+            return (
               <>
+                <div className="mb-4">
+                  <HintsBanner />
+                </div>
+
                 <div className="description-panel rounded-lg p-3 mb-4 text-center">
                   <p className="text-gray-400 text-xs mb-1">Share this code</p>
                   <div className="flex items-center justify-center gap-3">
@@ -236,7 +240,15 @@ export function Lobby() {
 
                 <div className="flex items-center justify-center gap-2 text-xs text-gray-500 mb-4">
                   <span>
-                    Cube: {lobbyState.cube_id}
+                    Cube:{" "}
+                    <a
+                      href={`https://cubecobra.com/cube/overview/${lobbyState.cube_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-amber-500 hover:text-amber-400 transition-colors"
+                    >
+                      {lobbyState.cube_id}
+                    </a>
                   </span>
                   <span>&middot;</span>
                   <span>
@@ -249,10 +261,6 @@ export function Lobby() {
                   >
                     Browse Cards
                   </button>
-                </div>
-
-                <div className="mb-4">
-                  <HintsBanner />
                 </div>
 
                 <div className="mb-4">
@@ -351,7 +359,7 @@ export function Lobby() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 mb-4 sm:mb-0">
+                <div className="flex items-center gap-3 mb-4">
                   {isHost && (
                     <button
                       onClick={() => actions.addPuppet()}
@@ -375,75 +383,64 @@ export function Lobby() {
                     </button>
                   )}
                 </div>
-              </>
-            );
 
-            const rightColumn = (
-              <div className="space-y-2">
-                {startMessage && (
-                  <p className="text-gray-500 text-xs mb-1 text-center">
-                    {startMessage}
-                  </p>
-                )}
+                <div className="space-y-2">
+                  {startMessage && (
+                    <p className="text-gray-500 text-xs mb-1 text-center">
+                      {startMessage}
+                    </p>
+                  )}
 
-                <button
-                  onClick={() => actions.setReady(!isReady)}
-                  className={`btn w-full py-2 ${
-                    isReady
-                      ? "bg-gray-600 text-white hover:bg-gray-500"
-                      : "bg-green-600 text-white hover:bg-green-500"
-                  }`}
-                >
-                  {isReady ? "Unready" : "Ready"}
-                </button>
-
-                {isHost && (
                   <button
-                    onClick={() => {
-                      setStartingGame(true);
-                      actions.startGame();
-                    }}
-                    disabled={!lobbyState.can_start || startingGame}
-                    className="btn btn-primary w-full py-2"
+                    onClick={() => actions.setReady(!isReady)}
+                    className={`btn w-full py-2 ${
+                      isReady
+                        ? "bg-gray-600 text-white hover:bg-gray-500"
+                        : "bg-green-600 text-white hover:bg-green-500"
+                    }`}
                   >
-                    {startingGame ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg
-                          className="animate-spin h-5 w-5"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                            fill="none"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
-                        Starting...
-                      </span>
-                    ) : (
-                      "Start Game"
-                    )}
+                    {isReady ? "Unready" : "Ready"}
                   </button>
-                )}
-              </div>
-            );
 
-            return (
-              <div className="sm:grid sm:grid-cols-[1fr_auto] sm:gap-6">
-                <div>{leftColumn}</div>
-                <div className="sm:w-48 sm:flex sm:flex-col sm:justify-end">
-                  {rightColumn}
+                  {isHost && (
+                    <button
+                      onClick={() => {
+                        setStartingGame(true);
+                        actions.startGame();
+                      }}
+                      disabled={!lobbyState.can_start || startingGame}
+                      className="btn btn-primary w-full py-2"
+                    >
+                      {startingGame ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg
+                            className="animate-spin h-5 w-5"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                              fill="none"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            />
+                          </svg>
+                          Starting...
+                        </span>
+                      ) : (
+                        "Start Game"
+                      )}
+                    </button>
+                  )}
                 </div>
-              </div>
+              </>
             );
           })()}
       </div>
