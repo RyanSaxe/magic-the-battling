@@ -168,7 +168,13 @@ export function Lobby() {
       )}
       <div className="bg-black/60 backdrop-blur rounded-lg border border-black/40 p-4 w-full max-w-md">
         <div className="flex items-center justify-between mb-3">
-          <div className="w-7" />
+          <button
+            onClick={() => navigate("/")}
+            className="w-7 h-7 rounded-full bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            title="Home"
+          >
+            ⌂
+          </button>
           <h1 className="text-xl font-bold text-white text-center">
             Game Lobby
           </h1>
@@ -272,20 +278,18 @@ export function Lobby() {
                         >
                           + Add Puppet
                         </button>
-                        {puppetCount > 0 && (
-                          <button
-                            onClick={() =>
-                              openGuide({
-                                docId: "non-human-players",
-                                tab: "puppets",
-                              })
-                            }
-                            className="w-5 h-5 rounded-full bg-white/10 border border-white/15 text-gray-400 hover:bg-white/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
-                            title="What are Puppets?"
-                          >
-                            ?
-                          </button>
-                        )}
+                        <button
+                          onClick={() =>
+                            openGuide({
+                              docId: "non-human-players",
+                              tab: "puppets",
+                            })
+                          }
+                          className="w-5 h-5 rounded-full bg-white/10 border border-white/15 text-gray-400 hover:bg-white/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
+                          title="What are Puppets?"
+                        >
+                          ?
+                        </button>
                       </div>
                     ) : (
                       puppetCount > 0 && (
