@@ -21,6 +21,7 @@ class GameRecord(Base):
     final_state_json = Column(Text, nullable=True)
     winner_player_id = Column(String, nullable=True)
     config_json = Column(Text, nullable=True)
+    shared = Column(Boolean, default=False)
 
     players = relationship("GamePlayerRecord", back_populates="game")
 

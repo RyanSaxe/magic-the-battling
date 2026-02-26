@@ -56,6 +56,7 @@ def init_db():
         _migrate(conn, "player_game_history", "source_history_id", "INTEGER")
         _migrate(conn, "player_game_history", "poison_history_json", "TEXT")
         _migrate(conn, "battle_snapshots", "play_draw_preference", "TEXT")
+        _migrate(conn, "games", "shared", "BOOLEAN", "0")
 
 
 def _migrate_rename_column_pre_create() -> None:

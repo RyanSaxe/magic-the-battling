@@ -69,6 +69,10 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
     if not owner_exists:
         return None
 
+    if not game_record.shared:
+        game_record.shared = True
+        db.commit()
+
     players: list[SharePlayerData] = []
     for history in histories:
         is_puppet = bool(history.is_puppet)
