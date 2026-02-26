@@ -46,6 +46,11 @@ def init_db():
     Base.metadata.create_all(bind=engine)
 
     with engine.connect() as conn:
+        conn.execute(text("PRAGMA journal_mode=WAL"))
+        conn.execute(text("PRAGMA busy_timeout=5000"))
+        conn.commit()
+
+    with engine.connect() as conn:
         _migrate(conn, "battle_snapshots", "poison", "INTEGER")
         _migrate(conn, "player_game_history", "is_puppet", "BOOLEAN", "0")
         _migrate(conn, "player_game_history", "source_history_id", "INTEGER")
