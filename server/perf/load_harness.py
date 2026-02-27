@@ -120,14 +120,15 @@ class PlayerRuntime:
     draft_swaps_sent: dict[tuple[int, int], int] = field(default_factory=dict)
     draft_roll_target: dict[tuple[int, int], bool] = field(default_factory=dict)
     draft_roll_sent: set[tuple[int, int]] = field(default_factory=set)
-    build_ready_sent: set[tuple[int, int]] = field(default_factory=set)
-    build_upgrade_sent: set[tuple[int, int, str]] = field(default_factory=set)
-    build_move_sent: set[tuple[int, int, str, str, str]] = field(default_factory=set)
-    build_expected_hand_count: dict[tuple[int, int], int] = field(default_factory=dict)
-    battle_moves_sent: dict[tuple[int, int], int] = field(default_factory=dict)
-    battle_treasure_sent: set[tuple[int, int]] = field(default_factory=set)
-    battle_submit_sent: set[tuple[int, int]] = field(default_factory=set)
-    reward_done_sent: set[tuple[int, int]] = field(default_factory=set)
+    build_ready_sent: set[tuple[int, int, int]] = field(default_factory=set)
+    build_upgrade_sent: set[tuple[int, int, int, str]] = field(default_factory=set)
+    build_move_sent: set[tuple[int, int, int, str, str, str]] = field(default_factory=set)
+    build_expected_hand_count: dict[tuple[int, int, int], int] = field(default_factory=dict)
+    battle_moves_sent: dict[tuple[int, int, int], int] = field(default_factory=dict)
+    battle_treasure_sent: set[tuple[int, int, int]] = field(default_factory=set)
+    battle_submit_sent: set[tuple[int, int, int]] = field(default_factory=set)
+    reward_done_sent: set[tuple[int, int, int]] = field(default_factory=set)
+    phase_visits: dict[tuple[int, int, str], int] = field(default_factory=dict)
     waiting_for_state_update: bool = False
     waiting_since: float | None = None
     last_state_signature: str | None = None
@@ -135,6 +136,9 @@ class PlayerRuntime:
     last_seen_stage: int | None = None
     last_seen_round: int | None = None
     last_seen_treasures: int | None = None
+    last_seen_poison: int | None = None
+    last_seen_in_sudden_death: bool | None = None
+    last_seen_build_ready: bool | None = None
     last_seen_pack_ids: list[str] = field(default_factory=list)
     last_seen_hand_ids: list[str] = field(default_factory=list)
     last_seen_sideboard_ids: list[str] = field(default_factory=list)
@@ -676,11 +680,11 @@ def _choose_unapplied_upgrade(self_player: dict[str, Any]) -> tuple[str, str] | 
 
 def _battle_result_for_turn(
     session_state: GameSessionState,
-    turn_key: tuple[int, int],
+    turn_key: tuple[int, int, int],
     player_name: str,
     opponent_name: str,
 ) -> str:
-    battle_key = f"{turn_key[0]}:{turn_key[1]}:{'|'.join(sorted((player_name, opponent_name)))}"
+    battle_key = f"{turn_key[0]}:{turn_key[1]}:{turn_key[2]}:{'|'.join(sorted((player_name, opponent_name)))}"
     cached = session_state.battle_results_by_key.get(battle_key)
     if cached is not None:
         return cached
@@ -765,6 +769,7 @@ async def _handle_build_phase(  # noqa: PLR0912
     runtime: PlayerRuntime,
     metrics: PerfMetrics,
     turn_key: tuple[int, int],
+    phase_turn_key: tuple[int, int, int],
 ) -> None:
     hand = self_player.get("hand")
     sideboard = self_player.get("sideboard")
@@ -776,11 +781,12 @@ async def _handle_build_phase(  # noqa: PLR0912
 
     stage, round_num = turn_key
     current_hand_count = len(hand)
-    expected_hand_count = runtime.build_expected_hand_count.get(turn_key, current_hand_count)
+    expected_hand_count = runtime.build_expected_hand_count.get(phase_turn_key, current_hand_count)
     if current_hand_count < expected_hand_count:
         # Ignore stale snapshots that arrive behind our last acknowledged move.
         return
-    runtime.build_expected_hand_count[turn_key] = current_hand_count
+    runtime.build_expected_hand_count[phase_turn_key] = current_hand_count
+    _, _, cycle = phase_turn_key
 
     if current_hand_count < hand_size:
         for card in sideboard:
@@ -789,7 +795,7 @@ async def _handle_build_phase(  # noqa: PLR0912
             move_id = card.get("id")
             if not isinstance(move_id, str):
                 continue
-            move_key = (stage, round_num, move_id, "sideboard", "hand")
+            move_key = (stage, round_num, cycle, move_id, "sideboard", "hand")
             if move_key in runtime.build_move_sent:
                 continue
             if await _send_action(
@@ -800,7 +806,7 @@ async def _handle_build_phase(  # noqa: PLR0912
                 {"card_id": move_id, "source": "sideboard", "destination": "hand"},
             ):
                 runtime.build_move_sent.add(move_key)
-                runtime.build_expected_hand_count[turn_key] = current_hand_count + 1
+                runtime.build_expected_hand_count[phase_turn_key] = current_hand_count + 1
             break
         return
 
@@ -811,7 +817,7 @@ async def _handle_build_phase(  # noqa: PLR0912
             move_id = card.get("id")
             if not isinstance(move_id, str):
                 continue
-            move_key = (stage, round_num, move_id, "hand", "sideboard")
+            move_key = (stage, round_num, cycle, move_id, "hand", "sideboard")
             if move_key in runtime.build_move_sent:
                 continue
             if await _send_action(
@@ -822,14 +828,14 @@ async def _handle_build_phase(  # noqa: PLR0912
                 {"card_id": move_id, "source": "hand", "destination": "sideboard"},
             ):
                 runtime.build_move_sent.add(move_key)
-                runtime.build_expected_hand_count[turn_key] = max(0, current_hand_count - 1)
+                runtime.build_expected_hand_count[phase_turn_key] = max(0, current_hand_count - 1)
             break
         return
 
     upgrade_choice = _choose_unapplied_upgrade(self_player)
     if upgrade_choice is not None:
         upgrade_id, target_card_id = upgrade_choice
-        upgrade_key = (stage, round_num, upgrade_id)
+        upgrade_key = (stage, round_num, cycle, upgrade_id)
         if upgrade_key not in runtime.build_upgrade_sent and await _send_action(
             ws,
             runtime,
@@ -840,7 +846,7 @@ async def _handle_build_phase(  # noqa: PLR0912
             runtime.build_upgrade_sent.add(upgrade_key)
         return
 
-    if not self_player.get("build_ready", False) and turn_key not in runtime.build_ready_sent:
+    if not self_player.get("build_ready", False) and phase_turn_key not in runtime.build_ready_sent:
         hand_order = [card["id"] for card in hand if isinstance(card, dict) and isinstance(card.get("id"), str)]
         payload_data: dict[str, Any] = {
             "basics": _pick_basics(runtime, turn_key),
@@ -850,7 +856,7 @@ async def _handle_build_phase(  # noqa: PLR0912
             payload_data["hand_order"] = hand_order
 
         if await _send_action(ws, runtime, metrics, "build_ready", payload_data):
-            runtime.build_ready_sent.add(turn_key)
+            runtime.build_ready_sent.add(phase_turn_key)
 
 
 async def _handle_battle_phase(
@@ -859,7 +865,7 @@ async def _handle_battle_phase(
     runtime: PlayerRuntime,
     session_state: GameSessionState,
     metrics: PerfMetrics,
-    turn_key: tuple[int, int],
+    turn_key: tuple[int, int, int],
 ) -> None:
     current_battle = payload.get("current_battle")
     if not isinstance(current_battle, dict):
@@ -918,12 +924,12 @@ async def _handle_reward_phase(
     ws: Any,
     runtime: PlayerRuntime,
     metrics: PerfMetrics,
-    turn_key: tuple[int, int],
+    turn_key: tuple[int, int, int],
 ) -> None:
     if turn_key in runtime.reward_done_sent:
         return
 
-    _, round_num = turn_key
+    round_num = turn_key[1]
     reward_payload: dict[str, Any] = {}
     if _is_stage_increasing(round_num) and payload.get("use_upgrades", True):
         available = payload.get("available_upgrades")
@@ -948,10 +954,18 @@ async def _handle_game_state(
     if not isinstance(self_player, dict):
         return
 
+    prior_phase = runtime.last_seen_phase
+    prior_stage = runtime.last_seen_stage
+    prior_round = runtime.last_seen_round
+
     runtime.last_seen_phase = self_player.get("phase") if isinstance(self_player.get("phase"), str) else None
     stage, round_num = _safe_stage_round(self_player)
     runtime.last_seen_stage = stage
     runtime.last_seen_round = round_num
+    poison_raw = self_player.get("poison")
+    runtime.last_seen_poison = int(poison_raw) if isinstance(poison_raw, int | float | str) else None
+    runtime.last_seen_in_sudden_death = bool(self_player.get("in_sudden_death", False))
+    runtime.last_seen_build_ready = bool(self_player.get("build_ready", False))
     runtime.last_seen_pack_ids = _card_id_list(self_player.get("current_pack"))
     runtime.last_seen_hand_ids = _card_id_list(self_player.get("hand"))
     runtime.last_seen_sideboard_ids = _card_id_list(self_player.get("sideboard"))
@@ -967,21 +981,29 @@ async def _handle_game_state(
         return
 
     turn_key = (stage, round_num)
+    prior_turn_key = (
+        (prior_stage, prior_round) if isinstance(prior_stage, int) and isinstance(prior_round, int) else None
+    )
+    phase_key = (stage, round_num, phase)
+    if prior_phase != phase or prior_turn_key != turn_key:
+        runtime.phase_visits[phase_key] = runtime.phase_visits.get(phase_key, 0) + 1
+    phase_visit = runtime.phase_visits.get(phase_key, 1)
+    phase_turn_key = (stage, round_num, phase_visit)
 
     if phase == "draft":
         await _handle_draft_phase(self_player, ws, runtime, metrics, turn_key)
         return
 
     if phase == "build":
-        await _handle_build_phase(self_player, ws, runtime, metrics, turn_key)
+        await _handle_build_phase(self_player, ws, runtime, metrics, turn_key, phase_turn_key)
         return
 
     if phase == "battle":
-        await _handle_battle_phase(payload, ws, runtime, session_state, metrics, turn_key)
+        await _handle_battle_phase(payload, ws, runtime, session_state, metrics, phase_turn_key)
         return
 
     if phase == "reward":
-        await _handle_reward_phase(payload, ws, runtime, metrics, turn_key)
+        await _handle_reward_phase(payload, ws, runtime, metrics, phase_turn_key)
 
 
 async def _run_player_loop(  # noqa: PLR0912
@@ -1113,7 +1135,61 @@ def _did_inflight_action_ack(runtime: PlayerRuntime, msg_type: str, payload: dic
     if inflight_action == "draft_done":
         return phase != "draft"
 
+    if inflight_action == "build_move":
+        payload_move = runtime.inflight_payload if isinstance(runtime.inflight_payload, dict) else {}
+        card_id = payload_move.get("card_id")
+        source = payload_move.get("source")
+        destination = payload_move.get("destination")
+        if not isinstance(card_id, str) or not isinstance(source, str) or not isinstance(destination, str):
+            return False
+        if source == "hand" and destination == "sideboard":
+            return card_id in sideboard_ids and card_id not in hand_ids
+        if source == "sideboard" and destination == "hand":
+            return card_id in hand_ids and card_id not in sideboard_ids
+        return False
+
+    if inflight_action == "build_ready":
+        build_ready = bool(self_player.get("build_ready", False))
+        return build_ready or phase != "build"
+
+    if inflight_action == "build_apply_upgrade":
+        payload_upgrade = runtime.inflight_payload if isinstance(runtime.inflight_payload, dict) else {}
+        upgrade_id = payload_upgrade.get("upgrade_id")
+        if not isinstance(upgrade_id, str):
+            return False
+        upgrades = self_player.get("upgrades")
+        if not isinstance(upgrades, list):
+            return False
+        for upgrade in upgrades:
+            if not isinstance(upgrade, dict):
+                continue
+            if upgrade.get("id") != upgrade_id:
+                continue
+            return upgrade.get("upgrade_target") is not None
+        return False
+
     return True
+
+
+def _runtime_debug_summary(runtime: PlayerRuntime) -> dict[str, Any]:
+    return {
+        "player": runtime.name,
+        "phase": runtime.last_seen_phase,
+        "stage": runtime.last_seen_stage,
+        "round": runtime.last_seen_round,
+        "treasures": runtime.last_seen_treasures,
+        "poison": runtime.last_seen_poison,
+        "in_sudden_death": runtime.last_seen_in_sudden_death,
+        "build_ready": runtime.last_seen_build_ready,
+        "waiting_for_state_update": runtime.waiting_for_state_update,
+        "inflight_action": runtime.inflight_action,
+        "inflight_payload": runtime.inflight_payload,
+        "last_sent_action": runtime.last_sent_action,
+        "last_sent_payload": runtime.last_sent_payload,
+        "pack_count": len(runtime.last_seen_pack_ids),
+        "hand_count": len(runtime.last_seen_hand_ids),
+        "sideboard_count": len(runtime.last_seen_sideboard_ids),
+    }
 
 
 async def _run_single_game(
@@ -1192,6 +1268,15 @@ async def _run_single_game(
                     completed = len(session_state.terminal_players) == config.players_per_game
                 except TimeoutError:
                     metrics.game_timeouts += 1
+                    if len(metrics.unhandled_exceptions) < 20:
+                        timeout_snapshot = {
+                            "game_id": game_id,
+                            "terminal_players": sorted(session_state.terminal_players),
+                            "player_states": [_runtime_debug_summary(runtime) for runtime in runtimes],
+                        }
+                        metrics.unhandled_exceptions.append(
+                            f"game_timeout_state: {json.dumps(timeout_snapshot, sort_keys=True)}"
+                        )
                 finally:
                     stop_event.set()
                     for task in tasks:

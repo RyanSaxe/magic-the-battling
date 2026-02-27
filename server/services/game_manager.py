@@ -4,6 +4,7 @@ import logging
 import os
 import random
 import secrets
+import time
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -156,6 +157,7 @@ class GameManager:
         self._player_id_to_name: dict[str, str] = {}
         self._join_code_to_game: dict[str, str] = {}
         self._cleanup_tasks: dict[str, asyncio.Task] = {}
+        self._cleanup_deadlines: dict[str, float] = {}
         self._pending_disconnect_tasks: dict[str, asyncio.Task] = {}
         self._spectate_requests: dict[str, PendingSpectateRequest] = {}
         self._final_screen_logged: set[tuple[str, str]] = set()
@@ -466,8 +468,19 @@ class GameManager:
 
     def _schedule_cleanup(self, game_id: str, delay: float = 300.0) -> None:
         """Schedule async cleanup after delay seconds (default 5 min)."""
-        if game_id in self._cleanup_tasks:
-            self._cleanup_tasks[game_id].cancel()
+        now = time.monotonic()
+        new_deadline = now + delay
+        existing_task = self._cleanup_tasks.get(game_id)
+        existing_deadline = self._cleanup_deadlines.get(game_id)
+        if (
+            existing_task
+            and not existing_task.done()
+            and existing_deadline is not None
+            and existing_deadline <= new_deadline
+        ):
+            return
+        if existing_task:
+            existing_task.cancel()
 
         async def cleanup_after_delay():
             await asyncio.sleep(delay)
@@ -477,6 +490,7 @@ class GameManager:
             loop = asyncio.get_event_loop()
             task = loop.create_task(cleanup_after_delay())
             self._cleanup_tasks[game_id] = task
+            self._cleanup_deadlines[game_id] = new_deadline
         except RuntimeError:
             pass
 
@@ -504,6 +518,7 @@ class GameManager:
         """Cancel scheduled cleanup when a player reconnects."""
         if task := self._cleanup_tasks.pop(game_id, None):
             task.cancel()
+        self._cleanup_deadlines.pop(game_id, None)
 
     def _cleanup_game(self, game_id: str) -> None:
         """Remove game from memory."""
@@ -523,6 +538,7 @@ class GameManager:
             self._player_id_to_name.pop(pid, None)
 
         self._cleanup_tasks.pop(game_id, None)
+        self._cleanup_deadlines.pop(game_id, None)
         self._final_screen_logged = {entry for entry in self._final_screen_logged if entry[0] != game_id}
 
     def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
