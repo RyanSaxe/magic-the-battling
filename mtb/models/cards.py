@@ -65,6 +65,104 @@ DEFAULT_UPGRADES_ID = "default_mtb_upgrades"
 DEFAULT_VANGUARD_ID = "default_mtb_vanguards"
 
 
+_SYNTHETIC_COLOR_PATTERNS: tuple[tuple[str, ...], ...] = (
+    (),
+    ("W",),
+    ("U",),
+    ("B",),
+    ("R",),
+    ("G",),
+    ("W", "U"),
+    ("U", "B"),
+    ("B", "R"),
+    ("R", "G"),
+    ("G", "W"),
+    ("W", "B", "G"),
+)
+_SYNTHETIC_TYPE_LINES: tuple[str, ...] = (
+    "Creature - Soldier",
+    "Creature - Wizard",
+    "Instant",
+    "Sorcery",
+    "Enchantment",
+    "Artifact",
+)
+
+
+def _synthetic_asset_url(card_id: str, kind: str, ext: str) -> str:
+    return f"https://mtb.synthetic.invalid/{kind}/{card_id}.{ext}"
+
+
+def build_synthetic_battler(
+    playable_count: int = 240,
+    upgrades_count: int = 4,
+    vanguards_count: int = 0,
+) -> Battler:
+    if playable_count <= 0:
+        raise ValueError("playable_count must be greater than 0")
+
+    cards: list[Card] = []
+    for i in range(playable_count):
+        card_id = f"synthetic-card-{i:04d}"
+        has_flip = i % 13 == 0
+        cards.append(
+            Card(
+                name=f"Synthetic Card {i}",
+                image_url=_synthetic_asset_url(card_id, "image", "jpg"),
+                png_url=_synthetic_asset_url(card_id, "image", "png"),
+                flip_image_url=_synthetic_asset_url(card_id, "image", "back.jpg") if has_flip else None,
+                flip_png_url=_synthetic_asset_url(card_id, "image", "back.png") if has_flip else None,
+                id=card_id,
+                type_line=_SYNTHETIC_TYPE_LINES[i % len(_SYNTHETIC_TYPE_LINES)],
+                elo=1200.0,
+                oracle_text=f"Synthetic load-test card {i}.",
+                colors=list(_SYNTHETIC_COLOR_PATTERNS[i % len(_SYNTHETIC_COLOR_PATTERNS)]),
+                cmc=float(i % 8),
+            )
+        )
+
+    upgrades = [
+        Card(
+            name=f"Synthetic Upgrade {i}",
+            image_url=_synthetic_asset_url(f"synthetic-upgrade-{i:03d}", "image", "jpg"),
+            png_url=_synthetic_asset_url(f"synthetic-upgrade-{i:03d}", "image", "png"),
+            id=f"synthetic-upgrade-{i:03d}",
+            type_line=UPGRADE_TYPE,
+            elo=1200.0,
+            oracle_text=f"Synthetic upgrade {i}.",
+            colors=[],
+            cmc=0.0,
+        )
+        for i in range(max(0, upgrades_count))
+    ]
+
+    vanguards = [
+        Card(
+            name=f"Synthetic Vanguard {i}",
+            image_url=_synthetic_asset_url(f"synthetic-vanguard-{i:03d}", "image", "jpg"),
+            png_url=_synthetic_asset_url(f"synthetic-vanguard-{i:03d}", "image", "png"),
+            id=f"synthetic-vanguard-{i:03d}",
+            type_line=VANGUARD_TYPE,
+            elo=1200.0,
+            life_modifier=0,
+            hand_modifier=0,
+            oracle_text=f"Synthetic vanguard {i}.",
+            colors=[],
+            cmc=0.0,
+        )
+        for i in range(max(0, vanguards_count))
+    ]
+
+    return Battler(
+        cards=cards,
+        upgrades=upgrades,
+        vanguards=vanguards,
+        elo=1200.0,
+        original_cards=list(cards),
+        original_upgrades=list(upgrades),
+    )
+
+
 def build_battler(
     battler_id: str = DEFAULT_BATTLER_ID,
     upgrades_id: str | None = None,

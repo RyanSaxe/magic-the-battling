@@ -1,0 +1,10 @@
+{
+  "min_games_started": 100,
+  "min_completion_rate_pct": 95.0,
+  "max_p95_latency_ms": 500.0,
+  "max_error_rate_pct": 1.0,
+  "max_disconnect_rate_pct": 1.0,
+  "max_peak_rss_mb": 2048.0,
+  "max_memory_growth_mb_per_min": 20.0
+}
+

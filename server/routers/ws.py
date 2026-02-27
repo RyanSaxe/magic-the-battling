@@ -176,6 +176,10 @@ class ConnectionManager:
 connection_manager = ConnectionManager()
 
 
+def _is_disconnected_runtime_error(exc: RuntimeError) -> bool:
+    return "WebSocket is not connected" in str(exc)
+
+
 async def _handle_spectator_connection(
     websocket: WebSocket, game_id: str, session_id: str, spectate_player: str, request_id: str
 ) -> bool:
@@ -247,7 +251,12 @@ async def websocket_endpoint(
                 )
 
         while True:
-            data = await websocket.receive_json()
+            try:
+                data = await websocket.receive_json()
+            except RuntimeError as exc:
+                if _is_disconnected_runtime_error(exc):
+                    raise WebSocketDisconnect(code=1006) from exc
+                raise
             await handle_message(game_id, player_id, data, websocket)
 
     except WebSocketDisconnect:

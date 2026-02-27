@@ -6,6 +6,7 @@ import pytest
 from mtb.models.cards import Battler, Card
 from mtb.models.game import Puppet, create_game, set_battler
 from server.db.models import PlayerGameHistory
+from server.routers.ws import ConnectionManager
 from server.services.game_manager import GameManager
 
 
@@ -204,8 +205,6 @@ class TestCanRejoin:
 
 class TestConnectionManagerPendingConnections:
     def test_reserve_connection_marks_player_as_connected(self):
-        from server.routers.ws import ConnectionManager  # noqa: PLC0415
-
         cm = ConnectionManager()
         assert not cm.is_player_connected("game1", "player1")
 
@@ -213,8 +212,6 @@ class TestConnectionManagerPendingConnections:
         assert cm.is_player_connected("game1", "player1")
 
     def test_reserved_player_included_in_connected_ids(self):
-        from server.routers.ws import ConnectionManager  # noqa: PLC0415
-
         cm = ConnectionManager()
         cm.reserve_connection("game1", "player1")
 
@@ -222,8 +219,6 @@ class TestConnectionManagerPendingConnections:
         assert "player1" in connected_ids
 
     def test_disconnect_clears_pending_connection(self):
-        from server.routers.ws import ConnectionManager  # noqa: PLC0415
-
         cm = ConnectionManager()
         cm.reserve_connection("game1", "player1")
         assert cm.is_player_connected("game1", "player1")
@@ -316,3 +311,26 @@ class TestSelfPlayerPlacement:
         state = game_manager.get_game_state("g1", "pid_alice")
         assert state is not None
         assert state.self_player.placement == 0
+
+    def test_terminal_screen_logs_once(self, game_manager):
+        cards = [self._make_card(f"c{i}") for i in range(50)]
+        battler = Battler(cards=cards, upgrades=[], vanguards=[])
+
+        game = create_game(["Alice"], num_players=1)
+        set_battler(game, battler)
+
+        game_manager._active_games["g1"] = game
+        game_manager._player_to_game["pid_alice"] = "g1"
+        game_manager._player_id_to_name["pid_alice"] = "Alice"
+
+        alice = game.players[0]
+        alice.phase = "game_over"
+        alice.placement = 2
+
+        with patch("server.services.game_manager.logger.info") as info_log:
+            state1 = game_manager.get_game_state("g1", "pid_alice")
+            state2 = game_manager.get_game_state("g1", "pid_alice")
+
+        assert state1 is not None
+        assert state2 is not None
+        assert info_log.call_count == 1

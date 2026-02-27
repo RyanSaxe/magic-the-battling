@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import random
 import secrets
 from collections.abc import Callable, Coroutine
@@ -19,6 +20,7 @@ from mtb.models.cards import (
     Battler,
     Card,
     build_battler,
+    build_synthetic_battler,
 )
 from mtb.models.game import (
     Battle,
@@ -64,6 +66,18 @@ from server.schemas.api import (
 from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
+TERMINAL_PLAYER_PHASES = frozenset(("winner", "eliminated", "game_over"))
+
+
+def _env_int(name: str, default: int, minimum: int = 0) -> int:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(minimum, value)
 
 
 def _scrub_face_down_cards(cards: list[Card], face_down_ids: set[str], id_map: dict[str, str]) -> list[Card]:
@@ -144,6 +158,7 @@ class GameManager:
         self._cleanup_tasks: dict[str, asyncio.Task] = {}
         self._pending_disconnect_tasks: dict[str, asyncio.Task] = {}
         self._spectate_requests: dict[str, PendingSpectateRequest] = {}
+        self._final_screen_logged: set[tuple[str, str]] = set()
 
     def create_game(
         self,
@@ -391,6 +406,20 @@ class GameManager:
             if player.phase not in ("winner", "eliminated", "game_over"):
                 player.phase = "game_over"
 
+        placements = sorted(
+            ((player.name, player.phase, player.placement) for player in game.players),
+            key=lambda item: item[2] if item[2] > 0 else 999,
+        )
+        placement_text = ", ".join(
+            f"{name}:{phase}:#{placement}" for name, phase, placement in placements if placement > 0
+        )
+        logger.info(
+            "Game complete: game_id=%s winner=%s placements=[%s]",
+            game_id,
+            winner.name if winner else None,
+            placement_text,
+        )
+
         if db is not None:
             game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
             if game_record:
@@ -451,10 +480,25 @@ class GameManager:
         except RuntimeError:
             pass
 
-    def schedule_abandoned_cleanup(self, game_id: str, delay: float = 86400.0) -> None:
-        """Schedule cleanup for abandoned game (default 24 hours)."""
-        logger.info("Scheduling abandoned game cleanup for game_id=%s in %.0f seconds", game_id, delay)
-        self._schedule_cleanup(game_id, delay)
+    def _get_abandoned_cleanup_delay(self, game_id: str) -> float:
+        pending = self._pending_games.get(game_id)
+        if pending and not pending.is_started:
+            # Pending lobby sessions should expire quickly if everyone leaves.
+            return float(_env_int("MTB_PENDING_ABANDONED_TTL_SECONDS", 900, minimum=1))
+
+        game = self._active_games.get(game_id)
+        if game and len(game.players) <= 1:
+            # Solo games (human + puppets) can keep a longer reconnect window.
+            return float(_env_int("MTB_SOLO_ABANDONED_TTL_SECONDS", 86400, minimum=1))
+
+        # Multiplayer reconnect window.
+        return float(_env_int("MTB_MULTIPLAYER_ABANDONED_TTL_SECONDS", 3600, minimum=1))
+
+    def schedule_abandoned_cleanup(self, game_id: str, delay: float | None = None) -> None:
+        """Schedule cleanup for abandoned game using game-type-specific TTLs."""
+        resolved_delay = delay if delay is not None else self._get_abandoned_cleanup_delay(game_id)
+        logger.info("Scheduling abandoned game cleanup for game_id=%s in %.0f seconds", game_id, resolved_delay)
+        self._schedule_cleanup(game_id, resolved_delay)
 
     def cancel_abandoned_cleanup(self, game_id: str) -> None:
         """Cancel scheduled cleanup when a player reconnects."""
@@ -479,8 +523,15 @@ class GameManager:
             self._player_id_to_name.pop(pid, None)
 
         self._cleanup_tasks.pop(game_id, None)
+        self._final_screen_logged = {entry for entry in self._final_screen_logged if entry[0] != game_id}
 
     def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
+        if os.environ.get("MTB_SYNTHETIC_BATTLER", "0") == "1":
+            playable_count = _env_int("MTB_SYNTHETIC_CARD_COUNT", 240, minimum=1)
+            upgrades_count = _env_int("MTB_SYNTHETIC_UPGRADES_COUNT", 4) if use_upgrades else 0
+            vanguards_count = _env_int("MTB_SYNTHETIC_VANGUARDS_COUNT", 1) if use_vanguards else 0
+            return build_synthetic_battler(playable_count, upgrades_count, vanguards_count)
+
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
         vanguards_id = DEFAULT_VANGUARD_ID if use_vanguards else None
         return build_battler(cube_id, upgrades_id, vanguards_id)
@@ -799,6 +850,7 @@ class GameManager:
         self._player_id_to_name.pop(player_id, None)
 
         if not pending.player_ids:
+            self._join_code_to_game.pop(pending.join_code, None)
             del self._pending_games[game_id]
 
         return True
@@ -1012,6 +1064,7 @@ class GameManager:
         all_players.extend(
             self._make_fake_player_view(fp, player, probabilities, most_recent_ghost_puppet_name) for fp in game.puppets
         )
+        self._maybe_log_terminal_screen(game_id, player)
 
         return GameStateResponse(
             game_id=game_id,
@@ -1050,6 +1103,26 @@ class GameManager:
             available_upgrades=game.available_upgrades,
             current_battle=current_battle,
             cube_id=game.config.cube_id,
+        )
+
+    def _maybe_log_terminal_screen(self, game_id: str, player: Player) -> None:
+        if player.phase not in TERMINAL_PLAYER_PHASES or player.placement <= 0:
+            return
+
+        key = (game_id, player.name)
+        if key in self._final_screen_logged:
+            return
+        self._final_screen_logged.add(key)
+
+        logger.info(
+            "Player reached final screen: game_id=%s player=%s phase=%s placement=%d stage=%d round=%d poison=%d",
+            game_id,
+            player.name,
+            player.phase,
+            player.placement,
+            player.stage,
+            player.round,
+            player.poison,
         )
 
     def _determine_game_phase(self, game: Game) -> str:

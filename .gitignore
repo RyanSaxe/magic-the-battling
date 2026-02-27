@@ -141,3 +141,6 @@ node_modules/
 web/.vite/
 
 backlog/
+
+# Generated performance test outputs
+tests/perf/reports/

@@ -22,6 +22,11 @@ def run_async(coro):
     try:
         return loop.run_until_complete(coro)
     finally:
+        pending = asyncio.all_tasks(loop)
+        for task in pending:
+            task.cancel()
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
         loop.close()
 
 
@@ -82,6 +87,19 @@ class TestSchedulePendingDisconnect:
             gm.schedule_pending_disconnect(pending_game.game_id, "pid_bob", delay=10.0)
             await asyncio.sleep(0.1)
             assert "pid_bob" in pending_game.player_ids
+
+        run_async(_test())
+
+    def test_removes_join_code_mapping_when_last_pending_player_times_out(self, gm):
+        pending = gm.create_game("Alice", "pid_alice", cube_id="test")
+        join_code = pending.join_code
+        assert gm.get_game_id_by_join_code(join_code) == pending.game_id
+
+        async def _test():
+            gm.schedule_pending_disconnect(pending.game_id, "pid_alice", delay=0.05)
+            await asyncio.sleep(0.1)
+            assert gm.get_pending_game_by_code(join_code) is None
+            assert gm.get_game_id_by_join_code(join_code) is None
 
         run_async(_test())
 
