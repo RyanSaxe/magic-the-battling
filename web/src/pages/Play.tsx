@@ -272,7 +272,9 @@ export function Play() {
   }, [friendsLoading, pendingGameId, lobbyState?.cube_loading_status, navigate]);
 
   useEffect(() => {
-    if (cubeId && cubeId !== "auto") warmCubeCache(cubeId);
+    if (!cubeId) return;
+    const timer = setTimeout(() => warmCubeCache(cubeId), 2000);
+    return () => clearTimeout(timer);
   }, [cubeId]);
 
   const handleCreateLobby = async () => {
