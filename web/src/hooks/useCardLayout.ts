@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useLayoutEffect, useEffect } from "react";
+import { useState, useCallback, useRef, useLayoutEffect } from "react";
 import { CARD_ASPECT_RATIO, bestFit, type ZoneDims } from "./cardSizeUtils";
 
 export interface ZoneSpec {
@@ -718,9 +718,8 @@ export function useCardLayout(
   );
 
   const configRef = useRef(config);
-  useEffect(() => {
-    configRef.current = config;
-  });
+  // eslint-disable-next-line react-hooks/refs -- must sync before useLayoutEffect reads it
+  configRef.current = config;
 
   const observerRef = useRef<ResizeObserver | null>(null);
   const elementRef = useRef<HTMLElement | null>(null);
