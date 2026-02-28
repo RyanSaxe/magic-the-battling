@@ -287,6 +287,12 @@ class GameManager:
                     pending.cube_id,
                 )
 
+        logger.info(
+            "Game started: game_id=%s cube=%s players=%s",
+            game_id,
+            pending.cube_id,
+            pending.player_names,
+        )
         self._active_games[game_id] = game
         self._pending_games.pop(game_id, None)
 
@@ -354,6 +360,12 @@ class GameManager:
                     pending.cube_id,
                 )
 
+        logger.info(
+            "Game started: game_id=%s cube=%s players=%s",
+            game_id,
+            pending.cube_id,
+            pending.player_names,
+        )
         self._active_games[game_id] = game
         self._pending_games.pop(game_id, None)
 
