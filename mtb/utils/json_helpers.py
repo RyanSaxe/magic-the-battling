@@ -2,6 +2,7 @@
 
 import asyncio
 import atexit
+import logging
 import threading
 import time
 from collections import OrderedDict
@@ -11,10 +12,12 @@ from typing import Any, TypeVar
 
 import httpx
 
+logger = logging.getLogger(__name__)
+
 # ----- Tunables -----
 _MIN_INTERVAL = 0.1  # seconds: minimum spacing between HTTP calls
 _TIMEOUT = httpx.Timeout(10.0, connect=3.05)
-_CACHE_MAX = 1024  # max entries to keep in memory
+_CACHE_MAX = 4096  # max entries to keep in memory
 
 
 T = TypeVar("T")
@@ -64,6 +67,7 @@ class _JsonService:
         self._rate_lock = asyncio.Lock()
         self._last_call = 0.0
         self._inflight: dict[str, asyncio.Task[Any]] = {}
+        self._inflight_revalidations: dict[str, asyncio.Task[None]] = {}
 
     def get_json(self, url: str) -> Any:
         return self._runtime.run(self._get_json(url))
@@ -71,15 +75,20 @@ class _JsonService:
     def revalidate(self, url: str) -> None:
         self._runtime.run(self._revalidate(url))
 
+    def revalidate_and_get(self, url: str) -> Any:
+        return self._runtime.run(self._revalidate_and_get(url))
+
     async def _get_json(self, url: str) -> Any:
         async with self._lock:
             entry = self._cache.get(url)
             if entry is not None:
                 self._cache.move_to_end(url)
+                logger.debug("cache hit: %s", url)
                 return entry.data
 
             task = self._inflight.get(url)
             if task is None:
+                logger.debug("cache miss, fetching: %s", url)
                 task = asyncio.create_task(self._fetch_and_store(url))
                 self._inflight[url] = task
 
@@ -87,15 +96,25 @@ class _JsonService:
 
     async def _revalidate(self, url: str) -> None:
         async with self._lock:
-            entry = self._cache.get(url)
+            existing = self._inflight_revalidations.get(url)
+            if existing is not None:
+                task = existing
+            elif (entry := self._cache.get(url)) is None:
+                task = asyncio.create_task(self._get_json(url))
+                self._inflight_revalidations[url] = task
+            elif not entry.etag:
+                return
+            else:
+                task = asyncio.create_task(self._do_revalidate(url, entry.etag))
+                self._inflight_revalidations[url] = task
 
-        if entry is None:
-            await self._get_json(url)
-            return
+        try:
+            await task
+        finally:
+            async with self._lock:
+                self._inflight_revalidations.pop(url, None)
 
-        if not entry.etag:
-            return
-
+    async def _do_revalidate(self, url: str, etag: str) -> None:
         async with self._rate_lock:
             now = time.monotonic()
             wait = _MIN_INTERVAL - (now - self._last_call)
@@ -104,7 +123,7 @@ class _JsonService:
             self._last_call = time.monotonic()
 
         try:
-            response = await self._client.get(url, headers={"If-None-Match": entry.etag})
+            response = await self._client.get(url, headers={"If-None-Match": etag})
             if response.status_code == 304:
                 return
             response.raise_for_status()
@@ -114,6 +133,10 @@ class _JsonService:
                 self._cache.move_to_end(url)
         except Exception:
             pass
+
+    async def _revalidate_and_get(self, url: str) -> Any:
+        await self._revalidate(url)
+        return await self._get_json(url)
 
     async def _fetch_and_store(self, url: str) -> Any:
         try:
@@ -182,3 +205,11 @@ def get_json(url: str) -> Any:
 
 def revalidate_json(url: str) -> None:
     _get_service().revalidate(url)
+
+
+def revalidate_and_get(url: str) -> Any:
+    return _get_service().revalidate_and_get(url)
+
+
+def is_cached(url: str) -> bool:
+    return url in _get_service()._cache

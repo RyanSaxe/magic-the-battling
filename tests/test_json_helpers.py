@@ -85,6 +85,25 @@ def test_get_json_after_stop_worker_returns(json_helpers_module, json_endpoint):
     assert result == {"call": 1}
 
 
+def test_revalidate_and_get_on_cache_miss(json_helpers_module, json_endpoint):
+    module = json_helpers_module
+    url, request_times = json_endpoint
+
+    result: dict | None = None
+
+    def call():
+        nonlocal result
+        result = module.revalidate_and_get(url)
+
+    worker = threading.Thread(target=call)
+    worker.start()
+    worker.join(timeout=5)
+
+    assert not worker.is_alive(), "revalidate_and_get deadlocked on cache miss"
+    assert result == {"call": 1}
+    assert len(request_times) == 1
+
+
 def test_concurrent_requests_share_single_fetch(json_helpers_module, json_endpoint):
     module = json_helpers_module
     url, request_times = json_endpoint
