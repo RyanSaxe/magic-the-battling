@@ -475,6 +475,7 @@ class GameManager:
         """Cancel scheduled cleanup when a player reconnects."""
         if task := self._cleanup_tasks.pop(game_id, None):
             task.cancel()
+            logger.info("Cancelled abandoned game cleanup for game_id=%s", game_id)
 
     def _cleanup_game(self, game_id: str) -> None:
         """Remove game from memory."""
