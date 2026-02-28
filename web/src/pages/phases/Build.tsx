@@ -12,7 +12,7 @@ import { TreasureCard } from "../../components/common/TreasureCard";
 import { PoisonCard } from "../../components/common/PoisonCard";
 import { CardGrid } from "../../components/common/CardGrid";
 import { ZoneLayout } from "../../components/common/ZoneLayout";
-import { useGameSummaryCardSize } from "../../hooks/useGameSummaryCardSize";
+import { useCardLayout, ZONE_LAYOUT_PADDING } from "../../hooks/useCardLayout";
 
 type Selection =
   | { type: "card"; cardId: string; zone: "hand" | "sideboard" }
@@ -209,12 +209,20 @@ export function BuildPhase({
     }
   };
 
+  const [stableSBCount, setStableSBCount] = useState(self_player.sideboard.length);
+  if (self_player.sideboard.length > stableSBCount) {
+    setStableSBCount(self_player.sideboard.length);
+  }
+
   const battlefieldCount = 3 + 1 + 1; // 3 basic slots + treasure + poison
-  const [containerRef, dims] = useGameSummaryCardSize({
-    handCount: maxHandSize,
-    battlefieldCount,
-    sideboardCount: self_player.sideboard.length,
-    commandZoneCount: 0,
+  const [containerRef, dims] = useCardLayout({
+    zones: {
+      hand: { count: maxHandSize },
+      battlefield: { count: battlefieldCount, priority: "fill", maxRows: 1 },
+      sideboard: { count: stableSBCount },
+    },
+    layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
+    ...ZONE_LAYOUT_PADDING,
   });
 
   const handDims = { width: dims.hand.width, height: dims.hand.height };

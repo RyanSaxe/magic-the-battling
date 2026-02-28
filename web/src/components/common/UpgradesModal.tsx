@@ -3,9 +3,8 @@ import type { Card as CardType } from '../../types'
 import { Card } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { CardGrid } from './CardGrid'
-import { useDualZoneCardSizes } from '../../hooks/useDualZoneCardSizes'
+import { useCardLayout } from '../../hooks/useCardLayout'
 import { useElementHeight } from '../../hooks/useElementHeight'
-import { useGameSummaryCardSize } from '../../hooks/useGameSummaryCardSize'
 
 interface UpgradesModalProps {
   upgrades: CardType[]
@@ -54,27 +53,24 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
   const isApplyMode = mode === 'apply'
 
   const [separatorRef, separatorHeight] = useElementHeight()
-  const [applyRef, applyDims] = useDualZoneCardSizes({
-    topCount: isApplyMode ? upgrades.length : 0,
-    bottomCount: isApplyMode ? targets.length : 0,
-    topGap: 6,
-    bottomGap: 6,
+  const [applyRef, applyDims] = useCardLayout({
+    zones: {
+      upgrades: { count: isApplyMode ? upgrades.length : 0, maxCardWidth: 200 },
+      targets: { count: isApplyMode ? targets.length : 0, maxCardWidth: 200 },
+    },
+    layout: { top: ['upgrades'], bottomLeft: ['targets'] },
     fixedHeight: separatorHeight,
-    topMaxWidth: 200,
-    bottomMaxWidth: 200,
   })
 
-  const [viewRef, viewDims] = useGameSummaryCardSize({
-    sideboardCount: !isApplyMode ? upgrades.length : 0,
-    handCount: 0,
-    battlefieldCount: 0,
-    commandZoneCount: 0,
+  const [viewRef, viewDims] = useCardLayout({
+    zones: { upgrades: { count: !isApplyMode ? upgrades.length : 0 } },
+    layout: { top: ['upgrades'] },
   })
 
   const upgradeDims = isApplyMode
-    ? { width: applyDims.top.width, height: applyDims.top.height }
-    : { width: viewDims.sideboard.width, height: viewDims.sideboard.height }
-  const targetDims = { width: applyDims.bottom.width, height: applyDims.bottom.height }
+    ? { width: applyDims.upgrades.width, height: applyDims.upgrades.height }
+    : { width: viewDims.upgrades.width, height: viewDims.upgrades.height }
+  const targetDims = { width: applyDims.targets.width, height: applyDims.targets.height }
 
   const handleConfirm = () => {
     if (!selectedUpgrade || !selectedTarget || !onApply) return
@@ -119,7 +115,7 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
           <div ref={applyRef} className="flex-1 min-h-0 flex flex-col p-2">
             {separatorHeight > 0 && (
               <div className="shrink-0 flex justify-center">
-                <CardGrid columns={applyDims.top.columns} cardWidth={upgradeDims.width}>
+                <CardGrid columns={applyDims.upgrades.columns} cardWidth={upgradeDims.width}>
                   {applied.map((upgrade) => (
                     <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={upgradeDims} />
                   ))}
@@ -144,7 +140,7 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
             <div ref={separatorRef} className="py-2 shrink-0"><hr className="border-gray-700" /></div>
             {separatorHeight > 0 && (
               <div className="flex-1 min-h-0 flex justify-center">
-                <CardGrid columns={applyDims.bottom.columns} cardWidth={targetDims.width}>
+                <CardGrid columns={applyDims.targets.columns} cardWidth={targetDims.width}>
                   {targets.map((card) => (
                     <Card
                       key={card.id}
@@ -162,7 +158,7 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
           <div ref={viewRef} className="flex-1 min-h-0 p-2">
             <div className="h-full">
               {upgrades.length > 0 ? (
-                <CardGrid columns={viewDims.sideboard.columns} cardWidth={upgradeDims.width}>
+                <CardGrid columns={viewDims.upgrades.columns} cardWidth={upgradeDims.width}>
                   {upgrades.map((upgrade) =>
                     upgrade.upgrade_target ? (
                       <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={upgradeDims} />

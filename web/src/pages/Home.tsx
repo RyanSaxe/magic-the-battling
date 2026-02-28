@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { FaDiscord } from "react-icons/fa6";
 import { CardShowcase } from "../components/home/CardShowcase";
-import { CreateGameModal } from "../components/home/CreateGameModal";
 import { JoinGameModal } from "../components/home/JoinGameModal";
+import { prefetchLegendaryName } from "../utils/prefetchName";
 
 export function Home() {
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const navigate = useNavigate();
   const [showJoinModal, setShowJoinModal] = useState(false);
+
+  useEffect(() => {
+    prefetchLegendaryName();
+  }, []);
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
@@ -22,7 +28,7 @@ export function Home() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => navigate("/play")}
               className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
             >
               Play Game
@@ -33,6 +39,15 @@ export function Home() {
             >
               Join Game
             </button>
+            <a
+              href="https://discord.gg/2NAjcWXNKn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary py-2 px-4 flex items-center gap-2"
+            >
+              <FaDiscord className="w-4 h-4" />
+              Discord
+            </a>
           </div>
         </div>
         <div className="sm:hidden text-center">
@@ -44,7 +59,7 @@ export function Home() {
           </p>
           <div className="flex gap-3 mt-2 justify-center">
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={() => navigate("/play")}
               className="btn btn-primary py-2 px-5 font-semibold animate-gentle-glow"
             >
               Play Game
@@ -55,6 +70,15 @@ export function Home() {
             >
               Join Game
             </button>
+            <a
+              href="https://discord.gg/2NAjcWXNKn"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary py-2 px-5 flex items-center gap-2"
+            >
+              <FaDiscord className="w-4 h-4" />
+              Discord
+            </a>
           </div>
         </div>
       </header>
@@ -63,29 +87,6 @@ export function Home() {
         <CardShowcase />
       </main>
 
-      <footer className="shrink-0 flex items-center justify-center gap-4 px-4 sm:px-6 py-3 text-sm">
-        <a
-          href="https://cubecobra.com/cube/overview/auto"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[#7289da] hover:text-[#99aab5] transition-colors"
-        >
-          Follow on Cube Cobra
-        </a>
-        <span className="text-gray-600">|</span>
-        <a
-          href="https://discord.gg/2NAjcWXNKn"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-[#7289da] hover:text-[#99aab5] transition-colors"
-        >
-          Join the Discord
-        </a>
-      </footer>
-
-      {showCreateModal && (
-        <CreateGameModal onClose={() => setShowCreateModal(false)} />
-      )}
       {showJoinModal && (
         <JoinGameModal onClose={() => setShowJoinModal(false)} />
       )}

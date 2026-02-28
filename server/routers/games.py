@@ -1,10 +1,14 @@
 import json
+import logging
 from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from mtb.models.game import BattleSnapshotData
+from mtb.utils.cubecobra import get_cube_data
+from mtb.utils.json_helpers import get_json, is_cached, revalidate_json
 from server.db import database
 from server.db.models import GameRecord, PlayerGameHistory
 from server.schemas.api import (
@@ -28,6 +32,8 @@ from server.schemas.api import (
 )
 from server.services.game_manager import game_manager
 from server.services.session_manager import session_manager
+
+logger = logging.getLogger(__name__)
 
 
 def get_db():
@@ -55,6 +61,7 @@ async def create_game(request: CreateGameRequest):
         target_player_count=request.target_player_count,
         auto_approve_spectators=request.auto_approve_spectators,
     )
+    pending.puppet_count = request.puppet_count
     session_manager.update_game_id(session.session_id, pending.game_id)
 
     async def broadcast_lobby():
@@ -68,6 +75,36 @@ async def create_game(request: CreateGameRequest):
         session_id=session.session_id,
         player_id=session.player_id,
     )
+
+
+class WarmCubeRequest(BaseModel):
+    cube_id: str
+
+
+@router.post("/cubes/warm")
+def warm_cube_cache(request: WarmCubeRequest):
+    logger.info("warming cube cache: %s", request.cube_id)
+
+    cube_url = f"https://cubecobra.com/cube/api/cubejson/{request.cube_id}"
+    try:
+        revalidate_json(cube_url)
+    except Exception:
+        get_json(cube_url)
+
+    data = get_json(cube_url)
+    cards = data["cards"]["mainboard"]
+    scryfall_ids = {card["details"]["scryfall_id"] for card in cards}
+    for token_id in (t for card in cards for t in card["details"].get("tokens", [])):
+        scryfall_ids.add(token_id)
+
+    cached = sum(1 for sid in scryfall_ids if is_cached(f"https://api.scryfall.com/cards/{sid}"))
+    to_fetch = len(scryfall_ids) - cached
+    logger.info("warming scryfall: %d cached, %d to fetch", cached, to_fetch)
+
+    get_cube_data(request.cube_id)
+
+    logger.info("warming complete: %s", request.cube_id)
+    return {"status": "ok"}
 
 
 @router.post("/join", response_model=JoinGameResponse)
@@ -361,6 +398,7 @@ def _build_human_snapshots(history: PlayerGameHistory) -> list[SharePlayerSnapsh
                 sideboard=snapshot_data.sideboard,
                 command_zone=snapshot_data.command_zone,
                 applied_upgrades=snapshot_data.applied_upgrades,
+                upgrades=snapshot_data.upgrades,
                 basic_lands=snapshot_data.basic_lands,
                 treasures=snapshot_data.treasures,
                 poison=poison,
@@ -398,6 +436,7 @@ def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[Sha
                 sideboard=snapshot_data.sideboard,
                 command_zone=snapshot_data.command_zone,
                 applied_upgrades=snapshot_data.applied_upgrades,
+                upgrades=snapshot_data.upgrades,
                 basic_lands=snapshot_data.basic_lands,
                 treasures=snapshot_data.treasures,
                 poison=poison_map[key],

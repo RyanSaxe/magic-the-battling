@@ -2,13 +2,13 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
 from mtb.models.cards import Card
-from mtb.utils.json_helpers import get_json
+from mtb.utils.json_helpers import revalidate_and_get
 from mtb.utils.scryfall import get_card_from_scryfall
 
 
 def get_cube_data(cube_id: str) -> list[Card]:
     url = f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
-    data = get_json(url)
+    data = revalidate_and_get(url)
     cube = data["cards"]["mainboard"]
 
     with ThreadPoolExecutor() as executor:

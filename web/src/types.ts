@@ -138,9 +138,11 @@ export interface LobbyState {
   can_start: boolean
   is_started: boolean
   target_player_count: number
+  puppet_count: number
   cube_loading_status: CubeLoadingStatus
   cube_loading_error: string | null
   available_puppet_count: number | null
+  use_upgrades: boolean
 }
 
 export interface CreateGameResponse {
@@ -189,6 +191,7 @@ export interface SharePlayerSnapshot {
   sideboard: Card[]
   command_zone: Card[]
   applied_upgrades: Card[]
+  upgrades?: Card[]
   basic_lands: string[]
   treasures: number
   poison: number

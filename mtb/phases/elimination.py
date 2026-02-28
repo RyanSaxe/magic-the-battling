@@ -1,6 +1,9 @@
+import logging
 import random
 
 from mtb.models.game import Game, Player, Puppet, StaticOpponent
+
+logger = logging.getLogger(__name__)
 
 Participant = Player | Puppet
 
@@ -30,6 +33,7 @@ def eliminate_puppet(game: Game, puppet: Puppet) -> None:
     puppet.is_eliminated = True
     remaining = len(get_live_players(game)) + len(get_live_puppets(game))
     puppet.placement = remaining + 1
+    logger.info("Puppet eliminated: name=%s placement=%d poison=%d", puppet.name, puppet.placement, puppet.poison)
     _update_ghosts(game, None, puppet, remaining)
 
 
@@ -41,6 +45,14 @@ def eliminate_player(game: Game, player: Player, round_num: int, stage_num: int)
 
     remaining_alive = len(get_live_players(game)) + len(get_live_puppets(game))
     player.placement = remaining_alive + 1
+    logger.info(
+        "Player eliminated: name=%s placement=%d poison=%d round=%d stage=%d",
+        player.name,
+        player.placement,
+        player.poison,
+        round_num,
+        stage_num,
+    )
     _update_ghosts(game, ghost_opponent, None, remaining_alive)
 
 

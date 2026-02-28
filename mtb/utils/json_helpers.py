@@ -2,21 +2,31 @@
 
 import asyncio
 import atexit
+import logging
 import threading
 import time
 from collections import OrderedDict
 from collections.abc import Coroutine
+from dataclasses import dataclass, field
 from typing import Any, TypeVar
 
 import httpx
 
+logger = logging.getLogger(__name__)
+
 # ----- Tunables -----
 _MIN_INTERVAL = 0.1  # seconds: minimum spacing between HTTP calls
 _TIMEOUT = httpx.Timeout(10.0, connect=3.05)
-_CACHE_MAX = 1024  # max entries to keep in memory
+_CACHE_MAX = 4096  # max entries to keep in memory
 
 
 T = TypeVar("T")
+
+
+@dataclass
+class _CacheEntry:
+    data: Any
+    etag: str | None = field(default=None)
 
 
 class _AsyncRuntime:
@@ -51,47 +61,101 @@ class _JsonService:
     def __init__(self) -> None:
         self._runtime = _AsyncRuntime()
         self._client = httpx.AsyncClient(timeout=_TIMEOUT)
-        self._cache: OrderedDict[str, Any] = OrderedDict()
+        self._cache: OrderedDict[str, _CacheEntry] = OrderedDict()
         self._cache_max = _CACHE_MAX
         self._lock = asyncio.Lock()
         self._rate_lock = asyncio.Lock()
         self._last_call = 0.0
         self._inflight: dict[str, asyncio.Task[Any]] = {}
+        self._inflight_revalidations: dict[str, asyncio.Task[None]] = {}
 
     def get_json(self, url: str) -> Any:
         return self._runtime.run(self._get_json(url))
 
+    def revalidate(self, url: str) -> None:
+        self._runtime.run(self._revalidate(url))
+
+    def revalidate_and_get(self, url: str) -> Any:
+        return self._runtime.run(self._revalidate_and_get(url))
+
     async def _get_json(self, url: str) -> Any:
         async with self._lock:
-            cached = self._cache.get(url)
-            if cached is not None:
+            entry = self._cache.get(url)
+            if entry is not None:
                 self._cache.move_to_end(url)
-                return cached
+                logger.debug("cache hit: %s", url)
+                return entry.data
 
             task = self._inflight.get(url)
             if task is None:
+                logger.debug("cache miss, fetching: %s", url)
                 task = asyncio.create_task(self._fetch_and_store(url))
                 self._inflight[url] = task
 
         return await task
 
-    async def _fetch_and_store(self, url: str) -> Any:
+    async def _revalidate(self, url: str) -> None:
+        async with self._lock:
+            existing = self._inflight_revalidations.get(url)
+            if existing is not None:
+                task = existing
+            elif (entry := self._cache.get(url)) is None:
+                task = asyncio.create_task(self._get_json(url))
+                self._inflight_revalidations[url] = task
+            elif not entry.etag:
+                return
+            else:
+                task = asyncio.create_task(self._do_revalidate(url, entry.etag))
+                self._inflight_revalidations[url] = task
+
         try:
-            data = await self._rate_limited_fetch(url)
+            await task
+        finally:
+            async with self._lock:
+                self._inflight_revalidations.pop(url, None)
+
+    async def _do_revalidate(self, url: str, etag: str) -> None:
+        async with self._rate_lock:
+            now = time.monotonic()
+            wait = _MIN_INTERVAL - (now - self._last_call)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last_call = time.monotonic()
+
+        try:
+            response = await self._client.get(url, headers={"If-None-Match": etag})
+            if response.status_code == 304:
+                return
+            response.raise_for_status()
+            new_entry = _CacheEntry(data=response.json(), etag=response.headers.get("etag"))
+            async with self._lock:
+                self._cache[url] = new_entry
+                self._cache.move_to_end(url)
+        except Exception:
+            pass
+
+    async def _revalidate_and_get(self, url: str) -> Any:
+        await self._revalidate(url)
+        return await self._get_json(url)
+
+    async def _fetch_and_store(self, url: str) -> Any:
+        logger.info("fetching: %s", url)
+        try:
+            data, etag = await self._rate_limited_fetch(url)
         except Exception:
             async with self._lock:
                 self._inflight.pop(url, None)
             raise
 
         async with self._lock:
-            self._cache[url] = data
+            self._cache[url] = _CacheEntry(data=data, etag=etag)
             self._cache.move_to_end(url)
             if len(self._cache) > self._cache_max:
                 self._cache.popitem(last=False)
             self._inflight.pop(url, None)
         return data
 
-    async def _rate_limited_fetch(self, url: str) -> Any:
+    async def _rate_limited_fetch(self, url: str) -> tuple[Any, str | None]:
         async with self._rate_lock:
             now = time.monotonic()
             wait = _MIN_INTERVAL - (now - self._last_call)
@@ -101,7 +165,7 @@ class _JsonService:
 
         response = await self._client.get(url)
         response.raise_for_status()
-        return response.json()
+        return response.json(), response.headers.get("etag")
 
     async def _close(self) -> None:
         await self._client.aclose()
@@ -138,3 +202,15 @@ atexit.register(stop_worker)
 
 def get_json(url: str) -> Any:
     return _get_service().get_json(url)
+
+
+def revalidate_json(url: str) -> None:
+    _get_service().revalidate(url)
+
+
+def revalidate_and_get(url: str) -> Any:
+    return _get_service().revalidate_and_get(url)
+
+
+def is_cached(url: str) -> bool:
+    return url in _get_service()._cache

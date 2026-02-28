@@ -16,6 +16,7 @@ class CreateGameRequest(BaseModel):
     use_upgrades: bool = True
     use_vanguards: bool = False
     target_player_count: int = 4
+    puppet_count: int = 0
     auto_approve_spectators: bool = False
 
 
@@ -129,9 +130,12 @@ class LobbyStateResponse(BaseModel):
     can_start: bool
     is_started: bool
     target_player_count: int = 4
+    puppet_count: int = 0
     cube_loading_status: CubeLoadingStatus = "loading"
     cube_loading_error: str | None = None
     available_puppet_count: int | None = None
+    cube_id: str = "auto"
+    use_upgrades: bool = True
 
 
 class DraftSwapAction(BaseModel):
@@ -246,6 +250,7 @@ class SharePlayerSnapshot(BaseModel):
     sideboard: list[Card]
     command_zone: list[Card]
     applied_upgrades: list[Card]
+    upgrades: list[Card] = Field(default_factory=list)
     basic_lands: list[str]
     treasures: int
     poison: int

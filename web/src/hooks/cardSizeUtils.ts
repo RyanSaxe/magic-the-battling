@@ -43,7 +43,7 @@ export function bestFit(
     }
 
     const fill = Math.min(1, totalHeight / availHeight)
-    const score = cardWidth * Math.sqrt(fill)
+    const score = cardWidth * Math.sqrt(fill) * Math.pow(0.90, rows - 1)
     if (score > bestScore) {
       bestScore = score
       bestResult = { width: cardWidth, height: cardHeight, rows, columns: cardsPerRow }

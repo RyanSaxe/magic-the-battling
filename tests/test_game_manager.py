@@ -228,7 +228,7 @@ class TestConnectionManagerPendingConnections:
         cm.reserve_connection("game1", "player1")
         assert cm.is_player_connected("game1", "player1")
 
-        cm.disconnect("game1", "player1")
+        cm.disconnect("game1", "player1", MagicMock())
         assert not cm.is_player_connected("game1", "player1")
 
 

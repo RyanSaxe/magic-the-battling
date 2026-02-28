@@ -3,6 +3,14 @@ import { createPortal } from "react-dom";
 import { BasicLandCard } from "./BasicLandCard";
 import { CardSlot } from "./CardSlot";
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from "../../constants/assets";
+import { CARD_ASPECT_RATIO } from "../../hooks/cardSizeUtils";
+
+const VIEWPORT_MARGIN = 8;
+const POPOVER_PADDING = 8;  // p-2
+const GRID_GAP = 6;         // gap-1.5
+const BUTTON_PADDING = 4;   // p-1
+const LABEL_HEIGHT = 14;
+const LABEL_GAP = 2;        // gap-0.5
 
 interface BasicLandSlotProps {
   selected: string | null;
@@ -21,6 +29,7 @@ export function BasicLandSlot({
   const triggerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [landSize, setLandSize] = useState({ w: dimensions.width, h: Math.round(dimensions.width * CARD_ASPECT_RATIO) });
 
   useEffect(() => {
     if (!open) return;
@@ -40,10 +49,32 @@ export function BasicLandSlot({
   const handleOpen = () => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();
-    setPos({
-      top: rect.bottom + 4,
-      left: rect.left + rect.width / 2,
-    });
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const NON_LAND_H = 2 * POPOVER_PADDING + GRID_GAP + 2 * (2 * BUTTON_PADDING + LABEL_GAP + LABEL_HEIGHT);
+    const availableHeight = vh - rect.bottom - 4 - VIEWPORT_MARGIN;
+    const maxFromVertical = Math.floor((availableHeight - NON_LAND_H) / (2 * CARD_ASPECT_RATIO));
+    const maxFromHorizontal = Math.floor(
+      (vw - 2 * VIEWPORT_MARGIN - 2 * POPOVER_PADDING - 2 * GRID_GAP - 6 * BUTTON_PADDING) / 3,
+    );
+
+    const landWidth = Math.min(dimensions.width, maxFromHorizontal, maxFromVertical);
+    const landHeight = Math.round(landWidth * CARD_ASPECT_RATIO);
+    setLandSize({ w: landWidth, h: landHeight });
+
+    const popoverWidth =
+      3 * landWidth + 6 * BUTTON_PADDING + 2 * GRID_GAP + 2 * POPOVER_PADDING;
+
+    let left = rect.left + rect.width / 2 - popoverWidth / 2;
+    left = Math.max(
+      VIEWPORT_MARGIN,
+      Math.min(left, vw - popoverWidth - VIEWPORT_MARGIN),
+    );
+
+    const top = rect.bottom + 4;
+
+    setPos({ top, left });
     setOpen(true);
   };
 
@@ -65,11 +96,7 @@ export function BasicLandSlot({
           <div
             ref={popoverRef}
             className="fixed z-50 bg-gray-900 border border-gray-600 rounded-lg p-2 shadow-xl"
-            style={{
-              top: pos.top,
-              left: pos.left,
-              transform: "translateX(-50%)",
-            }}
+            style={{ top: pos.top, left: pos.left }}
           >
             <div className="grid grid-cols-3 gap-1.5">
               {BASIC_LANDS.map(({ name }) => (
@@ -84,8 +111,12 @@ export function BasicLandSlot({
                   <img
                     src={BASIC_LAND_IMAGES[name]}
                     alt={name}
-                    className="w-10 h-14 object-cover"
-                    style={{ borderRadius: "var(--card-border-radius)" }}
+                    className="object-cover"
+                    style={{
+                      width: landSize.w,
+                      height: landSize.h,
+                      borderRadius: "var(--card-border-radius)",
+                    }}
                   />
                   <span className="text-[9px] text-gray-400">{name}</span>
                 </button>

@@ -43,6 +43,7 @@ def main():
     parser = argparse.ArgumentParser(description="Run dev servers")
     parser.add_argument("-r", "--reload", action="store_true", help="Enable auto-reload on code changes")
     parser.add_argument("-b", "--build", action="store_true", help="Build frontend and serve from backend only")
+    parser.add_argument("--no-compress", action="store_true", help="Disable WS compression (readable JSON in DevTools)")
     args = parser.parse_args()
 
     project_root = Path(__file__).parent.parent
@@ -61,6 +62,7 @@ def main():
         uvicorn_cmd,
         cwd=project_root,
         start_new_session=True,
+        env={**os.environ, "MTB_COMPRESS_WS": "0" if args.no_compress else "1"},
     )
 
     processes = [backend]

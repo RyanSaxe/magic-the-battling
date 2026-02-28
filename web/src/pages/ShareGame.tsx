@@ -170,7 +170,7 @@ export function ShareGame() {
       sideboard_count: snap?.sideboard.length ?? 0,
       hand_size: snap?.hand.length ?? 0,
       is_stage_increasing: false,
-      upgrades: snap?.applied_upgrades ?? [],
+      upgrades: snap?.upgrades?.length ? snap.upgrades : (snap?.applied_upgrades ?? []),
       vanguard: snap?.vanguard ?? null,
       chosen_basics: snap?.basic_lands ?? [],
       most_recently_revealed_cards: [],

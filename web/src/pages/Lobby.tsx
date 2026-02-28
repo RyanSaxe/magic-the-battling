@@ -6,13 +6,14 @@ import { rejoinGame } from "../api/client";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
+import { HintsBanner } from "../components/common/HintsBanner";
 
 export function Lobby() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   const { session, saveSession } = useSession();
   const { addToast } = useToast();
-  const { lobbyState, gameState, isConnected, actions } = useGame(
+  const { lobbyState, gameState, isConnected, kicked, actions } = useGame(
     gameId ?? null,
     session?.sessionId ?? null,
     null,
@@ -33,7 +34,10 @@ export function Lobby() {
     (p) => p.player_id === session?.playerId,
   );
   const lobbyHotkeyMap: Record<string, () => void> = {
-    "?": () => setShowRulesPanel(true),
+    "?": () => {
+      setRulesPanelTarget(undefined);
+      setShowRulesPanel(true);
+    },
   };
   if (lobbyState && currentPlayer && !showRulesPanel) {
     const isHost = currentPlayer.is_host;
@@ -55,6 +59,12 @@ export function Lobby() {
       navigate(`/game/${gameId}/play`);
     }
   }, [gameState, gameId, navigate]);
+
+  useEffect(() => {
+    if (kicked) {
+      navigate("/play");
+    }
+  }, [kicked, navigate]);
 
   const copyJoinCode = async () => {
     if (!lobbyState?.join_code) return;
@@ -139,81 +149,83 @@ export function Lobby() {
     );
   }
 
+  if (!lobbyState) {
+    return <div className="game-table h-dvh" />;
+  }
+
   return (
     <div className="game-table flex items-center justify-center p-4">
-      <div className="bg-black/60 backdrop-blur rounded-lg px-6 py-4 w-full max-w-md">
-        <h1 className="text-xl font-bold text-white text-center mb-1">
-          Game Lobby
-        </h1>
-        {!isConnected && (
-          <div className="bg-amber-900/50 text-amber-200 p-3 rounded mb-4">
-            Connecting...
+      {!isConnected && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-gray-950/90 backdrop-blur-sm border border-gray-700/50 border-l-[3px] border-l-amber-500 rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
+            <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <span className="text-sm text-gray-200">Reconnecting...</span>
           </div>
-        )}
+        </div>
+      )}
+      <div className="bg-black/60 backdrop-blur rounded-lg border border-black/40 p-4 w-full max-w-md">
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => navigate("/")}
+            className="w-7 h-7 rounded-full bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            title="Home"
+          >
+            ⌂
+          </button>
+          <h1 className="text-xl font-bold text-white text-center">
+            Game Lobby
+          </h1>
+          <button
+            onClick={() => {
+              setRulesPanelTarget(undefined);
+              setShowRulesPanel(true);
+            }}
+            className="w-7 h-7 rounded-full bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            title="Game Guide"
+          >
+            ?
+          </button>
+        </div>
 
         {lobbyState &&
           (() => {
             const isHost = currentPlayer?.is_host ?? false;
             const isReady = currentPlayer?.is_ready ?? false;
-            const botSlots =
-              lobbyState.target_player_count - lobbyState.players.length;
-            const allReady = lobbyState.players.every((p) => p.is_ready);
+            const puppetCount = lobbyState.puppet_count;
+            const total = lobbyState.target_player_count;
             const availablePuppets = lobbyState.available_puppet_count;
-            const hasEnoughBots =
-              availablePuppets !== null && availablePuppets >= botSlots;
+            const canAddPuppet =
+              availablePuppets !== null &&
+              puppetCount < availablePuppets &&
+              total < 8;
 
             const openGuide = (target?: RulesPanelTarget) => {
               setRulesPanelTarget(target);
               setShowRulesPanel(true);
             };
 
-            const cubeReady = lobbyState.cube_loading_status === "ready";
-            const pillBase =
-              "px-3 py-1 rounded-full text-xs transition-all border";
-            const pillActive = `${pillBase} bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20 hover:text-white cursor-pointer`;
-            const pillDisabled = `${pillBase} bg-white/[0.02] border-white/5 text-gray-500 cursor-default`;
+            const startMessage = (() => {
+              if (startingGame) return null;
+              if (total < 2) return "Need at least 2 players";
+              if (total % 2 !== 0)
+                return `Odd player count (${total})`;
+              if (!lobbyState.players.every((p) => p.is_ready))
+                return "Waiting for all players to ready";
+              if (
+                puppetCount > 0 &&
+                availablePuppets !== null &&
+                availablePuppets < puppetCount
+              )
+                return "Not enough puppets available";
+              return null;
+            })();
 
             return (
               <>
-                <div className="flex items-center justify-center gap-2 mb-3">
-                  <span
-                    onClick={
-                      cubeReady
-                        ? () => openGuide({ docId: "__cards__" })
-                        : undefined
-                    }
-                    className={cubeReady ? pillActive : pillDisabled}
-                  >
-                    {cubeReady ? (
-                      "Card Pool"
-                    ) : (
-                      <span className="flex items-center gap-1.5">
-                        <span className="inline-block w-2.5 h-2.5 border border-gray-500 border-t-transparent rounded-full animate-spin" />
-                        Cards
-                      </span>
-                    )}
-                  </span>
-                  {botSlots > 0 && (
-                    <span
-                      onClick={() =>
-                        openGuide({
-                          docId: "non-human-players",
-                          tab: "puppets",
-                        })
-                      }
-                      className={pillActive}
-                    >
-                      What are Puppets?
-                    </span>
-                  )}
-                  <span
-                    onClick={() => openGuide(undefined)}
-                    className={pillActive}
-                  >
-                    Game Guide
-                  </span>
-                </div>
-                <div className="bg-black/40 rounded-lg p-3 mb-4 text-center">
+                <div className="description-panel rounded-lg p-3 mb-3 text-center">
                   <p className="text-gray-400 text-xs mb-1">Share this code</p>
                   <div className="flex items-center justify-center gap-3">
                     <span className="text-2xl font-mono font-bold text-amber-400 tracking-wider">
@@ -226,18 +238,80 @@ export function Lobby() {
                       {copied ? "Copied!" : "Copy"}
                     </button>
                   </div>
+                  <div className="border-t border-white/5 mt-2 pt-2 flex items-center justify-center gap-2 text-xs text-gray-500">
+                    <span>
+                      Cube:{" "}
+                      <a
+                        href={`https://cubecobra.com/cube/overview/${lobbyState.cube_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-amber-500 hover:text-amber-400 transition-colors"
+                      >
+                        {lobbyState.cube_id}
+                      </a>
+                    </span>
+                    <span>&middot;</span>
+                    <span>
+                      Upgrades: {lobbyState.use_upgrades ? "On" : "Off"}
+                    </span>
+                    <span>&middot;</span>
+                    <button
+                      onClick={() => openGuide({ docId: "__cards__" })}
+                      className="text-amber-500/70 hover:text-amber-400 transition-colors"
+                    >
+                      Browse Cards
+                    </button>
+                  </div>
                 </div>
 
-                <div className="mb-4">
-                  <h2 className="text-white font-medium mb-2 text-sm">
-                    Players ({lobbyState.players.length}/
-                    {lobbyState.target_player_count})
-                  </h2>
-                  <div className="grid grid-cols-2 gap-1.5">
+                <div className="bg-black/20 rounded-lg border border-white/5 p-3 mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-white font-medium text-sm">
+                      Players ({total})
+                    </h2>
+                    {isHost ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => actions.addPuppet()}
+                          disabled={!canAddPuppet}
+                          className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                        >
+                          + Add Puppet
+                        </button>
+                        <button
+                          onClick={() =>
+                            openGuide({
+                              docId: "non-human-players",
+                              tab: "puppets",
+                            })
+                          }
+                          className="w-5 h-5 rounded-full bg-white/10 border border-white/15 text-gray-400 hover:bg-white/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
+                          title="What are Puppets?"
+                        >
+                          ?
+                        </button>
+                      </div>
+                    ) : (
+                      puppetCount > 0 && (
+                        <button
+                          onClick={() =>
+                            openGuide({
+                              docId: "non-human-players",
+                              tab: "puppets",
+                            })
+                          }
+                          className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
+                        >
+                          What are Puppets?
+                        </button>
+                      )
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
                     {lobbyState.players.map((player) => (
                       <div
-                        key={player.name}
-                        className="bg-black/30 px-2.5 py-2 rounded-lg flex items-center gap-1.5 min-w-0"
+                        key={player.player_id}
+                        className="bg-black/30 border border-white/5 px-3 py-2.5 rounded-lg flex items-center gap-2 min-w-0"
                       >
                         <span
                           className={`w-2 h-2 rounded-full shrink-0 ${
@@ -252,17 +326,27 @@ export function Lobby() {
                             Host
                           </span>
                         )}
+                        {isHost &&
+                          !player.is_host && (
+                            <button
+                              onClick={() => actions.kickPlayer(player.player_id)}
+                              className="text-gray-500 hover:text-red-400 transition-colors shrink-0 ml-auto text-xs"
+                              title="Remove player"
+                            >
+                              &times;
+                            </button>
+                          )}
                       </div>
                     ))}
-                    {botSlots > 0 &&
-                      Array.from({ length: botSlots }).map((_, i) => {
+                    {puppetCount > 0 &&
+                      Array.from({ length: puppetCount }).map((_, i) => {
                         const isSearching = availablePuppets === null;
                         const botAvailable =
                           !isSearching && i < availablePuppets;
                         return (
                           <div
                             key={`puppet-${i}`}
-                            className={`bg-black/20 px-2.5 py-2 rounded-lg flex items-center gap-1.5 border border-dashed ${
+                            className={`bg-black/20 px-3 py-2.5 rounded-lg flex items-center gap-2 border border-dashed ${
                               isSearching
                                 ? "border-amber-600/50"
                                 : botAvailable
@@ -300,93 +384,79 @@ export function Lobby() {
                             >
                               Puppet {i + 1}
                             </span>
+                            {isHost && (
+                              <button
+                                onClick={() => actions.removePuppet()}
+                                className="text-gray-500 hover:text-red-400 transition-colors shrink-0 ml-auto text-xs"
+                                title="Remove puppet"
+                              >
+                                &times;
+                              </button>
+                            )}
                           </div>
                         );
                       })}
                   </div>
-                  {botSlots > 0 &&
-                    availablePuppets !== null &&
-                    availablePuppets < botSlots && (
-                      <p className="text-gray-500 text-xs mt-1.5 px-1">
-                        Not enough games have been played with cubes like this
-                        one at these settings to play with this many puppets.
-                        Invite human players to join.
-                      </p>
-                    )}
                 </div>
 
-                <div className="space-y-2">
-                  {!isHost && (
-                    <button
-                      onClick={() => actions.setReady(!isReady)}
-                      className={`w-full py-2 rounded font-medium transition-colors ${
-                        isReady
-                          ? "bg-gray-600 text-white hover:bg-gray-500"
-                          : "bg-green-600 text-white hover:bg-green-500"
-                      }`}
-                    >
-                      {isReady ? "Unready" : "Ready"}
-                    </button>
+                <div className="space-y-2 mb-3">
+                  {startMessage && (
+                    <p className="text-gray-500 text-xs mb-1 text-center">
+                      {startMessage}
+                    </p>
                   )}
+
+                  <button
+                    onClick={() => actions.setReady(!isReady)}
+                    className={`btn w-full py-2 ${
+                      isReady
+                        ? "bg-gray-600 text-white hover:bg-gray-500"
+                        : "bg-green-600 text-white hover:bg-green-500"
+                    }`}
+                  >
+                    {isReady ? "Unready" : "Ready"}
+                  </button>
 
                   {isHost && (
-                    <>
-                      <button
-                        onClick={() => actions.setReady(!isReady)}
-                        className={`w-full py-2 rounded font-medium transition-colors ${
-                          isReady
-                            ? "bg-gray-600 text-white hover:bg-gray-500"
-                            : "bg-green-600 text-white hover:bg-green-500"
-                        }`}
-                      >
-                        {isReady ? "Unready" : "Ready"}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setStartingGame(true);
-                          actions.startGame();
-                        }}
-                        disabled={!lobbyState.can_start || startingGame}
-                        className="btn btn-primary w-full py-2"
-                      >
-                        {startingGame ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <svg
-                              className="animate-spin h-5 w-5"
-                              viewBox="0 0 24 24"
-                            >
-                              <circle
-                                className="opacity-25"
-                                cx="12"
-                                cy="12"
-                                r="10"
-                                stroke="currentColor"
-                                strokeWidth="4"
-                                fill="none"
-                              />
-                              <path
-                                className="opacity-75"
-                                fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                              />
-                            </svg>
-                            Starting...
-                          </span>
-                        ) : lobbyState.target_player_count < 2 ? (
-                          "Need at least 2 players"
-                        ) : !allReady ? (
-                          "Waiting for all players to ready"
-                        ) : availablePuppets === null ? (
-                          "Searching for puppets..."
-                        ) : !hasEnoughBots ? (
-                          `${botSlots - availablePuppets} puppet${botSlots - availablePuppets > 1 ? "s" : ""} not found - invite players`
-                        ) : (
-                          "Start Game"
-                        )}
-                      </button>
-                    </>
+                    <button
+                      onClick={() => {
+                        setStartingGame(true);
+                        actions.startGame();
+                      }}
+                      disabled={!lobbyState.can_start || startingGame}
+                      className="btn btn-primary w-full py-2"
+                    >
+                      {startingGame ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg
+                            className="animate-spin h-5 w-5"
+                            viewBox="0 0 24 24"
+                          >
+                            <circle
+                              className="opacity-25"
+                              cx="12"
+                              cy="12"
+                              r="10"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                              fill="none"
+                            />
+                            <path
+                              className="opacity-75"
+                              fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            />
+                          </svg>
+                          Starting...
+                        </span>
+                      ) : (
+                        "Start Game"
+                      )}
+                    </button>
                   )}
                 </div>
+
+                <HintsBanner />
               </>
             );
           })()}

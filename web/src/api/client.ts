@@ -16,6 +16,7 @@ export interface GameOptions {
   useUpgrades?: boolean
   useVanguards?: boolean
   targetPlayerCount?: number
+  puppetCount?: number
   autoApproveSpectators?: boolean
 }
 
@@ -32,6 +33,7 @@ export async function createGame(
       use_upgrades: options.useUpgrades ?? true,
       use_vanguards: options.useVanguards ?? false,
       target_player_count: options.targetPlayerCount ?? 4,
+      puppet_count: options.puppetCount ?? 0,
       auto_approve_spectators: options.autoApproveSpectators ?? false,
     }),
   })
@@ -128,4 +130,17 @@ export async function getShareGame(gameId: string, playerName: string): Promise<
     throw new Error(await getErrorMessage(response, 'Failed to load shared game'))
   }
   return response.json()
+}
+
+const _lastWarmTimes = new Map<string, number>()
+
+export function warmCubeCache(cubeId: string): void {
+  const now = Date.now()
+  if (now - (_lastWarmTimes.get(cubeId) ?? 0) < 30_000) return
+  _lastWarmTimes.set(cubeId, now)
+  fetch(`${API_BASE}/games/cubes/warm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cube_id: cubeId }),
+  }).catch(() => {})
 }

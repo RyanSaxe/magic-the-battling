@@ -14,7 +14,7 @@ export function useGame(
   spectatorConfig?: SpectatorConfig | null,
   onServerError?: (message: string) => void
 ) {
-  const { isConnected, gameState, lobbyState, send, pendingSpectateRequest, clearSpectateRequest } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError)
+  const { isConnected, gameState, lobbyState, send, pendingSpectateRequest, clearSpectateRequest, kicked } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError)
 
   const startGame = useCallback(() => {
     send('start_game')
@@ -105,6 +105,18 @@ export function useGame(
     send('reward_done', upgradeId ? { upgrade_id: upgradeId } : {})
   }, [send])
 
+  const addPuppet = useCallback(() => {
+    send('add_puppet')
+  }, [send])
+
+  const removePuppet = useCallback(() => {
+    send('remove_puppet')
+  }, [send])
+
+  const kickPlayer = useCallback((targetPlayerId: string) => {
+    send('kick_player', { target_player_id: targetPlayerId })
+  }, [send])
+
   const spectateResponse = useCallback((requestId: string, allowed: boolean) => {
     send('spectate_response', { request_id: requestId, allowed })
     clearSpectateRequest()
@@ -115,9 +127,13 @@ export function useGame(
     gameState,
     lobbyState,
     pendingSpectateRequest,
+    kicked,
     actions: {
       startGame,
       setReady,
+      addPuppet,
+      removePuppet,
+      kickPlayer,
       draftSwap,
       draftRoll,
       draftDone,
