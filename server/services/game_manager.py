@@ -371,6 +371,9 @@ class GameManager:
         if winner:
             winner.phase = "winner"
             winner.placement = 1
+            logger.info("Game won: game_id=%s winner=%s", game_id, winner.name)
+        else:
+            logger.info("Game over with no winner: game_id=%s", game_id)
 
         remaining_no_placement = [
             p for p in live_players if p.placement == 0 and p.name != (winner.name if winner else "")
