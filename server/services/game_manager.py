@@ -554,7 +554,7 @@ class GameManager:
             .options(joinedload(PlayerGameHistory.snapshots))
             .filter(
                 PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else sql_true(),
-                PlayerGameHistory.max_stage >= 5,
+                PlayerGameHistory.max_stage >= 6,
             )
         )
 
