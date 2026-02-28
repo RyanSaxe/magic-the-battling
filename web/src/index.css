@@ -28,10 +28,6 @@
   --zone-graveyard: rgba(75, 45, 45, 0.4);
   --zone-exile: rgba(88, 28, 135, 0.3);
   --zone-hand: rgba(30, 58, 95, 0.3);
-  --zone-pack: rgba(120, 80, 30, 0.3);
-  --zone-pool: rgba(40, 75, 55, 0.3);
-  --zone-sideboard: rgba(55, 55, 80, 0.3);
-  --zone-upgrades: rgba(100, 60, 100, 0.3);
 
   /* Card dimensions */
   --card-border-radius: 5% / 3.5%;
@@ -152,7 +148,7 @@ body {
 
 /* Battlefield - open area */
 .battlefield {
-  background: var(--zone-battlefield);
+  background: rgba(0, 0, 0, 0.1);
   border-radius: 8px;
 }
 
