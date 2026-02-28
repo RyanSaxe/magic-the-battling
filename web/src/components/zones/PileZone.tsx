@@ -32,9 +32,9 @@ export function PileZone({
   const defaultValidZones = ['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']
 
   const label = zone === 'graveyard' ? 'GY' : 'Exile'
-  const bgColor = zone === 'graveyard'
-    ? 'bg-red-950/40'
-    : 'bg-purple-950/40'
+  const bgVar = zone === 'graveyard'
+    ? 'var(--zone-graveyard)'
+    : 'var(--zone-exile)'
 
   if (cards.length === 0) {
     return (
@@ -43,7 +43,8 @@ export function PileZone({
         zoneOwner={zoneOwner}
         validFromZones={validFromZones || defaultValidZones as ZoneName[]}
         disabled={!allowInteraction}
-        className={`zone-pile ${bgColor} w-16 h-24 flex items-center justify-center`}
+        className="zone-pile w-16 h-24 flex items-center justify-center"
+        style={{ background: bgVar }}
       >
         <span className="text-gray-500 text-xs">{label}</span>
       </DroppableZone>
@@ -83,7 +84,8 @@ export function PileZone({
         onClick={() => setIsExpanded(false)}
       >
         <div
-          className={`${bgColor} rounded-lg p-4 max-w-4xl max-h-[80vh] overflow-auto`}
+          className="rounded-lg p-4 max-w-4xl max-h-[80vh] overflow-auto"
+          style={{ background: bgVar }}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex justify-between items-center mb-4">
@@ -119,7 +121,8 @@ export function PileZone({
       zoneOwner={zoneOwner}
       validFromZones={validFromZones || defaultValidZones as ZoneName[]}
       disabled={!allowInteraction}
-      className={`zone-pile ${bgColor}`}
+      className="zone-pile"
+      style={{ background: bgVar }}
     >
       <div
         className="relative w-16 h-24 cursor-pointer"
