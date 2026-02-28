@@ -139,6 +139,7 @@ class _JsonService:
         return await self._get_json(url)
 
     async def _fetch_and_store(self, url: str) -> Any:
+        logger.info("fetching: %s", url)
         try:
             data, etag = await self._rate_limited_fetch(url)
         except Exception:
