@@ -20,11 +20,11 @@ export function GoldfishIcon({ size = 'md', className = '' }: GoldfishIconProps)
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <ellipse cx="11" cy="12" rx="7" ry="5" fill="currentColor" opacity="0.85" />
-      <path d="M18 12 L22 8 L22 16 Z" fill="currentColor" opacity="0.7" />
+      <ellipse cx="11" cy="12" rx="7" ry="5" fill="#D4AF37" opacity="0.85" />
+      <path d="M18 12 L22 8 L22 16 Z" fill="#D4AF37" opacity="0.7" />
       <circle cx="7.5" cy="10.5" r="1" fill="black" opacity="0.6" />
-      <path d="M11 7.5 Q13 5.5 15 7" stroke="currentColor" strokeWidth="1.2" fill="none" opacity="0.5" />
-      <path d="M11 16.5 Q13 18.5 15 17" stroke="currentColor" strokeWidth="1" fill="none" opacity="0.4" />
+      <path d="M11 7.5 Q13 5.5 15 7" stroke="#D4AF37" strokeWidth="1.2" fill="none" opacity="0.5" />
+      <path d="M11 16.5 Q13 18.5 15 17" stroke="#D4AF37" strokeWidth="1" fill="none" opacity="0.4" />
     </svg>
   )
 }

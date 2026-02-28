@@ -453,7 +453,7 @@ export function Play() {
             )}
             <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
               <div className="flex items-center gap-3 mb-2">
-                <GoldfishIcon size="lg" className="text-cyan-400" />
+                <GoldfishIcon size="lg" className="" />
                 <h2 className="text-lg font-semibold text-white">Goldfish</h2>
               </div>
               <div className="flex-1 flex items-center justify-center">
@@ -491,7 +491,7 @@ export function Play() {
           <>
             {inactiveCard(
               "solo",
-              <GoldfishIcon size="sm" className="text-cyan-400 shrink-0" />,
+              <GoldfishIcon size="sm" className="shrink-0" />,
               "Goldfish",
             )}
             <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
@@ -576,7 +576,7 @@ export function Play() {
         </div>
         <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
           <div className="flex items-center gap-3 mb-2">
-            <GoldfishIcon size="lg" className="text-cyan-400" />
+            <GoldfishIcon size="lg" className="" />
             <h2 className="text-lg font-semibold text-white">Goldfish</h2>
           </div>
           <div className="flex-1 flex items-center">
