@@ -24,6 +24,7 @@ export interface CardLayoutConfig {
   sectionGap?: number;
   minCardWidth?: number;
   maxCardWidth?: number;
+  maxBottomRightFraction?: number;
 }
 
 export type CardLayoutResult = Record<string, ZoneDims>;
@@ -91,6 +92,7 @@ export function computeLayout(
     sectionGap = 0,
     minCardWidth = 1,
     maxCardWidth = 200,
+    maxBottomRightFraction = 0.3,
   } = config;
 
   const zoneIds = Object.keys(config.zones);
@@ -215,6 +217,14 @@ export function computeLayout(
       brCardW = brW;
       if (brCardW < minCardWidth) continue;
       brCellW = brCols * brCardW + (brCols - 1) * brZones[0].gap + 2 * sectionPadH;
+
+      const maxBRWidth = Math.floor(availW * maxBottomRightFraction);
+      if (brCellW > maxBRWidth) {
+        brCellW = maxBRWidth;
+        const innerW = brCellW - 2 * sectionPadH - (brCols - 1) * brZones[0].gap;
+        brCardW = Math.floor(innerW / brCols);
+        if (brCardW < minCardWidth) continue;
+      }
     }
 
     const blAvailW = hasBR
@@ -364,7 +374,7 @@ export function computeLayout(
           const topActualH = isTop ? pGridH + sectionPadV : topOverhead;
           const brActualAvailH = availH - topActualH - columnGap - brOverhead;
           const sized = sizeBR(brCols, brActualAvailH);
-          actualBRCardW = Math.max(minCardWidth, sized.brW);
+          actualBRCardW = Math.min(Math.max(minCardWidth, sized.brW), brCardW);
           actualBRRows = sized.brRowCount;
         }
 
@@ -567,7 +577,7 @@ export function computeLayout(
             const topActualH2 = topGridH2 > 0 ? topGridH2 + sectionPadV : topOverhead;
             const brActualAvailH2 = availH - topActualH2 - columnGap - brOverhead;
             const sized2 = sizeBR(brCols, brActualAvailH2);
-            actualBRCardW2 = Math.max(minCardWidth, sized2.brW);
+            actualBRCardW2 = Math.min(Math.max(minCardWidth, sized2.brW), brCardW);
             actualBRRows2 = sized2.brRowCount;
           }
 
