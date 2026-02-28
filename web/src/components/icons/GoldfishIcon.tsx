@@ -1,30 +1,16 @@
-interface GoldfishIconProps {
-  size?: 'sm' | 'md' | 'lg'
-  className?: string
-}
-
-const sizes = {
-  sm: 16,
-  md: 24,
-  lg: 32,
-}
-
-export function GoldfishIcon({ size = 'md', className = '' }: GoldfishIconProps) {
-  const px = sizes[size]
+export function GoldfishIcon({ className = 'w-7 h-7 text-amber-400' }: { className?: string }) {
   return (
     <svg
-      width={px}
-      height={px}
       viewBox="0 0 24 24"
       fill="none"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
     >
-      <ellipse cx="11" cy="12" rx="7" ry="5" fill="#D4AF37" opacity="0.85" />
-      <path d="M18 12 L22 8 L22 16 Z" fill="#D4AF37" opacity="0.7" />
-      <circle cx="7.5" cy="10.5" r="1" fill="black" opacity="0.6" />
-      <path d="M11 7.5 Q13 5.5 15 7" stroke="#D4AF37" strokeWidth="1.2" fill="none" opacity="0.5" />
-      <path d="M11 16.5 Q13 18.5 15 17" stroke="#D4AF37" strokeWidth="1" fill="none" opacity="0.4" />
+      <ellipse cx="10.5" cy="12" rx="7.5" ry="7" fill="currentColor" opacity="0.85" />
+      <path d="M17.5 12 L22.5 5 L21 12 L22.5 19 Z" fill="currentColor" opacity="0.7" />
+      <path d="M8 5.5 C10 2.5 13 2.5 15.5 5.5" fill="currentColor" opacity="0.6" />
+      <path d="M9 18.5 C10.5 21 12.5 21 14 18.5" fill="currentColor" opacity="0.5" />
+      <circle cx="7" cy="10" r="1.4" fill="black" opacity="0.45" />
     </svg>
   )
 }

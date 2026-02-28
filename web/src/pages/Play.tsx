@@ -272,7 +272,7 @@ export function Play() {
   }, [friendsLoading, pendingGameId, lobbyState?.cube_loading_status, navigate]);
 
   useEffect(() => {
-    warmCubeCache(cubeId || "auto");
+    if (cubeId && cubeId !== "auto") warmCubeCache(cubeId);
   }, [cubeId]);
 
   const handleCreateLobby = async () => {
@@ -453,7 +453,7 @@ export function Play() {
             )}
             <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
               <div className="flex items-center gap-3 mb-2">
-                <GoldfishIcon size="lg" className="" />
+                <GoldfishIcon className="w-8 h-8 text-amber-400" />
                 <h2 className="text-lg font-semibold text-white">Goldfish</h2>
               </div>
               <div className="flex-1 flex items-center justify-center">
@@ -491,7 +491,7 @@ export function Play() {
           <>
             {inactiveCard(
               "solo",
-              <GoldfishIcon size="sm" className="shrink-0" />,
+              <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
               "Goldfish",
             )}
             <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
@@ -576,7 +576,7 @@ export function Play() {
         </div>
         <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
           <div className="flex items-center gap-3 mb-2">
-            <GoldfishIcon size="lg" className="" />
+            <GoldfishIcon className="w-8 h-8 text-amber-400" />
             <h2 className="text-lg font-semibold text-white">Goldfish</h2>
           </div>
           <div className="flex-1 flex items-center">
