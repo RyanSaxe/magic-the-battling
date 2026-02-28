@@ -4,7 +4,7 @@ import { createGame, warmCubeCache } from "../api/client";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
-import { PuppetIcon } from "../components/icons/PuppetIcon";
+import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { HintsBanner } from "../components/common/HintsBanner";
 import { getLegendaryName } from "../utils/prefetchName";
 import { FaDiscord } from "react-icons/fa6";
@@ -272,7 +272,9 @@ export function Play() {
   }, [friendsLoading, pendingGameId, lobbyState?.cube_loading_status, navigate]);
 
   useEffect(() => {
-    warmCubeCache(cubeId || "auto");
+    if (!cubeId) return;
+    const timer = setTimeout(() => warmCubeCache(cubeId), 2000);
+    return () => clearTimeout(timer);
   }, [cubeId]);
 
   const handleCreateLobby = async () => {
@@ -453,8 +455,8 @@ export function Play() {
             )}
             <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
               <div className="flex items-center gap-3 mb-2">
-                <PuppetIcon size="lg" className="text-cyan-400" />
-                <h2 className="text-lg font-semibold text-white">Play Solo</h2>
+                <GoldfishIcon className="w-8 h-8 text-amber-400" />
+                <h2 className="text-lg font-semibold text-white">Goldfish</h2>
               </div>
               <div className="flex-1 flex items-center justify-center">
                 <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
@@ -491,8 +493,8 @@ export function Play() {
           <>
             {inactiveCard(
               "solo",
-              <PuppetIcon size="sm" className="text-cyan-400 shrink-0" />,
-              "Play Solo",
+              <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
+              "Goldfish",
             )}
             <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
               <div className="flex items-center gap-3 mb-2">
@@ -576,8 +578,8 @@ export function Play() {
         </div>
         <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
           <div className="flex items-center gap-3 mb-2">
-            <PuppetIcon size="lg" className="text-cyan-400" />
-            <h2 className="text-lg font-semibold text-white">Play Solo</h2>
+            <GoldfishIcon className="w-8 h-8 text-amber-400" />
+            <h2 className="text-lg font-semibold text-white">Goldfish</h2>
           </div>
           <div className="flex-1 flex items-center">
             <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">

@@ -12,6 +12,7 @@ interface BattleSidebarContentProps {
   onOpponentLifeChange: (life: number) => void;
   playerName: string;
   onCreateTreasure?: () => void;
+  onUntapAll?: () => void;
 }
 
 function LifeCounter({
@@ -157,6 +158,7 @@ export function BattleSidebarContent({
   onOpponentLifeChange,
   playerName,
   onCreateTreasure,
+  onUntapAll,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
@@ -225,14 +227,24 @@ export function BattleSidebarContent({
               )}
             </div>
           )}
-          {onCreateTreasure && (
-            <div className="mt-3">
-              <button
-                onClick={onCreateTreasure}
-                className="w-full px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-              >
-                Create Treasure
-              </button>
+          {(onCreateTreasure || onUntapAll) && (
+            <div className="mt-3 flex gap-2">
+              {onCreateTreasure && (
+                <button
+                  onClick={onCreateTreasure}
+                  className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+                >
+                  Treasure
+                </button>
+              )}
+              {onUntapAll && (
+                <button
+                  onClick={onUntapAll}
+                  className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+                >
+                  Untap All
+                </button>
+              )}
             </div>
           )}
         </div>

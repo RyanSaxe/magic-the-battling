@@ -287,6 +287,12 @@ class GameManager:
                     pending.cube_id,
                 )
 
+        logger.info(
+            "Game started: game_id=%s cube=%s players=%s",
+            game_id,
+            pending.cube_id,
+            pending.player_names,
+        )
         self._active_games[game_id] = game
         self._pending_games.pop(game_id, None)
 
@@ -354,6 +360,12 @@ class GameManager:
                     pending.cube_id,
                 )
 
+        logger.info(
+            "Game started: game_id=%s cube=%s players=%s",
+            game_id,
+            pending.cube_id,
+            pending.player_names,
+        )
         self._active_games[game_id] = game
         self._pending_games.pop(game_id, None)
 
@@ -371,6 +383,9 @@ class GameManager:
         if winner:
             winner.phase = "winner"
             winner.placement = 1
+            logger.info("Game won: game_id=%s winner=%s", game_id, winner.name)
+        else:
+            logger.info("Game over with no winner: game_id=%s", game_id)
 
         remaining_no_placement = [
             p for p in live_players if p.placement == 0 and p.name != (winner.name if winner else "")
@@ -460,6 +475,7 @@ class GameManager:
         """Cancel scheduled cleanup when a player reconnects."""
         if task := self._cleanup_tasks.pop(game_id, None):
             task.cancel()
+            logger.info("Cancelled abandoned game cleanup for game_id=%s", game_id)
 
     def _cleanup_game(self, game_id: str) -> None:
         """Remove game from memory."""
@@ -554,7 +570,7 @@ class GameManager:
             .options(joinedload(PlayerGameHistory.snapshots))
             .filter(
                 PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else sql_true(),
-                PlayerGameHistory.max_stage >= 5,
+                PlayerGameHistory.max_stage >= 6,
             )
         )
 

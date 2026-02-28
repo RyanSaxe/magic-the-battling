@@ -159,7 +159,7 @@ def resolve_puppet_vs_puppet(bot1: Puppet, bot2: Puppet, stage: int, round_num: 
     dmg1 = 1 + sum(1 for u in snap1.upgrades if u.upgrade_target)
     dmg2 = 1 + sum(1 for u in snap2.upgrades if u.upgrade_target)
 
-    outcome = random.choice(["bot1_wins", "bot2_wins", "draw"])
+    outcome = random.choices(["bot1_wins", "bot2_wins", "draw"], weights=[45, 45, 10], k=1)[0]
     if outcome == "bot1_wins":
         bot2.poison += dmg1
         bot1.last_battle_result = LastBattleResult(opponent_name=bot2.name, winner_name=bot1.name, poison_dealt=dmg1)

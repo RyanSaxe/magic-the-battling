@@ -939,6 +939,7 @@ function GameContent() {
           onOpponentLifeChange={handleOpponentLifeChange}
           playerName={self_player.name}
           onCreateTreasure={handleCreateTreasure}
+          onUntapAll={handleUntapAll}
         />
       );
     }
