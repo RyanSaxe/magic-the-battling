@@ -1071,6 +1071,7 @@ function GameContent() {
                   onClose={() => setActiveDndPanel(null)}
                   zone="sideboard"
                   zoneOwner="player"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
                 >
                   {(dims) =>
                     current_battle.your_zones.sideboard.map((card) => (
@@ -1097,6 +1098,7 @@ function GameContent() {
                   onClose={() => setActiveDndPanel(null)}
                   zone="sideboard"
                   zoneOwner="opponent"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
                 >
                   {(dims) =>
                     current_battle.opponent_full_sideboard!.map((card) => (
@@ -1125,6 +1127,7 @@ function GameContent() {
                   onClose={() => setActiveDndPanel(null)}
                   zone="graveyard"
                   zoneOwner="player"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
                 >
                   {(dims) =>
                     current_battle.your_zones.graveyard.map((card) => (
@@ -1151,6 +1154,7 @@ function GameContent() {
                   onClose={() => setActiveDndPanel(null)}
                   zone="exile"
                   zoneOwner="player"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
                 >
                   {(dims) =>
                     current_battle.your_zones.exile.map((card) => (

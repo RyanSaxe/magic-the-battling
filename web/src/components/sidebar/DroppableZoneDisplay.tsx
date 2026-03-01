@@ -25,6 +25,8 @@ interface DroppableZoneDisplayProps {
   size?: CardSize
 }
 
+const VALID_FROM_ZONES: ZoneName[] = ['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']
+
 export function ZoneModal({
   title,
   zone,
@@ -63,6 +65,7 @@ export function ZoneModal({
         onClose={handleClose}
         zone={zone}
         zoneOwner={zoneOwner}
+        validFromZones={VALID_FROM_ZONES}
       >
         {(dims) =>
           cards.map((card) => (
