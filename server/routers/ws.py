@@ -1,14 +1,21 @@
 import logging
 from collections import defaultdict
+from time import perf_counter
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 import server.db.database as db
 from server.compression import send_ws
+from server.observability import (
+    OBSERVABILITY_LOGGER_NAME,
+    record_ws_action_latency,
+    record_ws_broadcast_latency,
+)
 from server.services.game_manager import game_manager
 from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
+obs_logger = logging.getLogger(OBSERVABILITY_LOGGER_NAME)
 
 router = APIRouter()
 
@@ -95,6 +102,10 @@ class ConnectionManager:
         if game_id not in self._connections:
             return
 
+        start = perf_counter()
+        recipient_count = len(self._connections[game_id])
+        spectator_count = sum(len(sockets) for sockets in self._spectators.get(game_id, {}).values())
+
         for player_id, websocket in list(self._connections[game_id].items()):
             state = game_manager.get_game_state(game_id, player_id)
             if state:
@@ -118,9 +129,23 @@ class ConnectionManager:
                     except Exception:
                         self.disconnect_spectator(game_id, player_id, ws)
 
+        duration_ms = (perf_counter() - start) * 1000
+        record_ws_broadcast_latency("game_state", game_id, duration_ms, recipient_count, spectator_count)
+        obs_logger.info(
+            "WS broadcast latency: kind=%s game_id=%s recipients=%d spectators=%d duration_ms=%.2f",
+            "game_state",
+            game_id,
+            recipient_count,
+            spectator_count,
+            duration_ms,
+        )
+
     async def broadcast_lobby_state(self, game_id: str):
         if game_id not in self._connections:
             return
+
+        start = perf_counter()
+        recipient_count = len(self._connections[game_id])
 
         lobby = game_manager.get_lobby_state(game_id)
         if not lobby:
@@ -138,6 +163,17 @@ class ConnectionManager:
             except Exception:
                 self.disconnect(game_id, player_id, websocket)
 
+        duration_ms = (perf_counter() - start) * 1000
+        record_ws_broadcast_latency("lobby_state", game_id, duration_ms, recipient_count, 0)
+        obs_logger.info(
+            "WS broadcast latency: kind=%s game_id=%s recipients=%d spectators=%d duration_ms=%.2f",
+            "lobby_state",
+            game_id,
+            recipient_count,
+            0,
+            duration_ms,
+        )
+
     async def send_error(self, websocket: WebSocket, message: str):
         await send_ws(
             websocket,
@@ -150,6 +186,9 @@ class ConnectionManager:
     async def broadcast_game_over(self, game_id: str, winner_name: str | None):
         if game_id not in self._connections:
             return
+
+        start = perf_counter()
+        recipient_count = len(self._connections[game_id])
 
         for player_id, websocket in list(self._connections[game_id].items()):
             state = game_manager.get_game_state(game_id, player_id)
@@ -171,6 +210,17 @@ class ConnectionManager:
                     )
                 except Exception:
                     self.disconnect(game_id, player_id, websocket)
+
+        duration_ms = (perf_counter() - start) * 1000
+        record_ws_broadcast_latency("game_over", game_id, duration_ms, recipient_count, 0)
+        obs_logger.info(
+            "WS broadcast latency: kind=%s game_id=%s recipients=%d spectators=%d duration_ms=%.2f",
+            "game_over",
+            game_id,
+            recipient_count,
+            0,
+            duration_ms,
+        )
 
 
 connection_manager = ConnectionManager()
@@ -248,7 +298,25 @@ async def websocket_endpoint(
 
         while True:
             data = await websocket.receive_json()
-            await handle_message(game_id, player_id, data, websocket)
+            action = str(data.get("action", ""))
+            action_start = perf_counter()
+            action_result = "ok"
+            try:
+                await handle_message(game_id, player_id, data, websocket)
+            except Exception:
+                action_result = "exception"
+                raise
+            finally:
+                duration_ms = (perf_counter() - action_start) * 1000
+                record_ws_action_latency(action, game_id, duration_ms)
+                obs_logger.info(
+                    "WS action latency: action=%s game_id=%s player_id=%s result=%s duration_ms=%.2f",
+                    action,
+                    game_id,
+                    player_id,
+                    action_result,
+                    duration_ms,
+                )
 
     except WebSocketDisconnect:
         connection_manager.disconnect(game_id, player_id, websocket)
