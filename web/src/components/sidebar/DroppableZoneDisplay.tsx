@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Card as CardType, ZoneName } from '../../types'
+import type { ZoneOwner } from '../../dnd/types'
 import { Card } from '../card'
 import { DraggableCard, DroppableZone } from '../../dnd'
 import { DndPanel } from '../common/DndPanel'
@@ -24,6 +25,8 @@ interface DroppableZoneDisplayProps {
   size?: CardSize
 }
 
+const VALID_FROM_ZONES: ZoneName[] = ['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']
+
 export function ZoneModal({
   title,
   zone,
@@ -33,6 +36,8 @@ export function ZoneModal({
   onClose,
   onCardHover,
   onCardHoverEnd,
+  onCardClick,
+  selectedCardId,
 }: {
   title: string
   zone: ZoneName
@@ -42,6 +47,8 @@ export function ZoneModal({
   onClose: () => void
   onCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
+  onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
+  selectedCardId?: string
 }) {
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
@@ -56,10 +63,24 @@ export function ZoneModal({
         title={title}
         count={cards.length}
         onClose={handleClose}
+        zone={zone}
+        zoneOwner={zoneOwner}
+        validFromZones={VALID_FROM_ZONES}
       >
         {(dims) =>
           cards.map((card) => (
-            <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} dimensions={dims} isOpponent={isOpponent} onCardHover={onCardHover} onCardHoverEnd={onCardHoverEnd} />
+            <DraggableCard
+              key={card.id}
+              card={card}
+              zone={zone}
+              zoneOwner={zoneOwner}
+              dimensions={dims}
+              isOpponent={isOpponent}
+              onCardHover={onCardHover}
+              onCardHoverEnd={onCardHoverEnd}
+              selected={selectedCardId === card.id}
+              onClick={onCardClick ? () => onCardClick(card, zone, zoneOwner) : undefined}
+            />
           ))
         }
       </DndPanel>

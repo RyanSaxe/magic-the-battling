@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Card as CardType, ZoneName } from '../../types'
+import type { ZoneOwner } from '../../dnd/types'
 import { DraggableCard, DroppableZone, useGameDnd } from '../../dnd'
 import { Card } from '../card'
 import { ZoneModal } from '../sidebar/DroppableZoneDisplay'
@@ -20,6 +21,9 @@ interface CompactZoneDisplayProps {
   onCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
   canPeekFaceDown?: boolean
+  selectedCardId?: string
+  onZoneClick?: () => void
+  onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
 }
 
 export function CompactZoneDisplay({
@@ -34,6 +38,9 @@ export function CompactZoneDisplay({
   onCardHover,
   onCardHoverEnd,
   canPeekFaceDown,
+  selectedCardId,
+  onZoneClick,
+  onCardClick,
 }: CompactZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -68,7 +75,13 @@ export function CompactZoneDisplay({
         disabled={!allowInteraction}
       >
         <div
-          onClick={() => cards.length > 0 && setShowModal(true)}
+          onClick={() => {
+            if (selectedCardId && onZoneClick) {
+              onZoneClick()
+              return
+            }
+            if (cards.length > 0) setShowModal(true)
+          }}
           className={`flex flex-col items-center overflow-hidden rounded border border-gray-700 ${
             cards.length > 0
               ? 'hover:border-gray-500 cursor-pointer'
@@ -111,6 +124,8 @@ export function CompactZoneDisplay({
           onClose={() => setShowModal(false)}
           onCardHover={onCardHover}
           onCardHoverEnd={onCardHoverEnd}
+          onCardClick={onCardClick}
+          selectedCardId={selectedCardId}
         />
       )}
     </>

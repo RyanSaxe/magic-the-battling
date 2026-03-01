@@ -50,6 +50,8 @@ export function DroppableZone({
       ref={setNodeRef}
       className={`zone ${dropStateClass} ${className}`}
       style={style}
+      data-zone={zone}
+      data-zone-owner={zoneOwner}
     >
       {children}
     </div>

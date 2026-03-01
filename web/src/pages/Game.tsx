@@ -22,7 +22,7 @@ import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { ContextStripProvider, useContextStrip, useToast } from "../contexts";
 import { FaceDownProvider } from "../contexts/FaceDownContext";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
-import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
+import { GameDndProvider, useDndActions, DraggableCard, type ZoneOwner } from "../dnd";
 import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { UpgradesModal } from "../components/common/UpgradesModal";
@@ -919,6 +919,14 @@ function GameContent() {
   };
 
 
+  const handlePanelClickToMove = (e: React.MouseEvent, toZone: ZoneName, toOwner: ZoneOwner) => {
+    if ((e.target as HTMLElement).closest('.card') || (e.target as HTMLElement).closest('button')) return
+    if (battleSelectedCard && (toZone !== battleSelectedCard.zone || toOwner !== battleSelectedCard.owner)) {
+      actions.battleMove(battleSelectedCard.card.id, battleSelectedCard.zone, toZone, battleSelectedCard.owner, toOwner)
+      setBattleSelectedCard(null)
+    }
+  }
+
   const allFaceDownIds = (() => {
     if (!current_battle) return new Set<string>()
     const ids = new Set<string>()
@@ -1056,65 +1064,114 @@ function GameContent() {
               )}
             </div>
             {activeDndPanel === 'sideboard' && current_battle && (
-              <DndPanel
-                title="Your Sideboard"
-                count={current_battle.your_zones.sideboard.length}
-                onClose={() => setActiveDndPanel(null)}
-              >
-                {(dims) =>
-                  current_battle.your_zones.sideboard.map((card) => (
-                    <DraggableCard key={card.id} card={card} zone="sideboard" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
-                  ))
-                }
-              </DndPanel>
+              <div onClick={(e) => handlePanelClickToMove(e, 'sideboard', 'player')}>
+                <DndPanel
+                  title="Your Sideboard"
+                  count={current_battle.your_zones.sideboard.length}
+                  onClose={() => setActiveDndPanel(null)}
+                  zone="sideboard"
+                  zoneOwner="player"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                >
+                  {(dims) =>
+                    current_battle.your_zones.sideboard.map((card) => (
+                      <DraggableCard
+                        key={card.id}
+                        card={card}
+                        zone="sideboard"
+                        dimensions={dims}
+                        onCardHover={handleCardHover}
+                        onCardHoverEnd={handleCardHoverEnd}
+                        selected={battleSelectedCard?.card.id === card.id}
+                        onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'player' })}
+                      />
+                    ))
+                  }
+                </DndPanel>
+              </div>
             )}
             {activeDndPanel === 'opponentSideboard' && current_battle && current_battle.opponent_full_sideboard && (
-              <DndPanel
-                title={`${current_battle.opponent_name}'s Sideboard`}
-                count={current_battle.opponent_full_sideboard.length}
-                onClose={() => setActiveDndPanel(null)}
-              >
-                {(dims) =>
-                  current_battle.opponent_full_sideboard!.map((card) => (
-                    <DraggableCard
-                      key={card.id}
-                      card={card}
-                      zone="sideboard"
-                      zoneOwner="opponent"
-                      dimensions={dims}
-                      isOpponent
-                      onCardHover={handleOpponentCardHover}
-                      onCardHoverEnd={handleCardHoverEnd}
-                    />
-                  ))
-                }
-              </DndPanel>
+              <div onClick={(e) => handlePanelClickToMove(e, 'sideboard', 'opponent')}>
+                <DndPanel
+                  title={`${current_battle.opponent_name}'s Sideboard`}
+                  count={current_battle.opponent_full_sideboard.length}
+                  onClose={() => setActiveDndPanel(null)}
+                  zone="sideboard"
+                  zoneOwner="opponent"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                >
+                  {(dims) =>
+                    current_battle.opponent_full_sideboard!.map((card) => (
+                      <DraggableCard
+                        key={card.id}
+                        card={card}
+                        zone="sideboard"
+                        zoneOwner="opponent"
+                        dimensions={dims}
+                        isOpponent
+                        onCardHover={handleOpponentCardHover}
+                        onCardHoverEnd={handleCardHoverEnd}
+                        selected={battleSelectedCard?.card.id === card.id}
+                        onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'opponent' })}
+                      />
+                    ))
+                  }
+                </DndPanel>
+              </div>
             )}
             {activeDndPanel === 'graveyard' && current_battle && (
-              <DndPanel
-                title="Graveyard"
-                count={current_battle.your_zones.graveyard.length}
-                onClose={() => setActiveDndPanel(null)}
-              >
-                {(dims) =>
-                  current_battle.your_zones.graveyard.map((card) => (
-                    <DraggableCard key={card.id} card={card} zone="graveyard" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
-                  ))
-                }
-              </DndPanel>
+              <div onClick={(e) => handlePanelClickToMove(e, 'graveyard', 'player')}>
+                <DndPanel
+                  title="Graveyard"
+                  count={current_battle.your_zones.graveyard.length}
+                  onClose={() => setActiveDndPanel(null)}
+                  zone="graveyard"
+                  zoneOwner="player"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                >
+                  {(dims) =>
+                    current_battle.your_zones.graveyard.map((card) => (
+                      <DraggableCard
+                        key={card.id}
+                        card={card}
+                        zone="graveyard"
+                        dimensions={dims}
+                        onCardHover={handleCardHover}
+                        onCardHoverEnd={handleCardHoverEnd}
+                        selected={battleSelectedCard?.card.id === card.id}
+                        onClick={() => setBattleSelectedCard({ card, zone: 'graveyard', owner: 'player' })}
+                      />
+                    ))
+                  }
+                </DndPanel>
+              </div>
             )}
             {activeDndPanel === 'exile' && current_battle && (
-              <DndPanel
-                title="Exile"
-                count={current_battle.your_zones.exile.length}
-                onClose={() => setActiveDndPanel(null)}
-              >
-                {(dims) =>
-                  current_battle.your_zones.exile.map((card) => (
-                    <DraggableCard key={card.id} card={card} zone="exile" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
-                  ))
-                }
-              </DndPanel>
+              <div onClick={(e) => handlePanelClickToMove(e, 'exile', 'player')}>
+                <DndPanel
+                  title="Exile"
+                  count={current_battle.your_zones.exile.length}
+                  onClose={() => setActiveDndPanel(null)}
+                  zone="exile"
+                  zoneOwner="player"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                >
+                  {(dims) =>
+                    current_battle.your_zones.exile.map((card) => (
+                      <DraggableCard
+                        key={card.id}
+                        card={card}
+                        zone="exile"
+                        dimensions={dims}
+                        onCardHover={handleCardHover}
+                        onCardHoverEnd={handleCardHoverEnd}
+                        selected={battleSelectedCard?.card.id === card.id}
+                        onClick={() => setBattleSelectedCard({ card, zone: 'exile', owner: 'player' })}
+                      />
+                    ))
+                  }
+                </DndPanel>
+              </div>
             )}
           </GameDndProvider>
           </FaceDownProvider>
