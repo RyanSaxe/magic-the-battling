@@ -9,12 +9,21 @@ import {
   useSensors,
   type DragStartEvent,
   type DragEndEvent,
+  type CollisionDetection,
   pointerWithin,
 } from "@dnd-kit/core";
 import type { Card, ZoneName } from "../types";
 import { Card as CardComponent } from "../components/card";
 import { parseZoneId, type DragData, type ZoneOwner } from "./types";
 import { GameDndContext } from "./useGameDnd";
+
+// Prefer panel droppables over underlying zones when they overlap (e.g. mobile)
+const panelFirstPointerWithin: CollisionDetection = (args) => {
+  const collisions = pointerWithin(args);
+  if (collisions.length <= 1) return collisions;
+  const panelHit = collisions.find((c) => String(c.id).startsWith("panel:"));
+  return panelHit ? [panelHit, ...collisions.filter((c) => c !== panelHit)] : collisions;
+};
 
 interface GameDndProviderProps {
   children: ReactNode;
@@ -74,9 +83,10 @@ export function GameDndProvider({
 
       const dragData = event.active.data.current as DragData | undefined;
       const fromZoneId = dragData?.fromZoneId || "";
-      const { owner: fromOwner } = parseZoneId(fromZoneId);
+      const { zone: fromZone, owner: fromOwner } = parseZoneId(fromZoneId);
 
-      if (fromZoneId !== toZoneId) {
+      const isSameZone = fromZone === toZone && fromOwner === toOwner;
+      if (!isSameZone) {
         const isValidDrop =
           !validDropZones || validDropZones(activeFromZone).includes(toZone);
         if (isValidDrop && onCardMove) {
@@ -104,7 +114,7 @@ export function GameDndProvider({
     >
       <DndKitContext
         sensors={sensors}
-        collisionDetection={pointerWithin}
+        collisionDetection={panelFirstPointerWithin}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}

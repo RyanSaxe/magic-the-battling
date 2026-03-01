@@ -1,4 +1,5 @@
-import type { Zones, ZoneName } from '../../types'
+import type { Zones, Card as CardType, ZoneName } from '../../types'
+import type { ZoneOwner } from '../../dnd/types'
 import { CompactZoneDisplay } from './CompactZoneDisplay'
 
 const VALID_FROM_ZONES: ZoneName[] = [
@@ -14,6 +15,9 @@ interface BattlefieldZoneColumnProps {
   onCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
   canPeekFaceDown?: boolean
+  selectedCardId?: string
+  onZoneClick?: (toZone: ZoneName, toOwner: ZoneOwner) => void
+  onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
 }
 
 export function BattlefieldZoneColumn({
@@ -25,7 +29,11 @@ export function BattlefieldZoneColumn({
   onCardHover,
   onCardHoverEnd,
   canPeekFaceDown,
+  selectedCardId,
+  onZoneClick,
+  onCardClick,
 }: BattlefieldZoneColumnProps) {
+  const zoneOwner = isOpponent ? 'opponent' : 'player' as const
   return (
     <div
       className={`flex shrink-0 ${isOpponent ? 'flex-col-reverse' : 'flex-col'}`}
@@ -43,6 +51,9 @@ export function BattlefieldZoneColumn({
         onCardHover={onCardHover}
         onCardHoverEnd={onCardHoverEnd}
         canPeekFaceDown={canPeekFaceDown}
+        selectedCardId={selectedCardId}
+        onZoneClick={onZoneClick ? () => onZoneClick('graveyard', zoneOwner) : undefined}
+        onCardClick={onCardClick}
       />
       <CompactZoneDisplay
         title="Exile"
@@ -56,6 +67,9 @@ export function BattlefieldZoneColumn({
         onCardHover={onCardHover}
         onCardHoverEnd={onCardHoverEnd}
         canPeekFaceDown={canPeekFaceDown}
+        selectedCardId={selectedCardId}
+        onZoneClick={onZoneClick ? () => onZoneClick('exile', zoneOwner) : undefined}
+        onCardClick={onCardClick}
       />
     </div>
   )
