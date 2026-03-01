@@ -1,8 +1,10 @@
 import asyncio
+import json
 import logging
 import resource
 import sys
 
+from server.observability import flush_latency_metrics
 from server.routers.ws import connection_manager
 from server.services.game_manager import game_manager
 
@@ -34,6 +36,9 @@ async def _monitor_loop() -> None:
             spectators,
             mem_mb,
         )
+
+        latency = flush_latency_metrics()
+        logger.info("Latency summary: %s", json.dumps(latency, sort_keys=True))
 
 
 def start_monitoring() -> None:
