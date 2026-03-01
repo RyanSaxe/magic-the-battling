@@ -75,8 +75,9 @@ export function CompactZoneDisplay({
         disabled={!allowInteraction}
       >
         <div
-          onClick={() => {
+          onClick={(e) => {
             if (selectedCardId && onZoneClick) {
+              e.stopPropagation()
               onZoneClick()
               return
             }

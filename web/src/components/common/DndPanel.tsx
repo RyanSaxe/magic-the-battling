@@ -1,6 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { bestFit, type ZoneDims } from '../../hooks/cardSizeUtils'
-import { DroppableZone } from '../../dnd'
 import type { ZoneName } from '../../types'
 import type { ZoneOwner } from '../../dnd/types'
 
@@ -11,12 +10,11 @@ interface DndPanelProps {
   children: (dims: { width: number; height: number }) => React.ReactNode
   zone?: ZoneName
   zoneOwner?: ZoneOwner
-  validFromZones?: ZoneName[]
 }
 
 const DEFAULT_DIMS: ZoneDims = { width: 80, height: 112, rows: 1, columns: 1 }
 
-export function DndPanel({ title, count, onClose, children, zone, zoneOwner, validFromZones }: DndPanelProps) {
+export function DndPanel({ title, count, onClose, children, zone, zoneOwner }: DndPanelProps) {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_DIMS)
   const [mobileHeight, setMobileHeight] = useState<number | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
@@ -88,15 +86,12 @@ export function DndPanel({ title, count, onClose, children, zone, zoneOwner, val
         </button>
       </div>
       <div ref={bodyRef} className="flex-1 min-h-0 p-2 flex items-center justify-center">
-        {zone ? (
-          <DroppableZone zone={zone} zoneOwner={zoneOwner} validFromZones={validFromZones} className="flex flex-wrap gap-1.5 justify-center content-center w-full h-full">
-            {children({ width: dims.width, height: dims.height })}
-          </DroppableZone>
-        ) : (
-          <div className="flex flex-wrap gap-1.5 justify-center content-center">
-            {children({ width: dims.width, height: dims.height })}
-          </div>
-        )}
+        <div
+          className="flex flex-wrap gap-1.5 justify-center content-center"
+          {...(zone ? { 'data-zone': zone, 'data-zone-owner': zoneOwner ?? 'player' } : {})}
+        >
+          {children({ width: dims.width, height: dims.height })}
+        </div>
       </div>
     </div>
   )
