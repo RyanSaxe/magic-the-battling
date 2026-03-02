@@ -43,6 +43,16 @@ ACTION_REQUIRED_PHASES: dict[str, str] = {
 }
 
 
+async def _reject_websocket(websocket: WebSocket, code: int, reason: str) -> None:
+    # Accept-then-close ensures browsers receive the WebSocket close code
+    # instead of a generic HTTP 403 handshake rejection.
+    try:
+        await websocket.accept()
+    except Exception:
+        pass
+    await websocket.close(code=code, reason=reason)
+
+
 class ConnectionManager:
     def __init__(self):
         self._connections: dict[str, dict[str, WebSocket]] = defaultdict(dict)
@@ -57,7 +67,7 @@ class ConnectionManager:
 
     async def connect(self, game_id: str, player_id: str, websocket: WebSocket):
         if self.total_connections() >= MAX_WS_CONNECTIONS:
-            await websocket.close(code=1013, reason="Server is at websocket capacity")
+            await _reject_websocket(websocket, code=1013, reason="Server is at websocket capacity")
             return False
         game_manager.cancel_abandoned_cleanup(game_id)
         await websocket.accept()
@@ -265,12 +275,12 @@ async def _handle_spectator_connection(
 ) -> bool:
     req = game_manager.get_spectate_request(request_id)
     if not req or req.status != "approved" or req.session_id != session_id:
-        await websocket.close(code=4003, reason="Invalid spectate request")
+        await _reject_websocket(websocket, code=4003, reason="Invalid spectate request")
         return True
 
     target_player_id = game_manager.get_player_id_by_name(game_id, spectate_player)
     if not target_player_id:
-        await websocket.close(code=4004, reason="Target player not found")
+        await _reject_websocket(websocket, code=4004, reason="Target player not found")
         return True
 
     await connection_manager.connect_spectator(game_id, target_player_id, websocket)
@@ -297,7 +307,7 @@ async def websocket_endpoint(
 ):
     session = session_manager.get_session(session_id)
     if not session:
-        await websocket.close(code=4001, reason="Invalid session")
+        await _reject_websocket(websocket, code=4001, reason="Invalid session")
         return
 
     if spectate_player and request_id:
@@ -313,7 +323,7 @@ async def websocket_endpoint(
         game = game_manager.get_game(game_id)
 
     if not pending and not game:
-        await websocket.close(code=4004, reason="Game not found")
+        await _reject_websocket(websocket, code=4004, reason="Game not found")
         return
 
     game_manager.cancel_pending_disconnect(game_id, player_id)
