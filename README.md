@@ -23,9 +23,18 @@ cd web && npm ci
 
 # run the dev server (backend + frontend)
 uv run dev
+
+# run backend only, serving built frontend from web/dist (deployment-like)
+uv run dev --build
+
+# optional: compare variants on custom ports using a temporary DB copy
+uv run dev --build --backend-port 8100 --db-copy
+uv run dev --backend-port 8200 --frontend-port 3200 --db-copy
 ```
 
-Open http://localhost:5173 in your browser.
+Open:
+- `http://localhost:3000` for `uv run dev`
+- `http://localhost:8000` for `uv run dev --build`
 
 ## Testing
 
