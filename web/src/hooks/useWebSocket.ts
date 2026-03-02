@@ -45,19 +45,31 @@ export function useWebSocket(
   const reconnectTimeoutRef = useRef<number | null>(null)
   const reconnectAttempts = useRef(0)
   const isClosingRef = useRef(false)
+  const connectionGenerationRef = useRef(0)
   const onServerErrorRef = useRef(onServerError)
   useEffect(() => {
     onServerErrorRef.current = onServerError
   }, [onServerError])
 
   useEffect(() => {
-    if (!gameId || !sessionId) return
+    if (!gameId || !sessionId) {
+      isClosingRef.current = true
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current)
+      }
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+      return
+    }
 
+    const generation = ++connectionGenerationRef.current
     isClosingRef.current = false
     reconnectAttempts.current = 0
 
     const connect = () => {
-      if (!gameId || !sessionId) return
+      if (!gameId || !sessionId || generation !== connectionGenerationRef.current) return
 
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
       const host = window.location.host
@@ -68,8 +80,11 @@ export function useWebSocket(
       }
 
       const ws = new WebSocket(url)
+      wsRef.current = ws
+      const isCurrentSocket = () => connectionGenerationRef.current === generation && wsRef.current === ws
 
       ws.onopen = () => {
+        if (!isCurrentSocket()) return
         setState(s => ({ ...s, isConnected: true, invalidSession: false }))
         reconnectAttempts.current = 0
       }
@@ -81,6 +96,10 @@ export function useWebSocket(
         if (processing) return
         processing = true
         while (messageQueue.length > 0) {
+          if (!isCurrentSocket()) {
+            messageQueue.length = 0
+            break
+          }
           const ev = messageQueue.shift()!
           try {
             let message
@@ -114,11 +133,13 @@ export function useWebSocket(
       }
 
       ws.onmessage = (event) => {
+        if (!isCurrentSocket()) return
         messageQueue.push(event)
         processQueue()
       }
 
       ws.onclose = (event) => {
+        if (!isCurrentSocket()) return
         setState(s => ({ ...s, isConnected: false }))
         wsRef.current = null
 
@@ -140,8 +161,6 @@ export function useWebSocket(
       }
 
       ws.onerror = () => {}
-
-      wsRef.current = ws
     }
 
     connect()
@@ -153,6 +172,7 @@ export function useWebSocket(
       }
       if (wsRef.current) {
         wsRef.current.close()
+        wsRef.current = null
       }
     }
   }, [gameId, sessionId, spectatorConfig])

@@ -29,6 +29,7 @@ import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -368,9 +369,16 @@ function GameContent() {
   const { state, setPreviewCard } = useContextStrip();
 
   const isSpectator = !!spectatorConfig;
+  const wasInvalidSessionRef = useRef(false);
 
   useEffect(() => {
-    if (invalidSession && session) {
+    const shouldClear = shouldClearSessionOnInvalidEvent(
+      invalidSession,
+      wasInvalidSessionRef.current,
+      !!session,
+    );
+    wasInvalidSessionRef.current = invalidSession;
+    if (shouldClear) {
       clearSession();
     }
   }, [invalidSession, session, clearSession]);
