@@ -1,6 +1,14 @@
 import type { Card, CreateGameResponse, JoinGameResponse, GameStatusResponse, SpectateRequestStatus, ShareGameResponse } from '../types'
+import { getOrCreateDeviceId } from '../utils/deviceIdentity'
 
 const API_BASE = '/api'
+const DEVICE_ID_HEADER = 'X-MTB-Device-Id'
+
+function withDeviceHeaders(baseHeaders: HeadersInit = {}): HeadersInit {
+  const deviceId = getOrCreateDeviceId()
+  if (!deviceId) return baseHeaders
+  return { ...baseHeaders, [DEVICE_ID_HEADER]: deviceId }
+}
 
 async function getErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
@@ -26,7 +34,7 @@ export async function createGame(
 ): Promise<CreateGameResponse> {
   const response = await fetch(`${API_BASE}/games`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       player_name: playerName,
       cube_id: options.cubeId ?? 'auto',
@@ -46,7 +54,7 @@ export async function createGame(
 export async function joinGame(joinCode: string, playerName: string): Promise<JoinGameResponse> {
   const response = await fetch(`${API_BASE}/games/join`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ join_code: joinCode, player_name: playerName }),
   })
   if (!response.ok) {
@@ -67,7 +75,7 @@ export async function startGame(gameId: string): Promise<void> {
 export async function rejoinGame(gameId: string, playerName: string): Promise<JoinGameResponse> {
   const response = await fetch(`${API_BASE}/games/${gameId}/rejoin`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ player_name: playerName }),
   })
   if (!response.ok) {
@@ -91,7 +99,7 @@ export async function createSpectateRequest(
 ): Promise<{ request_id: string }> {
   const response = await fetch(`${API_BASE}/games/${gameId}/spectate-request`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ target_player_name: targetPlayerName, spectator_name: spectatorName }),
   })
   if (!response.ok) {
@@ -140,7 +148,7 @@ export function warmCubeCache(cubeId: string): void {
   _lastWarmTimes.set(cubeId, now)
   fetch(`${API_BASE}/games/cubes/warm`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ cube_id: cubeId }),
   }).catch(() => {})
 }

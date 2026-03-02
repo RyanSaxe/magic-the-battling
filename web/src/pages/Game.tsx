@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
@@ -30,6 +30,11 @@ import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
+import {
+  getRememberedPlayerForGame,
+  pickAutoReconnectPlayer,
+  rememberPlayerForGame,
+} from "../utils/deviceIdentity";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -58,6 +63,7 @@ function PlayerSelectionModal({
   const [rejoinName, setRejoinName] = useState("");
   const [rejoinLoading, setRejoinLoading] = useState(false);
   const pollingRef = useRef<number | null>(null);
+  const autoReconnectAttemptedRef = useRef(false);
 
   useEffect(() => {
     const fetchStatus = () => {
@@ -78,20 +84,43 @@ function PlayerSelectionModal({
     };
   }, []);
 
-  const handleReconnect = async (playerName: string) => {
-    setRejoinName(playerName);
-    setRejoinLoading(true);
-    setError("");
+  const handleReconnect = useCallback(
+    async (playerName: string, options?: { silent?: boolean }) => {
+      setRejoinName(playerName);
+      setRejoinLoading(true);
+      if (!options?.silent) {
+        setError("");
+      }
 
-    try {
-      const response = await rejoinGame(gameId, playerName);
-      onSessionCreated(response.session_id, response.player_id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reconnect");
-    } finally {
-      setRejoinLoading(false);
+      try {
+        const response = await rejoinGame(gameId, playerName);
+        rememberPlayerForGame(gameId, playerName.trim());
+        onSessionCreated(response.session_id, response.player_id);
+      } catch (err) {
+        if (!options?.silent) {
+          setError(err instanceof Error ? err.message : "Failed to reconnect");
+        }
+      } finally {
+        setRejoinLoading(false);
+      }
+    },
+    [gameId, onSessionCreated],
+  );
+
+  useEffect(() => {
+    if (rejoinLoading || requestStatus !== "idle" || selectedPlayer !== null || !status) {
+      return;
     }
-  };
+
+    const rememberedPlayer = getRememberedPlayerForGame(gameId);
+    const autoPlayer = pickAutoReconnectPlayer(rememberedPlayer, status.players);
+    if (!autoPlayer || autoReconnectAttemptedRef.current) {
+      return;
+    }
+
+    autoReconnectAttemptedRef.current = true;
+    void handleReconnect(autoPlayer, { silent: true });
+  }, [gameId, handleReconnect, rejoinLoading, requestStatus, selectedPlayer, status]);
 
   const handleWatchRequest = async () => {
     if (!selectedPlayer || !spectatorName.trim()) {
@@ -382,6 +411,14 @@ function GameContent() {
       clearSession();
     }
   }, [invalidSession, session, clearSession]);
+
+  useEffect(() => {
+    const playerName = gameState?.self_player.name;
+    if (!gameId || !playerName || isSpectator) {
+      return;
+    }
+    rememberPlayerForGame(gameId, playerName);
+  }, [gameId, gameState?.self_player.name, isSpectator]);
 
   // Lifted state from Build phase
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);

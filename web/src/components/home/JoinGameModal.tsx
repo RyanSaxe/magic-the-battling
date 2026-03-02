@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { joinGame } from '../../api/client'
 import { useSession } from '../../hooks/useSession'
+import { rememberPlayerForGame } from '../../utils/deviceIdentity'
 
 interface JoinGameModalProps {
   onClose: () => void
@@ -40,6 +41,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
     try {
       const response = await joinGame(joinCode, playerName)
       saveSession(response.session_id, response.player_id)
+      rememberPlayerForGame(response.game_id, playerName.trim())
       navigate(`/game/${response.game_id}/lobby`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to join game')

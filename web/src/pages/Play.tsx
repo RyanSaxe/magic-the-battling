@@ -7,6 +7,7 @@ import { useToast } from "../contexts";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { HintsBanner } from "../components/common/HintsBanner";
 import { getLegendaryName } from "../utils/prefetchName";
+import { rememberPlayerForGame } from "../utils/deviceIdentity";
 import { FaDiscord } from "react-icons/fa6";
 import type { LobbyState } from "../types";
 
@@ -290,6 +291,7 @@ export function Play() {
         autoApproveSpectators,
       });
       saveSession(response.session_id, response.player_id);
+      rememberPlayerForGame(response.game_id, playerName.trim());
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
@@ -318,6 +320,7 @@ export function Play() {
         puppetCount: count,
       });
       saveSession(response.session_id, response.player_id);
+      rememberPlayerForGame(response.game_id, playerName.trim());
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {

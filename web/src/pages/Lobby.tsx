@@ -7,6 +7,7 @@ import { useHotkeys } from "../hooks/useHotkeys";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
 import { HintsBanner } from "../components/common/HintsBanner";
+import { rememberPlayerForGame } from "../utils/deviceIdentity";
 
 export function Lobby() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -96,6 +97,7 @@ export function Lobby() {
     try {
       const response = await rejoinGame(gameId, rejoinName);
       saveSession(response.session_id, response.player_id);
+      rememberPlayerForGame(gameId, rejoinName.trim());
     } catch {
       setRejoinError("Could not rejoin. Check your name matches exactly.");
     } finally {
