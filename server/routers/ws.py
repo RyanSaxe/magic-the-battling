@@ -65,6 +65,39 @@ class ConnectionManager:
     def total_connections(self) -> int:
         return sum(len(v) for v in self._connections.values())
 
+    async def reset_runtime_state(self) -> dict[str, int]:
+        player_sockets = [ws for players in self._connections.values() for ws in players.values()]
+        spectator_sockets = [
+            ws for target_map in self._spectators.values() for sockets in target_map.values() for ws in sockets
+        ]
+        pending_count = sum(len(players) for players in self._pending_connections.values())
+
+        closed_players = 0
+        for ws in player_sockets:
+            try:
+                await ws.close(code=1012, reason="Runtime reset")
+            except Exception:
+                pass
+            closed_players += 1
+
+        closed_spectators = 0
+        for ws in spectator_sockets:
+            try:
+                await ws.close(code=1012, reason="Runtime reset")
+            except Exception:
+                pass
+            closed_spectators += 1
+
+        self._connections.clear()
+        self._pending_connections.clear()
+        self._spectators.clear()
+
+        return {
+            "player_connections_closed": closed_players,
+            "spectator_connections_closed": closed_spectators,
+            "pending_connections_cleared": pending_count,
+        }
+
     async def connect(self, game_id: str, player_id: str, websocket: WebSocket):
         if self.total_connections() >= MAX_WS_CONNECTIONS:
             self._pending_connections[game_id].discard(player_id)

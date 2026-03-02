@@ -45,6 +45,12 @@ class SessionManager:
     def size(self) -> int:
         return len(self._sessions)
 
+    def reset_all(self) -> int:
+        removed = len(self._sessions)
+        self._sessions.clear()
+        self._player_to_session.clear()
+        return removed
+
     def cleanup(self, ttl_minutes: int, max_total: int) -> int:
         now = datetime.now(UTC)
         expiry = now - timedelta(minutes=ttl_minutes)

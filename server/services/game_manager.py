@@ -464,6 +464,39 @@ class GameManager:
             logger.info("Evicted cold games from memory: count=%d", evicted)
         return evicted
 
+    def reset_runtime_state(self) -> dict[str, int]:
+        active_before = len(self._active_games)
+        pending_before = len(self._pending_games)
+        spectate_before = len(self._spectate_requests)
+        cleanup_before = len(self._cleanup_tasks)
+        pending_disconnect_before = len(self._pending_disconnect_tasks)
+
+        for task in list(self._cleanup_tasks.values()):
+            task.cancel()
+        self._cleanup_tasks.clear()
+
+        for task in list(self._pending_disconnect_tasks.values()):
+            task.cancel()
+        self._pending_disconnect_tasks.clear()
+
+        game_ids = list(set(self._active_games.keys()) | set(self._pending_games.keys()))
+        for game_id in game_ids:
+            self._cleanup_game(game_id)
+
+        self._spectate_requests.clear()
+        self._dirty_games.clear()
+
+        return {
+            "active_before": active_before,
+            "pending_before": pending_before,
+            "games_cleared": len(game_ids),
+            "spectate_requests_cleared": spectate_before,
+            "cleanup_tasks_cancelled": cleanup_before,
+            "pending_disconnect_tasks_cancelled": pending_disconnect_before,
+            "active_after": len(self._active_games),
+            "pending_after": len(self._pending_games),
+        }
+
     def create_game(
         self,
         player_name: str,
