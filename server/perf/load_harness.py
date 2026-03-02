@@ -114,6 +114,7 @@ class HarnessConfig:
     ops_token: str | None
     reset_runtime_between_sweeps: bool
     rss_sample_interval_sec: float
+    ws_action_jitter_ms: float
     json_output: bool
     json_output_path: str | None
 
@@ -241,6 +242,7 @@ class PhaseContext:
     deadline: float
     result: GameResult
     rng: random.Random
+    ws_action_jitter_ms: float = 0.0
 
 
 def resolve_db_source(explicit: str | None) -> Path:
@@ -462,6 +464,16 @@ async def send_ws_action(ws: Any, action: str, payload: dict[str, Any] | None = 
     await ws.send(json.dumps({"action": action, "payload": payload or {}}))
 
 
+async def maybe_apply_action_jitter(ctx: PhaseContext) -> None:
+    if ctx.ws_action_jitter_ms <= 0:
+        return
+    delay_ms = ctx.rng.uniform(0.0, ctx.ws_action_jitter_ms)
+    delay_sec = delay_ms / 1000.0
+    if delay_sec <= 0:
+        return
+    await asyncio.sleep(min(delay_sec, remaining_timeout(ctx.deadline)))
+
+
 async def wait_for_game_state(ctx: PhaseContext) -> dict[str, Any]:
     while True:
         message = await recv_ws_message(ctx)
@@ -490,6 +502,7 @@ async def send_action_and_wait_state(
     action: str,
     payload: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    await maybe_apply_action_jitter(ctx)
     started = time.perf_counter()
     await send_ws_action(ctx.ws, action, payload)
     state = await wait_for_game_state(ctx)
@@ -678,12 +691,14 @@ async def enter_game_from_lobby(ctx: PhaseContext) -> dict[str, Any]:
 
         can_start = bool(payload.get("can_start", False))
         if not ready_sent:
+            await maybe_apply_action_jitter(ctx)
             await send_ws_action(ctx.ws, "set_ready", {"is_ready": True})
             ready_sent = True
             continue
 
         if can_start and not start_sent:
             start_sent = True
+            await maybe_apply_action_jitter(ctx)
             start_sent_at = time.perf_counter()
             await send_ws_action(ctx.ws, "start_game")
             state = await wait_for_game_state(ctx)
@@ -867,7 +882,13 @@ async def run_one_game(
         result.ws_connect_ms = ws_connect_ms
 
         rng = random.Random(cfg.seed + game_index)
-        ctx = PhaseContext(ws=ws, deadline=deadline, result=result, rng=rng)
+        ctx = PhaseContext(
+            ws=ws,
+            deadline=deadline,
+            result=result,
+            rng=rng,
+            ws_action_jitter_ms=cfg.ws_action_jitter_ms,
+        )
 
         state = await enter_game_from_lobby(ctx)
         state = await play_until_terminal(ctx, state)
@@ -1207,6 +1228,12 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
         default=0.25,
         help="Managed server RSS sample interval in seconds",
     )
+    parser.add_argument(
+        "--ws-action-jitter-ms",
+        type=float,
+        default=0.0,
+        help="Random per-WS-action jitter up to this many milliseconds (harness only)",
+    )
     parser.add_argument("--json", action="store_true", help="Print final report as JSON")
     parser.add_argument("--json-output", default=None, help="Write final report JSON to this path")
     parser.add_argument(
@@ -1227,6 +1254,8 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
         raise ValueError("--backend-port must be between 1 and 65535")
     if args.rss_sample_interval_sec <= 0:
         raise ValueError("--rss-sample-interval-sec must be positive")
+    if args.ws_action_jitter_ms < 0:
+        raise ValueError("--ws-action-jitter-ms must be non-negative")
 
     sweep = parse_sweep(args.sweep, args.games)
     cfg = HarnessConfig(
@@ -1251,6 +1280,7 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
         ops_token=args.ops_token,
         reset_runtime_between_sweeps=args.reset_runtime_between_sweeps,
         rss_sample_interval_sec=args.rss_sample_interval_sec,
+        ws_action_jitter_ms=args.ws_action_jitter_ms,
         json_output=args.json,
         json_output_path=args.json_output,
     )
@@ -1366,6 +1396,7 @@ async def execute_sweeps(
             "seed": cfg.seed,
             "reset_runtime_between_sweeps": cfg.reset_runtime_between_sweeps,
             "rss_sample_interval_sec": cfg.rss_sample_interval_sec,
+            "ws_action_jitter_ms": cfg.ws_action_jitter_ms,
         },
         "calibration": asdict(calibration_result),
         "timeout_per_game_sec": timeout_per_game_sec,

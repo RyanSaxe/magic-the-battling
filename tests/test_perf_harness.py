@@ -76,6 +76,11 @@ def test_parse_args_runtime_reset_toggle():
     assert cfg.reset_runtime_between_sweeps is False
 
 
+def test_parse_args_ws_action_jitter():
+    cfg = parse_args(["--games", "1", "--ws-action-jitter-ms", "25"])
+    assert cfg.ws_action_jitter_ms == 25.0
+
+
 def test_rss_window_dict():
     window = rss_window_dict([100.0, 105.0, 103.0, 110.0])
     assert window["count"] == 4
