@@ -295,6 +295,80 @@ class GameManager:
             )
         return wrote
 
+    def _player_in_active_battle(self, game: Game, player_name: str) -> bool:
+        return any(player_name in (b.player.name, b.opponent.name) for b in game.active_battles)
+
+    def _canonicalize_active_battles(self, game: Game) -> bool:
+        changed = False
+        players_by_name = {p.name: p for p in game.players}
+        canonical_battles: list[Battle] = []
+
+        for active_battle in game.active_battles:
+            canonical_player = players_by_name.get(active_battle.player.name)
+            if canonical_player is None:
+                logger.warning(
+                    "Dropping restored battle with unknown player: %s",
+                    active_battle.player.name,
+                )
+                changed = True
+                continue
+            if active_battle.player is not canonical_player:
+                active_battle.player = canonical_player
+                changed = True
+
+            if isinstance(active_battle.opponent, Player):
+                canonical_opponent = players_by_name.get(active_battle.opponent.name)
+                if canonical_opponent is None:
+                    logger.warning(
+                        "Dropping restored battle with unknown opponent: %s",
+                        active_battle.opponent.name,
+                    )
+                    changed = True
+                    continue
+                if active_battle.opponent is not canonical_opponent:
+                    active_battle.opponent = canonical_opponent
+                    changed = True
+
+            canonical_battles.append(active_battle)
+
+        if len(canonical_battles) != len(game.active_battles):
+            changed = True
+        game.active_battles = canonical_battles
+        return changed
+
+    def _recover_missing_active_battles(self, game: Game) -> int:
+        recovered = 0
+        candidates = sorted(
+            (p for p in game.players if p.phase == "battle"),
+            key=lambda p: p.name,
+        )
+
+        for player in candidates:
+            if self._player_in_active_battle(game, player.name):
+                continue
+            if player.in_sudden_death:
+                # Sudden death resumes through build-ready logic, not normal pairing.
+                continue
+
+            opponent = battle.find_opponent(game, player)
+            if opponent is None:
+                continue
+            try:
+                battle.start(game, player, opponent)
+                recovered += 1
+            except Exception:
+                logger.exception("Failed recovering battle for player=%s", player.name)
+
+        return recovered
+
+    def _normalize_restored_game(self, game: Game) -> bool:
+        changed = self._canonicalize_active_battles(game)
+        recovered = self._recover_missing_active_battles(game)
+        if recovered > 0:
+            changed = True
+            logger.warning("Recovered %d missing active battle(s) after restore", recovered)
+        return changed
+
     def restore_game_from_snapshot(self, game_id: str) -> bool:
         if game_id in self._active_games:
             return True
@@ -306,6 +380,8 @@ class GameManager:
                 return False
             game = Game.model_validate_json(cast(str, row.state_json))
             self._active_games[game_id] = game
+            if self._normalize_restored_game(game):
+                self.mark_game_dirty(game_id, human_activity=False)
             last_activity = cast(datetime | None, row.last_human_activity_at)
             self._last_human_activity[game_id] = _utc_or_default(last_activity, datetime.now(UTC))
             self._connected_humans[game_id] = 0
@@ -333,6 +409,8 @@ class GameManager:
                     continue
                 last_activity = cast(datetime | None, row.last_human_activity_at)
                 self._active_games[snapshot_game_id] = game
+                if self._normalize_restored_game(game):
+                    self.mark_game_dirty(snapshot_game_id, human_activity=False)
                 self._last_human_activity[snapshot_game_id] = _utc_or_default(last_activity, datetime.now(UTC))
                 self._connected_humans[snapshot_game_id] = 0
                 restored += 1
@@ -964,7 +1042,7 @@ class GameManager:
             .filter(
                 PlayerGameHistory.game_id == game_id,
                 PlayerGameHistory.player_name == fp.name,
-                PlayerGameHistory.is_puppet == True,  # noqa: E712
+                PlayerGameHistory.is_puppet.is_(True),
             )
             .first()
         )
@@ -1296,6 +1374,13 @@ class GameManager:
         player = self.get_player(game, player_id)
         if not player:
             return None
+
+        if (
+            player.phase == "battle"
+            and not self._player_in_active_battle(game, player.name)
+            and self._recover_missing_active_battles(game) > 0
+        ):
+            self.mark_game_dirty(game_id, human_activity=False)
 
         phase = self._determine_game_phase(game)
 

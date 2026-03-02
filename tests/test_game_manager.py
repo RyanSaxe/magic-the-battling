@@ -5,7 +5,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from mtb.models.cards import Battler, Card
-from mtb.models.game import Puppet, create_game, set_battler
+from mtb.models.game import Game, Puppet, StaticOpponent, create_game, set_battler
+from mtb.phases import battle
 from server.db.models import PlayerGameHistory
 from server.routers.ws import ConnectionManager
 from server.services.game_manager import GameManager
@@ -320,3 +321,91 @@ class TestSelfPlayerPlacement:
         state = game_manager.get_game_state("g1", "pid_alice")
         assert state is not None
         assert state.self_player.placement == 0
+
+
+class TestRestoreRecovery:
+    def _make_battler(self) -> Battler:
+        cards = [Card(name=f"c{i}", image_url="img", id=f"c{i}", type_line="Creature") for i in range(80)]
+        return Battler(cards=cards, upgrades=[], vanguards=[])
+
+    def _make_puppet_snapshot(self) -> StaticOpponent:
+        return StaticOpponent(
+            name="Bot",
+            hand=[],
+            sideboard=[],
+            command_zone=[],
+            upgrades=[],
+            chosen_basics=["Plains", "Island", "Mountain"],
+            treasures=1,
+            hand_revealed=True,
+            is_ghost=False,
+            source_player_history_id=1,
+        )
+
+    def test_normalize_restored_game_rebinds_active_battle_players(self, game_manager):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        set_battler(game, self._make_battler())
+        alice, bob = game.players
+        alice.phase = "battle"
+        bob.phase = "battle"
+        alice.chosen_basics = ["Plains", "Island", "Mountain"]
+        bob.chosen_basics = ["Plains", "Island", "Mountain"]
+        battle.start(game, alice, bob)
+
+        restored = Game.model_validate_json(game.model_dump_json())
+        assert restored.active_battles
+        restored_battle = restored.active_battles[0]
+        assert restored_battle.player is not restored.players[0]
+        assert restored_battle.opponent is not restored.players[1]
+
+        changed = game_manager._normalize_restored_game(restored)
+
+        assert changed is True
+        restored_battle = restored.active_battles[0]
+        assert restored_battle.player is restored.players[0]
+        assert restored_battle.opponent is restored.players[1]
+
+    def test_restored_static_battle_submit_updates_canonical_player(self, game_manager):
+        game = create_game(["Alice"], num_players=1)
+        set_battler(game, self._make_battler())
+        alice = game.players[0]
+        alice.phase = "battle"
+        alice.chosen_basics = ["Plains", "Island", "Mountain"]
+
+        static_opponent = self._make_puppet_snapshot()
+        puppet = Puppet(name="Bot", player_history_id=1, snapshots={"3_1": static_opponent})
+        game.puppets.append(puppet)
+        bot_for_round = puppet.get_opponent_for_round(alice.stage, alice.round)
+        assert bot_for_round is not None
+        battle.start(game, alice, bot_for_round)
+
+        restored = Game.model_validate_json(game.model_dump_json())
+        game_manager._normalize_restored_game(restored)
+        canonical_alice = restored.players[0]
+
+        handled = game_manager.handle_battle_submit_result(restored, canonical_alice, canonical_alice.name)
+
+        assert handled is True
+        assert restored.active_battles == []
+        assert canonical_alice.phase == "reward"
+
+    def test_get_game_state_recovers_missing_static_battle(self, game_manager):
+        game = create_game(["Alice"], num_players=1)
+        set_battler(game, self._make_battler())
+        alice = game.players[0]
+        alice.phase = "battle"
+        alice.chosen_basics = ["Plains", "Island", "Mountain"]
+
+        static_opponent = self._make_puppet_snapshot()
+        puppet = Puppet(name="Bot", player_history_id=1, snapshots={"3_1": static_opponent})
+        game.puppets.append(puppet)
+
+        game_manager._active_games["g1"] = game
+        game_manager._player_to_game["pid_alice"] = "g1"
+        game_manager._player_id_to_name["pid_alice"] = "Alice"
+
+        state = game_manager.get_game_state("g1", "pid_alice")
+
+        assert state is not None
+        assert state.current_battle is not None
+        assert state.current_battle.opponent_name == "Bot"
