@@ -338,6 +338,70 @@ async def _handle_spectator_connection(
     return True
 
 
+async def _handle_player_disconnect(game_id: str, player_id: str, websocket: WebSocket) -> None:
+    connection_manager.disconnect(game_id, player_id, websocket)
+    game_manager.schedule_pending_disconnect(
+        game_id,
+        player_id,
+        on_removed=lambda: connection_manager.broadcast_lobby_state(game_id),
+    )
+    await connection_manager.broadcast_lobby_state(game_id)
+
+
+def _resolve_pending_or_game(game_id: str):
+    pending = game_manager.get_pending_game(game_id)
+    game = game_manager.get_game(game_id)
+    if not pending and not game:
+        game_manager.restore_game_from_snapshot(game_id)
+        game = game_manager.get_game(game_id)
+    return pending, game
+
+
+async def _connect_player_to_game(websocket: WebSocket, game_id: str, player_id: str):
+    pending, game = _resolve_pending_or_game(game_id)
+    if not pending and not game:
+        connection_manager.disconnect(game_id, player_id, websocket)
+        await _reject_websocket(websocket, code=4004, reason="Game not found")
+        return None
+
+    game_manager.cancel_pending_disconnect(game_id, player_id)
+    connected = await connection_manager.connect(game_id, player_id, websocket)
+    if not connected:
+        return None
+    return pending, game
+
+
+async def _send_initial_player_state(
+    websocket: WebSocket,
+    game_id: str,
+    player_id: str,
+    pending,
+    game,
+) -> None:
+    if pending and not pending.is_started:
+        await connection_manager.broadcast_lobby_state(game_id)
+    elif game:
+        state = game_manager.get_game_state(game_id, player_id)
+        if state:
+            await send_ws(
+                websocket,
+                {
+                    "type": "game_state",
+                    "payload": state.model_dump(),
+                },
+            )
+
+    notice = ops_manager.notice_payload()
+    if notice.get("mode") != "normal":
+        await send_ws(
+            websocket,
+            {
+                "type": "server_notice",
+                "payload": notice,
+            },
+        )
+
+
 @router.websocket("/ws/{game_id}")
 async def websocket_endpoint(
     websocket: WebSocket,
@@ -356,45 +420,13 @@ async def websocket_endpoint(
         return
 
     player_id = session.player_id
-
-    pending = game_manager.get_pending_game(game_id)
-    game = game_manager.get_game(game_id)
-    if not pending and not game:
-        game_manager.restore_game_from_snapshot(game_id)
-        game = game_manager.get_game(game_id)
-
-    if not pending and not game:
-        connection_manager.disconnect(game_id, player_id, websocket)
-        await _reject_websocket(websocket, code=4004, reason="Game not found")
+    connection_result = await _connect_player_to_game(websocket, game_id, player_id)
+    if connection_result is None:
         return
-
-    game_manager.cancel_pending_disconnect(game_id, player_id)
-    connected = await connection_manager.connect(game_id, player_id, websocket)
-    if not connected:
-        return
+    pending, game = connection_result
 
     try:
-        if pending and not pending.is_started:
-            await connection_manager.broadcast_lobby_state(game_id)
-        elif game:
-            state = game_manager.get_game_state(game_id, player_id)
-            if state:
-                await send_ws(
-                    websocket,
-                    {
-                        "type": "game_state",
-                        "payload": state.model_dump(),
-                    },
-                )
-        notice = ops_manager.notice_payload()
-        if notice.get("mode") != "normal":
-            await send_ws(
-                websocket,
-                {
-                    "type": "server_notice",
-                    "payload": notice,
-                },
-            )
+        await _send_initial_player_state(websocket, game_id, player_id, pending, game)
 
         while True:
             data = await websocket.receive_json()
@@ -419,13 +451,11 @@ async def websocket_endpoint(
                 )
 
     except WebSocketDisconnect:
-        connection_manager.disconnect(game_id, player_id, websocket)
-        game_manager.schedule_pending_disconnect(
-            game_id,
-            player_id,
-            on_removed=lambda: connection_manager.broadcast_lobby_state(game_id),
-        )
-        await connection_manager.broadcast_lobby_state(game_id)
+        await _handle_player_disconnect(game_id, player_id, websocket)
+    except RuntimeError as exc:
+        if "WebSocket is not connected" not in str(exc):
+            raise
+        await _handle_player_disconnect(game_id, player_id, websocket)
 
 
 def _validate_action_phase(action: str, player) -> str | None:

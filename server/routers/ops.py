@@ -60,11 +60,16 @@ async def set_ops_mode(request: OpsSetModeRequest, x_ops_token: str | None = Hea
 @router.get("/capacity", response_model=OpsCapacityResponse)
 def get_capacity(x_ops_token: str | None = Header(default=None)):
     _authorize(x_ops_token)
+    start_capacity = game_manager.game_start_capacity()
     return OpsCapacityResponse(
         loaded_games=game_manager.loaded_games_count(),
         hot_games=game_manager.hot_games_count(),
         pending_games=len(game_manager._pending_games),
         sessions=session_manager.size(),
+        game_starts_in_flight=start_capacity["in_flight"],
+        game_start_waiters=start_capacity["waiters"],
+        max_game_starts_in_flight=start_capacity["max_in_flight"],
+        max_game_start_waiters=start_capacity["max_waiters"],
     )
 
 

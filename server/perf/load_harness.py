@@ -30,6 +30,12 @@ VALID_PUPPET_COUNTS = (1, 3, 5, 7)
 BASIC_LANDS = ("Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes")
 TERMINAL_PHASES = {"winner", "game_over", "eliminated"}
 PASSIVE_PHASES = {"awaiting_elimination"}
+RETRYABLE_CREATE_STATUSES = {408, 425, 429, 500, 502, 503, 504}
+CREATE_RETRY_BASE_SEC = 0.15
+CREATE_RETRY_MAX_SEC = 3.0
+WS_CONNECT_RETRY_BASE_SEC = 0.10
+WS_CONNECT_RETRY_MAX_SEC = 2.0
+IDEMPOTENCY_KEY_HEADER = "x-mtb-idempotency-key"
 
 
 class GameFlowError(RuntimeError):
@@ -404,9 +410,11 @@ def choose_timeout_seconds(
     multiplier: float,
     min_timeout: float,
     max_timeout: float,
+    assumed_start_slots: int = 100,
 ) -> float:
     concurrency_factor = max(1.0, min(5.0, math.sqrt(max(concurrency, 1) / 25.0)))
-    computed = single_game_seconds * multiplier * concurrency_factor
+    queue_factor = max(1.0, math.sqrt(max(concurrency, 1) / max(assumed_start_slots, 1)))
+    computed = single_game_seconds * multiplier * concurrency_factor * queue_factor
     return max(min_timeout, min(max_timeout, computed))
 
 
@@ -438,6 +446,11 @@ def remaining_timeout(deadline: float) -> float:
     if remaining <= 0:
         raise TimeoutError("game exceeded timeout")
     return remaining
+
+
+def retry_delay_sec(attempt: int, base_sec: float, max_sec: float) -> float:
+    exp = min(max_sec, base_sec * (2**attempt))
+    return random.random() * exp
 
 
 async def recv_ws_message(ctx: PhaseContext) -> dict[str, Any]:
@@ -718,6 +731,113 @@ def build_create_game_payload(player_name: str, cfg: HarnessConfig) -> dict[str,
     }
 
 
+async def _sleep_retry_or_timeout(
+    *,
+    deadline: float,
+    attempt: int,
+    base_sec: float,
+    max_sec: float,
+    exhausted_message: str,
+) -> None:
+    remaining = remaining_timeout(deadline)
+    delay = retry_delay_sec(attempt, base_sec, max_sec)
+    if delay >= remaining:
+        raise TimeoutError(exhausted_message)
+    await asyncio.sleep(delay)
+
+
+async def create_game_with_retry(
+    client: httpx.AsyncClient,
+    cfg: HarnessConfig,
+    *,
+    player_name: str,
+    deadline: float,
+    idempotency_key: str,
+) -> tuple[str, str, float]:
+    create_started = time.perf_counter()
+    create_attempt = 0
+    create_payload = build_create_game_payload(player_name, cfg)
+
+    while True:
+        create_attempt += 1
+        try:
+            response = await client.post(
+                "/api/games",
+                json=create_payload,
+                headers={IDEMPOTENCY_KEY_HEADER: idempotency_key},
+            )
+        except httpx.HTTPError as exc:
+            msg = f"create_game retries exhausted: {exc}"
+            await _sleep_retry_or_timeout(
+                deadline=deadline,
+                attempt=create_attempt,
+                base_sec=CREATE_RETRY_BASE_SEC,
+                max_sec=CREATE_RETRY_MAX_SEC,
+                exhausted_message=msg,
+            )
+            continue
+
+        if response.status_code in RETRYABLE_CREATE_STATUSES:
+            detail = response.text.strip()
+            msg = f"create_game retry window exhausted ({response.status_code}: {detail})"
+            await _sleep_retry_or_timeout(
+                deadline=deadline,
+                attempt=create_attempt,
+                base_sec=CREATE_RETRY_BASE_SEC,
+                max_sec=CREATE_RETRY_MAX_SEC,
+                exhausted_message=msg,
+            )
+            continue
+
+        response.raise_for_status()
+        payload = response.json()
+        game_id = str(payload["game_id"])
+        session_id = str(payload["session_id"])
+        create_ms = (time.perf_counter() - create_started) * 1000.0
+        return game_id, session_id, create_ms
+
+
+async def connect_ws_with_retry(
+    *,
+    ws_uri: str,
+    deadline: float,
+) -> tuple[Any, float]:
+    ws_started = time.perf_counter()
+    ws_attempt = 0
+
+    while True:
+        ws_attempt += 1
+        try:
+            ws = await websockets.connect(
+                ws_uri,
+                max_size=None,
+                open_timeout=min(30.0, remaining_timeout(deadline)),
+                close_timeout=5,
+            )
+            ws_connect_ms = (time.perf_counter() - ws_started) * 1000.0
+            return ws, ws_connect_ms
+        except Exception as exc:
+            msg = f"ws connect retries exhausted: {exc}"
+            await _sleep_retry_or_timeout(
+                deadline=deadline,
+                attempt=ws_attempt,
+                base_sec=WS_CONNECT_RETRY_BASE_SEC,
+                max_sec=WS_CONNECT_RETRY_MAX_SEC,
+                exhausted_message=msg,
+            )
+
+
+def record_terminal_state(result: GameResult, state: dict[str, Any]) -> None:
+    self_player = state.get("self_player") or {}
+    phase = str(self_player.get("phase", ""))
+    result.final_phase = phase
+    result.final_stage = _to_int(self_player.get("stage"))
+    result.final_round = _to_int(self_player.get("round"))
+    result.success = phase in TERMINAL_PHASES
+    if not result.success:
+        result.error = f"terminal phase not reached (final phase: {phase})"
+
+
 async def run_one_game(
     client: httpx.AsyncClient,
     cfg: HarnessConfig,
@@ -727,39 +847,31 @@ async def run_one_game(
     result = GameResult(index=game_index)
     game_started_at = time.perf_counter()
     player_name = f"PerfPlayer-{game_index:05d}-{cfg.seed}"
+    deadline = time.monotonic() + timeout_sec
+    idempotency_key = f"perf-{cfg.seed}-{game_index}-{secrets.token_urlsafe(6)}"
 
     ws = None
     try:
-        create_started = time.perf_counter()
-        response = await client.post("/api/games", json=build_create_game_payload(player_name, cfg))
-        result.create_game_ms = (time.perf_counter() - create_started) * 1000.0
-        response.raise_for_status()
-        create_payload = response.json()
-
-        game_id = str(create_payload["game_id"])
-        session_id = str(create_payload["session_id"])
+        game_id, session_id, create_ms = await create_game_with_retry(
+            client,
+            cfg,
+            player_name=player_name,
+            deadline=deadline,
+            idempotency_key=idempotency_key,
+        )
+        result.create_game_ms = create_ms
         result.game_id = game_id
 
         ws_uri = ws_url_for(cfg.base_url, game_id, session_id)
-        ws_started = time.perf_counter()
-        ws = await websockets.connect(ws_uri, max_size=None, open_timeout=30, close_timeout=5)
-        result.ws_connect_ms = (time.perf_counter() - ws_started) * 1000.0
+        ws, ws_connect_ms = await connect_ws_with_retry(ws_uri=ws_uri, deadline=deadline)
+        result.ws_connect_ms = ws_connect_ms
 
-        deadline = time.monotonic() + timeout_sec
         rng = random.Random(cfg.seed + game_index)
         ctx = PhaseContext(ws=ws, deadline=deadline, result=result, rng=rng)
 
         state = await enter_game_from_lobby(ctx)
         state = await play_until_terminal(ctx, state)
-
-        self_player = state.get("self_player") or {}
-        phase = str(self_player.get("phase", ""))
-        result.final_phase = phase
-        result.final_stage = _to_int(self_player.get("stage"))
-        result.final_round = _to_int(self_player.get("round"))
-        result.success = phase in TERMINAL_PHASES
-        if not result.success:
-            result.error = f"terminal phase not reached (final phase: {phase})"
+        record_terminal_state(result, state)
 
     except TimeoutError as exc:
         result.error = f"timeout: {exc}"

@@ -1,8 +1,11 @@
+import asyncio
 import json
 import logging
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
@@ -37,27 +40,146 @@ from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
 
-
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+IDEMPOTENCY_KEY_HEADER = "x-mtb-idempotency-key"
+IDEMPOTENCY_TTL_MINUTES = 10
+IDEMPOTENCY_CACHE_MAX = 10_000
 
 
-router = APIRouter(prefix="/api/games", tags=["games"])
+@dataclass
+class _CreateIdempotencyEntry:
+    request_fingerprint: str
+    response: CreateGameResponse
+    created_at: datetime
 
 
-@router.post("", response_model=CreateGameResponse)
-async def create_game(request: CreateGameRequest):
+@dataclass
+class _CreateIdempotencyClaim:
+    cache_key: str | None
+    request_fingerprint: str
+    future: asyncio.Future[CreateGameResponse] | None = None
+    owns_future: bool = False
+
+
+_create_idempotency_cache: dict[str, _CreateIdempotencyEntry] = {}
+_create_idempotency_inflight: dict[str, asyncio.Future[CreateGameResponse]] = {}
+_create_idempotency_lock = asyncio.Lock()
+
+
+def _request_fingerprint(request: CreateGameRequest) -> str:
+    return json.dumps(
+        {
+            "player_name": request.player_name,
+            "cube_id": request.cube_id,
+            "use_upgrades": request.use_upgrades,
+            "use_vanguards": request.use_vanguards,
+            "target_player_count": request.target_player_count,
+            "puppet_count": request.puppet_count,
+            "auto_approve_spectators": request.auto_approve_spectators,
+        },
+        sort_keys=True,
+    )
+
+
+def _prune_idempotency_cache() -> None:
+    now = datetime.now(UTC)
+    expiry = now - timedelta(minutes=IDEMPOTENCY_TTL_MINUTES)
+    stale_keys = [key for key, entry in _create_idempotency_cache.items() if entry.created_at < expiry]
+    for key in stale_keys:
+        _create_idempotency_cache.pop(key, None)
+
+    overflow = len(_create_idempotency_cache) - IDEMPOTENCY_CACHE_MAX
+    if overflow <= 0:
+        return
+
+    oldest_keys = sorted(
+        _create_idempotency_cache.keys(),
+        key=lambda key: _create_idempotency_cache[key].created_at,
+    )[:overflow]
+    for key in oldest_keys:
+        _create_idempotency_cache.pop(key, None)
+
+
+def _normalize_idempotency_key(raw_key: str | None) -> str | None:
+    normalized = (raw_key or "").strip()
+    return normalized or None
+
+
+async def _claim_create_idempotency(
+    cache_key: str | None,
+    request_fingerprint: str,
+) -> tuple[CreateGameResponse | None, _CreateIdempotencyClaim]:
+    claim = _CreateIdempotencyClaim(cache_key=cache_key, request_fingerprint=request_fingerprint)
+    if cache_key is None:
+        return None, claim
+
+    async with _create_idempotency_lock:
+        _prune_idempotency_cache()
+        cached = _create_idempotency_cache.get(cache_key)
+        if cached:
+            if cached.request_fingerprint != request_fingerprint:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Idempotency key already used with a different create payload.",
+                )
+            return cached.response, claim
+
+        existing = _create_idempotency_inflight.get(cache_key)
+        if existing is not None:
+            claim.future = existing
+            return None, claim
+
+        claim.future = asyncio.get_running_loop().create_future()
+        claim.owns_future = True
+        _create_idempotency_inflight[cache_key] = claim.future
+        return None, claim
+
+
+async def _clear_create_inflight(cache_key: str | None) -> None:
+    if cache_key is None:
+        return
+    async with _create_idempotency_lock:
+        _create_idempotency_inflight.pop(cache_key, None)
+
+
+async def _resolve_claim_success(
+    claim: _CreateIdempotencyClaim,
+    response_payload: CreateGameResponse,
+) -> None:
+    if claim.cache_key is None or not claim.owns_future or claim.future is None:
+        return
+
+    async with _create_idempotency_lock:
+        _create_idempotency_cache[claim.cache_key] = _CreateIdempotencyEntry(
+            request_fingerprint=claim.request_fingerprint,
+            response=response_payload,
+            created_at=datetime.now(UTC),
+        )
+        _create_idempotency_inflight.pop(claim.cache_key, None)
+
+    if not claim.future.done():
+        claim.future.set_result(response_payload)
+
+
+async def _resolve_claim_error(claim: _CreateIdempotencyClaim, exc: Exception) -> None:
+    if claim.cache_key is None or not claim.owns_future or claim.future is None:
+        return
+
+    if not claim.future.done():
+        claim.future.set_exception(exc)
+    await _clear_create_inflight(claim.cache_key)
+
+
+def _new_game_block_reason() -> str | None:
     if ops_manager.blocks_new_games():
-        raise HTTPException(status_code=503, detail="Server is updating. New games are temporarily blocked.")
+        return "Server is updating. New games are temporarily blocked."
 
     allowed, reason = game_manager.can_accept_new_pending_game()
     if not allowed:
-        raise HTTPException(status_code=503, detail=reason or "Server is at capacity")
+        return reason or "Server is at capacity"
+    return None
 
+
+def _create_game_response(request: CreateGameRequest) -> CreateGameResponse:
     session = session_manager.create_session()
     pending = game_manager.create_game(
         player_name=request.player_name,
@@ -75,13 +197,53 @@ async def create_game(request: CreateGameRequest):
         await connection_manager.broadcast_lobby_state(pending.game_id)
 
     game_manager.start_battler_preload(pending, on_complete=broadcast_lobby)
-
     return CreateGameResponse(
         game_id=pending.game_id,
         join_code=pending.join_code,
         session_id=session.session_id,
         player_id=session.player_id,
     )
+
+
+def get_db():
+    db = database.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+router = APIRouter(prefix="/api/games", tags=["games"])
+
+
+@router.post("", response_model=CreateGameResponse)
+async def create_game(
+    request: CreateGameRequest,
+    x_mtb_idempotency_key: str | None = Header(default=None, alias=IDEMPOTENCY_KEY_HEADER),
+):
+    cache_key = _normalize_idempotency_key(x_mtb_idempotency_key)
+    fingerprint = _request_fingerprint(request)
+    cached_response, claim = await _claim_create_idempotency(cache_key, fingerprint)
+    if cached_response is not None:
+        return cached_response
+
+    if claim.future is not None and not claim.owns_future:
+        return await claim.future
+
+    block_reason = _new_game_block_reason()
+    if block_reason:
+        error = HTTPException(status_code=503, detail=block_reason)
+        await _resolve_claim_error(claim, error)
+        raise error
+
+    try:
+        response_payload = _create_game_response(request)
+    except Exception as exc:
+        await _resolve_claim_error(claim, exc)
+        raise
+
+    await _resolve_claim_success(claim, response_payload)
+    return response_payload
 
 
 class WarmCubeRequest(BaseModel):

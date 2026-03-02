@@ -4,6 +4,7 @@ import logging
 import random
 import secrets
 from collections.abc import Callable, Coroutine
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
@@ -55,6 +56,9 @@ from server.db.models import ActiveGameSnapshot, BattleSnapshot, GameRecord, Pla
 from server.runtime_config import (
     HOT_ACTION_WINDOW_MINUTES,
     IDLE_EVICT_MINUTES,
+    MAX_BATTLER_PRELOADS_IN_FLIGHT,
+    MAX_GAME_START_QUEUE,
+    MAX_GAME_STARTS_IN_FLIGHT,
     MAX_HOT_GAMES,
     MAX_PENDING_GAMES,
     MAX_SPECTATE_REQUESTS_TOTAL,
@@ -138,6 +142,10 @@ class PendingGame:
     _loading_task: asyncio.Task | None = field(default=None, repr=False)
 
 
+class GameStartQueueFullError(RuntimeError):
+    pass
+
+
 def _transfer_card_state(card_id: str, from_zones: Zones, to_zones: Zones) -> None:
     if card_id in from_zones.face_down_card_ids:
         from_zones.face_down_card_ids.remove(card_id)
@@ -169,6 +177,10 @@ class GameManager:
         self._connected_humans: dict[str, int] = {}
         self._snapshot_task: asyncio.Task | None = None
         self._action_locks: dict[str, asyncio.Lock] = {}
+        self._game_start_slots = asyncio.Semaphore(MAX_GAME_STARTS_IN_FLIGHT)
+        self._game_starts_in_flight = 0
+        self._game_start_waiters = 0
+        self._battler_preload_slots = asyncio.Semaphore(MAX_BATTLER_PRELOADS_IN_FLIGHT)
         self._snapshot_interval_sec = SNAPSHOT_INTERVAL_SEC
 
     def get_action_lock(self, game_id: str) -> asyncio.Lock:
@@ -209,9 +221,45 @@ class GameManager:
                 hot += 1
         return hot
 
+    def game_start_waiters_count(self) -> int:
+        return self._game_start_waiters
+
+    def game_starts_in_flight_count(self) -> int:
+        return self._game_starts_in_flight
+
+    def game_start_capacity(self) -> dict[str, int]:
+        return {
+            "in_flight": self._game_starts_in_flight,
+            "waiters": self._game_start_waiters,
+            "max_in_flight": MAX_GAME_STARTS_IN_FLIGHT,
+            "max_waiters": MAX_GAME_START_QUEUE,
+        }
+
+    @asynccontextmanager
+    async def _acquire_game_start_slot(self):
+        if self._game_start_waiters >= MAX_GAME_START_QUEUE:
+            raise GameStartQueueFullError("Server is starting many games. Please try again shortly.")
+
+        self._game_start_waiters += 1
+        acquired = False
+        try:
+            await self._game_start_slots.acquire()
+            acquired = True
+            self._game_start_waiters -= 1
+            self._game_starts_in_flight += 1
+            yield
+        finally:
+            if acquired:
+                self._game_starts_in_flight = max(0, self._game_starts_in_flight - 1)
+                self._game_start_slots.release()
+            else:
+                self._game_start_waiters = max(0, self._game_start_waiters - 1)
+
     def can_accept_new_pending_game(self) -> tuple[bool, str | None]:
         if len(self._pending_games) >= MAX_PENDING_GAMES:
             return False, "Too many pending games. Please try again shortly."
+        if self._game_start_waiters >= MAX_GAME_START_QUEUE:
+            return False, "Server is starting many games. Please try again shortly."
         if self.loaded_games_count() >= MAX_TOTAL_LOADED_GAMES_HARD:
             return False, "Server is at game capacity. Please try again shortly."
         if self.hot_games_count() >= MAX_HOT_GAMES:
@@ -597,6 +645,9 @@ class GameManager:
         if not allowed:
             return False, reason
 
+        if self._game_start_waiters >= MAX_GAME_START_QUEUE:
+            return False, "Server is starting many games. Please try again shortly."
+
         return True, None
 
     def start_game(self, game_id: str, db: Session | None = None) -> Game | None:
@@ -661,83 +712,86 @@ class GameManager:
         return game
 
     async def start_game_async(self, game_id: str, db: Session | None = None) -> Game | None:
-        pending = self._pending_games.get(game_id)
-        total = len(pending.player_names) + pending.puppet_count if pending else 0
-        if not pending or total < 2:
-            return None
-        allowed, _ = self.can_accept_loaded_game()
-        if not allowed:
-            return None
+        try:
+            async with self._acquire_game_start_slot():
+                pending = self._pending_games.get(game_id)
+                total = len(pending.player_names) + pending.puppet_count if pending else 0
+                if not pending or total < 2:
+                    return None
+                allowed, _ = self.can_accept_loaded_game()
+                if not allowed:
+                    return None
 
-        if pending._loading_task and not pending._loading_task.done():
-            try:
-                await asyncio.wait_for(pending._loading_task, timeout=30.0)
-            except TimeoutError:
-                pass
+                if pending._loading_task and not pending._loading_task.done():
+                    try:
+                        await asyncio.wait_for(pending._loading_task, timeout=30.0)
+                    except TimeoutError:
+                        pass
 
-        if pending.battler_error:
-            return None
+                if pending.battler_error:
+                    return None
 
-        if not pending.battler:
-            loop = asyncio.get_running_loop()
-            try:
-                pending.battler = await loop.run_in_executor(
-                    None, self._load_battler, pending.cube_id, pending.use_upgrades, pending.use_vanguards
+                if not pending.battler:
+                    loop = asyncio.get_running_loop()
+                    try:
+                        pending.battler = await loop.run_in_executor(
+                            None, self._load_battler, pending.cube_id, pending.use_upgrades, pending.use_vanguards
+                        )
+                    except Exception:
+                        return None
+
+                pending.is_started = True
+                pending.target_player_count = total
+
+                config = Config(
+                    use_upgrades=pending.use_upgrades,
+                    use_vanguards=pending.use_vanguards,
+                    auto_approve_spectators=pending.auto_approve_spectators,
+                    cube_id=pending.cube_id,
                 )
-            except Exception:
-                return None
+                game = create_game(pending.player_names, len(pending.player_names), config)
+                battler = pending.battler
+                set_battler(game, battler)
 
-        pending.is_started = True
-        pending.target_player_count = total
+                if db is not None:
+                    config_data = {
+                        "use_upgrades": pending.use_upgrades,
+                        "use_vanguards": pending.use_vanguards,
+                        "cube_id": pending.cube_id,
+                    }
+                    game_record = GameRecord(
+                        id=game_id,
+                        config_json=json.dumps(config_data),
+                    )
+                    db.add(game_record)
+                    db.commit()
 
-        config = Config(
-            use_upgrades=pending.use_upgrades,
-            use_vanguards=pending.use_vanguards,
-            auto_approve_spectators=pending.auto_approve_spectators,
-            cube_id=pending.cube_id,
-        )
-        game = create_game(pending.player_names, len(pending.player_names), config)
-        battler = pending.battler
-        set_battler(game, battler)
+                    if pending.puppet_count > 0:
+                        target_elo = battler.elo or 1200.0
+                        self.load_fake_players_for_game(
+                            db,
+                            game,
+                            pending.puppet_count,
+                            target_elo,
+                            pending.use_upgrades,
+                            pending.use_vanguards,
+                            pending.cube_id,
+                        )
 
-        if db is not None:
-            config_data = {
-                "use_upgrades": pending.use_upgrades,
-                "use_vanguards": pending.use_vanguards,
-                "cube_id": pending.cube_id,
-            }
-            game_record = GameRecord(
-                id=game_id,
-                config_json=json.dumps(config_data),
-            )
-            db.add(game_record)
-            db.commit()
-
-            if pending.puppet_count > 0:
-                target_elo = battler.elo or 1200.0
-                self.load_fake_players_for_game(
-                    db,
-                    game,
-                    pending.puppet_count,
-                    target_elo,
-                    pending.use_upgrades,
-                    pending.use_vanguards,
+                logger.info(
+                    "Game started: game_id=%s cube=%s players=%s",
+                    game_id,
                     pending.cube_id,
+                    pending.player_names,
                 )
-
-        logger.info(
-            "Game started: game_id=%s cube=%s players=%s",
-            game_id,
-            pending.cube_id,
-            pending.player_names,
-        )
-        self._active_games[game_id] = game
-        self._pending_games.pop(game_id, None)
-        self._last_human_activity[game_id] = datetime.now(UTC)
-        self._connected_humans[game_id] = 0
-        self.mark_game_dirty(game_id)
-
-        return game
+                self._active_games[game_id] = game
+                self._pending_games.pop(game_id, None)
+                self._last_human_activity[game_id] = datetime.now(UTC)
+                self._connected_humans[game_id] = 0
+                self.mark_game_dirty(game_id)
+                return game
+        except GameStartQueueFullError:
+            return None
 
     def complete_game(self, game_id: str, winner: Player | None, db: Session | None = None) -> None:
         """Complete a game - set phases, persist final state, schedule cleanup."""
@@ -881,10 +935,11 @@ class GameManager:
     ) -> None:
         pending.battler_loading = True
         try:
-            loop = asyncio.get_running_loop()
-            battler = await loop.run_in_executor(
-                None, self._load_battler, pending.cube_id, pending.use_upgrades, pending.use_vanguards
-            )
+            async with self._battler_preload_slots:
+                loop = asyncio.get_running_loop()
+                battler = await loop.run_in_executor(
+                    None, self._load_battler, pending.cube_id, pending.use_upgrades, pending.use_vanguards
+                )
             pending.battler = battler
         except Exception as e:
             pending.battler_error = str(e)

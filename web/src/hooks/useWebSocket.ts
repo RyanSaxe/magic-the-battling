@@ -25,6 +25,11 @@ interface SpectatorConfig {
   requestId: string
 }
 
+function computeReconnectDelayMs(attempt: number): number {
+  const capped = Math.min(500 * (2 ** attempt), 30_000)
+  return Math.floor(Math.random() * capped)
+}
+
 export function useWebSocket(
   gameId: string | null,
   sessionId: string | null,
@@ -154,7 +159,7 @@ export function useWebSocket(
         }
 
         if (!isClosingRef.current) {
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000)
+          const delay = computeReconnectDelayMs(reconnectAttempts.current)
           reconnectAttempts.current++
           reconnectTimeoutRef.current = window.setTimeout(connect, delay)
         }

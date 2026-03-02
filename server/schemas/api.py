@@ -291,3 +291,7 @@ class OpsCapacityResponse(BaseModel):
     hot_games: int
     pending_games: int
     sessions: int
+    game_starts_in_flight: int
+    game_start_waiters: int
+    max_game_starts_in_flight: int
+    max_game_start_waiters: int

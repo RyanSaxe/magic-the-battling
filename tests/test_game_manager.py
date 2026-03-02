@@ -9,6 +9,7 @@ from mtb.models.game import Game, Puppet, StaticOpponent, create_game, set_battl
 from mtb.phases import battle
 from server.db.models import PlayerGameHistory
 from server.routers.ws import ConnectionManager
+from server.runtime_config import MAX_GAME_START_QUEUE
 from server.services.game_manager import GameManager
 
 
@@ -235,6 +236,31 @@ class TestHotGamesTimezoneHandling:
         game_manager._last_human_activity["game1"] = datetime.now(UTC).replace(tzinfo=None)
 
         assert game_manager.hot_games_count() == 1
+
+
+class TestGameStartQueueGuards:
+    def test_can_accept_new_pending_game_rejects_when_start_queue_full(self, game_manager):
+        game_manager._game_start_waiters = MAX_GAME_START_QUEUE
+
+        allowed, reason = game_manager.can_accept_new_pending_game()
+
+        assert allowed is False
+        assert reason is not None
+        assert "starting many games" in reason.lower()
+
+    def test_can_start_game_rejects_when_start_queue_full(self, game_manager):
+        pending = game_manager.create_game(player_name="Host", player_id="host_pid")
+        joined = game_manager.join_game(pending.join_code, "Guest", "guest_pid")
+        assert joined is not None
+        pending.player_ready["host_pid"] = True
+        pending.player_ready["guest_pid"] = True
+        game_manager._game_start_waiters = MAX_GAME_START_QUEUE
+
+        can_start, reason = game_manager.can_start_game(pending.game_id, "host_pid")
+
+        assert can_start is False
+        assert reason is not None
+        assert "starting many games" in reason.lower()
 
 
 class TestPersistPlacementOnElimination:
