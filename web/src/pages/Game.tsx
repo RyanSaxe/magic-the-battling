@@ -1019,21 +1019,29 @@ function GameContent() {
             </div>
           </div>
         )}
-        {serverNotice && serverNotice.mode !== 'normal' && (
+        {serverNotice?.mode === 'draining' && (
+          <div className="fixed top-0 inset-x-0 z-40 px-3 pt-3 pointer-events-none">
+            <div className="mx-auto max-w-3xl pointer-events-auto bg-amber-950/90 border border-amber-500/40 rounded-lg shadow-xl px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-sm font-semibold text-amber-200">Scheduled Server Update</h2>
+                <span
+                  className="inline-flex items-center justify-center rounded-full border border-amber-300/70 text-amber-100 text-[10px] font-bold leading-none px-1.5 py-0.5 cursor-help"
+                  title="New games are temporarily paused. You can keep playing this game and reconnect after the update if needed."
+                >
+                  i
+                </span>
+              </div>
+              <p className="text-sm text-amber-100/95">
+                {serverNotice.message || 'A server update is scheduled soon. New games are paused while current games continue.'}
+              </p>
+            </div>
+          </div>
+        )}
+        {serverNotice?.mode === 'maintenance' && (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
             <div className="bg-gray-950/95 border border-amber-500/40 rounded-xl shadow-2xl p-6 max-w-md mx-4">
               <div className="flex items-center gap-2 mb-2">
-                <h2 className="text-xl font-semibold text-amber-300">
-                  {serverNotice.mode === 'maintenance' ? 'Server Maintenance' : 'Server Updating'}
-                </h2>
-                {serverNotice.mode === 'draining' && (
-                  <span
-                    className="inline-flex items-center justify-center rounded-full border border-amber-400/70 text-amber-200 text-[10px] font-bold leading-none px-1.5 py-0.5 cursor-help"
-                    title="If you are currently in a game, reconnect after the update and continue from the same game."
-                  >
-                    i
-                  </span>
-                )}
+                <h2 className="text-xl font-semibold text-amber-300">Server Maintenance</h2>
               </div>
               <p className="text-sm text-gray-200 mb-2">
                 {serverNotice.message || 'Please wait a moment while the server finishes an update.'}
