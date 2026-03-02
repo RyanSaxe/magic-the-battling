@@ -80,3 +80,22 @@ class BattleSnapshot(Base):
     player_history = relationship("PlayerGameHistory", back_populates="snapshots")
 
     __table_args__ = (Index("ix_snapshot_lookup", "player_history_id", "stage", "round"),)
+
+
+class ActiveGameSnapshot(Base):
+    __tablename__ = "active_game_snapshots"
+
+    game_id = Column(String, primary_key=True)
+    state_json = Column(Text, nullable=False)
+    last_human_activity_at = Column(DateTime, default=_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=_utc_now, nullable=False)
+
+
+class OpsState(Base):
+    __tablename__ = "ops_state"
+
+    id = Column(Integer, primary_key=True)
+    mode = Column(String, nullable=False, default="normal")
+    message = Column(Text, nullable=True)
+    updated_by = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=_utc_now, nullable=False)

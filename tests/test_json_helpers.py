@@ -40,7 +40,7 @@ def json_endpoint():
 
 @pytest.fixture
 def json_helpers_module():
-    from mtb.utils import json_helpers as module  # noqa: PLC0415
+    module = importlib.import_module("mtb.utils.json_helpers")
 
     try:
         module.stop_worker()

@@ -348,7 +348,7 @@ function SpectateRequestModal({
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { session, saveSession } = useSession();
+  const { session, saveSession, clearSession } = useSession();
 
   const [spectatorConfig, setSpectatorConfig] = useState<SpectatorConfig | null>(null);
   const [spectatingPlayer, setSpectatingPlayer] = useState<string | null>(null);
@@ -359,7 +359,7 @@ function GameContent() {
   const isSpectateMode = searchParams.get("spectate") === "true";
   const { addToast } = useToast();
 
-  const { gameState, isConnected, actions, pendingSpectateRequest } = useGame(
+  const { gameState, isConnected, actions, pendingSpectateRequest, serverNotice, invalidSession } = useGame(
     gameId ?? null,
     isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
@@ -368,6 +368,12 @@ function GameContent() {
   const { state, setPreviewCard } = useContextStrip();
 
   const isSpectator = !!spectatorConfig;
+
+  useEffect(() => {
+    if (invalidSession && session) {
+      clearSession();
+    }
+  }, [invalidSession, session, clearSession]);
 
   // Lifted state from Build phase
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
@@ -965,6 +971,21 @@ function GameContent() {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
               <span className="text-sm text-gray-200">Reconnecting...</span>
+            </div>
+          </div>
+        )}
+        {serverNotice && serverNotice.mode !== 'normal' && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+            <div className="bg-gray-950/95 border border-amber-500/40 rounded-xl shadow-2xl p-6 max-w-md mx-4">
+              <h2 className="text-xl font-semibold text-amber-300 mb-2">
+                {serverNotice.mode === 'maintenance' ? 'Server Maintenance' : 'Server Updating'}
+              </h2>
+              <p className="text-sm text-gray-200 mb-2">
+                {serverNotice.message || 'Please wait a moment while the server finishes an update.'}
+              </p>
+              <p className="text-xs text-gray-400">
+                Keep this tab open. Your game will reconnect automatically when available.
+              </p>
             </div>
           </div>
         )}

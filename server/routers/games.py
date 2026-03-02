@@ -11,6 +11,7 @@ from mtb.utils.cubecobra import get_cube_data
 from mtb.utils.json_helpers import get_json, is_cached, revalidate_json
 from server.db import database
 from server.db.models import GameRecord, PlayerGameHistory
+from server.routers.ws import connection_manager
 from server.schemas.api import (
     CreateGameRequest,
     CreateGameResponse,
@@ -31,6 +32,7 @@ from server.schemas.api import (
     StartGameResponse,
 )
 from server.services.game_manager import game_manager
+from server.services.ops_manager import ops_manager
 from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
@@ -49,7 +51,12 @@ router = APIRouter(prefix="/api/games", tags=["games"])
 
 @router.post("", response_model=CreateGameResponse)
 async def create_game(request: CreateGameRequest):
-    from server.routers.ws import connection_manager  # noqa: PLC0415
+    if ops_manager.blocks_new_games():
+        raise HTTPException(status_code=503, detail="Server is updating. New games are temporarily blocked.")
+
+    allowed, reason = game_manager.can_accept_new_pending_game()
+    if not allowed:
+        raise HTTPException(status_code=503, detail=reason or "Server is at capacity")
 
     session = session_manager.create_session()
     pending = game_manager.create_game(
@@ -110,6 +117,9 @@ def warm_cube_cache(request: WarmCubeRequest):
 @router.post("/join", response_model=JoinGameResponse)
 def join_game_by_code(request: JoinGameRequest):
     """Join a game using just the join code (no game_id needed)."""
+    if ops_manager.blocks_new_games():
+        raise HTTPException(status_code=503, detail="Server is updating. Joining new games is temporarily blocked.")
+
     game_id = game_manager.get_game_id_by_join_code(request.join_code)
     if not game_id:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -143,6 +153,9 @@ def join_game_by_code(request: JoinGameRequest):
 
 @router.post("/{game_id}/join", response_model=JoinGameResponse)
 def join_game(game_id: str, request: JoinGameRequest):
+    if ops_manager.blocks_new_games():
+        raise HTTPException(status_code=503, detail="Server is updating. Joining new games is temporarily blocked.")
+
     pending = game_manager.get_pending_game(game_id)
     if not pending:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -175,7 +188,8 @@ def join_game(game_id: str, request: JoinGameRequest):
 
 @router.post("/{game_id}/rejoin", response_model=JoinGameResponse)
 def rejoin_game(game_id: str, request: RejoinGameRequest):
-    from server.routers.ws import connection_manager  # noqa: PLC0415
+    if not game_manager.get_game(game_id):
+        game_manager.restore_game_from_snapshot(game_id)
 
     game = game_manager.get_game(game_id)
     if not game or not any(p.name == request.player_name for p in game.players):
@@ -230,6 +244,9 @@ def get_game_cards(game_id: str):
 
 @router.post("/{game_id}/start", response_model=StartGameResponse)
 def start_game(game_id: str):
+    if ops_manager.blocks_new_games():
+        raise HTTPException(status_code=503, detail="Server is updating. New games are temporarily blocked.")
+
     pending = game_manager.get_pending_game(game_id)
     if not pending:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -262,10 +279,11 @@ def get_game_state(game_id: str, session_id: str):
 
 @router.get("/{game_id}/status", response_model=GameStatusResponse)
 def get_game_status(game_id: str):
-    from server.routers.ws import connection_manager  # noqa: PLC0415
-
     pending = game_manager.get_pending_game(game_id)
     game = game_manager.get_game(game_id)
+    if not pending and not game:
+        game_manager.restore_game_from_snapshot(game_id)
+        game = game_manager.get_game(game_id)
 
     if not pending and not game:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -330,8 +348,6 @@ def get_game_status(game_id: str):
 
 @router.post("/{game_id}/spectate-request", response_model=SpectateRequestResponse)
 async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
-    from server.routers.ws import connection_manager  # noqa: PLC0415
-
     pending = game_manager.get_pending_game(game_id)
     game = game_manager.get_game(game_id)
 
@@ -350,7 +366,10 @@ async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
     if not player_exists:
         raise HTTPException(status_code=404, detail="Target player not found")
 
-    request_id = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
+    try:
+        request_id = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
 
     auto_approve = (pending and pending.auto_approve_spectators) or (game and game.config.auto_approve_spectators)
     if not auto_approve:

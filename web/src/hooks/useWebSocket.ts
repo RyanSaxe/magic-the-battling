@@ -11,7 +11,13 @@ interface WebSocketState {
   gameState: GameState | null
   lobbyState: LobbyState | null
   pendingSpectateRequest: SpectateRequest | null
+  serverNotice: {
+    mode: 'normal' | 'draining' | 'maintenance'
+    message: string
+    updated_at: string
+  } | null
   kicked: boolean
+  invalidSession: boolean
 }
 
 interface SpectatorConfig {
@@ -30,7 +36,9 @@ export function useWebSocket(
     gameState: null,
     lobbyState: null,
     pendingSpectateRequest: null,
+    serverNotice: null,
     kicked: false,
+    invalidSession: false,
   })
 
   const wsRef = useRef<WebSocket | null>(null)
@@ -62,7 +70,7 @@ export function useWebSocket(
       const ws = new WebSocket(url)
 
       ws.onopen = () => {
-        setState(s => ({ ...s, isConnected: true }))
+        setState(s => ({ ...s, isConnected: true, invalidSession: false }))
         reconnectAttempts.current = 0
       }
 
@@ -92,6 +100,8 @@ export function useWebSocket(
               onServerErrorRef.current?.(message.payload.message)
             } else if (message.type === 'spectate_request') {
               setState(s => ({ ...s, pendingSpectateRequest: message.payload }))
+            } else if (message.type === 'server_notice') {
+              setState(s => ({ ...s, serverNotice: message.payload }))
             } else if (message.type === 'kicked') {
               isClosingRef.current = true
               setState(s => ({ ...s, kicked: true }))
@@ -108,9 +118,19 @@ export function useWebSocket(
         processQueue()
       }
 
-      ws.onclose = () => {
+      ws.onclose = (event) => {
         setState(s => ({ ...s, isConnected: false }))
         wsRef.current = null
+
+        if (event.code === 4001) {
+          isClosingRef.current = true
+          setState(s => ({ ...s, invalidSession: true }))
+          return
+        }
+        if (event.code === 4004) {
+          isClosingRef.current = true
+          return
+        }
 
         if (!isClosingRef.current) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current), 30000)

@@ -11,11 +11,50 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      APP_BASE_URL: https://magic-the-battling-dev.fly.dev
     steps:
       - uses: actions/checkout@v4
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - run: flyctl deploy --config fly.dev.toml --remote-only
+      - name: Enter draining mode
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${APP_BASE_URL}/api/ops/mode" \
+            -H "Content-Type: application/json" \
+            -H "x-ops-token: ${OPS_API_TOKEN_DEV}" \
+            -d '{"mode":"draining","message":"Server updating. Please wait a moment while we reconnect your game.","updated_by":"github-actions-dev"}'
+        env:
+          OPS_API_TOKEN_DEV: ${{ secrets.OPS_API_TOKEN_DEV }}
+
+      - name: Wait for client notice window
+        run: sleep 60
+
+      - name: Deploy app
+        id: deploy_app
+        run: flyctl deploy --config fly.dev.toml --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_DEV }}
+
+      - name: Return to normal mode
+        if: success()
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${APP_BASE_URL}/api/ops/mode" \
+            -H "Content-Type: application/json" \
+            -H "x-ops-token: ${OPS_API_TOKEN_DEV}" \
+            -d '{"mode":"normal","message":"", "updated_by":"github-actions-dev"}'
+        env:
+          OPS_API_TOKEN_DEV: ${{ secrets.OPS_API_TOKEN_DEV }}
+
+      - name: Switch to maintenance mode on deploy failure
+        if: failure()
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${APP_BASE_URL}/api/ops/mode" \
+            -H "Content-Type: application/json" \
+            -H "x-ops-token: ${OPS_API_TOKEN_DEV}" \
+            -d '{"mode":"maintenance","message":"Deployment did not complete. Please retry in a few minutes.","updated_by":"github-actions-dev"}'
+        env:
+          OPS_API_TOKEN_DEV: ${{ secrets.OPS_API_TOKEN_DEV }}

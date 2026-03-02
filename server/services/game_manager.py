@@ -5,11 +5,13 @@ import random
 import secrets
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from importlib import import_module
 from typing import Any, Literal, cast
 from uuid import uuid4
 
 from sqlalchemy import true as sql_true
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session, joinedload
 
 import server.db.database as db
@@ -50,7 +52,17 @@ from mtb.phases.elimination import (
     setup_sudden_death_battle,
     would_be_dead_ready_for_elimination,
 )
-from server.db.models import BattleSnapshot, GameRecord, PlayerGameHistory
+from server.db.models import ActiveGameSnapshot, BattleSnapshot, GameRecord, PlayerGameHistory
+from server.runtime_config import (
+    HOT_ACTION_WINDOW_MINUTES,
+    IDLE_EVICT_MINUTES,
+    MAX_HOT_GAMES,
+    MAX_PENDING_GAMES,
+    MAX_SPECTATE_REQUESTS_TOTAL,
+    MAX_TOTAL_LOADED_GAMES_HARD,
+    SNAPSHOT_INTERVAL_SEC,
+    SPECTATE_REQUEST_TTL_MINUTES,
+)
 from server.schemas.api import (
     BattleView,
     CubeLoadingStatus,
@@ -64,6 +76,11 @@ from server.schemas.api import (
 from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
+
+
+def _get_connection_manager() -> Any:
+    ws_module = import_module("server.routers.ws")
+    return cast(Any, ws_module.connection_manager)
 
 
 def _scrub_face_down_cards(cards: list[Card], face_down_ids: set[str], id_map: dict[str, str]) -> list[Card]:
@@ -95,6 +112,7 @@ class PendingSpectateRequest:
     status: Literal["pending", "approved", "denied"] = "pending"
     session_id: str | None = None
     player_id: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -144,6 +162,220 @@ class GameManager:
         self._cleanup_tasks: dict[str, asyncio.Task] = {}
         self._pending_disconnect_tasks: dict[str, asyncio.Task] = {}
         self._spectate_requests: dict[str, PendingSpectateRequest] = {}
+        self._dirty_games: set[str] = set()
+        self._last_human_activity: dict[str, datetime] = {}
+        self._connected_humans: dict[str, int] = {}
+        self._snapshot_task: asyncio.Task | None = None
+        self._action_locks: dict[str, asyncio.Lock] = {}
+        self._snapshot_interval_sec = SNAPSHOT_INTERVAL_SEC
+
+    def get_action_lock(self, game_id: str) -> asyncio.Lock:
+        lock = self._action_locks.get(game_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._action_locks[game_id] = lock
+        return lock
+
+    def mark_game_dirty(self, game_id: str, *, human_activity: bool = True) -> None:
+        if game_id in self._active_games:
+            self._dirty_games.add(game_id)
+            if human_activity:
+                self._last_human_activity[game_id] = datetime.now(UTC)
+
+    def update_connected_humans(self, game_id: str, delta: int) -> None:
+        next_count = self._connected_humans.get(game_id, 0) + delta
+        if next_count <= 0:
+            self._connected_humans.pop(game_id, None)
+            return
+        self._connected_humans[game_id] = next_count
+        self._last_human_activity[game_id] = datetime.now(UTC)
+
+    def loaded_games_count(self) -> int:
+        return len(self._active_games)
+
+    def hot_games_count(self) -> int:
+        hot_cutoff = datetime.now(UTC) - timedelta(minutes=HOT_ACTION_WINDOW_MINUTES)
+        hot = 0
+        for game_id in self._active_games:
+            connected = self._connected_humans.get(game_id, 0) > 0
+            recently_active = (self._last_human_activity.get(game_id) or datetime.min.replace(tzinfo=UTC)) >= hot_cutoff
+            if connected or recently_active:
+                hot += 1
+        return hot
+
+    def can_accept_new_pending_game(self) -> tuple[bool, str | None]:
+        if len(self._pending_games) >= MAX_PENDING_GAMES:
+            return False, "Too many pending games. Please try again shortly."
+        if self.loaded_games_count() >= MAX_TOTAL_LOADED_GAMES_HARD:
+            return False, "Server is at game capacity. Please try again shortly."
+        if self.hot_games_count() >= MAX_HOT_GAMES:
+            return False, "Server is handling many active games. Please try again shortly."
+        return True, None
+
+    def can_accept_loaded_game(self) -> tuple[bool, str | None]:
+        if self.loaded_games_count() >= MAX_TOTAL_LOADED_GAMES_HARD:
+            return False, "Server is at game capacity. Please try again shortly."
+        return True, None
+
+    async def start_background_tasks(self) -> None:
+        if self._snapshot_task and not self._snapshot_task.done():
+            return
+
+        async def _loop() -> None:
+            while True:
+                await asyncio.sleep(self._snapshot_interval_sec)
+                self.persist_dirty_games()
+                self.evict_cold_games()
+                self.cleanup_expired_spectate_requests()
+
+        self._snapshot_task = asyncio.create_task(_loop())
+        logger.info("Started snapshot/eviction loop (every %.1fs)", self._snapshot_interval_sec)
+
+    async def stop_background_tasks(self) -> None:
+        if self._snapshot_task is None:
+            return
+        self._snapshot_task.cancel()
+        self._snapshot_task = None
+        self.persist_all_games()
+
+    def persist_all_games(self) -> int:
+        self._dirty_games.update(self._active_games.keys())
+        return self.persist_dirty_games()
+
+    def persist_dirty_games(self) -> int:
+        target_ids = [gid for gid in list(self._dirty_games) if gid in self._active_games]
+        if not target_ids:
+            return 0
+
+        now = datetime.now(UTC)
+        session = db.SessionLocal()
+        wrote = 0
+        try:
+            for game_id in target_ids:
+                game = self._active_games.get(game_id)
+                if game is None:
+                    self._dirty_games.discard(game_id)
+                    continue
+
+                state_json = game.model_dump_json()
+                activity_at = self._last_human_activity.get(game_id, now)
+                stmt = sqlite_insert(ActiveGameSnapshot).values(
+                    game_id=game_id,
+                    state_json=state_json,
+                    last_human_activity_at=activity_at,
+                    updated_at=now,
+                )
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=[ActiveGameSnapshot.game_id],
+                    set_={
+                        "state_json": state_json,
+                        "last_human_activity_at": activity_at,
+                        "updated_at": now,
+                    },
+                )
+                session.execute(stmt)
+                self._dirty_games.discard(game_id)
+                wrote += 1
+            session.commit()
+        finally:
+            session.close()
+
+        if wrote:
+            logger.info(
+                "Snapshot flush: wrote=%d loaded_games=%d dirty_remaining=%d",
+                wrote,
+                len(self._active_games),
+                len(self._dirty_games),
+            )
+        return wrote
+
+    def restore_game_from_snapshot(self, game_id: str) -> bool:
+        if game_id in self._active_games:
+            return True
+
+        session = db.SessionLocal()
+        try:
+            row = session.get(ActiveGameSnapshot, game_id)
+            if row is None:
+                return False
+            game = Game.model_validate_json(cast(str, row.state_json))
+            self._active_games[game_id] = game
+            last_activity = cast(datetime | None, row.last_human_activity_at)
+            self._last_human_activity[game_id] = last_activity or datetime.now(UTC)
+            self._connected_humans[game_id] = 0
+            self._dirty_games.discard(game_id)
+            logger.info("Restored active game from snapshot: game_id=%s", game_id)
+            return True
+        except Exception:
+            logger.exception("Failed restoring snapshot for game_id=%s", game_id)
+            return False
+        finally:
+            session.close()
+
+    def restore_all_snapshots(self) -> int:
+        restored = 0
+        session = db.SessionLocal()
+        try:
+            rows = session.query(ActiveGameSnapshot).all()
+            for row in rows:
+                snapshot_game_id = cast(str, row.game_id)
+                try:
+                    game = Game.model_validate_json(cast(str, row.state_json))
+                except Exception:
+                    logger.exception("Invalid snapshot; deleting row for game_id=%s", snapshot_game_id)
+                    session.delete(row)
+                    continue
+                last_activity = cast(datetime | None, row.last_human_activity_at)
+                self._active_games[snapshot_game_id] = game
+                self._last_human_activity[snapshot_game_id] = last_activity or datetime.now(UTC)
+                self._connected_humans[snapshot_game_id] = 0
+                restored += 1
+            session.commit()
+        finally:
+            session.close()
+
+        if restored:
+            logger.info("Restored %d active games from snapshots", restored)
+        return restored
+
+    def delete_snapshot(self, game_id: str) -> None:
+        session = db.SessionLocal()
+        try:
+            row = session.get(ActiveGameSnapshot, game_id)
+            if row is not None:
+                session.delete(row)
+                session.commit()
+        except Exception:
+            # Some tests construct GameManager without initializing DB schema.
+            # Snapshot deletion should be best-effort and never break game cleanup.
+            logger.debug("Skipping snapshot delete for game_id=%s", game_id, exc_info=True)
+        finally:
+            session.close()
+        self._dirty_games.discard(game_id)
+
+    def evict_cold_games(self) -> int:
+        cutoff = datetime.now(UTC) - timedelta(minutes=IDLE_EVICT_MINUTES)
+        candidates: list[str] = []
+        for game_id in self._active_games:
+            if self._connected_humans.get(game_id, 0) > 0:
+                continue
+            last_human = self._last_human_activity.get(game_id, datetime.min.replace(tzinfo=UTC))
+            if last_human < cutoff:
+                candidates.append(game_id)
+
+        if not candidates:
+            return 0
+
+        evicted = 0
+        for game_id in candidates:
+            self.mark_game_dirty(game_id, human_activity=False)
+            self.persist_dirty_games()
+            self._cleanup_game(game_id, preserve_snapshot=True)
+            evicted += 1
+
+        if evicted:
+            logger.info("Evicted cold games from memory: count=%d", evicted)
+        return evicted
 
     def create_game(
         self,
@@ -241,12 +473,19 @@ class GameManager:
         if not all_ready:
             return False, "Not all players are ready"
 
+        allowed, reason = self.can_accept_loaded_game()
+        if not allowed:
+            return False, reason
+
         return True, None
 
     def start_game(self, game_id: str, db: Session | None = None) -> Game | None:
         pending = self._pending_games.get(game_id)
         total = len(pending.player_names) + pending.puppet_count if pending else 0
         if not pending or total < 2:
+            return None
+        allowed, _ = self.can_accept_loaded_game()
+        if not allowed:
             return None
 
         pending.is_started = True
@@ -295,6 +534,9 @@ class GameManager:
         )
         self._active_games[game_id] = game
         self._pending_games.pop(game_id, None)
+        self._last_human_activity[game_id] = datetime.now(UTC)
+        self._connected_humans[game_id] = 0
+        self.mark_game_dirty(game_id)
 
         return game
 
@@ -302,6 +544,9 @@ class GameManager:
         pending = self._pending_games.get(game_id)
         total = len(pending.player_names) + pending.puppet_count if pending else 0
         if not pending or total < 2:
+            return None
+        allowed, _ = self.can_accept_loaded_game()
+        if not allowed:
             return None
 
         if pending._loading_task and not pending._loading_task.done():
@@ -368,6 +613,9 @@ class GameManager:
         )
         self._active_games[game_id] = game
         self._pending_games.pop(game_id, None)
+        self._last_human_activity[game_id] = datetime.now(UTC)
+        self._connected_humans[game_id] = 0
+        self.mark_game_dirty(game_id)
 
         return game
 
@@ -416,6 +664,7 @@ class GameManager:
 
             self._persist_final_placements(db, game_id, game)
 
+        self.delete_snapshot(game_id)
         self._schedule_cleanup(game_id)
 
     def _persist_player_placement(self, db: Session | None, game_id: str | None, name: str, placement: int) -> None:
@@ -460,11 +709,12 @@ class GameManager:
             self._cleanup_game(game_id)
 
         try:
-            loop = asyncio.get_event_loop()
-            task = loop.create_task(cleanup_after_delay())
-            self._cleanup_tasks[game_id] = task
+            loop = asyncio.get_running_loop()
         except RuntimeError:
-            pass
+            return
+
+        task = loop.create_task(cleanup_after_delay())
+        self._cleanup_tasks[game_id] = task
 
     def schedule_abandoned_cleanup(self, game_id: str, delay: float = 86400.0) -> None:
         """Schedule cleanup for abandoned game (default 24 hours)."""
@@ -477,7 +727,7 @@ class GameManager:
             task.cancel()
             logger.info("Cancelled abandoned game cleanup for game_id=%s", game_id)
 
-    def _cleanup_game(self, game_id: str) -> None:
+    def _cleanup_game(self, game_id: str, *, preserve_snapshot: bool = False) -> None:
         """Remove game from memory."""
         logger.info("Executing cleanup for game_id=%s", game_id)
         pending = self._pending_games.get(game_id)
@@ -495,6 +745,11 @@ class GameManager:
             self._player_id_to_name.pop(pid, None)
 
         self._cleanup_tasks.pop(game_id, None)
+        self._connected_humans.pop(game_id, None)
+        self._last_human_activity.pop(game_id, None)
+        self._action_locks.pop(game_id, None)
+        if not preserve_snapshot:
+            self.delete_snapshot(game_id)
 
     def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
@@ -771,7 +1026,10 @@ class GameManager:
         return None
 
     def can_rejoin(self, game_id: str, player_name: str) -> bool:
-        from server.routers.ws import connection_manager  # noqa: PLC0415
+        connection_manager = _get_connection_manager()
+
+        if game_id not in self._active_games:
+            self.restore_game_from_snapshot(game_id)
 
         game = self._active_games.get(game_id)
         if not game:
@@ -784,6 +1042,9 @@ class GameManager:
         return not (player_id and connection_manager.is_player_connected(game_id, player_id))
 
     def rejoin_game(self, game_id: str, player_name: str, player_id: str) -> bool:
+        if game_id not in self._active_games:
+            self.restore_game_from_snapshot(game_id)
+
         game = self._active_games.get(game_id)
         if not game or not any(p.name == player_name for p in game.players):
             return False
@@ -903,6 +1164,11 @@ class GameManager:
         return None
 
     def create_spectate_request(self, game_id: str, target_player_name: str, spectator_name: str) -> str:
+        self.cleanup_expired_spectate_requests()
+        if len(self._spectate_requests) >= MAX_SPECTATE_REQUESTS_TOTAL:
+            msg = "Too many spectate requests queued"
+            raise ValueError(msg)
+
         request_id = secrets.token_urlsafe(8)
         req = PendingSpectateRequest(
             request_id=request_id,
@@ -935,6 +1201,15 @@ class GameManager:
         if req and req.status == "pending":
             req.status = "denied"
         return req
+
+    def cleanup_expired_spectate_requests(self) -> int:
+        expiry = datetime.now(UTC) - timedelta(minutes=SPECTATE_REQUEST_TTL_MINUTES)
+        removed = 0
+        for request_id, req in list(self._spectate_requests.items()):
+            if req.created_at < expiry or req.status in {"approved", "denied"}:
+                self._spectate_requests.pop(request_id, None)
+                removed += 1
+        return removed
 
     def _get_cube_loading_status(self, pending: PendingGame) -> CubeLoadingStatus:
         if pending.battler_error:

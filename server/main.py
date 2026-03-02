@@ -15,8 +15,12 @@ from starlette.requests import Request
 from server.db.database import init_db
 from server.monitoring import start_monitoring, stop_monitoring
 from server.observability import OBSERVABILITY_LOGGER_NAME, configure_logging, record_http_latency
-from server.routers import games, share_preview, ws
+from server.routers import games, ops, share_preview, ws
+from server.runtime_config import MAX_SESSIONS_TOTAL, SESSION_TTL_MINUTES
+from server.services.game_manager import game_manager
+from server.services.ops_manager import ops_manager
 from server.services.preview import preview_service
+from server.services.session_manager import session_manager
 
 configure_logging()
 logger = logging.getLogger(OBSERVABILITY_LOGGER_NAME)
@@ -32,9 +36,16 @@ def _route_template(request: Request) -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    ops_manager.load()
+    game_manager.restore_all_snapshots()
     await preview_service.start()
     start_monitoring()
+    await game_manager.start_background_tasks()
     yield
+    removed_sessions = session_manager.cleanup(SESSION_TTL_MINUTES, MAX_SESSIONS_TOTAL)
+    if removed_sessions:
+        logging.getLogger(__name__).info("Session cleanup before shutdown removed=%d", removed_sessions)
+    await game_manager.stop_background_tasks()
     stop_monitoring()
     await preview_service.stop()
 
@@ -101,6 +112,7 @@ app.add_middleware(
 app.include_router(games.router)
 app.include_router(ws.router)
 app.include_router(share_preview.router)
+app.include_router(ops.router)
 
 
 @app.get("/health")

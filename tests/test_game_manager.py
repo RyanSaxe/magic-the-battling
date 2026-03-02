@@ -1,4 +1,5 @@
 import json
+from importlib import import_module
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -204,27 +205,27 @@ class TestCanRejoin:
 
 class TestConnectionManagerPendingConnections:
     def test_reserve_connection_marks_player_as_connected(self):
-        from server.routers.ws import ConnectionManager  # noqa: PLC0415
+        connection_manager_cls = import_module("server.routers.ws").ConnectionManager
 
-        cm = ConnectionManager()
+        cm = connection_manager_cls()
         assert not cm.is_player_connected("game1", "player1")
 
         cm.reserve_connection("game1", "player1")
         assert cm.is_player_connected("game1", "player1")
 
     def test_reserved_player_included_in_connected_ids(self):
-        from server.routers.ws import ConnectionManager  # noqa: PLC0415
+        connection_manager_cls = import_module("server.routers.ws").ConnectionManager
 
-        cm = ConnectionManager()
+        cm = connection_manager_cls()
         cm.reserve_connection("game1", "player1")
 
         connected_ids = cm.get_connected_player_ids("game1")
         assert "player1" in connected_ids
 
     def test_disconnect_clears_pending_connection(self):
-        from server.routers.ws import ConnectionManager  # noqa: PLC0415
+        connection_manager_cls = import_module("server.routers.ws").ConnectionManager
 
-        cm = ConnectionManager()
+        cm = connection_manager_cls()
         cm.reserve_connection("game1", "player1")
         assert cm.is_player_connected("game1", "player1")
 

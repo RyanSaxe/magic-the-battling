@@ -1,3 +1,5 @@
+from importlib import import_module
+
 from mtb.models.cards import build_battler
 
 
@@ -25,7 +27,7 @@ def test_build_battler_with_separate_upgrades_cube(monkeypatch, card_factory, up
 
 def test_game_manager_loads_upgrades_with_defaults(reset_singletons, mock_cube_data, card_factory, upgrade_factory):
     """Verify game_manager loads upgrades when use_upgrades=True."""
-    from server.services.game_manager import game_manager  # noqa: PLC0415
+    game_manager = import_module("server.services.game_manager").game_manager
 
     pending = game_manager.create_game(
         player_name="Alice",
@@ -45,7 +47,7 @@ def test_game_manager_loads_upgrades_with_defaults(reset_singletons, mock_cube_d
 
 def test_game_manager_no_upgrades_when_disabled(reset_singletons, mock_cube_data, card_factory, upgrade_factory):
     """Verify game_manager does not load upgrades when use_upgrades=False."""
-    from server.services.game_manager import game_manager  # noqa: PLC0415
+    game_manager = import_module("server.services.game_manager").game_manager
 
     pending = game_manager.create_game(
         player_name="Alice",

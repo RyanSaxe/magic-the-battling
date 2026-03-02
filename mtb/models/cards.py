@@ -1,5 +1,8 @@
 import random
 import warnings
+from collections.abc import Callable
+from importlib import import_module
+from typing import cast
 
 from pydantic import BaseModel, Field
 
@@ -70,8 +73,8 @@ def build_battler(
     upgrades_id: str | None = None,
     vanguards_id: str | None = None,
 ) -> Battler:
-    from mtb.utils.cubecobra import get_cube_data  # noqa: PLC0415
-
+    cubecobra_module = import_module("mtb.utils.cubecobra")
+    get_cube_data = cast(Callable[[str], list[Card]], cubecobra_module.get_cube_data)
     cards = get_cube_data(battler_id)
 
     vanguards = [card for card in cards if card.type_line.lower() == VANGUARD_TYPE]
