@@ -6,7 +6,6 @@ import secrets
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from importlib import import_module
 from typing import Any, Literal, cast
 from uuid import uuid4
 
@@ -76,11 +75,6 @@ from server.schemas.api import (
 from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
-
-
-def _get_connection_manager() -> Any:
-    ws_module = import_module("server.routers.ws")
-    return cast(Any, ws_module.connection_manager)
 
 
 def _scrub_face_down_cards(cards: list[Card], face_down_ids: set[str], id_map: dict[str, str]) -> list[Card]:
@@ -1026,7 +1020,7 @@ class GameManager:
         return None
 
     def can_rejoin(self, game_id: str, player_name: str) -> bool:
-        connection_manager = _get_connection_manager()
+        from server.routers.ws import connection_manager  # noqa: PLC0415
 
         if game_id not in self._active_games:
             self.restore_game_from_snapshot(game_id)
