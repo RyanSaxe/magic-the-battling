@@ -197,7 +197,9 @@ def rejoin_game(game_id: str, request: RejoinGameRequest):
 
     player_id = game_manager.get_player_id_by_name(game_id, request.player_name)
     if player_id and connection_manager.is_player_connected(game_id, player_id):
-        raise HTTPException(status_code=409, detail="Player is already connected")
+        recovered = connection_manager.clear_stale_pending_connection(game_id, player_id)
+        if not recovered:
+            raise HTTPException(status_code=409, detail="Player is already connected")
 
     session = session_manager.create_session(game_id)
     success = game_manager.rejoin_game(game_id, request.player_name, session.player_id)

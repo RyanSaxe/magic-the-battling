@@ -67,6 +67,7 @@ class ConnectionManager:
 
     async def connect(self, game_id: str, player_id: str, websocket: WebSocket):
         if self.total_connections() >= MAX_WS_CONNECTIONS:
+            self._pending_connections[game_id].discard(player_id)
             await _reject_websocket(websocket, code=1013, reason="Server is at websocket capacity")
             return False
         game_manager.cancel_abandoned_cleanup(game_id)
@@ -95,14 +96,21 @@ class ConnectionManager:
             self._pending_connections[game_id].discard(player_id)
 
     def get_connected_player_ids(self, game_id: str) -> set[str]:
-        connected = set(self._connections.get(game_id, {}).keys())
-        pending = self._pending_connections.get(game_id, set())
-        return connected | pending
+        return set(self._connections.get(game_id, {}).keys())
 
     def is_player_connected(self, game_id: str, player_id: str) -> bool:
         if player_id in self._connections.get(game_id, {}):
             return True
         return player_id in self._pending_connections.get(game_id, set())
+
+    def clear_stale_pending_connection(self, game_id: str, player_id: str) -> bool:
+        if player_id in self._connections.get(game_id, {}):
+            return False
+        pending = self._pending_connections.get(game_id)
+        if pending is None or player_id not in pending:
+            return False
+        pending.discard(player_id)
+        return True
 
     async def connect_spectator(self, game_id: str, target_player_id: str, websocket: WebSocket):
         await websocket.accept()
@@ -323,6 +331,7 @@ async def websocket_endpoint(
         game = game_manager.get_game(game_id)
 
     if not pending and not game:
+        connection_manager.disconnect(game_id, player_id, websocket)
         await _reject_websocket(websocket, code=4004, reason="Game not found")
         return
 

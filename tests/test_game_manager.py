@@ -1,11 +1,13 @@
 import json
-from unittest.mock import MagicMock, patch
+from datetime import UTC, datetime
+from unittest.mock import MagicMock
 
 import pytest
 
 from mtb.models.cards import Battler, Card
 from mtb.models.game import Puppet, create_game, set_battler
 from server.db.models import PlayerGameHistory
+from server.routers.ws import ConnectionManager
 from server.services.game_manager import GameManager
 
 
@@ -184,9 +186,9 @@ class TestCanRejoin:
         mock_game.players = [mock_player]
         game_manager._active_games["game1"] = mock_game
 
-        with patch("server.routers.ws.connection_manager") as mock_conn:
-            mock_conn.is_player_connected.return_value = False
-            assert game_manager.can_rejoin("game1", "Alice") is True
+        mock_conn = MagicMock()
+        mock_conn.return_value = False
+        assert game_manager.can_rejoin("game1", "Alice", is_player_connected=mock_conn) is True
 
     def test_can_rejoin_returns_false_for_connected_player(self, game_manager):
         mock_game = MagicMock()
@@ -197,15 +199,13 @@ class TestCanRejoin:
         game_manager._player_to_game["player_id_1"] = "game1"
         game_manager._player_id_to_name["player_id_1"] = "Alice"
 
-        with patch("server.routers.ws.connection_manager") as mock_conn:
-            mock_conn.is_player_connected.return_value = True
-            assert game_manager.can_rejoin("game1", "Alice") is False
+        mock_conn = MagicMock()
+        mock_conn.return_value = True
+        assert game_manager.can_rejoin("game1", "Alice", is_player_connected=mock_conn) is False
 
 
 class TestConnectionManagerPendingConnections:
     def test_reserve_connection_marks_player_as_connected(self):
-        from server.routers.ws import ConnectionManager  # noqa: PLC0415
-
         cm = ConnectionManager()
         assert not cm.is_player_connected("game1", "player1")
 
@@ -213,23 +213,27 @@ class TestConnectionManagerPendingConnections:
         assert cm.is_player_connected("game1", "player1")
 
     def test_reserved_player_included_in_connected_ids(self):
-        from server.routers.ws import ConnectionManager  # noqa: PLC0415
-
         cm = ConnectionManager()
         cm.reserve_connection("game1", "player1")
 
         connected_ids = cm.get_connected_player_ids("game1")
-        assert "player1" in connected_ids
+        assert "player1" not in connected_ids
 
     def test_disconnect_clears_pending_connection(self):
-        from server.routers.ws import ConnectionManager  # noqa: PLC0415
-
         cm = ConnectionManager()
         cm.reserve_connection("game1", "player1")
         assert cm.is_player_connected("game1", "player1")
 
         cm.disconnect("game1", "player1", MagicMock())
         assert not cm.is_player_connected("game1", "player1")
+
+
+class TestHotGamesTimezoneHandling:
+    def test_hot_games_count_handles_naive_timestamp(self, game_manager):
+        game_manager._active_games["game1"] = MagicMock()
+        game_manager._last_human_activity["game1"] = datetime.now(UTC).replace(tzinfo=None)
+
+        assert game_manager.hot_games_count() == 1
 
 
 class TestPersistPlacementOnElimination:

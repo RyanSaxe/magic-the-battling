@@ -69,9 +69,7 @@ class TestPreviewServiceRestart:
 
         with patch("server.services.preview.async_playwright") as mock_pw:
             mock_pw.return_value.start = AsyncMock(return_value=mock_playwright_cm)
-            result = asyncio.get_event_loop().run_until_complete(
-                service.screenshot("http://example.com/embed", "cache_key_123")
-            )
+            result = asyncio.run(service.screenshot("http://example.com/embed", "cache_key_123"))
 
         assert result == b"png_data"
 
@@ -84,4 +82,4 @@ class TestPreviewServiceRestart:
         service._browser.new_context = AsyncMock(side_effect=other_error)
 
         with pytest.raises(PlaywrightError, match="Some other Playwright error"):
-            asyncio.get_event_loop().run_until_complete(service.screenshot("http://example.com/embed", "cache_key_456"))
+            asyncio.run(service.screenshot("http://example.com/embed", "cache_key_456"))

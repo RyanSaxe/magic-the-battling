@@ -118,3 +118,15 @@ class TestGetGameState:
         )
 
         assert response.status_code == 404
+
+
+class TestRejoinGame:
+    def test_rejoin_recovers_stale_pending_connection(self, game_with_players, client):
+        game_id = game_with_players["game_id"]
+        client.post(f"/api/games/{game_id}/start")
+
+        first = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice"})
+        assert first.status_code == 200
+
+        second = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice"})
+        assert second.status_code == 200

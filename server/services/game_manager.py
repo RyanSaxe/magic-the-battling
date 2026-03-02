@@ -77,6 +77,14 @@ from server.services.session_manager import session_manager
 logger = logging.getLogger(__name__)
 
 
+def _utc_or_default(value: datetime | None, default: datetime) -> datetime:
+    if value is None:
+        return default
+    if value.tzinfo is None or value.tzinfo.utcoffset(value) is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
+
+
 def _scrub_face_down_cards(cards: list[Card], face_down_ids: set[str], id_map: dict[str, str]) -> list[Card]:
     result = []
     for card in cards:
@@ -192,7 +200,11 @@ class GameManager:
         hot = 0
         for game_id in self._active_games:
             connected = self._connected_humans.get(game_id, 0) > 0
-            recently_active = (self._last_human_activity.get(game_id) or datetime.min.replace(tzinfo=UTC)) >= hot_cutoff
+            last_human = _utc_or_default(
+                self._last_human_activity.get(game_id),
+                datetime.min.replace(tzinfo=UTC),
+            )
+            recently_active = last_human >= hot_cutoff
             if connected or recently_active:
                 hot += 1
         return hot
@@ -295,7 +307,7 @@ class GameManager:
             game = Game.model_validate_json(cast(str, row.state_json))
             self._active_games[game_id] = game
             last_activity = cast(datetime | None, row.last_human_activity_at)
-            self._last_human_activity[game_id] = last_activity or datetime.now(UTC)
+            self._last_human_activity[game_id] = _utc_or_default(last_activity, datetime.now(UTC))
             self._connected_humans[game_id] = 0
             self._dirty_games.discard(game_id)
             logger.info("Restored active game from snapshot: game_id=%s", game_id)
@@ -321,7 +333,7 @@ class GameManager:
                     continue
                 last_activity = cast(datetime | None, row.last_human_activity_at)
                 self._active_games[snapshot_game_id] = game
-                self._last_human_activity[snapshot_game_id] = last_activity or datetime.now(UTC)
+                self._last_human_activity[snapshot_game_id] = _utc_or_default(last_activity, datetime.now(UTC))
                 self._connected_humans[snapshot_game_id] = 0
                 restored += 1
             session.commit()
@@ -353,7 +365,10 @@ class GameManager:
         for game_id in self._active_games:
             if self._connected_humans.get(game_id, 0) > 0:
                 continue
-            last_human = self._last_human_activity.get(game_id, datetime.min.replace(tzinfo=UTC))
+            last_human = _utc_or_default(
+                self._last_human_activity.get(game_id),
+                datetime.min.replace(tzinfo=UTC),
+            )
             if last_human < cutoff:
                 candidates.append(game_id)
 
@@ -1019,9 +1034,12 @@ class GameManager:
                 return player
         return None
 
-    def can_rejoin(self, game_id: str, player_name: str) -> bool:
-        from server.routers.ws import connection_manager  # noqa: PLC0415
-
+    def can_rejoin(
+        self,
+        game_id: str,
+        player_name: str,
+        is_player_connected: Callable[[str, str], bool] | None = None,
+    ) -> bool:
         if game_id not in self._active_games:
             self.restore_game_from_snapshot(game_id)
 
@@ -1033,7 +1051,9 @@ class GameManager:
             return False
 
         player_id = self.get_player_id_by_name(game_id, player_name)
-        return not (player_id and connection_manager.is_player_connected(game_id, player_id))
+        if player_id and is_player_connected:
+            return not is_player_connected(game_id, player_id)
+        return True
 
     def rejoin_game(self, game_id: str, player_name: str, player_id: str) -> bool:
         if game_id not in self._active_games:
