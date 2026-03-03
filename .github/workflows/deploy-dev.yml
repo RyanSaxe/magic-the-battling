@@ -22,23 +22,23 @@ jobs:
           SWITCH_AT_UTC=$(date -u -d "+${DELAY_MINUTES} minutes" "+%Y-%m-%d %H:%M UTC")
           export SWITCH_AT_UTC
           PAYLOAD=$(python - <<'PY'
-import json
-import os
+          import json
+          import os
 
-print(
-    json.dumps(
-        {
-            "mode": "draining",
-            "message": (
-                f"Server update scheduled for {os.environ['SWITCH_AT_UTC']}. "
-                "New games are temporarily paused. "
-                "Tip: if you are currently in a game, you can reconnect and continue after the update."
-            ),
-            "updated_by": "github-actions-dev",
-        }
-    )
-)
-PY
+          print(
+              json.dumps(
+                  {
+                      "mode": "draining",
+                      "message": (
+                          f"Server update scheduled for {os.environ['SWITCH_AT_UTC']}. "
+                          "New games are temporarily paused. "
+                          "Tip: if you are currently in a game, you can reconnect and continue after the update."
+                      ),
+                      "updated_by": "github-actions-dev",
+                  }
+              )
+          )
+          PY
           )
           curl --fail --show-error --silent \
             -X POST "${APP_BASE_URL}/api/ops/mode" \
