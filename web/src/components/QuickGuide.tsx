@@ -725,14 +725,6 @@ export function QuickGuide({
         <div className="shrink-0 px-4 py-3 border-t border-amber-400/10 bg-gray-900/95 backdrop-blur-sm">
           <div className="flex items-center justify-between gap-3">
             <a
-              href={CUBECOBRA_PRIMER_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
-            >
-              CubeCobra Primer
-            </a>
-            <a
               href={DISCORD_INVITE_URL}
               target="_blank"
               rel="noopener noreferrer"
@@ -740,6 +732,14 @@ export function QuickGuide({
             >
               <FaDiscord className="w-4 h-4" />
               Ask for help
+            </a>
+            <a
+              href={CUBECOBRA_PRIMER_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
+            >
+              CubeCobra Primer
             </a>
           </div>
         </div>

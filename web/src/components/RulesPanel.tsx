@@ -40,14 +40,13 @@ export function RulesPanel({
         className="bg-gray-900 rounded-none sm:rounded-xl shadow-2xl border border-amber-400/10 w-full h-full sm:h-[calc(100dvh-4rem)] sm:max-w-4xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4 py-1.5 flex justify-end items-center shrink-0">
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl leading-none p-1"
-          >
-            &times;
-          </button>
-        </div>
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 z-20 text-gray-400 hover:text-white text-2xl leading-none p-1.5 rounded-md bg-black/35 hover:bg-black/50 transition-colors"
+          aria-label="Close guide"
+        >
+          &times;
+        </button>
 
         <QuickGuide
           key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
