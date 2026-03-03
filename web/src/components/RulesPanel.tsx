@@ -46,6 +46,7 @@ interface RulesPanelContentProps {
   initialTab?: string
   gameId?: string
   useUpgrades?: boolean
+  onBackToQuickGuide?: () => void
 }
 
 export function RulesPanelContent({
@@ -53,6 +54,7 @@ export function RulesPanelContent({
   initialTab,
   gameId,
   useUpgrades,
+  onBackToQuickGuide,
 }: RulesPanelContentProps) {
   const [selectedDocId, setSelectedDocId] = useState(initialDocId ?? 'overview')
   const [activeTab, setActiveTab] = useState(initialTab ?? '')
@@ -102,6 +104,16 @@ export function RulesPanelContent({
 
   const sidebar = (
     <nav className="space-y-4 py-3 px-3">
+      {onBackToQuickGuide && (
+        <div className="border-b border-gray-700/50 pb-3">
+          <button
+            onClick={onBackToQuickGuide}
+            className="text-sm text-amber-400 hover:text-amber-300 transition-colors px-2"
+          >
+            ← Quick Guide
+          </button>
+        </div>
+      )}
       {gameId && (
         <div className="border-b border-gray-700/50 pb-3">
           <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5 px-2">
@@ -161,6 +173,16 @@ export function RulesPanelContent({
 
   const navItems = (
     <>
+      {onBackToQuickGuide && (
+        <div className="border-b border-gray-700/50">
+          <button
+            onClick={onBackToQuickGuide}
+            className="w-full text-left px-4 py-3 text-sm text-amber-400 hover:text-amber-300 transition-colors"
+          >
+            ← Quick Guide
+          </button>
+        </div>
+      )}
       {gameId && (
         <div className="border-b border-gray-700/50">
           <div className="px-4 pt-3 pb-1 text-xs font-medium text-gray-400 uppercase tracking-wide">Browse</div>
@@ -277,6 +299,14 @@ export function RulesPanelContent({
   )
 }
 
+const PHASE_IDS = new Set(['draft', 'build', 'battle', 'reward'])
+
+function deriveInitialSection(docId?: string): string {
+  if (!docId) return 'overview'
+  if (PHASE_IDS.has(docId)) return docId
+  return 'overview'
+}
+
 interface RulesPanelProps {
   onClose: () => void
   initialDocId?: string
@@ -314,52 +344,34 @@ export function RulesPanel({
     setMode('comprehensive')
   }
 
-  const toggleBtnClass = (active: boolean) =>
-    `px-3 py-1 text-sm font-medium transition-colors ${
-      active
-        ? 'bg-amber-500/20 text-amber-300 border border-amber-400'
-        : 'text-gray-400 hover:text-gray-200 border border-transparent'
-    }`
+  const handleBackToQuickGuide = () => {
+    setMode('quick')
+  }
+
+  const title = mode === 'quick' ? 'Quick Guide' : 'Comprehensive Guide'
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 sm:p-8"
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-0 sm:p-8"
       onClick={onClose}
     >
       <div
-        className={`bg-gray-900 rounded-lg w-full h-[calc(100dvh-2rem)] sm:h-[calc(100dvh-4rem)] flex flex-col overflow-hidden ${
-          mode === 'quick' ? 'sm:max-w-2xl' : ''
-        }`}
+        className="bg-gray-900 rounded-none sm:rounded-xl shadow-2xl border border-amber-400/10 w-full h-full sm:h-[calc(100dvh-4rem)] sm:max-w-4xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4 py-2.5 border-b border-gray-700/50 flex items-center shrink-0">
-          <div className="flex-1" />
-          <div className="flex rounded-md overflow-hidden">
-            <button
-              onClick={() => setMode('quick')}
-              className={`${toggleBtnClass(mode === 'quick')} rounded-l-md`}
-            >
-              Quick
-            </button>
-            <button
-              onClick={() => setMode('comprehensive')}
-              className={`${toggleBtnClass(mode === 'comprehensive')} rounded-r-md`}
-            >
-              Comprehensive
-            </button>
-          </div>
-          <div className="flex-1 flex justify-end">
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-white text-2xl leading-none p-1"
-            >
-              &times;
-            </button>
-          </div>
+        <div className="px-4 py-2.5 border-b border-amber-400/15 flex items-center shrink-0">
+          <span className="text-white font-semibold text-sm flex-1">{title}</span>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white text-2xl leading-none p-1"
+          >
+            &times;
+          </button>
         </div>
 
         {mode === 'quick' ? (
           <QuickGuide
+            initialSection={deriveInitialSection(initialDocId)}
             gameId={gameId}
             useUpgrades={useUpgrades}
             useVanguards={useVanguards}
@@ -371,6 +383,7 @@ export function RulesPanel({
             initialTab={compTab}
             gameId={gameId}
             useUpgrades={useUpgrades}
+            onBackToQuickGuide={handleBackToQuickGuide}
           />
         )}
       </div>
