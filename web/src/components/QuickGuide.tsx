@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { FaDiscord } from 'react-icons/fa6'
 import { DOCS, getPhaseDoc } from '../docs'
 import { DocRenderer } from './DocRenderer'
 import { CardsView } from './CardsView'
@@ -7,35 +8,152 @@ import { PHASES, type Phase } from '../constants/phases'
 type HeaderTab = 'guide' | 'browse' | 'faq'
 type CardType = 'cards' | 'upgrades' | 'vanguards'
 type AccordionSection = 'overview' | Phase
+const ACCORDION_STEP_MS = 400
+const DISCORD_INVITE_URL = 'https://discord.gg/2NAjcWXNKn'
 
 interface AccordionItemProps {
   id: string
   label: string
   expanded: boolean
+  panelCapPx: number
   onToggle: () => void
   children: React.ReactNode
 }
 
-function AccordionItem({ id, label, expanded, onToggle, children }: AccordionItemProps) {
+function useSequentialAccordion<T extends string | number>(
+  initialOpen: T | null,
+  stepMs: number,
+) {
+  const [openId, setOpenId] = useState<T | null>(initialOpen)
+  const closeTimerRef = useRef<number | null>(null)
+  const pendingOpenRef = useRef<T | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current !== null) {
+        window.clearTimeout(closeTimerRef.current)
+      }
+    }
+  }, [])
+
+  const toggle = (id: T) => {
+    if (closeTimerRef.current !== null) {
+      if (openId === null && pendingOpenRef.current === null) {
+        window.clearTimeout(closeTimerRef.current)
+        closeTimerRef.current = null
+        setOpenId(id)
+        return
+      }
+      if (pendingOpenRef.current === id) {
+        pendingOpenRef.current = null
+        return
+      }
+      pendingOpenRef.current = id
+      return
+    }
+
+    if (openId === id) {
+      setOpenId(null)
+      return
+    }
+    if (openId === null) {
+      setOpenId(id)
+      return
+    }
+
+    pendingOpenRef.current = id
+    setOpenId(null)
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null
+      const next = pendingOpenRef.current
+      pendingOpenRef.current = null
+      if (next !== null) {
+        setOpenId(next)
+      }
+    }, stepMs)
+  }
+
+  return { openId, toggle }
+}
+
+function useAccordionPanelCap(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  refreshKey: string,
+) {
+  const [panelCapPx, setPanelCapPx] = useState(0)
+
+  useLayoutEffect(() => {
+    const container = containerRef.current
+    if (!container) {
+      return
+    }
+
+    const measure = () => {
+      const headers = Array.from(
+        container.querySelectorAll<HTMLElement>('[data-accordion-header="true"]'),
+      )
+      const headersTotal = headers.reduce((sum, header) => sum + header.getBoundingClientRect().height, 0)
+      const available = Math.max(0, Math.floor(container.clientHeight - headersTotal))
+      setPanelCapPx((prev) => (prev === available ? prev : available))
+    }
+
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(container)
+    const headers = container.querySelectorAll<HTMLElement>('[data-accordion-header="true"]')
+    headers.forEach((header) => observer.observe(header))
+    window.addEventListener('resize', measure)
+
+    return () => {
+      window.removeEventListener('resize', measure)
+      observer.disconnect()
+    }
+  }, [containerRef, refreshKey])
+
+  return panelCapPx
+}
+
+function AccordionItem({ id, label, expanded, panelCapPx, onToggle, children }: AccordionItemProps) {
   const panelId = `quick-guide-panel-${id}`
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [measuredContentPx, setMeasuredContentPx] = useState(0)
+
+  useLayoutEffect(() => {
+    const content = contentRef.current
+    if (!content) {
+      return
+    }
+
+    const measure = () => {
+      const nextHeight = Math.ceil(content.scrollHeight)
+      setMeasuredContentPx((prev) => (prev === nextHeight ? prev : nextHeight))
+    }
+
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(content)
+    return () => observer.disconnect()
+  }, [])
+
+  const cappedPanelPx = Math.max(0, Math.min(panelCapPx, measuredContentPx))
+  const panelMaxHeight = `${cappedPanelPx}px`
+
   return (
-    <div
-      className="quick-guide-accordion-item border-b border-amber-400/10 last:border-b-0 flex flex-col min-h-0 overflow-hidden"
-      style={expanded ? { flex: '1 1 0', minHeight: 0 } : { flex: '0 0 auto' }}
-    >
+    <div className="quick-guide-accordion-item border-b border-amber-400/10 last:border-b-0 flex flex-col min-h-0 overflow-hidden">
       <button
         onClick={onToggle}
         aria-expanded={expanded}
         aria-controls={panelId}
-        className={`w-full py-3 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-b transition-colors duration-200 ${
+        data-accordion-header="true"
+        className={`w-full py-3 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-b transition-colors duration-[400ms] ${
           expanded
             ? 'bg-gray-800/50 border-amber-400/25'
-            : 'hover:bg-gray-800/50 border-transparent'
+            : 'hover:bg-gray-800/50 border-amber-400/15'
         }`}
       >
-        <span className="text-white font-medium text-sm sm:text-base flex-1 text-left capitalize">{label}</span>
+        <span className="text-white font-medium text-sm sm:text-base flex-1 text-left">{label}</span>
         <svg
-          className={`w-4 h-4 transition-transform transition-colors duration-200 ${expanded ? 'rotate-90 text-amber-400' : 'text-gray-400'}`}
+          className={`w-4 h-4 transition-transform transition-colors duration-[400ms] ${expanded ? 'rotate-90 text-amber-400' : 'text-gray-400'}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -48,10 +166,13 @@ function AccordionItem({ id, label, expanded, onToggle, children }: AccordionIte
         id={panelId}
         className={`quick-guide-accordion-panel ${expanded ? 'open' : ''}`}
         aria-hidden={!expanded}
+        style={{ maxHeight: expanded ? panelMaxHeight : '0px' }}
       >
         <div className="quick-guide-accordion-panel-inner">
-          <div className="quick-guide-accordion-scroll px-5 py-4">
-            {children}
+          <div className="quick-guide-accordion-scroll" style={{ maxHeight: panelMaxHeight }}>
+            <div ref={contentRef} className="px-5 py-4">
+              {children}
+            </div>
           </div>
         </div>
       </div>
@@ -88,17 +209,31 @@ export function QuickGuide({
   onNavigateToComprehensive,
 }: QuickGuideProps) {
   const [activeTab, setActiveTab] = useState<HeaderTab>('guide')
-  const [expandedSection, setExpandedSection] = useState<AccordionSection | null>(
-    (initialSection as AccordionSection) ?? 'overview',
-  )
   const [cardType, setCardType] = useState<CardType>('cards')
+  const guideAccordionRef = useRef<HTMLDivElement>(null)
+  const faqAccordionRef = useRef<HTMLDivElement>(null)
 
   const overviewDoc = DOCS.find((d) => d.id === 'quick-overview')
   const faqDoc = DOCS.find((d) => d.id === 'faq')
-
-  const toggleSection = (id: AccordionSection) => {
-    setExpandedSection((prev) => (prev === id ? null : id))
-  }
+  const faqPairs = faqDoc
+    ? parseFaqPairs(faqDoc.parsed.sections['overview'] ?? faqDoc.parsed.body)
+    : []
+  const { openId: expandedSection, toggle: toggleSection } = useSequentialAccordion<AccordionSection>(
+    (initialSection as AccordionSection) ?? 'overview',
+    ACCORDION_STEP_MS,
+  )
+  const { openId: expandedFaqIndex, toggle: toggleFaq } = useSequentialAccordion<number>(
+    faqPairs.length > 0 ? 0 : null,
+    ACCORDION_STEP_MS,
+  )
+  const guidePanelCapPx = useAccordionPanelCap(
+    guideAccordionRef,
+    `${activeTab}:${expandedSection ?? 'none'}`,
+  )
+  const faqPanelCapPx = useAccordionPanelCap(
+    faqAccordionRef,
+    `${activeTab}:${expandedFaqIndex ?? 'none'}:${faqPairs.length}`,
+  )
 
   const headerTabs: { id: HeaderTab; label: string }[] = [
     { id: 'guide', label: 'How to Play' },
@@ -114,7 +249,7 @@ export function QuickGuide({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="flex gap-4 border-b border-amber-400/15 px-4 shrink-0">
+      <div className="flex gap-4 px-4 shrink-0 border-b border-amber-400/15">
         {headerTabs.map((tab) => (
           <button
             key={tab.id}
@@ -132,53 +267,49 @@ export function QuickGuide({
 
       {activeTab === 'guide' && (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          <AccordionItem
-            id="overview"
-            label="Overview"
-            expanded={expandedSection === 'overview'}
-            onToggle={() => toggleSection('overview')}
-          >
-            {overviewDoc ? (
-              <div className="text-sm sm:text-base">
-                <DocRenderer content={overviewDoc.parsed.sections['overview'] ?? overviewDoc.parsed.body} />
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">Overview content not found.</p>
-            )}
-          </AccordionItem>
-
-          {PHASES.map((phase) => {
-            const phaseDoc = getPhaseDoc(phase)
-            return (
-              <AccordionItem
-                id={phase}
-                key={phase}
-                label={`${phase} Phase`}
-                expanded={expandedSection === phase}
-                onToggle={() => toggleSection(phase)}
-              >
-                {phaseDoc?.parsed.sections['quick rules'] && (
-                  <div className="text-sm sm:text-base">
-                    <DocRenderer content={phaseDoc.parsed.sections['quick rules']} />
-                  </div>
-                )}
-                <button
-                  onClick={() => onNavigateToComprehensive(phase, 'rules')}
-                  className="mt-3 text-sm text-amber-400 hover:text-amber-300 transition-colors"
-                >
-                  View in Comprehensive Guide →
-                </button>
-              </AccordionItem>
-            )
-          })}
-
-          <div className="shrink-0 px-4 py-3 border-t border-amber-400/10">
-            <button
-              onClick={() => onNavigateToComprehensive()}
-              className="text-sm text-amber-400 hover:text-amber-300 transition-colors"
+          <div ref={guideAccordionRef} className="flex-1 min-h-0 overflow-hidden border-b border-amber-400/10">
+            <AccordionItem
+              id="overview"
+              label="Overview"
+              expanded={expandedSection === 'overview'}
+              panelCapPx={guidePanelCapPx}
+              onToggle={() => toggleSection('overview')}
             >
-              Comprehensive Guide →
-            </button>
+              {overviewDoc ? (
+                <div className="text-sm sm:text-base">
+                  <DocRenderer content={overviewDoc.parsed.sections['overview'] ?? overviewDoc.parsed.body} />
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">Overview content not found.</p>
+              )}
+            </AccordionItem>
+
+            {PHASES.map((phase) => {
+              const phaseDoc = getPhaseDoc(phase)
+              const phaseLabel = `${phase.charAt(0).toUpperCase()}${phase.slice(1)} Phase`
+              return (
+                <AccordionItem
+                  id={phase}
+                  key={phase}
+                  label={phaseLabel}
+                  expanded={expandedSection === phase}
+                  panelCapPx={guidePanelCapPx}
+                  onToggle={() => toggleSection(phase)}
+                >
+                  {phaseDoc?.parsed.sections['quick rules'] && (
+                    <div className="text-sm sm:text-base">
+                      <DocRenderer content={phaseDoc.parsed.sections['quick rules']} />
+                    </div>
+                  )}
+                  <button
+                    onClick={() => onNavigateToComprehensive(phase, 'rules')}
+                    className="mt-3 text-sm text-amber-400 hover:text-amber-300 transition-colors"
+                  >
+                    View in Comprehensive Guide →
+                  </button>
+                </AccordionItem>
+              )
+            })}
           </div>
         </div>
       )}
@@ -208,27 +339,57 @@ export function QuickGuide({
       )}
 
       {activeTab === 'browse' && !gameId && (
-        <div className="text-gray-500 text-center py-8 text-sm">
+        <div className="flex-1 flex items-center justify-center text-gray-500 text-center py-8 text-sm">
           Join a game to browse cards.
         </div>
       )}
 
       {activeTab === 'faq' && (
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-          {faqDoc ? (
-            parseFaqPairs(faqDoc.parsed.sections['overview'] ?? faqDoc.parsed.body).map((pair, i) => (
-              <div key={i} className="rounded-lg p-3 border border-amber-400/15">
-                <p className="text-sm sm:text-base text-white font-medium pb-2 mb-2 border-b border-amber-400/15">{pair.question}</p>
-                <div className="text-sm sm:text-base text-gray-300">
-                  <DocRenderer content={pair.answer} />
-                </div>
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <div ref={faqAccordionRef} className="flex-1 min-h-0 overflow-hidden border-b border-amber-400/10">
+            {faqPairs.length > 0 ? (
+              faqPairs.map((pair, index) => (
+                <AccordionItem
+                  id={`faq-${index}`}
+                  key={`${pair.question}-${index}`}
+                  label={pair.question}
+                  expanded={expandedFaqIndex === index}
+                  panelCapPx={faqPanelCapPx}
+                  onToggle={() => toggleFaq(index)}
+                >
+                  <div className="text-sm sm:text-base text-gray-300">
+                    <DocRenderer content={pair.answer} />
+                  </div>
+                </AccordionItem>
+              ))
+            ) : (
+              <div className="px-4 py-3">
+                <p className="text-sm text-gray-400">FAQ content not found.</p>
               </div>
-            ))
-          ) : (
-            <p className="text-sm text-gray-400">FAQ content not found.</p>
-          )}
+            )}
+          </div>
         </div>
       )}
+
+      <div className="shrink-0 px-4 py-3 border-t border-amber-400/10 bg-gray-900/95 backdrop-blur-sm">
+        <div className="flex items-center justify-between gap-3">
+          <button
+            onClick={() => onNavigateToComprehensive()}
+            className="text-sm text-amber-400 hover:text-amber-300 transition-colors"
+          >
+            Comprehensive Guide →
+          </button>
+          <a
+            href={DISCORD_INVITE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors"
+          >
+            <FaDiscord className="w-4 h-4" />
+            Ask for help
+          </a>
+        </div>
+      </div>
     </div>
   )
 }

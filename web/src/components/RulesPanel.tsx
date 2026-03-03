@@ -288,7 +288,7 @@ export function RulesPanel({
         className="bg-gray-900 rounded-none sm:rounded-xl shadow-2xl border border-amber-400/10 w-full h-full sm:h-[calc(100dvh-4rem)] sm:max-w-4xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4 py-2.5 border-b border-amber-400/15 flex items-center shrink-0">
+        <div className="px-4 py-2.5 flex items-center shrink-0">
           <span className="text-white font-semibold text-sm flex-1">{title}</span>
           <button
             onClick={onClose}
