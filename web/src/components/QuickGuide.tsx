@@ -33,11 +33,13 @@ function AccordionItem({ label, expanded, onToggle, children }: AccordionItemPro
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
       </button>
-      {expanded && (
-        <div className="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
-          {children}
+      <div className={`accordion-body ${expanded ? 'open' : ''}`} style={expanded ? { flex: '1 1 0', minHeight: 0 } : undefined}>
+        <div className={expanded ? 'overflow-y-auto' : ''}>
+          <div className="px-4 pb-4">
+            {children}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -71,7 +73,7 @@ export function QuickGuide({
   }
 
   const headerTabs: { id: HeaderTab; label: string }[] = [
-    { id: 'guide', label: 'Quick Guide' },
+    { id: 'guide', label: 'How to Play' },
     { id: 'browse', label: 'Browse Cards' },
     { id: 'faq', label: 'FAQ' },
   ]

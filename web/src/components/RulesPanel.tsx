@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { DOCS, type DocEntry } from '../docs'
 import { DocRenderer } from './DocRenderer'
 import { DocNavContext } from '../contexts/DocNavContext'
-import { CardsView } from './CardsView'
 import { ControlsTab } from './ControlsTab'
 import { QuickGuide } from './QuickGuide'
 
@@ -39,21 +38,15 @@ function TabContent({ doc, tab }: { doc: DocEntry; tab: string }) {
   return <DocRenderer content={sectionContent} />
 }
 
-const BROWSE_IDS = ['__cards__', '__upgrades__'] as const
-
 interface RulesPanelContentProps {
   initialDocId?: string
   initialTab?: string
-  gameId?: string
-  useUpgrades?: boolean
   onBackToQuickGuide?: () => void
 }
 
 export function RulesPanelContent({
   initialDocId,
   initialTab,
-  gameId,
-  useUpgrades,
   onBackToQuickGuide,
 }: RulesPanelContentProps) {
   const [selectedDocId, setSelectedDocId] = useState(initialDocId ?? 'overview')
@@ -73,8 +66,7 @@ export function RulesPanelContent({
     setActiveTab(initialTab ?? '')
   }
 
-  const isBrowseView = (BROWSE_IDS as readonly string[]).includes(selectedDocId)
-  const doc = isBrowseView ? null : (DOCS.find((d) => d.id === selectedDocId) ?? DOCS[0])
+  const doc = DOCS.find((d) => d.id === selectedDocId) ?? DOCS[0]
   const tabs = doc?.parsed.sectionOrder ?? []
   const showTabs = tabs.length > 1
 
@@ -82,10 +74,8 @@ export function RulesPanelContent({
 
   const handleDocSelect = (id: string) => {
     setSelectedDocId(id)
-    if (!(BROWSE_IDS as readonly string[]).includes(id)) {
-      const newDoc = DOCS.find((d) => d.id === id)
-      setActiveTab(newDoc?.parsed.sectionOrder[0] ?? '')
-    }
+    const newDoc = DOCS.find((d) => d.id === id)
+    setActiveTab(newDoc?.parsed.sectionOrder[0] ?? '')
     setMobileView('content')
   }
 
@@ -98,14 +88,36 @@ export function RulesPanelContent({
 
   const groups = groupedDocs()
 
-  const currentTitle = isBrowseView
-    ? (selectedDocId === '__cards__' ? 'Card Pool' : 'Upgrades')
-    : (doc?.parsed.meta.title ?? '')
+  const currentTitle = doc?.parsed.meta.title ?? ''
 
   const sidebar = (
-    <nav className="space-y-4 py-3 px-3">
+    <nav className="flex flex-col h-full py-3 px-3">
+      <div className="space-y-4 flex-1">
+        {groups.map(({ category, label, docs }) => (
+          <div key={category}>
+            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5 px-2">
+              {label}
+            </h3>
+            <div className="space-y-0.5">
+              {docs.map((d) => (
+                <button
+                  key={d.id}
+                  onClick={() => handleDocSelect(d.id)}
+                  className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
+                    d.id === selectedDocId
+                      ? 'bg-amber-500/20 text-amber-300'
+                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                  }`}
+                >
+                  {d.parsed.meta.title}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
       {onBackToQuickGuide && (
-        <div className="border-b border-gray-700/50 pb-3">
+        <div className="border-t border-gray-700/50 pt-3 mt-3">
           <button
             onClick={onBackToQuickGuide}
             className="text-sm text-amber-400 hover:text-amber-300 transition-colors px-2"
@@ -114,96 +126,11 @@ export function RulesPanelContent({
           </button>
         </div>
       )}
-      {gameId && (
-        <div className="border-b border-gray-700/50 pb-3">
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5 px-2">
-            Browse
-          </h3>
-          <div className="space-y-0.5">
-            <button
-              onClick={() => handleDocSelect('__cards__')}
-              className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
-                selectedDocId === '__cards__'
-                  ? 'bg-amber-500/20 text-amber-300'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              }`}
-            >
-              Card Pool
-            </button>
-            {useUpgrades !== false && (
-              <button
-                onClick={() => handleDocSelect('__upgrades__')}
-                className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
-                  selectedDocId === '__upgrades__'
-                    ? 'bg-amber-500/20 text-amber-300'
-                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                }`}
-              >
-                Upgrades
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-
-      {groups.map(({ category, label, docs }) => (
-        <div key={category}>
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5 px-2">
-            {label}
-          </h3>
-          <div className="space-y-0.5">
-            {docs.map((d) => (
-              <button
-                key={d.id}
-                onClick={() => handleDocSelect(d.id)}
-                className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
-                  d.id === selectedDocId
-                    ? 'bg-amber-500/20 text-amber-300'
-                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                }`}
-              >
-                {d.parsed.meta.title}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
     </nav>
   )
 
   const navItems = (
     <>
-      {onBackToQuickGuide && (
-        <div className="border-b border-gray-700/50">
-          <button
-            onClick={onBackToQuickGuide}
-            className="w-full text-left px-4 py-3 text-sm text-amber-400 hover:text-amber-300 transition-colors"
-          >
-            ← Quick Guide
-          </button>
-        </div>
-      )}
-      {gameId && (
-        <div className="border-b border-gray-700/50">
-          <div className="px-4 pt-3 pb-1 text-xs font-medium text-gray-400 uppercase tracking-wide">Browse</div>
-          <button
-            onClick={() => handleDocSelect('__cards__')}
-            className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-          >
-            <span>Card Pool</span>
-            <span className="text-gray-500">›</span>
-          </button>
-          {useUpgrades !== false && (
-            <button
-              onClick={() => handleDocSelect('__upgrades__')}
-              className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-            >
-              <span>Upgrades</span>
-              <span className="text-gray-500">›</span>
-            </button>
-          )}
-        </div>
-      )}
       {groups.map(({ category, label, docs }) => (
         <div key={category}>
           <div className="px-4 pt-3 pb-1 text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</div>
@@ -219,18 +146,20 @@ export function RulesPanelContent({
           ))}
         </div>
       ))}
+      {onBackToQuickGuide && (
+        <div className="border-t border-gray-700/50 mt-2">
+          <button
+            onClick={onBackToQuickGuide}
+            className="w-full text-left px-4 py-3 text-sm text-amber-400 hover:text-amber-300 transition-colors"
+          >
+            ← Quick Guide
+          </button>
+        </div>
+      )}
     </>
   )
 
-  const contentArea = isBrowseView && gameId ? (
-    <div className="flex flex-col flex-1 min-h-0 px-4 pt-3">
-      <h2 className="text-lg font-semibold text-white mb-2 shrink-0 hidden sm:block">{currentTitle}</h2>
-      <CardsView
-        gameId={gameId}
-        which={selectedDocId === '__cards__' ? 'cards' : 'upgrades'}
-      />
-    </div>
-  ) : doc ? (
+  const contentArea = doc ? (
     <>
       <div className="px-4 pt-3">
         <h2 className="text-lg font-semibold text-white mb-2 hidden sm:block">{doc.parsed.meta.title}</h2>
@@ -381,8 +310,6 @@ export function RulesPanel({
           <RulesPanelContent
             initialDocId={compDocId}
             initialTab={compTab}
-            gameId={gameId}
-            useUpgrades={useUpgrades}
             onBackToQuickGuide={handleBackToQuickGuide}
           />
         )}

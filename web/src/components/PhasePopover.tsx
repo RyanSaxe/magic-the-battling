@@ -1,4 +1,4 @@
-import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { PHASE_HOTKEYS, type HotkeyEntry } from '../constants/hotkeys'
 import { PHASE_SUMMARIES } from '../constants/phases'
@@ -32,6 +32,7 @@ function CompactHotkey({ entry }: { entry: HotkeyEntry }) {
 export function PhasePopover({ phase, anchorRect, onClose, onOpenGuide }: PhasePopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null)
   const arrowRef = useRef<HTMLDivElement>(null)
+  const [showHotkeys, setShowHotkeys] = useState(false)
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -77,6 +78,7 @@ export function PhasePopover({ phase, anchorRect, onClose, onOpenGuide }: PhaseP
   }, [anchorRect])
 
   useLayoutEffect(positionPopover, [positionPopover])
+  useLayoutEffect(positionPopover, [showHotkeys])
 
   const hotkeys = PHASE_HOTKEYS[phase] ?? []
 
@@ -108,10 +110,29 @@ export function PhasePopover({ phase, anchorRect, onClose, onOpenGuide }: PhaseP
 
         {hotkeys.length > 0 && (
           <div className="pt-2 border-t border-gray-700/50">
-            <div className="flex flex-wrap gap-x-3 gap-y-1">
-              {hotkeys.map((entry) => (
-                <CompactHotkey key={entry.key} entry={entry} />
-              ))}
+            <button
+              onClick={() => setShowHotkeys((v) => !v)}
+              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+            >
+              <svg
+                className={`w-3 h-3 transition-transform duration-200 ${showHotkeys ? 'rotate-90' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+              Keyboard Shortcuts
+            </button>
+            <div className={`accordion-body ${showHotkeys ? 'open' : ''}`}>
+              <div>
+                <div className="flex flex-wrap gap-x-3 gap-y-1 pt-2">
+                  {hotkeys.map((entry) => (
+                    <CompactHotkey key={entry.key} entry={entry} />
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}

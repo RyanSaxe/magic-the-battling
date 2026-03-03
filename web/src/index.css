@@ -476,6 +476,20 @@ body {
   transition: opacity 200ms ease-out;
 }
 
+/* Accordion expand/collapse animation */
+.accordion-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 250ms ease-out;
+}
+.accordion-body.open {
+  grid-template-rows: 1fr;
+}
+.accordion-body > div {
+  overflow: hidden;
+  min-height: 0;
+}
+
 /* Sunken panel for mode description text */
 .description-panel {
   background: rgba(0, 0, 0, 0.3);
