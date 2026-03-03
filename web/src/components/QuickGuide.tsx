@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { FaDiscord } from 'react-icons/fa6'
+import { FaDiscord, FaXmark } from 'react-icons/fa6'
 import { DOCS, getPhaseDoc } from '../docs'
 import { DocRenderer } from './DocRenderer'
 import { CardsView } from './CardsView'
@@ -35,6 +35,7 @@ interface QuickGuideProps {
   gameId?: string
   useUpgrades?: boolean
   useVanguards?: boolean
+  onClose?: () => void
 }
 
 interface ResolvedTarget {
@@ -369,6 +370,7 @@ export function QuickGuide({
   gameId,
   useUpgrades,
   useVanguards,
+  onClose,
 }: QuickGuideProps) {
   const guideAccordionRef = useRef<HTMLDivElement>(null)
   const controlsAccordionRef = useRef<HTMLDivElement>(null)
@@ -513,20 +515,31 @@ export function QuickGuide({
   return (
     <DocNavContext.Provider value={docNav}>
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex gap-4 px-4 shrink-0 border-b border-amber-400/15">
-          {headerTabs.map((tab) => (
+        <div className="flex items-end justify-between gap-3 px-4 shrink-0 border-b border-amber-400/15">
+          <div className="flex gap-4 min-w-0">
+            {headerTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-1 pb-2 pt-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                  tab.id === activeTab
+                    ? 'text-amber-400 border-amber-400'
+                    : 'text-gray-400 border-transparent hover:text-gray-200'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {onClose && (
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-1 pb-2 pt-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                tab.id === activeTab
-                  ? 'text-amber-400 border-amber-400'
-                  : 'text-gray-400 border-transparent hover:text-gray-200'
-              }`}
+              onClick={onClose}
+              className="inline-flex items-center justify-center w-6 h-6 mb-1 text-red-400 hover:text-red-300 transition-colors"
+              aria-label="Close guide"
             >
-              {tab.label}
+              <FaXmark className="w-4 h-4" />
             </button>
-          ))}
+          )}
         </div>
 
         {activeTab === 'guide' && (
