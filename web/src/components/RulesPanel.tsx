@@ -1,246 +1,15 @@
-import { useState, useEffect, useMemo } from 'react'
-import { DOCS, type DocEntry } from '../docs'
-import { DocRenderer } from './DocRenderer'
-import { DocNavContext } from '../contexts/DocNavContext'
-import { ControlsTab } from './ControlsTab'
+import { useEffect } from 'react'
 import { QuickGuide } from './QuickGuide'
 
 export interface RulesPanelTarget {
-  docId: string
+  docId?: string
   tab?: string
-  mode?: 'quick' | 'comprehensive'
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  'getting-started': 'The Game',
-  phases: 'Phases',
-}
-
-const CATEGORY_ORDER = ['getting-started', 'phases']
-
-function groupedDocs() {
-  return CATEGORY_ORDER.map((cat) => ({
-    category: cat,
-    label: CATEGORY_LABELS[cat],
-    docs: DOCS.filter((d) => d.category === cat).sort(
-      (a, b) => (a.parsed.meta.order ?? 99) - (b.parsed.meta.order ?? 99),
-    ),
-  }))
-}
-
-function TabContent({ doc, tab }: { doc: DocEntry; tab: string }) {
-  const phase = doc.parsed.meta.phase
-  if (tab === 'controls' && phase) {
-    return <ControlsTab phase={phase} />
-  }
-  const sectionContent = doc.parsed.sections[tab]
-  if (!sectionContent) return null
-  return <DocRenderer content={sectionContent} />
-}
-
-interface RulesPanelContentProps {
-  initialDocId?: string
-  initialTab?: string
-  onBackToQuickGuide?: () => void
-}
-
-export function RulesPanelContent({
-  initialDocId,
-  initialTab,
-  onBackToQuickGuide,
-}: RulesPanelContentProps) {
-  const [selectedDocId, setSelectedDocId] = useState(initialDocId ?? 'overview')
-  const [activeTab, setActiveTab] = useState(initialTab ?? '')
-  const [mobileView, setMobileView] = useState<'nav' | 'content'>(initialDocId ? 'content' : 'nav')
-  const [prevInitialDocId, setPrevInitialDocId] = useState(initialDocId)
-  const [prevInitialTab, setPrevInitialTab] = useState(initialTab)
-
-  if (initialDocId !== prevInitialDocId) {
-    setPrevInitialDocId(initialDocId)
-    setSelectedDocId(initialDocId ?? 'overview')
-    if (initialDocId) setMobileView('content')
-  }
-
-  if (initialTab !== prevInitialTab) {
-    setPrevInitialTab(initialTab)
-    setActiveTab(initialTab ?? '')
-  }
-
-  const doc = DOCS.find((d) => d.id === selectedDocId) ?? DOCS[0]
-  const tabs = doc?.parsed.sectionOrder ?? []
-  const showTabs = tabs.length > 1
-
-  const resolvedTab = activeTab && tabs.includes(activeTab) ? activeTab : tabs[0] ?? ''
-
-  const handleDocSelect = (id: string) => {
-    setSelectedDocId(id)
-    const newDoc = DOCS.find((d) => d.id === id)
-    setActiveTab(newDoc?.parsed.sectionOrder[0] ?? '')
-    setMobileView('content')
-  }
-
-  const docNav = useMemo(() => ({
-    navigate: (docId: string, tab?: string) => {
-      handleDocSelect(docId)
-      if (tab) setActiveTab(tab)
-    },
-  }), [])
-
-  const groups = groupedDocs()
-
-  const currentTitle = doc?.parsed.meta.title ?? ''
-
-  const sidebar = (
-    <nav className="flex flex-col h-full py-3 px-3">
-      <div className="space-y-4 flex-1">
-        {groups.map(({ category, label, docs }) => (
-          <div key={category}>
-            <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1.5 px-2">
-              {label}
-            </h3>
-            <div className="space-y-0.5">
-              {docs.map((d) => (
-                <button
-                  key={d.id}
-                  onClick={() => handleDocSelect(d.id)}
-                  className={`w-full text-left px-2 py-1.5 rounded text-sm transition-colors ${
-                    d.id === selectedDocId
-                      ? 'bg-amber-500/20 text-amber-300'
-                      : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                  }`}
-                >
-                  {d.parsed.meta.title}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      {onBackToQuickGuide && (
-        <div className="border-t border-gray-700/50 pt-3 mt-3">
-          <button
-            onClick={onBackToQuickGuide}
-            className="text-sm text-amber-400 hover:text-amber-300 transition-colors px-2"
-          >
-            ← Quick Guide
-          </button>
-        </div>
-      )}
-    </nav>
-  )
-
-  const navItems = (
-    <>
-      {groups.map(({ category, label, docs }) => (
-        <div key={category}>
-          <div className="px-4 pt-3 pb-1 text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</div>
-          {docs.map((d) => (
-            <button
-              key={d.id}
-              onClick={() => handleDocSelect(d.id)}
-              className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors"
-            >
-              <span>{d.parsed.meta.title}</span>
-              <span className="text-gray-500">›</span>
-            </button>
-          ))}
-        </div>
-      ))}
-      {onBackToQuickGuide && (
-        <div className="border-t border-gray-700/50 mt-2">
-          <button
-            onClick={onBackToQuickGuide}
-            className="w-full text-left px-4 py-3 text-sm text-amber-400 hover:text-amber-300 transition-colors"
-          >
-            ← Quick Guide
-          </button>
-        </div>
-      )}
-    </>
-  )
-
-  const contentArea = doc ? (
-    <>
-      <div className="px-4 pt-3">
-        <h2 className="text-lg font-semibold text-white mb-2 hidden sm:block">{doc.parsed.meta.title}</h2>
-        {showTabs && (
-          <div className="flex gap-1 border-b border-gray-700/50 -mx-4 px-4">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-3 py-1.5 text-sm capitalize transition-colors border-b-2 -mb-px ${
-                  tab === resolvedTab
-                    ? 'text-amber-400 border-amber-400'
-                    : 'text-gray-400 border-transparent hover:text-gray-200'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="flex-1 overflow-y-auto px-4 py-3">
-        <TabContent doc={doc} tab={resolvedTab} />
-      </div>
-    </>
-  ) : null
-
-  return (
-    <DocNavContext.Provider value={docNav}>
-      <div className="flex flex-1 min-h-0">
-        {/* Desktop sidebar */}
-        <div className="hidden sm:block w-[200px] shrink-0 border-r border-gray-700/50 overflow-y-auto">
-          {sidebar}
-        </div>
-
-        {/* Content area */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0">
-          {/* Mobile: nav list when mobileView === 'nav' */}
-          <div className={`sm:hidden ${mobileView === 'nav' ? 'flex-1 overflow-y-auto' : 'hidden'}`}>
-            {navItems}
-          </div>
-
-          {/* Mobile: back header when mobileView === 'content' */}
-          {mobileView === 'content' && (
-            <div className="sm:hidden relative px-3 py-2 border-b border-gray-700/50 flex items-center">
-              <button
-                onClick={() => setMobileView('nav')}
-                className="text-sm text-gray-400 hover:text-white shrink-0 z-10"
-              >
-                ← Back
-              </button>
-              <span className="absolute inset-0 flex items-center justify-center text-sm text-white font-medium pointer-events-none truncate px-16">
-                {currentTitle}
-              </span>
-            </div>
-          )}
-
-          {/* Content: hidden on mobile when showing nav, always visible on desktop */}
-          <div className={`flex-1 flex flex-col min-h-0 ${mobileView === 'nav' ? 'hidden sm:flex' : ''}`}>
-            {contentArea}
-          </div>
-        </div>
-      </div>
-    </DocNavContext.Provider>
-  )
-}
-
-const PHASE_IDS = new Set(['draft', 'build', 'battle', 'reward'])
-
-function deriveInitialSection(docId?: string): string {
-  if (!docId) return 'overview'
-  if (PHASE_IDS.has(docId)) return docId
-  return 'overview'
 }
 
 interface RulesPanelProps {
   onClose: () => void
   initialDocId?: string
   initialTab?: string
-  initialMode?: 'quick' | 'comprehensive'
   gameId?: string
   useUpgrades?: boolean
   useVanguards?: boolean
@@ -250,15 +19,10 @@ export function RulesPanel({
   onClose,
   initialDocId,
   initialTab,
-  initialMode,
   gameId,
   useUpgrades,
   useVanguards,
 }: RulesPanelProps) {
-  const [mode, setMode] = useState<'quick' | 'comprehensive'>(initialMode ?? 'quick')
-  const [compDocId, setCompDocId] = useState(initialDocId)
-  const [compTab, setCompTab] = useState(initialTab)
-
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -266,18 +30,6 @@ export function RulesPanel({
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
-
-  const handleNavigateToComprehensive = (docId?: string, tab?: string) => {
-    setCompDocId(docId)
-    setCompTab(tab)
-    setMode('comprehensive')
-  }
-
-  const handleBackToQuickGuide = () => {
-    setMode('quick')
-  }
-
-  const title = mode === 'quick' ? 'Quick Guide' : 'Comprehensive Guide'
 
   return (
     <div
@@ -288,8 +40,7 @@ export function RulesPanel({
         className="bg-gray-900 rounded-none sm:rounded-xl shadow-2xl border border-amber-400/10 w-full h-full sm:h-[calc(100dvh-4rem)] sm:max-w-4xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4 py-2.5 flex items-center shrink-0">
-          <span className="text-white font-semibold text-sm flex-1">{title}</span>
+        <div className="px-4 py-1.5 flex justify-end items-center shrink-0">
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white text-2xl leading-none p-1"
@@ -298,21 +49,14 @@ export function RulesPanel({
           </button>
         </div>
 
-        {mode === 'quick' ? (
-          <QuickGuide
-            initialSection={deriveInitialSection(initialDocId)}
-            gameId={gameId}
-            useUpgrades={useUpgrades}
-            useVanguards={useVanguards}
-            onNavigateToComprehensive={handleNavigateToComprehensive}
-          />
-        ) : (
-          <RulesPanelContent
-            initialDocId={compDocId}
-            initialTab={compTab}
-            onBackToQuickGuide={handleBackToQuickGuide}
-          />
-        )}
+        <QuickGuide
+          key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
+          initialDocId={initialDocId}
+          initialTab={initialTab}
+          gameId={gameId}
+          useUpgrades={useUpgrades}
+          useVanguards={useVanguards}
+        />
       </div>
     </div>
   )

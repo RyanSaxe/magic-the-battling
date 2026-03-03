@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react'
+import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { PHASE_HOTKEYS, type HotkeyEntry } from '../constants/hotkeys'
 import { PHASE_SUMMARIES } from '../constants/phases'
 import type { Phase } from '../constants/phases'
 
@@ -15,24 +14,19 @@ interface PhasePopoverProps {
   phase: Phase
   anchorRect: DOMRect
   onClose: () => void
-  onOpenGuide: () => void
+  onOpenDetails: () => void
+  onOpenControls: () => void
 }
 
-function CompactHotkey({ entry }: { entry: HotkeyEntry }) {
-  return (
-    <span className="inline-flex items-center gap-1">
-      <kbd className="bg-gray-700 text-gray-200 font-mono text-[10px] px-1.5 py-0.5 rounded border border-gray-600">
-        {entry.key}
-      </kbd>
-      <span className="text-xs text-gray-400">{entry.description}</span>
-    </span>
-  )
-}
-
-export function PhasePopover({ phase, anchorRect, onClose, onOpenGuide }: PhasePopoverProps) {
+export function PhasePopover({
+  phase,
+  anchorRect,
+  onClose,
+  onOpenDetails,
+  onOpenControls,
+}: PhasePopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null)
   const arrowRef = useRef<HTMLDivElement>(null)
-  const [showHotkeys, setShowHotkeys] = useState(false)
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -78,9 +72,6 @@ export function PhasePopover({ phase, anchorRect, onClose, onOpenGuide }: PhaseP
   }, [anchorRect])
 
   useLayoutEffect(positionPopover, [positionPopover])
-  useLayoutEffect(positionPopover, [showHotkeys])
-
-  const hotkeys = PHASE_HOTKEYS[phase] ?? []
 
   return createPortal(
     <div
@@ -108,41 +99,18 @@ export function PhasePopover({ phase, anchorRect, onClose, onOpenGuide }: PhaseP
           {PHASE_SUMMARIES[phase]}
         </p>
 
-        {hotkeys.length > 0 && (
-          <div className="pt-2 border-t border-gray-700/50">
-            <button
-              onClick={() => setShowHotkeys((v) => !v)}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 transition-colors"
-            >
-              <svg
-                className={`w-3 h-3 transition-transform duration-200 ${showHotkeys ? 'rotate-90' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-              Keyboard Shortcuts
-            </button>
-            <div className={`accordion-body ${showHotkeys ? 'open' : ''}`}>
-              <div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 pt-2">
-                  {hotkeys.map((entry) => (
-                    <CompactHotkey key={entry.key} entry={entry} />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="mt-2 pt-2 border-t border-gray-700/50 flex justify-center">
+        <div className="mt-2 pt-2 border-t border-gray-700/50 flex items-center justify-between gap-3">
           <button
-            onClick={onOpenGuide}
+            onClick={onOpenDetails}
             className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
           >
-            View in Guide →
+            Details
+          </button>
+          <button
+            onClick={onOpenControls}
+            className="text-xs text-blue-300 hover:text-blue-200 transition-colors"
+          >
+            Controls
           </button>
         </div>
       </div>

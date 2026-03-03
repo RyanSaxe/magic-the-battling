@@ -9,7 +9,7 @@ import { PHASE_HOTKEYS } from '../constants/hotkeys'
 import { HotkeyRow } from './HotkeyRow'
 
 function urlTransform(url: string) {
-  if (url.startsWith('doc:')) return url
+  if (url.startsWith('doc:') || url.startsWith('docs:')) return url
   return defaultUrlTransform(url)
 }
 
@@ -68,8 +68,8 @@ export function DocRenderer({ content, className }: DocRendererProps) {
       <strong className="text-white font-medium">{children}</strong>
     ),
     a: ({ href, children }) => {
-      if (href?.startsWith('doc:')) {
-        const rest = href.slice(4)
+      if (href?.startsWith('doc:') || href?.startsWith('docs:')) {
+        const rest = href.startsWith('docs:') ? href.slice(5) : href.slice(4)
         const [docId, tab] = rest.split('#')
         return (
           <button

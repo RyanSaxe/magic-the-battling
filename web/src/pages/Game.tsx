@@ -1465,7 +1465,6 @@ function GameContent() {
           onClose={() => setRulesPanelOpen(false)}
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
-          initialMode={rulesPanelTarget?.mode}
           gameId={gameId}
           useUpgrades={gameState.use_upgrades}
         />

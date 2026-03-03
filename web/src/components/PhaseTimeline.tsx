@@ -99,10 +99,16 @@ export function PhaseTimeline({
     setPopoverAnchorRect(null);
   }, []);
 
-  const handleOpenGuideFromPopover = useCallback(() => {
+  const handleOpenDetailsFromPopover = useCallback(() => {
     const phase = popoverPhase;
     handleClosePopover();
     onOpenRules?.(phase ? { docId: phase } : undefined);
+  }, [handleClosePopover, onOpenRules, popoverPhase]);
+
+  const handleOpenControlsFromPopover = useCallback(() => {
+    const phase = popoverPhase;
+    handleClosePopover();
+    onOpenRules?.(phase ? { docId: phase, tab: 'controls' } : undefined);
   }, [handleClosePopover, onOpenRules, popoverPhase]);
 
   if (!isGamePhase(currentPhase)) {
@@ -175,7 +181,8 @@ export function PhaseTimeline({
           phase={popoverPhase}
           anchorRect={popoverAnchorRect}
           onClose={handleClosePopover}
-          onOpenGuide={handleOpenGuideFromPopover}
+          onOpenDetails={handleOpenDetailsFromPopover}
+          onOpenControls={handleOpenControlsFromPopover}
         />
       )}
     </header>
