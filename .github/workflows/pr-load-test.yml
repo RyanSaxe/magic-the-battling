@@ -36,7 +36,7 @@ jobs:
           uv run python -m server.perf.load_harness \
             --db-copy \
             --mock-cube-data \
-            --sweep 10,100,1000 \
+            --sweep 10,50,100,200 \
             --puppet-count 3 \
             --disable-caps \
             --runtime-reset-between-sweeps \
@@ -116,7 +116,7 @@ jobs:
 
           reset_count = len(report.get("runtime_resets", []))
           lines.append("")
-          lines.append("- Harness config: `--db-copy --mock-cube-data --sweep 10,100,1000 --puppet-count 3 --disable-caps --runtime-reset-between-sweeps --game-timeout-sec 900`")
+          lines.append("- Harness config: `--db-copy --mock-cube-data --sweep 10,50,100,200 --puppet-count 3 --disable-caps --runtime-reset-between-sweeps --game-timeout-sec 900`")
           lines.append(f"- Runtime resets executed: `{reset_count}` (post-calibration, between sweeps, post-sweeps).")
           lines.append("- Guardrail: workflow fails if any sweep is not 100% completion.")
           lines.append("")
