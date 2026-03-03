@@ -1,12 +1,84 @@
+import hashlib
+import os
+import random
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
-from mtb.models.cards import Card
+from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
+from mtb.models.types import UPGRADE_TYPE, VANGUARD_TYPE
 from mtb.utils.json_helpers import revalidate_and_get
 from mtb.utils.scryfall import get_card_from_scryfall
 
+MOCK_CUBE_DATA_ENV = "MTB_FAKE_CUBE_DATA"
+MOCK_MAINBOARD_SIZE = 240
+MOCK_UPGRADES_SIZE = 4
+MOCK_VANGUARDS_SIZE = 4
+MOCK_COLORS = ("W", "U", "B", "R", "G")
+
+
+def _env_flag_enabled(name: str) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return False
+    return raw.strip().lower() not in {"", "0", "false", "no", "off"}
+
+
+def _mock_rng(cube_id: str) -> random.Random:
+    digest = hashlib.sha256(cube_id.encode("utf-8")).digest()
+    seed = int.from_bytes(digest[:8], "big")
+    return random.Random(seed)
+
+
+def _mock_card(
+    cube_id: str,
+    idx: int,
+    *,
+    type_line: str,
+    rng: random.Random,
+    life_modifier: int | None = None,
+    hand_modifier: int | None = None,
+) -> Card:
+    ident = f"mock-{cube_id}-{idx:04d}"
+    color_count = rng.randint(0, 2)
+    colors = list(rng.sample(MOCK_COLORS, color_count))
+    return Card(
+        name=f"{cube_id}_card_{idx:04d}",
+        image_url=f"https://example.invalid/{ident}.jpg",
+        png_url=f"https://example.invalid/{ident}.png",
+        id=ident,
+        type_line=type_line,
+        elo=1000.0 + rng.uniform(-120.0, 120.0),
+        colors=colors,
+        cmc=float(rng.randint(0, 7)),
+        life_modifier=life_modifier,
+        hand_modifier=hand_modifier,
+    )
+
+
+def _mock_cube_data(cube_id: str) -> list[Card]:
+    rng = _mock_rng(cube_id)
+    if cube_id == DEFAULT_UPGRADES_ID:
+        return [_mock_card(cube_id, idx, type_line=UPGRADE_TYPE, rng=rng) for idx in range(MOCK_UPGRADES_SIZE)]
+    if cube_id == DEFAULT_VANGUARD_ID:
+        return [
+            _mock_card(
+                cube_id,
+                idx,
+                type_line=VANGUARD_TYPE,
+                rng=rng,
+                life_modifier=rng.randint(-2, 6),
+                hand_modifier=rng.randint(-1, 2),
+            )
+            for idx in range(MOCK_VANGUARDS_SIZE)
+        ]
+
+    return [_mock_card(cube_id, idx, type_line="creature", rng=rng) for idx in range(MOCK_MAINBOARD_SIZE)]
+
 
 def get_cube_data(cube_id: str) -> list[Card]:
+    if _env_flag_enabled(MOCK_CUBE_DATA_ENV):
+        return _mock_cube_data(cube_id)
+
     url = f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
     data = revalidate_and_get(url)
     cube = data["cards"]["mainboard"]

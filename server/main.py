@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
@@ -26,6 +27,11 @@ configure_logging()
 logger = logging.getLogger(OBSERVABILITY_LOGGER_NAME)
 
 
+def _preview_disabled() -> bool:
+    raw = os.getenv("MTB_DISABLE_PREVIEW", "")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _route_template(request: Request) -> str:
     route = request.scope.get("route")
     if isinstance(route, APIRoute):
@@ -38,7 +44,11 @@ async def lifespan(app: FastAPI):
     init_db()
     ops_manager.load()
     game_manager.restore_all_snapshots()
-    await preview_service.start()
+    preview_enabled = not _preview_disabled()
+    if preview_enabled:
+        await preview_service.start()
+    else:
+        logging.getLogger(__name__).info("Preview service disabled by MTB_DISABLE_PREVIEW")
     start_monitoring()
     await game_manager.start_background_tasks()
     yield
@@ -47,7 +57,8 @@ async def lifespan(app: FastAPI):
         logging.getLogger(__name__).info("Session cleanup before shutdown removed=%d", removed_sessions)
     await game_manager.stop_background_tasks()
     stop_monitoring()
-    await preview_service.stop()
+    if preview_enabled:
+        await preview_service.stop()
 
 
 app = FastAPI(

@@ -1,3 +1,6 @@
+import json
+import sqlite3
+
 import pytest
 
 from server.perf.load_harness import (
@@ -6,6 +9,7 @@ from server.perf.load_harness import (
     parse_args,
     parse_sweep,
     rss_window_dict,
+    seed_puppet_histories,
 )
 
 
@@ -71,6 +75,16 @@ def test_parse_args_disable_ws_gzip_flag():
     assert cfg.disable_ws_gzip is True
 
 
+def test_parse_args_mock_cube_data_defaults_true():
+    cfg = parse_args(["--games", "1"])
+    assert cfg.mock_cube_data is True
+
+
+def test_parse_args_real_cube_data_flag():
+    cfg = parse_args(["--games", "1", "--real-cube-data"])
+    assert cfg.mock_cube_data is False
+
+
 def test_parse_args_runtime_reset_toggle():
     cfg = parse_args(["--games", "1", "--no-runtime-reset-between-sweeps"])
     assert cfg.reset_runtime_between_sweeps is False
@@ -89,3 +103,107 @@ def test_rss_window_dict():
     assert window["peak"] == 110.0
     assert window["delta_end"] == 10.0
     assert window["delta_peak"] == 10.0
+
+
+def _init_seed_schema(db_path):
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE games (
+                id TEXT PRIMARY KEY,
+                config_json TEXT,
+                shared INTEGER
+            );
+
+            CREATE TABLE player_game_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                battler_elo REAL NOT NULL,
+                max_stage INTEGER NOT NULL,
+                max_round INTEGER NOT NULL,
+                final_placement INTEGER,
+                is_puppet INTEGER
+            );
+
+            CREATE TABLE battle_snapshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player_history_id INTEGER NOT NULL,
+                stage INTEGER NOT NULL,
+                round INTEGER NOT NULL,
+                hand_json TEXT NOT NULL,
+                vanguard_json TEXT,
+                basic_lands_json TEXT NOT NULL,
+                applied_upgrades_json TEXT NOT NULL,
+                treasures INTEGER NOT NULL,
+                poison INTEGER,
+                play_draw_preference TEXT,
+                full_state_json TEXT NOT NULL
+            );
+            """
+        )
+
+
+def _insert_history(conn, *, game_id: str, config_json: str, player_name: str, elo: float):
+    conn.execute("INSERT INTO games (id, config_json, shared) VALUES (?, ?, 0)", (game_id, config_json))
+    cursor = conn.execute(
+        """
+        INSERT INTO player_game_history
+          (game_id, player_name, battler_elo, max_stage, max_round, final_placement, is_puppet)
+        VALUES (?, ?, ?, 6, 2, 2, 0)
+        """,
+        (game_id, player_name, elo),
+    )
+    history_id = int(cursor.lastrowid)
+    conn.execute(
+        """
+        INSERT INTO battle_snapshots
+          (player_history_id, stage, round, hand_json, vanguard_json, basic_lands_json,
+           applied_upgrades_json, treasures, poison, play_draw_preference, full_state_json)
+        VALUES (?, 3, 1, ?, NULL, ?, ?, 1, 0, 'play', ?)
+        """,
+        (
+            history_id,
+            json.dumps([]),
+            json.dumps(["Plains", "Island", "Swamp"]),
+            json.dumps([]),
+            json.dumps({"hand": [], "basic_lands": ["Plains", "Island", "Swamp"]}),
+        ),
+    )
+
+
+def test_seed_puppet_histories_backfills_when_existing_histories_miss_target_elo(tmp_path):
+    db_path = tmp_path / "seed.db"
+    _init_seed_schema(db_path)
+    config_json = json.dumps({"use_upgrades": True, "use_vanguards": False, "cube_id": "auto"})
+
+    with sqlite3.connect(str(db_path)) as conn:
+        for idx in range(25):
+            _insert_history(
+                conn,
+                game_id=f"old-{idx}",
+                config_json=config_json,
+                player_name=f"ExistingPlayer{idx}",
+                elo=1320.0,
+            )
+        conn.commit()
+
+    seeded = seed_puppet_histories(
+        db_path,
+        cube_id="auto",
+        use_upgrades=True,
+        use_vanguards=False,
+        min_histories=16,
+        target_elo=1000.0,
+    )
+    assert seeded == 16
+
+    seeded_again = seed_puppet_histories(
+        db_path,
+        cube_id="auto",
+        use_upgrades=True,
+        use_vanguards=False,
+        min_histories=16,
+        target_elo=1000.0,
+    )
+    assert seeded_again == 0

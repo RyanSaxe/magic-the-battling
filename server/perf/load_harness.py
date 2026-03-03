@@ -10,6 +10,7 @@ import random
 import secrets
 import shutil
 import signal
+import sqlite3
 import statistics
 import subprocess
 import sys
@@ -36,6 +37,8 @@ CREATE_RETRY_MAX_SEC = 3.0
 WS_CONNECT_RETRY_BASE_SEC = 0.10
 WS_CONNECT_RETRY_MAX_SEC = 2.0
 IDEMPOTENCY_KEY_HEADER = "x-mtb-idempotency-key"
+PUPPET_HISTORY_ELO_WINDOW = 200.0
+FAKE_MODE_TARGET_ELO = 1000.0
 
 
 class GameFlowError(RuntimeError):
@@ -107,6 +110,7 @@ class HarnessConfig:
     calibration_timeout_sec: float
     disable_caps: bool
     disable_ws_gzip: bool
+    mock_cube_data: bool
     db_copy: bool
     db_source: str | None
     backend_port: int
@@ -133,6 +137,7 @@ class ManagedServer:
     config: HarnessConfig
     process: subprocess.Popen | None = None
     temp_db_dir: Path | None = None
+    temp_db_path: Path | None = None
     base_url: str = DEFAULT_BASE_URL
     ops_token: str = ""
 
@@ -144,20 +149,25 @@ class ManagedServer:
 
         if self.config.db_copy:
             source_db = resolve_db_source(self.config.db_source)
-            if not source_db.exists():
-                msg = f"--db-copy database source does not exist: {source_db}"
-                raise FileNotFoundError(msg)
             temp_dir = Path(tempfile.mkdtemp(prefix="mtb-load-db-"))
             temp_db = temp_dir / source_db.name
-            shutil.copy2(source_db, temp_db)
+            if source_db.exists():
+                shutil.copy2(source_db, temp_db)
+                print(f"[harness] using DB copy: {temp_db} (source: {source_db})")
+            else:
+                temp_db.touch()
+                print(f"[harness] db source not found, using fresh temp DB: {temp_db} (expected source: {source_db})")
             self.temp_db_dir = temp_dir
+            self.temp_db_path = temp_db
             env["DATABASE_PATH"] = str(temp_db)
-            print(f"[harness] using DB copy: {temp_db} (source: {source_db})")
 
         if self.config.disable_caps:
             env.update(cap_overrides_for(self.config.max_requested_games))
 
         env["MTB_COMPRESS_WS"] = "0" if self.config.disable_ws_gzip else "1"
+        env["MTB_FAKE_CUBE_DATA"] = "1" if self.config.mock_cube_data else "0"
+        # Perf runs do not exercise share-preview screenshots; disable preview startup for stability.
+        env["MTB_DISABLE_PREVIEW"] = "1"
 
         cmd = [
             sys.executable,
@@ -176,6 +186,18 @@ class ManagedServer:
             start_new_session=True,
         )
         await wait_for_health(self.base_url, self.config.startup_timeout_sec, self.process)
+        if self.temp_db_path is not None:
+            target_elo = FAKE_MODE_TARGET_ELO if self.config.mock_cube_data else None
+            seeded = seed_puppet_histories(
+                self.temp_db_path,
+                cube_id=self.config.cube_id,
+                use_upgrades=self.config.use_upgrades,
+                use_vanguards=False,
+                min_histories=max(16, self.config.puppet_count * 4),
+                target_elo=target_elo,
+            )
+            if seeded > 0:
+                print(f"[harness] seeded {seeded} synthetic puppet histories for load runs")
         print(f"[harness] managed server ready at {self.base_url}")
         return self
 
@@ -251,6 +273,182 @@ def resolve_db_source(explicit: str | None) -> Path:
     if env_path := os.getenv("DATABASE_PATH"):
         return Path(env_path).expanduser().resolve()
     return (Path(__file__).resolve().parents[2] / "data" / "mtb.db").resolve()
+
+
+def _mock_snapshot_card(seed: str, idx: int) -> dict[str, Any]:
+    return {
+        "name": f"seed_card_{seed}_{idx}",
+        "image_url": f"https://example.invalid/seed/{seed}/{idx}.jpg",
+        "id": f"seed-{seed}-{idx:02d}",
+        "type_line": "creature",
+    }
+
+
+def _seed_history_payload(seed: int) -> tuple[dict[str, Any], list[dict[str, Any]], list[str]]:
+    hand = [_mock_snapshot_card(str(seed), idx) for idx in range(7)]
+    basics = ["Plains", "Island", "Swamp"]
+    full_state = {
+        "hand": hand,
+        "vanguard": None,
+        "basic_lands": basics,
+        "applied_upgrades": [],
+        "upgrades": [],
+        "treasures": 1,
+        "sideboard": [],
+        "command_zone": [],
+        "poison": 0,
+        "play_draw_preference": "play",
+    }
+    return full_state, hand, basics
+
+
+def _is_suspicious_name(name: str) -> bool:
+    if not name or len(name) <= 1:
+        return True
+    if name.isdigit():
+        return True
+    lower = name.lower()
+    if lower in ("test", "testing", "asdf", "qwerty"):
+        return True
+    return len(set(lower)) == 1
+
+
+def _is_varied_basics_json(raw: Any) -> bool:
+    if raw is None:
+        return False
+    if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="ignore")
+    if not isinstance(raw, str):
+        raw = str(raw)
+    if not raw:
+        return False
+    try:
+        basics = json.loads(raw)
+    except Exception:
+        return False
+    if not isinstance(basics, list) or not basics:
+        return False
+    return len({str(b) for b in basics}) > 1
+
+
+def _count_usable_histories(
+    conn: sqlite3.Connection,
+    *,
+    config_json: str,
+    target_elo: float | None,
+    elo_window: float,
+) -> int:
+    rows = conn.execute(
+        """
+        SELECT h.player_name, h.battler_elo, s.basic_lands_json
+        FROM player_game_history h
+        JOIN games g ON g.id = h.game_id
+        JOIN battle_snapshots s ON s.player_history_id = h.id
+        WHERE h.max_stage >= 6
+          AND g.config_json = ?
+          AND s.stage = 3
+          AND s.round = 1
+        """,
+        (config_json,),
+    ).fetchall()
+
+    usable = 0
+    for player_name, battler_elo, basics_json in rows:
+        name = str(player_name or "")
+        if _is_suspicious_name(name):
+            continue
+        if not _is_varied_basics_json(basics_json):
+            continue
+        if target_elo is not None:
+            try:
+                elo = float(battler_elo)
+            except (TypeError, ValueError):
+                continue
+            if abs(elo - target_elo) > elo_window:
+                continue
+        usable += 1
+
+    return usable
+
+
+def seed_puppet_histories(
+    db_path: Path,
+    *,
+    cube_id: str,
+    use_upgrades: bool,
+    use_vanguards: bool,
+    min_histories: int,
+    target_elo: float | None = None,
+    elo_window: float = PUPPET_HISTORY_ELO_WINDOW,
+) -> int:
+    config_json = json.dumps(
+        {
+            "use_upgrades": use_upgrades,
+            "use_vanguards": use_vanguards,
+            "cube_id": cube_id,
+        }
+    )
+
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute("PRAGMA busy_timeout=5000")
+        usable_count = _count_usable_histories(
+            conn,
+            config_json=config_json,
+            target_elo=target_elo,
+            elo_window=elo_window,
+        )
+        missing = max(0, min_histories - usable_count)
+        if missing == 0:
+            return 0
+
+        inserted = 0
+        for idx in range(missing):
+            suffix = secrets.token_hex(4)
+            game_id = f"perf_seed_game_{suffix}_{idx}"
+            player_name = f"ArchivePilot{idx + 1:04d}"
+            base_elo = target_elo if target_elo is not None else 1200.0
+            elo = base_elo + float(((idx % 9) - 4) * 15)
+            full_state, hand, basics = _seed_history_payload(idx)
+
+            conn.execute(
+                """
+                INSERT INTO games (id, config_json, shared)
+                VALUES (?, ?, 0)
+                """,
+                (game_id, config_json),
+            )
+            cursor = conn.execute(
+                """
+                INSERT INTO player_game_history
+                  (game_id, player_name, battler_elo, max_stage, max_round, final_placement, is_puppet)
+                VALUES (?, ?, ?, 6, 3, 2, 0)
+                """,
+                (game_id, player_name, elo),
+            )
+            rowid = cursor.lastrowid
+            if rowid is None:
+                msg = "failed to insert seeded player_game_history row"
+                raise RuntimeError(msg)
+            history_id = int(rowid)
+            conn.execute(
+                """
+                INSERT INTO battle_snapshots
+                  (player_history_id, stage, round, hand_json, vanguard_json, basic_lands_json,
+                   applied_upgrades_json, treasures, poison, play_draw_preference, full_state_json)
+                VALUES (?, 3, 1, ?, NULL, ?, ?, 1, 0, 'play', ?)
+                """,
+                (
+                    history_id,
+                    json.dumps(hand),
+                    json.dumps(basics),
+                    json.dumps([]),
+                    json.dumps(full_state),
+                ),
+            )
+            inserted += 1
+
+        conn.commit()
+        return inserted
 
 
 def cap_overrides_for(max_games: int) -> dict[str, str]:
@@ -414,9 +612,12 @@ def choose_timeout_seconds(
     max_timeout: float,
     assumed_start_slots: int = 100,
 ) -> float:
+    # At high concurrency, per-game wall time can scale close to linearly due event-loop
+    # contention and game-start queueing; include a linear term to avoid optimistic timeouts.
     concurrency_factor = max(1.0, min(5.0, math.sqrt(max(concurrency, 1) / 25.0)))
     queue_factor = max(1.0, math.sqrt(max(concurrency, 1) / max(assumed_start_slots, 1)))
-    computed = single_game_seconds * multiplier * concurrency_factor * queue_factor
+    scaled_factor = max(concurrency_factor * queue_factor, float(max(concurrency, 1)) * 1.5)
+    computed = single_game_seconds * multiplier * scaled_factor
     return max(min_timeout, min(max_timeout, computed))
 
 
@@ -1192,6 +1393,19 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
         help="When harness manages local server, set MTB_COMPRESS_WS=0 to disable WS gzip compression",
     )
     parser.add_argument(
+        "--mock-cube-data",
+        dest="mock_cube_data",
+        action="store_true",
+        default=True,
+        help="Use deterministic local cube data (no external CubeCobra/Scryfall calls) (default: true)",
+    )
+    parser.add_argument(
+        "--real-cube-data",
+        dest="mock_cube_data",
+        action="store_false",
+        help="Use real CubeCobra/Scryfall data (requires external network/cache)",
+    )
+    parser.add_argument(
         "--db-copy",
         action="store_true",
         help="Run against a managed local server pointed at a temporary DB copy (deleted on exit)",
@@ -1273,6 +1487,7 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
         calibration_timeout_sec=args.calibration_timeout_sec,
         disable_caps=args.disable_caps,
         disable_ws_gzip=args.disable_ws_gzip,
+        mock_cube_data=args.mock_cube_data,
         db_copy=args.db_copy,
         db_source=args.db_source,
         backend_port=args.backend_port,
@@ -1334,6 +1549,8 @@ async def run_against_existing_server(cfg: HarnessConfig) -> dict[str, Any]:
         print("[harness] note: --disable-caps cannot modify an already-running external server.")
     if cfg.disable_ws_gzip:
         print("[harness] note: --disable-ws-gzip cannot modify an already-running external server.")
+    if cfg.mock_cube_data:
+        print("[harness] note: --mock-cube-data only applies when harness manages the server process.")
     if cfg.reset_runtime_between_sweeps and not cfg.ops_token:
         print("[harness] note: runtime reset requires --ops-token when targeting an external server.")
     return await execute_sweeps(cfg, sampler=None, ops_token=cfg.ops_token)
@@ -1366,11 +1583,22 @@ async def execute_sweeps(
                 print(f"[harness] note: skipping runtime reset before sweep {games}; ops token unavailable.")
 
         concurrency = cfg.concurrency_for(games)
+        if cfg.game_timeout_sec is None:
+            timeout_for_sweep = choose_timeout_seconds(
+                single_game_seconds=calibration_result.duration_sec,
+                concurrency=concurrency,
+                multiplier=cfg.timeout_multiplier,
+                min_timeout=cfg.timeout_min_sec,
+                max_timeout=cfg.timeout_max_sec,
+            )
+        else:
+            timeout_for_sweep = timeout_per_game_sec
+
         sweep_summary = await run_sweep(
             cfg=cfg,
             games=games,
             concurrency=concurrency,
-            timeout_per_game_sec=timeout_per_game_sec,
+            timeout_per_game_sec=timeout_for_sweep,
             sampler=sampler,
         )
         sweeps.append(sweep_summary)
@@ -1392,6 +1620,7 @@ async def execute_sweeps(
             "use_upgrades": cfg.use_upgrades,
             "disable_caps": cfg.disable_caps,
             "disable_ws_gzip": cfg.disable_ws_gzip,
+            "mock_cube_data": cfg.mock_cube_data,
             "db_copy": cfg.db_copy,
             "seed": cfg.seed,
             "reset_runtime_between_sweeps": cfg.reset_runtime_between_sweeps,
