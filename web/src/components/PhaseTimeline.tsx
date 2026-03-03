@@ -1,6 +1,8 @@
+import { useState, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Phase } from "../constants/phases";
 import type { RulesPanelTarget } from "./RulesPanel";
+import { PhasePopover } from "./PhasePopover";
 
 const PHASES: Phase[] = ["draft", "build", "battle", "reward"];
 
@@ -70,6 +72,39 @@ export function PhaseTimeline({
   hamburger,
   title,
 }: PhaseTimelineProps) {
+  const [popoverPhase, setPopoverPhase] = useState<Phase | null>(null);
+  const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(null);
+  const phaseButtonRefs = useRef<Record<Phase, HTMLButtonElement | null>>({
+    draft: null,
+    build: null,
+    battle: null,
+    reward: null,
+  });
+
+  const handlePhaseClick = useCallback((phase: Phase) => {
+    if (popoverPhase === phase) {
+      setPopoverPhase(null);
+      setPopoverAnchorRect(null);
+      return;
+    }
+    const btn = phaseButtonRefs.current[phase];
+    if (btn) {
+      setPopoverAnchorRect(btn.getBoundingClientRect());
+      setPopoverPhase(phase);
+    }
+  }, [popoverPhase]);
+
+  const handleClosePopover = useCallback(() => {
+    setPopoverPhase(null);
+    setPopoverAnchorRect(null);
+  }, []);
+
+  const handleOpenGuideFromPopover = useCallback(() => {
+    const phase = popoverPhase;
+    handleClosePopover();
+    onOpenRules?.(phase ? { docId: phase } : undefined);
+  }, [handleClosePopover, onOpenRules, popoverPhase]);
+
   if (!isGamePhase(currentPhase)) {
     return (
       <header className="bg-black/30 py-1.5 pl-4 pr-1.5 border-b border-gray-700/50">
@@ -105,7 +140,8 @@ export function PhaseTimeline({
               <div key={phase} className="flex items-center gap-1 sm:gap-1.5">
                 <span className="text-gray-600 text-xs">→</span>
                 <button
-                  onClick={() => onOpenRules?.({ docId: phase })}
+                  ref={(el) => { phaseButtonRefs.current[phase] = el; }}
+                  onClick={() => handlePhaseClick(phase)}
                   className={`text-xs sm:text-sm font-medium capitalize transition-colors cursor-pointer
                     ${isActive ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
                     ${isCompleted ? "text-gray-500 line-through decoration-gray-600" : ""}
@@ -133,6 +169,15 @@ export function PhaseTimeline({
           {hamburger && <div className="shrink-0">{hamburger}</div>}
         </div>
       </div>
+
+      {popoverPhase && popoverAnchorRect && (
+        <PhasePopover
+          phase={popoverPhase}
+          anchorRect={popoverAnchorRect}
+          onClose={handleClosePopover}
+          onOpenGuide={handleOpenGuideFromPopover}
+        />
+      )}
     </header>
   );
 }

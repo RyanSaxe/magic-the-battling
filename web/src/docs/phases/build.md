@@ -12,6 +12,12 @@ The build phase is where you decide the best starting hand you can build from yo
 Look at the "Opponents" sidebar tab. This will show you the probability of facing other players as well as all the public data about them ([treasures](doc:game-pieces#treasures), [poison](doc:game-pieces#poison), [upgrades](doc:game-pieces#upgrades), and even what cards they cast in their most recent [battle](doc:battle)).
 :::
 
+## Quick Rules
+
+- Select your hand (size = current stage) and 3 basic lands.
+- Lands + treasures start on the battlefield untapped.
+- Player with most poison chooses play/draw.
+
 ## Rules
 
 - The three basic lands you select, along with your treasures, will start on the battlefield untapped in the upcoming [battle phase](doc:battle).

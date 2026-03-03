@@ -258,7 +258,7 @@ export function Lobby() {
                     </span>
                     <span>&middot;</span>
                     <button
-                      onClick={() => openGuide({ docId: "__cards__" })}
+                      onClick={() => openGuide({ docId: "__cards__", mode: 'comprehensive' })}
                       className="text-amber-500/70 hover:text-amber-400 transition-colors"
                     >
                       Browse Cards
@@ -285,6 +285,7 @@ export function Lobby() {
                             openGuide({
                               docId: "non-human-players",
                               tab: "puppets",
+                              mode: 'comprehensive',
                             })
                           }
                           className="w-5 h-5 rounded-full bg-white/10 border border-white/15 text-gray-400 hover:bg-white/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
@@ -300,6 +301,7 @@ export function Lobby() {
                             openGuide({
                               docId: "non-human-players",
                               tab: "puppets",
+                              mode: 'comprehensive',
                             })
                           }
                           className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
@@ -468,7 +470,9 @@ export function Lobby() {
           onClose={() => setShowRulesPanel(false)}
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
+          initialMode={rulesPanelTarget?.mode}
           gameId={gameId}
+          useUpgrades={lobbyState?.use_upgrades}
         />
       )}
     </div>

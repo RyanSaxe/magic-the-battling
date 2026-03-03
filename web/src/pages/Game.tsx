@@ -41,6 +41,42 @@ interface SpectatorConfig {
   requestId: string;
 }
 
+const SCHEDULED_UTC_RE = /scheduled for (\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}) UTC/i;
+const TOP_NOTICE_Z_INDEX = 2147483647;
+
+function scheduledEasternFromNotice(message: string): string | null {
+  const match = SCHEDULED_UTC_RE.exec(message);
+  if (!match) return null;
+
+  const [, year, month, day, hour, minute] = match;
+  const asDate = new Date(
+    Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+    ),
+  );
+  if (Number.isNaN(asDate.getTime())) return null;
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+    timeZoneName: "short",
+  }).format(asDate);
+}
+
+function drainingMessageWithEasternTime(message: string, easternTime: string | null): string {
+  if (!message) return "";
+  if (!easternTime) return message;
+  return message.replace(SCHEDULED_UTC_RE, `scheduled for ${easternTime}`);
+}
+
 function PlayerSelectionModal({
   gameId,
   onSessionCreated,
@@ -440,6 +476,7 @@ function GameContent() {
   const [activeDndPanel, setActiveDndPanel] = useState<ActiveDndPanel>(null);
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
+  const [dismissedDrainingNoticeAt, setDismissedDrainingNoticeAt] = useState<string | null>(null);
 
   const prevPhaseRef = useRef(gameState?.self_player.phase);
   if (gameState?.self_player.phase !== prevPhaseRef.current) {
@@ -1005,6 +1042,16 @@ function GameContent() {
     return null;
   };
 
+  const drainingNoticeHidden =
+    serverNotice?.mode === "draining" &&
+    dismissedDrainingNoticeAt === serverNotice.updated_at;
+  const drainingScheduledEt = serverNotice?.mode === "draining"
+    ? scheduledEasternFromNotice(serverNotice.message || "")
+    : null;
+  const drainingMessage = serverNotice?.mode === "draining"
+    ? drainingMessageWithEasternTime(serverNotice.message || "", drainingScheduledEt)
+    : "";
+
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
       <div className="game-table h-dvh overflow-hidden flex flex-col">
@@ -1019,8 +1066,8 @@ function GameContent() {
             </div>
           </div>
         )}
-        {serverNotice?.mode === 'draining' && (
-          <div className="fixed top-0 inset-x-0 z-40 px-3 pt-3 pointer-events-none">
+        {serverNotice?.mode === 'draining' && !drainingNoticeHidden && (
+          <div className="fixed top-0 inset-x-0 px-3 pt-3 pointer-events-none" style={{ zIndex: TOP_NOTICE_Z_INDEX }}>
             <div className="mx-auto max-w-3xl pointer-events-auto bg-amber-950/90 border border-amber-500/40 rounded-lg shadow-xl px-4 py-3">
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-sm font-semibold text-amber-200">Scheduled Server Update</h2>
@@ -1030,15 +1077,24 @@ function GameContent() {
                 >
                   i
                 </span>
+                <button
+                  type="button"
+                  onClick={() => setDismissedDrainingNoticeAt(serverNotice.updated_at)}
+                  className="ml-auto text-amber-100/80 hover:text-amber-100 text-xs px-1"
+                  aria-label="Dismiss scheduled server update notice"
+                  title="Dismiss"
+                >
+                  ✕
+                </button>
               </div>
               <p className="text-sm text-amber-100/95">
-                {serverNotice.message || 'A server update is scheduled soon. New games are paused while current games continue.'}
+                {drainingMessage || 'A server update is scheduled soon. New games are paused while current games continue.'}
               </p>
             </div>
           </div>
         )}
         {serverNotice?.mode === 'maintenance' && (
-          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center" style={{ zIndex: TOP_NOTICE_Z_INDEX }}>
             <div className="bg-gray-950/95 border border-amber-500/40 rounded-xl shadow-2xl p-6 max-w-md mx-4">
               <div className="flex items-center gap-2 mb-2">
                 <h2 className="text-xl font-semibold text-amber-300">Server Maintenance</h2>
@@ -1409,6 +1465,7 @@ function GameContent() {
           onClose={() => setRulesPanelOpen(false)}
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
+          initialMode={rulesPanelTarget?.mode}
           gameId={gameId}
           useUpgrades={gameState.use_upgrades}
         />

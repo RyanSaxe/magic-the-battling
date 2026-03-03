@@ -12,6 +12,11 @@ You made it to the end of the round. Enjoy your rewards!
 In the current game rules, there is no difference in rewards for the winner of the battle.
 :::
 
+## Quick Rules
+
+- +1 treasure every round, +1 random card (rounds 1–2).
+- Round 3: Vanquisher card (+1 hand size) and upgrade selection.
+
 ## Rules
 
 - Every player always gets +1 [treasure](doc:game-pieces#treasures).
