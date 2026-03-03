@@ -295,3 +295,12 @@ class OpsCapacityResponse(BaseModel):
     game_start_waiters: int
     max_game_starts_in_flight: int
     max_game_start_waiters: int
+
+
+class ServerStatusResponse(BaseModel):
+    mode: Literal["normal", "draining", "maintenance"]
+    message: str
+    updated_at: str
+    new_games_blocked: bool
+    scheduled_for_utc: str | None = None
+    estimated_recovery_minutes: int | None = None

@@ -1,6 +1,8 @@
 import logging
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from math import ceil
 from typing import Literal, cast
 
 from server.db import database
@@ -10,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 OpsMode = Literal["normal", "draining", "maintenance"]
 VALID_MODES = {"normal", "draining", "maintenance"}
+_SCHEDULED_UTC_RE = re.compile(r"scheduled for (\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC)", re.IGNORECASE)
 
 
 @dataclass
@@ -107,11 +110,53 @@ class OpsManager:
     def blocks_new_games(self) -> bool:
         return self._mode in {"draining", "maintenance"}
 
+    def _scheduled_time_utc(self) -> datetime | None:
+        if not self._message:
+            return None
+
+        match = _SCHEDULED_UTC_RE.search(self._message)
+        if not match:
+            return None
+
+        try:
+            return datetime.strptime(match.group(1), "%Y-%m-%d %H:%M UTC").replace(tzinfo=UTC)
+        except ValueError:
+            return None
+
+    def scheduled_for_utc_iso(self) -> str | None:
+        scheduled = self._scheduled_time_utc()
+        return scheduled.isoformat() if scheduled else None
+
+    def estimated_recovery_minutes(self) -> int | None:
+        if self._mode == "normal":
+            return None
+
+        if self._mode == "maintenance":
+            return 5
+
+        scheduled = self._scheduled_time_utc()
+        if scheduled:
+            minutes_until_rollout = max(0, ceil((scheduled - datetime.now(UTC)).total_seconds() / 60))
+            # Include a small buffer for rollout + health checks.
+            return minutes_until_rollout + 5
+
+        return 10
+
     def notice_payload(self) -> dict[str, str]:
         return {
             "mode": self._mode,
             "message": self._message or "",
             "updated_at": self._updated_at.isoformat(),
+        }
+
+    def public_status_payload(self) -> dict[str, str | bool | int | None]:
+        return {
+            "mode": self._mode,
+            "message": self._message or "",
+            "updated_at": self._updated_at.isoformat(),
+            "new_games_blocked": self.blocks_new_games(),
+            "scheduled_for_utc": self.scheduled_for_utc_iso(),
+            "estimated_recovery_minutes": self.estimated_recovery_minutes(),
         }
 
 

@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 IDEMPOTENCY_KEY_HEADER = "x-mtb-idempotency-key"
 IDEMPOTENCY_TTL_MINUTES = 10
 IDEMPOTENCY_CACHE_MAX = 10_000
+DEFAULT_UPDATE_RETRY_AFTER_SECONDS = 600
 
 
 @dataclass
@@ -179,6 +180,21 @@ def _new_game_block_reason() -> str | None:
     return None
 
 
+def _update_retry_after_seconds() -> str:
+    estimate_minutes = ops_manager.estimated_recovery_minutes()
+    if estimate_minutes is None:
+        return str(DEFAULT_UPDATE_RETRY_AFTER_SECONDS)
+    return str(max(60, estimate_minutes * 60))
+
+
+def _server_update_http_error(detail: str) -> HTTPException:
+    return HTTPException(
+        status_code=503,
+        detail=detail,
+        headers={"Retry-After": _update_retry_after_seconds()},
+    )
+
+
 def _create_game_response(request: CreateGameRequest) -> CreateGameResponse:
     session = session_manager.create_session()
     pending = game_manager.create_game(
@@ -232,7 +248,11 @@ async def create_game(
 
     block_reason = _new_game_block_reason()
     if block_reason:
-        error = HTTPException(status_code=503, detail=block_reason)
+        error = (
+            _server_update_http_error(block_reason)
+            if ops_manager.blocks_new_games()
+            else HTTPException(status_code=503, detail=block_reason)
+        )
         await _resolve_claim_error(claim, error)
         raise error
 
@@ -280,7 +300,7 @@ def warm_cube_cache(request: WarmCubeRequest):
 def join_game_by_code(request: JoinGameRequest):
     """Join a game using just the join code (no game_id needed)."""
     if ops_manager.blocks_new_games():
-        raise HTTPException(status_code=503, detail="Server is updating. Joining new games is temporarily blocked.")
+        raise _server_update_http_error("Server is updating. Joining new games is temporarily blocked.")
 
     game_id = game_manager.get_game_id_by_join_code(request.join_code)
     if not game_id:
@@ -316,7 +336,7 @@ def join_game_by_code(request: JoinGameRequest):
 @router.post("/{game_id}/join", response_model=JoinGameResponse)
 def join_game(game_id: str, request: JoinGameRequest):
     if ops_manager.blocks_new_games():
-        raise HTTPException(status_code=503, detail="Server is updating. Joining new games is temporarily blocked.")
+        raise _server_update_http_error("Server is updating. Joining new games is temporarily blocked.")
 
     pending = game_manager.get_pending_game(game_id)
     if not pending:
@@ -409,7 +429,7 @@ def get_game_cards(game_id: str):
 @router.post("/{game_id}/start", response_model=StartGameResponse)
 def start_game(game_id: str):
     if ops_manager.blocks_new_games():
-        raise HTTPException(status_code=503, detail="Server is updating. New games are temporarily blocked.")
+        raise _server_update_http_error("Server is updating. New games are temporarily blocked.")
 
     pending = game_manager.get_pending_game(game_id)
     if not pending:

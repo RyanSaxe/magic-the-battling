@@ -18,6 +18,7 @@ from server.monitoring import start_monitoring, stop_monitoring
 from server.observability import OBSERVABILITY_LOGGER_NAME, configure_logging, record_http_latency
 from server.routers import games, ops, share_preview, ws
 from server.runtime_config import MAX_SESSIONS_TOTAL, SESSION_TTL_MINUTES
+from server.schemas.api import ServerStatusResponse
 from server.services.game_manager import game_manager
 from server.services.ops_manager import ops_manager
 from server.services.preview import preview_service
@@ -129,6 +130,19 @@ app.include_router(ops.router)
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/api/server/status", response_model=ServerStatusResponse)
+def server_status():
+    snapshot = ops_manager.get_snapshot()
+    return ServerStatusResponse(
+        mode=snapshot.mode,
+        message=snapshot.message or "",
+        updated_at=snapshot.updated_at.isoformat(),
+        new_games_blocked=ops_manager.blocks_new_games(),
+        scheduled_for_utc=ops_manager.scheduled_for_utc_iso(),
+        estimated_recovery_minutes=ops_manager.estimated_recovery_minutes(),
+    )
 
 
 static_dir = Path(__file__).parent.parent / "web" / "dist"
