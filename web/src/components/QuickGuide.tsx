@@ -17,14 +17,21 @@ interface AccordionItemProps {
 
 function AccordionItem({ label, expanded, onToggle, children }: AccordionItemProps) {
   return (
-    <div className="border-b border-amber-400/10 last:border-b-0 flex flex-col min-h-0 shrink-0" style={expanded ? { flex: '1 1 0', minHeight: 0 } : undefined}>
+    <div
+      className="border-b border-amber-400/10 last:border-b-0 flex flex-col min-h-0"
+      style={expanded ? { flex: '1 1 0', minHeight: 0 } : { flex: '0 0 auto' }}
+    >
       <button
         onClick={onToggle}
-        className="w-full py-3 px-4 flex items-center gap-3 cursor-pointer hover:bg-gray-800/50 transition-colors shrink-0"
+        className={`w-full py-3 px-4 flex items-center gap-3 cursor-pointer transition-colors shrink-0 ${
+          expanded
+            ? 'bg-gray-800/50 border-b border-amber-400/25'
+            : 'hover:bg-gray-800/50'
+        }`}
       >
         <span className="text-white font-medium text-sm sm:text-base flex-1 text-left capitalize">{label}</span>
         <svg
-          className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
+          className={`w-4 h-4 transition-all duration-200 ${expanded ? 'rotate-90 text-amber-400' : 'text-gray-400'}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -33,15 +40,28 @@ function AccordionItem({ label, expanded, onToggle, children }: AccordionItemPro
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
       </button>
-      <div className={`accordion-body ${expanded ? 'open' : ''}`} style={expanded ? { flex: '1 1 0', minHeight: 0 } : undefined}>
-        <div className={expanded ? 'overflow-y-auto' : ''}>
-          <div className="px-4 pb-4">
+      {expanded && (
+        <div className="flex-1 min-h-0 overflow-y-auto" style={{ boxShadow: 'inset 0 4px 8px rgba(0, 0, 0, 0.35), inset 0 1px 3px rgba(0, 0, 0, 0.25)' }}>
+          <div className="px-5 py-4">
             {children}
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
+}
+
+function parseFaqPairs(content: string): { question: string; answer: string }[] {
+  const pairs: { question: string; answer: string }[] = []
+  const blocks = content.split(/\n\n+/)
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i].trim()
+    const match = block.match(/^\*\*(.+?)\*\*\s*\n?([\s\S]*)$/)
+    if (match) {
+      pairs.push({ question: match[1], answer: match[2].trim() })
+    }
+  }
+  return pairs
 }
 
 interface QuickGuideProps {
@@ -184,11 +204,16 @@ export function QuickGuide({
       )}
 
       {activeTab === 'faq' && (
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
           {faqDoc ? (
-            <div className="text-sm sm:text-base">
-              <DocRenderer content={faqDoc.parsed.sections['overview'] ?? faqDoc.parsed.body} />
-            </div>
+            parseFaqPairs(faqDoc.parsed.sections['overview'] ?? faqDoc.parsed.body).map((pair, i) => (
+              <div key={i} className="rounded-lg p-3 border border-amber-400/15">
+                <p className="text-sm sm:text-base text-white font-medium pb-2 mb-2 border-b border-amber-400/15">{pair.question}</p>
+                <div className="text-sm sm:text-base text-gray-300">
+                  <DocRenderer content={pair.answer} />
+                </div>
+              </div>
+            ))
           ) : (
             <p className="text-sm text-gray-400">FAQ content not found.</p>
           )}
