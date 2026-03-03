@@ -1,4 +1,12 @@
-import type { Card, CreateGameResponse, JoinGameResponse, GameStatusResponse, SpectateRequestStatus, ShareGameResponse } from '../types'
+import type {
+  Card,
+  CreateGameResponse,
+  JoinGameResponse,
+  GameStatusResponse,
+  SpectateRequestStatus,
+  ShareGameResponse,
+  ServerStatus,
+} from '../types'
 import { getOrCreateDeviceId } from '../utils/deviceIdentity'
 
 const API_BASE = '/api'
@@ -197,6 +205,14 @@ export async function getShareGame(gameId: string, playerName: string): Promise<
   const response = await fetch(`${API_BASE}/games/${gameId}/share/${encodeURIComponent(playerName)}`)
   if (!response.ok) {
     throw new Error(await getErrorMessage(response, 'Failed to load shared game'))
+  }
+  return response.json()
+}
+
+export async function getServerStatus(): Promise<ServerStatus> {
+  const response = await fetch(`${API_BASE}/server/status`)
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, 'Failed to load server status'))
   }
   return response.json()
 }

@@ -21,6 +21,15 @@ type OpponentCount = 1 | 3 | 5 | 7;
 type ActiveMode = "friends" | "solo";
 const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
 
+function normalizeCreateGameError(error: unknown): string {
+  const raw =
+    error instanceof Error ? error.message : "Failed to create game";
+  if (raw.toLowerCase().includes("server is updating")) {
+    return "New games are temporarily paused for a scheduled server update. If you are already in a game, you can keep playing and reconnect. Try again in about 10-15 minutes.";
+  }
+  return raw;
+}
+
 function useSoloLobbyWatcher(
   lobbyState: LobbyState | null,
   pendingGameId: string | null,
@@ -295,10 +304,7 @@ export function Play() {
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
-      addToast(
-        err instanceof Error ? err.message : "Failed to create game",
-        "error",
-      );
+      addToast(normalizeCreateGameError(err), "error");
       setFriendsLoading(false);
     }
   };
@@ -324,10 +330,7 @@ export function Play() {
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
-      addToast(
-        err instanceof Error ? err.message : "Failed to create game",
-        "error",
-      );
+      addToast(normalizeCreateGameError(err), "error");
       updateSoloPhase("idle");
     }
   };

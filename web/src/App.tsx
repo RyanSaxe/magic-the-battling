@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { ServerStatusBanner } from './components/common/ServerStatusBanner'
 import { ToastProvider } from './contexts'
 import { Home } from './pages/Home'
 import { Play } from './pages/Play'
@@ -13,6 +14,7 @@ function App() {
     <ErrorBoundary>
       <ToastProvider>
         <BrowserRouter>
+          <ServerStatusBanner />
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/play" element={<Play />} />

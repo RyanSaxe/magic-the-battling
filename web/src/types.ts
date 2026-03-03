@@ -178,6 +178,15 @@ export interface GameStatusResponse {
   auto_approve_spectators: boolean
 }
 
+export interface ServerStatus {
+  mode: 'normal' | 'draining' | 'maintenance'
+  message: string
+  updated_at: string
+  new_games_blocked: boolean
+  scheduled_for_utc: string | null
+  estimated_recovery_minutes: number | null
+}
+
 export interface SpectateRequestStatus {
   status: 'pending' | 'approved' | 'denied'
   session_id?: string
