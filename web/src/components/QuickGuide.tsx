@@ -9,29 +9,33 @@ type CardType = 'cards' | 'upgrades' | 'vanguards'
 type AccordionSection = 'overview' | Phase
 
 interface AccordionItemProps {
+  id: string
   label: string
   expanded: boolean
   onToggle: () => void
   children: React.ReactNode
 }
 
-function AccordionItem({ label, expanded, onToggle, children }: AccordionItemProps) {
+function AccordionItem({ id, label, expanded, onToggle, children }: AccordionItemProps) {
+  const panelId = `quick-guide-panel-${id}`
   return (
     <div
-      className="border-b border-amber-400/10 last:border-b-0 flex flex-col min-h-0"
+      className="quick-guide-accordion-item border-b border-amber-400/10 last:border-b-0 flex flex-col min-h-0 overflow-hidden"
       style={expanded ? { flex: '1 1 0', minHeight: 0 } : { flex: '0 0 auto' }}
     >
       <button
         onClick={onToggle}
-        className={`w-full py-3 px-4 flex items-center gap-3 cursor-pointer transition-colors shrink-0 ${
+        aria-expanded={expanded}
+        aria-controls={panelId}
+        className={`w-full py-3 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-b transition-colors duration-200 ${
           expanded
-            ? 'bg-gray-800/50 border-b border-amber-400/25'
-            : 'hover:bg-gray-800/50'
+            ? 'bg-gray-800/50 border-amber-400/25'
+            : 'hover:bg-gray-800/50 border-transparent'
         }`}
       >
         <span className="text-white font-medium text-sm sm:text-base flex-1 text-left capitalize">{label}</span>
         <svg
-          className={`w-4 h-4 transition-all duration-200 ${expanded ? 'rotate-90 text-amber-400' : 'text-gray-400'}`}
+          className={`w-4 h-4 transition-transform transition-colors duration-200 ${expanded ? 'rotate-90 text-amber-400' : 'text-gray-400'}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -40,13 +44,17 @@ function AccordionItem({ label, expanded, onToggle, children }: AccordionItemPro
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
         </svg>
       </button>
-      {expanded && (
-        <div className="flex-1 min-h-0 overflow-y-auto" style={{ boxShadow: 'inset 0 4px 8px rgba(0, 0, 0, 0.35), inset 0 1px 3px rgba(0, 0, 0, 0.25)' }}>
-          <div className="px-5 py-4">
+      <div
+        id={panelId}
+        className={`quick-guide-accordion-panel ${expanded ? 'open' : ''}`}
+        aria-hidden={!expanded}
+      >
+        <div className="quick-guide-accordion-panel-inner">
+          <div className="quick-guide-accordion-scroll px-5 py-4">
             {children}
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -125,6 +133,7 @@ export function QuickGuide({
       {activeTab === 'guide' && (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <AccordionItem
+            id="overview"
             label="Overview"
             expanded={expandedSection === 'overview'}
             onToggle={() => toggleSection('overview')}
@@ -142,6 +151,7 @@ export function QuickGuide({
             const phaseDoc = getPhaseDoc(phase)
             return (
               <AccordionItem
+                id={phase}
                 key={phase}
                 label={`${phase} Phase`}
                 expanded={expandedSection === phase}
