@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
@@ -29,6 +29,12 @@ import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
+import {
+  getRememberedPlayerForGame,
+  pickAutoReconnectPlayer,
+  rememberPlayerForGame,
+} from "../utils/deviceIdentity";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -57,6 +63,7 @@ function PlayerSelectionModal({
   const [rejoinName, setRejoinName] = useState("");
   const [rejoinLoading, setRejoinLoading] = useState(false);
   const pollingRef = useRef<number | null>(null);
+  const autoReconnectAttemptedRef = useRef(false);
 
   useEffect(() => {
     const fetchStatus = () => {
@@ -77,20 +84,43 @@ function PlayerSelectionModal({
     };
   }, []);
 
-  const handleReconnect = async (playerName: string) => {
-    setRejoinName(playerName);
-    setRejoinLoading(true);
-    setError("");
+  const handleReconnect = useCallback(
+    async (playerName: string, options?: { silent?: boolean }) => {
+      setRejoinName(playerName);
+      setRejoinLoading(true);
+      if (!options?.silent) {
+        setError("");
+      }
 
-    try {
-      const response = await rejoinGame(gameId, playerName);
-      onSessionCreated(response.session_id, response.player_id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reconnect");
-    } finally {
-      setRejoinLoading(false);
+      try {
+        const response = await rejoinGame(gameId, playerName);
+        rememberPlayerForGame(gameId, playerName.trim());
+        onSessionCreated(response.session_id, response.player_id);
+      } catch (err) {
+        if (!options?.silent) {
+          setError(err instanceof Error ? err.message : "Failed to reconnect");
+        }
+      } finally {
+        setRejoinLoading(false);
+      }
+    },
+    [gameId, onSessionCreated],
+  );
+
+  useEffect(() => {
+    if (rejoinLoading || requestStatus !== "idle" || selectedPlayer !== null || !status) {
+      return;
     }
-  };
+
+    const rememberedPlayer = getRememberedPlayerForGame(gameId);
+    const autoPlayer = pickAutoReconnectPlayer(rememberedPlayer, status.players);
+    if (!autoPlayer || autoReconnectAttemptedRef.current) {
+      return;
+    }
+
+    autoReconnectAttemptedRef.current = true;
+    void handleReconnect(autoPlayer, { silent: true });
+  }, [gameId, handleReconnect, rejoinLoading, requestStatus, selectedPlayer, status]);
 
   const handleWatchRequest = async () => {
     if (!selectedPlayer || !spectatorName.trim()) {
@@ -348,7 +378,7 @@ function SpectateRequestModal({
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { session, saveSession } = useSession();
+  const { session, saveSession, clearSession } = useSession();
 
   const [spectatorConfig, setSpectatorConfig] = useState<SpectatorConfig | null>(null);
   const [spectatingPlayer, setSpectatingPlayer] = useState<string | null>(null);
@@ -359,7 +389,7 @@ function GameContent() {
   const isSpectateMode = searchParams.get("spectate") === "true";
   const { addToast } = useToast();
 
-  const { gameState, isConnected, actions, pendingSpectateRequest } = useGame(
+  const { gameState, isConnected, actions, pendingSpectateRequest, serverNotice, invalidSession } = useGame(
     gameId ?? null,
     isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
@@ -368,6 +398,27 @@ function GameContent() {
   const { state, setPreviewCard } = useContextStrip();
 
   const isSpectator = !!spectatorConfig;
+  const wasInvalidSessionRef = useRef(false);
+
+  useEffect(() => {
+    const shouldClear = shouldClearSessionOnInvalidEvent(
+      invalidSession,
+      wasInvalidSessionRef.current,
+      !!session,
+    );
+    wasInvalidSessionRef.current = invalidSession;
+    if (shouldClear) {
+      clearSession();
+    }
+  }, [invalidSession, session, clearSession]);
+
+  useEffect(() => {
+    const playerName = gameState?.self_player.name;
+    if (!gameId || !playerName || isSpectator) {
+      return;
+    }
+    rememberPlayerForGame(gameId, playerName);
+  }, [gameId, gameState?.self_player.name, isSpectator]);
 
   // Lifted state from Build phase
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
@@ -965,6 +1016,39 @@ function GameContent() {
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
               <span className="text-sm text-gray-200">Reconnecting...</span>
+            </div>
+          </div>
+        )}
+        {serverNotice?.mode === 'draining' && (
+          <div className="fixed top-0 inset-x-0 z-40 px-3 pt-3 pointer-events-none">
+            <div className="mx-auto max-w-3xl pointer-events-auto bg-amber-950/90 border border-amber-500/40 rounded-lg shadow-xl px-4 py-3">
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="text-sm font-semibold text-amber-200">Scheduled Server Update</h2>
+                <span
+                  className="inline-flex items-center justify-center rounded-full border border-amber-300/70 text-amber-100 text-[10px] font-bold leading-none px-1.5 py-0.5 cursor-help"
+                  title="New games are temporarily paused. You can keep playing this game and reconnect after the update if needed."
+                >
+                  i
+                </span>
+              </div>
+              <p className="text-sm text-amber-100/95">
+                {serverNotice.message || 'A server update is scheduled soon. New games are paused while current games continue.'}
+              </p>
+            </div>
+          </div>
+        )}
+        {serverNotice?.mode === 'maintenance' && (
+          <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+            <div className="bg-gray-950/95 border border-amber-500/40 rounded-xl shadow-2xl p-6 max-w-md mx-4">
+              <div className="flex items-center gap-2 mb-2">
+                <h2 className="text-xl font-semibold text-amber-300">Server Maintenance</h2>
+              </div>
+              <p className="text-sm text-gray-200 mb-2">
+                {serverNotice.message || 'Please wait a moment while the server finishes an update.'}
+              </p>
+              <p className="text-xs text-gray-400">
+                Keep this tab open. Your game will reconnect automatically when available.
+              </p>
             </div>
           </div>
         )}

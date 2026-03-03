@@ -9,10 +9,10 @@ class TestWebSocketConnection:
         game_id = game_with_players["game_id"]
 
         with (
+            client.websocket_connect(f"/ws/{game_id}?session_id=invalid") as ws,
             pytest.raises(WebSocketDisconnect) as exc_info,
-            client.websocket_connect(f"/ws/{game_id}?session_id=invalid"),
         ):
-            pass
+            ws.receive_json()
 
         assert exc_info.value.code == 4001
 
@@ -20,10 +20,10 @@ class TestWebSocketConnection:
         session_id = game_with_players["alice"]["session_id"]
 
         with (
+            client.websocket_connect(f"/ws/nonexistent?session_id={session_id}") as ws,
             pytest.raises(WebSocketDisconnect) as exc_info,
-            client.websocket_connect(f"/ws/nonexistent?session_id={session_id}"),
         ):
-            pass
+            ws.receive_json()
 
         assert exc_info.value.code == 4004
 

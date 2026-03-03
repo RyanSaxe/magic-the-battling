@@ -14,7 +14,17 @@ export function useGame(
   spectatorConfig?: SpectatorConfig | null,
   onServerError?: (message: string) => void
 ) {
-  const { isConnected, gameState, lobbyState, send, pendingSpectateRequest, clearSpectateRequest, kicked } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError)
+  const {
+    isConnected,
+    gameState,
+    lobbyState,
+    send,
+    pendingSpectateRequest,
+    serverNotice,
+    clearSpectateRequest,
+    kicked,
+    invalidSession,
+  } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError)
 
   const startGame = useCallback(() => {
     send('start_game')
@@ -127,7 +137,9 @@ export function useGame(
     gameState,
     lobbyState,
     pendingSpectateRequest,
+    serverNotice,
     kicked,
+    invalidSession,
     actions: {
       startGame,
       setReady,

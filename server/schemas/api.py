@@ -271,3 +271,27 @@ class ShareGameResponse(BaseModel):
     created_at: str
     use_upgrades: bool
     players: list[SharePlayerData]
+
+
+class OpsStateResponse(BaseModel):
+    mode: Literal["normal", "draining", "maintenance"]
+    message: str
+    updated_by: str | None = None
+    updated_at: str
+
+
+class OpsSetModeRequest(BaseModel):
+    mode: Literal["normal", "draining", "maintenance"]
+    message: str = ""
+    updated_by: str | None = None
+
+
+class OpsCapacityResponse(BaseModel):
+    loaded_games: int
+    hot_games: int
+    pending_games: int
+    sessions: int
+    game_starts_in_flight: int
+    game_start_waiters: int
+    max_game_starts_in_flight: int
+    max_game_start_waiters: int

@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
@@ -15,11 +16,20 @@ from starlette.requests import Request
 from server.db.database import init_db
 from server.monitoring import start_monitoring, stop_monitoring
 from server.observability import OBSERVABILITY_LOGGER_NAME, configure_logging, record_http_latency
-from server.routers import games, share_preview, ws
+from server.routers import games, ops, share_preview, ws
+from server.runtime_config import MAX_SESSIONS_TOTAL, SESSION_TTL_MINUTES
+from server.services.game_manager import game_manager
+from server.services.ops_manager import ops_manager
 from server.services.preview import preview_service
+from server.services.session_manager import session_manager
 
 configure_logging()
 logger = logging.getLogger(OBSERVABILITY_LOGGER_NAME)
+
+
+def _preview_disabled() -> bool:
+    raw = os.getenv("MTB_DISABLE_PREVIEW", "")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _route_template(request: Request) -> str:
@@ -32,11 +42,23 @@ def _route_template(request: Request) -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    await preview_service.start()
+    ops_manager.load()
+    game_manager.restore_all_snapshots()
+    preview_enabled = not _preview_disabled()
+    if preview_enabled:
+        await preview_service.start()
+    else:
+        logging.getLogger(__name__).info("Preview service disabled by MTB_DISABLE_PREVIEW")
     start_monitoring()
+    await game_manager.start_background_tasks()
     yield
+    removed_sessions = session_manager.cleanup(SESSION_TTL_MINUTES, MAX_SESSIONS_TOTAL)
+    if removed_sessions:
+        logging.getLogger(__name__).info("Session cleanup before shutdown removed=%d", removed_sessions)
+    await game_manager.stop_background_tasks()
     stop_monitoring()
-    await preview_service.stop()
+    if preview_enabled:
+        await preview_service.stop()
 
 
 app = FastAPI(
@@ -101,6 +123,7 @@ app.add_middleware(
 app.include_router(games.router)
 app.include_router(ws.router)
 app.include_router(share_preview.router)
+app.include_router(ops.router)
 
 
 @app.get("/health")

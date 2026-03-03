@@ -1,0 +1,139 @@
+name: PR Load Test
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-load-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  goldfish-load:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    env:
+      LOAD_JSON_PATH: /tmp/mtb-pr-load.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run goldfish load sweep
+        run: |
+          uv run python -m server.perf.load_harness \
+            --db-copy \
+            --mock-cube-data \
+            --sweep 10,50,100,200 \
+            --puppet-count 3 \
+            --disable-caps \
+            --runtime-reset-between-sweeps \
+            --game-timeout-sec 900 \
+            --json-output "${LOAD_JSON_PATH}"
+
+      - name: Validate completion is 100%
+        id: validate
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          path = pathlib.Path(os.environ["LOAD_JSON_PATH"])
+          report = json.loads(path.read_text())
+          sweeps = report.get("sweeps", [])
+          if not sweeps:
+            print("No sweeps found in load report.", file=sys.stderr)
+            sys.exit(1)
+
+          lines = []
+          failed = False
+          for sweep in sweeps:
+            games = int(sweep.get("games", 0))
+            completed = int(sweep.get("completed", 0))
+            failed_count = int(sweep.get("failed", 0))
+            pct = (completed / games * 100.0) if games else 0.0
+            lines.append(
+              f"- {games} games: completed={completed}, failed={failed_count}, completion={pct:.2f}%"
+            )
+            if completed != games or failed_count != 0:
+              failed = True
+
+          summary = "\n".join(lines)
+          pathlib.Path("/tmp/load-summary.txt").write_text(summary + "\n")
+          print(summary)
+          if failed:
+            sys.exit(1)
+          PY
+
+      - name: Build PR comment body
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          path = pathlib.Path(os.environ["LOAD_JSON_PATH"])
+          if not path.exists():
+            pathlib.Path("/tmp/pr-load-comment.md").write_text(
+              "## PR Load Test\n\nLoad harness did not produce a report file.\n"
+            )
+            raise SystemExit
+
+          report = json.loads(path.read_text())
+          sweeps = report.get("sweeps", [])
+
+          lines = ["## PR Load Test", "", "| Games | Completed | Failed | Wall Time (s) | Throughput (games/s) | Action p95 (ms) | RSS Start (MB) | RSS Peak (MB) | RSS End (MB) | RSS Delta End (MB) |", "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
+          for s in sweeps:
+            games = s.get("games", 0)
+            completed = s.get("completed", 0)
+            failed = s.get("failed", 0)
+            wall = s.get("wall_time_sec", 0.0)
+            throughput = s.get("throughput_games_per_sec", 0.0)
+            action_p95 = (s.get("action_latency_stats_ms") or {}).get("p95", 0.0)
+            rss_window = s.get("server_rss_window_mb") or {}
+            rss_start = rss_window.get("start", 0.0)
+            rss_peak = rss_window.get("peak", 0.0)
+            rss_end = rss_window.get("end", 0.0)
+            rss_delta_end = rss_window.get("delta_end", 0.0)
+            lines.append(
+              f"| {games} | {completed} | {failed} | {wall:.2f} | {throughput:.3f} | {action_p95:.1f} | {rss_start:.1f} | {rss_peak:.1f} | {rss_end:.1f} | {rss_delta_end:.1f} |"
+            )
+
+          reset_count = len(report.get("runtime_resets", []))
+          lines.append("")
+          lines.append("- Harness config: `--db-copy --mock-cube-data --sweep 10,50,100,200 --puppet-count 3 --disable-caps --runtime-reset-between-sweeps --game-timeout-sec 900`")
+          lines.append(f"- Runtime resets executed: `{reset_count}` (post-calibration, between sweeps, post-sweeps).")
+          lines.append("- Guardrail: workflow fails if any sweep is not 100% completion.")
+          lines.append("")
+          lines.append("<sub>Automated comment from PR load-test workflow.</sub>")
+          pathlib.Path("/tmp/pr-load-comment.md").write_text("\n".join(lines) + "\n")
+          PY
+
+      - name: Comment results on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs')
+            const body = fs.readFileSync('/tmp/pr-load-comment.md', 'utf8')
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            })
