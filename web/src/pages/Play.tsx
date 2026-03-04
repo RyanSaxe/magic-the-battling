@@ -140,7 +140,7 @@ function AdvancedOptionsModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-gray-900 border border-white/10 rounded-lg p-5 w-full max-w-sm">
+      <div className="relative modal-chrome border border-white/10 rounded-lg p-5 w-full max-w-sm">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-white font-semibold">{title}</h3>
           <button
@@ -431,8 +431,12 @@ export function Play() {
         </div>
       </header>
 
+      <div className="flex-1 flex min-h-0">
+        <div className="hidden sm:block w-10 shrink-0 frame-chrome"
+             style={{ borderRight: '1px solid var(--gold-border)' }} />
+
       <main className="flex-1 flex flex-col sm:justify-center min-h-0 px-4 game-surface-full">
-      <div className="shrink-0 w-full max-w-5xl mx-auto">
+      <div className="shrink-0 w-full max-w-5xl mx-auto pt-6">
         <div className="mb-4">
           <label className="block text-gray-400 text-sm mb-1">Your Name</label>
           <input
@@ -623,6 +627,27 @@ export function Play() {
       </div>
       </main>
 
+        <div className="hidden sm:block w-10 shrink-0 frame-chrome"
+             style={{ borderLeft: '1px solid var(--gold-border)' }} />
+      </div>
+
+      <footer className="shrink-0 frame-chrome px-4 py-2"
+              style={{ borderTop: '1px solid var(--gold-border)' }}>
+        <div className="flex items-center justify-between max-w-5xl mx-auto">
+          <a href="https://cubecobra.com/cube/about/auto?view=primer"
+             target="_blank" rel="noopener noreferrer"
+             className="text-sm text-blue-300 hover:text-blue-200 transition-colors">
+            CubeCobra Primer
+          </a>
+          <a href="https://discord.gg/2NAjcWXNKn"
+             target="_blank" rel="noopener noreferrer"
+             className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors">
+            <FaDiscord className="w-4 h-4" />
+            Join Discord
+          </a>
+        </div>
+      </footer>
+
       {showFriendsAdvanced && (
         <AdvancedOptionsModal
           title="Friends Options"
@@ -692,7 +717,7 @@ export function Play() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={handleCancelSolo}
           />
-          <div className="relative bg-gray-900 border border-white/10 rounded-lg p-8 w-full max-w-md text-center">
+          <div className="relative modal-chrome border border-white/10 rounded-lg p-8 w-full max-w-md text-center">
             <h2 className="text-xl font-bold text-white mb-4">
               Not enough puppet data
             </h2>

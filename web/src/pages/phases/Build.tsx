@@ -329,7 +329,7 @@ export function BuildPhase({
             <PoisonCard count={self_player.poison} dimensions={bfDims} />
           </CardGrid>
         }
-        sideboardLabel={`Sideboard (${self_player.sideboard.length})`}
+        sideboardLabel="Sideboard"
         sideboardContent={
           <CardGrid columns={dims.sideboard.columns} cardWidth={sbDims.width}>
             {self_player.sideboard.map((card) => {

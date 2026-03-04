@@ -25,6 +25,9 @@
   /* Gold accent (for frame-to-felt border) */
   --gold-border: rgba(212, 175, 55, 0.45);
 
+  /* Modal / popover chrome */
+  --chrome-modal: #302824;
+
   /* Zone column — blends toward sidebar chrome */
   --zone-column-bg: #1c1b18;
 
@@ -101,9 +104,16 @@ body {
 .game-surface-full {
   position: relative;
   border-top: 1px solid rgba(212, 175, 55, 0.45);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.45);
   box-shadow:
     inset 0 1px 0 0 rgba(0, 0, 0, 0.8),
-    inset 0 6px 16px -4px rgba(0, 0, 0, 0.3);
+    inset 0 -1px 0 0 rgba(0, 0, 0, 0.8),
+    inset 0 6px 16px -4px rgba(0, 0, 0, 0.3),
+    inset 0 -6px 16px -4px rgba(0, 0, 0, 0.3);
+}
+
+.modal-chrome {
+  background-color: var(--chrome-modal);
 }
 
 /* Desktop left chrome strip — game pages only */
@@ -139,7 +149,7 @@ body {
 }
 
 .zone-battlefield {
-  background: radial-gradient(ellipse at center, rgba(28, 62, 58, 0.7), rgba(16, 38, 35, 0.6));
+  background: radial-gradient(ellipse at center, #1e4840, #122a28);
 }
 
 .zone-sideboard {
@@ -147,7 +157,7 @@ body {
 }
 
 .zone-upgrades {
-  background: radial-gradient(ellipse at center, #3a4a20, #242e12);
+  background: radial-gradient(ellipse at center, #343828, #20241a);
 }
 
 .zone-column {
@@ -243,7 +253,7 @@ body {
 
 /* Battlefield - open area */
 .battlefield {
-  background: radial-gradient(ellipse at center, rgba(28, 62, 58, 0.6), rgba(14, 32, 30, 0.5));
+  background: radial-gradient(ellipse at center, #1e4840, #122a28);
 }
 
 /* Zone piles (graveyard, exile) */

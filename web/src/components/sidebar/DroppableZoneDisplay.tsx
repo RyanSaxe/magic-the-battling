@@ -93,7 +93,7 @@ export function ZoneModal({
       onClick={handleClose}
     >
       <div
-        className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
+        className="modal-chrome rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">

@@ -16,8 +16,10 @@ import { RewardPhase } from "./phases/Reward";
 import { Sidebar } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
 import { GameSummary } from "../components/GameSummary";
+import { ShareModal } from "../components/ShareModal";
 import { ActionMenu } from "../components/ActionMenu";
 import { PhaseTimeline } from "../components/PhaseTimeline";
+import { getOrdinal } from "../utils/format";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { ContextStripProvider, useContextStrip, useToast } from "../contexts";
 import { FaceDownProvider } from "../contexts/FaceDownContext";
@@ -387,7 +389,7 @@ function SpectateRequestModal({
 }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-sm mx-4">
+      <div className="modal-chrome rounded-lg p-6 w-full max-w-sm mx-4">
         <h2 className="text-xl text-white mb-4">Spectate Request</h2>
         <p className="text-gray-300 mb-6">
           <strong>{spectatorName}</strong> wants to watch your game.
@@ -489,6 +491,9 @@ function GameContent() {
   // Rules panel state
   const [rulesPanelOpen, setRulesPanelOpen] = useState(false);
   const [rulesPanelTarget, setRulesPanelTarget] = useState<RulesPanelTarget | undefined>(undefined);
+
+  // Share modal state (game-over header)
+  const [shareOpen, setShareOpen] = useState(false);
 
   // Hover tracking for hotkeys
   const [hoveredCard, setHoveredCard] = useState<{ id: string; zone: ZoneName; owner: 'player' | 'opponent' } | null>(null);
@@ -734,6 +739,17 @@ function GameContent() {
   const currentPhase = gameState.self_player.phase;
 
   const { self_player, current_battle } = gameState;
+
+  const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
+  const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
+  const isWinner = selfPlacement === 1;
+
+  const shareUrl = gameId
+    ? `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(self_player.name)}`
+    : '';
+  const shareText = isWinner
+    ? 'Just won a game of Magic: The Battling! Check out the game:'
+    : `Just finished ${getOrdinal(selfPlacement)} in Magic: The Battling! Check out the game:`;
 
   const maxHandSize = self_player.hand_size;
   const handFull = self_player.hand.length === maxHandSize;
@@ -1129,6 +1145,21 @@ function GameContent() {
             hamburger={sizes.isMobile ? (
               <button onClick={() => setSidebarOpen(o => !o)} className="btn btn-secondary text-xs sm:text-sm">☰</button>
             ) : undefined}
+            title={isEndPhase ? (
+              <div className="flex items-center gap-3">
+                <span className={`font-bold ${isWinner ? 'text-amber-400' : 'text-gray-300'}`}>
+                  {getOrdinal(selfPlacement)} Place
+                </span>
+                {gameId && (
+                  <button
+                    className="text-xs font-medium rounded-full px-3 py-1 bg-indigo-600/80 hover:bg-indigo-500 text-white border border-indigo-400/30 transition-colors"
+                    onClick={() => setShareOpen(true)}
+                  >
+                    Share
+                  </button>
+                )}
+              </div>
+            ) : undefined}
           />
         </div>
 
@@ -1379,9 +1410,7 @@ function GameContent() {
                 currentPhase === "game_over") && (
                 <GameSummary
                   player={self_player}
-                  players={gameState.players}
                   useUpgrades={gameState.use_upgrades}
-                  gameId={gameId}
                 />
               )}
             </main>
@@ -1459,6 +1488,9 @@ function GameContent() {
           onClose={() => { setShowUpgradesModal(false); setUpgradeInitialTargetId(undefined); }}
           initialTargetId={upgradeInitialTargetId}
         />
+      )}
+      {shareOpen && (
+        <ShareModal url={shareUrl} shareText={shareText} onClose={() => setShareOpen(false)} />
       )}
       {rulesPanelOpen && (
         <RulesPanel

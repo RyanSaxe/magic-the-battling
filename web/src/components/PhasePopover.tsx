@@ -83,11 +83,11 @@ export function PhasePopover({
         position: 'fixed',
         visibility: 'hidden',
       }}
-      className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-[60] w-72"
+      className="modal-chrome border border-gray-700 rounded-lg shadow-xl z-[60] w-72"
     >
       <div
         ref={arrowRef}
-        className="absolute -top-1.5 w-3 h-3 bg-gray-900 border-l border-t border-gray-700 rotate-45"
+        className="absolute -top-1.5 w-3 h-3 modal-chrome border-l border-t border-gray-700 rotate-45"
       />
 
       <div className="p-3">

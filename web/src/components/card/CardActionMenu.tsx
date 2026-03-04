@@ -98,7 +98,7 @@ export function CardActionMenu({
       <div
         ref={menuRef}
         style={menuStyle}
-        className="bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[160px] z-50"
+        className="modal-chrome border border-gray-700 rounded-lg shadow-xl py-1 min-w-[160px] z-50"
       >
         {onBattlefield && (
           <>

@@ -63,7 +63,6 @@ export function SummaryEmbed() {
         <div className="w-full h-full flex flex-col">
           <GameSummary
             player={summaryData.selfPlayer}
-            players={summaryData.players}
             useUpgrades={data!.use_upgrades}
           />
         </div>

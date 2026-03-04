@@ -59,7 +59,7 @@ export function CompactZoneDisplay({
 
   const label = (
     <div className="flex items-center justify-center gap-0.5 px-1 shrink-0" style={{ height: LABEL_HEIGHT }}>
-      <span className="text-[7px] uppercase text-gray-500 font-medium leading-none">{title}</span>
+      <span className="text-[8px] uppercase text-gray-500 font-medium leading-tight truncate">{title}</span>
       {cards.length >= 2 && (
         <span className="text-[9px] font-bold text-gray-400 leading-none">{cards.length}</span>
       )}
