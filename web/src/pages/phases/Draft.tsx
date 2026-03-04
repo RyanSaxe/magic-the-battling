@@ -36,7 +36,7 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
       pool: { count: pool.length, maxCardWidth: 300 },
       pack: { count: currentPack.length, maxCardWidth: 400 },
     },
-    layout: { top: ['pool'], bottomLeft: ['pack'] },
+    layout: { top: ['pack'], bottomLeft: ['pool'] },
     fixedHeight: 65,
     padding: 24,
   })
@@ -82,44 +82,8 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
   return (
     <div ref={containerRef} className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col h-full" onClick={handleBackgroundClick}>
       <div className="flex flex-col flex-1 min-h-0" style={{ gap: 2 }}>
-        {/* Pool */}
-        <div className="zone-hand px-3 pt-5 pb-3 relative">
-          <span className={badgeCls}>Pool</span>
-          {pool.length === 0 ? (
-            <div className="flex items-center justify-center">
-              <div className="text-gray-500 text-sm text-center">
-                Swap cards from the pack to build your pool
-              </div>
-            </div>
-          ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${poolDims.columns}, ${poolDims.width}px)`,
-              gap: '6px',
-              justifyContent: 'center',
-              maxWidth: '100%',
-              overflow: 'hidden',
-            }}>
-              {pool.map((card, index) => {
-                const isInHand = self_player.hand.some((c) => c.id === card.id)
-                return (
-                  <Card
-                    key={card.id}
-                    card={card}
-                    onClick={() => handleCardClick(card, index, 'pool', isInHand)}
-                    selected={selectedCard?.card.id === card.id}
-                    dimensions={poolDims}
-                    upgraded={upgradedCardIds.has(card.id)}
-                    appliedUpgrades={getAppliedUpgrades(card.id)}
-                  />
-                )
-              })}
-            </div>
-          )}
-        </div>
-
         {/* Pack */}
-        <div className="zone-pack px-3 pt-5 pb-3 relative flex-1">
+        <div className="zone-pack px-3 pt-5 pb-3 relative">
           {isMobile && (
             <>
               <div className="absolute bottom-2 left-2 pointer-events-none z-10">
@@ -163,6 +127,42 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
                   dimensions={packDims}
                 />
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Pool */}
+        <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1">
+          <span className={badgeCls}>Pool</span>
+          {pool.length === 0 ? (
+            <div className="flex items-center justify-center">
+              <div className="text-gray-500 text-sm text-center">
+                Swap cards from the pack to build your pool
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${poolDims.columns}, ${poolDims.width}px)`,
+              gap: '6px',
+              justifyContent: 'center',
+              maxWidth: '100%',
+              overflow: 'hidden',
+            }}>
+              {pool.map((card, index) => {
+                const isInHand = self_player.hand.some((c) => c.id === card.id)
+                return (
+                  <Card
+                    key={card.id}
+                    card={card}
+                    onClick={() => handleCardClick(card, index, 'pool', isInHand)}
+                    selected={selectedCard?.card.id === card.id}
+                    dimensions={poolDims}
+                    upgraded={upgradedCardIds.has(card.id)}
+                    appliedUpgrades={getAppliedUpgrades(card.id)}
+                  />
+                )
+              })}
             </div>
           )}
         </div>

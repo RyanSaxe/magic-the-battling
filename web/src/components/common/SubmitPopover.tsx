@@ -34,18 +34,19 @@ export function SubmitPopover({ options, onClose }: SubmitPopoverProps) {
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-2 right-0 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1.5 min-w-[120px]"
+      className="absolute bottom-full mb-2 right-0 min-w-[120px]"
     >
-      <div className="absolute -bottom-1.5 right-4 w-3 h-3 modal-chrome border-r border-b gold-border rotate-45 pointer-events-none" />
-      {options.map((option) => (
-        <button
-          key={option.label}
-          onClick={option.onClick}
-          className={option.className ?? "btn btn-secondary text-sm py-1.5"}
-        >
-          {option.label}
-        </button>
-      ))}
+      <div className="relative translate-y-[3px] modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1.5">
+        {options.map((option) => (
+          <button
+            key={option.label}
+            onClick={option.onClick}
+            className={option.className ?? "btn btn-secondary text-sm py-1.5"}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

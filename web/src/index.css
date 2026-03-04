@@ -203,7 +203,7 @@ body {
 }
 
 .zone-pack {
-  background: radial-gradient(ellipse at center, #1f4a30, #112a1a);
+  background: radial-gradient(ellipse at center, #306842, #1a3a25);
 }
 
 .zone-battlefield {
@@ -211,11 +211,11 @@ body {
 }
 
 .zone-sideboard {
-  background: radial-gradient(ellipse at center, #1a3825, #0e1f14);
+  background: radial-gradient(ellipse at center, #343828, #20241a);
 }
 
 .zone-upgrades {
-  background: radial-gradient(ellipse at center, #343828, #20241a);
+  background: radial-gradient(ellipse at center, #1e4840, #122a28);
 }
 
 .zone-hand,
