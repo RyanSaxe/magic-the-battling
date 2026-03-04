@@ -80,8 +80,8 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
   )
 
   return (
-    <div ref={containerRef} className="zone-divider-bg p-[1px] flex-1 min-h-0 flex flex-col h-full" onClick={handleBackgroundClick}>
-      <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
+    <div ref={containerRef} className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col h-full" onClick={handleBackgroundClick}>
+      <div className="flex flex-col flex-1 min-h-0" style={{ gap: 2 }}>
         {/* Pool */}
         <div className="zone-hand px-3 pt-5 pb-3 relative">
           <span className={badgeCls}>Pool</span>

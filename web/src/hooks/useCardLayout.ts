@@ -33,7 +33,7 @@ export const ZONE_LAYOUT_PADDING = {
   sectionPadH: 12,
   sectionPadTop: 20,
   sectionPadBottom: 12,
-  sectionGap: 1,
+  sectionGap: 2,
 };
 
 const DEFAULT_DIMS: ZoneDims = { width: 100, height: 140, rows: 1, columns: 1 };

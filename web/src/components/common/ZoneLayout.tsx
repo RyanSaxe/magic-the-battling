@@ -3,7 +3,7 @@ import type { ReactNode, RefCallback } from 'react'
 export const badgeCls =
   'absolute left-1/2 -translate-x-1/2 -top-[9px] z-40 ' +
   'bg-[#2a2320] text-gray-400 text-[10px] uppercase tracking-widest ' +
-  'px-2.5 py-0.5 rounded-full border gold-border whitespace-nowrap'
+  'px-2.5 py-0.5 rounded-full border zone-label-pill whitespace-nowrap'
 
 interface ZoneLayoutProps {
   handContent: ReactNode
@@ -44,8 +44,8 @@ export function ZoneLayout({
   const hasRight = hasBattlefield || hasSideboard
 
   return (
-    <div ref={containerRef} className={className ?? 'zone-divider-bg p-[1px] flex-1 min-h-0 flex flex-col'} onClick={onClick}>
-      <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
+    <div ref={containerRef} className={className ?? 'zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col'} onClick={onClick}>
+      <div className="flex flex-col flex-1 min-h-0" style={{ gap: 2 }}>
         {hasHand && (
           <div className="zone-hand px-3 pt-5 pb-3 relative">
             <span className={badgeCls}>{handLabel}</span>
@@ -53,9 +53,9 @@ export function ZoneLayout({
           </div>
         )}
         {hasLower && (
-          <div className="flex flex-1" style={{ gap: 1 }}>
+          <div className="flex flex-1" style={{ gap: 2 }}>
             {hasRight && (
-              <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 1 }}>
+              <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 2 }}>
                 {hasBattlefield && (
                   <div className="zone-battlefield px-3 pt-5 pb-3 relative">
                     <span className={badgeCls}>{battlefieldLabel}</span>

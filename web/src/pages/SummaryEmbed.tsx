@@ -60,7 +60,7 @@ export function SummaryEmbed() {
       className="bg-gray-900 text-white overflow-hidden"
     >
       {summaryData ? (
-        <div className="w-full h-full flex flex-col">
+        <div className="w-full h-full flex flex-col pt-3 px-2 pb-2">
           <GameSummary
             player={summaryData.selfPlayer}
             useUpgrades={data!.use_upgrades}

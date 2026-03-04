@@ -375,7 +375,7 @@ export function Play() {
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <header className="shrink-0 px-4 sm:px-6 py-3 frame-chrome">
+      <header className="shrink-0 py-3 frame-chrome bar-pad-both">
         <div className="hidden sm:flex items-center justify-between">
           <div>
             <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
@@ -631,8 +631,8 @@ export function Play() {
              style={{ borderLeft: '1px solid var(--gold-border)' }} />
       </div>
 
-      <footer className="shrink-0 frame-chrome px-4 sm:px-14 py-2">
-        <div className="flex items-center justify-between max-w-5xl mx-auto">
+      <footer className="shrink-0 frame-chrome bar-pad-both py-2">
+        <div className="flex items-center justify-between">
           <a href="https://cubecobra.com/cube/about/auto?view=primer"
              target="_blank" rel="noopener noreferrer"
              className="text-sm text-blue-300 hover:text-blue-200 transition-colors">

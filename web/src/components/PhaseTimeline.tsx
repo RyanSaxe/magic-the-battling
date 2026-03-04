@@ -31,6 +31,7 @@ interface PhaseTimelineProps {
   onOpenRules?: (target?: RulesPanelTarget) => void;
   hamburger?: React.ReactNode;
   title?: React.ReactNode;
+  headerClassName?: string;
 }
 
 function isGamePhase(phase: string): phase is Phase {
@@ -71,6 +72,7 @@ export function PhaseTimeline({
   onOpenRules,
   hamburger,
   title,
+  headerClassName,
 }: PhaseTimelineProps) {
   const [popoverPhase, setPopoverPhase] = useState<Phase | null>(null);
   const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(null);
@@ -111,9 +113,11 @@ export function PhaseTimeline({
     onOpenRules?.(phase ? { docId: phase, tab: 'controls' } : undefined);
   }, [handleClosePopover, onOpenRules, popoverPhase]);
 
+  const headerCls = headerClassName ?? "py-1.5 pl-4 pr-1.5";
+
   if (!isGamePhase(currentPhase)) {
     return (
-      <header className="frame-chrome py-1.5 pl-4 pr-1.5">
+      <header className={`frame-chrome ${headerCls}`}>
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-300">
             {title ?? END_STATE_LABELS[currentPhase]}
@@ -129,7 +133,7 @@ export function PhaseTimeline({
   }
 
   return (
-    <header className="frame-chrome py-1.5 pl-4 pr-1.5">
+    <header className={`frame-chrome ${headerCls}`}>
       <div className="flex items-center">
         <div className="flex items-center gap-1 sm:gap-1.5 flex-1 justify-start min-w-0">
           <span className="text-xs sm:text-sm text-gray-300 font-mono">

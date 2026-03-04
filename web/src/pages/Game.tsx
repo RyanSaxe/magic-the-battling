@@ -1138,6 +1138,7 @@ function GameContent() {
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+            headerClassName="py-1.5 bar-pad-left"
             onOpenRules={(target) => {
               setRulesPanelTarget(target);
               setRulesPanelOpen(true);
@@ -1431,16 +1432,19 @@ function GameContent() {
         {/* Bottom Action Bar */}
         {!isSpectator && (
           <div className="shrink-0 relative z-50 frame-chrome">
-            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 bar-pad-left timeline-actions">
               {isEndPhase && gameId ? (
-                <div className="flex items-center justify-center w-full py-1">
-                  <button
-                    className="btn bg-indigo-600/80 hover:bg-indigo-500 text-white border border-indigo-400/30"
-                    onClick={() => setShareOpen(true)}
-                  >
-                    Share Game
-                  </button>
-                </div>
+                <>
+                  <div className="flex items-center gap-1.5 sm:gap-2 py-1">
+                    <button
+                      className="btn bg-purple-600 hover:bg-purple-500 text-white"
+                      onClick={() => setShareOpen(true)}
+                    >
+                      Share Game
+                    </button>
+                  </div>
+                  <div />
+                </>
               ) : renderActionButtons()}
             </div>
           </div>

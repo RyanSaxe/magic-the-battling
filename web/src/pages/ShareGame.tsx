@@ -292,6 +292,7 @@ export function ShareGame() {
           round={0}
           nextStage={0}
           nextRound={0}
+          headerClassName="py-1.5 bar-pad-left"
           title={
             <span className="flex items-center gap-2">
               <span className="text-amber-400 font-bold text-sm">Magic: The Battling</span>
@@ -346,7 +347,7 @@ export function ShareGame() {
 
       {/* Bottom Bar */}
       <div className="shrink-0 frame-chrome">
-        <div className="flex items-center justify-between py-1.5 sm:py-2 px-1.5 timeline-actions">
+        <div className="flex items-center justify-between py-1.5 sm:py-2 bar-pad-left timeline-actions">
           {/* Left: Round selector */}
           <div className="relative">
             <button

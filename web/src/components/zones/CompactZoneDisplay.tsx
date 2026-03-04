@@ -7,7 +7,7 @@ import { ZoneModal } from '../sidebar/DroppableZoneDisplay'
 import { makeZoneId } from '../../dnd/types'
 
 const CARD_ASPECT = 5 / 7
-const LABEL_HEIGHT = 16
+const LABEL_HEIGHT = 18
 
 interface CompactZoneDisplayProps {
   title: string
@@ -24,6 +24,7 @@ interface CompactZoneDisplayProps {
   selectedCardId?: string
   onZoneClick?: () => void
   onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
+  containerClassName?: string
 }
 
 export function CompactZoneDisplay({
@@ -41,6 +42,7 @@ export function CompactZoneDisplay({
   selectedCardId,
   onZoneClick,
   onCardClick,
+  containerClassName,
 }: CompactZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -59,7 +61,7 @@ export function CompactZoneDisplay({
 
   const label = (
     <div className="flex items-center justify-center gap-0.5 px-1 shrink-0" style={{ height: LABEL_HEIGHT }}>
-      <span className="text-[8px] uppercase text-gray-500 font-medium leading-tight truncate">{title}</span>
+      <span className="battle-side-label truncate">{title}</span>
       {cards.length >= 2 && (
         <span className="text-[9px] font-bold text-gray-400 leading-none">{cards.length}</span>
       )}
@@ -83,14 +85,14 @@ export function CompactZoneDisplay({
             }
             if (cards.length > 0) setShowModal(true)
           }}
-          className={`flex flex-col items-center overflow-hidden zone-column ${
+          className={`flex flex-col items-center overflow-hidden ${
             cards.length > 0
               ? 'cursor-pointer'
               : 'cursor-default'
-          }`}
+          } ${containerClassName ?? ''}`}
           style={{ width, height }}
         >
-          {!isOpponent && label}
+          {label}
           <div className="flex-1 flex items-center justify-center min-h-0 relative">
             {nextCard && (
               <div className="absolute">
@@ -111,7 +113,6 @@ export function CompactZoneDisplay({
               />
             )}
           </div>
-          {isOpponent && label}
         </div>
       </DroppableZone>
 

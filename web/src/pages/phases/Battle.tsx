@@ -240,10 +240,10 @@ export function BattlePhase({
   const handHeight = rowHeight + HAND_PADDING
   const bfHeight = 2 * rowHeight + BF_PADDING
   const sideZoneHeight = Math.floor((handHeight + bfHeight) / 3)
-  const lastSideZoneHeight = (handHeight + bfHeight) - 2 * sideZoneHeight
+  const lastSideZoneHeight = handHeight + bfHeight - 2 * sideZoneHeight
 
   return (
-    <div ref={containerRef} className="flex flex-col h-full" onClick={handleBackgroundClick}>
+    <div ref={containerRef} className="battle-layout flex flex-col h-full min-h-0 overflow-hidden" onClick={handleBackgroundClick}>
         {/* Sudden Death Banner */}
         {battle.is_sudden_death && (
           <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center shrink-0">
@@ -332,7 +332,7 @@ export function BattlePhase({
             </div>
           </div>
           {/* Opponent side zones: Library, Exile, Graveyard (top→bottom, mirrored) */}
-          <div className="flex flex-col shrink-0 zone-column zone-divider-bg" style={{ width: zoneColumnWidth, gap: 1 }}>
+          <div className="flex flex-col shrink-0 battle-side-column" style={{ width: zoneColumnWidth }}>
             <CompactZoneDisplay
               title={opponentHadCompanion ? "Companion" : "Library"}
               zone="command_zone"
@@ -348,6 +348,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('command_zone', 'opponent')}
               onCardClick={handleCardClick}
+              containerClassName="battle-side-cell"
             />
             <CompactZoneDisplay
               title="Exile"
@@ -364,6 +365,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('exile', 'opponent')}
               onCardClick={handleCardClick}
+              containerClassName="battle-side-cell"
             />
             <CompactZoneDisplay
               title="Graveyard"
@@ -380,6 +382,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('graveyard', 'opponent')}
               onCardClick={handleCardClick}
+              containerClassName="battle-side-cell"
             />
           </div>
         </div>
@@ -428,7 +431,7 @@ export function BattlePhase({
             </div>
           </div>
           {/* Your side zones: Graveyard, Exile, Library (top→bottom) */}
-          <div className="flex flex-col shrink-0 zone-column zone-divider-bg" style={{ width: zoneColumnWidth, gap: 1 }}>
+          <div className="flex flex-col shrink-0 battle-side-column battle-side-column-player" style={{ width: zoneColumnWidth }}>
             <CompactZoneDisplay
               title="Graveyard"
               zone="graveyard"
@@ -441,6 +444,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('graveyard', 'player')}
               onCardClick={handleCardClick}
+              containerClassName="battle-side-cell"
             />
             <CompactZoneDisplay
               title="Exile"
@@ -454,6 +458,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('exile', 'player')}
               onCardClick={handleCardClick}
+              containerClassName="battle-side-cell"
             />
             <CompactZoneDisplay
               title={playerHadCompanion ? "Companion" : "Library"}
@@ -467,6 +472,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('command_zone', 'player')}
               onCardClick={handleCardClick}
+              containerClassName="battle-side-cell"
             />
           </div>
         </div>

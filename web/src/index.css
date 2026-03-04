@@ -62,6 +62,11 @@
   --transition-fast: 150ms ease-out;
   --transition-normal: 200ms ease-out;
   --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Shared shell spacing */
+  --frame-rail-width: 40px;
+  --frame-rail-edge: calc(var(--frame-rail-width) + 1px);
+  --surface-gutter: 12px;
 }
 
 body {
@@ -74,39 +79,51 @@ body {
 /* Game table background - classic felt */
 .game-table {
   background-color: var(--table-felt);
-  background-image: radial-gradient(
-    ellipse at center,
-    var(--table-felt-light) 0%,
-    var(--table-felt) 50%,
-    var(--table-dark) 100%
-  );
+  background-image: radial-gradient(ellipse at center,
+      var(--table-felt-light) 0%,
+      var(--table-felt) 50%,
+      var(--table-dark) 100%);
   min-height: 100dvh;
 }
 
 /* Solid warm-brown chrome for header, footer, sidebar */
 .frame-chrome {
-  background: radial-gradient(
-    ellipse at 50% 50%,
-    color-mix(in srgb, var(--chrome) 95%, white) 0%,
-    var(--chrome) 70%
-  );
+  background: radial-gradient(ellipse at 50% 50%,
+      color-mix(in srgb, var(--chrome) 95%, white) 0%,
+      var(--chrome) 70%);
+}
+
+.bar-pad-both {
+  padding-left: var(--surface-gutter);
+  padding-right: var(--surface-gutter);
+}
+
+.bar-pad-left {
+  padding-left: var(--surface-gutter);
+  padding-right: var(--surface-gutter);
 }
 
 /* Felt content area — gold emboss + dark groove for 3D depth */
 .game-surface {
   position: relative;
-  border-top: 1px solid rgba(212, 175, 55, 0.6);
   box-shadow:
-    inset 0 1px 0 0 rgba(0, 0, 0, 0.8),
-    inset 0 8px 20px -4px rgba(0, 0, 0, 0.4);
+    inset 0 0 0 1px rgba(212, 175, 55, 0.58),
+    inset 0 1px 0 0 rgba(255, 231, 163, 0.24),
+    inset 0 -1px 0 0 rgba(255, 231, 163, 0.18),
+    inset 0 -2px 0 0 rgba(0, 0, 0, 0.82),
+    inset 0 8px 20px -4px rgba(0, 0, 0, 0.38),
+    inset 0 -8px 20px -8px rgba(0, 0, 0, 0.4);
 }
 
 .game-surface-full {
   position: relative;
-  border-top: 1px solid rgba(212, 175, 55, 0.6);
   box-shadow:
-    inset 0 1px 0 0 rgba(0, 0, 0, 0.8),
-    inset 0 8px 20px -4px rgba(0, 0, 0, 0.4);
+    inset 0 0 0 1px rgba(212, 175, 55, 0.58),
+    inset 0 1px 0 0 rgba(255, 231, 163, 0.24),
+    inset 0 -1px 0 0 rgba(255, 231, 163, 0.18),
+    inset 0 -2px 0 0 rgba(0, 0, 0, 0.82),
+    inset 0 8px 20px -4px rgba(0, 0, 0, 0.38),
+    inset 0 -8px 20px -8px rgba(0, 0, 0, 0.4);
 }
 
 .modal-chrome {
@@ -115,8 +132,18 @@ body {
 
 /* Desktop left chrome strip — game pages only */
 @media (min-width: 640px) {
+  .bar-pad-both {
+    padding-left: var(--frame-rail-edge);
+    padding-right: var(--frame-rail-edge);
+  }
+
+  .bar-pad-left {
+    padding-left: var(--frame-rail-edge);
+    padding-right: var(--surface-gutter);
+  }
+
   .game-surface {
-    padding-left: 40px;
+    padding-left: var(--frame-rail-edge);
   }
 
   .game-surface::before {
@@ -125,12 +152,10 @@ body {
     top: 0;
     left: 0;
     bottom: 0;
-    width: 40px;
-    background: radial-gradient(
-      ellipse at 50% 50%,
-      color-mix(in srgb, var(--chrome) 95%, white) 0%,
-      var(--chrome) 70%
-    );
+    width: var(--frame-rail-width);
+    background: radial-gradient(ellipse at 50% 50%,
+        color-mix(in srgb, var(--chrome) 95%, white) 0%,
+        var(--chrome) 70%);
     border-right: 1px solid rgba(212, 175, 55, 0.6);
     z-index: 2;
   }
@@ -157,7 +182,10 @@ body {
   background: radial-gradient(ellipse at center, #343828, #20241a);
 }
 
-.zone-hand, .zone-battlefield, .zone-sideboard, .zone-upgrades {
+.zone-hand,
+.zone-battlefield,
+.zone-sideboard,
+.zone-upgrades {
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 6px rgba(0, 0, 0, 0.2);
 }
 
@@ -168,11 +196,26 @@ body {
 /* Gold divider between zones */
 .zone-divider-bg {
   background-color: var(--gold-border-opaque);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 181, 0.24),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+.zone-label-pill {
+  border-color: var(--gold-border-opaque);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 181, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.45);
 }
 
 /* Utility classes for gold borders */
-.gold-border { border-color: var(--gold-border); }
-.gold-divider { border-color: rgba(212, 175, 55, 0.15); }
+.gold-border {
+  border-color: var(--gold-border);
+}
+
+.gold-divider {
+  border-color: rgba(212, 175, 55, 0.15);
+}
 
 /* Card base styles */
 .card {
@@ -261,6 +304,48 @@ body {
   background: radial-gradient(ellipse at center, #1e4840, #122a28);
 }
 
+/* Battle view should read flatter than build/draft zones */
+.battle-layout .zone-hand {
+  background: radial-gradient(ellipse at center, #2d6140, #1b3f2c);
+  box-shadow: none;
+}
+
+.battle-layout .battlefield {
+  background: radial-gradient(ellipse at center, #215048, #163a34);
+  box-shadow: none;
+}
+
+.battle-side-column {
+  box-sizing: border-box;
+  background: var(--zone-column-bg);
+  border-left: 1px solid var(--gold-border-opaque);
+  border-right: 1px solid var(--gold-border-opaque);
+  border-bottom: 1px solid var(--gold-border-opaque);
+  overflow: hidden;
+}
+
+.battle-side-column-player {
+  border-bottom: 0;
+  border-top: 1px solid var(--gold-border-opaque);
+}
+
+.battle-side-cell {
+  box-sizing: border-box;
+  background: #3a3431;
+}
+
+.battle-side-column .battle-side-cell + .battle-side-cell {
+  border-top: 1px solid var(--gold-border-opaque);
+}
+
+.battle-side-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a9a4a2;
+  line-height: 1;
+}
+
 /* Zone piles (graveyard, exile) */
 .zone-pile {
   background: rgba(0, 0, 0, 0.3);
@@ -282,7 +367,7 @@ body {
   padding: 8px 16px;
 }
 
-.hand-zone > :hover {
+.hand-zone> :hover {
   z-index: 100 !important;
 }
 
@@ -306,18 +391,17 @@ body {
   0% {
     background-position: -200% 0;
   }
+
   100% {
     background-position: 200% 0;
   }
 }
 
 .skeleton {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.1) 0%,
-    rgba(255, 255, 255, 0.2) 50%,
-    rgba(255, 255, 255, 0.1) 100%
-  );
+  background: linear-gradient(90deg,
+      rgba(255, 255, 255, 0.1) 0%,
+      rgba(255, 255, 255, 0.2) 50%,
+      rgba(255, 255, 255, 0.1) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -338,10 +422,23 @@ body {
 }
 
 @keyframes fade-hint {
-  0% { opacity: 0; transform: translateY(-4px); }
-  10% { opacity: 1; transform: translateY(0); }
-  85% { opacity: 1; }
-  100% { opacity: 0; }
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  10% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
 }
 
 .animate-fade-hint {
@@ -349,10 +446,23 @@ body {
 }
 
 @keyframes toast-fade {
-  0% { opacity: 0; transform: translateY(-8px); }
-  8% { opacity: 1; transform: translateY(0); }
-  85% { opacity: 1; }
-  100% { opacity: 0; }
+  0% {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  8% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
 }
 
 .animate-toast-fade {
@@ -360,11 +470,9 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(
-    135deg,
-    var(--color-gold) 0%,
-    var(--color-gold-dark) 100%
-  );
+  background: linear-gradient(135deg,
+      var(--color-gold) 0%,
+      var(--color-gold-dark) 100%);
   color: #1a1a1a;
 }
 
@@ -422,9 +530,12 @@ body {
 }
 
 @keyframes gentle-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 8px var(--color-gold-glow);
   }
+
   50% {
     box-shadow: 0 0 20px var(--color-gold-glow), 0 0 40px rgba(212, 175, 55, 0.2);
   }
@@ -448,7 +559,7 @@ body {
 /* Upgrade hand animation */
 .upgrade-target {
   transition: transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
-              box-shadow 500ms ease-out;
+    box-shadow 500ms ease-out;
   z-index: 1;
   position: relative;
 }
@@ -469,9 +580,17 @@ body {
 }
 
 @keyframes upgrade-gold-pulse {
-  0% { box-shadow: 0 0 0 rgba(251, 191, 36, 0); }
-  40% { box-shadow: 0 0 40px rgba(251, 191, 36, 0.9), 0 0 80px rgba(212, 175, 55, 0.4); }
-  100% { box-shadow: 0 0 12px rgba(251, 191, 36, 0.5); }
+  0% {
+    box-shadow: 0 0 0 rgba(251, 191, 36, 0);
+  }
+
+  40% {
+    box-shadow: 0 0 40px rgba(251, 191, 36, 0.9), 0 0 80px rgba(212, 175, 55, 0.4);
+  }
+
+  100% {
+    box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
+  }
 }
 
 .upgrade-target.phase-glow {
@@ -483,7 +602,7 @@ body {
   z-index: 21;
   opacity: 0;
   transition: transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
-              opacity 400ms ease-out;
+    opacity 400ms ease-out;
 }
 
 .upgrade-source.phase-slide-in {
@@ -510,35 +629,45 @@ body {
   border-left-color: #3b82f6;
 }
 
-.callout-note .callout-indicator { color: #60a5fa; }
+.callout-note .callout-indicator {
+  color: #60a5fa;
+}
 
 .callout-warn {
   background: rgba(234, 179, 8, 0.1);
   border-left-color: #eab308;
 }
 
-.callout-warn .callout-indicator { color: #facc15; }
+.callout-warn .callout-indicator {
+  color: #facc15;
+}
 
 .callout-deter {
   background: rgba(239, 68, 68, 0.1);
   border-left-color: #ef4444;
 }
 
-.callout-deter .callout-indicator { color: #f87171; }
+.callout-deter .callout-indicator {
+  color: #f87171;
+}
 
 .callout-commend {
   background: rgba(34, 197, 94, 0.1);
   border-left-color: #22c55e;
 }
 
-.callout-commend .callout-indicator { color: #4ade80; }
+.callout-commend .callout-indicator {
+  color: #4ade80;
+}
 
 .callout-tip {
   background: rgba(245, 158, 11, 0.1);
   border-left-color: #f59e0b;
 }
 
-.callout-tip .callout-indicator { color: #fbbf24; }
+.callout-tip .callout-indicator {
+  color: #fbbf24;
+}
 
 .callout-indicator {
   display: flex;
@@ -590,10 +719,12 @@ body {
   grid-template-rows: 0fr;
   transition: grid-template-rows 250ms ease-out;
 }
+
 .accordion-body.open {
   grid-template-rows: 1fr;
 }
-.accordion-body > div {
+
+.accordion-body>div {
   overflow: hidden;
   min-height: 0;
 }
