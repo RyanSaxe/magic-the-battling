@@ -216,35 +216,35 @@ function GuidedModeField({
   setEnabled: (v: boolean) => void;
 }) {
   return (
-    <div>
-      <label className="block text-gray-400 text-sm mb-1">Guided Mode</label>
-      <label className="w-full bg-black/40 border border-black/40 text-white rounded px-3 py-2 flex items-center justify-between cursor-pointer">
-        <span className="text-sm text-gray-200">
-          Open helpful tips in new situations
-        </span>
-        <span className="flex items-center gap-2 shrink-0">
-          <input
-            type="checkbox"
-            checked={enabled}
-            onChange={(e) => setEnabled(e.target.checked)}
-            className="sr-only peer"
-          />
-          <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                enabled ? "translate-x-5" : "translate-x-1"
-              }`}
-            />
-          </span>
-          <span
-            className="text-gray-400 hover:text-gray-200"
-            title="When you enter a new situation, helpful tips open automatically."
-          >
-            <InfoIcon size="sm" />
-          </span>
-        </span>
-      </label>
-    </div>
+    <label className="bg-black/40 border border-black/40 text-white rounded px-3 h-[42px] min-w-[118px] sm:min-w-[132px] flex items-center justify-end gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(e) => setEnabled(e.target.checked)}
+        className="sr-only peer"
+        aria-label="Guided mode"
+      />
+      <span
+        className={`text-xs font-medium uppercase tracking-wide ${
+          enabled ? "text-amber-300" : "text-gray-500"
+        }`}
+      >
+        {enabled ? "On" : "Off"}
+      </span>
+      <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            enabled ? "translate-x-5" : "translate-x-1"
+          }`}
+        />
+      </span>
+      <span
+        className="text-gray-400 hover:text-gray-200"
+        title="When you enter a new situation, helpful tips open automatically."
+      >
+        <InfoIcon size="sm" />
+      </span>
+    </label>
   );
 }
 
@@ -498,23 +498,30 @@ export function Play() {
       <main className="flex-1 flex flex-col sm:justify-center min-h-0 px-4 game-surface-full">
       <div className="shrink-0 w-full max-w-5xl mx-auto pt-6">
         <div className="mb-4">
-          <label className="block text-gray-400 text-sm mb-1">Your Name</label>
-          <input
-            type="text"
-            value={nameLoading ? "" : playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            onKeyDown={(e) =>
-              e.key === "Enter" && nameValid && handleCreateLobby()
-            }
-            disabled={nameLoading}
-            placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-            className="w-full bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-          />
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <label htmlFor="player-name" className="block text-gray-400 text-sm">
+              Your Name
+            </label>
+            <span className="block text-gray-400 text-sm text-right shrink-0">
+              Guided Mode
+            </span>
+          </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 sm:gap-3">
+            <input
+              id="player-name"
+              type="text"
+              value={nameLoading ? "" : playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              onKeyDown={(e) =>
+                e.key === "Enter" && nameValid && handleCreateLobby()
+              }
+              disabled={nameLoading}
+              placeholder={nameLoading ? "Generating name..." : "Enter your name"}
+              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+            />
+            <GuidedModeField enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
+          </div>
         </div>
-        <div className="mb-4">
-          <GuidedModeField enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
-        </div>
-
       </div>
 
       {/* Mobile: stacked cards, inactive always on top */}
