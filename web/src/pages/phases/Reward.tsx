@@ -4,6 +4,7 @@ import type { GameState, Card as CardType } from '../../types'
 import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
 import { useCardLayout } from '../../hooks/useCardLayout'
 import { useElementHeight } from '../../hooks/useElementHeight'
+import { badgeCls } from '../../components/common/ZoneLayout'
 
 interface RewardPhaseProps {
   gameState: GameState
@@ -90,7 +91,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
   const poolCards = [...self_player.hand, ...self_player.sideboard]
 
   const [upgradeHeaderRef, upgradeHeaderHeight] = useElementHeight()
-  const fixedHeight = upgradeHeaderHeight + 44
+  const fixedHeight = upgradeHeaderHeight + 56
 
   const [dualRef, { upgrades: upgradeCardDims, pool: poolCardDims }] = useCardLayout({
     zones: {
@@ -113,10 +114,10 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
   const isDraw = last_battle_result?.is_draw
 
   return (
-    <div className="flex flex-col h-full gap-4 p-4 overflow-hidden">
+    <div className={`flex flex-col h-full overflow-hidden ${hasUpgradeSection ? '' : 'gap-4 p-4'}`}>
       {/* Battle result header */}
       {last_battle_result && (
-        <div className="flex items-center justify-center gap-4 shrink-0 text-sm">
+        <div className={`flex items-center justify-center gap-4 shrink-0 text-sm ${hasUpgradeSection ? 'px-4 pt-4' : ''}`}>
           {isDraw ? (
             <span className="text-yellow-400 font-bold">Draw</span>
           ) : isWinner ? (
@@ -136,7 +137,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
 
       {/* Rewards */}
       {last_battle_result && (
-        <div className={hasUpgradeSection ? 'shrink-0' : 'flex-1 flex flex-col items-center justify-center'}>
+        <div className={hasUpgradeSection ? 'shrink-0 px-4 mt-3' : 'flex-1 flex flex-col items-center justify-center'}>
           {!hasUpgradeSection && (
             <div className="text-xs text-gray-400 uppercase tracking-wide mb-6">Your Rewards</div>
           )}
@@ -186,12 +187,13 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
 
       {/* Stage upgrade selection */}
       {hasUpgradeSection && (
-        <div ref={dualRef} className="flex-1 min-h-0 flex flex-col bg-amber-950/30 rounded-lg p-4 border-2 border-amber-500 overflow-hidden">
-          <div ref={upgradeHeaderRef} className="text-center mb-3 shrink-0">
-            <h3 className="text-lg font-bold text-amber-400">Stage Complete! Select an upgrade</h3>
-          </div>
-          {upgradeHeaderHeight > 0 && (
-            <>
+        <div ref={dualRef} className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col mt-3">
+          <div className="flex flex-col flex-1 min-h-0" style={{ gap: 2 }}>
+            <div className="zone-upgrades px-3 pt-5 pb-3 relative shrink-0 flex flex-col">
+              <span className={badgeCls}>Upgrades</span>
+              <div ref={upgradeHeaderRef} className="text-center mb-2 shrink-0">
+                <h3 className="text-lg font-bold text-amber-400">Stage Complete! Select an upgrade</h3>
+              </div>
               <div className="shrink-0" style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${upgradeCardDims.columns}, ${upgradeCardDims.width}px)`,
@@ -210,32 +212,32 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
                   />
                 ))}
               </div>
+            </div>
 
-              {/* Pool reference panel */}
-              <div className="mt-3 pt-3 border-t border-amber-500/30 flex-1 min-h-0 flex flex-col">
-                <div className="overflow-auto flex-1 min-h-0 p-1" style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
-                  gap: '6px',
-                  justifyContent: 'center',
-                  alignContent: 'start',
-                  maxWidth: '100%',
-                }}>
-                  {poolCards.map((card) => (
-                    <Card
-                      key={card.id}
-                      card={card}
-                      dimensions={poolCardDims}
-                      upgraded={upgradedCardIds.has(card.id)}
-                      appliedUpgrades={getAppliedUpgrades(card.id)}
-                      selected={selectedPoolCardId === card.id}
-                      onClick={() => onPoolCardSelect(selectedPoolCardId === card.id ? null : card.id)}
-                    />
-                  ))}
-                </div>
+            <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1 min-h-0 flex flex-col">
+              <span className={badgeCls}>Pool</span>
+              <div className="overflow-auto flex-1 min-h-0 p-1" style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
+                gap: '6px',
+                justifyContent: 'center',
+                alignContent: 'start',
+                maxWidth: '100%',
+              }}>
+                {poolCards.map((card) => (
+                  <Card
+                    key={card.id}
+                    card={card}
+                    dimensions={poolCardDims}
+                    upgraded={upgradedCardIds.has(card.id)}
+                    appliedUpgrades={getAppliedUpgrades(card.id)}
+                    selected={selectedPoolCardId === card.id}
+                    onClick={() => onPoolCardSelect(selectedPoolCardId === card.id ? null : card.id)}
+                  />
+                ))}
               </div>
-            </>
-          )}
+            </div>
+          </div>
         </div>
       )}
     </div>

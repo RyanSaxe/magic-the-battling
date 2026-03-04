@@ -1190,16 +1190,20 @@ function GameContent() {
             )}
             <div className="flex-1 flex min-h-0 game-surface">
               <main className="flex-1 flex flex-col min-h-0 min-w-0">
-                <BattlePhase
-                  gameState={gameState}
-                  actions={actions}
-                  isMobile={sizes.isMobile}
-                  selectedCard={battleSelectedCard}
-                  onSelectedCardChange={setBattleSelectedCard}
-                  onCardHover={handleCardHover}
-                  onOpponentCardHover={handleOpponentCardHover}
-                  onCardHoverEnd={handleCardHoverEnd}
-                />
+                <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
+                  <div className="surface-inner-emboss flex-1 min-h-0 flex flex-col">
+                    <BattlePhase
+                      gameState={gameState}
+                      actions={actions}
+                      isMobile={sizes.isMobile}
+                      selectedCard={battleSelectedCard}
+                      onSelectedCardChange={setBattleSelectedCard}
+                      onCardHover={handleCardHover}
+                      onOpponentCardHover={handleOpponentCardHover}
+                      onCardHoverEnd={handleCardHoverEnd}
+                    />
+                  </div>
+                </div>
               </main>
               {sizes.isMobile ? (
                 <>
@@ -1356,14 +1360,16 @@ function GameContent() {
                 />
               )}
               {currentPhase === "reward" && (
-                <RewardPhase
-                  gameState={gameState}
-                  actions={actions}
-                  selectedUpgradeId={selectedUpgradeId}
-                  onUpgradeSelect={setSelectedUpgradeId}
-                  selectedPoolCardId={selectedPoolCardId}
-                  onPoolCardSelect={setSelectedPoolCardId}
-                />
+                <div className="surface-inner-emboss p-[1px] flex-1 min-h-0 flex flex-col">
+                  <RewardPhase
+                    gameState={gameState}
+                    actions={actions}
+                    selectedUpgradeId={selectedUpgradeId}
+                    onUpgradeSelect={setSelectedUpgradeId}
+                    selectedPoolCardId={selectedPoolCardId}
+                    onPoolCardSelect={setSelectedPoolCardId}
+                  />
+                </div>
               )}
               {currentPhase === "awaiting_elimination" && (
                 <div className="flex-1 flex items-center justify-center">
@@ -1432,7 +1438,7 @@ function GameContent() {
         {/* Bottom Action Bar */}
         {!isSpectator && (
           <div className="shrink-0 relative z-50 frame-chrome">
-            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 bar-pad-left timeline-actions">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-left timeline-actions">
               {isEndPhase && gameId ? (
                 <>
                   <div className="flex items-center gap-1.5 sm:gap-2 py-1">

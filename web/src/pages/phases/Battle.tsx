@@ -239,8 +239,12 @@ export function BattlePhase({
   const { rowHeight } = sizes
   const handHeight = rowHeight + HAND_PADDING
   const bfHeight = 2 * rowHeight + BF_PADDING
-  const sideZoneHeight = Math.floor((handHeight + bfHeight) / 3)
-  const lastSideZoneHeight = handHeight + bfHeight - 2 * sideZoneHeight
+  const opponentTopZoneHeight = handHeight
+  const opponentMidZoneHeight = Math.floor(bfHeight / 2)
+  const opponentBottomZoneHeight = bfHeight - opponentMidZoneHeight
+  const playerTopZoneHeight = Math.floor(bfHeight / 2)
+  const playerMidZoneHeight = bfHeight - playerTopZoneHeight
+  const playerBottomZoneHeight = handHeight
 
   return (
     <div ref={containerRef} className="battle-layout flex flex-col h-full min-h-0 overflow-hidden" onClick={handleBackgroundClick}>
@@ -266,7 +270,7 @@ export function BattlePhase({
         <div className="flex shrink-0 overflow-hidden" style={{ height: handHeight + bfHeight }}>
           <div className="flex flex-col flex-1 min-w-0">
             {/* Opponent's hand */}
-            <div id="opponent-hand" className="shrink-0 zone-hand px-2 overflow-hidden" style={{ height: handHeight }}>
+            <div id="opponent-hand" className="shrink-0 zone-hand px-2 overflow-hidden battle-hand-separator-bottom" style={{ height: handHeight }}>
               {canManipulateOpponent ? (
                 <DroppableZone
                   zone="hand"
@@ -337,7 +341,7 @@ export function BattlePhase({
               title={opponentHadCompanion ? "Companion" : "Library"}
               zone="command_zone"
               cards={opponent_zones.command_zone}
-              height={sideZoneHeight}
+              height={opponentTopZoneHeight}
               width={zoneColumnWidth}
               isOpponent
               canManipulateOpponent={canManipulateOpponent}
@@ -354,7 +358,7 @@ export function BattlePhase({
               title="Exile"
               zone="exile"
               cards={opponent_zones.exile}
-              height={sideZoneHeight}
+              height={opponentMidZoneHeight}
               width={zoneColumnWidth}
               isOpponent
               canManipulateOpponent={canManipulateOpponent}
@@ -371,7 +375,7 @@ export function BattlePhase({
               title="Graveyard"
               zone="graveyard"
               cards={opponent_zones.graveyard}
-              height={lastSideZoneHeight}
+              height={opponentBottomZoneHeight}
               width={zoneColumnWidth}
               isOpponent
               canManipulateOpponent={canManipulateOpponent}
@@ -415,7 +419,7 @@ export function BattlePhase({
               />
             </div>
             {/* Your hand */}
-            <div className="shrink-0 zone-hand overflow-hidden" style={{ height: handHeight }}>
+            <div className="shrink-0 zone-hand overflow-hidden battle-hand-separator-top" style={{ height: handHeight }}>
               <HandZone
                 cards={your_zones.hand}
                 selectedCardId={selectedCard?.card.id}
@@ -436,7 +440,7 @@ export function BattlePhase({
               title="Graveyard"
               zone="graveyard"
               cards={your_zones.graveyard}
-              height={sideZoneHeight}
+              height={playerTopZoneHeight}
               width={zoneColumnWidth}
               validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
               onCardHover={onCardHover}
@@ -450,7 +454,7 @@ export function BattlePhase({
               title="Exile"
               zone="exile"
               cards={your_zones.exile}
-              height={sideZoneHeight}
+              height={playerMidZoneHeight}
               width={zoneColumnWidth}
               validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
               onCardHover={onCardHover}
@@ -464,7 +468,7 @@ export function BattlePhase({
               title={playerHadCompanion ? "Companion" : "Library"}
               zone="command_zone"
               cards={your_zones.command_zone}
-              height={lastSideZoneHeight}
+              height={playerBottomZoneHeight}
               width={zoneColumnWidth}
               validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
               onCardHover={onCardHover}

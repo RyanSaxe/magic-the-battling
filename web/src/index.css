@@ -34,6 +34,7 @@
   /* Opaque gold for dividers over colored backgrounds */
   --gold-border-opaque: #6b5c2e;
   --seam-stroke: var(--gold-border-opaque);
+  --seam-stroke-soft: rgba(107, 92, 46, 0.72);
   --seam-highlight: rgba(255, 236, 181, 0.24);
   --seam-shadow: rgba(0, 0, 0, 0.55);
 
@@ -111,12 +112,12 @@ body {
   position: relative;
   box-shadow:
     inset 0 0 0 1px rgba(212, 175, 55, 0.6),
-    inset 0 1px 0 0 rgba(255, 231, 163, 0.24),
-    inset 0 2px 0 0 rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 0 rgba(255, 231, 163, 0.28),
+    inset 0 2px 0 0 rgba(0, 0, 0, 0.32),
     inset 0 -1px 0 0 rgba(255, 231, 163, 0.26),
-    inset 0 -2px 0 0 rgba(212, 175, 55, 0.54),
-    inset 0 -3px 0 0 rgba(0, 0, 0, 0.82),
-    inset 0 -4px 0 0 rgba(0, 0, 0, 0.5),
+    inset 0 -2px 0 0 rgba(212, 175, 55, 0.5),
+    inset 0 -3px 0 0 rgba(0, 0, 0, 0.58),
+    inset 0 -4px 0 0 rgba(0, 0, 0, 0.24),
     inset 0 8px 20px -4px rgba(0, 0, 0, 0.38),
     inset 0 -8px 20px -8px rgba(0, 0, 0, 0.4);
 }
@@ -125,14 +126,26 @@ body {
   position: relative;
   box-shadow:
     inset 0 0 0 1px rgba(212, 175, 55, 0.6),
-    inset 0 1px 0 0 rgba(255, 231, 163, 0.24),
-    inset 0 2px 0 0 rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 0 rgba(255, 231, 163, 0.28),
+    inset 0 2px 0 0 rgba(0, 0, 0, 0.32),
     inset 0 -1px 0 0 rgba(255, 231, 163, 0.26),
-    inset 0 -2px 0 0 rgba(212, 175, 55, 0.54),
-    inset 0 -3px 0 0 rgba(0, 0, 0, 0.82),
-    inset 0 -4px 0 0 rgba(0, 0, 0, 0.5),
+    inset 0 -2px 0 0 rgba(212, 175, 55, 0.5),
+    inset 0 -3px 0 0 rgba(0, 0, 0, 0.58),
+    inset 0 -4px 0 0 rgba(0, 0, 0, 0.24),
     inset 0 8px 20px -4px rgba(0, 0, 0, 0.38),
     inset 0 -8px 20px -8px rgba(0, 0, 0, 0.4);
+}
+
+/* Subtle transparent inner frame for flatter phases (battle/reward) */
+.surface-inner-emboss {
+  box-shadow:
+    inset 0 0 0 1px rgba(212, 175, 55, 0.42),
+    inset 0 1px 0 rgba(255, 236, 181, 0.2),
+    inset 0 2px 0 rgba(0, 0, 0, 0.28),
+    inset 0 -1px 0 rgba(255, 236, 181, 0.12),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
+    inset 0 10px 20px -12px rgba(0, 0, 0, 0.28),
+    inset 0 -10px 20px -12px rgba(0, 0, 0, 0.25);
 }
 
 .modal-chrome {
@@ -207,8 +220,10 @@ body {
   background-color: var(--seam-stroke);
   box-shadow:
     inset 0 1px 0 var(--seam-highlight),
-    inset 0 -1px 0 rgba(255, 236, 181, 0.18),
-    inset 0 -2px 0 var(--seam-shadow);
+    inset 0 -1px 0 rgba(255, 236, 181, 0.22),
+    inset 0 -2px 0 rgba(212, 175, 55, 0.42),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.52),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.28);
 }
 
 .zone-label-pill {
@@ -328,18 +343,18 @@ body {
 .battle-side-column {
   box-sizing: border-box;
   background: var(--zone-column-bg);
-  border-left: 1px solid var(--seam-stroke);
-  border-right: 1px solid var(--seam-stroke);
+  border-left: 1px solid var(--seam-stroke-soft);
+  border-right: 1px solid var(--seam-stroke-soft);
   overflow: hidden;
 }
 
 .battle-side-column-opponent {
-  border-top: 1px solid var(--seam-stroke);
+  border-top: 1px solid var(--seam-stroke-soft);
 }
 
 .battle-side-column-player {
-  border-top: 1px solid var(--seam-stroke);
-  border-bottom: 1px solid var(--seam-stroke);
+  border-top: 1px solid var(--seam-stroke-soft);
+  border-bottom: 1px solid var(--seam-stroke-soft);
 }
 
 .battle-side-cell {
@@ -348,7 +363,15 @@ body {
 }
 
 .battle-side-column .battle-side-cell + .battle-side-cell {
-  border-top: 1px solid var(--seam-stroke);
+  border-top: 1px solid var(--seam-stroke-soft);
+}
+
+.battle-hand-separator-bottom {
+  border-bottom: 1px solid var(--seam-stroke-soft);
+}
+
+.battle-hand-separator-top {
+  border-top: 1px solid var(--seam-stroke-soft);
 }
 
 .battle-side-label {
@@ -430,7 +453,9 @@ body {
 }
 
 .timeline-actions .btn {
-  padding: 4px 10px;
+  min-height: 30px;
+  padding: 0 10px;
+  line-height: 1;
   font-size: 13px;
 }
 
