@@ -4,10 +4,16 @@ import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { rejoinGame } from "../api/client";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { InfoIcon } from "../components/icons/InfoIcon";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
 import { HintsBanner } from "../components/common/HintsBanner";
-import { rememberPlayerForGame } from "../utils/deviceIdentity";
+import {
+  getDefaultNewPlayerPreference,
+  getNewPlayerPreferenceForGame,
+  rememberPlayerForGame,
+  setNewPlayerPreferenceForGame,
+} from "../utils/deviceIdentity";
 
 export function Lobby() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -27,9 +33,32 @@ export function Lobby() {
   const [copied, setCopied] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
   const [showRulesPanel, setShowRulesPanel] = useState(false);
+  const [isGuidedMode, setIsGuidedMode] = useState(() =>
+    getDefaultNewPlayerPreference(),
+  );
   const [rulesPanelTarget, setRulesPanelTarget] = useState<
     RulesPanelTarget | undefined
   >(undefined);
+
+  useEffect(() => {
+    if (!gameId) return;
+    const existing = getNewPlayerPreferenceForGame(gameId);
+    const initial =
+      existing ??
+      lobbyState?.guided_mode_default ??
+      getDefaultNewPlayerPreference();
+    setIsGuidedMode(initial);
+    if (existing === null) {
+      setNewPlayerPreferenceForGame(gameId, initial);
+    }
+  }, [gameId, lobbyState?.guided_mode_default]);
+
+  const handleGuidedModeToggle = (nextValue: boolean) => {
+    setIsGuidedMode(nextValue);
+    if (gameId) {
+      setNewPlayerPreferenceForGame(gameId, nextValue);
+    }
+  };
 
   const currentPlayer = lobbyState?.players.find(
     (p) => p.player_id === session?.playerId,
@@ -402,6 +431,29 @@ export function Lobby() {
                 </div>
 
                 <div className="space-y-2 mb-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="text-white text-sm">Guided Mode</span>
+                    <input
+                      type="checkbox"
+                      checked={isGuidedMode}
+                      onChange={(e) => handleGuidedModeToggle(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <span className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+                      <span
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                          isGuidedMode ? "translate-x-5" : "translate-x-1"
+                        }`}
+                      />
+                    </span>
+                    <span
+                      className="text-gray-400 hover:text-gray-200"
+                      title="When you enter a new situation, helpful tips open automatically."
+                    >
+                      <InfoIcon size="sm" />
+                    </span>
+                  </label>
+
                   {startMessage && (
                     <p className="text-gray-500 text-xs mb-1 text-center">
                       {startMessage}

@@ -32,10 +32,13 @@ import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
+import type { Phase } from "../constants/phases";
 import {
+  markPlayedBefore,
   getRememberedPlayerForGame,
   pickAutoReconnectPlayer,
   rememberPlayerForGame,
+  resolveNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 
 interface SpectatorConfig {
@@ -77,6 +80,10 @@ function drainingMessageWithEasternTime(message: string, easternTime: string | n
   if (!message) return "";
   if (!easternTime) return message;
   return message.replace(SCHEDULED_UTC_RE, `scheduled for ${easternTime}`);
+}
+
+function isTimelinePhase(phase: string | undefined): phase is Phase {
+  return phase === "draft" || phase === "build" || phase === "battle" || phase === "reward";
 }
 
 function PlayerSelectionModal({
@@ -437,6 +444,31 @@ function GameContent() {
 
   const isSpectator = !!spectatorConfig;
   const wasInvalidSessionRef = useRef(false);
+  const [isNewPlayerOnboarding, setIsNewPlayerOnboarding] = useState(() =>
+    gameId ? resolveNewPlayerPreferenceForGame(gameId) : false,
+  );
+  const [autoOpenTimelinePhase, setAutoOpenTimelinePhase] = useState<Phase | null>(null);
+  const [showPuppetGhostExplainer, setShowPuppetGhostExplainer] = useState(false);
+  const seenTimelinePhasesRef = useRef<Set<Phase>>(new Set());
+  const shownPuppetGhostExplainerRef = useRef(false);
+  const selfPhase = gameState?.self_player.phase;
+  const canManipulateOpponent = gameState?.current_battle?.can_manipulate_opponent ?? false;
+
+  useEffect(() => {
+    const resolved = gameId ? resolveNewPlayerPreferenceForGame(gameId) : false;
+    seenTimelinePhasesRef.current = new Set();
+    shownPuppetGhostExplainerRef.current = false;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setIsNewPlayerOnboarding(resolved);
+      setAutoOpenTimelinePhase(null);
+      setShowPuppetGhostExplainer(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId]);
 
   useEffect(() => {
     const shouldClear = shouldClearSessionOnInvalidEvent(
@@ -456,7 +488,55 @@ function GameContent() {
       return;
     }
     rememberPlayerForGame(gameId, playerName);
+    markPlayedBefore();
   }, [gameId, gameState?.self_player.name, isSpectator]);
+
+  useEffect(() => {
+    if (!selfPhase || isSpectator || !isNewPlayerOnboarding) {
+      return;
+    }
+    if (!isTimelinePhase(selfPhase)) {
+      return;
+    }
+    if (seenTimelinePhasesRef.current.has(selfPhase)) {
+      return;
+    }
+    seenTimelinePhasesRef.current.add(selfPhase);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setAutoOpenTimelinePhase(selfPhase);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isNewPlayerOnboarding, isSpectator, selfPhase]);
+
+  useEffect(() => {
+    if (
+      selfPhase !== "battle" ||
+      isSpectator ||
+      !isNewPlayerOnboarding ||
+      shownPuppetGhostExplainerRef.current ||
+      !canManipulateOpponent
+    ) {
+      return;
+    }
+    shownPuppetGhostExplainerRef.current = true;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setShowPuppetGhostExplainer(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    canManipulateOpponent,
+    isNewPlayerOnboarding,
+    isSpectator,
+    selfPhase,
+  ]);
 
   // Lifted state from Build phase
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
@@ -1130,6 +1210,26 @@ function GameContent() {
             Watching {spectatingPlayer}'s game (spectator mode)
           </div>
         )}
+        {showPuppetGhostExplainer && (
+          <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="modal-chrome border border-cyan-500/40 rounded-lg p-5 w-full max-w-lg text-center">
+              <h2 className="text-lg font-semibold text-cyan-300 mb-2">
+                Puppet/Ghost Opponent
+              </h2>
+              <p className="text-sm text-gray-200 mb-4">
+                This opponent is a puppet/ghost. Their cards are fully visible,
+                and you can move cards on both sides to play out the battle and
+                decide who wins.
+              </p>
+              <button
+                onClick={() => setShowPuppetGhostExplainer(false)}
+                className="btn btn-primary py-2 px-5"
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        )}
         {/* Header - Phase Timeline. pr-64 on desktop offsets for sidebar so timeline centers over main content */}
         <div className="relative">
           <PhaseTimeline
@@ -1138,6 +1238,7 @@ function GameContent() {
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+            autoOpenPhase={isNewPlayerOnboarding ? autoOpenTimelinePhase : null}
             headerClassName="py-1.5 bar-pad-left"
             onOpenRules={(target) => {
               setRulesPanelTarget(target);

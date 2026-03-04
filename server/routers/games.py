@@ -76,6 +76,7 @@ def _request_fingerprint(request: CreateGameRequest) -> str:
             "target_player_count": request.target_player_count,
             "puppet_count": request.puppet_count,
             "auto_approve_spectators": request.auto_approve_spectators,
+            "guided_mode_default": request.guided_mode_default,
         },
         sort_keys=True,
     )
@@ -205,6 +206,7 @@ def _create_game_response(request: CreateGameRequest) -> CreateGameResponse:
         use_vanguards=request.use_vanguards,
         target_player_count=request.target_player_count,
         auto_approve_spectators=request.auto_approve_spectators,
+        guided_mode_default=request.guided_mode_default,
     )
     pending.puppet_count = request.puppet_count
     session_manager.update_game_id(session.session_id, pending.game_id)

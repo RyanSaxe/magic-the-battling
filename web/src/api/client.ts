@@ -59,6 +59,7 @@ export interface GameOptions {
   targetPlayerCount?: number
   puppetCount?: number
   autoApproveSpectators?: boolean
+  guidedModeDefault?: boolean
 }
 
 export async function createGame(
@@ -75,6 +76,7 @@ export async function createGame(
     target_player_count: options.targetPlayerCount ?? 4,
     puppet_count: options.puppetCount ?? 0,
     auto_approve_spectators: options.autoApproveSpectators ?? false,
+    guided_mode_default: options.guidedModeDefault ?? false,
   })
 
   for (let attempt = 0; attempt < CREATE_RETRY_MAX_ATTEMPTS; attempt++) {

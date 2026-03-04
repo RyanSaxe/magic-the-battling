@@ -5,9 +5,14 @@ import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
+import { InfoIcon } from "../components/icons/InfoIcon";
 import { HintsBanner } from "../components/common/HintsBanner";
 import { getLegendaryName } from "../utils/prefetchName";
-import { rememberPlayerForGame } from "../utils/deviceIdentity";
+import {
+  getDefaultNewPlayerPreference,
+  rememberPlayerForGame,
+  setNewPlayerPreferenceForGame,
+} from "../utils/deviceIdentity";
 import { FaDiscord } from "react-icons/fa6";
 import type { LobbyState } from "../types";
 
@@ -203,6 +208,39 @@ function UpgradesCheckbox({
   );
 }
 
+function GuidedModeSwitch({
+  enabled,
+  setEnabled,
+}: {
+  enabled: boolean;
+  setEnabled: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-2 cursor-pointer shrink-0">
+      <span className="text-white text-sm whitespace-nowrap">Guided Mode</span>
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(e) => setEnabled(e.target.checked)}
+        className="sr-only peer"
+      />
+      <span className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+        <span
+          className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+            enabled ? "translate-x-5" : "translate-x-1"
+          }`}
+        />
+      </span>
+      <span
+        className="text-gray-400 hover:text-gray-200"
+        title="When you enter a new situation, helpful tips open automatically."
+      >
+        <InfoIcon size="sm" />
+      </span>
+    </label>
+  );
+}
+
 function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -228,6 +266,9 @@ export function Play() {
   const [opponents, setOpponents] = useState<OpponentCount>(3);
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [activeMode, setActiveMode] = useState<ActiveMode>("solo");
+  const [isGuidedMode, setIsGuidedMode] = useState(() =>
+    getDefaultNewPlayerPreference(),
+  );
 
   const [friendsLoading, setFriendsLoading] = useState(false);
 
@@ -298,9 +339,11 @@ export function Play() {
         cubeId: cubeId || "auto",
         useUpgrades,
         autoApproveSpectators,
+        guidedModeDefault: isGuidedMode,
       });
       saveSession(response.session_id, response.player_id);
       rememberPlayerForGame(response.game_id, playerName.trim());
+      setNewPlayerPreferenceForGame(response.game_id, isGuidedMode);
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
@@ -324,9 +367,11 @@ export function Play() {
         useUpgrades,
         targetPlayerCount: targetCount,
         puppetCount: count,
+        guidedModeDefault: isGuidedMode,
       });
       saveSession(response.session_id, response.player_id);
       rememberPlayerForGame(response.game_id, playerName.trim());
+      setNewPlayerPreferenceForGame(response.game_id, isGuidedMode);
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
@@ -439,17 +484,20 @@ export function Play() {
       <div className="shrink-0 w-full max-w-5xl mx-auto pt-6">
         <div className="mb-4">
           <label className="block text-gray-400 text-sm mb-1">Your Name</label>
-          <input
-            type="text"
-            value={nameLoading ? "" : playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            onKeyDown={(e) =>
-              e.key === "Enter" && nameValid && handleCreateLobby()
-            }
-            disabled={nameLoading}
-            placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-            className="w-full bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-          />
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              value={nameLoading ? "" : playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              onKeyDown={(e) =>
+                e.key === "Enter" && nameValid && handleCreateLobby()
+              }
+              disabled={nameLoading}
+              placeholder={nameLoading ? "Generating name..." : "Enter your name"}
+              className="flex-1 bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+            />
+            <GuidedModeSwitch enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
+          </div>
         </div>
 
       </div>

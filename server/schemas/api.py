@@ -18,6 +18,7 @@ class CreateGameRequest(BaseModel):
     target_player_count: int = 4
     puppet_count: int = 0
     auto_approve_spectators: bool = False
+    guided_mode_default: bool = False
 
 
 class CreateGameResponse(BaseModel):
@@ -136,6 +137,7 @@ class LobbyStateResponse(BaseModel):
     available_puppet_count: int | None = None
     cube_id: str = "auto"
     use_upgrades: bool = True
+    guided_mode_default: bool = False
 
 
 class DraftSwapAction(BaseModel):

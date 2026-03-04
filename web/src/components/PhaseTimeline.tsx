@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Phase } from "../constants/phases";
 import type { RulesPanelTarget } from "./RulesPanel";
@@ -28,6 +28,8 @@ interface PhaseTimelineProps {
   round: number;
   nextStage: number;
   nextRound: number;
+  autoOpenPhase?: Phase | null;
+  autoOpenDurationMs?: number;
   onOpenRules?: (target?: RulesPanelTarget) => void;
   hamburger?: React.ReactNode;
   title?: React.ReactNode;
@@ -69,6 +71,8 @@ export function PhaseTimeline({
   round,
   nextStage,
   nextRound,
+  autoOpenPhase = null,
+  autoOpenDurationMs = 10_000,
   onOpenRules,
   hamburger,
   title,
@@ -76,6 +80,8 @@ export function PhaseTimeline({
 }: PhaseTimelineProps) {
   const [popoverPhase, setPopoverPhase] = useState<Phase | null>(null);
   const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(null);
+  const autoCloseTimerRef = useRef<number | null>(null);
+  const popoverPhaseRef = useRef<Phase | null>(null);
   const phaseButtonRefs = useRef<Record<Phase, HTMLButtonElement | null>>({
     draft: null,
     build: null,
@@ -83,23 +89,71 @@ export function PhaseTimeline({
     reward: null,
   });
 
-  const handlePhaseClick = useCallback((phase: Phase) => {
-    if (popoverPhase === phase) {
-      setPopoverPhase(null);
-      setPopoverAnchorRect(null);
-      return;
-    }
-    const btn = phaseButtonRefs.current[phase];
-    if (btn) {
-      setPopoverAnchorRect(btn.getBoundingClientRect());
-      setPopoverPhase(phase);
-    }
+  useEffect(() => {
+    popoverPhaseRef.current = popoverPhase;
   }, [popoverPhase]);
 
+  const clearAutoCloseTimer = useCallback(() => {
+    if (autoCloseTimerRef.current !== null) {
+      window.clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
+    }
+  }, []);
+
+  const openPopoverForPhase = useCallback(
+    (phase: Phase, autoCloseAfterMs?: number): boolean => {
+      const btn = phaseButtonRefs.current[phase];
+      if (!btn) {
+        return false;
+      }
+      clearAutoCloseTimer();
+      setPopoverAnchorRect(btn.getBoundingClientRect());
+      setPopoverPhase(phase);
+      if (autoCloseAfterMs && autoCloseAfterMs > 0) {
+        autoCloseTimerRef.current = window.setTimeout(() => {
+          if (popoverPhaseRef.current === phase) {
+            setPopoverPhase(null);
+            setPopoverAnchorRect(null);
+          }
+          autoCloseTimerRef.current = null;
+        }, autoCloseAfterMs);
+      }
+      return true;
+    },
+    [clearAutoCloseTimer],
+  );
+
   const handleClosePopover = useCallback(() => {
+    clearAutoCloseTimer();
     setPopoverPhase(null);
     setPopoverAnchorRect(null);
-  }, []);
+  }, [clearAutoCloseTimer]);
+
+  const handlePhaseClick = useCallback((phase: Phase) => {
+    if (popoverPhase === phase) {
+      handleClosePopover();
+      return;
+    }
+    openPopoverForPhase(phase);
+  }, [handleClosePopover, openPopoverForPhase, popoverPhase]);
+
+  useEffect(() => {
+    if (!autoOpenPhase) return;
+    if (!isGamePhase(currentPhase)) return;
+    if (autoOpenPhase !== currentPhase) return;
+    if (openPopoverForPhase(autoOpenPhase, autoOpenDurationMs)) return;
+
+    const retryId = window.setTimeout(() => {
+      openPopoverForPhase(autoOpenPhase, autoOpenDurationMs);
+    }, 0);
+    return () => window.clearTimeout(retryId);
+  }, [autoOpenDurationMs, autoOpenPhase, currentPhase, openPopoverForPhase]);
+
+  useEffect(() => {
+    return () => {
+      clearAutoCloseTimer();
+    };
+  }, [clearAutoCloseTimer]);
 
   const handleOpenDetailsFromPopover = useCallback(() => {
     const phase = popoverPhase;
