@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { bestFit, type ZoneDims } from "../../hooks/cardSizeUtils";
 import type { Card as CardType } from "../../types";
 import { Card } from "../card";
 import { UpgradeStack } from "./UpgradeStack";
@@ -10,6 +11,13 @@ interface ZoneDisplayProps {
   showUpgradeTargets?: boolean;
   companionIds?: Set<string>;
 }
+
+const DEFAULT_MODAL_DIMS: ZoneDims = {
+  width: 80,
+  height: 112,
+  rows: 1,
+  columns: 1,
+};
 
 function ZoneModal({
   title,
@@ -24,39 +32,118 @@ function ZoneModal({
   companionIds?: Set<string>;
   onClose: () => void;
 }) {
+  const [dims, setDims] = useState<ZoneDims>(DEFAULT_MODAL_DIMS);
+  const observerRef = useRef<ResizeObserver | null>(null);
+
+  const bodyRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+
+      if (!node) return;
+
+      const measure = () => {
+        const cs = getComputedStyle(node);
+        const width =
+          node.clientWidth -
+          parseFloat(cs.paddingLeft) -
+          parseFloat(cs.paddingRight);
+        const height =
+          node.clientHeight -
+          parseFloat(cs.paddingTop) -
+          parseFloat(cs.paddingBottom);
+
+        const next = bestFit(
+          cards.length,
+          Math.max(width, 0),
+          Math.max(height, 0),
+          8,
+          220,
+          64,
+        );
+
+        setDims((prev) =>
+          prev.width === next.width &&
+          prev.height === next.height &&
+          prev.rows === next.rows &&
+          prev.columns === next.columns
+            ? prev
+            : next,
+        );
+      };
+
+      measure();
+
+      const observer = new ResizeObserver(() => {
+        measure();
+      });
+
+      observer.observe(node);
+      observerRef.current = observer;
+    },
+    [cards.length],
+  );
+
+  useEffect(() => {
+    return () => {
+      observerRef.current?.disconnect();
+    };
+  }, []);
+
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 rounded-lg p-4 max-w-2xl max-h-[80vh] overflow-auto"
+        className="modal-chrome border gold-border rounded-lg w-full max-w-6xl h-[85vh] max-h-[860px] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-white font-medium">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+        <div className="px-4 py-2 border-b gold-divider flex justify-between items-center shrink-0">
+          <h3 className="text-white font-medium">
+            {title} ({cards.length})
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white text-lg leading-none"
+          >
             ✕
           </button>
         </div>
-        {cards.length === 0 ? (
-          <div className="text-gray-500 text-center py-4">No cards</div>
-        ) : (
-          <div className="flex flex-wrap gap-3 items-end">
-            {cards.map((card) =>
-              showUpgradeTargets ? (
-                <UpgradeStack key={card.id} upgrade={card} size="sm" />
-              ) : (
-                <Card
-                  key={card.id}
-                  card={card}
-                  size="sm"
-                  isCompanion={companionIds?.has(card.id)}
-                />
-              ),
-            )}
-          </div>
-        )}
+        <div ref={bodyRef} className="flex-1 min-h-0 p-3 overflow-auto">
+          {cards.length === 0 ? (
+            <div className="text-gray-500 text-center py-4">No cards</div>
+          ) : (
+            <div
+              className="grid gap-2 justify-center content-start"
+              style={{
+                gridTemplateColumns: `repeat(${Math.max(
+                  1,
+                  dims.columns,
+                )}, ${dims.width}px)`,
+              }}
+            >
+              {cards.map((card) =>
+                showUpgradeTargets ? (
+                  <UpgradeStack
+                    key={card.id}
+                    upgrade={card}
+                    dimensions={{ width: dims.width, height: dims.height }}
+                  />
+                ) : (
+                  <Card
+                    key={card.id}
+                    card={card}
+                    dimensions={{ width: dims.width, height: dims.height }}
+                    isCompanion={companionIds?.has(card.id)}
+                  />
+                ),
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

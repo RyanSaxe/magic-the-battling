@@ -90,7 +90,7 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
       onClick={onClose}
     >
       <div
-        className="modal-chrome rounded-lg flex flex-col w-full h-[calc(100dvh-2rem)] sm:h-[calc(100dvh-4rem)] overflow-hidden relative"
+        className="modal-chrome border gold-border rounded-lg flex flex-col w-full h-[calc(100dvh-2rem)] sm:h-[calc(100dvh-4rem)] overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-3 py-1 shrink-0 border-b gold-divider flex justify-between items-center">

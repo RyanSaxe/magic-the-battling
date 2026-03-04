@@ -145,7 +145,7 @@ function AdvancedOptionsModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative modal-chrome border border-white/10 rounded-lg p-5 w-full max-w-sm">
+      <div className="relative modal-chrome border gold-border rounded-lg p-5 w-full max-w-sm">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-white font-semibold">{title}</h3>
           <button
@@ -820,7 +820,7 @@ export function Play() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={handleCancelSolo}
           />
-          <div className="relative modal-chrome border border-white/10 rounded-lg p-8 w-full max-w-md text-center">
+          <div className="relative modal-chrome border gold-border rounded-lg p-8 w-full max-w-md text-center">
             <h2 className="text-xl font-bold text-white mb-4">
               Not enough puppet data
             </h2>

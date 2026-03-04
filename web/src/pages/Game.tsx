@@ -396,7 +396,7 @@ function SpectateRequestModal({
 }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="modal-chrome rounded-lg p-6 w-full max-w-sm mx-4">
+      <div className="modal-chrome border gold-border rounded-lg p-6 w-full max-w-sm mx-4">
         <h2 className="text-xl text-white mb-4">Spectate Request</h2>
         <p className="text-gray-300 mb-6">
           <strong>{spectatorName}</strong> wants to watch your game.
