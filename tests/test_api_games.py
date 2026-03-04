@@ -19,6 +19,17 @@ class TestCreateGame:
         assert r1.json()["game_id"] != r2.json()["game_id"]
         assert r1.json()["join_code"] != r2.json()["join_code"]
 
+    def test_persists_guided_mode_default_to_lobby(self, client):
+        create = client.post(
+            "/api/games",
+            json={"player_name": "Alice", "cube_id": "test", "guided_mode_default": True},
+        )
+        game_id = create.json()["game_id"]
+
+        lobby = client.get(f"/api/games/{game_id}/lobby")
+        assert lobby.status_code == 200
+        assert lobby.json()["guided_mode_default"] is True
+
 
 class TestJoinGame:
     def test_join_with_valid_code(self, client):
@@ -63,6 +74,7 @@ class TestGetLobby:
         assert "players" in data
         assert "can_start" in data
         assert "is_started" in data
+        assert "guided_mode_default" in data
         assert isinstance(data["players"], list)
 
     def test_missing_game_returns_404(self, client):

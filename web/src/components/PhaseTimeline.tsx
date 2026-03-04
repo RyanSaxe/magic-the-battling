@@ -1,6 +1,8 @@
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Phase } from "../constants/phases";
 import type { RulesPanelTarget } from "./RulesPanel";
+import { PhasePopover } from "./PhasePopover";
 
 const PHASES: Phase[] = ["draft", "build", "battle", "reward"];
 
@@ -26,9 +28,13 @@ interface PhaseTimelineProps {
   round: number;
   nextStage: number;
   nextRound: number;
+  autoOpenPhase?: Phase | null;
+  autoOpenDurationMs?: number;
+  onAutoOpenHandled?: (phase: Phase) => void;
   onOpenRules?: (target?: RulesPanelTarget) => void;
   hamburger?: React.ReactNode;
   title?: React.ReactNode;
+  headerClassName?: string;
 }
 
 function isGamePhase(phase: string): phase is Phase {
@@ -66,18 +72,118 @@ export function PhaseTimeline({
   round,
   nextStage,
   nextRound,
+  autoOpenPhase = null,
+  autoOpenDurationMs = 10_000,
+  onAutoOpenHandled,
   onOpenRules,
   hamburger,
   title,
+  headerClassName,
 }: PhaseTimelineProps) {
+  const [popoverPhase, setPopoverPhase] = useState<Phase | null>(null);
+  const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(null);
+  const autoCloseTimerRef = useRef<number | null>(null);
+  const popoverPhaseRef = useRef<Phase | null>(null);
+  const phaseButtonRefs = useRef<Record<Phase, HTMLButtonElement | null>>({
+    draft: null,
+    build: null,
+    battle: null,
+    reward: null,
+  });
+
+  useEffect(() => {
+    popoverPhaseRef.current = popoverPhase;
+  }, [popoverPhase]);
+
+  const clearAutoCloseTimer = useCallback(() => {
+    if (autoCloseTimerRef.current !== null) {
+      window.clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
+    }
+  }, []);
+
+  const openPopoverForPhase = useCallback(
+    (phase: Phase, autoCloseAfterMs?: number): boolean => {
+      const btn = phaseButtonRefs.current[phase];
+      if (!btn) {
+        return false;
+      }
+      clearAutoCloseTimer();
+      setPopoverAnchorRect(btn.getBoundingClientRect());
+      setPopoverPhase(phase);
+      if (autoCloseAfterMs && autoCloseAfterMs > 0) {
+        autoCloseTimerRef.current = window.setTimeout(() => {
+          if (popoverPhaseRef.current === phase) {
+            setPopoverPhase(null);
+            setPopoverAnchorRect(null);
+          }
+          autoCloseTimerRef.current = null;
+        }, autoCloseAfterMs);
+      }
+      return true;
+    },
+    [clearAutoCloseTimer],
+  );
+
+  const handleClosePopover = useCallback(() => {
+    clearAutoCloseTimer();
+    setPopoverPhase(null);
+    setPopoverAnchorRect(null);
+  }, [clearAutoCloseTimer]);
+
+  const handlePhaseClick = useCallback((phase: Phase) => {
+    if (popoverPhase === phase) {
+      handleClosePopover();
+      return;
+    }
+    openPopoverForPhase(phase);
+  }, [handleClosePopover, openPopoverForPhase, popoverPhase]);
+
+  useEffect(() => {
+    if (!autoOpenPhase) return;
+    if (!isGamePhase(currentPhase)) return;
+    if (autoOpenPhase !== currentPhase) return;
+    if (openPopoverForPhase(autoOpenPhase, autoOpenDurationMs)) {
+      onAutoOpenHandled?.(autoOpenPhase);
+      return;
+    }
+
+    const retryId = window.setTimeout(() => {
+      if (openPopoverForPhase(autoOpenPhase, autoOpenDurationMs)) {
+        onAutoOpenHandled?.(autoOpenPhase);
+      }
+    }, 0);
+    return () => window.clearTimeout(retryId);
+  }, [autoOpenDurationMs, autoOpenPhase, currentPhase, onAutoOpenHandled, openPopoverForPhase]);
+
+  useEffect(() => {
+    return () => {
+      clearAutoCloseTimer();
+    };
+  }, [clearAutoCloseTimer]);
+
+  const handleOpenDetailsFromPopover = useCallback(() => {
+    const phase = popoverPhase;
+    handleClosePopover();
+    onOpenRules?.(phase ? { docId: phase } : undefined);
+  }, [handleClosePopover, onOpenRules, popoverPhase]);
+
+  const handleOpenControlsFromPopover = useCallback(() => {
+    const phase = popoverPhase;
+    handleClosePopover();
+    onOpenRules?.(phase ? { docId: phase, tab: 'controls' } : undefined);
+  }, [handleClosePopover, onOpenRules, popoverPhase]);
+
+  const headerCls = headerClassName ?? "py-1.5 pl-4 pr-1.5";
+
   if (!isGamePhase(currentPhase)) {
     return (
-      <header className="bg-black/30 py-1.5 pl-4 pr-1.5 border-b border-gray-700/50">
+      <header className={`frame-chrome ${headerCls}`}>
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-300">
             {title ?? END_STATE_LABELS[currentPhase]}
           </span>
-          <div className="flex items-center gap-1 timeline-actions">
+          <div className="flex items-center gap-1.5 timeline-actions">
             {onOpenRules && <RulesButton onClick={() => onOpenRules()} />}
             <HomeButton />
             {hamburger && <div className="shrink-0">{hamburger}</div>}
@@ -88,7 +194,7 @@ export function PhaseTimeline({
   }
 
   return (
-    <header className="bg-black/30 py-1.5 pl-4 pr-1.5 border-b border-gray-700/50">
+    <header className={`frame-chrome ${headerCls}`}>
       <div className="flex items-center">
         <div className="flex items-center gap-1 sm:gap-1.5 flex-1 justify-start min-w-0">
           <span className="text-xs sm:text-sm text-gray-300 font-mono">
@@ -105,7 +211,8 @@ export function PhaseTimeline({
               <div key={phase} className="flex items-center gap-1 sm:gap-1.5">
                 <span className="text-gray-600 text-xs">→</span>
                 <button
-                  onClick={() => onOpenRules?.({ docId: phase })}
+                  ref={(el) => { phaseButtonRefs.current[phase] = el; }}
+                  onClick={() => handlePhaseClick(phase)}
                   className={`text-xs sm:text-sm font-medium capitalize transition-colors cursor-pointer
                     ${isActive ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
                     ${isCompleted ? "text-gray-500 line-through decoration-gray-600" : ""}
@@ -125,7 +232,7 @@ export function PhaseTimeline({
           </span>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0 timeline-actions">
+        <div className="flex items-center gap-1.5 shrink-0 timeline-actions">
           {onOpenRules && <RulesButton onClick={() => onOpenRules()} />}
           <div className="hidden sm:block">
             <HomeButton />
@@ -133,6 +240,16 @@ export function PhaseTimeline({
           {hamburger && <div className="shrink-0">{hamburger}</div>}
         </div>
       </div>
+
+      {popoverPhase && popoverAnchorRect && (
+        <PhasePopover
+          phase={popoverPhase}
+          anchorRect={popoverAnchorRect}
+          onClose={handleClosePopover}
+          onOpenDetails={handleOpenDetailsFromPopover}
+          onOpenControls={handleOpenControlsFromPopover}
+        />
+      )}
     </header>
   );
 }

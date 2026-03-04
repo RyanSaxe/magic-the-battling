@@ -59,7 +59,7 @@ function RoundPopover({
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-2 left-0 z-50 bg-gray-900/95 backdrop-blur border border-gray-700 rounded-lg shadow-2xl p-2 flex flex-col gap-1 min-w-[180px] max-h-[300px] overflow-y-auto"
+      className="absolute bottom-full mb-2 left-0 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 min-w-[180px] max-h-[300px] overflow-y-auto"
     >
       {options.map((opt) => (
         <button
@@ -202,7 +202,6 @@ export function ShareGame() {
           <GameSummary
             key={selectedPlayer}
             player={gameSummaryData.selfPlayer}
-            players={gameSummaryData.players}
             useUpgrades={data.use_upgrades}
             compact
           />
@@ -293,6 +292,7 @@ export function ShareGame() {
           round={0}
           nextStage={0}
           nextRound={0}
+          headerClassName="py-1.5 bar-pad-left"
           title={
             <span className="flex items-center gap-2">
               <span className="text-amber-400 font-bold text-sm">Magic: The Battling</span>
@@ -308,7 +308,8 @@ export function ShareGame() {
       </div>
 
       {/* Main + Sidebar */}
-      <div className="flex-1 flex min-h-0">
+      <div className="flex-1 flex min-h-0 game-surface">
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderRight: '1px solid var(--gold-border)' }} />
         <main className="flex-1 flex flex-col min-h-0 min-w-0">
           {renderContent()}
         </main>
@@ -326,8 +327,8 @@ export function ShareGame() {
                 sidebarOpen ? 'translate-x-0' : 'translate-x-full'
               }`}
             >
-              <aside className="w-64 h-full bg-gray-900 border-l border-gray-700 flex flex-col overflow-hidden">
-                <div className="px-3 py-2 border-b border-gray-700 text-sm font-medium text-gray-400">
+              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
+                <div className="px-3 py-2 text-sm font-medium text-gray-400">
                   Players
                 </div>
                 <div className="overflow-y-auto flex-1">
@@ -337,17 +338,18 @@ export function ShareGame() {
             </div>
           </>
         ) : (
-          <aside className="w-64 h-full bg-black/30 border-l border-gray-700 flex flex-col overflow-hidden">
+          <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
             <div className="overflow-y-auto flex-1">
               {renderSidebarContent()}
             </div>
           </aside>
         )}
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderLeft: '1px solid var(--gold-border)' }} />
       </div>
 
       {/* Bottom Bar */}
-      <div className="shrink-0 bg-black/30 border-t border-gray-700/50">
-        <div className="flex items-center justify-between py-1.5 sm:py-2 px-1.5 timeline-actions">
+      <div className="shrink-0 frame-chrome">
+        <div className="flex items-center justify-between py-1.5 sm:py-2 bar-pad-main timeline-actions">
           {/* Left: Round selector */}
           <div className="relative">
             <button

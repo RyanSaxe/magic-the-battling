@@ -27,6 +27,7 @@ VALID_NAME_RE = re.compile(r"^[^/]{1,64}$")
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX = 10
 _rate_limits: dict[str, list[float]] = defaultdict(list)
+PREVIEW_RENDER_VERSION = "preview-v4"
 
 
 def _get_db():
@@ -190,7 +191,8 @@ async def preview_image(
         return Response(status_code=404)
 
     data_json = share_data.model_dump_json()
-    cache_key = preview_service.cache.cache_key(data_json)
+    cache_basis = f"{PREVIEW_RENDER_VERSION}:{data_json}"
+    cache_key = preview_service.cache.cache_key(cache_basis)
     etag = cache_key[:16]
 
     if_none_match = request.headers.get("if-none-match")

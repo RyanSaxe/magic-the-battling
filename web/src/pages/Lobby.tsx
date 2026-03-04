@@ -1,13 +1,86 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { rejoinGame } from "../api/client";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { InfoIcon } from "../components/icons/InfoIcon";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
 import { HintsBanner } from "../components/common/HintsBanner";
-import { rememberPlayerForGame } from "../utils/deviceIdentity";
+import {
+  getDefaultNewPlayerPreference,
+  getNewPlayerPreferenceForGame,
+  rememberPlayerForGame,
+  setNewPlayerPreferenceForGame,
+} from "../utils/deviceIdentity";
+
+function GuidedModeSwitch({
+  enabled,
+  setEnabled,
+}: {
+  enabled: boolean;
+  setEnabled: (v: boolean) => void;
+}) {
+  const guidedModeHelpText =
+    "When Guided Mode is on, the first time you enter a situation, a simple popup gives you help.";
+  const [showGuidedModeHelp, setShowGuidedModeHelp] = useState(false);
+  const guidedModeHelpRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!guidedModeHelpRef.current?.contains(target)) {
+        setShowGuidedModeHelp(false);
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-1.5 shrink-0 rounded-md border border-white/15 bg-black/25 px-2 py-1">
+      <label className="flex items-center gap-1.5 cursor-pointer">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
+          Guided
+        </span>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          className="sr-only peer"
+        />
+        <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              enabled ? "translate-x-5" : "translate-x-1"
+            }`}
+          />
+        </span>
+      </label>
+      <div ref={guidedModeHelpRef} className="relative group shrink-0">
+        <button
+          type="button"
+          className="text-gray-400 hover:text-gray-200"
+          aria-label="What guided mode does"
+          aria-expanded={showGuidedModeHelp}
+          onClick={() => setShowGuidedModeHelp((v) => !v)}
+        >
+          <InfoIcon size="sm" />
+        </button>
+        <span
+          className={`absolute right-0 top-full mt-2 w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-50 ${
+            showGuidedModeHelp
+              ? "opacity-100"
+              : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
+          }`}
+        >
+          {guidedModeHelpText}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 export function Lobby() {
   const { gameId } = useParams<{ gameId: string }>();
@@ -27,9 +100,32 @@ export function Lobby() {
   const [copied, setCopied] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
   const [showRulesPanel, setShowRulesPanel] = useState(false);
+  const [isGuidedMode, setIsGuidedMode] = useState(() =>
+    getDefaultNewPlayerPreference(),
+  );
   const [rulesPanelTarget, setRulesPanelTarget] = useState<
     RulesPanelTarget | undefined
   >(undefined);
+
+  useEffect(() => {
+    if (!gameId) return;
+    const existing = getNewPlayerPreferenceForGame(gameId, session?.playerId);
+    const initial =
+      existing ??
+      lobbyState?.guided_mode_default ??
+      getDefaultNewPlayerPreference();
+    setIsGuidedMode(initial);
+    if (existing === null) {
+      setNewPlayerPreferenceForGame(gameId, initial, session?.playerId);
+    }
+  }, [gameId, lobbyState?.guided_mode_default, session?.playerId]);
+
+  const handleGuidedModeToggle = (nextValue: boolean) => {
+    setIsGuidedMode(nextValue);
+    if (gameId) {
+      setNewPlayerPreferenceForGame(gameId, nextValue, session?.playerId);
+    }
+  };
 
   const currentPlayer = lobbyState?.players.find(
     (p) => p.player_id === session?.playerId,
@@ -283,8 +379,8 @@ export function Lobby() {
                         <button
                           onClick={() =>
                             openGuide({
-                              docId: "non-human-players",
-                              tab: "puppets",
+                              docId: "faq",
+                              tab: "why-are-my-opponents-cards-face-up",
                             })
                           }
                           className="w-5 h-5 rounded-full bg-white/10 border border-white/15 text-gray-400 hover:bg-white/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
@@ -298,8 +394,8 @@ export function Lobby() {
                         <button
                           onClick={() =>
                             openGuide({
-                              docId: "non-human-players",
-                              tab: "puppets",
+                              docId: "faq",
+                              tab: "why-are-my-opponents-cards-face-up",
                             })
                           }
                           className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
@@ -402,11 +498,19 @@ export function Lobby() {
                 </div>
 
                 <div className="space-y-2 mb-3">
-                  {startMessage && (
-                    <p className="text-gray-500 text-xs mb-1 text-center">
-                      {startMessage}
-                    </p>
-                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <GuidedModeSwitch
+                      enabled={isGuidedMode}
+                      setEnabled={handleGuidedModeToggle}
+                    />
+                    {startMessage ? (
+                      <p className="text-gray-500 text-xs text-right leading-snug max-w-[58%]">
+                        {startMessage}
+                      </p>
+                    ) : (
+                      <span />
+                    )}
+                  </div>
 
                   <button
                     onClick={() => actions.setReady(!isReady)}
@@ -469,6 +573,7 @@ export function Lobby() {
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
           gameId={gameId}
+          useUpgrades={lobbyState?.use_upgrades}
         />
       )}
     </div>

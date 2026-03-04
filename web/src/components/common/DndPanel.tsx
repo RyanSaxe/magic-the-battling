@@ -12,11 +12,12 @@ interface DndPanelProps {
   zone?: ZoneName
   zoneOwner?: ZoneOwner
   validFromZones?: ZoneName[]
+  tone?: 'default' | 'battle'
 }
 
 const DEFAULT_DIMS: ZoneDims = { width: 80, height: 112, rows: 1, columns: 1 }
 
-export function DndPanel({ title, count, onClose, children, zone, zoneOwner, validFromZones }: DndPanelProps) {
+export function DndPanel({ title, count, onClose, children, zone, zoneOwner, validFromZones, tone = 'default' }: DndPanelProps) {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_DIMS)
   const [mobileHeight, setMobileHeight] = useState<number | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
@@ -76,12 +77,14 @@ export function DndPanel({ title, count, onClose, children, zone, zoneOwner, val
     [count],
   )
 
+  const isBattleTone = tone === 'battle'
+
   return (
     <div
-      className={`fixed top-0 left-0 right-0 sm:left-auto sm:!max-h-none sm:!h-full sm:w-64 bg-gray-900 border-b sm:border-b-0 sm:border-l border-gray-700 z-50 flex flex-col${mobileHeight == null ? ' max-h-[50vh]' : ''}`}
+      className={`fixed top-0 left-0 right-0 sm:left-auto sm:!max-h-none sm:!h-full ${isBattleTone ? 'sm:w-[calc(16rem-1px)] battle-panel-chrome' : 'sm:w-64 modal-chrome border-b sm:border-b-0 sm:border-l-2 gold-border'} z-50 flex flex-col${mobileHeight == null ? ' max-h-[50vh]' : ''}`}
       style={mobileHeight != null ? { height: mobileHeight } : undefined}
     >
-      <div className="px-1.5 py-1.5 sm:py-2 border-b border-gray-700/50 flex justify-between items-center shrink-0">
+      <div className={`px-2 py-1.5 sm:px-3 sm:py-[10px] flex justify-between items-center shrink-0 ${isBattleTone ? 'dnd-panel-header-battle' : 'border-b sm:border-b-2 gold-border'}`}>
         <h3 className="text-white font-medium text-sm">{title}</h3>
         <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">
           &times;

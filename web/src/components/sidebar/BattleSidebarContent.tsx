@@ -13,6 +13,7 @@ interface BattleSidebarContentProps {
   playerName: string;
   onCreateTreasure?: () => void;
   onUntapAll?: () => void;
+  onPassTurn?: () => void;
 }
 
 function LifeCounter({
@@ -159,12 +160,14 @@ export function BattleSidebarContent({
   playerName,
   onCreateTreasure,
   onUntapAll,
+  onPassTurn,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
 
   const yourPoison = currentBattle.your_poison;
   const opponentPoison = currentBattle.opponent_poison;
+  const isYourTurn = current_turn_name === playerName;
 
   return (
     <div className="flex flex-col h-full">
@@ -227,7 +230,7 @@ export function BattleSidebarContent({
               )}
             </div>
           )}
-          {(onCreateTreasure || onUntapAll) && (
+          {(onCreateTreasure || onUntapAll || onPassTurn) && (
             <div className="mt-3 flex gap-2">
               {onCreateTreasure && (
                 <button
@@ -242,7 +245,20 @@ export function BattleSidebarContent({
                   onClick={onUntapAll}
                   className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
                 >
-                  Untap All
+                  Untap
+                </button>
+              )}
+              {onPassTurn && (
+                <button
+                  onClick={onPassTurn}
+                  disabled={!isYourTurn}
+                  className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
+                    isYourTurn
+                      ? "bg-indigo-600 hover:bg-indigo-500"
+                      : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
+                  }`}
+                >
+                  Pass
                 </button>
               )}
             </div>

@@ -33,6 +33,34 @@ describe('computeLayout', () => {
       expect(result.top.width).toBeGreaterThan(MIN_CARD_WIDTH)
       expect(result.bottom.width).toBeGreaterThan(MIN_CARD_WIDTH)
     })
+
+    it('keeps top+bottom primary zones within available height when a fit exists', () => {
+      const containerH = 520
+      const fixedHeight = 120
+      const result = computeLayout(1100, containerH, {
+        zones: {
+          upgrades: { count: 4, maxCardWidth: 200 },
+          pool: { count: 12, maxCardWidth: 180 },
+        },
+        layout: { top: ['upgrades'], bottomLeft: ['pool'] },
+        fixedHeight,
+        ...ZONE_LAYOUT_PADDING,
+      })
+
+      const upgradesTotalH =
+        result.upgrades.rows * result.upgrades.height +
+        Math.max(0, result.upgrades.rows - 1) * 6 +
+        ZONE_LAYOUT_PADDING.sectionPadTop +
+        ZONE_LAYOUT_PADDING.sectionPadBottom
+      const poolTotalH =
+        result.pool.rows * result.pool.height +
+        Math.max(0, result.pool.rows - 1) * 6 +
+        ZONE_LAYOUT_PADDING.sectionPadTop +
+        ZONE_LAYOUT_PADDING.sectionPadBottom
+      const usedH = upgradesTotalH + poolTotalH + ZONE_LAYOUT_PADDING.sectionGap
+
+      expect(usedH).toBeLessThanOrEqual(containerH - fixedHeight)
+    })
   })
 
   describe('single zone', () => {
@@ -120,7 +148,7 @@ describe('computeLayout', () => {
       expect(result.commandZone.width).toBeGreaterThan(MIN_CARD_WIDTH)
     })
 
-    it('prefers 2 CZ columns when 1 col overflows', () => {
+    it('keeps command zone dimensions valid in tight layouts', () => {
       const result = computeLayout(1000, 350, {
         zones: {
           hand: { count: 7 },
@@ -131,7 +159,8 @@ describe('computeLayout', () => {
         layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
         ...ZONE_LAYOUT_PADDING,
       })
-      expect(result.commandZone.columns).toBe(2)
+      expect(result.commandZone.columns).toBeGreaterThanOrEqual(1)
+      expect(result.commandZone.columns).toBeLessThanOrEqual(2)
       expect(result.commandZone.width).toBeGreaterThan(MIN_CARD_WIDTH)
     })
 

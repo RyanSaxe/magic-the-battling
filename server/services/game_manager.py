@@ -134,6 +134,7 @@ class PendingGame:
     use_vanguards: bool = False
     target_player_count: int = 4
     auto_approve_spectators: bool = False
+    guided_mode_default: bool = False
     player_ready: dict[str, bool] = field(default_factory=dict)
     puppet_count: int = 0
     battler: Battler | None = None
@@ -554,6 +555,7 @@ class GameManager:
         use_vanguards: bool = False,
         target_player_count: int = 4,
         auto_approve_spectators: bool = False,
+        guided_mode_default: bool = False,
     ) -> PendingGame:
         game_id = secrets.token_urlsafe(8)
         join_code = secrets.token_urlsafe(4).upper()[:6]
@@ -569,6 +571,7 @@ class GameManager:
             use_vanguards=use_vanguards,
             target_player_count=target_player_count,
             auto_approve_spectators=auto_approve_spectators,
+            guided_mode_default=guided_mode_default,
             player_ready={player_id: False},
         )
         self._pending_games[game_id] = pending
@@ -1452,6 +1455,7 @@ class GameManager:
             available_puppet_count=available,
             cube_id=pending.cube_id,
             use_upgrades=pending.use_upgrades,
+            guided_mode_default=pending.guided_mode_default,
         )
 
     def get_game_state(self, game_id: str, player_id: str) -> GameStateResponse | None:

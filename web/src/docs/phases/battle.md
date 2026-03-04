@@ -12,6 +12,12 @@ The battle phase is where you play a quick mini-game of magic with a few modifie
 Be very mindful of when to use [treasures](doc:game-pieces#treasures) to try and win a game. Remember these are the economic unit of the game, and spending them wisely is what separates good and great players! Especially because, for the final battle, having the most treasures can be a huge advantage that opens doors for drastically different hands.
 :::
 
+## Quick Rules
+
+- 10 life, no library, no conceding, draws count as losses.
+- Lands + treasures start on the battlefield.
+- Loser gets poison counters. Keep up to 5 treasures.
+
 ## Rules
 
 ### Magic Rule Modifications

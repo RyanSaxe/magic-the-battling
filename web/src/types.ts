@@ -143,6 +143,7 @@ export interface LobbyState {
   cube_loading_error: string | null
   available_puppet_count: number | null
   use_upgrades: boolean
+  guided_mode_default: boolean
 }
 
 export interface CreateGameResponse {

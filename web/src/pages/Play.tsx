@@ -5,9 +5,14 @@ import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
+import { InfoIcon } from "../components/icons/InfoIcon";
 import { HintsBanner } from "../components/common/HintsBanner";
 import { getLegendaryName } from "../utils/prefetchName";
-import { rememberPlayerForGame } from "../utils/deviceIdentity";
+import {
+  getDefaultNewPlayerPreference,
+  rememberPlayerForGame,
+  setNewPlayerPreferenceForGame,
+} from "../utils/deviceIdentity";
 import { FaDiscord } from "react-icons/fa6";
 import type { LobbyState } from "../types";
 
@@ -140,7 +145,7 @@ function AdvancedOptionsModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-gray-900 border border-white/10 rounded-lg p-5 w-full max-w-sm">
+      <div className="relative modal-chrome border gold-border rounded-lg p-5 w-full max-w-sm">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-white font-semibold">{title}</h3>
           <button
@@ -203,6 +208,78 @@ function UpgradesCheckbox({
   );
 }
 
+function GuidedModeField({
+  enabled,
+  setEnabled,
+}: {
+  enabled: boolean;
+  setEnabled: (v: boolean) => void;
+}) {
+  const guidedModeHelpText =
+    "When Guided Mode is on, the first time you enter a situation, a simple popup gives you help.";
+  const [showGuidedModeHelp, setShowGuidedModeHelp] = useState(false);
+  const guidedModeHelpRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!guidedModeHelpRef.current?.contains(target)) {
+        setShowGuidedModeHelp(false);
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+
+  return (
+    <div className="bg-black/40 border border-black/40 text-white rounded px-3 h-[42px] min-w-[118px] sm:min-w-[132px] flex items-center justify-end gap-2">
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          className="sr-only peer"
+          aria-label="Guided mode"
+        />
+        <span
+          className={`text-xs font-medium uppercase tracking-wide ${
+            enabled ? "text-amber-300" : "text-gray-500"
+          }`}
+        >
+          {enabled ? "On" : "Off"}
+        </span>
+        <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              enabled ? "translate-x-5" : "translate-x-1"
+            }`}
+          />
+        </span>
+      </label>
+      <div ref={guidedModeHelpRef} className="relative group shrink-0">
+        <button
+          type="button"
+          className="text-gray-400 hover:text-gray-200"
+          aria-label="What guided mode does"
+          aria-expanded={showGuidedModeHelp}
+          onClick={() => setShowGuidedModeHelp((v) => !v)}
+        >
+          <InfoIcon size="sm" />
+        </button>
+        <span
+          className={`absolute right-0 top-full mt-2 w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-50 ${
+            showGuidedModeHelp
+              ? "opacity-100"
+              : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
+          }`}
+        >
+          {guidedModeHelpText}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -228,6 +305,9 @@ export function Play() {
   const [opponents, setOpponents] = useState<OpponentCount>(3);
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [activeMode, setActiveMode] = useState<ActiveMode>("solo");
+  const [isGuidedMode, setIsGuidedMode] = useState(() =>
+    getDefaultNewPlayerPreference(),
+  );
 
   const [friendsLoading, setFriendsLoading] = useState(false);
 
@@ -298,9 +378,15 @@ export function Play() {
         cubeId: cubeId || "auto",
         useUpgrades,
         autoApproveSpectators,
+        guidedModeDefault: isGuidedMode,
       });
       saveSession(response.session_id, response.player_id);
       rememberPlayerForGame(response.game_id, playerName.trim());
+      setNewPlayerPreferenceForGame(
+        response.game_id,
+        isGuidedMode,
+        response.player_id,
+      );
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
@@ -324,9 +410,15 @@ export function Play() {
         useUpgrades,
         targetPlayerCount: targetCount,
         puppetCount: count,
+        guidedModeDefault: isGuidedMode,
       });
       saveSession(response.session_id, response.player_id);
       rememberPlayerForGame(response.game_id, playerName.trim());
+      setNewPlayerPreferenceForGame(
+        response.game_id,
+        isGuidedMode,
+        response.player_id,
+      );
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
@@ -375,7 +467,7 @@ export function Play() {
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <header className="shrink-0 px-4 sm:px-6 py-3">
+      <header className="shrink-0 py-3 frame-chrome bar-pad-both">
         <div className="hidden sm:flex items-center justify-between">
           <div>
             <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
@@ -393,15 +485,6 @@ export function Play() {
             >
               Home
             </button>
-            <a
-              href="https://discord.gg/2NAjcWXNKn"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary py-2 px-4 flex items-center gap-2"
-            >
-              <FaDiscord className="w-4 h-4" />
-              Discord
-            </a>
           </div>
         </div>
         <div className="sm:hidden text-center">
@@ -418,36 +501,42 @@ export function Play() {
             >
               Home
             </button>
-            <a
-              href="https://discord.gg/2NAjcWXNKn"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary py-2 px-5 flex items-center gap-2"
-            >
-              <FaDiscord className="w-4 h-4" />
-              Discord
-            </a>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col sm:justify-center min-h-0 px-4">
-      <div className="shrink-0 w-full max-w-5xl mx-auto">
-        <div className="mb-4">
-          <label className="block text-gray-400 text-sm mb-1">Your Name</label>
-          <input
-            type="text"
-            value={nameLoading ? "" : playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            onKeyDown={(e) =>
-              e.key === "Enter" && nameValid && handleCreateLobby()
-            }
-            disabled={nameLoading}
-            placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-            className="w-full bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-          />
-        </div>
+      <div className="flex-1 flex min-h-0 game-surface">
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
+             style={{ borderRight: '1px solid var(--gold-border)' }} />
 
+      <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
+      <div className="zone-pack h-full min-h-0 flex flex-col sm:justify-center px-4">
+      <div className="shrink-0 w-full max-w-5xl mx-auto pt-6">
+        <div className="mb-4">
+          <div className="mb-1 flex items-center justify-between gap-3">
+            <label htmlFor="player-name" className="block text-gray-400 text-sm">
+              Your Name
+            </label>
+            <span className="block text-gray-400 text-sm text-right shrink-0">
+              Guided Mode
+            </span>
+          </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 sm:gap-3">
+            <input
+              id="player-name"
+              type="text"
+              value={nameLoading ? "" : playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              onKeyDown={(e) =>
+                e.key === "Enter" && nameValid && handleCreateLobby()
+              }
+              disabled={nameLoading}
+              placeholder={nameLoading ? "Generating name..." : "Enter your name"}
+              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+            />
+            <GuidedModeField enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
+          </div>
+        </div>
       </div>
 
       {/* Mobile: stacked cards, inactive always on top */}
@@ -621,7 +710,28 @@ export function Play() {
       <div className="shrink-0 w-full max-w-5xl mx-auto mt-3 mb-4">
         <HintsBanner variant="dark" />
       </div>
+      </div>
       </main>
+
+        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
+             style={{ borderLeft: '1px solid var(--gold-border)' }} />
+      </div>
+
+      <footer className="shrink-0 frame-chrome bar-pad-both py-2">
+        <div className="flex items-center justify-between">
+          <a href="https://cubecobra.com/cube/about/auto?view=primer"
+             target="_blank" rel="noopener noreferrer"
+             className="text-sm text-blue-300 hover:text-blue-200 transition-colors">
+            CubeCobra Primer
+          </a>
+          <a href="https://discord.gg/2NAjcWXNKn"
+             target="_blank" rel="noopener noreferrer"
+             className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors">
+            <FaDiscord className="w-4 h-4" />
+            Join Discord
+          </a>
+        </div>
+      </footer>
 
       {showFriendsAdvanced && (
         <AdvancedOptionsModal
@@ -692,7 +802,7 @@ export function Play() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={handleCancelSolo}
           />
-          <div className="relative bg-gray-900 border border-white/10 rounded-lg p-8 w-full max-w-md text-center">
+          <div className="relative modal-chrome border gold-border rounded-lg p-8 w-full max-w-md text-center">
             <h2 className="text-xl font-bold text-white mb-4">
               Not enough puppet data
             </h2>

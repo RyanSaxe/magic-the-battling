@@ -15,7 +15,7 @@ export function Home() {
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <header className="shrink-0 px-4 sm:px-6 py-3">
+      <header className="shrink-0 py-3 frame-chrome bar-pad-both">
         <div className="hidden sm:flex items-center justify-between">
           <div>
             <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
@@ -39,15 +39,6 @@ export function Home() {
             >
               Join Game
             </button>
-            <a
-              href="https://discord.gg/2NAjcWXNKn"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary py-2 px-4 flex items-center gap-2"
-            >
-              <FaDiscord className="w-4 h-4" />
-              Discord
-            </a>
           </div>
         </div>
         <div className="sm:hidden text-center">
@@ -70,22 +61,39 @@ export function Home() {
             >
               Join Game
             </button>
-            <a
-              href="https://discord.gg/2NAjcWXNKn"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary py-2 px-5 flex items-center gap-2"
-            >
-              <FaDiscord className="w-4 h-4" />
-              Discord
-            </a>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center min-h-0 px-4">
-        <CardShowcase />
-      </main>
+      <div className="flex-1 flex min-h-0 game-surface">
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
+             style={{ borderRight: '1px solid var(--gold-border)' }} />
+
+        <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
+          <div className="zone-pack h-full min-h-0 flex flex-col items-center justify-center px-4">
+            <CardShowcase />
+          </div>
+        </main>
+
+        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
+             style={{ borderLeft: '1px solid var(--gold-border)' }} />
+      </div>
+
+      <footer className="shrink-0 frame-chrome bar-pad-both py-2">
+        <div className="flex items-center justify-between">
+          <a href="https://discord.gg/2NAjcWXNKn"
+             target="_blank" rel="noopener noreferrer"
+             className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors">
+            <FaDiscord className="w-4 h-4" />
+            Join Discord
+          </a>
+          <a href="https://cubecobra.com/cube/about/auto?view=primer"
+             target="_blank" rel="noopener noreferrer"
+             className="text-sm text-blue-300 hover:text-blue-200 transition-colors">
+            CubeCobra Primer
+          </a>
+        </div>
+      </footer>
 
       {showJoinModal && (
         <JoinGameModal onClose={() => setShowJoinModal(false)} />

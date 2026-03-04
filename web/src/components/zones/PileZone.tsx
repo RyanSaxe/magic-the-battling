@@ -83,7 +83,7 @@ export function PileZone({
         onClick={() => setIsExpanded(false)}
       >
         <div
-          className={`${bgColor} rounded-lg p-4 max-w-4xl max-h-[80vh] overflow-auto`}
+          className="modal-chrome border gold-border rounded-lg p-4 max-w-4xl max-h-[80vh] overflow-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex justify-between items-center mb-4">

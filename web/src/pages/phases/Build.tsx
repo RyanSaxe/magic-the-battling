@@ -48,6 +48,7 @@ interface BuildPhaseProps {
   onHandSlotsChange?: (slots: (string | null)[]) => void;
   onCardHover?: (cardId: string, zone: ZoneName) => void;
   onCardHoverEnd?: () => void;
+  onQuickUpgrade?: (targetCardId: string) => void;
   isMobile?: boolean;
 }
 
@@ -88,6 +89,7 @@ export function BuildPhase({
   onHandSlotsChange,
   onCardHover,
   onCardHoverEnd,
+  onQuickUpgrade,
   isMobile = false,
 }: BuildPhaseProps) {
   const { self_player } = gameState;
@@ -151,6 +153,8 @@ export function BuildPhase({
   );
   const getAppliedUpgrades = (cardId: string) =>
     appliedUpgrades.filter((u) => u.upgrade_target!.id === cardId);
+  const hasUnappliedUpgrade = self_player.upgrades.some((u) => !u.upgrade_target);
+  const canQuickUpgrade = !locked && hasUnappliedUpgrade && !!onQuickUpgrade;
 
   const isCompanion = (card: CardType) =>
     card.oracle_text?.includes("Companion —") ?? false;
@@ -239,12 +243,35 @@ export function BuildPhase({
   const isCardSelected = (cardId: string) =>
     selection?.type === "card" && selection.cardId === cardId;
 
+  const renderQuickUpgradeButton = (card: CardType) => {
+    if (!canQuickUpgrade) return null;
+    const selected = isCardSelected(card.id);
+    const visibilityClasses = selected
+      ? "opacity-100 pointer-events-auto"
+      : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto";
+
+    return (
+      <button
+        type="button"
+        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-600 text-white shadow-md ring-1 ring-black/40 hover:bg-purple-500 transition-opacity duration-150 ${visibilityClasses}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onQuickUpgrade?.(card.id);
+        }}
+        aria-label={`Upgrade ${card.name}`}
+        title="Upgrade (U)"
+      >
+        Upgrade
+      </button>
+    );
+  };
+
   const handItems = handSlots.map((card, i) => {
     if (card) {
       return (
         <div
           key={card.id}
-          className="relative"
+          className="relative group"
           onMouseEnter={
             onCardHover ? () => onCardHover(card.id, "hand") : undefined
           }
@@ -258,6 +285,7 @@ export function BuildPhase({
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={getAppliedUpgrades(card.id)}
           />
+          {renderQuickUpgradeButton(card)}
         </div>
       );
     }
@@ -309,7 +337,7 @@ export function BuildPhase({
 
       <ZoneLayout
         containerRef={containerRef}
-        className={`bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col transition-opacity ${locked ? "opacity-60 pointer-events-none" : ""}`}
+        className={`zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col transition-opacity ${locked ? "opacity-60 pointer-events-none" : ""}`}
         onClick={handleBackgroundClick}
         hasHand={true}
         hasBattlefield={true}
@@ -329,7 +357,7 @@ export function BuildPhase({
             <PoisonCard count={self_player.poison} dimensions={bfDims} />
           </CardGrid>
         }
-        sideboardLabel={`Sideboard (${self_player.sideboard.length})`}
+        sideboardLabel="Sideboard"
         sideboardContent={
           <CardGrid columns={dims.sideboard.columns} cardWidth={sbDims.width}>
             {self_player.sideboard.map((card) => {
@@ -338,7 +366,7 @@ export function BuildPhase({
               return (
                 <div
                   key={card.id}
-                  className="relative"
+                  className="relative group"
                   onMouseEnter={
                     onCardHover
                       ? () => onCardHover(card.id, "sideboard")
@@ -355,6 +383,7 @@ export function BuildPhase({
                     upgraded={upgradedCardIds.has(card.id)}
                     appliedUpgrades={getAppliedUpgrades(card.id)}
                   />
+                  {renderQuickUpgradeButton(card)}
                   {cardIsCompanion && (
                     <button
                       disabled={locked}
