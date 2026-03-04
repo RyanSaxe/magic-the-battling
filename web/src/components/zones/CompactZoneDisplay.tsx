@@ -128,6 +128,7 @@ export function CompactZoneDisplay({
           cards={cards}
           allowInteraction={allowInteraction}
           isOpponent={isOpponent}
+          tone="battle"
           onClose={() => setShowModal(false)}
           onCardHover={onCardHover}
           onCardHoverEnd={onCardHoverEnd}

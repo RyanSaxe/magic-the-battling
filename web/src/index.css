@@ -137,6 +137,15 @@ body {
   background-color: var(--chrome-modal);
 }
 
+.battle-panel-chrome {
+  background: var(--chrome);
+}
+
+.dnd-panel-header-battle {
+  background: var(--chrome);
+  border-bottom: 0;
+}
+
 /* Desktop left chrome strip — game pages only */
 @media (min-width: 640px) {
   .bar-pad-both {
@@ -170,6 +179,21 @@ body {
         var(--chrome) 70%);
     border-right: 1px solid rgba(212, 175, 55, 0.6);
     z-index: 2;
+  }
+
+  .dnd-panel-header-battle {
+    position: relative;
+  }
+
+  .dnd-panel-header-battle::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -3px;
+    height: 2px;
+    background: var(--gold-border);
+    pointer-events: none;
   }
 }
 
@@ -389,7 +413,7 @@ body {
   background: #3a3431;
 }
 
-.battle-side-column > .battle-side-dropzone + .battle-side-dropzone .battle-side-cell {
+.battle-side-column > .battle-side-dropzone ~ .battle-side-dropzone .battle-side-cell {
   border-top: 2px solid rgba(212, 175, 55, 0.46);
 }
 

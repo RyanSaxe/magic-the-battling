@@ -1371,6 +1371,7 @@ function GameContent() {
                   title="Your Sideboard"
                   count={current_battle.your_zones.sideboard.length}
                   onClose={() => setActiveDndPanel(null)}
+                  tone="battle"
                   zone="sideboard"
                   zoneOwner="player"
                   validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
@@ -1398,6 +1399,7 @@ function GameContent() {
                   title={`${current_battle.opponent_name}'s Sideboard`}
                   count={current_battle.opponent_full_sideboard.length}
                   onClose={() => setActiveDndPanel(null)}
+                  tone="battle"
                   zone="sideboard"
                   zoneOwner="opponent"
                   validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
@@ -1427,6 +1429,7 @@ function GameContent() {
                   title="Graveyard"
                   count={current_battle.your_zones.graveyard.length}
                   onClose={() => setActiveDndPanel(null)}
+                  tone="battle"
                   zone="graveyard"
                   zoneOwner="player"
                   validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
@@ -1454,6 +1457,7 @@ function GameContent() {
                   title="Exile"
                   count={current_battle.your_zones.exile.length}
                   onClose={() => setActiveDndPanel(null)}
+                  tone="battle"
                   zone="exile"
                   zoneOwner="player"
                   validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}

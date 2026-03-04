@@ -39,6 +39,7 @@ export function ZoneModal({
   onCardClick,
   selectedCardId,
   forceFaceDown = false,
+  tone = 'default',
 }: {
   title: string
   zone: ZoneName
@@ -51,6 +52,7 @@ export function ZoneModal({
   onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
   selectedCardId?: string
   forceFaceDown?: boolean
+  tone?: 'default' | 'battle'
 }) {
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
@@ -65,6 +67,7 @@ export function ZoneModal({
         title={title}
         count={cards.length}
         onClose={handleClose}
+        tone={tone}
         zone={zone}
         zoneOwner={zoneOwner}
         validFromZones={VALID_FROM_ZONES}

@@ -36,6 +36,7 @@ export function SubmitPopover({ options, onClose }: SubmitPopoverProps) {
       ref={ref}
       className="absolute bottom-full mb-2 right-0 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1.5 min-w-[120px]"
     >
+      <div className="absolute -bottom-1.5 right-4 w-3 h-3 modal-chrome border-r border-b gold-border rotate-45 pointer-events-none" />
       {options.map((option) => (
         <button
           key={option.label}
