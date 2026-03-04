@@ -358,12 +358,12 @@ body {
 }
 
 .battle-side-column-opponent {
-  border-top: 1px solid var(--seam-stroke-soft);
+  border-top: 1px solid var(--gold-border);
 }
 
 .battle-side-column-player {
-  border-top: 1px solid var(--seam-stroke-soft);
-  border-bottom: 1px solid var(--seam-stroke-soft);
+  border-top: 1px solid var(--gold-border);
+  border-bottom: 1px solid var(--gold-border);
 }
 
 .battle-side-cell {
@@ -372,7 +372,7 @@ body {
 }
 
 .battle-side-column .battle-side-cell + .battle-side-cell {
-  border-top: 1px solid var(--seam-stroke-soft);
+  border-top: 1px solid var(--gold-border);
 }
 
 .battle-hand-separator-bottom {

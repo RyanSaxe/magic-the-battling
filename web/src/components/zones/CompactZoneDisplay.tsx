@@ -75,6 +75,8 @@ export function CompactZoneDisplay({
         zoneOwner={zoneOwner}
         validFromZones={validFromZones}
         disabled={!allowInteraction}
+        className="box-border shrink-0"
+        style={{ width, height }}
       >
         <div
           onClick={(e) => {
@@ -89,8 +91,7 @@ export function CompactZoneDisplay({
             cards.length > 0
               ? 'cursor-pointer'
               : 'cursor-default'
-          } ${containerClassName ?? ''}`}
-          style={{ width, height }}
+          } ${containerClassName ?? ''} w-full h-full`}
         >
           {label}
           <div className="flex-1 flex items-center justify-center min-h-0 relative">
