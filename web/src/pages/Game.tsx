@@ -1473,18 +1473,14 @@ function GameContent() {
                 />
               )}
               {currentPhase === "reward" && (
-                <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-                  <div className="zone-pack flex-1 min-h-0 flex flex-col">
-                    <RewardPhase
-                      gameState={gameState}
-                      actions={actions}
-                      selectedUpgradeId={selectedUpgradeId}
-                      onUpgradeSelect={setSelectedUpgradeId}
-                      selectedPoolCardId={selectedPoolCardId}
-                      onPoolCardSelect={setSelectedPoolCardId}
-                    />
-                  </div>
-                </div>
+                <RewardPhase
+                  gameState={gameState}
+                  actions={actions}
+                  selectedUpgradeId={selectedUpgradeId}
+                  onUpgradeSelect={setSelectedUpgradeId}
+                  selectedPoolCardId={selectedPoolCardId}
+                  onPoolCardSelect={setSelectedPoolCardId}
+                />
               )}
               {currentPhase === "awaiting_elimination" && (
                 <div className="flex-1 flex items-center justify-center">

@@ -113,82 +113,91 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
 
   const isWinner = last_battle_result?.winner_name === self_player.name
   const isDraw = last_battle_result?.is_draw
+  const summaryFrameClass = hasUpgradeSection
+    ? 'zone-divider-soft p-[2px] shrink-0'
+    : 'zone-divider-bg p-[2px] flex-1 min-h-0'
+  const summaryInnerClass = hasUpgradeSection
+    ? 'zone-pack px-5 py-4'
+    : 'zone-pack h-full min-h-0 px-5 py-5 flex flex-col justify-center'
 
   return (
-    <div className={`flex flex-col h-full overflow-hidden ${hasUpgradeSection ? '' : 'gap-4 p-4'}`}>
-      {/* Battle result header */}
-      {last_battle_result && (
-        <div className={`flex items-center justify-center gap-4 shrink-0 text-sm ${hasUpgradeSection ? 'px-4 pt-4' : ''}`}>
-          {isDraw ? (
-            <span className="text-yellow-400 font-bold">Draw</span>
-          ) : isWinner ? (
-            <span className="text-green-400 font-bold">Victory!</span>
-          ) : (
-            <span className="text-red-400 font-bold">Defeat</span>
-          )}
-          <span className="text-gray-500">vs {last_battle_result.opponent_name}</span>
-          {last_battle_result.poison_dealt > 0 && (
-            <span className="text-purple-400">Dealt {last_battle_result.poison_dealt} poison</span>
-          )}
-          {last_battle_result.poison_taken > 0 && (
-            <span className="text-red-400">Took {last_battle_result.poison_taken} poison</span>
-          )}
-        </div>
-      )}
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      <div className={summaryFrameClass}>
+        <div className={summaryInnerClass}>
+          {last_battle_result ? (
+            <>
+              <div className="flex items-center justify-center gap-4 shrink-0 text-sm">
+                {isDraw ? (
+                  <span className="text-yellow-400 font-bold">Draw</span>
+                ) : isWinner ? (
+                  <span className="text-green-400 font-bold">Victory!</span>
+                ) : (
+                  <span className="text-red-400 font-bold">Defeat</span>
+                )}
+                <span className="text-gray-500">vs {last_battle_result.opponent_name}</span>
+                {last_battle_result.poison_dealt > 0 && (
+                  <span className="text-purple-400">Dealt {last_battle_result.poison_dealt} poison</span>
+                )}
+                {last_battle_result.poison_taken > 0 && (
+                  <span className="text-red-400">Took {last_battle_result.poison_taken} poison</span>
+                )}
+              </div>
 
-      {/* Rewards */}
-      {last_battle_result && (
-        <div className={hasUpgradeSection ? 'shrink-0 px-4 mt-3' : 'flex-1 flex flex-col items-center justify-center'}>
-          {!hasUpgradeSection && (
-            <div className="text-xs text-gray-400 uppercase tracking-wide mb-6">Your Rewards</div>
-          )}
-          <div ref={hasUpgradeSection ? undefined : rewardRef} className="flex justify-center gap-6 w-full">
-            {last_battle_result.treasures_gained > 0 && (
-              <RewardCard
-                imageUrl={TREASURE_TOKEN_IMAGE}
-                label={`+${last_battle_result.treasures_gained} Treasure`}
-                compact={hasUpgradeSection}
-                dimensions={hasUpgradeSection ? undefined : rewardCardDims}
-              />
-            )}
-            {last_battle_result.vanquisher_gained && (
-              <RewardCard
-                imageUrl={THE_VANQUISHER_IMAGE}
-                label="Vanquisher"
-                sublabel="+1 Hand Size"
-                compact={hasUpgradeSection}
-                dimensions={hasUpgradeSection ? undefined : rewardCardDims}
-              />
-            )}
-            {last_battle_result.card_gained && (
-              hasUpgradeSection ? (
-                <RewardCard
-                  imageUrl={(last_battle_result.card_gained.png_url ?? last_battle_result.card_gained.image_url)!}
-                  label={`New: ${last_battle_result.card_gained.name}`}
-                  compact
-                />
-              ) : (
-                <div className="flex flex-col items-center gap-2">
-                  <Card card={last_battle_result.card_gained} dimensions={rewardCardDims} />
-                  <div className="text-center">
-                    <div className="text-white font-medium">New Card</div>
-                    <div className="text-gray-400 text-sm">{last_battle_result.card_gained.name}</div>
-                  </div>
-                </div>
-              )
-            )}
-            {!last_battle_result.treasures_gained &&
-              !last_battle_result.vanquisher_gained &&
-              !last_battle_result.card_gained && (
-                <div className="text-gray-500 text-center">No rewards this round</div>
+              {!hasUpgradeSection && (
+                <div className="text-xs text-gray-400 uppercase tracking-wide text-center mt-4 mb-6">Your Rewards</div>
               )}
-          </div>
+
+              <div ref={hasUpgradeSection ? undefined : rewardRef} className={`flex justify-center gap-6 w-full ${hasUpgradeSection ? 'mt-3' : ''}`}>
+                {last_battle_result.treasures_gained > 0 && (
+                  <RewardCard
+                    imageUrl={TREASURE_TOKEN_IMAGE}
+                    label={`+${last_battle_result.treasures_gained} Treasure`}
+                    compact={hasUpgradeSection}
+                    dimensions={hasUpgradeSection ? undefined : rewardCardDims}
+                  />
+                )}
+                {last_battle_result.vanquisher_gained && (
+                  <RewardCard
+                    imageUrl={THE_VANQUISHER_IMAGE}
+                    label="Vanquisher"
+                    sublabel="+1 Hand Size"
+                    compact={hasUpgradeSection}
+                    dimensions={hasUpgradeSection ? undefined : rewardCardDims}
+                  />
+                )}
+                {last_battle_result.card_gained && (
+                  hasUpgradeSection ? (
+                    <RewardCard
+                      imageUrl={(last_battle_result.card_gained.png_url ?? last_battle_result.card_gained.image_url)!}
+                      label={`New: ${last_battle_result.card_gained.name}`}
+                      compact
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <Card card={last_battle_result.card_gained} dimensions={rewardCardDims} />
+                      <div className="text-center">
+                        <div className="text-white font-medium">New Card</div>
+                        <div className="text-gray-400 text-sm">{last_battle_result.card_gained.name}</div>
+                      </div>
+                    </div>
+                  )
+                )}
+                {!last_battle_result.treasures_gained &&
+                  !last_battle_result.vanquisher_gained &&
+                  !last_battle_result.card_gained && (
+                    <div className="text-gray-500 text-center">No rewards this round</div>
+                  )}
+              </div>
+            </>
+          ) : (
+            <div className="text-gray-500 text-center py-6">No rewards this round</div>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Stage upgrade selection */}
       {hasUpgradeSection && (
-        <div ref={dualRef} className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col mt-3">
+        <div ref={dualRef} className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
           <div className="flex flex-col flex-1 min-h-0" style={{ gap: 2 }}>
             <div className="zone-upgrades px-3 pt-5 pb-3 relative shrink-0 flex flex-col">
               <span className={badgeCls}>Upgrades</span>
