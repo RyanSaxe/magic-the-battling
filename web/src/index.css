@@ -73,6 +73,10 @@
   --sidebar-width: 16rem;
   --sidebar-lane-nudge: 10px;
   --surface-gutter: 12px;
+  --bar-mobile-inline: 6px;
+  --bar-top-right-desktop: 6px;
+  --bar-bottom-left-desktop: calc(var(--frame-rail-edge) - 4px);
+  --bar-bottom-right-desktop: calc(var(--sidebar-width) + var(--surface-gutter) - var(--sidebar-lane-nudge) - 4px);
 }
 
 body {
@@ -105,13 +109,13 @@ body {
 }
 
 .bar-pad-left {
-  padding-left: var(--surface-gutter);
-  padding-right: var(--surface-gutter);
+  padding-left: var(--bar-mobile-inline);
+  padding-right: var(--bar-mobile-inline);
 }
 
 .bar-pad-main {
-  padding-left: var(--surface-gutter);
-  padding-right: var(--surface-gutter);
+  padding-left: var(--bar-mobile-inline);
+  padding-right: var(--bar-mobile-inline);
 }
 
 /* Felt content area — gold emboss + dark groove for 3D depth */
@@ -142,12 +146,12 @@ body {
 
   .bar-pad-left {
     padding-left: var(--frame-rail-edge);
-    padding-right: var(--surface-gutter);
+    padding-right: var(--bar-top-right-desktop);
   }
 
   .bar-pad-main {
-    padding-left: var(--frame-rail-edge);
-    padding-right: calc(var(--sidebar-width) + var(--surface-gutter) - var(--sidebar-lane-nudge));
+    padding-left: var(--bar-bottom-left-desktop);
+    padding-right: var(--bar-bottom-right-desktop);
   }
 
   .game-surface {
@@ -351,6 +355,7 @@ body {
 
 .battle-side-column {
   box-sizing: border-box;
+  position: relative;
   background: var(--zone-column-bg);
   border-left: 2px solid rgba(212, 175, 55, 0.46);
   box-shadow:
@@ -368,6 +373,17 @@ body {
   border-bottom: 0;
 }
 
+.battle-side-column-player::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(212, 175, 55, 0.46);
+  pointer-events: none;
+}
+
 .battle-side-cell {
   box-sizing: border-box;
   background: #3a3431;
@@ -375,7 +391,6 @@ body {
 
 .battle-side-column > .battle-side-dropzone + .battle-side-dropzone .battle-side-cell {
   border-top: 2px solid rgba(212, 175, 55, 0.46);
-  box-shadow: inset 0 1px 0 rgba(255, 236, 181, 0.14);
 }
 
 .battle-side-dropzone {
@@ -404,12 +419,10 @@ body {
 
 .battle-hand-separator-bottom {
   border-bottom: 2px solid rgba(212, 175, 55, 0.46);
-  box-shadow: inset 0 -1px 0 rgba(255, 236, 181, 0.14);
 }
 
 .battle-hand-separator-top {
   border-top: 2px solid rgba(212, 175, 55, 0.46);
-  box-shadow: inset 0 1px 0 rgba(255, 236, 181, 0.14);
 }
 
 .battle-side-label {

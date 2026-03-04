@@ -376,7 +376,7 @@ export function BattlePhase({
               />
             </div>
           </div>
-          {/* Opponent side zones: Library, Exile, Graveyard (top→bottom, mirrored) */}
+          {/* Opponent side zones: Library, Graveyard, Exile (top→bottom, mirrored) */}
           <div className="flex flex-col shrink-0 battle-side-column battle-side-column-opponent" style={{ width: zoneColumnWidth }}>
             <CompactZoneDisplay
               title={opponentCommandZoneTitle}
@@ -397,9 +397,9 @@ export function BattlePhase({
               containerClassName="battle-side-cell"
             />
             <CompactZoneDisplay
-              title="Exile"
-              zone="exile"
-              cards={opponent_zones.exile}
+              title="Graveyard"
+              zone="graveyard"
+              cards={opponent_zones.graveyard}
               height={opponentMidZoneHeight}
               width={zoneColumnWidth}
               isOpponent
@@ -409,14 +409,14 @@ export function BattlePhase({
               onCardHoverEnd={onCardHoverEnd}
               canPeekFaceDown={opponent_hand_revealed}
               selectedCardId={selectedCard?.card.id}
-              onZoneClick={() => handleZoneClick('exile', 'opponent')}
+              onZoneClick={() => handleZoneClick('graveyard', 'opponent')}
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
             />
             <CompactZoneDisplay
-              title="Graveyard"
-              zone="graveyard"
-              cards={opponent_zones.graveyard}
+              title="Exile"
+              zone="exile"
+              cards={opponent_zones.exile}
               height={opponentBottomZoneHeight}
               width={zoneColumnWidth}
               isOpponent
@@ -426,7 +426,7 @@ export function BattlePhase({
               onCardHoverEnd={onCardHoverEnd}
               canPeekFaceDown={opponent_hand_revealed}
               selectedCardId={selectedCard?.card.id}
-              onZoneClick={() => handleZoneClick('graveyard', 'opponent')}
+              onZoneClick={() => handleZoneClick('exile', 'opponent')}
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
             />
@@ -476,33 +476,33 @@ export function BattlePhase({
               />
             </div>
           </div>
-          {/* Your side zones: Graveyard, Exile, Library (top→bottom) */}
+          {/* Your side zones: Exile, Graveyard, Library (top→bottom) */}
           <div className="flex flex-col shrink-0 battle-side-column battle-side-column-player" style={{ width: zoneColumnWidth }}>
             <CompactZoneDisplay
-              title="Graveyard"
-              zone="graveyard"
-              cards={your_zones.graveyard}
+              title="Exile"
+              zone="exile"
+              cards={your_zones.exile}
               height={playerTopZoneHeight}
               width={zoneColumnWidth}
               validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
               onCardHover={onCardHover}
               onCardHoverEnd={onCardHoverEnd}
               selectedCardId={selectedCard?.card.id}
-              onZoneClick={() => handleZoneClick('graveyard', 'player')}
+              onZoneClick={() => handleZoneClick('exile', 'player')}
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
             />
             <CompactZoneDisplay
-              title="Exile"
-              zone="exile"
-              cards={your_zones.exile}
+              title="Graveyard"
+              zone="graveyard"
+              cards={your_zones.graveyard}
               height={playerMidZoneHeight}
               width={zoneColumnWidth}
               validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
               onCardHover={onCardHover}
               onCardHoverEnd={onCardHoverEnd}
               selectedCardId={selectedCard?.card.id}
-              onZoneClick={() => handleZoneClick('exile', 'player')}
+              onZoneClick={() => handleZoneClick('graveyard', 'player')}
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
             />

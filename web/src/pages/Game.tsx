@@ -1576,7 +1576,7 @@ function GameContent() {
         )}
         {/* Bottom Action Bar */}
         {!isSpectator && (
-          <div className="shrink-0 relative z-50 frame-chrome">
+          <div className="shrink-0 relative z-40 frame-chrome">
             <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-main timeline-actions">
               {isEndPhase && gameId ? (
                 <>

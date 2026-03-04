@@ -78,10 +78,10 @@ export function DndPanel({ title, count, onClose, children, zone, zoneOwner, val
 
   return (
     <div
-      className={`fixed top-0 left-0 right-0 sm:left-auto sm:!max-h-none sm:!h-full sm:w-64 modal-chrome border-b sm:border-b-0 sm:border-l gold-border z-50 flex flex-col${mobileHeight == null ? ' max-h-[50vh]' : ''}`}
+      className={`fixed top-0 left-0 right-0 sm:left-auto sm:!max-h-none sm:!h-full sm:w-64 modal-chrome border-b sm:border-b-0 sm:border-l-2 gold-border z-50 flex flex-col${mobileHeight == null ? ' max-h-[50vh]' : ''}`}
       style={mobileHeight != null ? { height: mobileHeight } : undefined}
     >
-      <div className="px-2 py-1.5 sm:py-2 border-b gold-divider flex justify-between items-center shrink-0">
+      <div className="px-2 py-1.5 sm:px-3 sm:py-[10px] border-b sm:border-b-2 gold-border flex justify-between items-center shrink-0">
         <h3 className="text-white font-medium text-sm">{title}</h3>
         <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">
           &times;

@@ -64,9 +64,6 @@ export function CompactZoneDisplay({
   const label = (
     <div className="flex items-center justify-center gap-0 px-0.5 shrink-0" style={{ height: LABEL_HEIGHT }}>
       <span className="battle-side-label truncate">{title}</span>
-      {cards.length >= 2 && (
-        <span className="text-[8px] font-bold text-gray-400 leading-none">{cards.length}</span>
-      )}
     </div>
   )
 
