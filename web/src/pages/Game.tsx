@@ -541,8 +541,11 @@ function GameContent() {
   ]);
 
   // Lifted state from Build phase
+  type UpgradesModalOpenMode = 'auto' | 'view';
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
   const [showUpgradesModal, setShowUpgradesModal] = useState(false);
+  const [upgradesModalOpenMode, setUpgradesModalOpenMode] =
+    useState<UpgradesModalOpenMode>('auto');
   const [upgradeInitialTargetId, setUpgradeInitialTargetId] = useState<string | undefined>(undefined);
   const handSlotsRef = useRef<(string | null)[]>([]);
 
@@ -624,6 +627,15 @@ function GameContent() {
     window.open(url.toString(), '_blank');
   };
 
+  const openUpgradesModal = useCallback((
+    targetCardId?: string,
+    mode: UpgradesModalOpenMode = 'auto',
+  ) => {
+    setUpgradeInitialTargetId(targetCardId);
+    setUpgradesModalOpenMode(mode);
+    setShowUpgradesModal(true);
+  }, []);
+
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   const modalOpen = rulesPanelOpen || showUpgradesModal || actionMenuOpen;
   const hotkeyMap: Record<string, () => void> = (() => {
@@ -651,7 +663,7 @@ function GameContent() {
       };
       map['Enter'] = () => actions.draftDone();
       map['u'] = () => {
-        if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+        if (sp.upgrades.length > 0) openUpgradesModal(undefined, 'view');
       };
     } else if (phase === 'build') {
       if (showSubmitHandPopover) {
@@ -681,12 +693,11 @@ function GameContent() {
         };
       }
       map['u'] = () => {
-        if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+        if (sp.upgrades.length > 0) openUpgradesModal(undefined, 'view');
       };
       if (hoveredCard && sp.upgrades.some((u) => !u.upgrade_target)) {
         map['u'] = () => {
-          setUpgradeInitialTargetId(hoveredCard.id);
-          setShowUpgradesModal(true);
+          openUpgradesModal(hoveredCard.id);
         };
       }
     } else if (phase === 'battle' && cb) {
@@ -780,7 +791,7 @@ function GameContent() {
           }
         };
         map['v'] = () => {
-          if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+          if (sp.upgrades.length > 0) openUpgradesModal(undefined, 'view');
         };
       }
     } else if (phase === 'reward') {
@@ -842,6 +853,14 @@ function GameContent() {
   const needsUpgrade =
     isStageIncreasing && gameState.available_upgrades.length > 0;
   const canContinue = !needsUpgrade || !!selectedUpgradeId;
+  const hasPendingBuildUpgrades =
+    currentPhase === "build" && self_player.upgrades.some((u) => !u.upgrade_target);
+  const upgradesModalMode: "view" | "apply" =
+    upgradesModalOpenMode === "view"
+      ? "view"
+      : hasPendingBuildUpgrades
+        ? "apply"
+        : "view";
 
   const handleContinue = () => {
     actions.rewardDone(selectedUpgradeId ?? undefined);
@@ -877,7 +896,7 @@ function GameContent() {
       left = (
         <div className="flex items-center gap-1.5 sm:gap-2">
           {self_player.upgrades.length > 0 && (
-            <button onClick={() => setShowUpgradesModal(true)} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
               View Upgrades
             </button>
           )}
@@ -901,7 +920,7 @@ function GameContent() {
     } else if (currentPhase === "build") {
       if (self_player.build_ready) {
         left = self_player.upgrades.length > 0 ? (
-          <button onClick={() => setShowUpgradesModal(true)} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+          <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
             View Upgrades
           </button>
         ) : null;
@@ -919,10 +938,10 @@ function GameContent() {
       } else {
         left = self_player.upgrades.length > 0 ? (
           <button
-            onClick={() => setShowUpgradesModal(true)}
-            className={`btn text-white ${self_player.upgrades.some((u) => !u.upgrade_target) ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-600 hover:bg-gray-500'}`}
+            onClick={() => openUpgradesModal(undefined, 'view')}
+            className="btn bg-gray-600 hover:bg-gray-500 text-white"
           >
-            {self_player.upgrades.some((u) => !u.upgrade_target) ? 'Apply Upgrade' : 'View Upgrades'}
+            View Upgrades
           </button>
         ) : null;
         right = (
@@ -1469,6 +1488,7 @@ function GameContent() {
                   onHandSlotsChange={(slots) => { handSlotsRef.current = slots; }}
                   onCardHover={handleCardHover}
                   onCardHoverEnd={handleCardHoverEnd}
+                  onQuickUpgrade={openUpgradesModal}
                   isMobile={sizes.isMobile}
                 />
               )}
@@ -1604,10 +1624,14 @@ function GameContent() {
       {showUpgradesModal && (
         <UpgradesModal
           upgrades={self_player.upgrades}
-          mode={currentPhase === 'build' && self_player.upgrades.some((u) => !u.upgrade_target) ? 'apply' : 'view'}
+          mode={upgradesModalMode}
           targets={[...self_player.hand, ...self_player.sideboard]}
           onApply={(upgradeId, targetId) => actions.buildApplyUpgrade(upgradeId, targetId)}
-          onClose={() => { setShowUpgradesModal(false); setUpgradeInitialTargetId(undefined); }}
+          onClose={() => {
+            setShowUpgradesModal(false);
+            setUpgradeInitialTargetId(undefined);
+            setUpgradesModalOpenMode('auto');
+          }}
           initialTargetId={upgradeInitialTargetId}
         />
       )}
