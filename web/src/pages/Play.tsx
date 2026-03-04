@@ -491,11 +491,12 @@ export function Play() {
         </div>
       </header>
 
-      <div className="flex-1 flex min-h-0">
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
+      <div className="flex-1 flex min-h-0 game-surface">
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
              style={{ borderRight: '1px solid var(--gold-border)' }} />
 
-      <main className="flex-1 flex flex-col sm:justify-center min-h-0 px-4 game-surface-full">
+      <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
+      <div className="zone-pack h-full min-h-0 flex flex-col sm:justify-center px-4">
       <div className="shrink-0 w-full max-w-5xl mx-auto pt-6">
         <div className="mb-4">
           <div className="mb-1 flex items-center justify-between gap-3">
@@ -694,6 +695,7 @@ export function Play() {
 
       <div className="shrink-0 w-full max-w-5xl mx-auto mt-3 mb-4">
         <HintsBanner variant="dark" />
+      </div>
       </div>
       </main>
 

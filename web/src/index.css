@@ -122,32 +122,6 @@ body {
     inset 0 -8px 20px -8px rgba(0, 0, 0, 0.4);
 }
 
-.game-surface-full {
-  position: relative;
-  box-shadow:
-    inset 0 0 0 1px rgba(212, 175, 55, 0.6),
-    inset 0 1px 0 0 rgba(255, 231, 163, 0.28),
-    inset 0 2px 0 0 rgba(0, 0, 0, 0.32),
-    inset 0 -1px 0 0 rgba(255, 231, 163, 0.26),
-    inset 0 -2px 0 0 rgba(212, 175, 55, 0.5),
-    inset 0 -3px 0 0 rgba(0, 0, 0, 0.58),
-    inset 0 -4px 0 0 rgba(0, 0, 0, 0.24),
-    inset 0 8px 20px -4px rgba(0, 0, 0, 0.38),
-    inset 0 -8px 20px -8px rgba(0, 0, 0, 0.4);
-}
-
-/* Subtle transparent inner frame for flatter phases (battle/reward) */
-.surface-inner-emboss {
-  box-shadow:
-    inset 0 0 0 1px rgba(212, 175, 55, 0.42),
-    inset 0 1px 0 rgba(255, 236, 181, 0.2),
-    inset 0 2px 0 rgba(0, 0, 0, 0.28),
-    inset 0 -1px 0 rgba(255, 236, 181, 0.12),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.4),
-    inset 0 10px 20px -12px rgba(0, 0, 0, 0.28),
-    inset 0 -10px 20px -12px rgba(0, 0, 0, 0.25);
-}
-
 .modal-chrome {
   background-color: var(--chrome-modal);
 }
@@ -329,23 +303,14 @@ body {
   background: radial-gradient(ellipse at center, #1e4840, #122a28);
 }
 
-/* Battle view should read flatter than build/draft zones */
 .battle-layout {
-  /* Elevated table-edge feel via interior shadowing, without altering seam borders */
   box-shadow:
-    inset 0 14px 18px -16px rgba(0, 0, 0, 0.58),
-    inset 0 -14px 18px -16px rgba(0, 0, 0, 0.58),
-    inset 12px 0 16px -16px rgba(0, 0, 0, 0.44),
-    inset -12px 0 16px -16px rgba(0, 0, 0, 0.44);
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
 }
 
-.battle-layout .zone-hand {
-  background: radial-gradient(ellipse at center, #2d6140, #1b3f2c);
-  box-shadow: none;
-}
-
+.battle-layout .zone-hand,
 .battle-layout .battlefield {
-  background: radial-gradient(ellipse at center, #215048, #163a34);
   box-shadow: none;
 }
 

@@ -1302,18 +1302,16 @@ function GameContent() {
                    style={{ borderRight: '1px solid var(--gold-border)' }} />
               <main className="flex-1 flex flex-col min-h-0 min-w-0">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-                  <div className="surface-inner-emboss flex-1 min-h-0 flex flex-col">
-                    <BattlePhase
-                      gameState={gameState}
-                      actions={actions}
-                      isMobile={sizes.isMobile}
-                      selectedCard={battleSelectedCard}
-                      onSelectedCardChange={setBattleSelectedCard}
-                      onCardHover={handleCardHover}
-                      onOpponentCardHover={handleOpponentCardHover}
-                      onCardHoverEnd={handleCardHoverEnd}
-                    />
-                  </div>
+                  <BattlePhase
+                    gameState={gameState}
+                    actions={actions}
+                    isMobile={sizes.isMobile}
+                    selectedCard={battleSelectedCard}
+                    onSelectedCardChange={setBattleSelectedCard}
+                    onCardHover={handleCardHover}
+                    onOpponentCardHover={handleOpponentCardHover}
+                    onCardHoverEnd={handleCardHoverEnd}
+                  />
                 </div>
               </main>
               {sizes.isMobile ? (
@@ -1475,15 +1473,17 @@ function GameContent() {
                 />
               )}
               {currentPhase === "reward" && (
-                <div className="surface-inner-emboss p-[1px] flex-1 min-h-0 flex flex-col">
-                  <RewardPhase
-                    gameState={gameState}
-                    actions={actions}
-                    selectedUpgradeId={selectedUpgradeId}
-                    onUpgradeSelect={setSelectedUpgradeId}
-                    selectedPoolCardId={selectedPoolCardId}
-                    onPoolCardSelect={setSelectedPoolCardId}
-                  />
+                <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
+                  <div className="zone-pack flex-1 min-h-0 flex flex-col">
+                    <RewardPhase
+                      gameState={gameState}
+                      actions={actions}
+                      selectedUpgradeId={selectedUpgradeId}
+                      onUpgradeSelect={setSelectedUpgradeId}
+                      selectedPoolCardId={selectedPoolCardId}
+                      onPoolCardSelect={setSelectedPoolCardId}
+                    />
+                  </div>
                 </div>
               )}
               {currentPhase === "awaiting_elimination" && (
