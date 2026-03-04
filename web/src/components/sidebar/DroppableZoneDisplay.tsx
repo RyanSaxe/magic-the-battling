@@ -38,6 +38,7 @@ export function ZoneModal({
   onCardHoverEnd,
   onCardClick,
   selectedCardId,
+  forceFaceDown = false,
 }: {
   title: string
   zone: ZoneName
@@ -49,6 +50,7 @@ export function ZoneModal({
   onCardHoverEnd?: () => void
   onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
   selectedCardId?: string
+  forceFaceDown?: boolean
 }) {
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
@@ -80,6 +82,8 @@ export function ZoneModal({
               onCardHoverEnd={onCardHoverEnd}
               selected={selectedCardId === card.id}
               onClick={onCardClick ? () => onCardClick(card, zone, zoneOwner) : undefined}
+              faceDown={forceFaceDown}
+              canPeekFaceDown={!forceFaceDown}
             />
           ))
         }
@@ -110,7 +114,7 @@ export function ZoneModal({
         ) : (
           <div className="flex flex-wrap gap-2">
             {cards.map((card) => (
-              <Card key={card.id} card={card} size="sm" />
+              <Card key={card.id} card={card} size="sm" faceDown={forceFaceDown} />
             ))}
           </div>
         )}

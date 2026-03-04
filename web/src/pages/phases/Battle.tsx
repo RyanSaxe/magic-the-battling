@@ -38,6 +38,12 @@ const isLandOrTreasure = (card: CardType) =>
   card.type_line.toLowerCase().includes("land") ||
   card.type_line.toLowerCase().includes("treasure")
 
+type CommandZoneRole = 'library' | 'companion'
+
+function deriveCommandZoneRole(commandZoneCards: CardType[] | undefined): CommandZoneRole {
+  return (commandZoneCards?.length ?? 0) > 0 ? 'companion' : 'library'
+}
+
 function countTopLevel(cards: CardType[], attachments: Record<string, string[]>, predicate: (c: CardType) => boolean): number {
   const attachedIds = new Set(Object.values(attachments).flat())
   return cards.filter((c) => !attachedIds.has(c.id) && predicate(c)).length
@@ -55,8 +61,14 @@ export function BattlePhase({
 }: BattlePhaseProps) {
   const setSelectedCard = onSelectedCardChange
 
-  const [opponentHadCompanion, setOpponentHadCompanion] = useState(false)
-  const [playerHadCompanion, setPlayerHadCompanion] = useState(false)
+  const [commandZoneRoles, setCommandZoneRoles] = useState<{
+    player: CommandZoneRole
+    opponent: CommandZoneRole
+  }>({
+    player: 'library',
+    opponent: 'library',
+  })
+  const [commandZoneRolesBattleIdentity, setCommandZoneRolesBattleIdentity] = useState<string | null>(null)
 
   const selectedCardRef = useRef(selectedCard)
   const actionsRef = useRef(actions)
@@ -91,12 +103,41 @@ export function BattlePhase({
   const yourZones = battle?.your_zones
   const oppZones = battle?.opponent_zones
 
-  if (!opponentHadCompanion && (oppZones?.command_zone?.length ?? 0) > 0) {
-    setOpponentHadCompanion(true)
-  }
-  if (!playerHadCompanion && (yourZones?.command_zone?.length ?? 0) > 0) {
-    setPlayerHadCompanion(true)
-  }
+  const battleIdentity = battle
+    ? `${battle.opponent_name}|${battle.coin_flip_name}|${battle.on_the_play_name}|${battle.is_sudden_death ? 'sd' : 'normal'}`
+    : null
+
+  useEffect(() => {
+    if (!battle || !battleIdentity) {
+      return
+    }
+    if (commandZoneRolesBattleIdentity === battleIdentity) {
+      return
+    }
+
+    const nextRoles = {
+      player: deriveCommandZoneRole(battle.your_zones.command_zone),
+      opponent: deriveCommandZoneRole(battle.opponent_zones.command_zone),
+    }
+
+    queueMicrotask(() => {
+      setCommandZoneRoles(nextRoles)
+      setCommandZoneRolesBattleIdentity(battleIdentity)
+    })
+  }, [battle, battleIdentity, commandZoneRolesBattleIdentity])
+
+  const effectiveCommandZoneRoles =
+    battle && battleIdentity && commandZoneRolesBattleIdentity !== battleIdentity
+      ? {
+          player: deriveCommandZoneRole(battle.your_zones.command_zone),
+          opponent: deriveCommandZoneRole(battle.opponent_zones.command_zone),
+        }
+      : commandZoneRoles
+
+  const playerCommandZoneTitle = effectiveCommandZoneRoles.player === 'companion' ? 'Companion' : 'Library'
+  const opponentCommandZoneTitle = effectiveCommandZoneRoles.opponent === 'companion' ? 'Companion' : 'Library'
+  const forcePlayerCommandZoneFaceDown = effectiveCommandZoneRoles.player === 'library'
+  const forceOpponentCommandZoneFaceDown = effectiveCommandZoneRoles.opponent === 'library'
 
   const playerHandCount = yourZones?.hand.length ?? 0
   const opponentHandCount = battle?.opponent_hand_count ?? 0
@@ -338,7 +379,7 @@ export function BattlePhase({
           {/* Opponent side zones: Library, Exile, Graveyard (top→bottom, mirrored) */}
           <div className="flex flex-col shrink-0 battle-side-column battle-side-column-opponent" style={{ width: zoneColumnWidth }}>
             <CompactZoneDisplay
-              title={opponentHadCompanion ? "Companion" : "Library"}
+              title={opponentCommandZoneTitle}
               zone="command_zone"
               cards={opponent_zones.command_zone}
               height={opponentTopZoneHeight}
@@ -349,6 +390,7 @@ export function BattlePhase({
               onCardHover={onOpponentCardHover}
               onCardHoverEnd={onCardHoverEnd}
               canPeekFaceDown={opponent_hand_revealed}
+              forceFaceDown={forceOpponentCommandZoneFaceDown}
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('command_zone', 'opponent')}
               onCardClick={handleCardClick}
@@ -465,7 +507,7 @@ export function BattlePhase({
               containerClassName="battle-side-cell"
             />
             <CompactZoneDisplay
-              title={playerHadCompanion ? "Companion" : "Library"}
+              title={playerCommandZoneTitle}
               zone="command_zone"
               cards={your_zones.command_zone}
               height={playerBottomZoneHeight}
@@ -473,6 +515,7 @@ export function BattlePhase({
               validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
               onCardHover={onCardHover}
               onCardHoverEnd={onCardHoverEnd}
+              forceFaceDown={forcePlayerCommandZoneFaceDown}
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('command_zone', 'player')}
               onCardClick={handleCardClick}

@@ -30,6 +30,7 @@ interface PhaseTimelineProps {
   nextRound: number;
   autoOpenPhase?: Phase | null;
   autoOpenDurationMs?: number;
+  onAutoOpenHandled?: (phase: Phase) => void;
   onOpenRules?: (target?: RulesPanelTarget) => void;
   hamburger?: React.ReactNode;
   title?: React.ReactNode;
@@ -73,6 +74,7 @@ export function PhaseTimeline({
   nextRound,
   autoOpenPhase = null,
   autoOpenDurationMs = 10_000,
+  onAutoOpenHandled,
   onOpenRules,
   hamburger,
   title,
@@ -141,13 +143,18 @@ export function PhaseTimeline({
     if (!autoOpenPhase) return;
     if (!isGamePhase(currentPhase)) return;
     if (autoOpenPhase !== currentPhase) return;
-    if (openPopoverForPhase(autoOpenPhase, autoOpenDurationMs)) return;
+    if (openPopoverForPhase(autoOpenPhase, autoOpenDurationMs)) {
+      onAutoOpenHandled?.(autoOpenPhase);
+      return;
+    }
 
     const retryId = window.setTimeout(() => {
-      openPopoverForPhase(autoOpenPhase, autoOpenDurationMs);
+      if (openPopoverForPhase(autoOpenPhase, autoOpenDurationMs)) {
+        onAutoOpenHandled?.(autoOpenPhase);
+      }
     }, 0);
     return () => window.clearTimeout(retryId);
-  }, [autoOpenDurationMs, autoOpenPhase, currentPhase, openPopoverForPhase]);
+  }, [autoOpenDurationMs, autoOpenPhase, currentPhase, onAutoOpenHandled, openPopoverForPhase]);
 
   useEffect(() => {
     return () => {

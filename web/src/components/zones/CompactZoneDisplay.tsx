@@ -25,6 +25,7 @@ interface CompactZoneDisplayProps {
   onZoneClick?: () => void
   onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
   containerClassName?: string
+  forceFaceDown?: boolean
 }
 
 export function CompactZoneDisplay({
@@ -43,6 +44,7 @@ export function CompactZoneDisplay({
   onZoneClick,
   onCardClick,
   containerClassName,
+  forceFaceDown = false,
 }: CompactZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -97,7 +99,11 @@ export function CompactZoneDisplay({
           <div className="flex-1 flex items-center justify-center min-h-0 relative">
             {nextCard && (
               <div className="absolute">
-                <Card card={nextCard} dimensions={{ width: cardW, height: cardH }} />
+                <Card
+                  card={nextCard}
+                  dimensions={{ width: cardW, height: cardH }}
+                  faceDown={forceFaceDown}
+                />
               </div>
             )}
             {topCard && (
@@ -110,7 +116,8 @@ export function CompactZoneDisplay({
                 isOpponent={isOpponent}
                 onCardHover={allowInteraction ? onCardHover : undefined}
                 onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
-                canPeekFaceDown={canPeekFaceDown}
+                faceDown={forceFaceDown}
+                canPeekFaceDown={forceFaceDown ? false : canPeekFaceDown}
               />
             )}
           </div>
@@ -129,6 +136,7 @@ export function CompactZoneDisplay({
           onCardHoverEnd={onCardHoverEnd}
           onCardClick={onCardClick}
           selectedCardId={selectedCardId}
+          forceFaceDown={forceFaceDown}
         />
       )}
     </>

@@ -1153,6 +1153,7 @@ function GameContent() {
           playerName={self_player.name}
           onCreateTreasure={handleCreateTreasure}
           onUntapAll={handleUntapAll}
+          onPassTurn={handlePassTurn}
         />
       );
     }
@@ -1240,6 +1241,11 @@ function GameContent() {
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
             autoOpenPhase={isNewPlayerOnboarding ? autoOpenTimelinePhase : null}
+            onAutoOpenHandled={(phase) => {
+              setAutoOpenTimelinePhase((current) =>
+                current === phase ? null : current,
+              );
+            }}
             headerClassName="py-1.5 bar-pad-left"
             onOpenRules={(target) => {
               setRulesPanelTarget(target);

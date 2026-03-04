@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
@@ -22,31 +22,63 @@ function GuidedModeSwitch({
   enabled: boolean;
   setEnabled: (v: boolean) => void;
 }) {
+  const guidedModeHelpText =
+    "When Guided Mode is on, the first time you enter a situation, a simple popup gives you help.";
+  const [showGuidedModeHelp, setShowGuidedModeHelp] = useState(false);
+  const guidedModeHelpRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!guidedModeHelpRef.current?.contains(target)) {
+        setShowGuidedModeHelp(false);
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+
   return (
-    <label className="flex items-center gap-1.5 cursor-pointer shrink-0 rounded-md border border-white/15 bg-black/25 px-2 py-1">
-      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
-        Guided
-      </span>
-      <input
-        type="checkbox"
-        checked={enabled}
-        onChange={(e) => setEnabled(e.target.checked)}
-        className="sr-only peer"
-      />
-      <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-            enabled ? "translate-x-5" : "translate-x-1"
-          }`}
+    <div className="flex items-center gap-1.5 shrink-0 rounded-md border border-white/15 bg-black/25 px-2 py-1">
+      <label className="flex items-center gap-1.5 cursor-pointer">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
+          Guided
+        </span>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          className="sr-only peer"
         />
-      </span>
-      <span
-        className="text-gray-400 hover:text-gray-200"
-        title="When you enter a new situation, helpful tips open automatically."
-      >
-        <InfoIcon size="sm" />
-      </span>
-    </label>
+        <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              enabled ? "translate-x-5" : "translate-x-1"
+            }`}
+          />
+        </span>
+      </label>
+      <div ref={guidedModeHelpRef} className="relative group shrink-0">
+        <button
+          type="button"
+          className="text-gray-400 hover:text-gray-200"
+          aria-label="What guided mode does"
+          aria-expanded={showGuidedModeHelp}
+          onClick={() => setShowGuidedModeHelp((v) => !v)}
+        >
+          <InfoIcon size="sm" />
+        </button>
+        <span
+          className={`absolute right-0 top-full mt-2 w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-50 ${
+            showGuidedModeHelp
+              ? "opacity-100"
+              : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
+          }`}
+        >
+          {guidedModeHelpText}
+        </span>
+      </div>
+    </div>
   );
 }
 

@@ -58,6 +58,8 @@ def _create_zones(player: Player | StaticOpponent) -> Zones:
     treasures = [_create_treasure_token() for _ in range(player.treasures)]
     command_zone_ids = {c.id for c in player.command_zone}
     sideboard_display = [c for c in player.sideboard if c.id not in command_zone_ids]
+    # TODO(v1.0): Split companion and library storage; command_zone currently doubles
+    # as the battle "library" rendering source to avoid historical data regressions.
     submitted = player.hand + player.sideboard
     revealed_card_ids = [c.id for c in player.command_zone]
 
