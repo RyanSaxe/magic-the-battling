@@ -39,15 +39,6 @@ export function Home() {
             >
               Join Game
             </button>
-            <a
-              href="https://discord.gg/2NAjcWXNKn"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary py-2 px-4 flex items-center gap-2"
-            >
-              <FaDiscord className="w-4 h-4" />
-              Discord
-            </a>
           </div>
         </div>
         <div className="sm:hidden text-center">
@@ -70,15 +61,6 @@ export function Home() {
             >
               Join Game
             </button>
-            <a
-              href="https://discord.gg/2NAjcWXNKn"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary py-2 px-5 flex items-center gap-2"
-            >
-              <FaDiscord className="w-4 h-4" />
-              Discord
-            </a>
           </div>
         </div>
       </header>
