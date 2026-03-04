@@ -58,10 +58,10 @@ export function CompactZoneDisplay({
   const cardH = Math.floor(cardW / CARD_ASPECT)
 
   const label = (
-    <div className="flex items-center justify-center gap-0.5 bg-black/70 rounded px-1 shrink-0" style={{ height: LABEL_HEIGHT }}>
-      <span className="text-[7px] uppercase text-gray-300 font-medium leading-none">{title}</span>
+    <div className="flex items-center justify-center gap-0.5 px-1 shrink-0" style={{ height: LABEL_HEIGHT }}>
+      <span className="text-[7px] uppercase text-gray-500 font-medium leading-none">{title}</span>
       {cards.length >= 2 && (
-        <span className="text-[9px] font-bold text-white leading-none">{cards.length}</span>
+        <span className="text-[9px] font-bold text-gray-400 leading-none">{cards.length}</span>
       )}
     </div>
   )
@@ -83,10 +83,10 @@ export function CompactZoneDisplay({
             }
             if (cards.length > 0) setShowModal(true)
           }}
-          className={`flex flex-col items-center overflow-hidden rounded border border-gray-700 ${
+          className={`flex flex-col items-center overflow-hidden zone-column ${
             cards.length > 0
-              ? 'hover:border-gray-500 cursor-pointer'
-              : 'border-dashed cursor-default'
+              ? 'cursor-pointer'
+              : 'cursor-default'
           }`}
           style={{ width, height }}
         >

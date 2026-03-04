@@ -15,7 +15,7 @@ export function Home() {
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <header className="shrink-0 px-4 sm:px-6 py-3">
+      <header className="shrink-0 px-4 sm:px-6 py-3 frame-chrome">
         <div className="hidden sm:flex items-center justify-between">
           <div>
             <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
@@ -83,7 +83,7 @@ export function Home() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center min-h-0 px-4">
+      <main className="flex-1 flex flex-col items-center justify-center min-h-0 px-4 game-surface-full">
         <CardShowcase />
       </main>
 

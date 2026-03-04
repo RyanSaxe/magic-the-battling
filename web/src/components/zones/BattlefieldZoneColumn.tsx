@@ -36,7 +36,7 @@ export function BattlefieldZoneColumn({
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
   return (
     <div
-      className={`flex shrink-0 ${isOpponent ? 'flex-col-reverse' : 'flex-col'}`}
+      className={`flex shrink-0 zone-column ${isOpponent ? 'flex-col-reverse' : 'flex-col'}`}
       style={{ width: columnWidth }}
     >
       <CompactZoneDisplay

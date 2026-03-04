@@ -375,7 +375,7 @@ export function Play() {
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <header className="shrink-0 px-4 sm:px-6 py-3">
+      <header className="shrink-0 px-4 sm:px-6 py-3 frame-chrome">
         <div className="hidden sm:flex items-center justify-between">
           <div>
             <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
@@ -431,7 +431,7 @@ export function Play() {
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col sm:justify-center min-h-0 px-4">
+      <main className="flex-1 flex flex-col sm:justify-center min-h-0 px-4 game-surface-full">
       <div className="shrink-0 w-full max-w-5xl mx-auto">
         <div className="mb-4">
           <label className="block text-gray-400 text-sm mb-1">Your Name</label>

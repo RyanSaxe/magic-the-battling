@@ -1140,7 +1140,7 @@ function GameContent() {
             validDropZones={getValidDropZones}
           >
             {sizes.isMobile && current_battle && (
-              <div className="shrink-0 flex items-center justify-between px-2 py-1 bg-black/40 text-xs">
+              <div className="shrink-0 flex items-center justify-between px-2 py-1 frame-chrome text-xs">
                 <div className="flex items-center gap-1">
                   <span className="text-gray-300 truncate max-w-[60px]">{current_battle.opponent_name}</span>
                   <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
@@ -1166,7 +1166,7 @@ function GameContent() {
                 </div>
               </div>
             )}
-            <div className="flex-1 flex min-h-0">
+            <div className="flex-1 flex min-h-0 game-surface">
               <main className="flex-1 flex flex-col min-h-0 min-w-0">
                 <BattlePhase
                   gameState={gameState}
@@ -1316,7 +1316,7 @@ function GameContent() {
           </GameDndProvider>
           </FaceDownProvider>
         ) : (
-          <div className="flex-1 flex min-h-0">
+          <div className="flex-1 flex min-h-0 game-surface">
             <main className="flex-1 flex flex-col min-h-0 min-w-0">
               {currentPhase === "draft" && (
                 <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
@@ -1411,7 +1411,7 @@ function GameContent() {
         )}
         {/* Bottom Action Bar */}
         {!isSpectator && (
-          <div className="shrink-0 relative z-50 bg-black/30 border-t border-gray-700/50">
+          <div className="shrink-0 relative z-50 frame-chrome">
             <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
               {renderActionButtons()}
             </div>

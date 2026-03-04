@@ -80,10 +80,10 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
   )
 
   return (
-    <div ref={containerRef} className="bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col h-full" onClick={handleBackgroundClick}>
+    <div ref={containerRef} className="zone-divider-bg p-[1px] flex-1 min-h-0 flex flex-col h-full" onClick={handleBackgroundClick}>
       <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
         {/* Pool */}
-        <div className="bg-black/30 px-3 pt-5 pb-3 relative">
+        <div className="zone-hand px-3 pt-5 pb-3 relative">
           <span className={badgeCls}>Pool</span>
           {pool.length === 0 ? (
             <div className="flex items-center justify-center">
@@ -119,7 +119,7 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
         </div>
 
         {/* Pack */}
-        <div className="bg-black/30 px-3 pt-5 pb-3 relative flex-1">
+        <div className="zone-pack px-3 pt-5 pb-3 relative flex-1">
           {isMobile && (
             <>
               <div className="absolute bottom-2 left-2 pointer-events-none z-10">

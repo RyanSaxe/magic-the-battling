@@ -44,10 +44,10 @@ export function ZoneLayout({
   const hasRight = hasBattlefield || hasSideboard
 
   return (
-    <div ref={containerRef} className={className ?? 'rounded-lg bg-gray-600/40 p-[1px] flex-1 min-h-0 flex flex-col'} onClick={onClick}>
+    <div ref={containerRef} className={className ?? 'zone-divider-bg p-[1px] flex-1 min-h-0 flex flex-col'} onClick={onClick}>
       <div className="flex flex-col flex-1 min-h-0" style={{ gap: 1 }}>
         {hasHand && (
-          <div className="bg-black/30 px-3 pt-5 pb-3 relative">
+          <div className="zone-hand px-3 pt-5 pb-3 relative">
             <span className={badgeCls}>{handLabel}</span>
             {handContent}
           </div>
@@ -57,13 +57,13 @@ export function ZoneLayout({
             {hasRight && (
               <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 1 }}>
                 {hasBattlefield && (
-                  <div className="bg-black/30 px-3 pt-5 pb-3 relative">
+                  <div className="zone-battlefield px-3 pt-5 pb-3 relative">
                     <span className={badgeCls}>{battlefieldLabel}</span>
                     {battlefieldContent}
                   </div>
                 )}
                 {hasSideboard && (
-                  <div className="bg-black/30 px-3 pt-5 pb-3 relative flex-1">
+                  <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1">
                     <span className={badgeCls}>{sideboardLabel}</span>
                     {sideboardContent}
                   </div>
@@ -71,7 +71,7 @@ export function ZoneLayout({
               </div>
             )}
             {hasUpgrades && (
-              <div className="bg-black/30 px-3 pt-5 pb-3 relative flex items-center justify-center" style={{ minWidth: '7rem' }}>
+              <div className="zone-upgrades px-3 pt-5 pb-3 relative flex items-center justify-center" style={{ minWidth: '7rem' }}>
                 <span className={badgeCls}>{upgradesLabel}</span>
                 <div className="overflow-hidden">
                   {upgradesContent}

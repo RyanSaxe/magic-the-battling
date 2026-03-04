@@ -18,6 +18,20 @@
   --mana-red: #d3202a;
   --mana-green: #00733e;
 
+  /* Chrome (warm walnut-tinted dark) */
+  --chrome: #1c1714;
+  --chrome-highlight: rgba(255, 255, 255, 0.03);
+
+  /* Gold accent (for frame-to-felt border) */
+  --gold-border: rgba(212, 175, 55, 0.45);
+
+  /* Zone column — blends toward sidebar chrome */
+  --zone-column-bg: #1c1b18;
+
+  /* Hand zone (warmer, lighter green) */
+  --hand-felt: #2a5e3a;
+  --hand-felt-light: #306842;
+
   /* Table/playmat */
   --table-dark: #0f2d1a;
   --table-felt: #1a4d2e;
@@ -61,6 +75,88 @@ body {
     var(--table-dark) 100%
   );
   min-height: 100dvh;
+}
+
+/* Solid warm-brown chrome for header, footer, sidebar */
+.frame-chrome {
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    color-mix(in srgb, var(--chrome) 95%, white) 0%,
+    var(--chrome) 70%
+  );
+}
+
+/* Felt content area — gold emboss + dark groove for 3D depth */
+.game-surface {
+  position: relative;
+  border-top: 1px solid rgba(212, 175, 55, 0.45);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.45);
+  box-shadow:
+    inset 0 1px 0 0 rgba(0, 0, 0, 0.8),
+    inset 0 -1px 0 0 rgba(0, 0, 0, 0.8),
+    inset 0 6px 16px -4px rgba(0, 0, 0, 0.3),
+    inset 0 -6px 16px -4px rgba(0, 0, 0, 0.3);
+}
+
+.game-surface-full {
+  position: relative;
+  border-top: 1px solid rgba(212, 175, 55, 0.45);
+  box-shadow:
+    inset 0 1px 0 0 rgba(0, 0, 0, 0.8),
+    inset 0 6px 16px -4px rgba(0, 0, 0, 0.3);
+}
+
+/* Desktop left chrome strip — game pages only */
+@media (min-width: 640px) {
+  .game-surface {
+    padding-left: 40px;
+  }
+
+  .game-surface::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 40px;
+    background: radial-gradient(
+      ellipse at 50% 50%,
+      color-mix(in srgb, var(--chrome) 95%, white) 0%,
+      var(--chrome) 70%
+    );
+    border-right: 1px solid rgba(212, 175, 55, 0.45);
+    z-index: 2;
+  }
+}
+
+/* Zone-specific backgrounds */
+.zone-hand {
+  background: radial-gradient(ellipse at center, #306842, #1a3a25);
+}
+
+.zone-pack {
+  background: radial-gradient(ellipse at center, #1f4a30, #112a1a);
+}
+
+.zone-battlefield {
+  background: radial-gradient(ellipse at center, rgba(28, 62, 58, 0.7), rgba(16, 38, 35, 0.6));
+}
+
+.zone-sideboard {
+  background: radial-gradient(ellipse at center, #1a3825, #0e1f14);
+}
+
+.zone-upgrades {
+  background: radial-gradient(ellipse at center, #3a4a20, #242e12);
+}
+
+.zone-column {
+  background: var(--zone-column-bg);
+}
+
+/* Gold divider between zones */
+.zone-divider-bg {
+  background-color: var(--gold-border);
 }
 
 /* Card base styles */
@@ -132,7 +228,6 @@ body {
     box-shadow var(--transition-fast),
     border-color var(--transition-fast);
   border: 2px dashed transparent;
-  border-radius: 8px;
 }
 
 .zone.drop-valid {
@@ -148,8 +243,7 @@ body {
 
 /* Battlefield - open area */
 .battlefield {
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
+  background: radial-gradient(ellipse at center, rgba(28, 62, 58, 0.6), rgba(14, 32, 30, 0.5));
 }
 
 /* Zone piles (graveyard, exile) */
@@ -171,7 +265,6 @@ body {
   justify-content: center;
   gap: 6px;
   padding: 8px 16px;
-  background: rgba(34, 84, 61, 0.4);
 }
 
 .hand-zone > :hover {

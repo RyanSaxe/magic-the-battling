@@ -41,7 +41,7 @@ export function Sidebar({
     revealedPlayer && revealedPlayer.name !== currentPlayer.name;
 
   return (
-    <aside className="relative w-64 h-full bg-black/30 border-l border-gray-700 flex flex-col overflow-hidden">
+    <aside className="relative w-64 h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
       {phaseContent ? (
         <div className="overflow-y-auto overflow-x-hidden flex-1">
           {phaseContent}
