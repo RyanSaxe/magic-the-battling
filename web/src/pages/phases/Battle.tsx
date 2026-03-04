@@ -332,7 +332,7 @@ export function BattlePhase({
             </div>
           </div>
           {/* Opponent side zones: Library, Exile, Graveyard (top→bottom, mirrored) */}
-          <div className="flex flex-col shrink-0 battle-side-column" style={{ width: zoneColumnWidth }}>
+          <div className="flex flex-col shrink-0 battle-side-column battle-side-column-opponent" style={{ width: zoneColumnWidth }}>
             <CompactZoneDisplay
               title={opponentHadCompanion ? "Companion" : "Library"}
               zone="command_zone"
