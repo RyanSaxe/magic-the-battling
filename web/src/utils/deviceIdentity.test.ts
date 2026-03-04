@@ -78,6 +78,15 @@ describe("new player preference", () => {
     expect(resolveNewPlayerPreferenceForGame("game-1")).toBe(false);
   });
 
+  it("stores scoped preferences per player in the same game", () => {
+    setNewPlayerPreferenceForGame("game-1", true, "player-a");
+    setNewPlayerPreferenceForGame("game-1", false, "player-b");
+
+    expect(getNewPlayerPreferenceForGame("game-1", "player-a")).toBe(true);
+    expect(getNewPlayerPreferenceForGame("game-1", "player-b")).toBe(false);
+    expect(getNewPlayerPreferenceForGame("game-1", "player-c")).toBeNull();
+  });
+
   it("falls back to default when no game-specific value is stored", () => {
     markPlayedBefore();
     expect(getNewPlayerPreferenceForGame("missing")).toBeNull();

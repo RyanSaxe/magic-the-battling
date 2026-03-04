@@ -445,7 +445,7 @@ function GameContent() {
   const isSpectator = !!spectatorConfig;
   const wasInvalidSessionRef = useRef(false);
   const [isNewPlayerOnboarding, setIsNewPlayerOnboarding] = useState(() =>
-    gameId ? resolveNewPlayerPreferenceForGame(gameId) : false,
+    gameId ? resolveNewPlayerPreferenceForGame(gameId, session?.playerId) : false,
   );
   const [autoOpenTimelinePhase, setAutoOpenTimelinePhase] = useState<Phase | null>(null);
   const [showPuppetGhostExplainer, setShowPuppetGhostExplainer] = useState(false);
@@ -455,7 +455,9 @@ function GameContent() {
   const canManipulateOpponent = gameState?.current_battle?.can_manipulate_opponent ?? false;
 
   useEffect(() => {
-    const resolved = gameId ? resolveNewPlayerPreferenceForGame(gameId) : false;
+    const resolved = gameId
+      ? resolveNewPlayerPreferenceForGame(gameId, session?.playerId)
+      : false;
     seenTimelinePhasesRef.current = new Set();
     shownPuppetGhostExplainerRef.current = false;
     let cancelled = false;
@@ -468,7 +470,7 @@ function GameContent() {
     return () => {
       cancelled = true;
     };
-  }, [gameId]);
+  }, [gameId, session?.playerId]);
 
   useEffect(() => {
     const shouldClear = shouldClearSessionOnInvalidEvent(

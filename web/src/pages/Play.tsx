@@ -208,7 +208,7 @@ function UpgradesCheckbox({
   );
 }
 
-function GuidedModeSwitch({
+function GuidedModeField({
   enabled,
   setEnabled,
 }: {
@@ -216,28 +216,35 @@ function GuidedModeSwitch({
   setEnabled: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer shrink-0">
-      <span className="text-white text-sm whitespace-nowrap">Guided Mode</span>
-      <input
-        type="checkbox"
-        checked={enabled}
-        onChange={(e) => setEnabled(e.target.checked)}
-        className="sr-only peer"
-      />
-      <span className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
-        <span
-          className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-            enabled ? "translate-x-5" : "translate-x-1"
-          }`}
-        />
-      </span>
-      <span
-        className="text-gray-400 hover:text-gray-200"
-        title="When you enter a new situation, helpful tips open automatically."
-      >
-        <InfoIcon size="sm" />
-      </span>
-    </label>
+    <div>
+      <label className="block text-gray-400 text-sm mb-1">Guided Mode</label>
+      <label className="w-full bg-black/40 border border-black/40 text-white rounded px-3 py-2 flex items-center justify-between cursor-pointer">
+        <span className="text-sm text-gray-200">
+          Open helpful tips in new situations
+        </span>
+        <span className="flex items-center gap-2 shrink-0">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            className="sr-only peer"
+          />
+          <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                enabled ? "translate-x-5" : "translate-x-1"
+              }`}
+            />
+          </span>
+          <span
+            className="text-gray-400 hover:text-gray-200"
+            title="When you enter a new situation, helpful tips open automatically."
+          >
+            <InfoIcon size="sm" />
+          </span>
+        </span>
+      </label>
+    </div>
   );
 }
 
@@ -343,7 +350,11 @@ export function Play() {
       });
       saveSession(response.session_id, response.player_id);
       rememberPlayerForGame(response.game_id, playerName.trim());
-      setNewPlayerPreferenceForGame(response.game_id, isGuidedMode);
+      setNewPlayerPreferenceForGame(
+        response.game_id,
+        isGuidedMode,
+        response.player_id,
+      );
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
@@ -371,7 +382,11 @@ export function Play() {
       });
       saveSession(response.session_id, response.player_id);
       rememberPlayerForGame(response.game_id, playerName.trim());
-      setNewPlayerPreferenceForGame(response.game_id, isGuidedMode);
+      setNewPlayerPreferenceForGame(
+        response.game_id,
+        isGuidedMode,
+        response.player_id,
+      );
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
@@ -484,20 +499,20 @@ export function Play() {
       <div className="shrink-0 w-full max-w-5xl mx-auto pt-6">
         <div className="mb-4">
           <label className="block text-gray-400 text-sm mb-1">Your Name</label>
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              value={nameLoading ? "" : playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === "Enter" && nameValid && handleCreateLobby()
-              }
-              disabled={nameLoading}
-              placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-              className="flex-1 bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-            />
-            <GuidedModeSwitch enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
-          </div>
+          <input
+            type="text"
+            value={nameLoading ? "" : playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            onKeyDown={(e) =>
+              e.key === "Enter" && nameValid && handleCreateLobby()
+            }
+            disabled={nameLoading}
+            placeholder={nameLoading ? "Generating name..." : "Enter your name"}
+            className="w-full bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+          />
+        </div>
+        <div className="mb-4">
+          <GuidedModeField enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
         </div>
 
       </div>

@@ -15,6 +15,41 @@ import {
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 
+function GuidedModeSwitch({
+  enabled,
+  setEnabled,
+}: {
+  enabled: boolean;
+  setEnabled: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-1.5 cursor-pointer shrink-0 rounded-md border border-white/15 bg-black/25 px-2 py-1">
+      <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
+        Guided
+      </span>
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(e) => setEnabled(e.target.checked)}
+        className="sr-only peer"
+      />
+      <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            enabled ? "translate-x-5" : "translate-x-1"
+          }`}
+        />
+      </span>
+      <span
+        className="text-gray-400 hover:text-gray-200"
+        title="When you enter a new situation, helpful tips open automatically."
+      >
+        <InfoIcon size="sm" />
+      </span>
+    </label>
+  );
+}
+
 export function Lobby() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
@@ -42,21 +77,21 @@ export function Lobby() {
 
   useEffect(() => {
     if (!gameId) return;
-    const existing = getNewPlayerPreferenceForGame(gameId);
+    const existing = getNewPlayerPreferenceForGame(gameId, session?.playerId);
     const initial =
       existing ??
       lobbyState?.guided_mode_default ??
       getDefaultNewPlayerPreference();
     setIsGuidedMode(initial);
     if (existing === null) {
-      setNewPlayerPreferenceForGame(gameId, initial);
+      setNewPlayerPreferenceForGame(gameId, initial, session?.playerId);
     }
-  }, [gameId, lobbyState?.guided_mode_default]);
+  }, [gameId, lobbyState?.guided_mode_default, session?.playerId]);
 
   const handleGuidedModeToggle = (nextValue: boolean) => {
     setIsGuidedMode(nextValue);
     if (gameId) {
-      setNewPlayerPreferenceForGame(gameId, nextValue);
+      setNewPlayerPreferenceForGame(gameId, nextValue, session?.playerId);
     }
   };
 
@@ -431,34 +466,19 @@ export function Lobby() {
                 </div>
 
                 <div className="space-y-2 mb-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <span className="text-white text-sm">Guided Mode</span>
-                    <input
-                      type="checkbox"
-                      checked={isGuidedMode}
-                      onChange={(e) => handleGuidedModeToggle(e.target.checked)}
-                      className="sr-only peer"
+                  <div className="flex items-center justify-between gap-2">
+                    <GuidedModeSwitch
+                      enabled={isGuidedMode}
+                      setEnabled={handleGuidedModeToggle}
                     />
-                    <span className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
-                      <span
-                        className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                          isGuidedMode ? "translate-x-5" : "translate-x-1"
-                        }`}
-                      />
-                    </span>
-                    <span
-                      className="text-gray-400 hover:text-gray-200"
-                      title="When you enter a new situation, helpful tips open automatically."
-                    >
-                      <InfoIcon size="sm" />
-                    </span>
-                  </label>
-
-                  {startMessage && (
-                    <p className="text-gray-500 text-xs mb-1 text-center">
-                      {startMessage}
-                    </p>
-                  )}
+                    {startMessage ? (
+                      <p className="text-gray-500 text-xs text-right leading-snug max-w-[58%]">
+                        {startMessage}
+                      </p>
+                    ) : (
+                      <span />
+                    )}
+                  </div>
 
                   <button
                     onClick={() => actions.setReady(!isReady)}

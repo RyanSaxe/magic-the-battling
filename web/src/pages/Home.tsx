@@ -97,16 +97,16 @@ export function Home() {
 
       <footer className="shrink-0 frame-chrome bar-pad-both py-2">
         <div className="flex items-center justify-between">
-          <a href="https://cubecobra.com/cube/about/auto?view=primer"
-             target="_blank" rel="noopener noreferrer"
-             className="text-sm text-blue-300 hover:text-blue-200 transition-colors">
-            CubeCobra Primer
-          </a>
           <a href="https://discord.gg/2NAjcWXNKn"
              target="_blank" rel="noopener noreferrer"
              className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors">
             <FaDiscord className="w-4 h-4" />
             Join Discord
+          </a>
+          <a href="https://cubecobra.com/cube/about/auto?view=primer"
+             target="_blank" rel="noopener noreferrer"
+             className="text-sm text-blue-300 hover:text-blue-200 transition-colors">
+            CubeCobra Primer
           </a>
         </div>
       </footer>

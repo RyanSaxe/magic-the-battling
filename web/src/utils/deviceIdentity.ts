@@ -2,6 +2,7 @@ const DEVICE_ID_KEY = "mtb_device_id";
 const GAME_PLAYER_MAP_KEY = "mtb_game_player_map";
 const GAME_NEW_PLAYER_PREF_MAP_KEY = "mtb_game_new_player_pref_map";
 const PLAYED_BEFORE_KEY = "mtb_played_before";
+const GAME_PLAYER_PREF_KEY_SEP = "::";
 const MAX_TRACKED_GAMES = 100;
 
 interface TrackedPlayerEntry {
@@ -173,29 +174,50 @@ export function getDefaultNewPlayerPreference(): boolean {
   return !hasPlayedBefore();
 }
 
+function buildScopedGamePreferenceKey(gameId: string, playerId: string): string {
+  return `${gameId}${GAME_PLAYER_PREF_KEY_SEP}${playerId}`;
+}
+
 export function setNewPlayerPreferenceForGame(
   gameId: string,
   isNewPlayer: boolean,
+  playerId?: string | null,
 ): void {
   if (!gameId) return;
   getOrCreateDeviceId();
 
   const map = readNewPlayerPreferenceMap();
-  map[gameId] = {
+  const scopedKey = playerId
+    ? buildScopedGamePreferenceKey(gameId, playerId)
+    : gameId;
+  map[scopedKey] = {
     is_new_player: isNewPlayer,
     seen_at: Date.now(),
   };
   writeNewPlayerPreferenceMap(pruneNewPlayerPreferenceMap(map));
 }
 
-export function getNewPlayerPreferenceForGame(gameId: string): boolean | null {
+export function getNewPlayerPreferenceForGame(
+  gameId: string,
+  playerId?: string | null,
+): boolean | null {
   if (!gameId) return null;
   const map = readNewPlayerPreferenceMap();
+  if (playerId) {
+    const scoped = buildScopedGamePreferenceKey(gameId, playerId);
+    return map[scoped]?.is_new_player ?? null;
+  }
   return map[gameId]?.is_new_player ?? null;
 }
 
-export function resolveNewPlayerPreferenceForGame(gameId: string): boolean {
-  return getNewPlayerPreferenceForGame(gameId) ?? getDefaultNewPlayerPreference();
+export function resolveNewPlayerPreferenceForGame(
+  gameId: string,
+  playerId?: string | null,
+): boolean {
+  return (
+    getNewPlayerPreferenceForGame(gameId, playerId) ??
+    getDefaultNewPlayerPreference()
+  );
 }
 
 export function pickAutoReconnectPlayer(
