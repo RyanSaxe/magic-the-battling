@@ -1212,26 +1212,6 @@ function GameContent() {
             Watching {spectatingPlayer}'s game (spectator mode)
           </div>
         )}
-        {showPuppetGhostExplainer && (
-          <div className="fixed inset-0 z-[80] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="modal-chrome border border-cyan-500/40 rounded-lg p-5 w-full max-w-lg text-center">
-              <h2 className="text-lg font-semibold text-cyan-300 mb-2">
-                Puppet/Ghost Opponent
-              </h2>
-              <p className="text-sm text-gray-200 mb-4">
-                This opponent is a puppet/ghost. Their cards are fully visible,
-                and you can move cards on both sides to play out the battle and
-                decide who wins.
-              </p>
-              <button
-                onClick={() => setShowPuppetGhostExplainer(false)}
-                className="btn btn-primary py-2 px-5"
-              >
-                Got it
-              </button>
-            </div>
-          </div>
-        )}
         {/* Header - Phase Timeline. pr-64 on desktop offsets for sidebar so timeline centers over main content */}
         <div className="relative">
           <PhaseTimeline
@@ -1292,6 +1272,32 @@ function GameContent() {
               </div>
             )}
             <div className="flex-1 flex min-h-0 game-surface">
+              {showPuppetGhostExplainer && (
+                <>
+                  <div className="absolute inset-0 z-[45] bg-black/45 backdrop-blur-[2px]" />
+                  <div className="absolute inset-0 z-[55] pointer-events-none flex items-center justify-center p-4">
+                    <div
+                      className="modal-chrome border rounded-lg p-5 w-full max-w-lg text-center pointer-events-auto shadow-xl"
+                      style={{ borderColor: "var(--color-gold)" }}
+                    >
+                      <h2 className="text-lg font-semibold text-amber-300 mb-2">
+                        Puppet/Ghost Opponent
+                      </h2>
+                      <p className="text-sm text-gray-200 mb-4">
+                        This opponent is a puppet/ghost. Their cards are fully visible,
+                        and you can move cards on both sides to play out the battle and
+                        decide who wins.
+                      </p>
+                      <button
+                        onClick={() => setShowPuppetGhostExplainer(false)}
+                        className="btn btn-primary py-2 px-5"
+                      >
+                        Got it
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
               <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
                    style={{ borderRight: '1px solid var(--gold-border)' }} />
               <main className="flex-1 flex flex-col min-h-0 min-w-0">

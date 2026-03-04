@@ -358,21 +358,22 @@ body {
 }
 
 .battle-side-column-opponent {
-  border-top: 1px solid var(--gold-border);
+  border-top: 0;
 }
 
 .battle-side-column-player {
-  border-top: 1px solid var(--gold-border);
-  border-bottom: 1px solid var(--gold-border);
+  border-top: 0;
+  border-bottom: 1px solid var(--seam-stroke-soft);
 }
 
 .battle-side-cell {
   box-sizing: border-box;
   background: #3a3431;
+  border-top: 1px solid var(--seam-stroke-soft);
 }
 
-.battle-side-column .battle-side-cell + .battle-side-cell {
-  border-top: 1px solid var(--gold-border);
+.battle-side-dropzone {
+  border: 0;
 }
 
 .battle-hand-separator-bottom {
@@ -384,8 +385,8 @@ body {
 }
 
 .battle-side-label {
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: 8px;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #a9a4a2;
   line-height: 1;

@@ -60,10 +60,10 @@ export function CompactZoneDisplay({
   const cardH = Math.floor(cardW / CARD_ASPECT)
 
   const label = (
-    <div className="flex items-center justify-center gap-0.5 px-1 shrink-0" style={{ height: LABEL_HEIGHT }}>
+    <div className="flex items-center justify-center gap-0 px-0.5 shrink-0" style={{ height: LABEL_HEIGHT }}>
       <span className="battle-side-label truncate">{title}</span>
       {cards.length >= 2 && (
-        <span className="text-[9px] font-bold text-gray-400 leading-none">{cards.length}</span>
+        <span className="text-[8px] font-bold text-gray-400 leading-none">{cards.length}</span>
       )}
     </div>
   )
@@ -75,7 +75,7 @@ export function CompactZoneDisplay({
         zoneOwner={zoneOwner}
         validFromZones={validFromZones}
         disabled={!allowInteraction}
-        className="box-border shrink-0"
+        className="box-border shrink-0 battle-side-dropzone"
         style={{ width, height }}
       >
         <div
