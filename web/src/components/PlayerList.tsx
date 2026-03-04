@@ -160,6 +160,8 @@ export function PlayerList({
 }: PlayerListProps) {
   const { state, setRevealedPlayerName } = useContextStrip();
   const [activeTab, setActiveTab] = useState<Tab>("you");
+  const nonSelfPlayers = players.filter((p) => p.name !== currentPlayerName);
+  const showOthersTab = players.length > 4;
 
   useEffect(() => {
     setRevealedPlayerName(null);
@@ -179,9 +181,6 @@ export function PlayerList({
       setRevealedPlayerName(null);
     }
   };
-
-  const nonSelfPlayers = players.filter((p) => p.name !== currentPlayerName);
-  const showOthersTab = players.length > 4;
 
   const opponents = showOthersTab
     ? nonSelfPlayers.filter(

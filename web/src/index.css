@@ -70,6 +70,8 @@
   /* Shared shell spacing */
   --frame-rail-width: 40px;
   --frame-rail-edge: calc(var(--frame-rail-width) + 1px);
+  --sidebar-width: 16rem;
+  --sidebar-lane-nudge: 10px;
   --surface-gutter: 12px;
 }
 
@@ -107,6 +109,11 @@ body {
   padding-right: var(--surface-gutter);
 }
 
+.bar-pad-main {
+  padding-left: var(--surface-gutter);
+  padding-right: var(--surface-gutter);
+}
+
 /* Felt content area — gold emboss + dark groove for 3D depth */
 .game-surface {
   position: relative;
@@ -136,6 +143,11 @@ body {
   .bar-pad-left {
     padding-left: var(--frame-rail-edge);
     padding-right: var(--surface-gutter);
+  }
+
+  .bar-pad-main {
+    padding-left: var(--frame-rail-edge);
+    padding-right: calc(var(--sidebar-width) + var(--surface-gutter) - var(--sidebar-lane-nudge));
   }
 
   .game-surface {

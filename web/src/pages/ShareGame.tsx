@@ -327,7 +327,7 @@ export function ShareGame() {
                 sidebarOpen ? 'translate-x-0' : 'translate-x-full'
               }`}
             >
-              <aside className="w-64 h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
+              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
                 <div className="px-3 py-2 text-sm font-medium text-gray-400">
                   Players
                 </div>
@@ -338,7 +338,7 @@ export function ShareGame() {
             </div>
           </>
         ) : (
-          <aside className="w-64 h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
+          <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
             <div className="overflow-y-auto flex-1">
               {renderSidebarContent()}
             </div>
@@ -349,7 +349,7 @@ export function ShareGame() {
 
       {/* Bottom Bar */}
       <div className="shrink-0 frame-chrome">
-        <div className="flex items-center justify-between py-1.5 sm:py-2 bar-pad-left timeline-actions">
+        <div className="flex items-center justify-between py-1.5 sm:py-2 bar-pad-main timeline-actions">
           {/* Left: Round selector */}
           <div className="relative">
             <button

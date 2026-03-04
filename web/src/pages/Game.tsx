@@ -1231,7 +1231,7 @@ function GameContent() {
             Watching {spectatingPlayer}'s game (spectator mode)
           </div>
         )}
-        {/* Header - Phase Timeline. pr-64 on desktop offsets for sidebar so timeline centers over main content */}
+        {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
         <div className="relative">
           <PhaseTimeline
             currentPhase={currentPhase}
@@ -1571,7 +1571,7 @@ function GameContent() {
         {/* Bottom Action Bar */}
         {!isSpectator && (
           <div className="shrink-0 relative z-50 frame-chrome">
-            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-left timeline-actions">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-main timeline-actions">
               {isEndPhase && gameId ? (
                 <>
                   <div className="flex items-center gap-1.5 sm:gap-2 py-1">
