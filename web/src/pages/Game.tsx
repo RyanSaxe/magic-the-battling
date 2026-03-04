@@ -1292,6 +1292,8 @@ function GameContent() {
               </div>
             )}
             <div className="flex-1 flex min-h-0 game-surface">
+              <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
+                   style={{ borderRight: '1px solid var(--gold-border)' }} />
               <main className="flex-1 flex flex-col min-h-0 min-w-0">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
                   <div className="surface-inner-emboss flex-1 min-h-0 flex flex-col">
@@ -1331,6 +1333,8 @@ function GameContent() {
                   useUpgrades={gameState.use_upgrades}
                 />
               )}
+              <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
+                   style={{ borderLeft: '1px solid var(--gold-border)' }} />
             </div>
             {activeDndPanel === 'sideboard' && current_battle && (
               <div onClick={(e) => handlePanelClickToMove(e, 'sideboard', 'player')}>
@@ -1446,6 +1450,8 @@ function GameContent() {
           </FaceDownProvider>
         ) : (
           <div className="flex-1 flex min-h-0 game-surface">
+            <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
+                 style={{ borderRight: '1px solid var(--gold-border)' }} />
             <main className="flex-1 flex flex-col min-h-0 min-w-0">
               {currentPhase === "draft" && (
                 <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
@@ -1536,6 +1542,8 @@ function GameContent() {
                 useUpgrades={gameState.use_upgrades}
               />
             )}
+            <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
+                 style={{ borderLeft: '1px solid var(--gold-border)' }} />
           </div>
         )}
         {/* Bottom Action Bar */}

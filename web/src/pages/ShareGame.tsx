@@ -309,6 +309,7 @@ export function ShareGame() {
 
       {/* Main + Sidebar */}
       <div className="flex-1 flex min-h-0 game-surface">
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderRight: '1px solid var(--gold-border)' }} />
         <main className="flex-1 flex flex-col min-h-0 min-w-0">
           {renderContent()}
         </main>
@@ -343,6 +344,7 @@ export function ShareGame() {
             </div>
           </aside>
         )}
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderLeft: '1px solid var(--gold-border)' }} />
       </div>
 
       {/* Bottom Bar */}

@@ -84,14 +84,14 @@ export function Home() {
       </header>
 
       <div className="flex-1 flex min-h-0">
-        <div className="hidden sm:block w-10 shrink-0 frame-chrome"
+        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
              style={{ borderRight: '1px solid var(--gold-border)' }} />
 
         <main className="flex-1 flex flex-col items-center justify-center min-h-0 px-4 game-surface-full">
           <CardShowcase />
         </main>
 
-        <div className="hidden sm:block w-10 shrink-0 frame-chrome"
+        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
              style={{ borderLeft: '1px solid var(--gold-border)' }} />
       </div>
 
