@@ -2,7 +2,7 @@ import { Card } from '../../components/card'
 import { THE_VANQUISHER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
 import type { GameState, Card as CardType } from '../../types'
 import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
-import { useCardLayout } from '../../hooks/useCardLayout'
+import { useCardLayout, ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
 import { useElementHeight } from '../../hooks/useElementHeight'
 import { badgeCls } from '../../components/common/ZoneLayout'
 
@@ -91,7 +91,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
   const poolCards = [...self_player.hand, ...self_player.sideboard]
 
   const [upgradeHeaderRef, upgradeHeaderHeight] = useElementHeight()
-  const fixedHeight = upgradeHeaderHeight + 56
+  const fixedHeight = upgradeHeaderHeight + 8
 
   const [dualRef, { upgrades: upgradeCardDims, pool: poolCardDims }] = useCardLayout({
     zones: {
@@ -100,6 +100,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
     },
     layout: { top: ['upgrades'], bottomLeft: ['pool'] },
     fixedHeight,
+    ...ZONE_LAYOUT_PADDING,
   })
 
   const handleUpgradeClick = (upgrade: CardType) => {
@@ -216,7 +217,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
 
             <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1 min-h-0 flex flex-col">
               <span className={badgeCls}>Pool</span>
-              <div className="overflow-auto flex-1 min-h-0 p-1" style={{
+              <div className="overflow-hidden flex-1 min-h-0" style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
                 gap: '6px',
