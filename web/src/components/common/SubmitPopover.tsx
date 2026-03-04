@@ -34,7 +34,7 @@ export function SubmitPopover({ options, onClose }: SubmitPopoverProps) {
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-2 right-0 modal-chrome backdrop-blur border border-gray-700 rounded-lg shadow-2xl p-2 flex flex-col gap-1.5 min-w-[120px]"
+      className="absolute bottom-full mb-2 right-0 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1.5 min-w-[120px]"
     >
       {options.map((option) => (
         <button

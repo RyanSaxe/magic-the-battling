@@ -95,7 +95,7 @@ export function BasicLandSlot({
         createPortal(
           <div
             ref={popoverRef}
-            className="fixed z-50 bg-gray-900 border border-gray-600 rounded-lg p-2 shadow-xl"
+            className="fixed z-50 modal-chrome border gold-border rounded-lg p-2 shadow-xl"
             style={{ top: pos.top, left: pos.left }}
           >
             <div className="grid grid-cols-3 gap-1.5">

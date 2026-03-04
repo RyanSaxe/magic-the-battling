@@ -64,5 +64,6 @@ export const PHASE_HOTKEYS: Record<string, HotkeyEntry[]> = {
     { key: 'H', description: 'Move to hand' },
     { key: 'B', description: 'Move to battlefield' },
     { key: 'E', description: 'Move to exile' },
+    { key: 'L', description: 'Move to library' },
   ],
 }

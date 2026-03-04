@@ -275,8 +275,8 @@ function AccordionItem({ id, label, expanded, panelCapPx, onToggle, children }: 
         data-accordion-header="true"
         className={`w-full py-3 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-b transition-colors duration-[400ms] ${
           expanded
-            ? 'bg-gray-800/50 border-amber-400/25'
-            : 'hover:bg-gray-800/50 border-amber-400/15'
+            ? 'bg-black/20 border-amber-400/25'
+            : 'hover:bg-black/20 border-amber-400/15'
         }`}
       >
         <span className="text-white font-medium text-sm sm:text-base flex-1 text-left">{label}</span>
@@ -735,7 +735,7 @@ export function QuickGuide({
           </div>
         )}
 
-        <div className="shrink-0 px-4 py-3 border-t border-amber-400/10 bg-gray-900/95 backdrop-blur-sm">
+        <div className="shrink-0 px-4 py-3 border-t border-amber-400/10 modal-chrome backdrop-blur-sm">
           <div className="flex items-center justify-between gap-3">
             <a
               href={DISCORD_INVITE_URL}

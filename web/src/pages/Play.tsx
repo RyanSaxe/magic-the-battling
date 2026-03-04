@@ -631,8 +631,7 @@ export function Play() {
              style={{ borderLeft: '1px solid var(--gold-border)' }} />
       </div>
 
-      <footer className="shrink-0 frame-chrome px-4 py-2"
-              style={{ borderTop: '1px solid var(--gold-border)' }}>
+      <footer className="shrink-0 frame-chrome px-4 sm:px-14 py-2">
         <div className="flex items-center justify-between max-w-5xl mx-auto">
           <a href="https://cubecobra.com/cube/about/auto?view=primer"
              target="_blank" rel="noopener noreferrer"

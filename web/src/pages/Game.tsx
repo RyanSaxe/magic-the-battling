@@ -649,7 +649,7 @@ function GameContent() {
               }
             }
           };
-          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile' } as const;
+          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile', l: 'command_zone' } as const;
           for (const [key, toZone] of Object.entries(moveZones)) {
             map[key] = () => {
               if (toZone !== hoveredCard.zone) {
@@ -1146,19 +1146,9 @@ function GameContent() {
               <button onClick={() => setSidebarOpen(o => !o)} className="btn btn-secondary text-xs sm:text-sm">☰</button>
             ) : undefined}
             title={isEndPhase ? (
-              <div className="flex items-center gap-3">
-                <span className={`font-bold ${isWinner ? 'text-amber-400' : 'text-gray-300'}`}>
-                  {getOrdinal(selfPlacement)} Place
-                </span>
-                {gameId && (
-                  <button
-                    className="text-xs font-medium rounded-full px-3 py-1 bg-indigo-600/80 hover:bg-indigo-500 text-white border border-indigo-400/30 transition-colors"
-                    onClick={() => setShareOpen(true)}
-                  >
-                    Share
-                  </button>
-                )}
-              </div>
+              <span className={`font-bold ${isWinner ? 'text-amber-400' : 'text-gray-300'}`}>
+                {getOrdinal(selfPlacement)} Place
+              </span>
             ) : undefined}
           />
         </div>
@@ -1442,7 +1432,16 @@ function GameContent() {
         {!isSpectator && (
           <div className="shrink-0 relative z-50 frame-chrome">
             <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
-              {renderActionButtons()}
+              {isEndPhase && gameId ? (
+                <div className="flex items-center justify-center w-full py-1">
+                  <button
+                    className="btn bg-indigo-600/80 hover:bg-indigo-500 text-white border border-indigo-400/30"
+                    onClick={() => setShareOpen(true)}
+                  >
+                    Share Game
+                  </button>
+                </div>
+              ) : renderActionButtons()}
             </div>
           </div>
         )}

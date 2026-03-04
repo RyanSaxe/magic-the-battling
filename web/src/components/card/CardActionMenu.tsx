@@ -98,7 +98,7 @@ export function CardActionMenu({
       <div
         ref={menuRef}
         style={menuStyle}
-        className="modal-chrome border border-gray-700 rounded-lg shadow-xl py-1 min-w-[160px] z-50"
+        className="modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[160px] z-50"
       >
         {onBattlefield && (
           <>
@@ -283,13 +283,13 @@ function MenuItem({
 }
 
 function MenuDivider() {
-  return <div className="border-t border-gray-700 my-1" />
+  return <div className="border-t gold-divider my-1" />
 }
 
 function Submenu({ children, maxHeight }: { children: React.ReactNode; maxHeight?: number }) {
   return (
     <div
-      className="ml-2 pl-2 border-l border-gray-700"
+      className="ml-2 pl-2 border-l gold-divider"
       style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}
     >
       {children}
