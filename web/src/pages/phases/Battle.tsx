@@ -270,7 +270,7 @@ export function BattlePhase({
         <div className="flex shrink-0 overflow-hidden" style={{ height: handHeight + bfHeight }}>
           <div className="flex flex-col flex-1 min-w-0">
             {/* Opponent's hand */}
-            <div id="opponent-hand" className="shrink-0 zone-hand px-2 overflow-hidden battle-hand-separator-bottom" style={{ height: handHeight }}>
+            <div id="opponent-hand" className="shrink-0 zone-hand overflow-hidden" style={{ height: handHeight }}>
               {canManipulateOpponent ? (
                 <DroppableZone
                   zone="hand"
@@ -308,7 +308,7 @@ export function BattlePhase({
               )}
             </div>
             {/* Opponent's battlefield */}
-            <div className="relative flex-1 min-w-0 battlefield overflow-hidden">
+            <div className="relative flex-1 min-w-0 battlefield overflow-hidden battle-hand-separator-top">
               <BattlefieldZone
                 cards={opponent_zones.battlefield}
                 selectedCardId={selectedCard?.card.id}

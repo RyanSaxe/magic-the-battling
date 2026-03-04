@@ -162,7 +162,7 @@ export function BattlefieldZone({
         zoneOwner={zoneOwner}
         validFromZones={validFromZones}
         disabled={!allowInteraction}
-        className="battlefield p-2"
+        className="h-full p-2"
       >
         <div
           className={`flex flex-col gap-1.5 ${isOpponent ? "flex-col-reverse" : ""}`}
@@ -204,7 +204,7 @@ export function BattlefieldZone({
       zoneOwner={zoneOwner}
       validFromZones={validFromZones}
       disabled={!allowInteraction}
-      className={`battlefield flex-1 ${compact ? 'p-1' : 'p-4'}`}
+      className={`h-full flex-1 ${compact ? 'p-1' : 'p-4'}`}
     >
       {label && (
         <div className="text-xs text-gray-400 mb-2 uppercase tracking-wide">
