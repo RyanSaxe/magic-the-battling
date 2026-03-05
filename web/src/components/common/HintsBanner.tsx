@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { GAME_HINTS } from "../../constants/hints";
 
 const CYCLE_INTERVAL = 8000;
-const FADE_DURATION = 200;
+const FADE_OUT_DURATION = 280;
+const SWAP_PAUSE = 80;
 
 export function HintsBanner({ variant = "default" }: { variant?: "default" | "dark" } = {}) {
   const [index, setIndex] = useState(
@@ -10,14 +11,32 @@ export function HintsBanner({ variant = "default" }: { variant?: "default" | "da
   );
   const [visible, setVisible] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fadeOutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fadeInRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTransitionTimers = useCallback(() => {
+    if (fadeOutRef.current) {
+      clearTimeout(fadeOutRef.current);
+      fadeOutRef.current = null;
+    }
+    if (fadeInRef.current) {
+      clearTimeout(fadeInRef.current);
+      fadeInRef.current = null;
+    }
+  }, []);
 
   const goTo = useCallback((next: number) => {
+    clearTransitionTimers();
     setVisible(false);
-    setTimeout(() => {
+    fadeOutRef.current = setTimeout(() => {
       setIndex(next);
-      setVisible(true);
-    }, FADE_DURATION);
-  }, []);
+      fadeInRef.current = setTimeout(() => {
+        setVisible(true);
+        fadeInRef.current = null;
+      }, SWAP_PAUSE);
+      fadeOutRef.current = null;
+    }, FADE_OUT_DURATION);
+  }, [clearTransitionTimers]);
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -30,8 +49,9 @@ export function HintsBanner({ variant = "default" }: { variant?: "default" | "da
     resetTimer();
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+      clearTransitionTimers();
     };
-  }, [resetTimer]);
+  }, [resetTimer, clearTransitionTimers]);
 
   const prev = () => {
     if (timerRef.current) clearTimeout(timerRef.current);

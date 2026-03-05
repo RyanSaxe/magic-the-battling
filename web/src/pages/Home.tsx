@@ -22,8 +22,7 @@ export function Home() {
               Magic: The Battling
             </h1>
             <p className="text-gray-400 text-sm">
-              A Magic: the Gathering format inspired by the autobattler game
-              genre
+              An MtG format inspired by autobattlers
             </p>
           </div>
           <div className="flex gap-2">
@@ -48,7 +47,7 @@ export function Home() {
                 Magic: The Battling
               </h1>
               <p className="text-gray-400 text-xs">
-                Inspired by the autobattler game genre
+                An MtG format inspired by autobattlers
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
