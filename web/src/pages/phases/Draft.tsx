@@ -104,7 +104,7 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
                   <img
                     src={POISON_COUNTER_IMAGE}
                     alt="Poison"
-                    className="h-[52px] block shadow-lg"
+                    className="h-[56px] block shadow-lg"
                     style={{ borderRadius: 'var(--card-border-radius)' }}
                   />
                   <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-purple-400 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
