@@ -41,26 +41,30 @@ export function Home() {
             </button>
           </div>
         </div>
-        <div className="sm:hidden text-center">
-          <h1 className="hero-title text-2xl font-bold tracking-tight">
-            Magic: The Battling
-          </h1>
-          <p className="text-gray-400 text-xs">
-            Inspired by the autobattler game genre
-          </p>
-          <div className="flex gap-3 mt-2 justify-center">
-            <button
-              onClick={() => navigate("/play")}
-              className="btn btn-primary py-2 px-5 font-semibold animate-gentle-glow"
-            >
-              Play Game
-            </button>
-            <button
-              onClick={() => setShowJoinModal(true)}
-              className="btn btn-secondary py-2 px-5"
-            >
-              Join Game
-            </button>
+        <div className="sm:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
+                Magic: The Battling
+              </h1>
+              <p className="text-gray-400 text-xs">
+                Inspired by the autobattler game genre
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => navigate("/play")}
+                className="btn btn-primary py-1.5 px-3 text-sm font-semibold animate-gentle-glow"
+              >
+                Play
+              </button>
+              <button
+                onClick={() => setShowJoinModal(true)}
+                className="btn btn-secondary py-1.5 px-3 text-sm"
+              >
+                Join
+              </button>
+            </div>
           </div>
         </div>
       </header>
