@@ -364,6 +364,14 @@ async def _connect_player_to_game(websocket: WebSocket, game_id: str, player_id:
         await _reject_websocket(websocket, code=4004, reason="Game not found")
         return None
 
+    if pending and player_id not in pending.player_ids:
+        await _reject_websocket(websocket, code=4001, reason="Invalid session")
+        return None
+
+    if game and not game_manager.get_player(game, player_id):
+        await _reject_websocket(websocket, code=4001, reason="Player not found in game")
+        return None
+
     game_manager.cancel_pending_disconnect(game_id, player_id)
     connected = await connection_manager.connect(game_id, player_id, websocket)
     if not connected:

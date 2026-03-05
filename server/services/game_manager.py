@@ -52,7 +52,7 @@ from mtb.phases.elimination import (
     setup_sudden_death_battle,
     would_be_dead_ready_for_elimination,
 )
-from server.db.models import ActiveGameSnapshot, BattleSnapshot, GameRecord, PlayerGameHistory
+from server.db.models import ActiveGameSnapshot, BattleSnapshot, GamePlayerRecord, GameRecord, PlayerGameHistory
 from server.runtime_config import (
     HOT_ACTION_WINDOW_MINUTES,
     IDLE_EVICT_MINUTES,
@@ -418,6 +418,58 @@ class GameManager:
             logger.warning("Recovered %d missing active battle(s) after restore", recovered)
         return changed
 
+    def _clear_runtime_player_mappings_for_game(self, game_id: str) -> None:
+        players_to_remove = [pid for pid, gid in self._player_to_game.items() if gid == game_id]
+        for pid in players_to_remove:
+            self._player_to_game.pop(pid, None)
+            self._player_id_to_name.pop(pid, None)
+
+    def _persist_human_player_mappings(
+        self,
+        db_session: Session,
+        game_id: str,
+        player_pairs: list[tuple[str, str]],
+    ) -> None:
+        # Keep one active player_id mapping per human name for deterministic reconnect behavior.
+        for player_id, player_name in player_pairs:
+            db_session.query(GamePlayerRecord).filter(
+                GamePlayerRecord.game_id == game_id,
+                GamePlayerRecord.player_name == player_name,
+                GamePlayerRecord.is_puppet.is_(False),
+            ).delete(synchronize_session=False)
+            db_session.add(
+                GamePlayerRecord(
+                    game_id=game_id,
+                    player_id=player_id,
+                    player_name=player_name,
+                    is_puppet=False,
+                )
+            )
+
+    def _restore_human_player_mappings(self, db_session: Session, game_id: str, game: Game) -> int:
+        self._clear_runtime_player_mappings_for_game(game_id)
+
+        valid_names = {p.name for p in game.players}
+        rows = (
+            db_session.query(GamePlayerRecord)
+            .filter(
+                GamePlayerRecord.game_id == game_id,
+                GamePlayerRecord.is_puppet.is_(False),
+            )
+            .all()
+        )
+
+        restored = 0
+        for row in rows:
+            player_id = cast(str, row.player_id)
+            player_name = cast(str, row.player_name)
+            if player_name not in valid_names:
+                continue
+            self._player_to_game[player_id] = game_id
+            self._player_id_to_name[player_id] = player_name
+            restored += 1
+        return restored
+
     def restore_game_from_snapshot(self, game_id: str) -> bool:
         if game_id in self._active_games:
             return True
@@ -431,6 +483,9 @@ class GameManager:
             self._active_games[game_id] = game
             if self._normalize_restored_game(game):
                 self.mark_game_dirty(game_id, human_activity=False)
+            restored_mappings = self._restore_human_player_mappings(session, game_id, game)
+            if restored_mappings == 0:
+                logger.warning("No human player mappings restored for game_id=%s", game_id)
             last_activity = cast(datetime | None, row.last_human_activity_at)
             self._last_human_activity[game_id] = _utc_or_default(last_activity, datetime.now(UTC))
             self._connected_humans[game_id] = 0
@@ -460,6 +515,7 @@ class GameManager:
                 self._active_games[snapshot_game_id] = game
                 if self._normalize_restored_game(game):
                     self.mark_game_dirty(snapshot_game_id, human_activity=False)
+                self._restore_human_player_mappings(session, snapshot_game_id, game)
                 self._last_human_activity[snapshot_game_id] = _utc_or_default(last_activity, datetime.now(UTC))
                 self._connected_humans[snapshot_game_id] = 0
                 restored += 1
@@ -686,6 +742,11 @@ class GameManager:
                 config_json=json.dumps(config_data),
             )
             db.add(game_record)
+            self._persist_human_player_mappings(
+                db,
+                game_id,
+                list(zip(pending.player_ids, pending.player_names, strict=False)),
+            )
             db.commit()
 
             if pending.puppet_count > 0:
@@ -767,6 +828,11 @@ class GameManager:
                         config_json=json.dumps(config_data),
                     )
                     db.add(game_record)
+                    self._persist_human_player_mappings(
+                        db,
+                        game_id,
+                        list(zip(pending.player_ids, pending.player_names, strict=False)),
+                    )
                     db.commit()
 
                     if pending.puppet_count > 0:
@@ -915,11 +981,7 @@ class GameManager:
 
         self._active_games.pop(game_id, None)
         self._pending_games.pop(game_id, None)
-
-        players_to_remove = [pid for pid, gid in self._player_to_game.items() if gid == game_id]
-        for pid in players_to_remove:
-            self._player_to_game.pop(pid, None)
-            self._player_id_to_name.pop(pid, None)
+        self._clear_runtime_player_mappings_for_game(game_id)
 
         self._cleanup_tasks.pop(game_id, None)
         self._connected_humans.pop(game_id, None)
@@ -1243,6 +1305,12 @@ class GameManager:
 
         self._player_to_game[player_id] = game_id
         self._player_id_to_name[player_id] = player_name
+        session = db.SessionLocal()
+        try:
+            self._persist_human_player_mappings(session, game_id, [(player_id, player_name)])
+            session.commit()
+        finally:
+            session.close()
         return True
 
     def remove_player_from_pending(self, game_id: str, player_id: str) -> bool:
