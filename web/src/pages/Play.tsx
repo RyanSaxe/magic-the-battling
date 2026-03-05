@@ -474,8 +474,7 @@ export function Play() {
               Magic: The Battling
             </h1>
             <p className="text-gray-400 text-sm">
-              A Magic: the Gathering format inspired by the autobattler game
-              genre
+              An MtG format inspired by autobattlers
             </p>
           </div>
           <div className="flex gap-2">
@@ -487,17 +486,19 @@ export function Play() {
             </button>
           </div>
         </div>
-        <div className="sm:hidden text-center">
-          <h1 className="hero-title text-2xl font-bold tracking-tight">
-            Magic: The Battling
-          </h1>
-          <p className="text-gray-400 text-xs">
-            Inspired by the autobattler game genre
-          </p>
-          <div className="flex justify-center mt-2 gap-3">
+        <div className="sm:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
+                Magic: The Battling
+              </h1>
+              <p className="text-gray-400 text-xs">
+                An MtG format inspired by autobattlers
+              </p>
+            </div>
             <button
               onClick={() => navigate("/")}
-              className="btn btn-secondary py-2 px-5"
+              className="btn btn-secondary py-1.5 px-3 text-sm shrink-0"
             >
               Home
             </button>

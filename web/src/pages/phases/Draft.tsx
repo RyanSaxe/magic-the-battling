@@ -86,17 +86,27 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
         <div className="zone-pack px-3 pt-5 pb-3 relative">
           {isMobile && (
             <>
-              <div className="absolute bottom-2 left-2 pointer-events-none z-10">
-                <div className="relative">
-                  <img src={TREASURE_TOKEN_IMAGE} alt="Treasure" className="h-12 rounded-sm shadow-lg" />
+              <div className="absolute top-0 left-0 pointer-events-none z-10">
+                <div className="relative draft-token-frame draft-token-frame--treasure">
+                  <img
+                    src={TREASURE_TOKEN_IMAGE}
+                    alt="Treasure"
+                    className="h-[56px] block shadow-lg"
+                    style={{ borderRadius: 'var(--card-border-radius)' }}
+                  />
                   <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-amber-400 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
                     {self_player.treasures}
                   </span>
                 </div>
               </div>
-              <div className="absolute bottom-2 right-2 pointer-events-none z-10">
-                <div className="relative">
-                  <img src={POISON_COUNTER_IMAGE} alt="Poison" className="h-12 rounded-sm shadow-lg" />
+              <div className="absolute top-0 right-0 pointer-events-none z-10">
+                <div className="relative draft-token-frame draft-token-frame--poison">
+                  <img
+                    src={POISON_COUNTER_IMAGE}
+                    alt="Poison"
+                    className="h-[56px] block shadow-lg"
+                    style={{ borderRadius: 'var(--card-border-radius)' }}
+                  />
                   <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-purple-400 text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
                     {self_player.poison}
                   </span>

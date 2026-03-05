@@ -24,6 +24,7 @@ export function useGame(
     clearSpectateRequest,
     kicked,
     invalidSession,
+    gameNotFound,
   } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError)
 
   const startGame = useCallback(() => {
@@ -140,6 +141,7 @@ export function useGame(
     serverNotice,
     kicked,
     invalidSession,
+    gameNotFound,
     actions: {
       startGame,
       setReady,

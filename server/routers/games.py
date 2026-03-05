@@ -429,7 +429,7 @@ def get_game_cards(game_id: str):
 
 
 @router.post("/{game_id}/start", response_model=StartGameResponse)
-def start_game(game_id: str):
+def start_game(game_id: str, db: Session = Depends(get_db)):  # noqa: B008
     if ops_manager.blocks_new_games():
         raise _server_update_http_error("Server is updating. New games are temporarily blocked.")
 
@@ -443,7 +443,7 @@ def start_game(game_id: str):
     if pending.target_player_count < 2:
         raise HTTPException(status_code=400, detail="Need at least 2 players to start")
 
-    game = game_manager.start_game(game_id)
+    game = game_manager.start_game(game_id, db)
     if not game:
         raise HTTPException(status_code=500, detail="Failed to start game")
 

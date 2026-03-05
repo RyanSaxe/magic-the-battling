@@ -15,9 +15,13 @@ interface WebSocketState {
     mode: 'normal' | 'draining' | 'maintenance'
     message: string
     updated_at: string
+    new_games_blocked?: boolean
+    scheduled_for_utc?: string | null
+    estimated_recovery_minutes?: number | null
   } | null
   kicked: boolean
   invalidSession: boolean
+  gameNotFound: boolean
 }
 
 interface SpectatorConfig {
@@ -44,6 +48,7 @@ export function useWebSocket(
     serverNotice: null,
     kicked: false,
     invalidSession: false,
+    gameNotFound: false,
   })
 
   const wsRef = useRef<WebSocket | null>(null)
@@ -90,7 +95,12 @@ export function useWebSocket(
 
       ws.onopen = () => {
         if (!isCurrentSocket()) return
-        setState(s => ({ ...s, isConnected: true, invalidSession: false }))
+        setState(s => ({
+          ...s,
+          isConnected: true,
+          invalidSession: false,
+          gameNotFound: false,
+        }))
         reconnectAttempts.current = 0
       }
 
@@ -155,6 +165,7 @@ export function useWebSocket(
         }
         if (event.code === 4004) {
           isClosingRef.current = true
+          setState(s => ({ ...s, gameNotFound: true }))
           return
         }
 

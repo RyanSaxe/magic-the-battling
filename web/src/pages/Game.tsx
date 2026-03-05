@@ -563,7 +563,7 @@ function GameContent() {
   const [activeDndPanel, setActiveDndPanel] = useState<ActiveDndPanel>(null);
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
-  const [dismissedDrainingNoticeAt, setDismissedDrainingNoticeAt] = useState<string | null>(null);
+  const [dismissedServerNoticeAt, setDismissedServerNoticeAt] = useState<string | null>(null);
 
   const prevPhaseRef = useRef(gameState?.self_player.phase);
   if (gameState?.self_player.phase !== prevPhaseRef.current) {
@@ -1160,69 +1160,103 @@ function GameContent() {
     return null;
   };
 
-  const drainingNoticeHidden =
-    serverNotice?.mode === "draining" &&
-    dismissedDrainingNoticeAt === serverNotice.updated_at;
+  const serverNoticeHidden = !!serverNotice && dismissedServerNoticeAt === serverNotice.updated_at;
   const drainingScheduledEt = serverNotice?.mode === "draining"
     ? scheduledEasternFromNotice(serverNotice.message || "")
     : null;
   const drainingMessage = serverNotice?.mode === "draining"
     ? drainingMessageWithEasternTime(serverNotice.message || "", drainingScheduledEt)
     : "";
+  const recoveryHint = serverNotice?.estimated_recovery_minutes
+    ? `Estimated recovery: about ${serverNotice.estimated_recovery_minutes} minute${serverNotice.estimated_recovery_minutes === 1 ? "" : "s"}.`
+    : null;
 
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
       <div className="game-table h-dvh overflow-hidden flex flex-col">
         {!isConnected && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
-            <div className="bg-gray-950/90 backdrop-blur-sm border border-gray-700/50 border-l-[3px] border-l-amber-500 rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
+            <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
               <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              <span className="text-sm text-gray-200">Reconnecting...</span>
+              <span className="text-sm text-gray-100">Reconnecting...</span>
             </div>
           </div>
         )}
-        {serverNotice?.mode === 'draining' && !drainingNoticeHidden && (
+        {serverNotice && serverNotice.mode !== "normal" && serverNoticeHidden && (
+          <div className="fixed top-3 right-3 pointer-events-none" style={{ zIndex: TOP_NOTICE_Z_INDEX }}>
+            <button
+              type="button"
+              onClick={() => setDismissedServerNoticeAt(null)}
+              className="pointer-events-auto modal-chrome border gold-border rounded-md px-3 py-1 text-xs text-amber-100 hover:text-white"
+            >
+              Show Server Notice
+            </button>
+          </div>
+        )}
+        {serverNotice?.mode === "draining" && !serverNoticeHidden && (
           <div className="fixed top-0 inset-x-0 px-3 pt-3 pointer-events-none" style={{ zIndex: TOP_NOTICE_Z_INDEX }}>
-            <div className="mx-auto max-w-3xl pointer-events-auto bg-amber-950/90 border border-amber-500/40 rounded-lg shadow-xl px-4 py-3">
-              <div className="flex items-center gap-2 mb-1">
-                <h2 className="text-sm font-semibold text-amber-200">Scheduled Server Update</h2>
-                <span
-                  className="inline-flex items-center justify-center rounded-full border border-amber-300/70 text-amber-100 text-[10px] font-bold leading-none px-1.5 py-0.5 cursor-help"
-                  title="New games are temporarily paused. You can keep playing this game and reconnect after the update if needed."
-                >
-                  i
+            <div className="mx-auto max-w-3xl pointer-events-auto modal-chrome border gold-border rounded-lg shadow-xl px-4 py-3">
+              <div className="flex items-start gap-3">
+                <span className="inline-flex items-center justify-center rounded-full border gold-border text-amber-200 text-[10px] uppercase tracking-wide px-2 py-0.5 shrink-0">
+                  Update
                 </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold text-amber-200">Scheduled Server Update</h2>
+                  </div>
+                  <p className="text-sm text-gray-100 mt-1 leading-snug">
+                    {drainingMessage || "A server update is scheduled soon."}
+                  </p>
+                  <p className="text-xs text-gray-300 mt-1 leading-snug">
+                    New games are paused temporarily. Your current game can continue and reconnect automatically if needed.
+                  </p>
+                  {recoveryHint && (
+                    <p className="text-xs text-amber-200/90 mt-1">{recoveryHint}</p>
+                  )}
+                </div>
                 <button
                   type="button"
-                  onClick={() => setDismissedDrainingNoticeAt(serverNotice.updated_at)}
-                  className="ml-auto text-amber-100/80 hover:text-amber-100 text-xs px-1"
-                  aria-label="Dismiss scheduled server update notice"
+                  onClick={() => setDismissedServerNoticeAt(serverNotice.updated_at)}
+                  className="text-amber-100/70 hover:text-amber-100 text-xs px-1 shrink-0"
+                  aria-label="Dismiss server notice"
                   title="Dismiss"
                 >
                   ✕
                 </button>
               </div>
-              <p className="text-sm text-amber-100/95">
-                {drainingMessage || 'A server update is scheduled soon. New games are paused while current games continue.'}
-              </p>
             </div>
           </div>
         )}
-        {serverNotice?.mode === 'maintenance' && (
+        {serverNotice?.mode === "maintenance" && !serverNoticeHidden && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center" style={{ zIndex: TOP_NOTICE_Z_INDEX }}>
-            <div className="bg-gray-950/95 border border-amber-500/40 rounded-xl shadow-2xl p-6 max-w-md mx-4">
+            <div className="modal-chrome border gold-border rounded-xl shadow-2xl p-6 max-w-md mx-4 w-full">
               <div className="flex items-center gap-2 mb-2">
-                <h2 className="text-xl font-semibold text-amber-300">Server Maintenance</h2>
+                <span className="inline-flex items-center justify-center rounded-full border gold-border text-amber-200 text-[10px] uppercase tracking-wide px-2 py-0.5">
+                  Maintenance
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDismissedServerNoticeAt(serverNotice.updated_at)}
+                  className="ml-auto text-amber-100/70 hover:text-amber-100 text-sm px-1"
+                  aria-label="Dismiss server maintenance notice"
+                  title="Dismiss"
+                >
+                  ✕
+                </button>
               </div>
-              <p className="text-sm text-gray-200 mb-2">
-                {serverNotice.message || 'Please wait a moment while the server finishes an update.'}
+              <h2 className="text-xl font-semibold text-amber-300 mb-2">Server Maintenance</h2>
+              <p className="text-sm text-gray-100 mb-2 leading-snug">
+                {serverNotice.message || "The server is temporarily unavailable while maintenance is in progress."}
               </p>
-              <p className="text-xs text-gray-400">
-                Keep this tab open. Your game will reconnect automatically when available.
+              <p className="text-xs text-gray-300 leading-snug">
+                Keep this tab open and we’ll reconnect automatically when service returns.
               </p>
+              {recoveryHint && (
+                <p className="text-xs text-amber-200/90 mt-2">{recoveryHint}</p>
+              )}
             </div>
           </div>
         )}
