@@ -49,9 +49,15 @@ export function HintsBanner({ variant = "default" }: { variant?: "default" | "da
     resetTimer();
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [resetTimer]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
       clearTransitionTimers();
     };
-  }, [resetTimer, clearTransitionTimers]);
+  }, [clearTransitionTimers]);
 
   const prev = () => {
     if (timerRef.current) clearTimeout(timerRef.current);

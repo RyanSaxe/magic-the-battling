@@ -305,7 +305,7 @@ export function Lobby() {
                 }}
                 className="btn btn-secondary py-2 px-4"
               >
-                ?
+                Guide
               </button>
             </div>
           </div>
@@ -409,7 +409,7 @@ export function Lobby() {
                 }}
                 className="btn btn-secondary py-2 px-4"
               >
-                ?
+                Guide
               </button>
             </div>
           </div>
@@ -533,7 +533,7 @@ export function Lobby() {
               }}
               className="btn btn-secondary py-2 px-4"
             >
-              ?
+              Guide
             </button>
           </div>
         </div>
