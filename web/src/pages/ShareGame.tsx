@@ -283,7 +283,7 @@ export function ShareGame() {
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
     <div className="h-dvh flex flex-col bg-gray-900 text-white overflow-hidden">
       {/* Header */}
-      <header className="shrink-0 py-3 frame-chrome bar-pad-both">
+      <header className="shrink-0 py-3 frame-chrome px-3 sm:pl-[var(--frame-rail-edge)] sm:pr-3">
         <div className="hidden sm:flex items-center justify-between">
           <div>
             <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
@@ -295,16 +295,16 @@ export function ShareGame() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate('/play')}
-              className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
-            >
-              Play Game
-            </button>
-            <button
               onClick={() => navigate('/')}
               className="btn btn-secondary py-2 px-4"
             >
               Home
+            </button>
+            <button
+              onClick={() => navigate('/play')}
+              className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
+            >
+              Play Game
             </button>
           </div>
         </div>
@@ -320,16 +320,16 @@ export function ShareGame() {
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <button
-                onClick={() => navigate('/play')}
-                className="btn btn-primary py-1.5 px-3 text-sm font-semibold animate-gentle-glow"
-              >
-                Play
-              </button>
-              <button
                 onClick={() => navigate('/')}
                 className="btn btn-secondary py-1.5 px-3 text-sm"
               >
                 Home
+              </button>
+              <button
+                onClick={() => navigate('/play')}
+                className="btn btn-primary py-1.5 px-3 text-sm font-semibold animate-gentle-glow"
+              >
+                Play
               </button>
             </div>
           </div>

@@ -8,6 +8,7 @@ import { InfoIcon } from "../components/icons/InfoIcon";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
 import { HintsBanner } from "../components/common/HintsBanner";
+import { CubeCobraPrimerLink } from "../components/common/CubeCobraPrimerLink";
 import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import {
   getDefaultNewPlayerPreference,
@@ -134,14 +135,7 @@ function GuidedModeSwitch({
 function LobbyFooterLinks() {
   return (
     <div className="flex items-center justify-between">
-      <a
-        href="https://cubecobra.com/cube/about/auto?view=primer"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
-      >
-        CubeCobra Primer
-      </a>
+      <CubeCobraPrimerLink />
       <a
         href="https://discord.gg/2NAjcWXNKn"
         target="_blank"

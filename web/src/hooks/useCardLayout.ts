@@ -356,7 +356,7 @@ export function computeLayout(
               vGaps({ gap: fillBL[0]?.gap ?? 6 } as ResolvedZone, d.rows),
             0,
           ) +
-          Math.max(0, fillBL.length - 1) * sectionGap +
+          Math.max(0, (!isTop ? 1 : 0) + fillBL.length - 1) * sectionGap +
           fillBL.length * sectionPadV;
 
         const totalH =
@@ -566,7 +566,7 @@ export function computeLayout(
           const fillTotalH2 = Object.values(fillDims).reduce(
             (s, d) => s + d.rows * d.height + vGaps({ gap: fillBL[0]?.gap ?? 6 } as ResolvedZone, d.rows),
             0,
-          ) + Math.max(0, fillBL.length - 1) * sectionGap + fillBL.length * sectionPadV;
+          ) + Math.max(0, (!pAIsTop ? 1 : 0) + (!pBIsTop ? 1 : 0) + fillBL.length - 1) * sectionGap + fillBL.length * sectionPadV;
           const totalH2 = (pAIsTop ? sectionPadV + aGridH : 0)
             + (pBIsTop ? sectionPadV + bGridH : 0)
             + columnGap
@@ -701,8 +701,7 @@ export function computeLayout(
       const zone = allZones.get(id)!;
       return sum + d.rows * d.height + vGaps(zone, d.rows);
     }, 0)
-      + topOverhead + blOverhead + columnGap
-      + Math.max(0, blIds.filter((id) => (chosen[id]?.width ?? 0) > 0).length - 1) * sectionGap;
+      + topOverhead + blOverhead + columnGap;
 
     let slack = availH - usedH;
 

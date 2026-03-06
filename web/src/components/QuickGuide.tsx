@@ -7,6 +7,7 @@ import { PHASES, type Phase } from '../constants/phases'
 import { PHASE_HOTKEYS } from '../constants/hotkeys'
 import { HotkeyRow } from './HotkeyRow'
 import { DocNavContext } from '../contexts/DocNavContext'
+import { CubeCobraPrimerLink } from './common/CubeCobraPrimerLink'
 
 type HeaderTab = 'guide' | 'controls' | 'tips' | 'browse' | 'faq'
 type CardType = 'cards' | 'upgrades' | 'vanguards'
@@ -16,7 +17,6 @@ type TipsSection = 'global' | Phase
 
 const ACCORDION_STEP_MS = 400
 const DISCORD_INVITE_URL = 'https://discord.gg/2NAjcWXNKn'
-const CUBECOBRA_PRIMER_URL = 'https://cubecobra.com/cube/about/auto?view=primer'
 const FACE_UP_FAQ_SLUG = 'why-are-my-opponents-cards-face-up'
 const FINALS_FAQ_SLUG = 'how-do-finals-and-sudden-death-work'
 
@@ -746,14 +746,7 @@ export function QuickGuide({
               <FaDiscord className="w-4 h-4" />
               Ask for help
             </a>
-            <a
-              href={CUBECOBRA_PRIMER_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
-            >
-              CubeCobra Primer
-            </a>
+            <CubeCobraPrimerLink />
           </div>
         </div>
       </div>

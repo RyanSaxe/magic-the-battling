@@ -53,7 +53,7 @@ export function ZoneLayout({
           </div>
         )}
         {hasLower && (
-          <div className="flex flex-1" style={{ gap: 2 }}>
+          <div className="flex flex-1 min-h-0" style={{ gap: 2 }}>
             {hasRight && (
               <div className="flex-1 min-w-0 flex flex-col" style={{ gap: 2 }}>
                 {hasBattlefield && (
@@ -63,7 +63,7 @@ export function ZoneLayout({
                   </div>
                 )}
                 {hasSideboard && (
-                  <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1">
+                  <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1 min-h-0">
                     <span className={badgeCls}>{sideboardLabel}</span>
                     {sideboardContent}
                   </div>

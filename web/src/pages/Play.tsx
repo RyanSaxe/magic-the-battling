@@ -7,6 +7,7 @@ import { useToast } from "../contexts";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { InfoIcon } from "../components/icons/InfoIcon";
 import { HintsBanner } from "../components/common/HintsBanner";
+import { CubeCobraPrimerLink } from "../components/common/CubeCobraPrimerLink";
 import { getLegendaryName } from "../utils/prefetchName";
 import {
   getDefaultNewPlayerPreference,
@@ -645,20 +646,19 @@ export function Play() {
           <HintsBanner variant="rail" />
         </main>
 
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
+      <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
              style={{ borderLeft: '1px solid var(--gold-border)' }} />
       </div>
 
       <footer className="shrink-0 frame-chrome bar-pad-both py-2">
         <div className="flex items-center justify-between">
-          <a href="https://cubecobra.com/cube/about/auto?view=primer"
-             target="_blank" rel="noopener noreferrer"
-             className="text-sm text-blue-300 hover:text-blue-200 transition-colors">
-            CubeCobra Primer
-          </a>
-          <a href="https://discord.gg/2NAjcWXNKn"
-             target="_blank" rel="noopener noreferrer"
-             className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors">
+          <CubeCobraPrimerLink />
+          <a
+            href="https://discord.gg/2NAjcWXNKn"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors"
+          >
             <FaDiscord className="w-4 h-4" />
             Join Discord
           </a>

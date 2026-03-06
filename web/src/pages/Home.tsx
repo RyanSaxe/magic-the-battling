@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaDiscord } from "react-icons/fa6";
 import { CardShowcase } from "../components/home/CardShowcase";
 import { JoinGameModal } from "../components/home/JoinGameModal";
+import { CubeCobraPrimerLink } from "../components/common/CubeCobraPrimerLink";
 import { prefetchLegendaryName } from "../utils/prefetchName";
 
 export function Home() {
@@ -27,16 +28,16 @@ export function Home() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => navigate("/play")}
-              className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
-            >
-              Play Game
-            </button>
-            <button
               onClick={() => setShowJoinModal(true)}
               className="btn btn-secondary py-2 px-4"
             >
               Join Game
+            </button>
+            <button
+              onClick={() => navigate("/play")}
+              className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
+            >
+              Play Game
             </button>
           </div>
         </div>
@@ -52,16 +53,16 @@ export function Home() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={() => navigate("/play")}
-                className="btn btn-primary py-1.5 px-3 text-sm font-semibold animate-gentle-glow"
-              >
-                Play
-              </button>
-              <button
                 onClick={() => setShowJoinModal(true)}
                 className="btn btn-secondary py-1.5 px-3 text-sm"
               >
                 Join
+              </button>
+              <button
+                onClick={() => navigate("/play")}
+                className="btn btn-primary py-1.5 px-3 text-sm font-semibold animate-gentle-glow"
+              >
+                Play
               </button>
             </div>
           </div>
@@ -84,17 +85,16 @@ export function Home() {
 
       <footer className="shrink-0 frame-chrome bar-pad-both py-2">
         <div className="flex items-center justify-between">
-          <a href="https://discord.gg/2NAjcWXNKn"
-             target="_blank" rel="noopener noreferrer"
-             className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors">
+          <a
+            href="https://discord.gg/2NAjcWXNKn"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors"
+          >
             <FaDiscord className="w-4 h-4" />
             Join Discord
           </a>
-          <a href="https://cubecobra.com/cube/about/auto?view=primer"
-             target="_blank" rel="noopener noreferrer"
-             className="text-sm text-blue-300 hover:text-blue-200 transition-colors">
-            CubeCobra Primer
-          </a>
+          <CubeCobraPrimerLink />
         </div>
       </footer>
 
