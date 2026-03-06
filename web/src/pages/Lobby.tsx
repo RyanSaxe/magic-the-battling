@@ -135,16 +135,16 @@ function GuidedModeSwitch({
 function LobbyFooterLinks() {
   return (
     <div className="flex items-center justify-between">
-      <CubeCobraPrimerLink />
       <a
         href="https://discord.gg/2NAjcWXNKn"
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors"
+        className="inline-flex items-center gap-2 text-sm text-[#5865F2] hover:text-[#7983F5] transition-colors"
       >
         <FaDiscord className="w-4 h-4" />
         Join Discord
       </a>
+      <CubeCobraPrimerLink />
     </div>
   );
 }

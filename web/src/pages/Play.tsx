@@ -246,17 +246,15 @@ function GuidedModeField({
           aria-label="Guided mode"
         />
         <span
-          className={`text-xs font-medium uppercase tracking-wide ${
-            enabled ? "text-amber-300" : "text-gray-500"
-          }`}
+          className={`text-xs font-medium uppercase tracking-wide ${enabled ? "text-amber-300" : "text-gray-500"
+            }`}
         >
           {enabled ? "On" : "Off"}
         </span>
         <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-              enabled ? "translate-x-5" : "translate-x-1"
-            }`}
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? "translate-x-5" : "translate-x-1"
+              }`}
           />
         </span>
       </label>
@@ -271,11 +269,10 @@ function GuidedModeField({
           <InfoIcon size="sm" />
         </button>
         <span
-          className={`absolute right-0 top-full mt-2 w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-50 ${
-            showGuidedModeHelp
-              ? "opacity-100"
-              : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
-          }`}
+          className={`absolute right-0 top-full mt-2 w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-50 ${showGuidedModeHelp
+            ? "opacity-100"
+            : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
+            }`}
         >
           {guidedModeHelpText}
         </span>
@@ -512,7 +509,7 @@ export function Play() {
 
       <div className="flex-1 flex min-h-0 game-surface">
         <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
-             style={{ borderRight: '1px solid var(--gold-border)' }} />
+          style={{ borderRight: '1px solid var(--gold-border)' }} />
 
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className="zone-pack flex-1 min-h-0 flex flex-col px-4 py-4 sm:py-2 sm:items-center sm:justify-center overflow-auto">
@@ -561,11 +558,10 @@ export function Play() {
                         <div className="flex-1 flex items-center justify-center">
                           <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
                             <span className="block text-amber-400/70">
-                              Battle hands that real players piloted
+                              Battle historically winning hands!
                             </span>
                             <span className="block">
-                              to strong finishes. Their cards are face up, and you decide
-                              who wins.
+                              Their cards are face up in battle. You can move them around to simulate the game and decide who would have won.
                             </span>
                           </p>
                         </div>
@@ -608,11 +604,10 @@ export function Play() {
                         <div className="flex-1 flex items-center justify-center">
                           <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
                             <span className="block text-amber-400/70">
-                              Can you draft an unbeatable hand?
+                              Draft an unbeatable hand!
                             </span>
                             <span className="block">
-                              Compete with your friends to see who can turn trash into
-                              treasure!
+                              See who is the best drafter. Everybody starts with trash, and it's up to you to turn it into treasure!
                             </span>
                           </p>
                         </div>
@@ -646,22 +641,22 @@ export function Play() {
           <HintsBanner variant="rail" />
         </main>
 
-      <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
-             style={{ borderLeft: '1px solid var(--gold-border)' }} />
+        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
+          style={{ borderLeft: '1px solid var(--gold-border)' }} />
       </div>
 
       <footer className="shrink-0 frame-chrome bar-pad-both py-2">
         <div className="flex items-center justify-between">
-          <CubeCobraPrimerLink />
           <a
             href="https://discord.gg/2NAjcWXNKn"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors"
+            className="inline-flex items-center gap-2 text-sm text-[#5865F2] hover:text-[#7983F5] transition-colors"
           >
             <FaDiscord className="w-4 h-4" />
             Join Discord
           </a>
+          <CubeCobraPrimerLink />
         </div>
       </footer>
 
@@ -707,11 +702,10 @@ export function Play() {
                 <button
                   key={count}
                   onClick={() => setOpponents(count)}
-                  className={`px-3 py-1.5 rounded text-sm font-medium btn-dark-border transition-colors ${
-                    opponents === count
-                      ? "bg-amber-500 text-black"
-                      : "bg-black/40 text-gray-300 hover:bg-black/30"
-                  }`}
+                  className={`px-3 py-1.5 rounded text-sm font-medium btn-dark-border transition-colors ${opponents === count
+                    ? "bg-amber-500 text-black"
+                    : "bg-black/40 text-gray-300 hover:bg-black/30"
+                    }`}
                 >
                   {count}
                 </button>
@@ -790,11 +784,10 @@ function RecoveryOpponentPicker({
           <button
             key={n}
             onClick={() => setSelected(n)}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-              selected === n
-                ? "bg-amber-500 text-black"
-                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-            }`}
+            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${selected === n
+              ? "bg-amber-500 text-black"
+              : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
           >
             {n}
           </button>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { getPhaseSummaryRows } from '../constants/phases'
+import { getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
 import type { Phase } from '../constants/phases'
 
 const PHASE_TITLE_COLOR: Record<Phase, string> = {
@@ -124,6 +124,12 @@ export function PhasePopover({
           ))}
         </div>
 
+        <div className="mt-2 bg-black/35 rounded-lg border border-black/40 px-3 py-2">
+          <p className="text-[11px] text-gray-400 leading-[1.4]">
+            <span className="text-amber-400/90 font-semibold text-[10px] uppercase tracking-wide mr-1.5">Tip</span>
+            {getPhaseTip(phase)}
+          </p>
+        </div>
       </div>
     </div>,
     document.body,

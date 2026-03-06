@@ -13,7 +13,7 @@ function CubeCobraPrimerIcon({ className = '' }: { className?: string }) {
       aria-hidden="true"
     >
       <path
-        fill="currentColor"
+        fill="none"
         d="M1189.56,542.79v413.7c0,29.33-15.66,56.43-41.06,71.08l-358.64,206.8c-25.37,14.63-56.6,14.63-81.97,0l-356.37-205.48c-25.41-14.65-41.06-41.75-41.06-71.08v-414.87c0-29.33,15.66-56.43,41.06-71.08l357.64-206.22c25.37-14.63,56.6-14.63,81.97,0l357.37,206.07c25.41,14.65,41.06,41.75,41.06,71.08Z"
       />
       <path
@@ -27,7 +27,7 @@ function CubeCobraPrimerIcon({ className = '' }: { className?: string }) {
 export function CubeCobraPrimerLink({
   className = '',
 }: CubeCobraPrimerLinkProps) {
-  const combinedClass = `inline-flex items-center gap-1.5 text-sm text-green-400 hover:text-green-300 transition-colors ${className}`.trim()
+  const combinedClass = `inline-flex items-center gap-1.5 text-sm text-[#498007] hover:text-[#5ba50a] transition-colors ${className}`.trim()
   return (
     <a
       href={CUBECOBRA_PRIMER_URL}
@@ -36,7 +36,7 @@ export function CubeCobraPrimerLink({
       className={combinedClass}
     >
       <span>CubeCobra Primer</span>
-      <CubeCobraPrimerIcon className="w-3.5 h-3.5 shrink-0" />
+      <CubeCobraPrimerIcon className="w-6 h-6 shrink-0" />
     </a>
   )
 }
