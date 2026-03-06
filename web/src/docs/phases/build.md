@@ -6,6 +6,8 @@ order: 2
 
 ## Overview
 
+Build the best hand you can with the pool you have!
+
 - Select 3 basic lands to start untapped on the battlefield in the upcoming [battle phase](doc:battle).
 - Your hand size is always equal to the current stage, which you can see in the upper left corner.
 - Your opponent will be randomly be chosen from three other players at your table. If you faced one of them in the previous battle, your odds of facing versus that player is only 10%.

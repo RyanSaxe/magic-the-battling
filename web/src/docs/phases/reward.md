@@ -8,14 +8,12 @@ order: 4
 
 You made it to the end of the round. Enjoy your rewards!
 
-:::note
-In the current game rules, there is no difference in rewards for the winner of the [battle](doc:battle).
-:::
+Note that, in the current game rules, there is no difference in rewards for the winner of the [battle](doc:battle).
 
 - Every player always gets +1 [treasure](doc:game-pieces#treasures).
-- For the first and second round of every stage, every player gets +1 random card from the [battler](doc:__cards__).
-- For the third and final round of every stage, the random card is replaced with a Vanquisher card (increases hand size by 1).
-- For the third and final round of every stage, if you are playing with [upgrades](doc:game-pieces#upgrades), you get to select one to add to your pool.
+- For the 1st and 2nd round of every stage, every player gets +1 random card from the [battler](doc:__cards__).
+- For the 3rd round of every stage, the random card is replaced with a Vanquisher card (increases hand size by 1).
+- For the 3rd round of every stage, if you are playing with [upgrades](doc:game-pieces#upgrades), select one to add to your pool.
 
 ## Controls
 

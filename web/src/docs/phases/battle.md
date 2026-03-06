@@ -8,10 +8,6 @@ order: 3
 
 The battle phase is where you play a quick mini-game of magic with a few modified rules.
 
-:::tip
-Be very mindful of when to use [treasures](doc:game-pieces#treasures) to try and win a game. Remember these are the economic unit of the game, and spending them wisely is what separates good and great players! Especially because, for the final battle, having the most treasures can be a huge advantage that opens doors for drastically different hands.
-:::
-
 ## Magic Rule Modifications
 
 - Each player starts with 10 life
