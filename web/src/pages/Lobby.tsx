@@ -834,7 +834,7 @@ export function Lobby() {
                   <div className={isHost ? "grid grid-cols-2 gap-2" : ""}>
                     <button
                       onClick={() => actions.setReady(!isReady)}
-                      className={`btn w-full py-2 ${
+                      className={`btn btn-dark-border w-full py-2 ${
                         isReady
                           ? "bg-gray-600 text-white hover:bg-gray-500"
                           : "bg-green-600 text-white hover:bg-green-500"
@@ -850,7 +850,7 @@ export function Lobby() {
                           actions.startGame();
                         }}
                         disabled={!lobbyState.can_start || startingGame}
-                        className="btn btn-primary w-full py-2"
+                        className="btn btn-primary btn-dark-border w-full py-2"
                       >
                         {startingGame ? (
                           <span className="flex items-center justify-center gap-2">

@@ -556,6 +556,10 @@ body {
   border: none;
 }
 
+.btn-dark-border {
+  border: 1px solid #000 !important;
+}
+
 .play-action-btn {
   border: 1px solid #000 !important;
 }

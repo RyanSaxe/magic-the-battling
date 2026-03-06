@@ -145,18 +145,21 @@ function AdvancedOptionsModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative modal-chrome border gold-border rounded-lg p-5 w-full max-w-sm">
-        <div className="flex items-center justify-between mb-4">
+      <div className="relative modal-chrome border gold-border rounded-lg p-5 w-full max-w-sm felt-raised-panel">
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
           <h3 className="text-white font-semibold">{title}</h3>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-gray-300 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
           >
             ✕
           </button>
         </div>
-        <div className="space-y-4">{children}</div>
-        <button onClick={onClose} className="btn btn-primary w-full py-2 mt-5">
+        <div className="space-y-3">{children}</div>
+        <button
+          onClick={onClose}
+          className="btn btn-primary play-action-btn w-full py-2 mt-4"
+        >
           Done
         </button>
       </div>
@@ -173,12 +176,12 @@ function CubeIdInput({
 }) {
   return (
     <div>
-      <label className="block text-gray-300 text-sm mb-1">CubeCobra ID</label>
+      <label className="block text-white text-sm mb-1">CubeCobra ID</label>
       <input
         type="text"
         value={cubeId}
         onChange={(e) => setCubeId(e.target.value)}
-        className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
         placeholder="auto"
       />
     </div>
@@ -193,12 +196,12 @@ function UpgradesCheckbox({
   setUseUpgrades: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer">
+    <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
       <input
         type="checkbox"
         checked={useUpgrades}
         onChange={(e) => setUseUpgrades(e.target.checked)}
-        className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
+        className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
       />
       <span className="text-white text-sm">Upgrades</span>
       <span className="text-gray-500 text-xs">
@@ -284,7 +287,7 @@ function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="h-[42px] w-[42px] shrink-0 rounded-lg bg-white/20 border border-black text-gray-300 hover:bg-white/30 hover:text-white transition-all flex items-center justify-center text-base"
+      className="h-[42px] w-[42px] shrink-0 rounded-lg bg-white/20 btn-dark-border text-gray-300 hover:bg-white/30 hover:text-white transition-all flex items-center justify-center text-base"
       title="Advanced Options"
     >
       ⚙
@@ -672,12 +675,12 @@ export function Play() {
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
           />
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={autoApproveSpectators}
               onChange={(e) => setAutoApproveSpectators(e.target.checked)}
-              className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
+              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
             />
             <span className="text-white text-sm">Open Spectating</span>
             <span className="text-gray-500 text-xs">— let anyone watch</span>
@@ -695,8 +698,8 @@ export function Play() {
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
           />
-          <div>
-            <label className="block text-gray-300 text-sm mb-1">
+          <div className="bg-black/35 border border-black/40 rounded-lg p-3">
+            <label className="block text-gray-300 text-sm mb-2">
               Opponents
             </label>
             <div className="flex gap-1.5">
@@ -704,10 +707,10 @@ export function Play() {
                 <button
                   key={count}
                   onClick={() => setOpponents(count)}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  className={`px-3 py-1.5 rounded text-sm font-medium btn-dark-border transition-colors ${
                     opponents === count
                       ? "bg-amber-500 text-black"
-                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                      : "bg-black/40 text-gray-300 hover:bg-black/30"
                   }`}
                 >
                   {count}
@@ -720,7 +723,7 @@ export function Play() {
 
       {(soloLoading || friendsLoading) && (
         <div
-          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-[2px]"
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-[1px]"
           onClick={soloLoading ? handleCancelSolo : handleCancelFriends}
         />
       )}
