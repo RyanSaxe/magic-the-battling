@@ -217,12 +217,16 @@ function useAccordionPanelCap(
       return
     }
 
+    const MAX_RESERVED_HEADERS = 3
+
     const measure = () => {
       const headers = Array.from(
         container.querySelectorAll<HTMLElement>('[data-accordion-header="true"]'),
       )
+      const singleHeight = headers[0]?.getBoundingClientRect().height ?? 0
       const headersTotal = headers.reduce((sum, header) => sum + header.getBoundingClientRect().height, 0)
-      const available = Math.max(0, Math.floor(container.clientHeight - headersTotal))
+      const reservedHeight = Math.min(headersTotal, singleHeight * MAX_RESERVED_HEADERS)
+      const available = Math.max(0, Math.floor(container.clientHeight - reservedHeight))
       setPanelCapPx((prev) => (prev === available ? prev : available))
     }
 
@@ -579,7 +583,7 @@ export function QuickGuide({
 
         {activeTab === 'guide' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={guideAccordionRef} className="flex-1 min-h-0 overflow-hidden border-b border-amber-400/10">
+            <div ref={guideAccordionRef} className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               <AccordionItem
                 id="guide-overview"
                 label="Overview"
@@ -639,7 +643,7 @@ export function QuickGuide({
 
         {activeTab === 'controls' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={controlsAccordionRef} className="flex-1 min-h-0 overflow-hidden border-b border-amber-400/10">
+            <div ref={controlsAccordionRef} className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               <AccordionItem
                 id="controls-global"
                 label="Global Controls"
@@ -674,7 +678,7 @@ export function QuickGuide({
 
         {activeTab === 'tips' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={tipsAccordionRef} className="flex-1 min-h-0 overflow-hidden border-b border-amber-400/10">
+            <div ref={tipsAccordionRef} className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               <AccordionItem
                 id="tips-global"
                 label="Global Tips"
@@ -745,7 +749,7 @@ export function QuickGuide({
 
         {activeTab === 'faq' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={faqAccordionRef} className="flex-1 min-h-0 overflow-hidden border-b border-amber-400/10">
+            <div ref={faqAccordionRef} className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               {faqEntries.length > 0 ? (
                 faqEntries.map((entry, index) => (
                   <AccordionItem
@@ -755,7 +759,7 @@ export function QuickGuide({
                     expanded={faqOpenId === index}
                     panelCapPx={faqPanelCapPx}
                     onToggle={() => toggleFaqSection(index)}
-                    labelClassName="text-amber-200/90"
+                    labelClassName="text-white font-semibold"
                   >
                     <div className="text-sm sm:text-base text-gray-300">
                       <DocRenderer content={entry.answer} />

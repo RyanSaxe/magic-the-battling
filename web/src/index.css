@@ -86,6 +86,30 @@ body {
   background-color: var(--table-dark);
 }
 
+/* Walnut-themed scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(61, 51, 48, 0.8) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(61, 51, 48, 0.8);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(90, 75, 70, 0.9);
+}
+
 /* Game table background - classic felt */
 .game-table {
   background-color: var(--table-felt);
