@@ -3,33 +3,50 @@ title: FAQ
 order: 99
 ---
 
-## Overview
+## Why are my opponent's cards face up?
 
-**Why are my opponent's cards face up?**
-If a game needs filler players, the system can use **Puppets** (historical submitted builds). Puppets are intentionally shown face up so you can resolve a deterministic "goldfish" style battle. The same concept is used for **The Ghost** when an odd player count would otherwise create a bye after eliminations. **The Ghost** will always have the most recently eliminated player's last build.
+If a game needs filler players, the system can use **Puppets** (historical games from real players that made it to stage 6). Puppets are intentionally shown face up so you can resolve a deterministic goldfish-style battle.
 
-**Can I concede a battle?**
-No. Conceding is disabled because treasures created during battle persist into future rounds.
+The same concept is used for **The Ghost** when an odd player count would otherwise create a bye after eliminations. The Ghost always uses the most recently eliminated player's last build.
 
-**How do I win?**
-Whenever a player gets to 10 poison, they are eliminated. The last player standing is the winner. But a finals game must always happen to determine this.
+## Can I concede a battle?
 
-When only two players remain, the game enters the **finals**. Finals follow the same draft → build → battle → reward cycle, but with one key change to who gets to choose to play or draw:
+No. Conceding is disabled because [treasures](doc:game-pieces#treasures) created during battle persist into future rounds.
 
-- In the **first game** of the finals, the player with the most [poison](doc:game-pieces#poison) chooses play or draw (same as normal rounds).
-- In **subsequent games**, the **loser** of the previous game gets to choose.
-- If the previous game was a **draw**, the choice falls back to whoever has the most [poison](doc:game-pieces#poison).
+## How do I win?
 
-**What happens if multiple players die at the same time?**
+When a player reaches 10 [poison](doc:game-pieces#poison), they are eliminated. Last player standing wins.
 
-In order for the game to be as fun as possible, there should always be a final match. Because of this, at any time multiple players are eliminated in the same phase, and that would cause 1 or less players left alive, the two eliminated players with the least poison are set to 9 poison and face off in Sudden Death.
+## Are there different rules when only 2 players are alive?
 
-Sudden Death is a loop between the [build](doc:build) and [battle](doc:battle) phases until one player is eliminated. Basically, the players will play against eachother until one is eliminated, but without any rewards or chance to draft new cards.
-**How many players can play?**
-The game supports 2–8 players, and the table size must be even.
+There is exactly one rule that is different, and it's not just 1v1 games, but applies to the finals of a multiplayer game as well.
 
-**How long does a game take?**
-A typical game takes 15-30 minutes in goldfish mode, 45–60 minutes online with friends, and 60-120 minutes in person depending on the number of players.
+When only two players remain alive, they enter **The Finals**. The only change to the rules for the finals is about who chooses play or draw:
 
-**How does this logistically work in paper?**
-The best source for detailing how to play in person is the CubeCobra primer: [Comprehensive rules / primer](https://cubecobra.com/cube/about/auto?view=primer).
+- The first finals game, the player with the most [poison](doc:game-pieces#poison) chooses play or draw.
+- In later finals games, the loser of the previous game chooses.
+- If the previous game was a draw, choice falls back to the player with the most [poison](doc:game-pieces#poison).
+
+To guarantee a true finishing match, the game can trigger **Sudden Death** when simultaneous eliminations would otherwise end the game without a proper final battle.
+
+## What is Sudden Death?
+
+If multiple players are eliminated in the same phase and that would leave one or fewer players alive, the two eliminated players with the lowest poison are reset to 9 poison and face off in Sudden Death.
+
+Sudden Death loops between [build](doc:build) and [battle](doc:battle) until one player is eliminated. There are no reward or drafting steps during this loop.
+
+## How many players can play?
+
+The game supports 2-8 players, and the table size must be even.
+
+## How long does a game take?
+
+A typical game takes 15-30 minutes in goldfish mode, 45-60 minutes online with friends, and 60-120 minutes in person depending on player count and pace.
+
+## How does this work in paper?
+
+The best source for in-person logistics is the [CubeCobra Primer](https://cubecobra.com/cube/about/auto?view=primer).
+
+## Can I build my own Battler?
+
+Of course! If you click the settings icon on the Play page, you can provide a cubecobra ID for your custom battler to play with. For advice on how to build your own battler, refer to the end of the [CubeCobra Primer](https://cubecobra.com/cube/about/auto?view=primer#advice-for-building-your-own).

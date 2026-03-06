@@ -321,6 +321,23 @@ function parseFaqPairs(content: string): { question: string; answer: string }[] 
   return pairs
 }
 
+function getH2TitleMap(raw: string): Map<string, string> {
+  const titleByKey = new Map<string, string>()
+  const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
+  for (const line of body.split(/\r?\n/)) {
+    const match = line.match(/^##(?!#)\s*(.+?)\s*$/)
+    if (!match) {
+      continue
+    }
+    const title = match[1].trim()
+    const key = title.toLowerCase()
+    if (!titleByKey.has(key)) {
+      titleByKey.set(key, title)
+    }
+  }
+  return titleByKey
+}
+
 function PhaseControlsContent({ phase }: { phase: Phase }) {
   const phaseDoc = getPhaseDoc(phase)
   const controlsMarkdown = phaseDoc?.parsed.sections['controls']
@@ -387,7 +404,24 @@ export function QuickGuide({
     if (!faqDoc) {
       return []
     }
-    return parseFaqPairs(faqDoc.parsed.sections['overview'] ?? faqDoc.parsed.body).map((pair) => ({
+    const titleBySection = getH2TitleMap(faqDoc.raw)
+    const sectionEntries = faqDoc.parsed.sectionOrder
+      .filter((sectionKey) => sectionKey !== 'overview')
+      .map((sectionKey) => {
+        const answer = faqDoc.parsed.sections[sectionKey]?.trim() ?? ''
+        if (!answer) {
+          return null
+        }
+        const question = titleBySection.get(sectionKey) ?? sectionKey
+        return { question, answer }
+      })
+      .filter((entry): entry is { question: string; answer: string } => entry !== null)
+
+    const fallbackEntries = sectionEntries.length > 0
+      ? sectionEntries
+      : parseFaqPairs(faqDoc.parsed.sections['overview'] ?? faqDoc.parsed.body)
+
+    return fallbackEntries.map((pair) => ({
       ...pair,
       slug: toSlug(pair.question),
     }))

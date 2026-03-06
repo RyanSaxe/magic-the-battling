@@ -16,9 +16,9 @@ export function parseDoc(raw: string): ParsedDoc {
   const meta: DocMeta = { title: '' }
   let body = raw
 
-  const fmMatch = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/)
+  const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/)
   if (fmMatch) {
-    for (const line of fmMatch[1].split('\n')) {
+    for (const line of fmMatch[1].split(/\r?\n/)) {
       const kv = line.match(/^(\w+):\s*(.+)$/)
       if (kv) {
         const val = kv[2].trim()
@@ -30,13 +30,32 @@ export function parseDoc(raw: string): ParsedDoc {
 
   const sections: Record<string, string> = {}
   const sectionOrder: string[] = []
-  const parts = body.split(/^## /m)
-  for (const part of parts.slice(1)) {
-    const nlIdx = part.indexOf('\n')
-    const heading = part.slice(0, nlIdx).trim().toLowerCase()
-    sections[heading] = part.slice(nlIdx + 1).trim()
-    sectionOrder.push(heading)
+
+  const lines = body.split(/\r?\n/)
+  let activeHeading: string | null = null
+  let activeLines: string[] = []
+
+  const flushSection = () => {
+    if (!activeHeading) {
+      return
+    }
+    sections[activeHeading] = activeLines.join('\n').trim()
+    sectionOrder.push(activeHeading)
   }
+
+  for (const line of lines) {
+    const headingMatch = line.match(/^##(?!#)\s*(.+?)\s*$/)
+    if (headingMatch) {
+      flushSection()
+      activeHeading = headingMatch[1].trim().toLowerCase()
+      activeLines = []
+      continue
+    }
+    if (activeHeading) {
+      activeLines.push(line)
+    }
+  }
+  flushSection()
 
   return { meta, sections, sectionOrder, body }
 }
