@@ -7,12 +7,7 @@ order: 2
 
 The game UI is split into a few areas. The bottom-left holds an **actions menu** with context-sensitive actions for the current phase and selected cards. The bottom-right has **navigation controls** for advancing through phases and submitting results.
 
-Each phase has its own set of controls and hotkeys:
-
-- [Draft Phase controls](doc:draft#controls) — picking cards and rerolling packs
-- [Build Phase controls](doc:build#controls) — constructing your hand and applying upgrades
-- [Battle Phase controls](doc:battle#controls) — drag-and-drop and game-actions
-- [Reward Phase controls](doc:reward#controls) — claiming your rewards
+Additionally, all phases have a sidebar that contains extra information and actions. Most importantly, on all phases except for the [battle phase](doc:battle), you can view the most recently cast cards from your opponents as well as their current [treasure](doc:game-pieces#treasures) and [poison](doc:game-pieces#poison). Because you can't see this on the battle phase, you may want to try and remember what you might be up against!
 
 ## Shortcuts
 

@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FaDiscord, FaXmark } from 'react-icons/fa6'
-import { DOCS, getPhaseDoc } from '../docs'
+import { DOCS, getPhaseDoc, type DocEntry } from '../docs'
 import { DocRenderer } from './DocRenderer'
 import { CardsView } from './CardsView'
 import { PHASES, type Phase } from '../constants/phases'
 import { PHASE_HOTKEYS } from '../constants/hotkeys'
 import { HotkeyRow } from './HotkeyRow'
 import { DocNavContext } from '../contexts/DocNavContext'
+import { CubeCobraPrimerLink } from './common/CubeCobraPrimerLink'
 
 type HeaderTab = 'guide' | 'controls' | 'tips' | 'browse' | 'faq'
 type CardType = 'cards' | 'upgrades' | 'vanguards'
@@ -16,7 +17,6 @@ type TipsSection = 'global' | Phase
 
 const ACCORDION_STEP_MS = 400
 const DISCORD_INVITE_URL = 'https://discord.gg/2NAjcWXNKn'
-const CUBECOBRA_PRIMER_URL = 'https://cubecobra.com/cube/about/auto?view=primer'
 const FACE_UP_FAQ_SLUG = 'why-are-my-opponents-cards-face-up'
 const FINALS_FAQ_SLUG = 'how-do-finals-and-sudden-death-work'
 
@@ -24,8 +24,8 @@ interface AccordionItemProps {
   id: string
   label: string
   expanded: boolean
-  panelCapPx: number
   onToggle: () => void
+  labelClassName?: string
   children: React.ReactNode
 }
 
@@ -204,47 +204,10 @@ function useSequentialAccordion<T extends string | number>(
   return { openId, toggle, openImmediate }
 }
 
-function useAccordionPanelCap(
-  containerRef: RefObject<HTMLDivElement | null>,
-  refreshKey: string,
-) {
-  const [panelCapPx, setPanelCapPx] = useState(0)
-
-  useLayoutEffect(() => {
-    const container = containerRef.current
-    if (!container) {
-      return
-    }
-
-    const measure = () => {
-      const headers = Array.from(
-        container.querySelectorAll<HTMLElement>('[data-accordion-header="true"]'),
-      )
-      const headersTotal = headers.reduce((sum, header) => sum + header.getBoundingClientRect().height, 0)
-      const available = Math.max(0, Math.floor(container.clientHeight - headersTotal))
-      setPanelCapPx((prev) => (prev === available ? prev : available))
-    }
-
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(container)
-    const headers = container.querySelectorAll<HTMLElement>('[data-accordion-header="true"]')
-    headers.forEach((header) => observer.observe(header))
-    window.addEventListener('resize', measure)
-
-    return () => {
-      window.removeEventListener('resize', measure)
-      observer.disconnect()
-    }
-  }, [containerRef, refreshKey])
-
-  return panelCapPx
-}
-
-function AccordionItem({ id, label, expanded, panelCapPx, onToggle, children }: AccordionItemProps) {
+function AccordionItem({ id, label, expanded, onToggle, labelClassName, children }: AccordionItemProps) {
   const panelId = `guide-panel-${id}`
   const contentRef = useRef<HTMLDivElement>(null)
-  const [measuredContentPx, setMeasuredContentPx] = useState(0)
+  const [contentHeight, setContentHeight] = useState(0)
 
   useLayoutEffect(() => {
     const content = contentRef.current
@@ -254,7 +217,7 @@ function AccordionItem({ id, label, expanded, panelCapPx, onToggle, children }: 
 
     const measure = () => {
       const nextHeight = Math.ceil(content.scrollHeight)
-      setMeasuredContentPx((prev) => (prev === nextHeight ? prev : nextHeight))
+      setContentHeight((prev) => (prev === nextHeight ? prev : nextHeight))
     }
 
     measure()
@@ -263,25 +226,21 @@ function AccordionItem({ id, label, expanded, panelCapPx, onToggle, children }: 
     return () => observer.disconnect()
   }, [])
 
-  const cappedPanelPx = Math.max(0, Math.min(panelCapPx, measuredContentPx))
-  const panelMaxHeight = `${cappedPanelPx}px`
-
   return (
-    <div className="quick-guide-accordion-item border-b border-amber-400/10 last:border-b-0 flex flex-col min-h-0 overflow-hidden">
+    <div className="quick-guide-accordion-item border-b border-amber-400/10 last:border-b-0">
       <button
         onClick={onToggle}
         aria-expanded={expanded}
         aria-controls={panelId}
-        data-accordion-header="true"
-        className={`w-full py-3 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-b transition-colors duration-[400ms] ${
+        className={`w-full py-3.5 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-l-3 transition-all duration-[400ms] ${
           expanded
-            ? 'bg-black/20 border-amber-400/25'
-            : 'hover:bg-black/20 border-amber-400/15'
+            ? 'bg-amber-400/8 border-l-amber-400'
+            : 'border-l-transparent hover:border-l-amber-400/40 hover:bg-black/20'
         }`}
       >
-        <span className="text-white font-medium text-sm sm:text-base flex-1 text-left">{label}</span>
+        <span className={`font-medium text-base flex-1 text-left ${labelClassName ?? 'text-white'}`}>{label}</span>
         <svg
-          className={`w-4 h-4 transition-transform transition-colors duration-[400ms] ${expanded ? 'rotate-90 text-amber-400' : 'text-gray-400'}`}
+          className={`w-5 h-5 transition-transform transition-colors duration-[400ms] ${expanded ? 'rotate-90 text-amber-400' : 'text-gray-400'}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -294,13 +253,11 @@ function AccordionItem({ id, label, expanded, panelCapPx, onToggle, children }: 
         id={panelId}
         className={`quick-guide-accordion-panel ${expanded ? 'open' : ''}`}
         aria-hidden={!expanded}
-        style={{ maxHeight: expanded ? panelMaxHeight : '0px' }}
+        style={{ maxHeight: expanded ? `${contentHeight}px` : '0px' }}
       >
         <div className="quick-guide-accordion-panel-inner">
-          <div className="quick-guide-accordion-scroll" style={{ maxHeight: panelMaxHeight }}>
-            <div ref={contentRef} className="px-5 py-4">
-              {children}
-            </div>
+          <div ref={contentRef} className="px-5 py-4 sm:px-6 sm:py-5">
+            {children}
           </div>
         </div>
       </div>
@@ -321,6 +278,35 @@ function parseFaqPairs(content: string): { question: string; answer: string }[] 
   return pairs
 }
 
+function getH2TitleMap(raw: string): Map<string, string> {
+  const titleByKey = new Map<string, string>()
+  const body = raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, '')
+  for (const line of body.split(/\r?\n/)) {
+    const match = line.match(/^##(?!#)\s*(.+?)\s*$/)
+    if (!match) {
+      continue
+    }
+    const title = match[1].trim()
+    const key = title.toLowerCase()
+    if (!titleByKey.has(key)) {
+      titleByKey.set(key, title)
+    }
+  }
+  return titleByKey
+}
+
+const EXCLUDED_GUIDE_SECTIONS = new Set(['overview', 'controls'])
+
+function buildPhaseGuideContent(doc: DocEntry): string {
+  const { sections, sectionTitles, sectionOrder } = doc.parsed
+  const overview = sections['overview'] ?? ''
+  const additional = sectionOrder
+    .filter((key) => !EXCLUDED_GUIDE_SECTIONS.has(key))
+    .map((key) => `## ${sectionTitles[key] ?? key}\n\n${sections[key]}`)
+    .join('\n\n')
+  return additional ? `${overview}\n\n${additional}` : overview
+}
+
 function PhaseControlsContent({ phase }: { phase: Phase }) {
   const phaseDoc = getPhaseDoc(phase)
   const controlsMarkdown = phaseDoc?.parsed.sections['controls']
@@ -337,9 +323,9 @@ function PhaseControlsContent({ phase }: { phase: Phase }) {
 
       {hotkeys.length > 0 && (
         <div>
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+          <h2 className="text-[0.9375rem] font-semibold text-gray-200 tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
             Keyboard Shortcuts
-          </h3>
+          </h2>
           <div className="space-y-1.5">
             {hotkeys.map((entry) => (
               <HotkeyRow key={entry.key} entry={entry} />
@@ -350,9 +336,9 @@ function PhaseControlsContent({ phase }: { phase: Phase }) {
 
       {hoverHotkeys.length > 0 && (
         <div>
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+          <h2 className="text-[0.9375rem] font-semibold text-gray-200 tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
             When Hovering a Card
-          </h3>
+          </h2>
           <div className="space-y-1.5">
             {hoverHotkeys.map((entry) => (
               <HotkeyRow key={entry.key} entry={entry} />
@@ -372,11 +358,6 @@ export function QuickGuide({
   useVanguards,
   onClose,
 }: QuickGuideProps) {
-  const guideAccordionRef = useRef<HTMLDivElement>(null)
-  const controlsAccordionRef = useRef<HTMLDivElement>(null)
-  const tipsAccordionRef = useRef<HTMLDivElement>(null)
-  const faqAccordionRef = useRef<HTMLDivElement>(null)
-
   const quickOverviewDoc = DOCS.find((d) => d.id === 'quick-overview')
   const gamePiecesDoc = DOCS.find((d) => d.id === 'game-pieces')
   const controlsDoc = DOCS.find((d) => d.id === 'controls')
@@ -387,7 +368,24 @@ export function QuickGuide({
     if (!faqDoc) {
       return []
     }
-    return parseFaqPairs(faqDoc.parsed.sections['overview'] ?? faqDoc.parsed.body).map((pair) => ({
+    const titleBySection = getH2TitleMap(faqDoc.raw)
+    const sectionEntries = faqDoc.parsed.sectionOrder
+      .filter((sectionKey) => sectionKey !== 'overview')
+      .map((sectionKey) => {
+        const answer = faqDoc.parsed.sections[sectionKey]?.trim() ?? ''
+        if (!answer) {
+          return null
+        }
+        const question = titleBySection.get(sectionKey) ?? sectionKey
+        return { question, answer }
+      })
+      .filter((entry): entry is { question: string; answer: string } => entry !== null)
+
+    const fallbackEntries = sectionEntries.length > 0
+      ? sectionEntries
+      : parseFaqPairs(faqDoc.parsed.sections['overview'] ?? faqDoc.parsed.body)
+
+    return fallbackEntries.map((pair) => ({
       ...pair,
       slug: toSlug(pair.question),
     }))
@@ -440,23 +438,6 @@ export function QuickGuide({
     openImmediate: openFaqSectionImmediate,
   } = useSequentialAccordion<number>(initialFaqIndex, ACCORDION_STEP_MS)
 
-  const guidePanelCapPx = useAccordionPanelCap(
-    guideAccordionRef,
-    `${activeTab}:${guideOpenId ?? 'none'}`,
-  )
-  const controlsPanelCapPx = useAccordionPanelCap(
-    controlsAccordionRef,
-    `${activeTab}:${controlsOpenId ?? 'none'}`,
-  )
-  const tipsPanelCapPx = useAccordionPanelCap(
-    tipsAccordionRef,
-    `${activeTab}:${tipsOpenId ?? 'none'}`,
-  )
-  const faqPanelCapPx = useAccordionPanelCap(
-    faqAccordionRef,
-    `${activeTab}:${faqOpenId ?? 'none'}:${faqEntries.length}`,
-  )
-
   const getFaqIndex = useCallback((rawSlug?: string) => {
     if (faqEntries.length === 0) {
       return null
@@ -499,7 +480,7 @@ export function QuickGuide({
   }), [applyTarget])
 
   const headerTabs: { id: HeaderTab; label: string }[] = [
-    { id: 'guide', label: 'Guide' },
+    { id: 'guide', label: 'Rules' },
     { id: 'controls', label: 'Controls' },
     { id: 'tips', label: 'Tips' },
     { id: 'browse', label: 'Cards' },
@@ -515,16 +496,16 @@ export function QuickGuide({
   return (
     <DocNavContext.Provider value={docNav}>
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex items-end justify-between gap-3 px-4 shrink-0 border-b border-amber-400/15">
-          <div className="flex gap-4 min-w-0">
+        <div className="flex items-center justify-between gap-3 px-5 py-3 shrink-0 bg-black/30 border-b border-[rgba(212,175,55,0.45)]">
+          <div className="flex gap-2 min-w-0">
             {headerTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-1 pb-2 pt-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                className={`px-3 py-1.5 text-[0.8125rem] font-medium transition-colors rounded-md ${
                   tab.id === activeTab
-                    ? 'text-amber-400 border-amber-400'
-                    : 'text-gray-400 border-transparent hover:text-gray-200'
+                    ? 'bg-amber-400/15 text-amber-300'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
                 }`}
               >
                 {tab.label}
@@ -534,7 +515,7 @@ export function QuickGuide({
           {onClose && (
             <button
               onClick={onClose}
-              className="inline-flex items-center justify-center w-6 h-6 mb-1 text-red-400 hover:text-red-300 transition-colors"
+              className="inline-flex items-center justify-center w-7 h-7 -mr-2 text-red-400 hover:text-red-300 transition-colors"
               aria-label="Close guide"
             >
               <FaXmark className="w-4 h-4" />
@@ -544,20 +525,36 @@ export function QuickGuide({
 
         {activeTab === 'guide' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={guideAccordionRef} className="flex-1 min-h-0 overflow-hidden border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               <AccordionItem
                 id="guide-overview"
                 label="Overview"
                 expanded={guideOpenId === 'overview'}
-                panelCapPx={guidePanelCapPx}
+
                 onToggle={() => toggleGuideSection('overview')}
               >
                 {quickOverviewDoc ? (
                   <div className="text-sm sm:text-base">
-                    <DocRenderer content={quickOverviewDoc.parsed.sections['overview'] ?? quickOverviewDoc.parsed.body} />
+                    <DocRenderer content={buildPhaseGuideContent(quickOverviewDoc)} />
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400">Overview content not found.</p>
+                )}
+              </AccordionItem>
+
+              <AccordionItem
+                id="guide-game-pieces"
+                label="Game Pieces"
+                expanded={guideOpenId === 'game-pieces'}
+
+                onToggle={() => toggleGuideSection('game-pieces')}
+              >
+                {gamePiecesDoc ? (
+                  <div className="text-sm sm:text-base">
+                    <DocRenderer content={gamePiecesDoc.parsed.body} />
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">Game pieces content not found.</p>
                 )}
               </AccordionItem>
 
@@ -569,12 +566,12 @@ export function QuickGuide({
                     key={phase}
                     label={`${toTitleCase(phase)} Phase`}
                     expanded={guideOpenId === phase}
-                    panelCapPx={guidePanelCapPx}
+    
                     onToggle={() => toggleGuideSection(phase)}
                   >
-                    {phaseDoc?.parsed.sections['rules'] ? (
+                    {phaseDoc ? (
                       <div className="text-sm sm:text-base">
-                        <DocRenderer content={phaseDoc.parsed.sections['rules']} />
+                        <DocRenderer content={buildPhaseGuideContent(phaseDoc)} />
                       </div>
                     ) : (
                       <p className="text-sm text-gray-400">Rules are not defined for this phase yet.</p>
@@ -582,34 +579,18 @@ export function QuickGuide({
                   </AccordionItem>
                 )
               })}
-
-              <AccordionItem
-                id="guide-game-pieces"
-                label="Game Pieces"
-                expanded={guideOpenId === 'game-pieces'}
-                panelCapPx={guidePanelCapPx}
-                onToggle={() => toggleGuideSection('game-pieces')}
-              >
-                {gamePiecesDoc ? (
-                  <div className="text-sm sm:text-base">
-                    <DocRenderer content={gamePiecesDoc.parsed.body} />
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400">Game pieces content not found.</p>
-                )}
-              </AccordionItem>
             </div>
           </div>
         )}
 
         {activeTab === 'controls' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={controlsAccordionRef} className="flex-1 min-h-0 overflow-hidden border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               <AccordionItem
                 id="controls-global"
                 label="Global Controls"
                 expanded={controlsOpenId === 'global'}
-                panelCapPx={controlsPanelCapPx}
+
                 onToggle={() => toggleControlsSection('global')}
               >
                 {controlsDoc ? (
@@ -627,7 +608,7 @@ export function QuickGuide({
                   key={phase}
                   label={`${toTitleCase(phase)} Phase Controls`}
                   expanded={controlsOpenId === phase}
-                  panelCapPx={controlsPanelCapPx}
+  
                   onToggle={() => toggleControlsSection(phase)}
                 >
                   <PhaseControlsContent phase={phase} />
@@ -639,12 +620,12 @@ export function QuickGuide({
 
         {activeTab === 'tips' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={tipsAccordionRef} className="flex-1 min-h-0 overflow-hidden border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               <AccordionItem
                 id="tips-global"
                 label="Global Tips"
                 expanded={tipsOpenId === 'global'}
-                panelCapPx={tipsPanelCapPx}
+
                 onToggle={() => toggleTipsSection('global')}
               >
                 {tipsDoc?.parsed.sections['global'] ? (
@@ -662,7 +643,7 @@ export function QuickGuide({
                   key={phase}
                   label={`${toTitleCase(phase)} Phase Tips`}
                   expanded={tipsOpenId === phase}
-                  panelCapPx={tipsPanelCapPx}
+  
                   onToggle={() => toggleTipsSection(phase)}
                 >
                   {tipsDoc?.parsed.sections[phase] ? (
@@ -710,7 +691,7 @@ export function QuickGuide({
 
         {activeTab === 'faq' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={faqAccordionRef} className="flex-1 min-h-0 overflow-hidden border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               {faqEntries.length > 0 ? (
                 faqEntries.map((entry, index) => (
                   <AccordionItem
@@ -718,8 +699,9 @@ export function QuickGuide({
                     key={entry.slug}
                     label={entry.question}
                     expanded={faqOpenId === index}
-                    panelCapPx={faqPanelCapPx}
+
                     onToggle={() => toggleFaqSection(index)}
+                    labelClassName="text-white font-semibold"
                   >
                     <div className="text-sm sm:text-base text-gray-300">
                       <DocRenderer content={entry.answer} />
@@ -735,25 +717,18 @@ export function QuickGuide({
           </div>
         )}
 
-        <div className="shrink-0 px-4 py-3 border-t border-amber-400/10 modal-chrome backdrop-blur-sm">
+        <div className="shrink-0 px-4 py-3.5 border-t border-[rgba(212,175,55,0.45)] bg-black/30">
           <div className="flex items-center justify-between gap-3">
             <a
               href={DISCORD_INVITE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 text-sm text-violet-300 hover:text-violet-200 transition-colors"
+              className="inline-flex items-center gap-2 text-sm text-[#6974F4] hover:text-[#7983F5] transition-colors"
             >
               <FaDiscord className="w-4 h-4" />
               Ask for help
             </a>
-            <a
-              href={CUBECOBRA_PRIMER_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-300 hover:text-blue-200 transition-colors"
-            >
-              CubeCobra Primer
-            </a>
+            <CubeCobraPrimerLink />
           </div>
         </div>
       </div>

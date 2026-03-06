@@ -34,38 +34,45 @@ export function DocRenderer({ content, className }: DocRendererProps) {
 
   const components: Components = {
     h2: ({ children }) => (
-      <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide mt-4 mb-1 first:mt-0">
+      <h2 className="text-[0.9375rem] font-semibold text-gray-200 tracking-wide mt-5 mb-2 first:mt-0 border-b border-amber-400/15 pb-1">
         {children}
       </h2>
     ),
     h3: ({ children }) => (
-      <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mt-3 mb-1">
+      <h3 className="text-sm font-semibold text-amber-400/80 uppercase tracking-wider mt-4 mb-1.5">
         {children}
       </h3>
     ),
     p: ({ children }) => (
-      <p className="text-sm text-gray-300 mb-2">{children}</p>
+      <p className="text-sm sm:text-[0.9375rem] text-gray-300 mb-3 leading-relaxed">{children}</p>
     ),
     ul: ({ children }) => (
-      <ul className="space-y-0.5 mb-2">{children}</ul>
+      <ul className="doc-list space-y-1.5 mb-3">{children}</ul>
     ),
     li: ({ children }) => (
-      <li className="flex gap-2 text-sm text-gray-300">
-        <span className="text-amber-400 shrink-0">•</span>
+      <li className="doc-list-item flex gap-2 text-sm sm:text-[0.9375rem] text-gray-300 leading-relaxed">
         <span>{children}</span>
       </li>
     ),
     table: ({ children }) => (
-      <table className="w-full text-sm text-gray-300 mb-2">{children}</table>
+      <table className="w-full text-sm text-gray-300 mb-3 [&_tr:nth-child(even)]:bg-white/3">{children}</table>
     ),
     th: ({ children }) => (
-      <th className="text-left text-gray-400 font-medium pb-1 pr-3">{children}</th>
+      <th className="text-left text-gray-400 font-medium pb-1 pr-3 border-b border-amber-400/15">{children}</th>
     ),
     td: ({ children }) => (
       <td className="pb-1 pr-3">{children}</td>
     ),
     strong: ({ children }) => (
-      <strong className="text-white font-medium">{children}</strong>
+      <strong className="text-amber-200 font-semibold">{children}</strong>
+    ),
+    hr: () => (
+      <hr className="border-t border-amber-400/20 my-4" />
+    ),
+    blockquote: ({ children }) => (
+      <blockquote className="border-l-3 border-amber-400/40 pl-4 italic text-gray-400 my-3">
+        {children}
+      </blockquote>
     ),
     a: ({ href, children }) => {
       if (href?.startsWith('doc:') || href?.startsWith('docs:')) {
@@ -74,14 +81,14 @@ export function DocRenderer({ content, className }: DocRendererProps) {
         return (
           <button
             onClick={() => docNav.navigate(docId, tab)}
-            className="text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
+            className="text-amber-400 hover:text-amber-300 underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors cursor-pointer"
           >
             {children}
           </button>
         )
       }
       return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 transition-colors">
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors">
           {children}
         </a>
       )

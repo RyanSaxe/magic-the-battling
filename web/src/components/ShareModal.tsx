@@ -20,6 +20,7 @@ interface Platform {
   label: string
   icon: IconType
   mobileOnly?: boolean
+  desktopOnly?: boolean
   getUrl: (url: string, text: string) => string
 }
 
@@ -45,13 +46,13 @@ const PLATFORMS: Platform[] = [
   {
     label: 'Facebook',
     icon: FaFacebook,
+    desktopOnly: true,
     getUrl: (url) =>
       `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
   },
   {
     label: 'WhatsApp',
     icon: FaWhatsapp,
-    mobileOnly: true,
     getUrl: (url, text) =>
       `https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`,
   },
@@ -117,15 +118,15 @@ export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          {PLATFORMS.map(({ label, icon: Icon, mobileOnly, getUrl }) => (
+          {PLATFORMS.map(({ label, icon: Icon, mobileOnly, desktopOnly, getUrl }) => (
             <button
               key={label}
               onClick={() => handlePlatformClick(getUrl)}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors ${
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-lg bg-black/40 border border-black/50 text-gray-300 hover:bg-black/30 hover:border-black/70 hover:ring-1 hover:ring-amber-500/30 transition-colors ${
                 mobileOnly ? 'sm:hidden' : ''
-              }`}
+              } ${desktopOnly ? 'hidden sm:flex' : ''}`}
             >
-              <Icon className="text-2xl text-white" />
+              <Icon className="text-2xl text-gray-100" />
               <span className="text-xs text-gray-300">{label}</span>
             </button>
           ))}
@@ -135,10 +136,10 @@ export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
             className={`flex flex-col items-center gap-1.5 p-3 rounded-lg transition-colors ${
               copied
                 ? 'bg-emerald-600/80 border border-emerald-400/30'
-                : 'bg-gray-800 hover:bg-gray-700'
+                : 'bg-black/40 border border-black/50 text-gray-300 hover:bg-black/30 hover:border-black/70 hover:ring-1 hover:ring-amber-500/30'
             }`}
           >
-            <FaLink className="text-2xl text-white" />
+            <FaLink className="text-2xl text-gray-100" />
             <span className="text-xs text-gray-300">
               {copied ? 'Copied!' : 'Copy Link'}
             </span>

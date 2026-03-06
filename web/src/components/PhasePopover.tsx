@@ -1,6 +1,6 @@
 import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { PHASE_SUMMARIES } from '../constants/phases'
+import { getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
 import type { Phase } from '../constants/phases'
 
 const PHASE_TITLE_COLOR: Record<Phase, string> = {
@@ -13,6 +13,8 @@ const PHASE_TITLE_COLOR: Record<Phase, string> = {
 interface PhasePopoverProps {
   phase: Phase
   anchorRect: DOMRect
+  useUpgrades: boolean
+  isClosing?: boolean
   onClose: () => void
   onOpenDetails: () => void
   onOpenControls: () => void
@@ -21,6 +23,8 @@ interface PhasePopoverProps {
 export function PhasePopover({
   phase,
   anchorRect,
+  useUpgrades,
+  isClosing = false,
   onClose,
   onOpenDetails,
   onOpenControls,
@@ -67,7 +71,9 @@ export function PhasePopover({
 
     if (arrowRef.current) {
       const arrowLeft = anchorRect.left + anchorRect.width / 2 - left
-      arrowRef.current.style.left = `${Math.max(12, Math.min(arrowLeft - 6, 260))}px`
+      const minArrowLeft = 12
+      const maxArrowLeft = Math.max(minArrowLeft, rect.width - 18)
+      arrowRef.current.style.left = `${Math.max(minArrowLeft, Math.min(arrowLeft - 6, maxArrowLeft))}px`
     }
   }, [anchorRect])
 
@@ -83,35 +89,48 @@ export function PhasePopover({
         position: 'fixed',
         visibility: 'hidden',
       }}
-      className="modal-chrome border gold-border rounded-lg shadow-xl z-[60] w-72"
+      className={`modal-chrome border gold-border rounded-lg shadow-xl z-[60] felt-raised-panel min-w-[16rem] w-max max-w-[calc(100vw-1rem)] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
     >
       <div
         ref={arrowRef}
         className="absolute -top-1.5 w-3 h-3 modal-chrome border-l border-t gold-border rotate-45"
       />
 
-      <div className="p-3">
-        <h3 className={`text-sm font-semibold capitalize mb-1.5 ${PHASE_TITLE_COLOR[phase]}`}>
+      <div className="modal-chrome border-b gold-border rounded-t-lg px-3 py-2 flex items-center justify-between gap-2">
+        <span className={`text-sm font-semibold capitalize ${PHASE_TITLE_COLOR[phase]}`}>
           {phase} Phase
-        </h3>
-
-        <p className="text-xs text-gray-300 mb-2">
-          {PHASE_SUMMARIES[phase]}
-        </p>
-
-        <div className="mt-2 pt-2 border-t gold-divider flex items-center justify-between gap-3">
+        </span>
+        <div className="flex items-center gap-1.5">
           <button
             onClick={onOpenDetails}
-            className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
+            className="btn-secondary text-xs py-1 px-2.5 rounded"
           >
             Details
           </button>
           <button
             onClick={onOpenControls}
-            className="text-xs text-blue-300 hover:text-blue-200 transition-colors"
+            className="btn-secondary text-xs py-1 px-2.5 rounded"
           >
             Controls
           </button>
+        </div>
+      </div>
+
+      <div className="p-3">
+        <div className="bg-black/35 rounded-lg border border-black/40 px-3 py-2">
+          {getPhaseSummaryRows(phase, useUpgrades).map((row, index) => (
+            <p key={`${phase}-${index}`} className="text-xs text-gray-300 mb-1.5 last:mb-0 leading-5">
+              <span className="text-amber-400/90 mr-1.5">{index + 1}.</span>
+              {row}
+            </p>
+          ))}
+        </div>
+
+        <div className="mt-2 bg-black/35 rounded-lg border border-black/40 px-3 py-2">
+          <p className="text-[11px] text-gray-400 leading-[1.4]">
+            <span className="text-amber-400/90 font-semibold text-[10px] uppercase tracking-wide mr-1.5">Tip</span>
+            {getPhaseTip(phase)}
+          </p>
         </div>
       </div>
     </div>,

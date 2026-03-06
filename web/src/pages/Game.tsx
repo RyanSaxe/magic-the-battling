@@ -1274,6 +1274,7 @@ function GameContent() {
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+            useUpgrades={gameState.use_upgrades}
             autoOpenPhase={isNewPlayerOnboarding ? autoOpenTimelinePhase : null}
             onAutoOpenHandled={(phase) => {
               setAutoOpenTimelinePhase((current) =>
@@ -1619,6 +1620,14 @@ function GameContent() {
               {isEndPhase && gameId ? (
                 <>
                   <div className="flex items-center gap-1.5 sm:gap-2 py-1">
+                    <button
+                      className="btn bg-slate-700 hover:bg-slate-600 text-white"
+                      onClick={() =>
+                        window.open(shareUrl, "_blank", "noopener,noreferrer")
+                      }
+                    >
+                      Review
+                    </button>
                     <button
                       className="btn bg-purple-600 hover:bg-purple-500 text-white"
                       onClick={() => setShareOpen(true)}
