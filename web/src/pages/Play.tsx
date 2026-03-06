@@ -512,7 +512,7 @@ export function Play() {
 
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className="zone-pack flex-1 min-h-0 flex flex-col px-4 py-4 sm:py-2 sm:items-center sm:justify-center overflow-auto">
-            <section className="w-full max-w-5xl mx-auto modal-chrome border gold-border rounded-lg overflow-hidden flex-1 min-h-0 flex flex-col sm:flex-none felt-raised-panel">
+            <section className="w-full max-w-md mx-auto modal-chrome border gold-border rounded-lg overflow-hidden flex-1 min-h-0 flex flex-col sm:flex-none felt-raised-panel">
               <div className="p-4 sm:p-5 flex-1 min-h-0 flex flex-col sm:flex-none">
                 <div className="mb-4">
                   <div className="mb-1 flex items-center justify-between gap-3">
@@ -540,8 +540,8 @@ export function Play() {
                   </div>
                 </div>
 
-                {/* Mobile: stacked cards, inactive always on top */}
-                <div className="sm:hidden flex-1 min-h-0 flex flex-col gap-3">
+                {/* Single active-mode card for all breakpoints */}
+                <div className="w-full max-w-md mx-auto flex-1 min-h-0 sm:flex-none flex flex-col gap-3">
                   {activeMode === "solo" ? (
                     <>
                       {inactiveCard(
@@ -631,81 +631,6 @@ export function Play() {
                       </div>
                     </>
                   )}
-                </div>
-
-                {/* Desktop: split panes inside one shared panel */}
-                <div className="hidden sm:grid sm:grid-cols-2 rounded-lg border border-white/10 bg-black/35 overflow-hidden">
-                  <div className="flex flex-col px-5 py-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <FriendsIcon className="w-8 h-8 text-amber-400" />
-                      <h2 className="text-lg font-semibold text-white">
-                        Play with Friends
-                      </h2>
-                    </div>
-                    <div className="flex-1 flex items-center">
-                      <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                        <span className="text-amber-400/70">
-                          Can you draft an unbeatable hand?
-                        </span>{" "}
-                        Compete with your friends to see who can turn trash into
-                        treasure!{" "}
-                      </p>
-                    </div>
-                    <div className="mt-auto flex gap-2 pt-4">
-                      <button
-                        onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
-                        disabled={friendsLoading ? false : !nameValid}
-                        className={`flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-                      >
-                        {friendsLoading ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Loading...
-                          </>
-                        ) : (
-                          "Create Lobby"
-                        )}
-                      </button>
-                      <GearButton onClick={() => setShowFriendsAdvanced(true)} />
-                    </div>
-                  </div>
-                  <div className="flex flex-col px-5 py-4 border-l border-white/10 bg-black/10">
-                    <div className="flex items-center gap-3 mb-2">
-                      <GoldfishIcon className="w-8 h-8 text-amber-400" />
-                      <h2 className="text-lg font-semibold text-white">Goldfish</h2>
-                    </div>
-                    <div className="flex-1 flex items-center">
-                      <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                        <span className="text-amber-400/70">
-                          Battle hands that real players piloted
-                        </span>{" "}
-                        to strong finishes. Their cards are face up, and you decide wins.
-                      </p>
-                    </div>
-                    <div className="mt-auto flex gap-2 pt-4">
-                      <button
-                        onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
-                        disabled={soloLoading ? false : !nameValid}
-                        className={`flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-                      >
-                        {soloLoading ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Loading...
-                          </>
-                        ) : (
-                          "Start Game"
-                        )}
-                      </button>
-                      <GearButton onClick={() => setShowSoloAdvanced(true)} />
-                    </div>
-                  </div>
                 </div>
               </div>
             </section>
