@@ -284,7 +284,7 @@ function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="h-[42px] w-[42px] shrink-0 rounded-lg bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all flex items-center justify-center text-base"
+      className="h-[42px] w-[42px] shrink-0 rounded-lg bg-white/20 border border-white/20 text-gray-300 hover:bg-white/30 hover:text-white transition-all flex items-center justify-center text-base"
       title="Advanced Options"
     >
       ⚙
@@ -567,7 +567,7 @@ export function Play() {
                           <button
                             onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
                             disabled={soloLoading ? false : !nameValid}
-                            className={`flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                            className={`flex-1 py-2 flex items-center justify-center gap-2 border border-black ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
                           >
                             {soloLoading ? (
                               <>
@@ -612,7 +612,7 @@ export function Play() {
                           <button
                             onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
                             disabled={friendsLoading ? false : !nameValid}
-                            className={`flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                            className={`flex-1 py-2 flex items-center justify-center gap-2 border border-black ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
                           >
                             {friendsLoading ? (
                               <>

@@ -1621,6 +1621,14 @@ function GameContent() {
                 <>
                   <div className="flex items-center gap-1.5 sm:gap-2 py-1">
                     <button
+                      className="btn bg-slate-700 hover:bg-slate-600 text-white"
+                      onClick={() =>
+                        window.open(shareUrl, "_blank", "noopener,noreferrer")
+                      }
+                    >
+                      Review
+                    </button>
+                    <button
                       className="btn bg-purple-600 hover:bg-purple-500 text-white"
                       onClick={() => setShareOpen(true)}
                     >
