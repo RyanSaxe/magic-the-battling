@@ -533,7 +533,7 @@ export function QuickGuide({
   }), [applyTarget])
 
   const headerTabs: { id: HeaderTab; label: string }[] = [
-    { id: 'guide', label: 'Guide' },
+    { id: 'guide', label: 'Rules' },
     { id: 'controls', label: 'Controls' },
     { id: 'tips', label: 'Tips' },
     { id: 'browse', label: 'Cards' },
@@ -595,6 +595,22 @@ export function QuickGuide({
                 )}
               </AccordionItem>
 
+              <AccordionItem
+                id="guide-game-pieces"
+                label="Game Pieces"
+                expanded={guideOpenId === 'game-pieces'}
+                panelCapPx={guidePanelCapPx}
+                onToggle={() => toggleGuideSection('game-pieces')}
+              >
+                {gamePiecesDoc ? (
+                  <div className="text-sm sm:text-base">
+                    <DocRenderer content={gamePiecesDoc.parsed.body} />
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">Game pieces content not found.</p>
+                )}
+              </AccordionItem>
+
               {PHASES.map((phase) => {
                 const phaseDoc = getPhaseDoc(phase)
                 return (
@@ -616,22 +632,6 @@ export function QuickGuide({
                   </AccordionItem>
                 )
               })}
-
-              <AccordionItem
-                id="guide-game-pieces"
-                label="Game Pieces"
-                expanded={guideOpenId === 'game-pieces'}
-                panelCapPx={guidePanelCapPx}
-                onToggle={() => toggleGuideSection('game-pieces')}
-              >
-                {gamePiecesDoc ? (
-                  <div className="text-sm sm:text-base">
-                    <DocRenderer content={gamePiecesDoc.parsed.body} />
-                  </div>
-                ) : (
-                  <p className="text-sm text-gray-400">Game pieces content not found.</p>
-                )}
-              </AccordionItem>
             </div>
           </div>
         )}
