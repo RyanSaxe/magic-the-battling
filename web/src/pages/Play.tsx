@@ -510,209 +510,208 @@ export function Play() {
         <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
              style={{ borderRight: '1px solid var(--gold-border)' }} />
 
-      <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
-      <div className="zone-pack h-full min-h-0 flex flex-col sm:justify-center px-4">
-      <div className="shrink-0 w-full max-w-5xl mx-auto pt-6">
-        <div className="mb-4">
-          <div className="mb-1 flex items-center justify-between gap-3">
-            <label htmlFor="player-name" className="block text-gray-400 text-sm">
-              Your Name
-            </label>
-            <span className="block text-gray-400 text-sm text-right shrink-0">
-              Guided Mode
-            </span>
-          </div>
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 sm:gap-3">
-            <input
-              id="player-name"
-              type="text"
-              value={nameLoading ? "" : playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              onKeyDown={(e) =>
-                e.key === "Enter" && nameValid && handleCreateLobby()
-              }
-              disabled={nameLoading}
-              placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-            />
-            <GuidedModeField enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
-          </div>
-        </div>
-      </div>
+        <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
+          <div className="zone-pack h-full min-h-0 flex flex-col sm:justify-center px-4 py-4 overflow-auto">
+            <section className="w-full max-w-5xl mx-auto modal-chrome border gold-border rounded-lg overflow-hidden shadow-[inset_0_1px_0_rgba(255,236,181,0.16),0_16px_36px_rgba(0,0,0,0.3)]">
+              <HintsBanner variant="rail" />
+              <div className="p-4 sm:p-5">
+                <div className="mb-4">
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <label htmlFor="player-name" className="block text-gray-300 text-sm">
+                      Your Name
+                    </label>
+                    <span className="block text-gray-300 text-sm text-right shrink-0">
+                      Guided Mode
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 sm:gap-3">
+                    <input
+                      id="player-name"
+                      type="text"
+                      value={nameLoading ? "" : playerName}
+                      onChange={(e) => setPlayerName(e.target.value)}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && nameValid && handleCreateLobby()
+                      }
+                      disabled={nameLoading}
+                      placeholder={nameLoading ? "Generating name..." : "Enter your name"}
+                      className="w-full h-[42px] bg-black/35 border border-white/10 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+                    />
+                    <GuidedModeField enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
+                  </div>
+                </div>
 
-      {/* Mobile: stacked cards, inactive always on top */}
-      <div className="sm:hidden flex-1 flex flex-col gap-3 w-full max-w-5xl mx-auto min-h-0">
-        {activeMode === "solo" ? (
-          <>
-            {inactiveCard(
-              "friends",
-              <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
-              "Play with Friends",
-            )}
-            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
-              <div className="flex items-center gap-3 mb-2">
-                <GoldfishIcon className="w-8 h-8 text-amber-400" />
-                <h2 className="text-lg font-semibold text-white">Goldfish</h2>
-              </div>
-              <div className="flex-1 flex items-center justify-center">
-                <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                  <span className="text-amber-400/70">
-                    Battle hands that real players piloted
-                  </span>{" "}
-                  to strong finishes. Their cards are face up, and you decide
-                  who wins.
-                </p>
-              </div>
-              <div className="mt-auto flex gap-2 pt-4 relative z-50">
-                <button
-                  onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
-                  disabled={soloLoading ? false : !nameValid}
-                  className={`flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-                >
-                  {soloLoading ? (
+                {/* Mobile: stacked cards, inactive always on top */}
+                <div className="sm:hidden flex flex-col gap-3 min-h-0">
+                  {activeMode === "solo" ? (
                     <>
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Loading...
+                      {inactiveCard(
+                        "friends",
+                        <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
+                        "Play with Friends",
+                      )}
+                      <div className="bg-black/45 rounded-lg p-5 border border-white/10 flex flex-col">
+                        <div className="flex items-center gap-3 mb-2">
+                          <GoldfishIcon className="w-8 h-8 text-amber-400" />
+                          <h2 className="text-lg font-semibold text-white">Goldfish</h2>
+                        </div>
+                        <div className="flex-1 flex items-center justify-center">
+                          <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                            <span className="text-amber-400/70">
+                              Battle hands that real players piloted
+                            </span>{" "}
+                            to strong finishes. Their cards are face up, and you decide
+                            who wins.
+                          </p>
+                        </div>
+                        <div className="mt-auto flex gap-2 pt-4 relative z-50">
+                          <button
+                            onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
+                            disabled={soloLoading ? false : !nameValid}
+                            className={`flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                          >
+                            {soloLoading ? (
+                              <>
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Loading...
+                              </>
+                            ) : (
+                              "Start Game"
+                            )}
+                          </button>
+                          <GearButton onClick={() => setShowSoloAdvanced(true)} />
+                        </div>
+                      </div>
                     </>
                   ) : (
-                    "Start Game"
-                  )}
-                </button>
-                <GearButton onClick={() => setShowSoloAdvanced(true)} />
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            {inactiveCard(
-              "solo",
-              <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
-              "Goldfish",
-            )}
-            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
-              <div className="flex items-center gap-3 mb-2">
-                <FriendsIcon className="w-8 h-8 text-amber-400" />
-                <h2 className="text-lg font-semibold text-white">
-                  Play with Friends
-                </h2>
-              </div>
-              <div className="flex-1 flex items-center justify-center">
-                <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                  <span className="text-amber-400/70">
-                    Can you draft an unbeatable hand?
-                  </span>{" "}
-                  Compete with your friends to see who can turn trash into
-                  treasure!{" "}
-                </p>
-              </div>
-              <div className="mt-auto flex gap-2 pt-4 relative z-50">
-                <button
-                  onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
-                  disabled={friendsLoading ? false : !nameValid}
-                  className={`flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-                >
-                  {friendsLoading ? (
                     <>
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Loading...
+                      {inactiveCard(
+                        "solo",
+                        <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
+                        "Goldfish",
+                      )}
+                      <div className="bg-black/45 rounded-lg p-5 border border-white/10 flex flex-col">
+                        <div className="flex items-center gap-3 mb-2">
+                          <FriendsIcon className="w-8 h-8 text-amber-400" />
+                          <h2 className="text-lg font-semibold text-white">
+                            Play with Friends
+                          </h2>
+                        </div>
+                        <div className="flex-1 flex items-center justify-center">
+                          <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                            <span className="text-amber-400/70">
+                              Can you draft an unbeatable hand?
+                            </span>{" "}
+                            Compete with your friends to see who can turn trash into
+                            treasure!{" "}
+                          </p>
+                        </div>
+                        <div className="mt-auto flex gap-2 pt-4 relative z-50">
+                          <button
+                            onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
+                            disabled={friendsLoading ? false : !nameValid}
+                            className={`flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                          >
+                            {friendsLoading ? (
+                              <>
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Loading...
+                              </>
+                            ) : (
+                              "Create Lobby"
+                            )}
+                          </button>
+                          <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+                        </div>
+                      </div>
                     </>
-                  ) : (
-                    "Create Lobby"
                   )}
-                </button>
-                <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+                </div>
+
+                {/* Desktop: split panes inside one shared panel */}
+                <div className="hidden sm:grid sm:grid-cols-2 rounded-lg border border-white/10 bg-black/35 overflow-hidden">
+                  <div className="flex flex-col px-5 py-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <FriendsIcon className="w-8 h-8 text-amber-400" />
+                      <h2 className="text-lg font-semibold text-white">
+                        Play with Friends
+                      </h2>
+                    </div>
+                    <div className="flex-1 flex items-center">
+                      <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                        <span className="text-amber-400/70">
+                          Can you draft an unbeatable hand?
+                        </span>{" "}
+                        Compete with your friends to see who can turn trash into
+                        treasure!{" "}
+                      </p>
+                    </div>
+                    <div className="mt-auto flex gap-2 pt-4 relative z-50">
+                      <button
+                        onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
+                        disabled={friendsLoading ? false : !nameValid}
+                        className={`flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                      >
+                        {friendsLoading ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Loading...
+                          </>
+                        ) : (
+                          "Create Lobby"
+                        )}
+                      </button>
+                      <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+                    </div>
+                  </div>
+                  <div className="flex flex-col px-5 py-4 border-l border-white/10 bg-black/10">
+                    <div className="flex items-center gap-3 mb-2">
+                      <GoldfishIcon className="w-8 h-8 text-amber-400" />
+                      <h2 className="text-lg font-semibold text-white">Goldfish</h2>
+                    </div>
+                    <div className="flex-1 flex items-center">
+                      <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                        <span className="text-amber-400/70">
+                          Battle hands that real players piloted
+                        </span>{" "}
+                        to strong finishes. Their cards are face up, and you decide wins.
+                      </p>
+                    </div>
+                    <div className="mt-auto flex gap-2 pt-4 relative z-50">
+                      <button
+                        onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
+                        disabled={soloLoading ? false : !nameValid}
+                        className={`flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                      >
+                        {soloLoading ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Loading...
+                          </>
+                        ) : (
+                          "Start Game"
+                        )}
+                      </button>
+                      <GearButton onClick={() => setShowSoloAdvanced(true)} />
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Desktop: side-by-side cards */}
-      <div className="hidden sm:grid sm:grid-cols-2 gap-4 w-full max-w-5xl mx-auto">
-        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
-          <div className="flex items-center gap-3 mb-2">
-            <FriendsIcon className="w-8 h-8 text-amber-400" />
-            <h2 className="text-lg font-semibold text-white">
-              Play with Friends
-            </h2>
+            </section>
           </div>
-          <div className="flex-1 flex items-center">
-            <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-              <span className="text-amber-400/70">
-                Can you draft an unbeatable hand?
-              </span>{" "}
-              Compete with your friends to see who can turn trash into
-              treasure!{" "}
-            </p>
-          </div>
-          <div className="mt-auto flex gap-2 pt-4 relative z-50">
-            <button
-              onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
-              disabled={friendsLoading ? false : !nameValid}
-              className={`flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-            >
-              {friendsLoading ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Loading...
-                </>
-              ) : (
-                "Create Lobby"
-              )}
-            </button>
-            <GearButton onClick={() => setShowFriendsAdvanced(true)} />
-          </div>
-        </div>
-        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
-          <div className="flex items-center gap-3 mb-2">
-            <GoldfishIcon className="w-8 h-8 text-amber-400" />
-            <h2 className="text-lg font-semibold text-white">Goldfish</h2>
-          </div>
-          <div className="flex-1 flex items-center">
-            <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-              <span className="text-amber-400/70">
-                Battle hands that real players piloted
-              </span>{" "}
-              to strong finishes. Their cards are face up, and you decide wins.
-            </p>
-          </div>
-          <div className="mt-auto flex gap-2 pt-4 relative z-50">
-            <button
-              onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
-              disabled={soloLoading ? false : !nameValid}
-              className={`flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-            >
-              {soloLoading ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Loading...
-                </>
-              ) : (
-                "Start Game"
-              )}
-            </button>
-            <GearButton onClick={() => setShowSoloAdvanced(true)} />
-          </div>
-        </div>
-      </div>
-
-      <div className="shrink-0 w-full max-w-5xl mx-auto mt-3 mb-4">
-        <HintsBanner variant="dark" />
-      </div>
-      </div>
-      </main>
+        </main>
 
         <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
              style={{ borderLeft: '1px solid var(--gold-border)' }} />
