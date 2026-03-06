@@ -58,13 +58,15 @@ Deployed to [Fly.io](https://fly.io) via Docker — see `fly.toml` and `Dockerfi
 
 Labels on the merged PR control deploy behavior and release creation.
 
-**Deploy delay** (`deploy:*`) — controls how long players are warned before the server restarts:
+**Deploy delay** (`deploy:*`) — controls how long players are warned before the server restarts.
+Both workflows support the same labels but have different defaults:
 
-| Label | Delay | Use case |
-|-------|-------|----------|
-| *(none)* | 15 min | Normal deploys |
-| `deploy:quick` | 0 min | Hotfixes, config changes |
-| `deploy:long` | 1 hour | Large updates during peak hours |
+| Label | Dev default | Prod default | Use case |
+|-------|-------------|--------------|----------|
+| *(none)* | 0 min | 15 min | Normal deploys |
+| `deploy:quick` | 0 min | 0 min | Hotfixes, config changes |
+| `deploy:default` | 15 min | 15 min | Explicit standard delay |
+| `deploy:long` | 1 hour | 1 hour | Large updates during peak hours |
 
 **Release** (`release:*`) — triggers a tagged GitHub release after successful deploy:
 
