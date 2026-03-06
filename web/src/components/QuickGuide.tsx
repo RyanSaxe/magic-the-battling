@@ -26,6 +26,7 @@ interface AccordionItemProps {
   expanded: boolean
   panelCapPx: number
   onToggle: () => void
+  labelClassName?: string
   children: React.ReactNode
 }
 
@@ -241,7 +242,7 @@ function useAccordionPanelCap(
   return panelCapPx
 }
 
-function AccordionItem({ id, label, expanded, panelCapPx, onToggle, children }: AccordionItemProps) {
+function AccordionItem({ id, label, expanded, panelCapPx, onToggle, labelClassName, children }: AccordionItemProps) {
   const panelId = `guide-panel-${id}`
   const contentRef = useRef<HTMLDivElement>(null)
   const [measuredContentPx, setMeasuredContentPx] = useState(0)
@@ -273,15 +274,15 @@ function AccordionItem({ id, label, expanded, panelCapPx, onToggle, children }: 
         aria-expanded={expanded}
         aria-controls={panelId}
         data-accordion-header="true"
-        className={`w-full py-3 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-b transition-colors duration-[400ms] ${
+        className={`w-full py-3.5 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-l-3 transition-all duration-[400ms] ${
           expanded
-            ? 'bg-black/20 border-amber-400/25'
-            : 'hover:bg-black/20 border-amber-400/15'
+            ? 'bg-amber-400/8 border-l-amber-400'
+            : 'border-l-transparent hover:border-l-amber-400/40 hover:bg-black/20'
         }`}
       >
-        <span className="text-white font-medium text-sm sm:text-base flex-1 text-left">{label}</span>
+        <span className={`font-medium text-base flex-1 text-left ${labelClassName ?? 'text-white'}`}>{label}</span>
         <svg
-          className={`w-4 h-4 transition-transform transition-colors duration-[400ms] ${expanded ? 'rotate-90 text-amber-400' : 'text-gray-400'}`}
+          className={`w-5 h-5 transition-transform transition-colors duration-[400ms] ${expanded ? 'rotate-90 text-amber-400' : 'text-gray-400'}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -298,7 +299,7 @@ function AccordionItem({ id, label, expanded, panelCapPx, onToggle, children }: 
       >
         <div className="quick-guide-accordion-panel-inner">
           <div className="quick-guide-accordion-scroll" style={{ maxHeight: panelMaxHeight }}>
-            <div ref={contentRef} className="px-5 py-4">
+            <div ref={contentRef} className="px-5 py-4 sm:px-6 sm:py-5">
               {children}
             </div>
           </div>
@@ -549,16 +550,16 @@ export function QuickGuide({
   return (
     <DocNavContext.Provider value={docNav}>
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex items-end justify-between gap-3 px-4 shrink-0 border-b border-amber-400/15">
-          <div className="flex gap-4 min-w-0">
+        <div className="flex items-center justify-between gap-3 px-5 py-3 shrink-0 bg-black/30">
+          <div className="flex gap-2 min-w-0">
             {headerTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-1 pb-2 pt-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                className={`px-3 py-1.5 text-[0.8125rem] font-medium transition-colors rounded-md ${
                   tab.id === activeTab
-                    ? 'text-amber-400 border-amber-400'
-                    : 'text-gray-400 border-transparent hover:text-gray-200'
+                    ? 'bg-amber-400/15 text-amber-300'
+                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
                 }`}
               >
                 {tab.label}
@@ -754,6 +755,7 @@ export function QuickGuide({
                     expanded={faqOpenId === index}
                     panelCapPx={faqPanelCapPx}
                     onToggle={() => toggleFaqSection(index)}
+                    labelClassName="text-amber-200/90"
                   >
                     <div className="text-sm sm:text-base text-gray-300">
                       <DocRenderer content={entry.answer} />
@@ -769,7 +771,7 @@ export function QuickGuide({
           </div>
         )}
 
-        <div className="shrink-0 px-4 py-3 border-t border-amber-400/10 modal-chrome backdrop-blur-sm">
+        <div className="shrink-0 px-4 py-3.5 border-t-2 border-amber-400/25 modal-chrome backdrop-blur-sm">
           <div className="flex items-center justify-between gap-3">
             <a
               href={DISCORD_INVITE_URL}
