@@ -284,7 +284,7 @@ function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="h-[42px] w-[42px] shrink-0 rounded-lg bg-white/20 border border-white/20 text-gray-300 hover:bg-white/30 hover:text-white transition-all flex items-center justify-center text-base"
+      className="h-[42px] w-[42px] shrink-0 rounded-lg bg-white/20 border border-black text-gray-300 hover:bg-white/30 hover:text-white transition-all flex items-center justify-center text-base"
       title="Advanced Options"
     >
       ⚙
@@ -556,18 +556,20 @@ export function Play() {
                         </div>
                         <div className="flex-1 flex items-center justify-center">
                           <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                            <span className="text-amber-400/70">
+                            <span className="block text-amber-400/70">
                               Battle hands that real players piloted
-                            </span>{" "}
-                            to strong finishes. Their cards are face up, and you decide
-                            who wins.
+                            </span>
+                            <span className="block">
+                              to strong finishes. Their cards are face up, and you decide
+                              who wins.
+                            </span>
                           </p>
                         </div>
                         <div className="mt-auto flex gap-2 pt-4">
                           <button
                             onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
                             disabled={soloLoading ? false : !nameValid}
-                            className={`flex-1 py-2 flex items-center justify-center gap-2 border border-black ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                            className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
                           >
                             {soloLoading ? (
                               <>
@@ -601,18 +603,20 @@ export function Play() {
                         </div>
                         <div className="flex-1 flex items-center justify-center">
                           <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                            <span className="text-amber-400/70">
+                            <span className="block text-amber-400/70">
                               Can you draft an unbeatable hand?
-                            </span>{" "}
-                            Compete with your friends to see who can turn trash into
-                            treasure!{" "}
+                            </span>
+                            <span className="block">
+                              Compete with your friends to see who can turn trash into
+                              treasure!
+                            </span>
                           </p>
                         </div>
                         <div className="mt-auto flex gap-2 pt-4">
                           <button
                             onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
                             disabled={friendsLoading ? false : !nameValid}
-                            className={`flex-1 py-2 flex items-center justify-center gap-2 border border-black ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                            className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
                           >
                             {friendsLoading ? (
                               <>

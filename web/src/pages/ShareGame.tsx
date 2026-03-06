@@ -7,7 +7,6 @@ import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
 import { buildGameSummaryData } from '../utils/share'
 import { getOrdinal, getPlacementBadgeColor } from '../utils/format'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
-import { PhaseTimeline } from '../components/PhaseTimeline'
 import { CardPreviewContext, CardPreviewModal } from '../components/card'
 
 interface RoundOption {
@@ -134,7 +133,6 @@ export function ShareGame() {
     )
   }
 
-  const gameFinished = data.players.every((p) => p.final_placement != null)
   const ownerPlayer = data.players.find((p) => p.name === data.owner_name)
   const referenceSnapshots = ownerPlayer?.snapshots ?? data.players[0]?.snapshots ?? []
   const isFinal = selectedRound === 'final'
@@ -285,27 +283,58 @@ export function ShareGame() {
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
     <div className="h-dvh flex flex-col bg-gray-900 text-white overflow-hidden">
       {/* Header */}
-      <div className="relative">
-        <PhaseTimeline
-          currentPhase="game_over"
-          stage={0}
-          round={0}
-          nextStage={0}
-          nextRound={0}
-          headerClassName="py-1.5 bar-pad-left"
-          title={
-            <span className="flex items-center gap-2">
-              <span className="text-amber-400 font-bold text-sm">Magic: The Battling</span>
-              {!gameFinished && (
-                <span className="text-xs text-gray-500 italic">Game in Progress</span>
-              )}
-            </span>
-          }
-          hamburger={sizes.isMobile ? (
-            <button onClick={() => setSidebarOpen(o => !o)} className="btn btn-secondary text-xs sm:text-sm">☰</button>
-          ) : undefined}
-        />
-      </div>
+      <header className="shrink-0 py-3 frame-chrome bar-pad-both">
+        <div className="hidden sm:flex items-center justify-between">
+          <div>
+            <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
+              Magic: The Battling
+            </h1>
+            <p className="text-gray-400 text-sm">
+              An MtG format inspired by autobattlers
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/play')}
+              className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
+            >
+              Play Game
+            </button>
+            <button
+              onClick={() => navigate('/')}
+              className="btn btn-secondary py-2 px-4"
+            >
+              Home
+            </button>
+          </div>
+        </div>
+        <div className="sm:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
+                Magic: The Battling
+              </h1>
+              <p className="text-gray-400 text-xs">
+                An MtG format inspired by autobattlers
+              </p>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={() => navigate('/play')}
+                className="btn btn-primary py-1.5 px-3 text-sm font-semibold animate-gentle-glow"
+              >
+                Play
+              </button>
+              <button
+                onClick={() => navigate('/')}
+                className="btn btn-secondary py-1.5 px-3 text-sm"
+              >
+                Home
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
 
       {/* Main + Sidebar */}
       <div className="flex-1 flex min-h-0 game-surface">
@@ -350,7 +379,6 @@ export function ShareGame() {
       {/* Bottom Bar */}
       <div className="shrink-0 frame-chrome">
         <div className="flex items-center justify-between py-1.5 sm:py-2 bar-pad-main timeline-actions">
-          {/* Left: Round selector */}
           <div className="relative">
             <button
               className="btn btn-secondary text-sm py-1.5 px-3"
@@ -367,8 +395,6 @@ export function ShareGame() {
               />
             )}
           </div>
-
-          {/* Right: Prev / Next */}
           <div className="flex items-center gap-2">
             <button
               className="btn btn-secondary text-sm py-1.5 disabled:opacity-30"
@@ -384,6 +410,15 @@ export function ShareGame() {
             >
               Next
             </button>
+            {sizes.isMobile && (
+              <button
+                onClick={() => setSidebarOpen((o) => !o)}
+                className="btn btn-secondary py-1.5 px-2 text-sm"
+                aria-label="Players"
+              >
+                ☰
+              </button>
+            )}
           </div>
         </div>
       </div>

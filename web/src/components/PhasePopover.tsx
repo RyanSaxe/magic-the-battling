@@ -87,43 +87,43 @@ export function PhasePopover({
         position: 'fixed',
         visibility: 'hidden',
       }}
-      className="modal-chrome border gold-border rounded-lg shadow-xl z-[60] min-w-[16rem] w-max max-w-[calc(100vw-1rem)]"
+      className="modal-chrome border gold-border rounded-lg shadow-xl z-[60] felt-raised-panel min-w-[16rem] w-max max-w-[calc(100vw-1rem)]"
     >
       <div
         ref={arrowRef}
         className="absolute -top-1.5 w-3 h-3 modal-chrome border-l border-t gold-border rotate-45"
       />
 
-      <div className="p-3">
-        <h3 className={`text-sm font-semibold capitalize mb-1.5 ${PHASE_TITLE_COLOR[phase]}`}>
+      <div className="modal-chrome border-b gold-border rounded-t-lg px-3 py-2 flex items-center justify-between gap-2">
+        <span className={`text-sm font-semibold capitalize ${PHASE_TITLE_COLOR[phase]}`}>
           {phase} Phase
-        </h3>
-
-        <ul className="mb-2 overflow-hidden rounded-md border gold-divider divide-y gold-divider">
-          {getPhaseSummaryRows(phase, useUpgrades).map((row, index) => (
-            <li key={`${phase}-${index}`} className="grid grid-cols-[auto,1fr] items-start gap-2 px-2.5 py-1.5 text-xs text-gray-200 leading-5">
-              <span aria-hidden className="text-amber-300/90">
-                •
-              </span>
-              <span>{row}</span>
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-2 pt-2 border-t gold-divider flex items-center justify-between gap-3">
+        </span>
+        <div className="flex items-center gap-1.5">
           <button
             onClick={onOpenDetails}
-            className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
+            className="btn-secondary text-xs py-1 px-2.5 rounded"
           >
             Details
           </button>
           <button
             onClick={onOpenControls}
-            className="text-xs text-blue-300 hover:text-blue-200 transition-colors"
+            className="btn-secondary text-xs py-1 px-2.5 rounded"
           >
             Controls
           </button>
         </div>
+      </div>
+
+      <div className="p-3">
+        <div className="bg-black/35 rounded-lg border border-black/40 px-3 py-2">
+          {getPhaseSummaryRows(phase, useUpgrades).map((row, index) => (
+            <p key={`${phase}-${index}`} className="text-xs text-gray-300 mb-1.5 last:mb-0 leading-5">
+              <span className="text-amber-400/90 mr-1.5">{index + 1}.</span>
+              {row}
+            </p>
+          ))}
+        </div>
+
       </div>
     </div>,
     document.body,

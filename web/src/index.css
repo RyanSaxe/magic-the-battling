@@ -556,6 +556,10 @@ body {
   border: none;
 }
 
+.play-action-btn {
+  border: 1px solid #000 !important;
+}
+
 .timeline-actions .btn {
   min-height: 30px;
   padding: 0 10px;

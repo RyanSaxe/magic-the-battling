@@ -182,9 +182,13 @@ export function PhaseTimeline({
     return (
       <header className={`frame-chrome ${headerCls}`}>
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-300">
-            {title ?? END_STATE_LABELS[currentPhase]}
-          </span>
+          {title ? (
+            <div className="min-w-0">{title}</div>
+          ) : (
+            <span className="text-sm font-medium text-gray-300">
+              {END_STATE_LABELS[currentPhase]}
+            </span>
+          )}
           <div className="flex items-center gap-1.5 timeline-actions">
             {onOpenRules && <RulesButton onClick={() => onOpenRules()} />}
             <HomeButton />
