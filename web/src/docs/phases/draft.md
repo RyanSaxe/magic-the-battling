@@ -14,8 +14,8 @@ Look at the numbers in the top left of the screen (3-1 at game start). This is t
 
 - You are dealt a pack of 5 cards to draft from.
 - You can swap any card from your pool with any card in the pack. You can take this action any number of times.
-- Spend 1 treasure to reroll the pack: discard the current pack and be dealt a new one.
-- At the end of the upcoming [battle phase](doc:battle) you are only allowed to keep 5 treasures. If you currently have more than 5, or are planning on playing a hand that will produce treasures over the limit, you should consider rolling.
+- Spend 1 [treasure](doc:game-pieces#treasures) to reroll the pack: discard the current pack and be dealt a new one.
+- At the end of the upcoming [battle phase](doc:battle) you are only allowed to keep 5 treasures. If you currently have more than 5, or are planning on playing a hand that will produce [treasures](doc:game-pieces#treasures) over the limit, you should consider rolling.
 
 ## Controls
 

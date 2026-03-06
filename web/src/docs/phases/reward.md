@@ -9,7 +9,7 @@ order: 4
 You made it to the end of the round. Enjoy your rewards!
 
 :::note
-In the current game rules, there is no difference in rewards for the winner of the battle.
+In the current game rules, there is no difference in rewards for the winner of the [battle](doc:battle).
 :::
 
 - Every player always gets +1 [treasure](doc:game-pieces#treasures).

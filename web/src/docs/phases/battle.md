@@ -16,16 +16,16 @@ Be very mindful of when to use [treasures](doc:game-pieces#treasures) to try and
 
 - Each player starts with 10 life
 - Libraries start empty, and you cannot lose the game due to not being able to draw cards.
-- Conceding is not allowed because Treasure tokens created during a battle persist afterwards.
+- Conceding is not allowed because [Treasure tokens](doc:game-pieces#treasures) created during a battle persist afterwards.
 - A draw is considered a loss for both players.
 
 ## Before the Battle Starts
 
-- All basic lands selected during the build phase start on the battlefield untapped.
+- All basic lands selected during the [build phase](doc:build) start on the battlefield untapped.
 - All [treasures](doc:game-pieces#treasures) a player has at the beginning of the battle phase will start on their battlefield.
 - All [poison counters](doc:game-pieces#poison) a player has is attached to them during the battle.
 - The player with the most [poison counters](doc:game-pieces#poison) gets their choice of play/draw. If players are tied, the choosing player is selected randomly. In the finals, after the first game, the loser of the previous game chooses instead.
-- Each player's starting hand and sideboard become exactly what was selected during the build phase.
+- Each player's starting hand and sideboard become exactly what was selected during the [build phase](doc:build).
 
 ## After the Battle Ends
 
