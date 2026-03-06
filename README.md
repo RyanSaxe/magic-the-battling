@@ -54,6 +54,31 @@ Start the dev server and visit [`/docs`](http://localhost:8000/docs) for the aut
 
 Deployed to [Fly.io](https://fly.io) via Docker — see `fly.toml` and `Dockerfile`.
 
+### PR Labels
+
+Labels on the merged PR control deploy behavior and release creation.
+
+**Deploy delay** (`deploy:*`) — controls how long players are warned before the server restarts.
+Both workflows support the same labels but have different defaults:
+
+| Label | Dev default | Prod default | Use case |
+|-------|-------------|--------------|----------|
+| *(none)* | 0 min | 15 min | Normal deploys |
+| `deploy:quick` | 0 min | 0 min | Hotfixes, config changes |
+| `deploy:default` | 15 min | 15 min | Explicit standard delay |
+| `deploy:long` | 1 hour | 1 hour | Large updates during peak hours |
+
+**Release** (`release:*`) — triggers a tagged GitHub release after successful deploy:
+
+| Label | Effect |
+|-------|--------|
+| *(none)* | No release created |
+| `release:patch` | Bump patch version (e.g. v1.0.0 → v1.0.1) |
+| `release:minor` | Bump minor version (e.g. v1.0.0 → v1.1.0) |
+| `release:major` | Bump major version (e.g. v1.0.0 → v2.0.0) |
+
+Labels can be combined — e.g. `deploy:quick` + `release:patch` for an urgent bugfix release.
+
 ## Fly Operations Report
 
 Use the report script to inspect game activity, memory signals, and recent log events.

@@ -9,15 +9,54 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  resolve-delay:
+    runs-on: ubuntu-latest
+    outputs:
+      delay_minutes: ${{ steps.delay.outputs.minutes }}
+      delay_seconds: ${{ steps.delay.outputs.seconds }}
+    steps:
+      - name: Determine deploy delay from PR label
+        id: delay
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LABEL=$(gh pr list \
+            --repo "${{ github.repository }}" \
+            --search "${{ github.sha }}" \
+            --state merged \
+            --json labels \
+            --jq '[.[0].labels[].name // empty | select(startswith("deploy:"))] | .[0] // empty' \
+            2>/dev/null || true)
+
+          case "$LABEL" in
+            deploy:quick)
+              echo "minutes=0" >> $GITHUB_OUTPUT
+              echo "seconds=0" >> $GITHUB_OUTPUT
+              echo "Deploy delay: quick (0 min)"
+              ;;
+            deploy:long)
+              echo "minutes=60" >> $GITHUB_OUTPUT
+              echo "seconds=3600" >> $GITHUB_OUTPUT
+              echo "Deploy delay: long (60 min)"
+              ;;
+            *)
+              echo "minutes=15" >> $GITHUB_OUTPUT
+              echo "seconds=900" >> $GITHUB_OUTPUT
+              echo "Deploy delay: default (15 min)"
+              ;;
+          esac
+
   announce-drain:
     runs-on: ubuntu-latest
+    needs: resolve-delay
     env:
       APP_BASE_URL: https://magic-the-battling.fly.dev
-      DELAY_MINUTES: "60"
+      DELAY_MINUTES: ${{ needs.resolve-delay.outputs.delay_minutes }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Enter draining mode
+        if: env.DELAY_MINUTES != '0'
         run: |
           SWITCH_AT_UTC=$(date -u -d "+${DELAY_MINUTES} minutes" "+%Y-%m-%d %H:%M UTC")
           export SWITCH_AT_UTC
@@ -74,16 +113,17 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    needs: announce-drain
+    needs: [resolve-delay, announce-drain]
     env:
       APP_BASE_URL: https://magic-the-battling.fly.dev
-      DELAY_SECONDS: "3600"
+      DELAY_SECONDS: ${{ needs.resolve-delay.outputs.delay_seconds }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Wait for scheduled deploy window
+        if: env.DELAY_SECONDS != '0'
         run: sleep "${DELAY_SECONDS}"
 
       - name: Deploy app
@@ -161,3 +201,87 @@ jobs:
           esac
         env:
           OPS_API_TOKEN: ${{ secrets.OPS_API_TOKEN }}
+
+  release:
+    runs-on: ubuntu-latest
+    needs: deploy
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find merged PR and read release label
+        id: pr_info
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR_NUMBER=$(gh pr list \
+            --search "${{ github.sha }}" \
+            --state merged \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No merged PR found for this commit; skipping release."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          BUMP=$(gh pr view "$PR_NUMBER" \
+            --json labels \
+            --jq '[.labels[].name | select(startswith("release:"))] | .[0] // empty' \
+            | sed 's/^release://')
+
+          if [ -z "$BUMP" ]; then
+            echo "No release label on PR #${PR_NUMBER}; skipping release."
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "bump=$BUMP" >> $GITHUB_OUTPUT
+          echo "skip=false" >> $GITHUB_OUTPUT
+          echo "Will create a $BUMP release from PR #${PR_NUMBER}."
+
+      - name: Get latest tag
+        if: steps.pr_info.outputs.skip != 'true'
+        id: get_tag
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+
+      - name: Calculate new version
+        if: steps.pr_info.outputs.skip != 'true'
+        id: calc_version
+        run: |
+          LATEST_TAG="${{ steps.get_tag.outputs.latest_tag }}"
+          VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          case "${{ steps.pr_info.outputs.bump }}" in
+            major)
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+              ;;
+            minor)
+              MINOR=$((MINOR + 1))
+              PATCH=0
+              ;;
+            patch)
+              PATCH=$((PATCH + 1))
+              ;;
+          esac
+
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub release
+        if: steps.pr_info.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create ${{ steps.calc_version.outputs.new_version }} \
+            --title "${{ steps.calc_version.outputs.new_version }}" \
+            --generate-notes
