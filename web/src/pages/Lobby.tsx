@@ -79,7 +79,7 @@ function GuidedModeSwitch({
   }, [showGuidedModeHelp]);
 
   return (
-    <div className="flex items-center gap-1.5 shrink-0 rounded-md border border-white/15 bg-black/25 px-2 py-1">
+    <div className="flex items-center gap-1.5 shrink-0 rounded-md border border-black/40 bg-black/40 px-2 py-1">
       <label className="flex items-center gap-1.5 cursor-pointer">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
           Guided
@@ -627,7 +627,7 @@ export function Lobby() {
 
                   return (
                     <>
-                      <div className="rounded-lg p-3 mb-3 text-center bg-black/20 border border-white/10">
+                      <div className="rounded-lg p-3 mb-3 text-center bg-black/35 border border-black/40">
                         <div className="flex items-center justify-center gap-3">
                           <span className="text-2xl font-mono font-bold text-amber-400 tracking-wider">
                             {lobbyState.join_code}
@@ -639,7 +639,7 @@ export function Lobby() {
                             {copied ? "Copied!" : "Copy"}
                           </button>
                         </div>
-                        <div className="border-t border-white/5 mt-2 pt-2 flex items-center justify-center gap-2 text-xs text-gray-500">
+                        <div className="border-t border-black/40 mt-2 pt-2 flex items-center justify-center gap-2 text-xs text-gray-500">
                           <span>
                             Cube:{" "}
                             <a
@@ -665,7 +665,7 @@ export function Lobby() {
                         </div>
                       </div>
 
-                <div className="bg-black/35 rounded-lg border border-white/10 p-3 mb-3">
+                <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-white font-medium text-sm">Players</h2>
                     {isHost ? (
@@ -684,7 +684,7 @@ export function Lobby() {
                               tab: "why-are-my-opponents-cards-face-up",
                             })
                           }
-                          className="w-5 h-5 rounded-full bg-white/10 border border-white/15 text-gray-400 hover:bg-white/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
+                          className="w-5 h-5 rounded-full bg-black/30 border border-black/40 text-gray-400 hover:bg-black/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
                           title="What are Puppets?"
                         >
                           ?
@@ -713,7 +713,7 @@ export function Lobby() {
                         return (
                           <div
                             key={slot.key}
-                            className="bg-black/45 border border-white/10 px-3 py-2.5 rounded-lg flex items-center gap-2 min-w-0"
+                            className="bg-black/30 border border-black/40 px-3 py-2.5 rounded-lg flex items-center gap-2 min-w-0"
                           >
                             <span
                               className={`w-2 h-2 rounded-full shrink-0 ${
@@ -802,9 +802,9 @@ export function Lobby() {
                       return (
                         <div
                           key={slot.key}
-                          className="bg-black/20 border border-dashed border-white/20 px-3 py-2.5 rounded-lg flex items-center gap-2 min-w-0"
+                          className="bg-black/20 border border-dashed border-black/35 px-3 py-2.5 rounded-lg flex items-center gap-2 min-w-0"
                         >
-                          <span className="w-2 h-2 rounded-full shrink-0 bg-white/20" />
+                          <span className="w-2 h-2 rounded-full shrink-0 bg-black/40" />
                           <span className="text-gray-500 text-sm italic">
                             {filledSlots.length === 1 && slot.openIndex === 0
                               ? "required"
@@ -816,7 +816,7 @@ export function Lobby() {
                   </div>
                 </div>
 
-                <div className="space-y-2 mb-3">
+                <div className="space-y-3 mb-3">
                   <div className="flex items-center justify-between gap-2">
                     <GuidedModeSwitch
                       enabled={isGuidedMode}

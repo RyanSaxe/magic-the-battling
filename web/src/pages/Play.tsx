@@ -284,7 +284,7 @@ function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="px-3.5 self-stretch shrink-0 rounded-lg bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all flex items-center justify-center text-lg"
+      className="h-[42px] w-[42px] shrink-0 rounded-lg bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all flex items-center justify-center text-base"
       title="Advanced Options"
     >
       ⚙
@@ -457,7 +457,7 @@ export function Play() {
   ) => (
     <button
       onClick={() => setActiveMode(mode)}
-      className="shrink-0 bg-black/60 backdrop-blur rounded-lg px-4 py-3 border border-black/40 flex items-center gap-3 w-full text-left hover:bg-black/50 transition-colors"
+      className="shrink-0 bg-black/35 rounded-lg px-4 py-3 border border-black/40 flex items-center gap-3 w-full text-left hover:bg-black/30 transition-colors"
     >
       {icon}
       <span className="text-white font-medium text-sm">{label}</span>
@@ -534,7 +534,7 @@ export function Play() {
                       }
                       disabled={nameLoading}
                       placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-                      className="w-full h-[42px] bg-black/35 border border-white/10 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+                      className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
                     />
                     <GuidedModeField enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
                   </div>
@@ -549,7 +549,7 @@ export function Play() {
                         <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
                         "Play with Friends",
                       )}
-                      <div className="bg-black/45 rounded-lg p-5 border border-white/10 flex flex-col flex-1 min-h-0">
+                      <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col flex-1 min-h-0">
                         <div className="flex items-center gap-3 mb-2">
                           <GoldfishIcon className="w-8 h-8 text-amber-400" />
                           <h2 className="text-lg font-semibold text-white">Goldfish</h2>
@@ -592,7 +592,7 @@ export function Play() {
                         <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
                         "Goldfish",
                       )}
-                      <div className="bg-black/45 rounded-lg p-5 border border-white/10 flex flex-col flex-1 min-h-0">
+                      <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col flex-1 min-h-0">
                         <div className="flex items-center gap-3 mb-2">
                           <FriendsIcon className="w-8 h-8 text-amber-400" />
                           <h2 className="text-lg font-semibold text-white">
