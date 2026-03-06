@@ -510,11 +510,10 @@ export function Play() {
         <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
              style={{ borderRight: '1px solid var(--gold-border)' }} />
 
-        <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
-          <div className="zone-pack h-full min-h-0 flex flex-col sm:justify-center px-4 py-4 overflow-auto">
-            <section className="w-full max-w-5xl mx-auto modal-chrome border gold-border rounded-lg overflow-hidden shadow-[inset_0_1px_0_rgba(255,236,181,0.16),0_16px_36px_rgba(0,0,0,0.3)]">
-              <HintsBanner variant="rail" />
-              <div className="p-4 sm:p-5">
+        <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
+          <div className="zone-pack flex-1 min-h-0 flex flex-col px-4 py-4 sm:py-2 sm:items-center sm:justify-center overflow-auto">
+            <section className="w-full max-w-5xl mx-auto modal-chrome border gold-border rounded-lg overflow-hidden flex-1 min-h-0 flex flex-col sm:flex-none felt-raised-panel">
+              <div className="p-4 sm:p-5 flex-1 min-h-0 flex flex-col sm:flex-none">
                 <div className="mb-4">
                   <div className="mb-1 flex items-center justify-between gap-3">
                     <label htmlFor="player-name" className="block text-gray-300 text-sm">
@@ -542,7 +541,7 @@ export function Play() {
                 </div>
 
                 {/* Mobile: stacked cards, inactive always on top */}
-                <div className="sm:hidden flex flex-col gap-3 min-h-0">
+                <div className="sm:hidden flex-1 min-h-0 flex flex-col gap-3">
                   {activeMode === "solo" ? (
                     <>
                       {inactiveCard(
@@ -550,7 +549,7 @@ export function Play() {
                         <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
                         "Play with Friends",
                       )}
-                      <div className="bg-black/45 rounded-lg p-5 border border-white/10 flex flex-col">
+                      <div className="bg-black/45 rounded-lg p-5 border border-white/10 flex flex-col flex-1 min-h-0">
                         <div className="flex items-center gap-3 mb-2">
                           <GoldfishIcon className="w-8 h-8 text-amber-400" />
                           <h2 className="text-lg font-semibold text-white">Goldfish</h2>
@@ -564,7 +563,7 @@ export function Play() {
                             who wins.
                           </p>
                         </div>
-                        <div className="mt-auto flex gap-2 pt-4 relative z-50">
+                        <div className="mt-auto flex gap-2 pt-4">
                           <button
                             onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
                             disabled={soloLoading ? false : !nameValid}
@@ -593,7 +592,7 @@ export function Play() {
                         <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
                         "Goldfish",
                       )}
-                      <div className="bg-black/45 rounded-lg p-5 border border-white/10 flex flex-col">
+                      <div className="bg-black/45 rounded-lg p-5 border border-white/10 flex flex-col flex-1 min-h-0">
                         <div className="flex items-center gap-3 mb-2">
                           <FriendsIcon className="w-8 h-8 text-amber-400" />
                           <h2 className="text-lg font-semibold text-white">
@@ -609,7 +608,7 @@ export function Play() {
                             treasure!{" "}
                           </p>
                         </div>
-                        <div className="mt-auto flex gap-2 pt-4 relative z-50">
+                        <div className="mt-auto flex gap-2 pt-4">
                           <button
                             onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
                             disabled={friendsLoading ? false : !nameValid}
@@ -652,7 +651,7 @@ export function Play() {
                         treasure!{" "}
                       </p>
                     </div>
-                    <div className="mt-auto flex gap-2 pt-4 relative z-50">
+                    <div className="mt-auto flex gap-2 pt-4">
                       <button
                         onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
                         disabled={friendsLoading ? false : !nameValid}
@@ -686,7 +685,7 @@ export function Play() {
                         to strong finishes. Their cards are face up, and you decide wins.
                       </p>
                     </div>
-                    <div className="mt-auto flex gap-2 pt-4 relative z-50">
+                    <div className="mt-auto flex gap-2 pt-4">
                       <button
                         onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
                         disabled={soloLoading ? false : !nameValid}
@@ -711,6 +710,7 @@ export function Play() {
               </div>
             </section>
           </div>
+          <HintsBanner variant="rail" />
         </main>
 
         <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
@@ -791,7 +791,7 @@ export function Play() {
 
       {(soloLoading || friendsLoading) && (
         <div
-          className="fixed inset-0 z-40 bg-black/40"
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-[2px]"
           onClick={soloLoading ? handleCancelSolo : handleCancelFriends}
         />
       )}

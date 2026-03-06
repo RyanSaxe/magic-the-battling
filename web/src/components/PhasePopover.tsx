@@ -1,6 +1,6 @@
 import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { PHASE_SUMMARIES } from '../constants/phases'
+import { getPhaseSummaryRows } from '../constants/phases'
 import type { Phase } from '../constants/phases'
 
 const PHASE_TITLE_COLOR: Record<Phase, string> = {
@@ -13,6 +13,7 @@ const PHASE_TITLE_COLOR: Record<Phase, string> = {
 interface PhasePopoverProps {
   phase: Phase
   anchorRect: DOMRect
+  useUpgrades: boolean
   onClose: () => void
   onOpenDetails: () => void
   onOpenControls: () => void
@@ -21,6 +22,7 @@ interface PhasePopoverProps {
 export function PhasePopover({
   phase,
   anchorRect,
+  useUpgrades,
   onClose,
   onOpenDetails,
   onOpenControls,
@@ -67,7 +69,9 @@ export function PhasePopover({
 
     if (arrowRef.current) {
       const arrowLeft = anchorRect.left + anchorRect.width / 2 - left
-      arrowRef.current.style.left = `${Math.max(12, Math.min(arrowLeft - 6, 260))}px`
+      const minArrowLeft = 12
+      const maxArrowLeft = Math.max(minArrowLeft, rect.width - 18)
+      arrowRef.current.style.left = `${Math.max(minArrowLeft, Math.min(arrowLeft - 6, maxArrowLeft))}px`
     }
   }, [anchorRect])
 
@@ -83,7 +87,7 @@ export function PhasePopover({
         position: 'fixed',
         visibility: 'hidden',
       }}
-      className="modal-chrome border gold-border rounded-lg shadow-xl z-[60] w-72"
+      className="modal-chrome border gold-border rounded-lg shadow-xl z-[60] min-w-[16rem] w-max max-w-[calc(100vw-1rem)]"
     >
       <div
         ref={arrowRef}
@@ -95,9 +99,16 @@ export function PhasePopover({
           {phase} Phase
         </h3>
 
-        <p className="text-xs text-gray-300 mb-2">
-          {PHASE_SUMMARIES[phase]}
-        </p>
+        <ul className="mb-2 overflow-hidden rounded-md border gold-divider divide-y gold-divider">
+          {getPhaseSummaryRows(phase, useUpgrades).map((row, index) => (
+            <li key={`${phase}-${index}`} className="grid grid-cols-[auto,1fr] items-start gap-2 px-2.5 py-1.5 text-xs text-gray-200 leading-5">
+              <span aria-hidden className="text-amber-300/90">
+                •
+              </span>
+              <span>{row}</span>
+            </li>
+          ))}
+        </ul>
 
         <div className="mt-2 pt-2 border-t gold-divider flex items-center justify-between gap-3">
           <button

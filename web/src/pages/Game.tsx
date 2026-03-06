@@ -1274,6 +1274,7 @@ function GameContent() {
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+            useUpgrades={gameState.use_upgrades}
             autoOpenPhase={isNewPlayerOnboarding ? autoOpenTimelinePhase : null}
             onAutoOpenHandled={(phase) => {
               setAutoOpenTimelinePhase((current) =>

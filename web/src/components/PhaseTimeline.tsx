@@ -28,6 +28,7 @@ interface PhaseTimelineProps {
   round: number;
   nextStage: number;
   nextRound: number;
+  useUpgrades?: boolean;
   autoOpenPhase?: Phase | null;
   autoOpenDurationMs?: number;
   onAutoOpenHandled?: (phase: Phase) => void;
@@ -72,6 +73,7 @@ export function PhaseTimeline({
   round,
   nextStage,
   nextRound,
+  useUpgrades = true,
   autoOpenPhase = null,
   autoOpenDurationMs = 10_000,
   onAutoOpenHandled,
@@ -245,6 +247,7 @@ export function PhaseTimeline({
         <PhasePopover
           phase={popoverPhase}
           anchorRect={popoverAnchorRect}
+          useUpgrades={useUpgrades}
           onClose={handleClosePopover}
           onOpenDetails={handleOpenDetailsFromPopover}
           onOpenControls={handleOpenControlsFromPopover}
