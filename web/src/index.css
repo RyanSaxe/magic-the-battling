@@ -835,6 +835,32 @@ body {
   margin: 0;
 }
 
+.hint-rail {
+  position: relative;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--chrome-modal) 64%, #9b7b55) 0%,
+    color-mix(in srgb, var(--chrome-modal) 76%, #7f6243) 52%,
+    color-mix(in srgb, var(--chrome-modal) 82%, #5e4732) 100%
+  );
+  border-bottom: 2px solid rgba(212, 175, 55, 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 181, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.52),
+    inset 0 -4px 10px rgba(0, 0, 0, 0.28);
+}
+
+.hint-rail::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1px;
+  height: 1px;
+  background: rgba(255, 236, 181, 0.24);
+  pointer-events: none;
+}
+
 /* Hints banner crossfade */
 .hint-fade-in {
   opacity: 1;
