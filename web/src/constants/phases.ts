@@ -14,18 +14,18 @@ const PHASE_SUMMARY_ROWS: Record<Phase, PhaseSummaryRow[]> = {
   ],
   build: [
     { text: 'Click any two cards to swap them.' },
-    { text: 'Selected basic lands and treasures start untapped on the battlefield.' },
-    { text: 'Next up: play a game of magic with 10 life, your starting hand and battlefield.' },
+    { text: 'Basic lands and treasures start on the battlefield.' },
+    { text: 'Next: play magic with 10 life and an empty library.' },
   ],
   battle: [
-    { text: 'Drag and drop cards between zones to play out the game.' },
-    { text: 'This is a sandbox phase, so nothing happens automatically.' },
-    { text: 'Treasures roll over to the next phase, so spend them carefully.' },
+    { text: 'Drag and drop cards between zones to play the game.' },
+    { text: 'This is a sandbox, so nothing happens automatically.' },
+    { text: 'Double tap on any card to tap/untap it.' },
   ],
   reward: [
-    { text: 'After every battle, you get a random card and a treasure.' },
-    { text: 'After every third battle, your hand size increases for next stage.' },
-    { text: 'After every third battle, you can choose a special upgrade!', requiresUpgrades: true },
+    { text: 'After every battle, get a random card and a treasure.' },
+    { text: 'After every 3rd battle, your hand size increases' },
+    { text: 'After every 3rd battle, choose a special upgrade!', requiresUpgrades: true },
   ],
 }
 
