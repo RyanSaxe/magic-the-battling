@@ -47,11 +47,10 @@ export function DocRenderer({ content, className }: DocRendererProps) {
       <p className="text-sm sm:text-[0.9375rem] text-gray-300 mb-3 leading-relaxed">{children}</p>
     ),
     ul: ({ children }) => (
-      <ul className="space-y-1.5 mb-3">{children}</ul>
+      <ul className="doc-list space-y-1.5 mb-3">{children}</ul>
     ),
     li: ({ children }) => (
-      <li className="flex gap-2 text-sm sm:text-[0.9375rem] text-gray-300 leading-relaxed">
-        <span className="text-amber-400 shrink-0">•</span>
+      <li className="doc-list-item flex gap-2 text-sm sm:text-[0.9375rem] text-gray-300 leading-relaxed">
         <span>{children}</span>
       </li>
     ),
@@ -82,14 +81,14 @@ export function DocRenderer({ content, className }: DocRendererProps) {
         return (
           <button
             onClick={() => docNav.navigate(docId, tab)}
-            className="text-amber-400 hover:text-amber-300 underline decoration-amber-400/30 underline-offset-2 hover:decoration-amber-400/60 transition-colors cursor-pointer"
+            className="text-amber-400 hover:text-amber-300 underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors cursor-pointer"
           >
             {children}
           </button>
         )
       }
       return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 underline decoration-amber-400/30 underline-offset-2 hover:decoration-amber-400/60 transition-colors">
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors">
           {children}
         </a>
       )

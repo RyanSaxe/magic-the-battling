@@ -554,7 +554,7 @@ export function QuickGuide({
   return (
     <DocNavContext.Provider value={docNav}>
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex items-center justify-between gap-3 px-5 py-3 shrink-0 bg-black/30">
+        <div className="flex items-center justify-between gap-3 px-5 py-3 shrink-0 bg-black/30 border-b border-[rgba(212,175,55,0.45)]">
           <div className="flex gap-2 min-w-0">
             {headerTabs.map((tab) => (
               <button
@@ -573,7 +573,7 @@ export function QuickGuide({
           {onClose && (
             <button
               onClick={onClose}
-              className="inline-flex items-center justify-center w-6 h-6 mb-1 text-red-400 hover:text-red-300 transition-colors"
+              className="inline-flex items-center justify-center w-7 h-7 -mr-2 text-red-400 hover:text-red-300 transition-colors"
               aria-label="Close guide"
             >
               <FaXmark className="w-4 h-4" />
@@ -775,7 +775,7 @@ export function QuickGuide({
           </div>
         )}
 
-        <div className="shrink-0 px-4 py-3.5 border-t-2 border-amber-400/25 modal-chrome backdrop-blur-sm">
+        <div className="shrink-0 px-4 py-3.5 border-t border-[rgba(212,175,55,0.45)] bg-black/30">
           <div className="flex items-center justify-between gap-3">
             <a
               href={DISCORD_INVITE_URL}

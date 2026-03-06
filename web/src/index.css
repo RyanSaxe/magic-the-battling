@@ -89,7 +89,7 @@ body {
 /* Walnut-themed scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(61, 51, 48, 0.8) transparent;
+  scrollbar-color: #1c1714 transparent;
 }
 
 ::-webkit-scrollbar {
@@ -102,12 +102,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(61, 51, 48, 0.8);
+  background: var(--chrome);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(90, 75, 70, 0.9);
+  background: #2a2320;
 }
 
 /* Game table background - classic felt */
@@ -952,6 +952,23 @@ body {
   .quick-guide-accordion-panel {
     transition: none;
   }
+}
+
+/* Auto-numbered doc lists */
+.doc-list {
+  counter-reset: list-item;
+}
+
+.doc-list-item {
+  counter-increment: list-item;
+}
+
+.doc-list-item::before {
+  content: counter(list-item) ".";
+  color: rgb(245 158 11 / 0.9);
+  font-size: 0.875rem;
+  min-width: 1.25rem;
+  flex-shrink: 0;
 }
 
 /* Sunken panel for mode description text */
