@@ -4,26 +4,11 @@ phase: build
 order: 2
 ---
 
-## Overview
-
-The build phase is where you decide the best starting hand you can build from your pool, which you will use in the next [battle phase](doc:battle).
-
-:::tip
-Look at the "Opponents" sidebar tab. This will show you the probability of facing other players as well as all the public data about them ([treasures](doc:game-pieces#treasures), [poison](doc:game-pieces#poison), [upgrades](doc:game-pieces#upgrades), and even what cards they cast in their most recent [battle](doc:battle)).
-:::
-
-## Quick Rules
-
-- Select your hand (size = current stage) and 3 basic lands.
-- Lands + treasures start on the battlefield untapped.
-- Player with most poison chooses play/draw.
-
 ## Rules
 
-- The three basic lands you select, along with your treasures, will start on the battlefield untapped in the upcoming [battle phase](doc:battle).
+- Select 3 basic lands to start untapped on the battlefield in the upcoming [battle phase](doc:battle).
 - Your hand size is always equal to the current stage, which you can see in the upper left corner.
 - Your opponent will be randomly be chosen from three other players at your table. If you faced one of them in the previous battle, your odds of facing versus that player is only 10%.
-- For the upcoming [battle phase](doc:battle), the player with the most [poison](doc:game-pieces#poison) will get their selected choice of play or draw. In the [finals](doc:winning-the-game#finals), this rule changes — the loser of the previous game chooses instead.
 - Once you apply an upgrade, that action can never be undone. Choose carefully.
 
 ## Controls

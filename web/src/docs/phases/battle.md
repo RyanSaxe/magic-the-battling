@@ -23,7 +23,7 @@ Be very mindful of when to use [treasures](doc:game-pieces#treasures) to try and
 ### Magic Rule Modifications
 
 - Each player starts with 10 life
-- There is no library - hence you cannot draw cards and can't lose the game due to not being able to draw cards.
+- Libraries start empty, and you cannot lose the game due to not being able to draw cards.
 - Conceding is not allowed because Treasure tokens created during a battle persist afterwards.
 - A draw is considered a loss for both players.
 
@@ -32,13 +32,13 @@ Be very mindful of when to use [treasures](doc:game-pieces#treasures) to try and
 - All basic lands selected during the build phase start on the battlefield untapped.
 - All [treasures](doc:game-pieces#treasures) a player has at the beginning of the battle phase will start on their battlefield.
 - All [poison counters](doc:game-pieces#poison) a player has is attached to them during the battle.
-- The player with the most [poison counters](doc:game-pieces#poison) gets their choice of play/draw. If players are tied, the choosing player is selected randomly. In the [finals](doc:winning-the-game#finals), the loser of the previous game chooses instead.
+- The player with the most [poison counters](doc:game-pieces#poison) gets their choice of play/draw. If players are tied, the choosing player is selected randomly. In the finals, after the first game, the loser of the previous game chooses instead.
 - Each player's starting hand and sideboard become exactly what was selected during the build phase.
 
 ### After the Battle Ends
 
-- The losing player(s) get N [poison counters](doc:game-pieces#poison), where N is 1 + the number of [upgrades](doc:game-pieces#upgrades) their opponent has applied. If you are not playing with upgrades, N is Fibonacci(stage - 2).
-- Each player keeps up to 5 [treasures](doc:game-pieces#treasures) that are still on their battlefield and discards the rest.
+- The losing player(s) get N [poison counters](doc:game-pieces#poison), where N is 1 + the number of [upgrades](doc:game-pieces#upgrades) their opponent has applied (unapplied upgrades do not count!). If you are not playing with upgrades, N is Fibonacci(stage - 2).
+- Each player keeps up to 5 [treasures](doc:game-pieces#treasures) that are still on their battlefield and exiles the rest.
 
 ## Controls
 
