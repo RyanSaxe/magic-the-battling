@@ -18,6 +18,7 @@ class CreateGameRequest(BaseModel):
     target_player_count: int = 4
     puppet_count: int = 0
     auto_approve_spectators: bool = False
+    guided_mode_default: bool = False
 
 
 class CreateGameResponse(BaseModel):
@@ -136,6 +137,7 @@ class LobbyStateResponse(BaseModel):
     available_puppet_count: int | None = None
     cube_id: str = "auto"
     use_upgrades: bool = True
+    guided_mode_default: bool = False
 
 
 class DraftSwapAction(BaseModel):
@@ -271,3 +273,36 @@ class ShareGameResponse(BaseModel):
     created_at: str
     use_upgrades: bool
     players: list[SharePlayerData]
+
+
+class OpsStateResponse(BaseModel):
+    mode: Literal["normal", "draining", "maintenance"]
+    message: str
+    updated_by: str | None = None
+    updated_at: str
+
+
+class OpsSetModeRequest(BaseModel):
+    mode: Literal["normal", "draining", "maintenance"]
+    message: str = ""
+    updated_by: str | None = None
+
+
+class OpsCapacityResponse(BaseModel):
+    loaded_games: int
+    hot_games: int
+    pending_games: int
+    sessions: int
+    game_starts_in_flight: int
+    game_start_waiters: int
+    max_game_starts_in_flight: int
+    max_game_start_waiters: int
+
+
+class ServerStatusResponse(BaseModel):
+    mode: Literal["normal", "draining", "maintenance"]
+    message: str
+    updated_at: str
+    new_games_blocked: bool
+    scheduled_for_utc: str | None = None
+    estimated_recovery_minutes: int | None = None

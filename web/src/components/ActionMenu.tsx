@@ -96,12 +96,12 @@ export function ActionMenu({
     <>
       <div className="fixed inset-0 z-50" onClick={onClose} />
       <div
-        className="fixed bottom-16 left-4 bg-gray-900 border border-gray-700 rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-50"
+        className="fixed bottom-16 left-4 modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-50"
         style={{ maxWidth: 280 }}
       >
         {card && (
           <>
-            <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-700 truncate">
+            <div className="px-3 py-1.5 text-xs text-gray-400 border-b gold-divider truncate">
               {card.name}
             </div>
 
@@ -301,13 +301,13 @@ function MenuItem({
 }
 
 function MenuDivider() {
-  return <div className="border-t border-gray-700 my-1" />
+  return <div className="border-t gold-divider my-1" />
 }
 
 function Submenu({ children, maxHeight }: { children: React.ReactNode; maxHeight?: number }) {
   return (
     <div
-      className="ml-2 pl-2 border-l border-gray-700"
+      className="ml-2 pl-2 border-l gold-divider"
       style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}
     >
       {children}

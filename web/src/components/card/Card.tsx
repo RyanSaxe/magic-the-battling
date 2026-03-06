@@ -194,11 +194,6 @@ export function Card({
           ))}
         </div>
       )}
-      {isCompanion && (
-        <div className="absolute bottom-0 right-0 bg-purple-600/90 text-white text-xs px-1.5 py-0.5 rounded-tl font-medium">
-          Companion
-        </div>
-      )}
     </div>
   )
 }

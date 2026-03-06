@@ -143,6 +143,7 @@ export interface LobbyState {
   cube_loading_error: string | null
   available_puppet_count: number | null
   use_upgrades: boolean
+  guided_mode_default: boolean
 }
 
 export interface CreateGameResponse {
@@ -176,6 +177,15 @@ export interface GameStatusResponse {
   is_started: boolean
   players: GameStatusPlayer[]
   auto_approve_spectators: boolean
+}
+
+export interface ServerStatus {
+  mode: 'normal' | 'draining' | 'maintenance'
+  message: string
+  updated_at: string
+  new_games_blocked: boolean
+  scheduled_for_utc: string | null
+  estimated_recovery_minutes: number | null
 }
 
 export interface SpectateRequestStatus {

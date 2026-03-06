@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import type { Card as CardType, ZoneName } from '../../types'
+import type { ZoneOwner } from '../../dnd/types'
 import { DraggableCard, DroppableZone, useGameDnd } from '../../dnd'
 import { Card } from '../card'
 import { ZoneModal } from '../sidebar/DroppableZoneDisplay'
 import { makeZoneId } from '../../dnd/types'
 
 const CARD_ASPECT = 5 / 7
-const LABEL_HEIGHT = 16
+const LABEL_HEIGHT = 18
 
 interface CompactZoneDisplayProps {
   title: string
@@ -20,6 +21,11 @@ interface CompactZoneDisplayProps {
   onCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
   canPeekFaceDown?: boolean
+  selectedCardId?: string
+  onZoneClick?: () => void
+  onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
+  containerClassName?: string
+  forceFaceDown?: boolean
 }
 
 export function CompactZoneDisplay({
@@ -34,6 +40,11 @@ export function CompactZoneDisplay({
   onCardHover,
   onCardHoverEnd,
   canPeekFaceDown,
+  selectedCardId,
+  onZoneClick,
+  onCardClick,
+  containerClassName,
+  forceFaceDown = false,
 }: CompactZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -51,11 +62,8 @@ export function CompactZoneDisplay({
   const cardH = Math.floor(cardW / CARD_ASPECT)
 
   const label = (
-    <div className="flex items-center justify-center gap-0.5 bg-black/70 rounded px-1 shrink-0" style={{ height: LABEL_HEIGHT }}>
-      <span className="text-[7px] uppercase text-gray-300 font-medium leading-none">{title}</span>
-      {cards.length >= 2 && (
-        <span className="text-[9px] font-bold text-white leading-none">{cards.length}</span>
-      )}
+    <div className="flex items-center justify-center gap-0 px-0.5 shrink-0" style={{ height: LABEL_HEIGHT }}>
+      <span className="battle-side-label truncate">{title}</span>
     </div>
   )
 
@@ -66,21 +74,33 @@ export function CompactZoneDisplay({
         zoneOwner={zoneOwner}
         validFromZones={validFromZones}
         disabled={!allowInteraction}
+        className="box-border shrink-0 battle-side-dropzone"
+        style={{ width, height }}
       >
         <div
-          onClick={() => cards.length > 0 && setShowModal(true)}
-          className={`flex flex-col items-center overflow-hidden rounded border border-gray-700 ${
+          onClick={(e) => {
+            if (selectedCardId && onZoneClick) {
+              e.stopPropagation()
+              onZoneClick()
+              return
+            }
+            if (cards.length > 0) setShowModal(true)
+          }}
+          className={`flex flex-col items-center overflow-hidden ${
             cards.length > 0
-              ? 'hover:border-gray-500 cursor-pointer'
-              : 'border-dashed cursor-default'
-          }`}
-          style={{ width, height }}
+              ? 'cursor-pointer'
+              : 'cursor-default'
+          } ${containerClassName ?? ''} w-full h-full`}
         >
-          {!isOpponent && label}
+          {label}
           <div className="flex-1 flex items-center justify-center min-h-0 relative">
             {nextCard && (
               <div className="absolute">
-                <Card card={nextCard} dimensions={{ width: cardW, height: cardH }} />
+                <Card
+                  card={nextCard}
+                  dimensions={{ width: cardW, height: cardH }}
+                  faceDown={forceFaceDown}
+                />
               </div>
             )}
             {topCard && (
@@ -93,11 +113,11 @@ export function CompactZoneDisplay({
                 isOpponent={isOpponent}
                 onCardHover={allowInteraction ? onCardHover : undefined}
                 onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
-                canPeekFaceDown={canPeekFaceDown}
+                faceDown={forceFaceDown}
+                canPeekFaceDown={forceFaceDown ? false : canPeekFaceDown}
               />
             )}
           </div>
-          {isOpponent && label}
         </div>
       </DroppableZone>
 
@@ -108,9 +128,13 @@ export function CompactZoneDisplay({
           cards={cards}
           allowInteraction={allowInteraction}
           isOpponent={isOpponent}
+          tone="battle"
           onClose={() => setShowModal(false)}
           onCardHover={onCardHover}
           onCardHoverEnd={onCardHoverEnd}
+          onCardClick={onCardClick}
+          selectedCardId={selectedCardId}
+          forceFaceDown={forceFaceDown}
         />
       )}
     </>

@@ -3,16 +3,18 @@
 import pytest
 from starlette.websockets import WebSocketDisconnect
 
+import server.routers.ws as ws_module
+
 
 class TestWebSocketConnection:
     def test_invalid_session_closes_connection(self, client, game_with_players):
         game_id = game_with_players["game_id"]
 
         with (
+            client.websocket_connect(f"/ws/{game_id}?session_id=invalid") as ws,
             pytest.raises(WebSocketDisconnect) as exc_info,
-            client.websocket_connect(f"/ws/{game_id}?session_id=invalid"),
         ):
-            pass
+            ws.receive_json()
 
         assert exc_info.value.code == 4001
 
@@ -20,10 +22,10 @@ class TestWebSocketConnection:
         session_id = game_with_players["alice"]["session_id"]
 
         with (
+            client.websocket_connect(f"/ws/nonexistent?session_id={session_id}") as ws,
             pytest.raises(WebSocketDisconnect) as exc_info,
-            client.websocket_connect(f"/ws/nonexistent?session_id={session_id}"),
         ):
-            pass
+            ws.receive_json()
 
         assert exc_info.value.code == 4004
 
@@ -95,3 +97,33 @@ class TestGameWebSocket:
 
                 assert msg_alice["type"] == "game_state"
                 assert msg_bob["type"] == "game_state"
+
+    def test_reconnect_after_snapshot_restore_uses_persisted_mapping(self, client, game_with_players):
+        game_id = game_with_players["game_id"]
+        session_id = game_with_players["alice"]["session_id"]
+        client.post(f"/api/games/{game_id}/start")
+
+        game_manager = ws_module.game_manager
+        game_manager.mark_game_dirty(game_id)
+        game_manager.persist_dirty_games()
+        game_manager._cleanup_game(game_id, preserve_snapshot=True)
+
+        with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
+            msg = ws.receive_json()
+            assert msg["type"] == "game_state"
+
+    def test_missing_runtime_mapping_rejects_invalid_session(self, client, game_with_players):
+        game_id = game_with_players["game_id"]
+        session_id = game_with_players["alice"]["session_id"]
+        client.post(f"/api/games/{game_id}/start")
+
+        game_manager = ws_module.game_manager
+        game_manager._clear_runtime_player_mappings_for_game(game_id)
+
+        with (
+            client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws,
+            pytest.raises(WebSocketDisconnect) as exc_info,
+        ):
+            ws.receive_json()
+
+        assert exc_info.value.code == 4001

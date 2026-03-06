@@ -27,6 +27,7 @@ VALID_NAME_RE = re.compile(r"^[^/]{1,64}$")
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX = 10
 _rate_limits: dict[str, list[float]] = defaultdict(list)
+PREVIEW_RENDER_VERSION = "preview-v4"
 
 
 def _get_db():
@@ -149,12 +150,14 @@ async def share_page_with_og(
         return Response(status_code=404)
 
     index_html = index_path.read_text()
+    index_hash = hashlib.sha256(index_html.encode()).hexdigest()[:16]
 
     if not share_data:
         return HTMLResponse(content=index_html, headers={"Cache-Control": "no-cache"})
 
     data_json = share_data.model_dump_json()
-    etag = hashlib.sha256(data_json.encode()).hexdigest()[:16]
+    etag_basis = f"{PREVIEW_RENDER_VERSION}:{index_hash}:{data_json}"
+    etag = hashlib.sha256(etag_basis.encode()).hexdigest()[:16]
 
     if_none_match = request.headers.get("if-none-match")
     if if_none_match and if_none_match.strip('"') == etag:
@@ -165,7 +168,8 @@ async def share_page_with_og(
     return HTMLResponse(
         content=html,
         headers={
-            "Cache-Control": "public, max-age=3600",
+            # HTML should always revalidate so hashed asset references do not go stale after deploys.
+            "Cache-Control": "public, max-age=0, must-revalidate",
             "ETag": f'"{etag}"',
         },
     )
@@ -190,7 +194,8 @@ async def preview_image(
         return Response(status_code=404)
 
     data_json = share_data.model_dump_json()
-    cache_key = preview_service.cache.cache_key(data_json)
+    cache_basis = f"{PREVIEW_RENDER_VERSION}:{data_json}"
+    cache_key = preview_service.cache.cache_key(cache_basis)
     etag = cache_key[:16]
 
     if_none_match = request.headers.get("if-none-match")
@@ -220,5 +225,5 @@ def _serve_plain_index() -> Response:
     static_dir = Path(__file__).parent.parent.parent / "web" / "dist"
     index_path = static_dir / "index.html"
     if index_path.exists():
-        return HTMLResponse(content=index_path.read_text())
+        return HTMLResponse(content=index_path.read_text(), headers={"Cache-Control": "no-cache"})
     return Response(status_code=404)

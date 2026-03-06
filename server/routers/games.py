@@ -1,8 +1,11 @@
+import asyncio
 import json
 import logging
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
@@ -11,6 +14,7 @@ from mtb.utils.cubecobra import get_cube_data
 from mtb.utils.json_helpers import get_json, is_cached, revalidate_json
 from server.db import database
 from server.db.models import GameRecord, PlayerGameHistory
+from server.routers.ws import connection_manager
 from server.schemas.api import (
     CreateGameRequest,
     CreateGameResponse,
@@ -31,9 +35,192 @@ from server.schemas.api import (
     StartGameResponse,
 )
 from server.services.game_manager import game_manager
+from server.services.ops_manager import ops_manager
 from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
+
+IDEMPOTENCY_KEY_HEADER = "x-mtb-idempotency-key"
+IDEMPOTENCY_TTL_MINUTES = 10
+IDEMPOTENCY_CACHE_MAX = 10_000
+DEFAULT_UPDATE_RETRY_AFTER_SECONDS = 600
+
+
+@dataclass
+class _CreateIdempotencyEntry:
+    request_fingerprint: str
+    response: CreateGameResponse
+    created_at: datetime
+
+
+@dataclass
+class _CreateIdempotencyClaim:
+    cache_key: str | None
+    request_fingerprint: str
+    future: asyncio.Future[CreateGameResponse] | None = None
+    owns_future: bool = False
+
+
+_create_idempotency_cache: dict[str, _CreateIdempotencyEntry] = {}
+_create_idempotency_inflight: dict[str, asyncio.Future[CreateGameResponse]] = {}
+_create_idempotency_lock = asyncio.Lock()
+
+
+def _request_fingerprint(request: CreateGameRequest) -> str:
+    return json.dumps(
+        {
+            "player_name": request.player_name,
+            "cube_id": request.cube_id,
+            "use_upgrades": request.use_upgrades,
+            "use_vanguards": request.use_vanguards,
+            "target_player_count": request.target_player_count,
+            "puppet_count": request.puppet_count,
+            "auto_approve_spectators": request.auto_approve_spectators,
+            "guided_mode_default": request.guided_mode_default,
+        },
+        sort_keys=True,
+    )
+
+
+def _prune_idempotency_cache() -> None:
+    now = datetime.now(UTC)
+    expiry = now - timedelta(minutes=IDEMPOTENCY_TTL_MINUTES)
+    stale_keys = [key for key, entry in _create_idempotency_cache.items() if entry.created_at < expiry]
+    for key in stale_keys:
+        _create_idempotency_cache.pop(key, None)
+
+    overflow = len(_create_idempotency_cache) - IDEMPOTENCY_CACHE_MAX
+    if overflow <= 0:
+        return
+
+    oldest_keys = sorted(
+        _create_idempotency_cache.keys(),
+        key=lambda key: _create_idempotency_cache[key].created_at,
+    )[:overflow]
+    for key in oldest_keys:
+        _create_idempotency_cache.pop(key, None)
+
+
+def _normalize_idempotency_key(raw_key: str | None) -> str | None:
+    normalized = (raw_key or "").strip()
+    return normalized or None
+
+
+async def _claim_create_idempotency(
+    cache_key: str | None,
+    request_fingerprint: str,
+) -> tuple[CreateGameResponse | None, _CreateIdempotencyClaim]:
+    claim = _CreateIdempotencyClaim(cache_key=cache_key, request_fingerprint=request_fingerprint)
+    if cache_key is None:
+        return None, claim
+
+    async with _create_idempotency_lock:
+        _prune_idempotency_cache()
+        cached = _create_idempotency_cache.get(cache_key)
+        if cached:
+            if cached.request_fingerprint != request_fingerprint:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Idempotency key already used with a different create payload.",
+                )
+            return cached.response, claim
+
+        existing = _create_idempotency_inflight.get(cache_key)
+        if existing is not None:
+            claim.future = existing
+            return None, claim
+
+        claim.future = asyncio.get_running_loop().create_future()
+        claim.owns_future = True
+        _create_idempotency_inflight[cache_key] = claim.future
+        return None, claim
+
+
+async def _clear_create_inflight(cache_key: str | None) -> None:
+    if cache_key is None:
+        return
+    async with _create_idempotency_lock:
+        _create_idempotency_inflight.pop(cache_key, None)
+
+
+async def _resolve_claim_success(
+    claim: _CreateIdempotencyClaim,
+    response_payload: CreateGameResponse,
+) -> None:
+    if claim.cache_key is None or not claim.owns_future or claim.future is None:
+        return
+
+    async with _create_idempotency_lock:
+        _create_idempotency_cache[claim.cache_key] = _CreateIdempotencyEntry(
+            request_fingerprint=claim.request_fingerprint,
+            response=response_payload,
+            created_at=datetime.now(UTC),
+        )
+        _create_idempotency_inflight.pop(claim.cache_key, None)
+
+    if not claim.future.done():
+        claim.future.set_result(response_payload)
+
+
+async def _resolve_claim_error(claim: _CreateIdempotencyClaim, exc: Exception) -> None:
+    if claim.cache_key is None or not claim.owns_future or claim.future is None:
+        return
+
+    if not claim.future.done():
+        claim.future.set_exception(exc)
+    await _clear_create_inflight(claim.cache_key)
+
+
+def _new_game_block_reason() -> str | None:
+    if ops_manager.blocks_new_games():
+        return "Server is updating. New games are temporarily blocked."
+
+    allowed, reason = game_manager.can_accept_new_pending_game()
+    if not allowed:
+        return reason or "Server is at capacity"
+    return None
+
+
+def _update_retry_after_seconds() -> str:
+    estimate_minutes = ops_manager.estimated_recovery_minutes()
+    if estimate_minutes is None:
+        return str(DEFAULT_UPDATE_RETRY_AFTER_SECONDS)
+    return str(max(60, estimate_minutes * 60))
+
+
+def _server_update_http_error(detail: str) -> HTTPException:
+    return HTTPException(
+        status_code=503,
+        detail=detail,
+        headers={"Retry-After": _update_retry_after_seconds()},
+    )
+
+
+def _create_game_response(request: CreateGameRequest) -> CreateGameResponse:
+    session = session_manager.create_session()
+    pending = game_manager.create_game(
+        player_name=request.player_name,
+        player_id=session.player_id,
+        cube_id=request.cube_id,
+        use_upgrades=request.use_upgrades,
+        use_vanguards=request.use_vanguards,
+        target_player_count=request.target_player_count,
+        auto_approve_spectators=request.auto_approve_spectators,
+        guided_mode_default=request.guided_mode_default,
+    )
+    pending.puppet_count = request.puppet_count
+    session_manager.update_game_id(session.session_id, pending.game_id)
+
+    async def broadcast_lobby():
+        await connection_manager.broadcast_lobby_state(pending.game_id)
+
+    game_manager.start_battler_preload(pending, on_complete=broadcast_lobby)
+    return CreateGameResponse(
+        game_id=pending.game_id,
+        join_code=pending.join_code,
+        session_id=session.session_id,
+        player_id=session.player_id,
+    )
 
 
 def get_db():
@@ -48,33 +235,37 @@ router = APIRouter(prefix="/api/games", tags=["games"])
 
 
 @router.post("", response_model=CreateGameResponse)
-async def create_game(request: CreateGameRequest):
-    from server.routers.ws import connection_manager  # noqa: PLC0415
+async def create_game(
+    request: CreateGameRequest,
+    x_mtb_idempotency_key: str | None = Header(default=None, alias=IDEMPOTENCY_KEY_HEADER),
+):
+    cache_key = _normalize_idempotency_key(x_mtb_idempotency_key)
+    fingerprint = _request_fingerprint(request)
+    cached_response, claim = await _claim_create_idempotency(cache_key, fingerprint)
+    if cached_response is not None:
+        return cached_response
 
-    session = session_manager.create_session()
-    pending = game_manager.create_game(
-        player_name=request.player_name,
-        player_id=session.player_id,
-        cube_id=request.cube_id,
-        use_upgrades=request.use_upgrades,
-        use_vanguards=request.use_vanguards,
-        target_player_count=request.target_player_count,
-        auto_approve_spectators=request.auto_approve_spectators,
-    )
-    pending.puppet_count = request.puppet_count
-    session_manager.update_game_id(session.session_id, pending.game_id)
+    if claim.future is not None and not claim.owns_future:
+        return await claim.future
 
-    async def broadcast_lobby():
-        await connection_manager.broadcast_lobby_state(pending.game_id)
+    block_reason = _new_game_block_reason()
+    if block_reason:
+        error = (
+            _server_update_http_error(block_reason)
+            if ops_manager.blocks_new_games()
+            else HTTPException(status_code=503, detail=block_reason)
+        )
+        await _resolve_claim_error(claim, error)
+        raise error
 
-    game_manager.start_battler_preload(pending, on_complete=broadcast_lobby)
+    try:
+        response_payload = _create_game_response(request)
+    except Exception as exc:
+        await _resolve_claim_error(claim, exc)
+        raise
 
-    return CreateGameResponse(
-        game_id=pending.game_id,
-        join_code=pending.join_code,
-        session_id=session.session_id,
-        player_id=session.player_id,
-    )
+    await _resolve_claim_success(claim, response_payload)
+    return response_payload
 
 
 class WarmCubeRequest(BaseModel):
@@ -110,6 +301,9 @@ def warm_cube_cache(request: WarmCubeRequest):
 @router.post("/join", response_model=JoinGameResponse)
 def join_game_by_code(request: JoinGameRequest):
     """Join a game using just the join code (no game_id needed)."""
+    if ops_manager.blocks_new_games():
+        raise _server_update_http_error("Server is updating. Joining new games is temporarily blocked.")
+
     game_id = game_manager.get_game_id_by_join_code(request.join_code)
     if not game_id:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -143,6 +337,9 @@ def join_game_by_code(request: JoinGameRequest):
 
 @router.post("/{game_id}/join", response_model=JoinGameResponse)
 def join_game(game_id: str, request: JoinGameRequest):
+    if ops_manager.blocks_new_games():
+        raise _server_update_http_error("Server is updating. Joining new games is temporarily blocked.")
+
     pending = game_manager.get_pending_game(game_id)
     if not pending:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -175,7 +372,8 @@ def join_game(game_id: str, request: JoinGameRequest):
 
 @router.post("/{game_id}/rejoin", response_model=JoinGameResponse)
 def rejoin_game(game_id: str, request: RejoinGameRequest):
-    from server.routers.ws import connection_manager  # noqa: PLC0415
+    if not game_manager.get_game(game_id):
+        game_manager.restore_game_from_snapshot(game_id)
 
     game = game_manager.get_game(game_id)
     if not game or not any(p.name == request.player_name for p in game.players):
@@ -183,7 +381,9 @@ def rejoin_game(game_id: str, request: RejoinGameRequest):
 
     player_id = game_manager.get_player_id_by_name(game_id, request.player_name)
     if player_id and connection_manager.is_player_connected(game_id, player_id):
-        raise HTTPException(status_code=409, detail="Player is already connected")
+        recovered = connection_manager.clear_stale_pending_connection(game_id, player_id)
+        if not recovered:
+            raise HTTPException(status_code=409, detail="Player is already connected")
 
     session = session_manager.create_session(game_id)
     success = game_manager.rejoin_game(game_id, request.player_name, session.player_id)
@@ -229,7 +429,10 @@ def get_game_cards(game_id: str):
 
 
 @router.post("/{game_id}/start", response_model=StartGameResponse)
-def start_game(game_id: str):
+def start_game(game_id: str, db: Session = Depends(get_db)):  # noqa: B008
+    if ops_manager.blocks_new_games():
+        raise _server_update_http_error("Server is updating. New games are temporarily blocked.")
+
     pending = game_manager.get_pending_game(game_id)
     if not pending:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -240,7 +443,7 @@ def start_game(game_id: str):
     if pending.target_player_count < 2:
         raise HTTPException(status_code=400, detail="Need at least 2 players to start")
 
-    game = game_manager.start_game(game_id)
+    game = game_manager.start_game(game_id, db)
     if not game:
         raise HTTPException(status_code=500, detail="Failed to start game")
 
@@ -262,10 +465,11 @@ def get_game_state(game_id: str, session_id: str):
 
 @router.get("/{game_id}/status", response_model=GameStatusResponse)
 def get_game_status(game_id: str):
-    from server.routers.ws import connection_manager  # noqa: PLC0415
-
     pending = game_manager.get_pending_game(game_id)
     game = game_manager.get_game(game_id)
+    if not pending and not game:
+        game_manager.restore_game_from_snapshot(game_id)
+        game = game_manager.get_game(game_id)
 
     if not pending and not game:
         raise HTTPException(status_code=404, detail="Game not found")
@@ -330,8 +534,6 @@ def get_game_status(game_id: str):
 
 @router.post("/{game_id}/spectate-request", response_model=SpectateRequestResponse)
 async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
-    from server.routers.ws import connection_manager  # noqa: PLC0415
-
     pending = game_manager.get_pending_game(game_id)
     game = game_manager.get_game(game_id)
 
@@ -350,7 +552,10 @@ async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
     if not player_exists:
         raise HTTPException(status_code=404, detail="Target player not found")
 
-    request_id = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
+    try:
+        request_id = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
 
     auto_approve = (pending and pending.auto_approve_spectators) or (game and game.config.auto_approve_spectators)
     if not auto_approve:

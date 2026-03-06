@@ -90,10 +90,10 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
       onClick={onClose}
     >
       <div
-        className="bg-gray-900 rounded-lg flex flex-col w-full h-[calc(100dvh-2rem)] sm:h-[calc(100dvh-4rem)] overflow-hidden relative"
+        className="modal-chrome border gold-border rounded-lg flex flex-col w-full h-[calc(100dvh-2rem)] sm:h-[calc(100dvh-4rem)] overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-3 py-1 shrink-0 border-b border-gray-700/50 flex justify-between items-center">
+        <div className="px-3 py-1 shrink-0 border-b gold-divider flex justify-between items-center">
           <div className="min-w-0">
             <h2 className="text-white font-semibold text-lg truncate">
               {isApplyMode ? (
@@ -137,7 +137,7 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
                 </CardGrid>
               </div>
             )}
-            <div ref={separatorRef} className="py-2 shrink-0"><hr className="border-gray-700" /></div>
+            <div ref={separatorRef} className="py-2 shrink-0"><hr className="gold-divider" /></div>
             {separatorHeight > 0 && (
               <div className="flex-1 min-h-0 flex justify-center">
                 <CardGrid columns={applyDims.targets.columns} cardWidth={targetDims.width}>

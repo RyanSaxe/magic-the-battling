@@ -33,7 +33,7 @@ export const ZONE_LAYOUT_PADDING = {
   sectionPadH: 12,
   sectionPadTop: 20,
   sectionPadBottom: 12,
-  sectionGap: 1,
+  sectionGap: 2,
 };
 
 const DEFAULT_DIMS: ZoneDims = { width: 100, height: 140, rows: 1, columns: 1 };
@@ -356,7 +356,7 @@ export function computeLayout(
               vGaps({ gap: fillBL[0]?.gap ?? 6 } as ResolvedZone, d.rows),
             0,
           ) +
-          Math.max(0, fillBL.length - 1) * sectionGap +
+          Math.max(0, (!isTop ? 1 : 0) + fillBL.length - 1) * sectionGap +
           fillBL.length * sectionPadV;
 
         const totalH =
@@ -370,16 +370,22 @@ export function computeLayout(
 
         let actualBRCardW = brCardW;
         let actualBRRows = 0;
+        let brGridOverflow = 0;
         if (hasBR) {
           const topActualH = isTop ? pGridH + sectionPadV : topOverhead;
           const brActualAvailH = availH - topActualH - columnGap - brOverhead;
           const sized = sizeBR(brCols, brActualAvailH);
           actualBRCardW = Math.min(Math.max(minCardWidth, sized.brW), brCardW);
           actualBRRows = sized.brRowCount;
+          const brGridH = actualBRRows * Math.round(actualBRCardW * CARD_ASPECT_RATIO) + vGaps(brZones[0], actualBRRows);
+          brGridOverflow = Math.max(0, brGridH - brActualAvailH);
         }
 
-        if (totalH > availH) {
-          const overflow = totalH - availH;
+        const overflow = Math.max(
+          Math.max(0, totalH - availH),
+          brGridOverflow,
+        );
+        if (overflow > 0) {
           if (overflow < bestOverflow) {
             bestOverflow = overflow;
             const r = makeDefaults(zoneIds);
@@ -560,7 +566,7 @@ export function computeLayout(
           const fillTotalH2 = Object.values(fillDims).reduce(
             (s, d) => s + d.rows * d.height + vGaps({ gap: fillBL[0]?.gap ?? 6 } as ResolvedZone, d.rows),
             0,
-          ) + Math.max(0, fillBL.length - 1) * sectionGap + fillBL.length * sectionPadV;
+          ) + Math.max(0, (!pAIsTop ? 1 : 0) + (!pBIsTop ? 1 : 0) + fillBL.length - 1) * sectionGap + fillBL.length * sectionPadV;
           const totalH2 = (pAIsTop ? sectionPadV + aGridH : 0)
             + (pBIsTop ? sectionPadV + bGridH : 0)
             + columnGap
@@ -572,6 +578,7 @@ export function computeLayout(
 
           let actualBRCardW2 = brCardW;
           let actualBRRows2 = 0;
+          let brGridOverflow2 = 0;
           if (hasBR) {
             const topGridH2 = pAIsTop ? aRows * aCardH + vGaps(pA, aRows) : (pBIsTop ? bRows * bCardH + vGaps(pB, bRows) : 0);
             const topActualH2 = topGridH2 > 0 ? topGridH2 + sectionPadV : topOverhead;
@@ -579,6 +586,42 @@ export function computeLayout(
             const sized2 = sizeBR(brCols, brActualAvailH2);
             actualBRCardW2 = Math.min(Math.max(minCardWidth, sized2.brW), brCardW);
             actualBRRows2 = sized2.brRowCount;
+            const brGridH2 = actualBRRows2 * Math.round(actualBRCardW2 * CARD_ASPECT_RATIO) + vGaps(brZones[0], actualBRRows2);
+            brGridOverflow2 = Math.max(0, brGridH2 - brActualAvailH2);
+          }
+
+          const overflow = Math.max(
+            Math.max(0, totalH2 - availH),
+            brGridOverflow2,
+          );
+          if (overflow > 0) {
+            if (overflow < bestOverflow) {
+              bestOverflow = overflow;
+              const r = makeDefaults(zoneIds);
+              r[pA.id] = {
+                width: aW,
+                height: aCardH,
+                rows: aRows,
+                columns: Math.ceil(pA.count / aRows),
+              };
+              r[pB.id] = {
+                width: bW,
+                height: bCardH,
+                rows: bRows,
+                columns: Math.ceil(pB.count / bRows),
+              };
+              for (const [fid, fd] of Object.entries(fillDims)) r[fid] = fd;
+              if (hasBR) {
+                r[brZones[0].id] = {
+                  width: actualBRCardW2,
+                  height: Math.round(actualBRCardW2 * CARD_ASPECT_RATIO),
+                  rows: actualBRRows2,
+                  columns: brCols,
+                };
+              }
+              bestOverflowResult = r;
+            }
+            continue;
           }
 
           if (score > bestScore) {
@@ -658,8 +701,7 @@ export function computeLayout(
       const zone = allZones.get(id)!;
       return sum + d.rows * d.height + vGaps(zone, d.rows);
     }, 0)
-      + topOverhead + blOverhead + columnGap
-      + Math.max(0, blIds.filter((id) => (chosen[id]?.width ?? 0) > 0).length - 1) * sectionGap;
+      + topOverhead + blOverhead + columnGap;
 
     let slack = availH - usedH;
 

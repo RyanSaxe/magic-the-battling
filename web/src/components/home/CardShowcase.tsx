@@ -30,20 +30,29 @@ const UPGRADE_TIMINGS = {
   shrinkDuration: 500,
 };
 
-function computeShowcaseSizes(vw: number, vh: number) {
-  const isMobile = vw < 640;
-  const availableWidth = vw - (isMobile ? 16 : 64);
+function computeShowcaseSizes(
+  containerWidth: number,
+  viewportWidth: number,
+  viewportHeight: number,
+) {
+  const isMobile = viewportWidth < 640;
+  const availableWidth = Math.max(1, containerWidth - (isMobile ? 0 : 32));
   const effectiveSlots = isMobile
     ? MAX_HAND_SIZE - (MAX_HAND_SIZE - 1) * MOBILE_OVERLAP
     : MAX_HAND_SIZE;
-  const maxWidthFromViewport = Math.floor(
-    (availableWidth - (isMobile ? 0 : CARD_GAP * (MAX_HAND_SIZE - 1))) /
+  const maxWidthFromContainer = Math.floor(
+    Math.max(1, availableWidth - (isMobile ? 0 : CARD_GAP * (MAX_HAND_SIZE - 1))) /
       effectiveSlots,
   );
-  const maxHeightFromViewport = Math.round(vh * (isMobile ? 0.28 : 0.38));
-  const cardHeight = Math.min(
-    maxHeightFromViewport,
-    Math.round((maxWidthFromViewport * 7) / 5),
+  const maxHeightFromViewport = Math.round(
+    viewportHeight * (isMobile ? 0.28 : 0.38),
+  );
+  const cardHeight = Math.max(
+    1,
+    Math.min(
+      maxHeightFromViewport,
+      Math.round((maxWidthFromContainer * 7) / 5),
+    ),
   );
   const cardWidth = Math.round((cardHeight * 5) / 7);
   const handGap = isMobile ? -Math.round(cardWidth * MOBILE_OVERLAP) : CARD_GAP;
@@ -58,18 +67,41 @@ function computeShowcaseSizes(vw: number, vh: number) {
 }
 
 function useShowcaseSizes() {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const calculateSizes = useCallback(() => {
+    const viewportWidth = window.innerWidth;
+    const containerWidth = containerRef.current?.clientWidth ?? viewportWidth;
+    return computeShowcaseSizes(
+      containerWidth,
+      viewportWidth,
+      window.innerHeight,
+    );
+  }, []);
+
   const [sizes, setSizes] = useState(() =>
-    computeShowcaseSizes(window.innerWidth, window.innerHeight),
+    computeShowcaseSizes(window.innerWidth, window.innerWidth, window.innerHeight),
   );
 
   useEffect(() => {
-    const handleResize = () =>
-      setSizes(computeShowcaseSizes(window.innerWidth, window.innerHeight));
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+    const updateSizes = () => setSizes(calculateSizes());
+    updateSizes();
 
-  return sizes;
+    const container = containerRef.current;
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(updateSizes)
+        : null;
+    if (container && observer) observer.observe(container);
+
+    window.addEventListener("resize", updateSizes);
+    return () => {
+      window.removeEventListener("resize", updateSizes);
+      observer?.disconnect();
+    };
+  }, [calculateSizes]);
+
+  return { sizes, containerRef };
 }
 
 function UpgradeSourceCard({
@@ -147,7 +179,7 @@ export function CardShowcase() {
   } | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const targetCardRef = useRef<HTMLDivElement | null>(null);
-  const sizes = useShowcaseSizes();
+  const { sizes, containerRef } = useShowcaseSizes();
 
   const runUpgradeSequence = useCallback(() => {
     const {
@@ -241,7 +273,10 @@ export function CardShowcase() {
     upgradePhase === "done";
 
   return (
-    <div className="flex flex-col items-center gap-4 flex-1 justify-center">
+    <div
+      ref={containerRef}
+      className="w-full max-w-full flex flex-col items-center gap-4 flex-1 justify-center"
+    >
       <p className="text-amber-200/80 text-lg sm:text-xl italic font-medium tracking-wide">
         {stage.tagline}
       </p>

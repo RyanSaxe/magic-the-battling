@@ -9,13 +9,155 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  announce-drain:
+    runs-on: ubuntu-latest
+    env:
+      APP_BASE_URL: https://magic-the-battling-dev.fly.dev
+      DELAY_MINUTES: "10"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enter draining mode
+        run: |
+          SWITCH_AT_UTC=$(date -u -d "+${DELAY_MINUTES} minutes" "+%Y-%m-%d %H:%M UTC")
+          export SWITCH_AT_UTC
+          PAYLOAD=$(python - <<'PY'
+          import json
+          import os
+
+          print(
+              json.dumps(
+                  {
+                      "mode": "draining",
+                      "message": (
+                          f"Server update scheduled for {os.environ['SWITCH_AT_UTC']}. "
+                          "New games are temporarily paused. "
+                          "Tip: if you are currently in a game, you can reconnect and continue after the update."
+                      ),
+                      "updated_by": "github-actions-dev",
+                  }
+              )
+          )
+          PY
+          )
+          RESPONSE_FILE=$(mktemp)
+          STATUS_CODE=$(curl --show-error --silent \
+            --output "${RESPONSE_FILE}" \
+            --write-out "%{http_code}" \
+            -X POST "${APP_BASE_URL}/api/ops/mode" \
+            -H "Content-Type: application/json" \
+            -H "x-ops-token: ${OPS_API_TOKEN_DEV}" \
+            -d "${PAYLOAD}") || {
+              echo "Failed to reach ops mode endpoint." >&2
+              cat "${RESPONSE_FILE}" >&2 || true
+              exit 1
+            }
+
+          if [ "${STATUS_CODE}" = "200" ]; then
+            echo "Server entered draining mode."
+            exit 0
+          fi
+
+          case "${STATUS_CODE}" in
+            401|403|404|405|503)
+              echo "Ops mode unavailable (HTTP ${STATUS_CODE}); continuing deploy without pre-drain."
+              cat "${RESPONSE_FILE}" || true
+              ;;
+            *)
+              echo "Unexpected status from ops mode endpoint: ${STATUS_CODE}" >&2
+              cat "${RESPONSE_FILE}" >&2 || true
+              exit 1
+              ;;
+          esac
+        env:
+          OPS_API_TOKEN_DEV: ${{ secrets.OPS_API_TOKEN_DEV }}
+
   deploy:
     runs-on: ubuntu-latest
+    needs: announce-drain
+    env:
+      APP_BASE_URL: https://magic-the-battling-dev.fly.dev
+      DELAY_SECONDS: "600"
     steps:
       - uses: actions/checkout@v4
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - run: flyctl deploy --config fly.dev.toml --remote-only
+      - name: Wait for scheduled deploy window
+        run: sleep "${DELAY_SECONDS}"
+
+      - name: Deploy app
+        id: deploy_app
+        run: flyctl deploy --config fly.dev.toml --remote-only
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_DEV }}
+
+      - name: Return to normal mode
+        if: success()
+        run: |
+          RESPONSE_FILE=$(mktemp)
+          STATUS_CODE=$(curl --show-error --silent \
+            --output "${RESPONSE_FILE}" \
+            --write-out "%{http_code}" \
+            -X POST "${APP_BASE_URL}/api/ops/mode" \
+            -H "Content-Type: application/json" \
+            -H "x-ops-token: ${OPS_API_TOKEN_DEV}" \
+            -d '{"mode":"normal","message":"", "updated_by":"github-actions-dev"}') || {
+              echo "Failed to reach ops mode endpoint." >&2
+              cat "${RESPONSE_FILE}" >&2 || true
+              exit 1
+            }
+
+          if [ "${STATUS_CODE}" = "200" ]; then
+            echo "Server returned to normal mode."
+            exit 0
+          fi
+
+          case "${STATUS_CODE}" in
+            401|403|404|405|503)
+              echo "Ops mode unavailable (HTTP ${STATUS_CODE}) after deploy; continuing."
+              cat "${RESPONSE_FILE}" || true
+              ;;
+            *)
+              echo "Unexpected status from ops mode endpoint: ${STATUS_CODE}" >&2
+              cat "${RESPONSE_FILE}" >&2 || true
+              exit 1
+              ;;
+          esac
+        env:
+          OPS_API_TOKEN_DEV: ${{ secrets.OPS_API_TOKEN_DEV }}
+
+      - name: Switch to maintenance mode on deploy failure
+        if: failure()
+        run: |
+          RESPONSE_FILE=$(mktemp)
+          STATUS_CODE=$(curl --show-error --silent \
+            --output "${RESPONSE_FILE}" \
+            --write-out "%{http_code}" \
+            -X POST "${APP_BASE_URL}/api/ops/mode" \
+            -H "Content-Type: application/json" \
+            -H "x-ops-token: ${OPS_API_TOKEN_DEV}" \
+            -d '{"mode":"maintenance","message":"Deployment did not complete. Please retry in a few minutes.","updated_by":"github-actions-dev"}') || {
+              echo "Failed to reach ops mode endpoint." >&2
+              cat "${RESPONSE_FILE}" >&2 || true
+              exit 1
+            }
+
+          if [ "${STATUS_CODE}" = "200" ]; then
+            echo "Server switched to maintenance mode."
+            exit 0
+          fi
+
+          case "${STATUS_CODE}" in
+            401|403|404|405|503)
+              echo "Ops mode unavailable (HTTP ${STATUS_CODE}) on failed deploy; continuing."
+              cat "${RESPONSE_FILE}" || true
+              ;;
+            *)
+              echo "Unexpected status from ops mode endpoint: ${STATUS_CODE}" >&2
+              cat "${RESPONSE_FILE}" >&2 || true
+              exit 1
+              ;;
+          esac
+        env:
+          OPS_API_TOKEN_DEV: ${{ secrets.OPS_API_TOKEN_DEV }}

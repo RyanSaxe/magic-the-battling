@@ -5,8 +5,15 @@ import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
+import { InfoIcon } from "../components/icons/InfoIcon";
 import { HintsBanner } from "../components/common/HintsBanner";
+import { CubeCobraPrimerLink } from "../components/common/CubeCobraPrimerLink";
 import { getLegendaryName } from "../utils/prefetchName";
+import {
+  getDefaultNewPlayerPreference,
+  rememberPlayerForGame,
+  setNewPlayerPreferenceForGame,
+} from "../utils/deviceIdentity";
 import { FaDiscord } from "react-icons/fa6";
 import type { LobbyState } from "../types";
 
@@ -19,6 +26,15 @@ type SoloPhase =
 type OpponentCount = 1 | 3 | 5 | 7;
 type ActiveMode = "friends" | "solo";
 const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
+
+function normalizeCreateGameError(error: unknown): string {
+  const raw =
+    error instanceof Error ? error.message : "Failed to create game";
+  if (raw.toLowerCase().includes("server is updating")) {
+    return "New games are temporarily paused for a scheduled server update. If you are already in a game, you can keep playing and reconnect. Try again in about 10-15 minutes.";
+  }
+  return raw;
+}
 
 function useSoloLobbyWatcher(
   lobbyState: LobbyState | null,
@@ -130,18 +146,21 @@ function AdvancedOptionsModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-gray-900 border border-white/10 rounded-lg p-5 w-full max-w-sm">
-        <div className="flex items-center justify-between mb-4">
+      <div className="relative modal-chrome border gold-border rounded-lg p-5 w-full max-w-sm felt-raised-panel">
+        <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
           <h3 className="text-white font-semibold">{title}</h3>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-gray-300 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
           >
             ✕
           </button>
         </div>
-        <div className="space-y-4">{children}</div>
-        <button onClick={onClose} className="btn btn-primary w-full py-2 mt-5">
+        <div className="space-y-3">{children}</div>
+        <button
+          onClick={onClose}
+          className="btn btn-primary play-action-btn w-full py-2 mt-4"
+        >
           Done
         </button>
       </div>
@@ -158,12 +177,12 @@ function CubeIdInput({
 }) {
   return (
     <div>
-      <label className="block text-gray-300 text-sm mb-1">CubeCobra ID</label>
+      <label className="block text-white text-sm mb-1">CubeCobra ID</label>
       <input
         type="text"
         value={cubeId}
         onChange={(e) => setCubeId(e.target.value)}
-        className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
         placeholder="auto"
       />
     </div>
@@ -178,12 +197,12 @@ function UpgradesCheckbox({
   setUseUpgrades: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 cursor-pointer">
+    <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
       <input
         type="checkbox"
         checked={useUpgrades}
         onChange={(e) => setUseUpgrades(e.target.checked)}
-        className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
+        className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
       />
       <span className="text-white text-sm">Upgrades</span>
       <span className="text-gray-500 text-xs">
@@ -193,11 +212,80 @@ function UpgradesCheckbox({
   );
 }
 
+function GuidedModeField({
+  enabled,
+  setEnabled,
+}: {
+  enabled: boolean;
+  setEnabled: (v: boolean) => void;
+}) {
+  const guidedModeHelpText =
+    "When Guided Mode is on, the first time you enter a situation, a simple popup gives you help.";
+  const [showGuidedModeHelp, setShowGuidedModeHelp] = useState(false);
+  const guidedModeHelpRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!guidedModeHelpRef.current?.contains(target)) {
+        setShowGuidedModeHelp(false);
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+
+  return (
+    <div className="bg-black/40 border border-black/40 text-white rounded px-3 h-[42px] min-w-[118px] sm:min-w-[132px] flex items-center justify-end gap-2">
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => setEnabled(e.target.checked)}
+          className="sr-only peer"
+          aria-label="Guided mode"
+        />
+        <span
+          className={`text-xs font-medium uppercase tracking-wide ${enabled ? "text-amber-300" : "text-gray-500"
+            }`}
+        >
+          {enabled ? "On" : "Off"}
+        </span>
+        <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? "translate-x-5" : "translate-x-1"
+              }`}
+          />
+        </span>
+      </label>
+      <div ref={guidedModeHelpRef} className="relative group shrink-0">
+        <button
+          type="button"
+          className="text-gray-400 hover:text-gray-200"
+          aria-label="What guided mode does"
+          aria-expanded={showGuidedModeHelp}
+          onClick={() => setShowGuidedModeHelp((v) => !v)}
+        >
+          <InfoIcon size="sm" />
+        </button>
+        <span
+          className={`absolute right-0 top-full mt-2 w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-50 ${showGuidedModeHelp
+            ? "opacity-100"
+            : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
+            }`}
+        >
+          {guidedModeHelpText}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="px-3.5 self-stretch shrink-0 rounded-lg bg-white/10 border border-white/20 text-gray-300 hover:bg-white/20 hover:text-white transition-all flex items-center justify-center text-lg"
+      className="h-[42px] w-[42px] shrink-0 rounded-lg bg-white/20 btn-dark-border text-gray-300 hover:bg-white/30 hover:text-white transition-all flex items-center justify-center text-base"
       title="Advanced Options"
     >
       ⚙
@@ -218,6 +306,9 @@ export function Play() {
   const [opponents, setOpponents] = useState<OpponentCount>(3);
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [activeMode, setActiveMode] = useState<ActiveMode>("solo");
+  const [isGuidedMode, setIsGuidedMode] = useState(() =>
+    getDefaultNewPlayerPreference(),
+  );
 
   const [friendsLoading, setFriendsLoading] = useState(false);
 
@@ -288,15 +379,19 @@ export function Play() {
         cubeId: cubeId || "auto",
         useUpgrades,
         autoApproveSpectators,
+        guidedModeDefault: isGuidedMode,
       });
       saveSession(response.session_id, response.player_id);
+      rememberPlayerForGame(response.game_id, playerName.trim());
+      setNewPlayerPreferenceForGame(
+        response.game_id,
+        isGuidedMode,
+        response.player_id,
+      );
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
-      addToast(
-        err instanceof Error ? err.message : "Failed to create game",
-        "error",
-      );
+      addToast(normalizeCreateGameError(err), "error");
       setFriendsLoading(false);
     }
   };
@@ -316,15 +411,19 @@ export function Play() {
         useUpgrades,
         targetPlayerCount: targetCount,
         puppetCount: count,
+        guidedModeDefault: isGuidedMode,
       });
       saveSession(response.session_id, response.player_id);
+      rememberPlayerForGame(response.game_id, playerName.trim());
+      setNewPlayerPreferenceForGame(
+        response.game_id,
+        isGuidedMode,
+        response.player_id,
+      );
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
-      addToast(
-        err instanceof Error ? err.message : "Failed to create game",
-        "error",
-      );
+      addToast(normalizeCreateGameError(err), "error");
       updateSoloPhase("idle");
     }
   };
@@ -359,7 +458,7 @@ export function Play() {
   ) => (
     <button
       onClick={() => setActiveMode(mode)}
-      className="shrink-0 bg-black/60 backdrop-blur rounded-lg px-4 py-3 border border-black/40 flex items-center gap-3 w-full text-left hover:bg-black/50 transition-colors"
+      className="shrink-0 bg-black/35 rounded-lg px-4 py-3 border border-black/40 flex items-center gap-3 w-full text-left hover:bg-black/30 transition-colors"
     >
       {icon}
       <span className="text-white font-medium text-sm">{label}</span>
@@ -369,15 +468,14 @@ export function Play() {
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <header className="shrink-0 px-4 sm:px-6 py-3">
+      <header className="shrink-0 py-3 frame-chrome bar-pad-both">
         <div className="hidden sm:flex items-center justify-between">
           <div>
             <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
               Magic: The Battling
             </h1>
             <p className="text-gray-400 text-sm">
-              A Magic: the Gathering format inspired by the autobattler game
-              genre
+              An MtG format inspired by autobattlers
             </p>
           </div>
           <div className="flex gap-2">
@@ -387,235 +485,180 @@ export function Play() {
             >
               Home
             </button>
-            <a
-              href="https://discord.gg/2NAjcWXNKn"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary py-2 px-4 flex items-center gap-2"
-            >
-              <FaDiscord className="w-4 h-4" />
-              Discord
-            </a>
           </div>
         </div>
-        <div className="sm:hidden text-center">
-          <h1 className="hero-title text-2xl font-bold tracking-tight">
-            Magic: The Battling
-          </h1>
-          <p className="text-gray-400 text-xs">
-            Inspired by the autobattler game genre
-          </p>
-          <div className="flex justify-center mt-2 gap-3">
+        <div className="sm:hidden">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
+                Magic: The Battling
+              </h1>
+              <p className="text-gray-400 text-xs">
+                An MtG format inspired by autobattlers
+              </p>
+            </div>
             <button
               onClick={() => navigate("/")}
-              className="btn btn-secondary py-2 px-5"
+              className="btn btn-secondary py-1.5 px-3 text-sm shrink-0"
             >
               Home
             </button>
-            <a
-              href="https://discord.gg/2NAjcWXNKn"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-secondary py-2 px-5 flex items-center gap-2"
-            >
-              <FaDiscord className="w-4 h-4" />
-              Discord
-            </a>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 flex flex-col sm:justify-center min-h-0 px-4">
-      <div className="shrink-0 w-full max-w-5xl mx-auto">
-        <div className="mb-4">
-          <label className="block text-gray-400 text-sm mb-1">Your Name</label>
-          <input
-            type="text"
-            value={nameLoading ? "" : playerName}
-            onChange={(e) => setPlayerName(e.target.value)}
-            onKeyDown={(e) =>
-              e.key === "Enter" && nameValid && handleCreateLobby()
-            }
-            disabled={nameLoading}
-            placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-            className="w-full bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-          />
-        </div>
+      <div className="flex-1 flex min-h-0 game-surface">
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
+          style={{ borderRight: '1px solid var(--gold-border)' }} />
 
-      </div>
+        <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
+          <div className="zone-pack flex-1 min-h-0 flex flex-col px-4 py-4 sm:py-2 sm:items-center sm:justify-center overflow-auto">
+            <section className="w-full max-w-md mx-auto modal-chrome border gold-border rounded-lg overflow-hidden flex-1 min-h-0 flex flex-col sm:flex-none felt-raised-panel">
+              <div className="p-4 sm:p-5 flex-1 min-h-0 flex flex-col sm:flex-none">
+                <div className="mb-4">
+                  <div className="mb-1 flex items-center justify-between gap-3">
+                    <label htmlFor="player-name" className="block text-gray-300 text-sm">
+                      Your Name
+                    </label>
+                    <span className="block text-gray-300 text-sm text-right shrink-0">
+                      Guided Mode
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 sm:gap-3">
+                    <input
+                      id="player-name"
+                      type="text"
+                      value={nameLoading ? "" : playerName}
+                      onChange={(e) => setPlayerName(e.target.value)}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" && nameValid && handleCreateLobby()
+                      }
+                      disabled={nameLoading}
+                      placeholder={nameLoading ? "Generating name..." : "Enter your name"}
+                      className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+                    />
+                    <GuidedModeField enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
+                  </div>
+                </div>
 
-      {/* Mobile: stacked cards, inactive always on top */}
-      <div className="sm:hidden flex-1 flex flex-col gap-3 w-full max-w-5xl mx-auto min-h-0">
-        {activeMode === "solo" ? (
-          <>
-            {inactiveCard(
-              "friends",
-              <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
-              "Play with Friends",
-            )}
-            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
-              <div className="flex items-center gap-3 mb-2">
-                <GoldfishIcon className="w-8 h-8 text-amber-400" />
-                <h2 className="text-lg font-semibold text-white">Goldfish</h2>
-              </div>
-              <div className="flex-1 flex items-center justify-center">
-                <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                  <span className="text-amber-400/70">
-                    Battle hands that real players piloted
-                  </span>{" "}
-                  to strong finishes. Their cards are face up, and you decide
-                  who wins.
-                </p>
-              </div>
-              <div className="mt-auto flex gap-2 pt-4 relative z-50">
-                <button
-                  onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
-                  disabled={soloLoading ? false : !nameValid}
-                  className={`flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-                >
-                  {soloLoading ? (
+                {/* Single active-mode card for all breakpoints */}
+                <div className="w-full max-w-md mx-auto flex-1 min-h-0 sm:flex-none flex flex-col gap-3">
+                  {activeMode === "solo" ? (
                     <>
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Loading...
+                      {inactiveCard(
+                        "friends",
+                        <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
+                        "Play with Friends",
+                      )}
+                      <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col flex-1 min-h-0">
+                        <div className="flex items-center gap-3 mb-2">
+                          <GoldfishIcon className="w-8 h-8 text-amber-400" />
+                          <h2 className="text-lg font-semibold text-white">Goldfish</h2>
+                        </div>
+                        <div className="flex-1 flex items-center justify-center">
+                          <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                            <span className="block text-amber-400/70">
+                              Battle historically winning hands!
+                            </span>
+                            <span className="block">
+                              Their cards are face up in battle. You can move them around to simulate the game and decide who would have won.
+                            </span>
+                          </p>
+                        </div>
+                        <div className="mt-auto flex gap-2 pt-4">
+                          <button
+                            onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
+                            disabled={soloLoading ? false : !nameValid}
+                            className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                          >
+                            {soloLoading ? (
+                              <>
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Loading...
+                              </>
+                            ) : (
+                              "Start Game"
+                            )}
+                          </button>
+                          <GearButton onClick={() => setShowSoloAdvanced(true)} />
+                        </div>
+                      </div>
                     </>
                   ) : (
-                    "Start Game"
-                  )}
-                </button>
-                <GearButton onClick={() => setShowSoloAdvanced(true)} />
-              </div>
-            </div>
-          </>
-        ) : (
-          <>
-            {inactiveCard(
-              "solo",
-              <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
-              "Goldfish",
-            )}
-            <div className="flex-1 bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
-              <div className="flex items-center gap-3 mb-2">
-                <FriendsIcon className="w-8 h-8 text-amber-400" />
-                <h2 className="text-lg font-semibold text-white">
-                  Play with Friends
-                </h2>
-              </div>
-              <div className="flex-1 flex items-center justify-center">
-                <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                  <span className="text-amber-400/70">
-                    Can you draft an unbeatable hand?
-                  </span>{" "}
-                  Compete with your friends to see who can turn trash into
-                  treasure!{" "}
-                </p>
-              </div>
-              <div className="mt-auto flex gap-2 pt-4 relative z-50">
-                <button
-                  onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
-                  disabled={friendsLoading ? false : !nameValid}
-                  className={`flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-                >
-                  {friendsLoading ? (
                     <>
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Loading...
+                      {inactiveCard(
+                        "solo",
+                        <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
+                        "Goldfish",
+                      )}
+                      <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col flex-1 min-h-0">
+                        <div className="flex items-center gap-3 mb-2">
+                          <FriendsIcon className="w-8 h-8 text-amber-400" />
+                          <h2 className="text-lg font-semibold text-white">
+                            Play with Friends
+                          </h2>
+                        </div>
+                        <div className="flex-1 flex items-center justify-center">
+                          <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                            <span className="block text-amber-400/70">
+                              Draft an unbeatable hand!
+                            </span>
+                            <span className="block">
+                              See who is the best drafter. Everybody starts with trash, and it's up to you to turn it into treasure!
+                            </span>
+                          </p>
+                        </div>
+                        <div className="mt-auto flex gap-2 pt-4">
+                          <button
+                            onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
+                            disabled={friendsLoading ? false : !nameValid}
+                            className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                          >
+                            {friendsLoading ? (
+                              <>
+                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                                Loading...
+                              </>
+                            ) : (
+                              "Create Lobby"
+                            )}
+                          </button>
+                          <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+                        </div>
+                      </div>
                     </>
-                  ) : (
-                    "Create Lobby"
                   )}
-                </button>
-                <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+                </div>
               </div>
-            </div>
-          </>
-        )}
+            </section>
+          </div>
+          <HintsBanner variant="rail" />
+        </main>
+
+        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
+          style={{ borderLeft: '1px solid var(--gold-border)' }} />
       </div>
 
-      {/* Desktop: side-by-side cards */}
-      <div className="hidden sm:grid sm:grid-cols-2 gap-4 w-full max-w-5xl mx-auto">
-        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
-          <div className="flex items-center gap-3 mb-2">
-            <FriendsIcon className="w-8 h-8 text-amber-400" />
-            <h2 className="text-lg font-semibold text-white">
-              Play with Friends
-            </h2>
-          </div>
-          <div className="flex-1 flex items-center">
-            <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-              <span className="text-amber-400/70">
-                Can you draft an unbeatable hand?
-              </span>{" "}
-              Compete with your friends to see who can turn trash into
-              treasure!{" "}
-            </p>
-          </div>
-          <div className="mt-auto flex gap-2 pt-4 relative z-50">
-            <button
-              onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
-              disabled={friendsLoading ? false : !nameValid}
-              className={`flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-            >
-              {friendsLoading ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Loading...
-                </>
-              ) : (
-                "Create Lobby"
-              )}
-            </button>
-            <GearButton onClick={() => setShowFriendsAdvanced(true)} />
-          </div>
+      <footer className="shrink-0 frame-chrome bar-pad-both py-2">
+        <div className="flex items-center justify-between">
+          <a
+            href="https://discord.gg/2NAjcWXNKn"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-[#6974F4] hover:text-[#7983F5] transition-colors"
+          >
+            <FaDiscord className="w-4 h-4" />
+            Join Discord
+          </a>
+          <CubeCobraPrimerLink />
         </div>
-        <div className="bg-black/60 backdrop-blur rounded-lg p-5 border border-black/40 flex flex-col">
-          <div className="flex items-center gap-3 mb-2">
-            <GoldfishIcon className="w-8 h-8 text-amber-400" />
-            <h2 className="text-lg font-semibold text-white">Goldfish</h2>
-          </div>
-          <div className="flex-1 flex items-center">
-            <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-              <span className="text-amber-400/70">
-                Battle hands that real players piloted
-              </span>{" "}
-              to strong finishes. Their cards are face up, and you decide wins.
-            </p>
-          </div>
-          <div className="mt-auto flex gap-2 pt-4 relative z-50">
-            <button
-              onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
-              disabled={soloLoading ? false : !nameValid}
-              className={`flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-            >
-              {soloLoading ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Loading...
-                </>
-              ) : (
-                "Start Game"
-              )}
-            </button>
-            <GearButton onClick={() => setShowSoloAdvanced(true)} />
-          </div>
-        </div>
-      </div>
-
-      <div className="shrink-0 w-full max-w-5xl mx-auto mt-3 mb-4">
-        <HintsBanner variant="dark" />
-      </div>
-      </main>
+      </footer>
 
       {showFriendsAdvanced && (
         <AdvancedOptionsModal
@@ -627,12 +670,12 @@ export function Play() {
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
           />
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
               checked={autoApproveSpectators}
               onChange={(e) => setAutoApproveSpectators(e.target.checked)}
-              className="w-4 h-4 rounded bg-gray-700 border-gray-600 text-amber-500 focus:ring-amber-500"
+              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
             />
             <span className="text-white text-sm">Open Spectating</span>
             <span className="text-gray-500 text-xs">— let anyone watch</span>
@@ -650,8 +693,8 @@ export function Play() {
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
           />
-          <div>
-            <label className="block text-gray-300 text-sm mb-1">
+          <div className="bg-black/35 border border-black/40 rounded-lg p-3">
+            <label className="block text-gray-300 text-sm mb-2">
               Opponents
             </label>
             <div className="flex gap-1.5">
@@ -659,11 +702,10 @@ export function Play() {
                 <button
                   key={count}
                   onClick={() => setOpponents(count)}
-                  className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                    opponents === count
-                      ? "bg-amber-500 text-black"
-                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                  }`}
+                  className={`px-3 py-1.5 rounded text-sm font-medium btn-dark-border transition-colors ${opponents === count
+                    ? "bg-amber-500 text-black"
+                    : "bg-black/40 text-gray-300 hover:bg-black/30"
+                    }`}
                 >
                   {count}
                 </button>
@@ -675,7 +717,7 @@ export function Play() {
 
       {(soloLoading || friendsLoading) && (
         <div
-          className="fixed inset-0 z-40 bg-black/40"
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-[1px]"
           onClick={soloLoading ? handleCancelSolo : handleCancelFriends}
         />
       )}
@@ -686,7 +728,7 @@ export function Play() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={handleCancelSolo}
           />
-          <div className="relative bg-gray-900 border border-white/10 rounded-lg p-8 w-full max-w-md text-center">
+          <div className="relative modal-chrome border gold-border rounded-lg p-8 w-full max-w-md text-center">
             <h2 className="text-xl font-bold text-white mb-4">
               Not enough puppet data
             </h2>
@@ -742,11 +784,10 @@ function RecoveryOpponentPicker({
           <button
             key={n}
             onClick={() => setSelected(n)}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${
-              selected === n
-                ? "bg-amber-500 text-black"
-                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-            }`}
+            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${selected === n
+              ? "bg-amber-500 text-black"
+              : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
           >
             {n}
           </button>

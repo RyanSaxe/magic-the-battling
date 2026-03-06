@@ -28,6 +28,7 @@ relative_files = true
 
 [project.scripts]
 dev = "server.dev:main"
+perf-load = "server.perf.load_harness:main"
 
 [build-system]
 requires = ["hatchling"]

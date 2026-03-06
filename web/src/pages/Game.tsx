@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
@@ -16,23 +16,74 @@ import { RewardPhase } from "./phases/Reward";
 import { Sidebar } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
 import { GameSummary } from "../components/GameSummary";
+import { ShareModal } from "../components/ShareModal";
 import { ActionMenu } from "../components/ActionMenu";
 import { PhaseTimeline } from "../components/PhaseTimeline";
+import { getOrdinal } from "../utils/format";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { ContextStripProvider, useContextStrip, useToast } from "../contexts";
 import { FaceDownProvider } from "../contexts/FaceDownContext";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
-import { GameDndProvider, useDndActions, DraggableCard } from "../dnd";
+import { GameDndProvider, useDndActions, DraggableCard, type ZoneOwner } from "../dnd";
 import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
+import type { Phase } from "../constants/phases";
+import {
+  markPlayedBefore,
+  getRememberedPlayerForGame,
+  pickAutoReconnectPlayer,
+  rememberPlayerForGame,
+  resolveNewPlayerPreferenceForGame,
+} from "../utils/deviceIdentity";
 
 interface SpectatorConfig {
   spectatePlayer: string;
   requestId: string;
+}
+
+const SCHEDULED_UTC_RE = /scheduled for (\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}) UTC/i;
+const TOP_NOTICE_Z_INDEX = 2147483647;
+
+function scheduledEasternFromNotice(message: string): string | null {
+  const match = SCHEDULED_UTC_RE.exec(message);
+  if (!match) return null;
+
+  const [, year, month, day, hour, minute] = match;
+  const asDate = new Date(
+    Date.UTC(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+      Number(hour),
+      Number(minute),
+    ),
+  );
+  if (Number.isNaN(asDate.getTime())) return null;
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+    timeZoneName: "short",
+  }).format(asDate);
+}
+
+function drainingMessageWithEasternTime(message: string, easternTime: string | null): string {
+  if (!message) return "";
+  if (!easternTime) return message;
+  return message.replace(SCHEDULED_UTC_RE, `scheduled for ${easternTime}`);
+}
+
+function isTimelinePhase(phase: string | undefined): phase is Phase {
+  return phase === "draft" || phase === "build" || phase === "battle" || phase === "reward";
 }
 
 function PlayerSelectionModal({
@@ -57,6 +108,7 @@ function PlayerSelectionModal({
   const [rejoinName, setRejoinName] = useState("");
   const [rejoinLoading, setRejoinLoading] = useState(false);
   const pollingRef = useRef<number | null>(null);
+  const autoReconnectAttemptedRef = useRef(false);
 
   useEffect(() => {
     const fetchStatus = () => {
@@ -77,20 +129,43 @@ function PlayerSelectionModal({
     };
   }, []);
 
-  const handleReconnect = async (playerName: string) => {
-    setRejoinName(playerName);
-    setRejoinLoading(true);
-    setError("");
+  const handleReconnect = useCallback(
+    async (playerName: string, options?: { silent?: boolean }) => {
+      setRejoinName(playerName);
+      setRejoinLoading(true);
+      if (!options?.silent) {
+        setError("");
+      }
 
-    try {
-      const response = await rejoinGame(gameId, playerName);
-      onSessionCreated(response.session_id, response.player_id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reconnect");
-    } finally {
-      setRejoinLoading(false);
+      try {
+        const response = await rejoinGame(gameId, playerName);
+        rememberPlayerForGame(gameId, playerName.trim());
+        onSessionCreated(response.session_id, response.player_id);
+      } catch (err) {
+        if (!options?.silent) {
+          setError(err instanceof Error ? err.message : "Failed to reconnect");
+        }
+      } finally {
+        setRejoinLoading(false);
+      }
+    },
+    [gameId, onSessionCreated],
+  );
+
+  useEffect(() => {
+    if (rejoinLoading || requestStatus !== "idle" || selectedPlayer !== null || !status) {
+      return;
     }
-  };
+
+    const rememberedPlayer = getRememberedPlayerForGame(gameId);
+    const autoPlayer = pickAutoReconnectPlayer(rememberedPlayer, status.players);
+    if (!autoPlayer || autoReconnectAttemptedRef.current) {
+      return;
+    }
+
+    autoReconnectAttemptedRef.current = true;
+    void handleReconnect(autoPlayer, { silent: true });
+  }, [gameId, handleReconnect, rejoinLoading, requestStatus, selectedPlayer, status]);
 
   const handleWatchRequest = async () => {
     if (!selectedPlayer || !spectatorName.trim()) {
@@ -321,7 +396,7 @@ function SpectateRequestModal({
 }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg p-6 w-full max-w-sm mx-4">
+      <div className="modal-chrome border gold-border rounded-lg p-6 w-full max-w-sm mx-4">
         <h2 className="text-xl text-white mb-4">Spectate Request</h2>
         <p className="text-gray-300 mb-6">
           <strong>{spectatorName}</strong> wants to watch your game.
@@ -348,7 +423,7 @@ function SpectateRequestModal({
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { session, saveSession } = useSession();
+  const { session, saveSession, clearSession } = useSession();
 
   const [spectatorConfig, setSpectatorConfig] = useState<SpectatorConfig | null>(null);
   const [spectatingPlayer, setSpectatingPlayer] = useState<string | null>(null);
@@ -359,7 +434,7 @@ function GameContent() {
   const isSpectateMode = searchParams.get("spectate") === "true";
   const { addToast } = useToast();
 
-  const { gameState, isConnected, actions, pendingSpectateRequest } = useGame(
+  const { gameState, isConnected, actions, pendingSpectateRequest, serverNotice, invalidSession } = useGame(
     gameId ?? null,
     isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
@@ -368,10 +443,109 @@ function GameContent() {
   const { state, setPreviewCard } = useContextStrip();
 
   const isSpectator = !!spectatorConfig;
+  const wasInvalidSessionRef = useRef(false);
+  const [isNewPlayerOnboarding, setIsNewPlayerOnboarding] = useState(() =>
+    gameId ? resolveNewPlayerPreferenceForGame(gameId, session?.playerId) : false,
+  );
+  const [autoOpenTimelinePhase, setAutoOpenTimelinePhase] = useState<Phase | null>(null);
+  const [showPuppetGhostExplainer, setShowPuppetGhostExplainer] = useState(false);
+  const seenTimelinePhasesRef = useRef<Set<Phase>>(new Set());
+  const shownPuppetGhostExplainerRef = useRef(false);
+  const selfPhase = gameState?.self_player.phase;
+  const canManipulateOpponent = gameState?.current_battle?.can_manipulate_opponent ?? false;
+
+  useEffect(() => {
+    const resolved = gameId
+      ? resolveNewPlayerPreferenceForGame(gameId, session?.playerId)
+      : false;
+    seenTimelinePhasesRef.current = new Set();
+    shownPuppetGhostExplainerRef.current = false;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setIsNewPlayerOnboarding(resolved);
+      setAutoOpenTimelinePhase(null);
+      setShowPuppetGhostExplainer(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [gameId, session?.playerId]);
+
+  useEffect(() => {
+    const shouldClear = shouldClearSessionOnInvalidEvent(
+      invalidSession,
+      wasInvalidSessionRef.current,
+      !!session,
+    );
+    wasInvalidSessionRef.current = invalidSession;
+    if (shouldClear) {
+      clearSession();
+    }
+  }, [invalidSession, session, clearSession]);
+
+  useEffect(() => {
+    const playerName = gameState?.self_player.name;
+    if (!gameId || !playerName || isSpectator) {
+      return;
+    }
+    rememberPlayerForGame(gameId, playerName);
+    markPlayedBefore();
+  }, [gameId, gameState?.self_player.name, isSpectator]);
+
+  useEffect(() => {
+    if (!selfPhase || isSpectator || !isNewPlayerOnboarding) {
+      return;
+    }
+    if (!isTimelinePhase(selfPhase)) {
+      return;
+    }
+    if (seenTimelinePhasesRef.current.has(selfPhase)) {
+      return;
+    }
+    seenTimelinePhasesRef.current.add(selfPhase);
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setAutoOpenTimelinePhase(selfPhase);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isNewPlayerOnboarding, isSpectator, selfPhase]);
+
+  useEffect(() => {
+    if (
+      selfPhase !== "battle" ||
+      isSpectator ||
+      !isNewPlayerOnboarding ||
+      shownPuppetGhostExplainerRef.current ||
+      !canManipulateOpponent
+    ) {
+      return;
+    }
+    shownPuppetGhostExplainerRef.current = true;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setShowPuppetGhostExplainer(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    canManipulateOpponent,
+    isNewPlayerOnboarding,
+    isSpectator,
+    selfPhase,
+  ]);
 
   // Lifted state from Build phase
+  type UpgradesModalOpenMode = 'auto' | 'view';
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
   const [showUpgradesModal, setShowUpgradesModal] = useState(false);
+  const [upgradesModalOpenMode, setUpgradesModalOpenMode] =
+    useState<UpgradesModalOpenMode>('auto');
   const [upgradeInitialTargetId, setUpgradeInitialTargetId] = useState<string | undefined>(undefined);
   const handSlotsRef = useRef<(string | null)[]>([]);
 
@@ -389,6 +563,7 @@ function GameContent() {
   const [activeDndPanel, setActiveDndPanel] = useState<ActiveDndPanel>(null);
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
+  const [dismissedServerNoticeAt, setDismissedServerNoticeAt] = useState<string | null>(null);
 
   const prevPhaseRef = useRef(gameState?.self_player.phase);
   if (gameState?.self_player.phase !== prevPhaseRef.current) {
@@ -401,6 +576,9 @@ function GameContent() {
   // Rules panel state
   const [rulesPanelOpen, setRulesPanelOpen] = useState(false);
   const [rulesPanelTarget, setRulesPanelTarget] = useState<RulesPanelTarget | undefined>(undefined);
+
+  // Share modal state (game-over header)
+  const [shareOpen, setShareOpen] = useState(false);
 
   // Hover tracking for hotkeys
   const [hoveredCard, setHoveredCard] = useState<{ id: string; zone: ZoneName; owner: 'player' | 'opponent' } | null>(null);
@@ -449,6 +627,15 @@ function GameContent() {
     window.open(url.toString(), '_blank');
   };
 
+  const openUpgradesModal = useCallback((
+    targetCardId?: string,
+    mode: UpgradesModalOpenMode = 'auto',
+  ) => {
+    setUpgradeInitialTargetId(targetCardId);
+    setUpgradesModalOpenMode(mode);
+    setShowUpgradesModal(true);
+  }, []);
+
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   const modalOpen = rulesPanelOpen || showUpgradesModal || actionMenuOpen;
   const hotkeyMap: Record<string, () => void> = (() => {
@@ -476,7 +663,7 @@ function GameContent() {
       };
       map['Enter'] = () => actions.draftDone();
       map['u'] = () => {
-        if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+        if (sp.upgrades.length > 0) openUpgradesModal(undefined, 'view');
       };
     } else if (phase === 'build') {
       if (showSubmitHandPopover) {
@@ -506,12 +693,11 @@ function GameContent() {
         };
       }
       map['u'] = () => {
-        if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+        if (sp.upgrades.length > 0) openUpgradesModal(undefined, 'view');
       };
       if (hoveredCard && sp.upgrades.some((u) => !u.upgrade_target)) {
         map['u'] = () => {
-          setUpgradeInitialTargetId(hoveredCard.id);
-          setShowUpgradesModal(true);
+          openUpgradesModal(hoveredCard.id);
         };
       }
     } else if (phase === 'battle' && cb) {
@@ -556,7 +742,7 @@ function GameContent() {
               }
             }
           };
-          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile' } as const;
+          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile', l: 'command_zone' } as const;
           for (const [key, toZone] of Object.entries(moveZones)) {
             map[key] = () => {
               if (toZone !== hoveredCard.zone) {
@@ -605,7 +791,7 @@ function GameContent() {
           }
         };
         map['v'] = () => {
-          if (sp.upgrades.length > 0) setShowUpgradesModal(true);
+          if (sp.upgrades.length > 0) openUpgradesModal(undefined, 'view');
         };
       }
     } else if (phase === 'reward') {
@@ -647,6 +833,17 @@ function GameContent() {
 
   const { self_player, current_battle } = gameState;
 
+  const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
+  const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
+  const isWinner = selfPlacement === 1;
+
+  const shareUrl = gameId
+    ? `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(self_player.name)}`
+    : '';
+  const shareText = isWinner
+    ? 'Just won a game of Magic: The Battling! Check out the game:'
+    : `Just finished ${getOrdinal(selfPlacement)} in Magic: The Battling! Check out the game:`;
+
   const maxHandSize = self_player.hand_size;
   const handFull = self_player.hand.length === maxHandSize;
   const basicsComplete = selectedBasics.length === 3;
@@ -656,6 +853,14 @@ function GameContent() {
   const needsUpgrade =
     isStageIncreasing && gameState.available_upgrades.length > 0;
   const canContinue = !needsUpgrade || !!selectedUpgradeId;
+  const hasPendingBuildUpgrades =
+    currentPhase === "build" && self_player.upgrades.some((u) => !u.upgrade_target);
+  const upgradesModalMode: "view" | "apply" =
+    upgradesModalOpenMode === "view"
+      ? "view"
+      : hasPendingBuildUpgrades
+        ? "apply"
+        : "view";
 
   const handleContinue = () => {
     actions.rewardDone(selectedUpgradeId ?? undefined);
@@ -691,7 +896,7 @@ function GameContent() {
       left = (
         <div className="flex items-center gap-1.5 sm:gap-2">
           {self_player.upgrades.length > 0 && (
-            <button onClick={() => setShowUpgradesModal(true)} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
               View Upgrades
             </button>
           )}
@@ -715,7 +920,7 @@ function GameContent() {
     } else if (currentPhase === "build") {
       if (self_player.build_ready) {
         left = self_player.upgrades.length > 0 ? (
-          <button onClick={() => setShowUpgradesModal(true)} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+          <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
             View Upgrades
           </button>
         ) : null;
@@ -733,10 +938,10 @@ function GameContent() {
       } else {
         left = self_player.upgrades.length > 0 ? (
           <button
-            onClick={() => setShowUpgradesModal(true)}
-            className={`btn text-white ${self_player.upgrades.some((u) => !u.upgrade_target) ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-600 hover:bg-gray-500'}`}
+            onClick={() => openUpgradesModal(undefined, 'view')}
+            className="btn bg-gray-600 hover:bg-gray-500 text-white"
           >
-            {self_player.upgrades.some((u) => !u.upgrade_target) ? 'Apply Upgrade' : 'View Upgrades'}
+            View Upgrades
           </button>
         ) : null;
         right = (
@@ -919,6 +1124,14 @@ function GameContent() {
   };
 
 
+  const handlePanelClickToMove = (e: React.MouseEvent, toZone: ZoneName, toOwner: ZoneOwner) => {
+    if ((e.target as HTMLElement).closest('.card') || (e.target as HTMLElement).closest('button')) return
+    if (battleSelectedCard && (toZone !== battleSelectedCard.zone || toOwner !== battleSelectedCard.owner)) {
+      actions.battleMove(battleSelectedCard.card.id, battleSelectedCard.zone, toZone, battleSelectedCard.owner, toOwner)
+      setBattleSelectedCard(null)
+    }
+  }
+
   const allFaceDownIds = (() => {
     if (!current_battle) return new Set<string>()
     const ids = new Set<string>()
@@ -940,23 +1153,110 @@ function GameContent() {
           playerName={self_player.name}
           onCreateTreasure={handleCreateTreasure}
           onUntapAll={handleUntapAll}
+          onPassTurn={handlePassTurn}
         />
       );
     }
     return null;
   };
 
+  const serverNoticeHidden = !!serverNotice && dismissedServerNoticeAt === serverNotice.updated_at;
+  const drainingScheduledEt = serverNotice?.mode === "draining"
+    ? scheduledEasternFromNotice(serverNotice.message || "")
+    : null;
+  const drainingMessage = serverNotice?.mode === "draining"
+    ? drainingMessageWithEasternTime(serverNotice.message || "", drainingScheduledEt)
+    : "";
+  const recoveryHint = serverNotice?.estimated_recovery_minutes
+    ? `Estimated recovery: about ${serverNotice.estimated_recovery_minutes} minute${serverNotice.estimated_recovery_minutes === 1 ? "" : "s"}.`
+    : null;
+
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
       <div className="game-table h-dvh overflow-hidden flex flex-col">
         {!isConnected && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
-            <div className="bg-gray-950/90 backdrop-blur-sm border border-gray-700/50 border-l-[3px] border-l-amber-500 rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
+            <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
               <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              <span className="text-sm text-gray-200">Reconnecting...</span>
+              <span className="text-sm text-gray-100">Reconnecting...</span>
+            </div>
+          </div>
+        )}
+        {serverNotice && serverNotice.mode !== "normal" && serverNoticeHidden && (
+          <div className="fixed top-3 right-3 pointer-events-none" style={{ zIndex: TOP_NOTICE_Z_INDEX }}>
+            <button
+              type="button"
+              onClick={() => setDismissedServerNoticeAt(null)}
+              className="pointer-events-auto modal-chrome border gold-border rounded-md px-3 py-1 text-xs text-amber-100 hover:text-white"
+            >
+              Show Server Notice
+            </button>
+          </div>
+        )}
+        {serverNotice?.mode === "draining" && !serverNoticeHidden && (
+          <div className="fixed top-0 inset-x-0 px-3 pt-3 pointer-events-none" style={{ zIndex: TOP_NOTICE_Z_INDEX }}>
+            <div className="mx-auto max-w-3xl pointer-events-auto modal-chrome border gold-border rounded-lg shadow-xl px-4 py-3">
+              <div className="flex items-start gap-3">
+                <span className="inline-flex items-center justify-center rounded-full border gold-border text-amber-200 text-[10px] uppercase tracking-wide px-2 py-0.5 shrink-0">
+                  Update
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold text-amber-200">Scheduled Server Update</h2>
+                  </div>
+                  <p className="text-sm text-gray-100 mt-1 leading-snug">
+                    {drainingMessage || "A server update is scheduled soon."}
+                  </p>
+                  <p className="text-xs text-gray-300 mt-1 leading-snug">
+                    New games are paused temporarily. Your current game can continue and reconnect automatically if needed.
+                  </p>
+                  {recoveryHint && (
+                    <p className="text-xs text-amber-200/90 mt-1">{recoveryHint}</p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDismissedServerNoticeAt(serverNotice.updated_at)}
+                  className="text-amber-100/70 hover:text-amber-100 text-xs px-1 shrink-0"
+                  aria-label="Dismiss server notice"
+                  title="Dismiss"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {serverNotice?.mode === "maintenance" && !serverNoticeHidden && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center" style={{ zIndex: TOP_NOTICE_Z_INDEX }}>
+            <div className="modal-chrome border gold-border rounded-xl shadow-2xl p-6 max-w-md mx-4 w-full">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="inline-flex items-center justify-center rounded-full border gold-border text-amber-200 text-[10px] uppercase tracking-wide px-2 py-0.5">
+                  Maintenance
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDismissedServerNoticeAt(serverNotice.updated_at)}
+                  className="ml-auto text-amber-100/70 hover:text-amber-100 text-sm px-1"
+                  aria-label="Dismiss server maintenance notice"
+                  title="Dismiss"
+                >
+                  ✕
+                </button>
+              </div>
+              <h2 className="text-xl font-semibold text-amber-300 mb-2">Server Maintenance</h2>
+              <p className="text-sm text-gray-100 mb-2 leading-snug">
+                {serverNotice.message || "The server is temporarily unavailable while maintenance is in progress."}
+              </p>
+              <p className="text-xs text-gray-300 leading-snug">
+                Keep this tab open and we’ll reconnect automatically when service returns.
+              </p>
+              {recoveryHint && (
+                <p className="text-xs text-amber-200/90 mt-2">{recoveryHint}</p>
+              )}
             </div>
           </div>
         )}
@@ -966,7 +1266,7 @@ function GameContent() {
             Watching {spectatingPlayer}'s game (spectator mode)
           </div>
         )}
-        {/* Header - Phase Timeline. pr-64 on desktop offsets for sidebar so timeline centers over main content */}
+        {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
         <div className="relative">
           <PhaseTimeline
             currentPhase={currentPhase}
@@ -974,12 +1274,25 @@ function GameContent() {
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+            useUpgrades={gameState.use_upgrades}
+            autoOpenPhase={isNewPlayerOnboarding ? autoOpenTimelinePhase : null}
+            onAutoOpenHandled={(phase) => {
+              setAutoOpenTimelinePhase((current) =>
+                current === phase ? null : current,
+              );
+            }}
+            headerClassName="py-1.5 bar-pad-left"
             onOpenRules={(target) => {
               setRulesPanelTarget(target);
               setRulesPanelOpen(true);
             }}
             hamburger={sizes.isMobile ? (
               <button onClick={() => setSidebarOpen(o => !o)} className="btn btn-secondary text-xs sm:text-sm">☰</button>
+            ) : undefined}
+            title={isEndPhase ? (
+              <span className={`font-bold ${isWinner ? 'text-amber-400' : 'text-gray-300'}`}>
+                {getOrdinal(selfPlacement)} Place
+              </span>
             ) : undefined}
           />
         </div>
@@ -992,7 +1305,7 @@ function GameContent() {
             validDropZones={getValidDropZones}
           >
             {sizes.isMobile && current_battle && (
-              <div className="shrink-0 flex items-center justify-between px-2 py-1 bg-black/40 text-xs">
+              <div className="shrink-0 flex items-center justify-between px-2 py-1 frame-chrome text-xs">
                 <div className="flex items-center gap-1">
                   <span className="text-gray-300 truncate max-w-[60px]">{current_battle.opponent_name}</span>
                   <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
@@ -1018,18 +1331,48 @@ function GameContent() {
                 </div>
               </div>
             )}
-            <div className="flex-1 flex min-h-0">
+            <div className="flex-1 flex min-h-0 game-surface">
+              {showPuppetGhostExplainer && (
+                <>
+                  <div className="absolute inset-0 z-[45] bg-black/45 backdrop-blur-[2px]" />
+                  <div className="absolute inset-0 z-[55] pointer-events-none flex items-center justify-center p-4">
+                    <div
+                      className="modal-chrome border rounded-lg p-5 w-full max-w-lg text-center pointer-events-auto shadow-xl"
+                      style={{ borderColor: "var(--color-gold)" }}
+                    >
+                      <h2 className="text-lg font-semibold text-amber-300 mb-2">
+                        Puppet/Ghost Opponent
+                      </h2>
+                      <p className="text-sm text-gray-200 mb-4">
+                        This opponent is a puppet/ghost. Their cards are fully visible,
+                        and you can move cards on both sides to play out the battle and
+                        decide who wins.
+                      </p>
+                      <button
+                        onClick={() => setShowPuppetGhostExplainer(false)}
+                        className="btn btn-primary py-2 px-5"
+                      >
+                        Got it
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+              <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
+                   style={{ borderRight: '1px solid var(--gold-border)' }} />
               <main className="flex-1 flex flex-col min-h-0 min-w-0">
-                <BattlePhase
-                  gameState={gameState}
-                  actions={actions}
-                  isMobile={sizes.isMobile}
-                  selectedCard={battleSelectedCard}
-                  onSelectedCardChange={setBattleSelectedCard}
-                  onCardHover={handleCardHover}
-                  onOpponentCardHover={handleOpponentCardHover}
-                  onCardHoverEnd={handleCardHoverEnd}
-                />
+                <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
+                  <BattlePhase
+                    gameState={gameState}
+                    actions={actions}
+                    isMobile={sizes.isMobile}
+                    selectedCard={battleSelectedCard}
+                    onSelectedCardChange={setBattleSelectedCard}
+                    onCardHover={handleCardHover}
+                    onOpponentCardHover={handleOpponentCardHover}
+                    onCardHoverEnd={handleCardHoverEnd}
+                  />
+                </div>
               </main>
               {sizes.isMobile ? (
                 <>
@@ -1054,72 +1397,129 @@ function GameContent() {
                   useUpgrades={gameState.use_upgrades}
                 />
               )}
+              <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
+                   style={{ borderLeft: '1px solid var(--gold-border)' }} />
             </div>
             {activeDndPanel === 'sideboard' && current_battle && (
-              <DndPanel
-                title="Your Sideboard"
-                count={current_battle.your_zones.sideboard.length}
-                onClose={() => setActiveDndPanel(null)}
-              >
-                {(dims) =>
-                  current_battle.your_zones.sideboard.map((card) => (
-                    <DraggableCard key={card.id} card={card} zone="sideboard" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
-                  ))
-                }
-              </DndPanel>
+              <div onClick={(e) => handlePanelClickToMove(e, 'sideboard', 'player')}>
+                <DndPanel
+                  title="Your Sideboard"
+                  count={current_battle.your_zones.sideboard.length}
+                  onClose={() => setActiveDndPanel(null)}
+                  tone="battle"
+                  zone="sideboard"
+                  zoneOwner="player"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                >
+                  {(dims) =>
+                    current_battle.your_zones.sideboard.map((card) => (
+                      <DraggableCard
+                        key={card.id}
+                        card={card}
+                        zone="sideboard"
+                        dimensions={dims}
+                        onCardHover={handleCardHover}
+                        onCardHoverEnd={handleCardHoverEnd}
+                        selected={battleSelectedCard?.card.id === card.id}
+                        onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'player' })}
+                      />
+                    ))
+                  }
+                </DndPanel>
+              </div>
             )}
             {activeDndPanel === 'opponentSideboard' && current_battle && current_battle.opponent_full_sideboard && (
-              <DndPanel
-                title={`${current_battle.opponent_name}'s Sideboard`}
-                count={current_battle.opponent_full_sideboard.length}
-                onClose={() => setActiveDndPanel(null)}
-              >
-                {(dims) =>
-                  current_battle.opponent_full_sideboard!.map((card) => (
-                    <DraggableCard
-                      key={card.id}
-                      card={card}
-                      zone="sideboard"
-                      zoneOwner="opponent"
-                      dimensions={dims}
-                      isOpponent
-                      onCardHover={handleOpponentCardHover}
-                      onCardHoverEnd={handleCardHoverEnd}
-                    />
-                  ))
-                }
-              </DndPanel>
+              <div onClick={(e) => handlePanelClickToMove(e, 'sideboard', 'opponent')}>
+                <DndPanel
+                  title={`${current_battle.opponent_name}'s Sideboard`}
+                  count={current_battle.opponent_full_sideboard.length}
+                  onClose={() => setActiveDndPanel(null)}
+                  tone="battle"
+                  zone="sideboard"
+                  zoneOwner="opponent"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                >
+                  {(dims) =>
+                    current_battle.opponent_full_sideboard!.map((card) => (
+                      <DraggableCard
+                        key={card.id}
+                        card={card}
+                        zone="sideboard"
+                        zoneOwner="opponent"
+                        dimensions={dims}
+                        isOpponent
+                        onCardHover={handleOpponentCardHover}
+                        onCardHoverEnd={handleCardHoverEnd}
+                        selected={battleSelectedCard?.card.id === card.id}
+                        onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'opponent' })}
+                      />
+                    ))
+                  }
+                </DndPanel>
+              </div>
             )}
             {activeDndPanel === 'graveyard' && current_battle && (
-              <DndPanel
-                title="Graveyard"
-                count={current_battle.your_zones.graveyard.length}
-                onClose={() => setActiveDndPanel(null)}
-              >
-                {(dims) =>
-                  current_battle.your_zones.graveyard.map((card) => (
-                    <DraggableCard key={card.id} card={card} zone="graveyard" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
-                  ))
-                }
-              </DndPanel>
+              <div onClick={(e) => handlePanelClickToMove(e, 'graveyard', 'player')}>
+                <DndPanel
+                  title="Graveyard"
+                  count={current_battle.your_zones.graveyard.length}
+                  onClose={() => setActiveDndPanel(null)}
+                  tone="battle"
+                  zone="graveyard"
+                  zoneOwner="player"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                >
+                  {(dims) =>
+                    current_battle.your_zones.graveyard.map((card) => (
+                      <DraggableCard
+                        key={card.id}
+                        card={card}
+                        zone="graveyard"
+                        dimensions={dims}
+                        onCardHover={handleCardHover}
+                        onCardHoverEnd={handleCardHoverEnd}
+                        selected={battleSelectedCard?.card.id === card.id}
+                        onClick={() => setBattleSelectedCard({ card, zone: 'graveyard', owner: 'player' })}
+                      />
+                    ))
+                  }
+                </DndPanel>
+              </div>
             )}
             {activeDndPanel === 'exile' && current_battle && (
-              <DndPanel
-                title="Exile"
-                count={current_battle.your_zones.exile.length}
-                onClose={() => setActiveDndPanel(null)}
-              >
-                {(dims) =>
-                  current_battle.your_zones.exile.map((card) => (
-                    <DraggableCard key={card.id} card={card} zone="exile" dimensions={dims} onCardHover={handleCardHover} onCardHoverEnd={handleCardHoverEnd} />
-                  ))
-                }
-              </DndPanel>
+              <div onClick={(e) => handlePanelClickToMove(e, 'exile', 'player')}>
+                <DndPanel
+                  title="Exile"
+                  count={current_battle.your_zones.exile.length}
+                  onClose={() => setActiveDndPanel(null)}
+                  tone="battle"
+                  zone="exile"
+                  zoneOwner="player"
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                >
+                  {(dims) =>
+                    current_battle.your_zones.exile.map((card) => (
+                      <DraggableCard
+                        key={card.id}
+                        card={card}
+                        zone="exile"
+                        dimensions={dims}
+                        onCardHover={handleCardHover}
+                        onCardHoverEnd={handleCardHoverEnd}
+                        selected={battleSelectedCard?.card.id === card.id}
+                        onClick={() => setBattleSelectedCard({ card, zone: 'exile', owner: 'player' })}
+                      />
+                    ))
+                  }
+                </DndPanel>
+              </div>
             )}
           </GameDndProvider>
           </FaceDownProvider>
         ) : (
-          <div className="flex-1 flex min-h-0">
+          <div className="flex-1 flex min-h-0 game-surface">
+            <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
+                 style={{ borderRight: '1px solid var(--gold-border)' }} />
             <main className="flex-1 flex flex-col min-h-0 min-w-0">
               {currentPhase === "draft" && (
                 <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
@@ -1133,6 +1533,7 @@ function GameContent() {
                   onHandSlotsChange={(slots) => { handSlotsRef.current = slots; }}
                   onCardHover={handleCardHover}
                   onCardHoverEnd={handleCardHoverEnd}
+                  onQuickUpgrade={openUpgradesModal}
                   isMobile={sizes.isMobile}
                 />
               )}
@@ -1182,9 +1583,7 @@ function GameContent() {
                 currentPhase === "game_over") && (
                 <GameSummary
                   player={self_player}
-                  players={gameState.players}
                   useUpgrades={gameState.use_upgrades}
-                  gameId={gameId}
                 />
               )}
             </main>
@@ -1210,13 +1609,35 @@ function GameContent() {
                 useUpgrades={gameState.use_upgrades}
               />
             )}
+            <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
+                 style={{ borderLeft: '1px solid var(--gold-border)' }} />
           </div>
         )}
         {/* Bottom Action Bar */}
         {!isSpectator && (
-          <div className="shrink-0 relative z-50 bg-black/30 border-t border-gray-700/50">
-            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-1.5 timeline-actions">
-              {renderActionButtons()}
+          <div className="shrink-0 relative z-40 frame-chrome">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-main timeline-actions">
+              {isEndPhase && gameId ? (
+                <>
+                  <div className="flex items-center gap-1.5 sm:gap-2 py-1">
+                    <button
+                      className="btn bg-slate-700 hover:bg-slate-600 text-white"
+                      onClick={() =>
+                        window.open(shareUrl, "_blank", "noopener,noreferrer")
+                      }
+                    >
+                      Review
+                    </button>
+                    <button
+                      className="btn bg-purple-600 hover:bg-purple-500 text-white"
+                      onClick={() => setShareOpen(true)}
+                    >
+                      Share Game
+                    </button>
+                  </div>
+                  <div />
+                </>
+              ) : renderActionButtons()}
             </div>
           </div>
         )}
@@ -1256,12 +1677,19 @@ function GameContent() {
       {showUpgradesModal && (
         <UpgradesModal
           upgrades={self_player.upgrades}
-          mode={currentPhase === 'build' && self_player.upgrades.some((u) => !u.upgrade_target) ? 'apply' : 'view'}
+          mode={upgradesModalMode}
           targets={[...self_player.hand, ...self_player.sideboard]}
           onApply={(upgradeId, targetId) => actions.buildApplyUpgrade(upgradeId, targetId)}
-          onClose={() => { setShowUpgradesModal(false); setUpgradeInitialTargetId(undefined); }}
+          onClose={() => {
+            setShowUpgradesModal(false);
+            setUpgradeInitialTargetId(undefined);
+            setUpgradesModalOpenMode('auto');
+          }}
           initialTargetId={upgradeInitialTargetId}
         />
+      )}
+      {shareOpen && (
+        <ShareModal url={shareUrl} shareText={shareText} onClose={() => setShareOpen(false)} />
       )}
       {rulesPanelOpen && (
         <RulesPanel

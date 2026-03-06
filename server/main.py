@@ -1,32 +1,65 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
+from time import perf_counter
+from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
+from starlette.requests import Request
 
 from server.db.database import init_db
 from server.monitoring import start_monitoring, stop_monitoring
-from server.routers import games, share_preview, ws
+from server.observability import OBSERVABILITY_LOGGER_NAME, configure_logging, record_http_latency
+from server.routers import games, ops, share_preview, ws
+from server.runtime_config import MAX_SESSIONS_TOTAL, SESSION_TTL_MINUTES
+from server.schemas.api import ServerStatusResponse
+from server.services.game_manager import game_manager
+from server.services.ops_manager import ops_manager
 from server.services.preview import preview_service
+from server.services.session_manager import session_manager
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+configure_logging()
+logger = logging.getLogger(OBSERVABILITY_LOGGER_NAME)
+
+
+def _preview_disabled() -> bool:
+    raw = os.getenv("MTB_DISABLE_PREVIEW", "")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _route_template(request: Request) -> str:
+    route = request.scope.get("route")
+    if isinstance(route, APIRoute):
+        return route.path
+    return request.url.path
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    await preview_service.start()
+    ops_manager.load()
+    game_manager.restore_all_snapshots()
+    preview_enabled = not _preview_disabled()
+    if preview_enabled:
+        await preview_service.start()
+    else:
+        logging.getLogger(__name__).info("Preview service disabled by MTB_DISABLE_PREVIEW")
     start_monitoring()
+    await game_manager.start_background_tasks()
     yield
+    removed_sessions = session_manager.cleanup(SESSION_TTL_MINUTES, MAX_SESSIONS_TOTAL)
+    if removed_sessions:
+        logging.getLogger(__name__).info("Session cleanup before shutdown removed=%d", removed_sessions)
+    await game_manager.stop_background_tasks()
     stop_monitoring()
-    await preview_service.stop()
+    if preview_enabled:
+        await preview_service.stop()
 
 
 app = FastAPI(
@@ -35,6 +68,44 @@ app = FastAPI(
     description="Real-time multiplayer Magic: The Gathering draft game",
     version="0.1.0",
 )
+
+
+@app.middleware("http")
+async def observe_http_requests(request: Request, call_next):
+    start = perf_counter()
+    request_id = request.headers.get("x-request-id", uuid4().hex[:12])
+    method = request.method
+    path = _route_template(request)
+
+    try:
+        response = await call_next(request)
+    except Exception:
+        duration_ms = (perf_counter() - start) * 1000
+        record_http_latency(method, path, 500, duration_ms)
+        logger.exception(
+            "HTTP latency: request_id=%s method=%s path=%s status=%d duration_ms=%.2f",
+            request_id,
+            method,
+            path,
+            500,
+            duration_ms,
+        )
+        raise
+
+    duration_ms = (perf_counter() - start) * 1000
+    status = response.status_code
+    response.headers.setdefault("x-request-id", request_id)
+    record_http_latency(method, path, status, duration_ms)
+    logger.info(
+        "HTTP latency: request_id=%s method=%s path=%s status=%d duration_ms=%.2f",
+        request_id,
+        method,
+        path,
+        status,
+        duration_ms,
+    )
+    return response
+
 
 app.add_middleware(GZipMiddleware, minimum_size=500)  # type: ignore[arg-type]
 app.add_middleware(
@@ -53,11 +124,25 @@ app.add_middleware(
 app.include_router(games.router)
 app.include_router(ws.router)
 app.include_router(share_preview.router)
+app.include_router(ops.router)
 
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+@app.get("/api/server/status", response_model=ServerStatusResponse)
+def server_status():
+    snapshot = ops_manager.get_snapshot()
+    return ServerStatusResponse(
+        mode=snapshot.mode,
+        message=snapshot.message or "",
+        updated_at=snapshot.updated_at.isoformat(),
+        new_games_blocked=ops_manager.blocks_new_games(),
+        scheduled_for_utc=ops_manager.scheduled_for_utc_iso(),
+        estimated_recovery_minutes=ops_manager.estimated_recovery_minutes(),
+    )
 
 
 static_dir = Path(__file__).parent.parent / "web" / "dist"
