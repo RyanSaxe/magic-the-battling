@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FaDiscord, FaXmark } from 'react-icons/fa6'
-import { DOCS, getPhaseDoc } from '../docs'
+import { DOCS, getPhaseDoc, type DocEntry } from '../docs'
 import { DocRenderer } from './DocRenderer'
 import { CardsView } from './CardsView'
 import { PHASES, type Phase } from '../constants/phases'
@@ -24,7 +24,6 @@ interface AccordionItemProps {
   id: string
   label: string
   expanded: boolean
-  panelCapPx: number
   onToggle: () => void
   labelClassName?: string
   children: React.ReactNode
@@ -205,51 +204,10 @@ function useSequentialAccordion<T extends string | number>(
   return { openId, toggle, openImmediate }
 }
 
-function useAccordionPanelCap(
-  containerRef: RefObject<HTMLDivElement | null>,
-  refreshKey: string,
-) {
-  const [panelCapPx, setPanelCapPx] = useState(0)
-
-  useLayoutEffect(() => {
-    const container = containerRef.current
-    if (!container) {
-      return
-    }
-
-    const MAX_RESERVED_HEADERS = 3
-
-    const measure = () => {
-      const headers = Array.from(
-        container.querySelectorAll<HTMLElement>('[data-accordion-header="true"]'),
-      )
-      const singleHeight = headers[0]?.getBoundingClientRect().height ?? 0
-      const headersTotal = headers.reduce((sum, header) => sum + header.getBoundingClientRect().height, 0)
-      const reservedHeight = Math.min(headersTotal, singleHeight * MAX_RESERVED_HEADERS)
-      const available = Math.max(0, Math.floor(container.clientHeight - reservedHeight))
-      setPanelCapPx((prev) => (prev === available ? prev : available))
-    }
-
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(container)
-    const headers = container.querySelectorAll<HTMLElement>('[data-accordion-header="true"]')
-    headers.forEach((header) => observer.observe(header))
-    window.addEventListener('resize', measure)
-
-    return () => {
-      window.removeEventListener('resize', measure)
-      observer.disconnect()
-    }
-  }, [containerRef, refreshKey])
-
-  return panelCapPx
-}
-
-function AccordionItem({ id, label, expanded, panelCapPx, onToggle, labelClassName, children }: AccordionItemProps) {
+function AccordionItem({ id, label, expanded, onToggle, labelClassName, children }: AccordionItemProps) {
   const panelId = `guide-panel-${id}`
   const contentRef = useRef<HTMLDivElement>(null)
-  const [measuredContentPx, setMeasuredContentPx] = useState(0)
+  const [contentHeight, setContentHeight] = useState(0)
 
   useLayoutEffect(() => {
     const content = contentRef.current
@@ -259,7 +217,7 @@ function AccordionItem({ id, label, expanded, panelCapPx, onToggle, labelClassNa
 
     const measure = () => {
       const nextHeight = Math.ceil(content.scrollHeight)
-      setMeasuredContentPx((prev) => (prev === nextHeight ? prev : nextHeight))
+      setContentHeight((prev) => (prev === nextHeight ? prev : nextHeight))
     }
 
     measure()
@@ -268,16 +226,12 @@ function AccordionItem({ id, label, expanded, panelCapPx, onToggle, labelClassNa
     return () => observer.disconnect()
   }, [])
 
-  const cappedPanelPx = Math.max(0, Math.min(panelCapPx, measuredContentPx))
-  const panelMaxHeight = `${cappedPanelPx}px`
-
   return (
-    <div className="quick-guide-accordion-item border-b border-amber-400/10 last:border-b-0 flex flex-col min-h-0 overflow-hidden">
+    <div className="quick-guide-accordion-item border-b border-amber-400/10 last:border-b-0">
       <button
         onClick={onToggle}
         aria-expanded={expanded}
         aria-controls={panelId}
-        data-accordion-header="true"
         className={`w-full py-3.5 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-l-3 transition-all duration-[400ms] ${
           expanded
             ? 'bg-amber-400/8 border-l-amber-400'
@@ -299,13 +253,11 @@ function AccordionItem({ id, label, expanded, panelCapPx, onToggle, labelClassNa
         id={panelId}
         className={`quick-guide-accordion-panel ${expanded ? 'open' : ''}`}
         aria-hidden={!expanded}
-        style={{ maxHeight: expanded ? panelMaxHeight : '0px' }}
+        style={{ maxHeight: expanded ? `${contentHeight}px` : '0px' }}
       >
         <div className="quick-guide-accordion-panel-inner">
-          <div className="quick-guide-accordion-scroll" style={{ maxHeight: panelMaxHeight }}>
-            <div ref={contentRef} className="px-5 py-4 sm:px-6 sm:py-5">
-              {children}
-            </div>
+          <div ref={contentRef} className="px-5 py-4 sm:px-6 sm:py-5">
+            {children}
           </div>
         </div>
       </div>
@@ -343,6 +295,18 @@ function getH2TitleMap(raw: string): Map<string, string> {
   return titleByKey
 }
 
+const EXCLUDED_GUIDE_SECTIONS = new Set(['overview', 'controls'])
+
+function buildPhaseGuideContent(doc: DocEntry): string {
+  const { sections, sectionTitles, sectionOrder } = doc.parsed
+  const overview = sections['overview'] ?? ''
+  const additional = sectionOrder
+    .filter((key) => !EXCLUDED_GUIDE_SECTIONS.has(key))
+    .map((key) => `## ${sectionTitles[key] ?? key}\n\n${sections[key]}`)
+    .join('\n\n')
+  return additional ? `${overview}\n\n${additional}` : overview
+}
+
 function PhaseControlsContent({ phase }: { phase: Phase }) {
   const phaseDoc = getPhaseDoc(phase)
   const controlsMarkdown = phaseDoc?.parsed.sections['controls']
@@ -359,9 +323,9 @@ function PhaseControlsContent({ phase }: { phase: Phase }) {
 
       {hotkeys.length > 0 && (
         <div>
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+          <h2 className="text-[0.9375rem] font-semibold text-gray-200 tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
             Keyboard Shortcuts
-          </h3>
+          </h2>
           <div className="space-y-1.5">
             {hotkeys.map((entry) => (
               <HotkeyRow key={entry.key} entry={entry} />
@@ -372,9 +336,9 @@ function PhaseControlsContent({ phase }: { phase: Phase }) {
 
       {hoverHotkeys.length > 0 && (
         <div>
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+          <h2 className="text-[0.9375rem] font-semibold text-gray-200 tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
             When Hovering a Card
-          </h3>
+          </h2>
           <div className="space-y-1.5">
             {hoverHotkeys.map((entry) => (
               <HotkeyRow key={entry.key} entry={entry} />
@@ -394,11 +358,6 @@ export function QuickGuide({
   useVanguards,
   onClose,
 }: QuickGuideProps) {
-  const guideAccordionRef = useRef<HTMLDivElement>(null)
-  const controlsAccordionRef = useRef<HTMLDivElement>(null)
-  const tipsAccordionRef = useRef<HTMLDivElement>(null)
-  const faqAccordionRef = useRef<HTMLDivElement>(null)
-
   const quickOverviewDoc = DOCS.find((d) => d.id === 'quick-overview')
   const gamePiecesDoc = DOCS.find((d) => d.id === 'game-pieces')
   const controlsDoc = DOCS.find((d) => d.id === 'controls')
@@ -478,23 +437,6 @@ export function QuickGuide({
     toggle: toggleFaqSection,
     openImmediate: openFaqSectionImmediate,
   } = useSequentialAccordion<number>(initialFaqIndex, ACCORDION_STEP_MS)
-
-  const guidePanelCapPx = useAccordionPanelCap(
-    guideAccordionRef,
-    `${activeTab}:${guideOpenId ?? 'none'}`,
-  )
-  const controlsPanelCapPx = useAccordionPanelCap(
-    controlsAccordionRef,
-    `${activeTab}:${controlsOpenId ?? 'none'}`,
-  )
-  const tipsPanelCapPx = useAccordionPanelCap(
-    tipsAccordionRef,
-    `${activeTab}:${tipsOpenId ?? 'none'}`,
-  )
-  const faqPanelCapPx = useAccordionPanelCap(
-    faqAccordionRef,
-    `${activeTab}:${faqOpenId ?? 'none'}:${faqEntries.length}`,
-  )
 
   const getFaqIndex = useCallback((rawSlug?: string) => {
     if (faqEntries.length === 0) {
@@ -583,17 +525,17 @@ export function QuickGuide({
 
         {activeTab === 'guide' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={guideAccordionRef} className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               <AccordionItem
                 id="guide-overview"
                 label="Overview"
                 expanded={guideOpenId === 'overview'}
-                panelCapPx={guidePanelCapPx}
+
                 onToggle={() => toggleGuideSection('overview')}
               >
                 {quickOverviewDoc ? (
                   <div className="text-sm sm:text-base">
-                    <DocRenderer content={quickOverviewDoc.parsed.sections['overview'] ?? quickOverviewDoc.parsed.body} />
+                    <DocRenderer content={buildPhaseGuideContent(quickOverviewDoc)} />
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400">Overview content not found.</p>
@@ -604,7 +546,7 @@ export function QuickGuide({
                 id="guide-game-pieces"
                 label="Game Pieces"
                 expanded={guideOpenId === 'game-pieces'}
-                panelCapPx={guidePanelCapPx}
+
                 onToggle={() => toggleGuideSection('game-pieces')}
               >
                 {gamePiecesDoc ? (
@@ -624,12 +566,12 @@ export function QuickGuide({
                     key={phase}
                     label={`${toTitleCase(phase)} Phase`}
                     expanded={guideOpenId === phase}
-                    panelCapPx={guidePanelCapPx}
+    
                     onToggle={() => toggleGuideSection(phase)}
                   >
-                    {phaseDoc?.parsed.sections['rules'] ? (
+                    {phaseDoc ? (
                       <div className="text-sm sm:text-base">
-                        <DocRenderer content={phaseDoc.parsed.sections['rules']} />
+                        <DocRenderer content={buildPhaseGuideContent(phaseDoc)} />
                       </div>
                     ) : (
                       <p className="text-sm text-gray-400">Rules are not defined for this phase yet.</p>
@@ -643,12 +585,12 @@ export function QuickGuide({
 
         {activeTab === 'controls' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={controlsAccordionRef} className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               <AccordionItem
                 id="controls-global"
                 label="Global Controls"
                 expanded={controlsOpenId === 'global'}
-                panelCapPx={controlsPanelCapPx}
+
                 onToggle={() => toggleControlsSection('global')}
               >
                 {controlsDoc ? (
@@ -666,7 +608,7 @@ export function QuickGuide({
                   key={phase}
                   label={`${toTitleCase(phase)} Phase Controls`}
                   expanded={controlsOpenId === phase}
-                  panelCapPx={controlsPanelCapPx}
+  
                   onToggle={() => toggleControlsSection(phase)}
                 >
                   <PhaseControlsContent phase={phase} />
@@ -678,12 +620,12 @@ export function QuickGuide({
 
         {activeTab === 'tips' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={tipsAccordionRef} className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               <AccordionItem
                 id="tips-global"
                 label="Global Tips"
                 expanded={tipsOpenId === 'global'}
-                panelCapPx={tipsPanelCapPx}
+
                 onToggle={() => toggleTipsSection('global')}
               >
                 {tipsDoc?.parsed.sections['global'] ? (
@@ -701,7 +643,7 @@ export function QuickGuide({
                   key={phase}
                   label={`${toTitleCase(phase)} Phase Tips`}
                   expanded={tipsOpenId === phase}
-                  panelCapPx={tipsPanelCapPx}
+  
                   onToggle={() => toggleTipsSection(phase)}
                 >
                   {tipsDoc?.parsed.sections[phase] ? (
@@ -749,7 +691,7 @@ export function QuickGuide({
 
         {activeTab === 'faq' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={faqAccordionRef} className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
               {faqEntries.length > 0 ? (
                 faqEntries.map((entry, index) => (
                   <AccordionItem
@@ -757,7 +699,7 @@ export function QuickGuide({
                     key={entry.slug}
                     label={entry.question}
                     expanded={faqOpenId === index}
-                    panelCapPx={faqPanelCapPx}
+
                     onToggle={() => toggleFaqSection(index)}
                     labelClassName="text-white font-semibold"
                   >

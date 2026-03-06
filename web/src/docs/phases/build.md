@@ -4,7 +4,7 @@ phase: build
 order: 2
 ---
 
-## Rules
+## Overview
 
 - Select 3 basic lands to start untapped on the battlefield in the upcoming [battle phase](doc:battle).
 - Your hand size is always equal to the current stage, which you can see in the upper left corner.

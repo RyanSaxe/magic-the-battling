@@ -8,6 +8,7 @@ export interface DocMeta {
 export interface ParsedDoc {
   meta: DocMeta
   sections: Record<string, string>
+  sectionTitles: Record<string, string>
   sectionOrder: string[]
   body: string
 }
@@ -29,6 +30,7 @@ export function parseDoc(raw: string): ParsedDoc {
   }
 
   const sections: Record<string, string> = {}
+  const sectionTitles: Record<string, string> = {}
   const sectionOrder: string[] = []
 
   const lines = body.split(/\r?\n/)
@@ -47,7 +49,9 @@ export function parseDoc(raw: string): ParsedDoc {
     const headingMatch = line.match(/^##(?!#)\s*(.+?)\s*$/)
     if (headingMatch) {
       flushSection()
-      activeHeading = headingMatch[1].trim().toLowerCase()
+      const title = headingMatch[1].trim()
+      activeHeading = title.toLowerCase()
+      sectionTitles[activeHeading] = title
       activeLines = []
       continue
     }
@@ -57,7 +61,7 @@ export function parseDoc(raw: string): ParsedDoc {
   }
   flushSection()
 
-  return { meta, sections, sectionOrder, body }
+  return { meta, sections, sectionTitles, sectionOrder, body }
 }
 
 export function extractBullets(section: string): string[] {
