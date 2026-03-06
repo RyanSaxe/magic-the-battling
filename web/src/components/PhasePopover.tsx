@@ -14,6 +14,7 @@ interface PhasePopoverProps {
   phase: Phase
   anchorRect: DOMRect
   useUpgrades: boolean
+  isClosing?: boolean
   onClose: () => void
   onOpenDetails: () => void
   onOpenControls: () => void
@@ -23,6 +24,7 @@ export function PhasePopover({
   phase,
   anchorRect,
   useUpgrades,
+  isClosing = false,
   onClose,
   onOpenDetails,
   onOpenControls,
@@ -87,7 +89,7 @@ export function PhasePopover({
         position: 'fixed',
         visibility: 'hidden',
       }}
-      className="modal-chrome border gold-border rounded-lg shadow-xl z-[60] felt-raised-panel min-w-[16rem] w-max max-w-[calc(100vw-1rem)]"
+      className={`modal-chrome border gold-border rounded-lg shadow-xl z-[60] felt-raised-panel min-w-[16rem] w-max max-w-[calc(100vw-1rem)] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
     >
       <div
         ref={arrowRef}

@@ -1,6 +1,6 @@
 ---
 title: Game Pieces
-order: 3
+order: 2
 ---
 
 ## Treasures
