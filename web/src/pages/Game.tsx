@@ -1107,6 +1107,11 @@ function GameContent() {
     actions.battlePassTurn();
   };
 
+  const handleRollDie = (sides: number) => {
+    const result = Math.floor(Math.random() * sides) + 1;
+    addToast(`Rolled a d${sides}: ${result}`, "info");
+  };
+
   const handleUntapAll = () => {
     if (!current_battle) return;
     const battlefieldIds = new Set(current_battle.your_zones.battlefield.map(c => c.id));
@@ -1672,6 +1677,7 @@ function GameContent() {
           onShowOpponentSideboard={() => { setActiveDndPanel('opponentSideboard'); setActionMenuOpen(false); }}
           onCreateTreasure={handleCreateTreasure}
           onPassTurn={handlePassTurn}
+          onRollDie={handleRollDie}
           onClose={() => setActionMenuOpen(false)}
         />
       )}

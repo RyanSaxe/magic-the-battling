@@ -31,12 +31,14 @@ interface ActionMenuProps {
   onShowOpponentSideboard: () => void
   onCreateTreasure: () => void
   onPassTurn: () => void
+  onRollDie: (sides: number) => void
   onClose: () => void
 }
 
-type SubmenuType = 'none' | 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo'
+type SubmenuType = 'none' | 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo' | 'rollDie'
 
 const COUNTER_TYPES = ['+1/+1', '-1/-1', 'Loyalty', 'Charge', 'Custom']
+const DIE_SIDES = [2, 4, 6, 8, 10, 12, 20]
 
 export function ActionMenu({
   selectedCard,
@@ -52,6 +54,7 @@ export function ActionMenu({
   onShowOpponentSideboard,
   onCreateTreasure,
   onPassTurn,
+  onRollDie,
   onClose,
 }: ActionMenuProps) {
   const [submenu, setSubmenu] = useState<SubmenuType>('none')
@@ -269,6 +272,41 @@ export function ActionMenu({
           onClick={() => handleGeneralAction(onPassTurn)}
           disabled={!isYourTurn}
         />
+
+        <MenuDivider />
+
+        <MenuItem
+          label="Roll a Die"
+          hasSubmenu
+          onClick={() => setSubmenu(submenu === 'rollDie' ? 'none' : 'rollDie')}
+        />
+        {submenu === 'rollDie' && (
+          <Submenu>
+            {DIE_SIDES.map(sides => (
+              <MenuItem
+                key={sides}
+                label={`d${sides}`}
+                onClick={() => {
+                  onRollDie(sides)
+                  onClose()
+                }}
+              />
+            ))}
+            <MenuItem
+              label="Custom..."
+              onClick={() => {
+                const input = prompt('Number of sides:')
+                if (input) {
+                  const sides = parseInt(input, 10)
+                  if (sides > 0) {
+                    onRollDie(sides)
+                    onClose()
+                  }
+                }
+              }}
+            />
+          </Submenu>
+        )}
       </div>
     </>
   )
