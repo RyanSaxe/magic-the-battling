@@ -2130,6 +2130,14 @@ class GameManager:
             to_zones.get_zone(to_zone).append(card)
             if from_zones is not to_zones:
                 _transfer_card_state(card_id, from_zones, to_zones)
+
+            is_token = battle._is_token(b.player_zones, card_id) or battle._is_token(b.opponent_zones, card_id)
+            if is_token and to_zone != "battlefield":
+                to_zones.get_zone(to_zone).remove(card)
+                for z in (b.player_zones, b.opponent_zones):
+                    battle._remove_token_state(z, card_id)
+                return True
+
             self._track_revealed_card(b, card, from_zones, to_zone)
             return True
         return False
