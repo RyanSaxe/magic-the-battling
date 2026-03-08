@@ -1316,29 +1316,6 @@ function GameContent() {
             onCardMove={handleCardMove}
             validDropZones={getValidDropZones}
           >
-            {sizes.isMobile && current_battle && (
-              <div className="shrink-0 flex items-center justify-between px-2 py-1 frame-chrome text-xs">
-                <div className="flex items-center gap-1">
-                  <span className="text-gray-300 truncate max-w-[60px]">{current_battle.opponent_name}</span>
-                  <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
-                  <span className="text-white font-bold">{current_battle.opponent_life}</span>
-                  <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life + 1)} className="text-gray-400 hover:text-white px-1">+</button>
-                </div>
-                <div className="text-center">
-                  {current_battle.current_turn_name === self_player.name ? (
-                    <span className="text-green-400 font-medium">Your turn</span>
-                  ) : (
-                    <span className="text-amber-400 font-medium">Opp's turn</span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-gray-300">You</span>
-                  <button onClick={() => handleYourLifeChange(current_battle.your_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
-                  <span className="text-white font-bold">{current_battle.your_life}</span>
-                  <button onClick={() => handleYourLifeChange(current_battle.your_life + 1)} className="text-gray-400 hover:text-white px-1">+</button>
-                </div>
-              </div>
-            )}
             <div className="flex-1 flex min-h-0 game-surface">
               {showPuppetGhostExplainer && (
                 <>
@@ -1370,6 +1347,33 @@ function GameContent() {
                    style={{ borderRight: '1px solid var(--gold-border)' }} />
               <main className="flex-1 flex flex-col min-h-0 min-w-0">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
+                {sizes.isMobile && current_battle && (
+                  <div className="shrink-0 flex items-center justify-between px-2 py-1 mb-[2px] mobile-life-bar text-xs">
+                    <div className="flex items-center gap-1">
+                      <span className="text-gray-300 truncate max-w-[60px]">{current_battle.opponent_name}</span>
+                      <div className="flex items-center gap-0.5 rounded px-1 py-0.5" style={{ background: 'var(--chrome)' }}>
+                        <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
+                        <span className="text-white font-bold">{current_battle.opponent_life}</span>
+                        <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life + 1)} className="text-gray-400 hover:text-white px-1">+</button>
+                      </div>
+                    </div>
+                    <div className="text-center">
+                      {current_battle.current_turn_name === self_player.name ? (
+                        <span className="text-green-400 font-medium">Your turn</span>
+                      ) : (
+                        <span className="text-amber-400 font-medium">Opp's turn</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-0.5 rounded px-1 py-0.5" style={{ background: 'var(--chrome)' }}>
+                        <button onClick={() => handleYourLifeChange(current_battle.your_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
+                        <span className="text-white font-bold">{current_battle.your_life}</span>
+                        <button onClick={() => handleYourLifeChange(current_battle.your_life + 1)} className="text-gray-400 hover:text-white px-1">+</button>
+                      </div>
+                      <span className="text-gray-300 truncate max-w-[60px]">{self_player.name}</span>
+                    </div>
+                  </div>
+                )}
                   <BattlePhase
                     gameState={gameState}
                     actions={actions}
