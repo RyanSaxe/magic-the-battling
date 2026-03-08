@@ -25,7 +25,6 @@ import { ContextStripProvider, useContextStrip, useToast } from "../contexts";
 import { FaceDownProvider } from "../contexts/FaceDownContext";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard, type ZoneOwner } from "../dnd";
-import { POISON_COUNTER_IMAGE } from "../constants/assets";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
@@ -1324,8 +1323,6 @@ function GameContent() {
                   <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
                   <span className="text-white font-bold">{current_battle.opponent_life}</span>
                   <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life + 1)} className="text-gray-400 hover:text-white px-1">+</button>
-                  <img src={POISON_COUNTER_IMAGE} alt="poison" className="w-4 h-4 rounded-sm" />
-                  <span className="text-green-400">{current_battle.opponent_poison ?? 0}</span>
                 </div>
                 <div className="text-center">
                   {current_battle.current_turn_name === self_player.name ? (
@@ -1339,8 +1336,6 @@ function GameContent() {
                   <button onClick={() => handleYourLifeChange(current_battle.your_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
                   <span className="text-white font-bold">{current_battle.your_life}</span>
                   <button onClick={() => handleYourLifeChange(current_battle.your_life + 1)} className="text-gray-400 hover:text-white px-1">+</button>
-                  <img src={POISON_COUNTER_IMAGE} alt="poison" className="w-4 h-4 rounded-sm" />
-                  <span className="text-green-400">{current_battle.your_poison ?? 0}</span>
                 </div>
               </div>
             )}

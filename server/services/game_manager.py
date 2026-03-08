@@ -2178,7 +2178,10 @@ class GameManager:
     def handle_battle_pass_turn(self, game: Game, player: Player) -> bool | str:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
-                if battle.pass_turn(b, player):
+                acting = player
+                if isinstance(b.opponent, StaticOpponent) and b.current_turn_name == b.opponent.name:
+                    acting = b.opponent
+                if battle.pass_turn(b, acting):
                     return True
                 return "Not your turn"
         return False

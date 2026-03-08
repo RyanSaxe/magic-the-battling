@@ -301,7 +301,7 @@ def get_pairing_probabilities(game: Game, player: Player) -> dict[str, float]:
     return {candidate.name: weight for candidate, weight in zip(viable, weights, strict=True)}
 
 
-def pass_turn(battle: Battle, player: Player) -> bool:
+def pass_turn(battle: Battle, player: Player | StaticOpponent) -> bool:
     """Pass turn to opponent. Returns True if successful."""
     if battle.current_turn_name != player.name:
         return False

@@ -1277,6 +1277,29 @@ class TestFaceDownScrubbing:
         view = manager._make_battle_view(b, alice, game)
         assert view.can_manipulate_opponent is False
 
+    def test_pass_turn_for_static_opponent(self, card_factory):
+        """Player should be able to pass the static opponent's turn on their behalf."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[card_factory("card1")],
+            chosen_basics=["Plains", "Island", "Mountain"],
+        )
+
+        b = battle.start(game, alice, static_opp)
+        manager = GameManager()
+
+        if b.current_turn_name == alice.name:
+            assert manager.handle_battle_pass_turn(game, alice) is True
+            assert b.current_turn_name == "Bot"
+
+        assert b.current_turn_name == "Bot"
+        assert manager.handle_battle_pass_turn(game, alice) is True
+        assert b.current_turn_name == alice.name
+
     def test_pvp_scrubbing_remaps_tapped_and_counters(self, card_factory):
         """Scrubbing should also remap tapped_card_ids and counters for face-down cards."""
         game = create_game(["Alice", "Bob"], num_players=2)
