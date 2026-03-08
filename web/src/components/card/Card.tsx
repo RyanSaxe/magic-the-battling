@@ -42,7 +42,7 @@ const glowColors = {
 
 const canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
 
-const BASIC_LAND_NAMES = new Set(BASIC_LANDS.map(l => l.name))
+const BASIC_LAND_NAMES: Set<string> = new Set(BASIC_LANDS.map(l => l.name))
 
 const isBasicLandOrTreasureToken = (card: CardType) =>
   BASIC_LAND_NAMES.has(card.name) ||
