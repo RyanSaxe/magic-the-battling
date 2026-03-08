@@ -14,6 +14,10 @@ interface BattleSidebarContentProps {
   onCreateTreasure?: () => void;
   onUntapAll?: () => void;
   onPassTurn?: () => void;
+  canManipulateOpponent?: boolean;
+  onCreateOpponentTreasure?: () => void;
+  onUntapOpponentAll?: () => void;
+  onPassOpponentTurn?: () => void;
 }
 
 function LifeCounter({
@@ -161,6 +165,10 @@ export function BattleSidebarContent({
   onCreateTreasure,
   onUntapAll,
   onPassTurn,
+  canManipulateOpponent,
+  onCreateOpponentTreasure,
+  onUntapOpponentAll,
+  onPassOpponentTurn,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
@@ -177,6 +185,39 @@ export function BattleSidebarContent({
           upgrades={opponent_zones.upgrades}
           isReversed
         />
+        {canManipulateOpponent && (
+          <div className="mt-2 flex gap-2">
+            {onCreateOpponentTreasure && (
+              <button
+                onClick={onCreateOpponentTreasure}
+                className="flex-1 px-3 py-1.5 text-xs rounded bg-rose-700 hover:bg-rose-600 text-white font-medium"
+              >
+                Opp Treasure
+              </button>
+            )}
+            {onUntapOpponentAll && (
+              <button
+                onClick={onUntapOpponentAll}
+                className="flex-1 px-3 py-1.5 text-xs rounded bg-rose-700 hover:bg-rose-600 text-white font-medium"
+              >
+                Opp Untap
+              </button>
+            )}
+            {onPassOpponentTurn && (
+              <button
+                onClick={onPassOpponentTurn}
+                disabled={isYourTurn}
+                className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
+                  !isYourTurn
+                    ? "bg-rose-700 hover:bg-rose-600"
+                    : "bg-rose-700/35 text-white/60 cursor-not-allowed"
+                }`}
+              >
+                Opp Pass
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Life counters */}

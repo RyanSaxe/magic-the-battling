@@ -1099,6 +1099,10 @@ function GameContent() {
     actions.battleUpdateCardState("create_treasure", "", {});
   };
 
+  const handleCreateOpponentTreasure = () => {
+    actions.battleUpdateCardState("create_treasure", "", { for_opponent: true });
+  };
+
   const handlePassTurn = () => {
     actions.battlePassTurn();
   };
@@ -1154,6 +1158,10 @@ function GameContent() {
           onCreateTreasure={handleCreateTreasure}
           onUntapAll={handleUntapAll}
           onPassTurn={handlePassTurn}
+          canManipulateOpponent={canManipulateOpponent}
+          onCreateOpponentTreasure={handleCreateOpponentTreasure}
+          onUntapOpponentAll={handleUntapOpponentAll}
+          onPassOpponentTurn={handlePassTurn}
         />
       );
     }
