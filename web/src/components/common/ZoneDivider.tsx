@@ -1,11 +1,11 @@
-import { useRef, useCallback } from "react";
+import {
+  type DividerDragCallbacks,
+  useDividerDrag,
+} from "../../hooks/useDividerDrag";
 
-interface ZoneDividerProps {
+interface ZoneDividerProps extends DividerDragCallbacks {
   orientation: "horizontal" | "vertical";
-  onDragStart: () => void;
-  onDrag: (deltaPx: number) => void;
-  onDragEnd: () => void;
-  onDoubleClick?: () => void;
+  interactive?: boolean;
 }
 
 export function ZoneDivider({
@@ -14,37 +14,13 @@ export function ZoneDivider({
   onDrag,
   onDragEnd,
   onDoubleClick,
+  interactive = true,
 }: ZoneDividerProps) {
-  const startPos = useRef(0);
-
-  const handlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      e.preventDefault();
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      startPos.current =
-        orientation === "horizontal" ? e.clientY : e.clientX;
-      document.body.style.userSelect = "none";
-      onDragStart();
-    },
-    [orientation, onDragStart],
-  );
-
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!e.buttons) return;
-      const current =
-        orientation === "horizontal" ? e.clientY : e.clientX;
-      const delta = current - startPos.current;
-      startPos.current = current;
-      onDrag(delta);
-    },
-    [orientation, onDrag],
-  );
-
-  const handlePointerUp = useCallback(() => {
-    document.body.style.userSelect = "";
-    onDragEnd();
-  }, [onDragEnd]);
+  const dragBindings = useDividerDrag({
+    orientation,
+    callbacks: { onDragStart, onDrag, onDragEnd, onDoubleClick },
+    enabled: interactive,
+  });
 
   const isHorizontal = orientation === "horizontal";
 
@@ -60,14 +36,15 @@ export function ZoneDivider({
       }}
     >
       <div
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onDoubleClick={onDoubleClick}
+        {...dragBindings}
         style={{
           position: "absolute",
-          cursor: isHorizontal ? "row-resize" : "col-resize",
-          touchAction: "none",
+          cursor: interactive
+            ? isHorizontal
+              ? "row-resize"
+              : "col-resize"
+            : undefined,
+          touchAction: interactive ? "none" : undefined,
           ...(isHorizontal
             ? { top: -5, left: 0, right: 0, height: 12 }
             : { left: -5, top: 0, bottom: 0, width: 12 }),

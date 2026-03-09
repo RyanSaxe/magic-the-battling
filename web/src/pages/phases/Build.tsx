@@ -364,6 +364,7 @@ export function BuildPhase({
         containerRef={containerRef}
         className={`zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col transition-opacity ${locked ? "opacity-60 pointer-events-none" : ""}`}
         onClick={handleBackgroundClick}
+        isMobile={isMobile}
         hasHand={true}
         hasBattlefield={true}
         hasSideboard={self_player.sideboard.length > 0}

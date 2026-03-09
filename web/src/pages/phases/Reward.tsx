@@ -4,7 +4,7 @@ import type { GameState, Card as CardType } from '../../types'
 import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
 import { useCardLayout, ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
 import { useElementHeight } from '../../hooks/useElementHeight'
-import { badgeCls } from '../../components/common/ZoneLayout'
+import { ZoneLabel } from '../../components/common/ZoneLabel'
 
 interface RewardPhaseProps {
   gameState: GameState
@@ -200,7 +200,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
         <div ref={dualRef} className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
           <div className="flex flex-col flex-1 min-h-0" style={{ gap: 2 }}>
             <div className="zone-upgrades px-3 pt-5 pb-3 relative shrink-0 flex flex-col">
-              <span className={badgeCls}>Upgrades</span>
+              <ZoneLabel>Upgrades</ZoneLabel>
               <div ref={upgradeHeaderRef} className="text-center mb-2 shrink-0">
                 <h3 className="text-lg font-bold text-amber-400">Stage Complete! Select an upgrade</h3>
               </div>
@@ -225,7 +225,7 @@ export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, sel
             </div>
 
             <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1 min-h-0 flex flex-col">
-              <span className={badgeCls}>Pool</span>
+              <ZoneLabel>Pool</ZoneLabel>
               <div className="overflow-hidden flex-1 min-h-0" style={{
                 display: 'grid',
                 gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,

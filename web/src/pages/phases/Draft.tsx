@@ -2,8 +2,8 @@ import { useState, useCallback } from 'react'
 import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useCardLayout } from '../../hooks/useCardLayout'
-import { badgeCls } from '../../components/common/ZoneLayout'
 import { ZoneDivider } from '../../components/common/ZoneDivider'
+import { ZoneLabel } from '../../components/common/ZoneLabel'
 import { usePersistedConstraints } from '../../hooks/usePersistedConstraints'
 import { useZoneDividers } from '../../hooks/useZoneDividers'
 import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
@@ -56,6 +56,7 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
     containerWidth: containerSize.width,
     currentLayout: { pool: poolDims, pack: packDims },
     layoutConfig: draftLayoutConfig,
+    allowHorizontalResize: !isMobile,
     constraints,
     onConstraintsChange: setConstraints,
     onConstraintsClear: clearConstraints,
@@ -134,7 +135,7 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
               </div>
             </>
           )}
-          <span className={badgeCls}>Pack</span>
+          <ZoneLabel>Pack</ZoneLabel>
           {currentPack.length === 0 ? (
             <div className="text-center">
               <div className="text-gray-400 text-sm">No pack available</div>
@@ -162,12 +163,18 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
         </div>
 
         {dividerCallbacks.topDivider && (
-          <ZoneDivider orientation="horizontal" {...dividerCallbacks.topDivider} />
+          <ZoneDivider
+            orientation="horizontal"
+            interactive={!isMobile}
+            {...dividerCallbacks.topDivider}
+          />
         )}
 
         {/* Pool */}
         <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1">
-          <span className={badgeCls}>Pool</span>
+          <ZoneLabel mobileDragCallbacks={isMobile ? dividerCallbacks.topDivider : null}>
+            Pool
+          </ZoneLabel>
           {pool.length === 0 ? (
             <div className="flex items-center justify-center">
               <div className="text-gray-500 text-sm text-center">

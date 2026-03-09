@@ -1,11 +1,7 @@
 import type { ReactNode, RefCallback } from 'react'
 import type { DividerCallbacks } from '../../hooks/useZoneDividers'
 import { ZoneDivider } from './ZoneDivider'
-
-export const badgeCls =
-  'absolute left-1/2 -translate-x-1/2 -top-[9px] z-40 ' +
-  'bg-[#2a2320] text-gray-400 text-[10px] uppercase tracking-widest ' +
-  'px-2.5 py-0.5 rounded-full border zone-label-pill whitespace-nowrap'
+import { ZoneLabel } from './ZoneLabel'
 
 interface ZoneLayoutProps {
   handContent: ReactNode
@@ -24,6 +20,7 @@ interface ZoneLayoutProps {
   className?: string
   onClick?: React.MouseEventHandler<HTMLDivElement>
   dividerCallbacks?: DividerCallbacks | null
+  isMobile?: boolean
 }
 
 export function ZoneLayout({
@@ -43,23 +40,37 @@ export function ZoneLayout({
   className,
   onClick,
   dividerCallbacks,
+  isMobile = false,
 }: ZoneLayoutProps) {
   const hasLower = hasBattlefield || hasSideboard || hasUpgrades
   const hasRight = hasBattlefield || hasSideboard
   const hasDividers = !!dividerCallbacks
   const gap = hasDividers ? 0 : 2
+  const mobileTopHandle = isMobile ? dividerCallbacks?.topDivider ?? null : null
+  const mobileBottomSplitHandle = isMobile
+    ? dividerCallbacks?.bottomLeftSplitDivider ?? null
+    : null
+  const battlefieldLabelHandle = hasBattlefield ? mobileTopHandle : null
+  const sideboardLabelHandle = hasBattlefield
+    ? mobileBottomSplitHandle
+    : mobileTopHandle
+  const upgradesLabelHandle = hasUpgrades ? mobileTopHandle : null
 
   return (
     <div ref={containerRef} className={className ?? 'zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col'} onClick={onClick}>
       <div className="flex flex-col flex-1 min-h-0" style={{ gap }}>
         {hasHand && (
           <div className="zone-hand px-3 pt-5 pb-3 relative">
-            <span className={badgeCls}>{handLabel}</span>
+            <ZoneLabel>{handLabel}</ZoneLabel>
             {handContent}
           </div>
         )}
         {hasHand && hasLower && dividerCallbacks?.topDivider && (
-          <ZoneDivider orientation="horizontal" {...dividerCallbacks.topDivider} />
+          <ZoneDivider
+            orientation="horizontal"
+            interactive={!isMobile}
+            {...dividerCallbacks.topDivider}
+          />
         )}
         {hasLower && (
           <div className="flex flex-1 min-h-0" style={{ gap }}>
@@ -67,27 +78,41 @@ export function ZoneLayout({
               <div className="flex-1 min-w-0 flex flex-col" style={{ gap }}>
                 {hasBattlefield && (
                   <div className="zone-battlefield px-3 pt-5 pb-3 relative">
-                    <span className={badgeCls}>{battlefieldLabel}</span>
+                    <ZoneLabel mobileDragCallbacks={battlefieldLabelHandle}>
+                      {battlefieldLabel}
+                    </ZoneLabel>
                     {battlefieldContent}
                   </div>
                 )}
                 {hasBattlefield && hasSideboard && dividerCallbacks?.bottomLeftSplitDivider && (
-                  <ZoneDivider orientation="horizontal" {...dividerCallbacks.bottomLeftSplitDivider} />
+                  <ZoneDivider
+                    orientation="horizontal"
+                    interactive={!isMobile}
+                    {...dividerCallbacks.bottomLeftSplitDivider}
+                  />
                 )}
                 {hasSideboard && (
                   <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1 min-h-0">
-                    <span className={badgeCls}>{sideboardLabel}</span>
+                    <ZoneLabel mobileDragCallbacks={sideboardLabelHandle}>
+                      {sideboardLabel}
+                    </ZoneLabel>
                     {sideboardContent}
                   </div>
                 )}
               </div>
             )}
             {hasRight && hasUpgrades && dividerCallbacks?.leftDivider && (
-              <ZoneDivider orientation="vertical" {...dividerCallbacks.leftDivider} />
+              <ZoneDivider
+                orientation="vertical"
+                interactive={!isMobile}
+                {...dividerCallbacks.leftDivider}
+              />
             )}
             {hasUpgrades && (
               <div className="zone-upgrades px-3 pt-5 pb-3 relative flex items-center justify-center" style={{ minWidth: '7rem' }}>
-                <span className={badgeCls}>{upgradesLabel}</span>
+                <ZoneLabel mobileDragCallbacks={upgradesLabelHandle}>
+                  {upgradesLabel}
+                </ZoneLabel>
                 <div className="overflow-hidden">
                   {upgradesContent}
                 </div>

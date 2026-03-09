@@ -1,8 +1,12 @@
 import { useRef, useCallback, useMemo } from "react";
-import type { ZoneConstraints } from "./computeConstrainedLayout";
+import {
+  deriveConstraintsFromLayout,
+  type ZoneConstraints,
+} from "./computeConstrainedLayout";
+import type { DividerDragCallbacks } from "./useDividerDrag";
 import type { CardLayoutConfig, CardLayoutResult } from "./useCardLayout";
 
-function omitKey<T extends Record<string, unknown>>(obj: T, key: keyof T): Partial<T> {
+function omitKey<T extends object>(obj: T, key: keyof T): Partial<T> {
   const copy = { ...obj };
   delete copy[key];
   return copy;
@@ -11,24 +15,9 @@ function omitKey<T extends Record<string, unknown>>(obj: T, key: keyof T): Parti
 const MIN_ZONE_PX = 80;
 
 export interface DividerCallbacks {
-  topDivider: {
-    onDragStart: () => void;
-    onDrag: (deltaPx: number) => void;
-    onDragEnd: () => void;
-    onDoubleClick: () => void;
-  } | null;
-  bottomLeftSplitDivider: {
-    onDragStart: () => void;
-    onDrag: (deltaPx: number) => void;
-    onDragEnd: () => void;
-    onDoubleClick: () => void;
-  } | null;
-  leftDivider: {
-    onDragStart: () => void;
-    onDrag: (deltaPx: number) => void;
-    onDragEnd: () => void;
-    onDoubleClick: () => void;
-  } | null;
+  topDivider: DividerDragCallbacks | null;
+  bottomLeftSplitDivider: DividerDragCallbacks | null;
+  leftDivider: DividerDragCallbacks | null;
 }
 
 function clampFraction(value: number, containerPx: number): number {
@@ -37,35 +26,12 @@ function clampFraction(value: number, containerPx: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function deriveTopFraction(
-  layout: CardLayoutResult,
-  config: CardLayoutConfig,
-  containerH: number,
-): number {
-  const topIds = config.layout.top ?? [];
-  const fixedHeight = config.fixedHeight ?? 0;
-  const sectionPadTop = config.sectionPadTop ?? 0;
-  const sectionPadBottom = config.sectionPadBottom ?? 0;
-  const sectionPadV = sectionPadTop + sectionPadBottom;
-  const availH = containerH - fixedHeight;
-  if (availH <= 0) return 0.5;
-
-  let topH = 0;
-  for (const id of topIds) {
-    const d = layout[id];
-    if (d && d.width > 0) {
-      const gap = config.zones[id]?.gap ?? 6;
-      topH += d.rows * d.height + gap * Math.max(0, d.rows - 1) + sectionPadV;
-    }
-  }
-  return topH / availH;
-}
-
 export function useZoneDividers(cfg: {
   containerHeight: number;
   containerWidth: number;
   currentLayout: CardLayoutResult;
   layoutConfig: CardLayoutConfig;
+  allowHorizontalResize?: boolean;
   constraints: ZoneConstraints | null;
   onConstraintsChange: (c: ZoneConstraints) => void;
   onConstraintsClear: () => void;
@@ -75,6 +41,7 @@ export function useZoneDividers(cfg: {
     containerWidth,
     currentLayout,
     layoutConfig,
+    allowHorizontalResize = true,
     constraints,
     onConstraintsChange,
     onConstraintsClear,
@@ -97,15 +64,25 @@ export function useZoneDividers(cfg: {
 
   const showTopDivider = hasActiveTop && hasActiveBottom;
   const showBottomLeftSplit = hasActiveBLMultiple;
-  const showLeftDivider = hasActiveBL && hasActiveBR;
+  const showLeftDivider = allowHorizontalResize && hasActiveBL && hasActiveBR;
 
   const fixedHeight = layoutConfig.fixedHeight ?? 0;
   const availH = containerHeight - fixedHeight;
+  const derivedConstraints = useMemo(
+    () =>
+      deriveConstraintsFromLayout(
+        currentLayout,
+        layoutConfig,
+        containerHeight,
+        containerWidth,
+      ),
+    [containerHeight, containerWidth, currentLayout, layoutConfig],
+  );
 
   const makeTopDivider = useCallback(() => ({
     onDragStart: () => {
-      const currentFraction = constraints?.topFraction ??
-        deriveTopFraction(currentLayout, layoutConfig, containerHeight);
+      const currentFraction =
+        constraints?.topFraction ?? derivedConstraints.topFraction;
       draftRef.current = { ...constraints, topFraction: currentFraction };
     },
     onDrag: (deltaPx: number) => {
@@ -125,14 +102,22 @@ export function useZoneDividers(cfg: {
         onConstraintsChange(rest);
       }
     },
-  }), [constraints, currentLayout, layoutConfig, containerHeight, availH, onConstraintsChange, onConstraintsClear]);
+  }), [constraints, derivedConstraints.topFraction, availH, onConstraintsChange, onConstraintsClear]);
 
   const makeBottomLeftSplitDivider = useCallback(() => ({
     onDragStart: () => {
-      draftRef.current = { ...constraints, bottomLeftSplit: constraints?.bottomLeftSplit ?? 0.5 };
+      draftRef.current = {
+        ...constraints,
+        bottomLeftSplit:
+          constraints?.bottomLeftSplit ?? derivedConstraints.bottomLeftSplit,
+      };
     },
     onDrag: (deltaPx: number) => {
-      const bottomH = availH * (1 - (constraints?.topFraction ?? 0.5));
+      const topFraction =
+        draftRef.current.topFraction ??
+        constraints?.topFraction ??
+        derivedConstraints.topFraction;
+      const bottomH = availH * (1 - topFraction);
       const prev = draftRef.current.bottomLeftSplit ?? 0.5;
       const next = clampFraction(prev + deltaPx / bottomH, bottomH);
       draftRef.current = { ...draftRef.current, bottomLeftSplit: next };
@@ -149,14 +134,24 @@ export function useZoneDividers(cfg: {
         onConstraintsChange(rest);
       }
     },
-  }), [constraints, availH, onConstraintsChange, onConstraintsClear]);
+  }), [
+    constraints,
+    derivedConstraints.bottomLeftSplit,
+    derivedConstraints.topFraction,
+    availH,
+    onConstraintsChange,
+    onConstraintsClear,
+  ]);
 
   const makeLeftDivider = useCallback(() => ({
     onDragStart: () => {
-      draftRef.current = { ...constraints, leftFraction: constraints?.leftFraction ?? 0.7 };
+      draftRef.current = {
+        ...constraints,
+        leftFraction: constraints?.leftFraction ?? derivedConstraints.leftFraction,
+      };
     },
     onDrag: (deltaPx: number) => {
-      const prev = draftRef.current.leftFraction ?? 0.7;
+      const prev = draftRef.current.leftFraction ?? derivedConstraints.leftFraction;
       const next = clampFraction(prev + deltaPx / containerWidth, containerWidth);
       draftRef.current = { ...draftRef.current, leftFraction: next };
       onConstraintsChange({ ...draftRef.current });
@@ -172,7 +167,13 @@ export function useZoneDividers(cfg: {
         onConstraintsChange(rest);
       }
     },
-  }), [constraints, containerWidth, onConstraintsChange, onConstraintsClear]);
+  }), [
+    constraints,
+    containerWidth,
+    derivedConstraints.leftFraction,
+    onConstraintsChange,
+    onConstraintsClear,
+  ]);
 
   return useMemo(() => ({
     topDivider: showTopDivider ? makeTopDivider() : null,
