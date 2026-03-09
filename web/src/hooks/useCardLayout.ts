@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useLayoutEffect } from "react";
 import { CARD_ASPECT_RATIO, bestFit, type ZoneDims } from "./cardSizeUtils";
 import {
-  computeConstrainedFrames,
   computeConstrainedLayoutState,
   deriveConstraintsFromLayout,
   type ZoneConstraints,
@@ -986,17 +985,18 @@ export function useCardLayout(
       if (cfg.constraints) {
         return computeConstrainedLayoutState(w, h, cfg, cfg.constraints);
       }
-      const dims = computeLayout(w, h, cfg);
+      if (cfg.alwaysComputeFrames) {
+        const derivedConstraints = deriveConstraintsFromLayout(
+          computeLayout(w, h, cfg),
+          cfg,
+          h,
+          w,
+        );
+        return computeConstrainedLayoutState(w, h, cfg, derivedConstraints);
+      }
       return {
-        dims,
-        frames: cfg.alwaysComputeFrames
-          ? computeConstrainedFrames(
-              w,
-              h,
-              cfg,
-              deriveConstraintsFromLayout(dims, cfg, h, w),
-            )
-          : null,
+        dims: computeLayout(w, h, cfg),
+        frames: null,
       };
     },
     [],

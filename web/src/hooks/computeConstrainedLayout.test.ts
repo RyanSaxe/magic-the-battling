@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   computeConstrainedFrames,
   computeConstrainedLayout,
+  computeConstrainedLayoutState,
   deriveConstraintsFromLayout,
 } from "./computeConstrainedLayout";
 import { computeLayout, ZONE_LAYOUT_PADDING } from "./useCardLayout";
@@ -159,6 +160,49 @@ describe("computeConstrainedLayout", () => {
       expect(frames.upgrades.innerHeight).toBeGreaterThan(0);
       expect(frames.pool.innerHeight).toBeGreaterThan(0);
       expect(usedHeight).toBe(650);
+    });
+
+    it("re-fits cards to derived frames for reward-style top fill layouts", () => {
+      const config = {
+        zones: {
+          rewards: { count: 2, priority: "fill" as const, maxRows: 1, maxCardWidth: 300 },
+          upgrades: { count: 4, maxCardWidth: 200 },
+          pool: { count: 13, maxCardWidth: 180 },
+        },
+        layout: {
+          top: ["rewards"],
+          bottomLeft: ["upgrades", "pool"],
+        },
+        ...ZONE_LAYOUT_PADDING,
+      };
+
+      const unconstrained = computeLayout(1200, 520, config);
+      const derived = deriveConstraintsFromLayout(
+        unconstrained,
+        config,
+        520,
+        1200,
+      );
+      const { dims, frames } = computeConstrainedLayoutState(
+        1200,
+        520,
+        config,
+        derived,
+      );
+
+      const rewardsGridHeight =
+        dims.rewards.rows * dims.rewards.height +
+        Math.max(0, dims.rewards.rows - 1) * 6;
+      const upgradesGridHeight =
+        dims.upgrades.rows * dims.upgrades.height +
+        Math.max(0, dims.upgrades.rows - 1) * 6;
+      const poolGridHeight =
+        dims.pool.rows * dims.pool.height +
+        Math.max(0, dims.pool.rows - 1) * 6;
+
+      expect(rewardsGridHeight).toBeLessThanOrEqual(frames.rewards.innerHeight);
+      expect(upgradesGridHeight).toBeLessThanOrEqual(frames.upgrades.innerHeight);
+      expect(poolGridHeight).toBeLessThanOrEqual(frames.pool.innerHeight);
     });
   });
 
