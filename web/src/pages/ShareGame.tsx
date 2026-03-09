@@ -338,7 +338,7 @@ export function ShareGame() {
 
       {/* Main + Sidebar */}
       <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderRight: '1px solid var(--gold-border)' }} />
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
         <main className="flex-1 flex flex-col min-h-0 min-w-0">
           {renderContent()}
         </main>
@@ -356,7 +356,7 @@ export function ShareGame() {
                 sidebarOpen ? 'translate-x-0' : 'translate-x-full'
               }`}
             >
-              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
+              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
                 <div className="px-3 py-2 text-sm font-medium text-gray-400">
                   Players
                 </div>
@@ -367,13 +367,13 @@ export function ShareGame() {
             </div>
           </>
         ) : (
-          <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
+          <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
             <div className="overflow-y-auto flex-1">
               {renderSidebarContent()}
             </div>
           </aside>
         )}
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderLeft: '1px solid var(--gold-border)' }} />
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
       </div>
 
       {/* Bottom Bar */}

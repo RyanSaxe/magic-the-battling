@@ -70,8 +70,7 @@ export function Home() {
       </header>
 
       <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
-             style={{ borderRight: '1px solid var(--gold-border)' }} />
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
 
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
           <div className="zone-pack h-full min-h-0 flex flex-col items-center justify-center px-4">
@@ -79,8 +78,7 @@ export function Home() {
           </div>
         </main>
 
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
-             style={{ borderLeft: '1px solid var(--gold-border)' }} />
+        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
       </div>
 
       <footer className="shrink-0 frame-chrome bar-pad-both py-2">

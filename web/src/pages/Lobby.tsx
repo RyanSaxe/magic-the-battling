@@ -332,7 +332,7 @@ export function Lobby() {
           </div>
         </header>
         <div className="flex-1 flex min-h-0 game-surface">
-          <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderRight: "1px solid var(--gold-border)" }} />
+          <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
           <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
             <div className="zone-pack h-full min-h-0 flex items-center justify-center">
               <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
@@ -360,7 +360,7 @@ export function Lobby() {
               </div>
             </div>
           </main>
-          <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" style={{ borderLeft: "1px solid var(--gold-border)" }} />
+          <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
         </div>
         <footer className="shrink-0 frame-chrome bar-pad-both py-2">
           <LobbyFooterLinks />
@@ -436,7 +436,7 @@ export function Lobby() {
           </div>
         </header>
         <div className="flex-1 flex min-h-0 game-surface">
-          <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderRight: "1px solid var(--gold-border)" }} />
+          <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
           <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
             <div className="zone-pack h-full min-h-0 flex items-center justify-center">
               {gameNotFound ? (
@@ -474,7 +474,7 @@ export function Lobby() {
               )}
             </div>
           </main>
-          <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" style={{ borderLeft: "1px solid var(--gold-border)" }} />
+          <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
         </div>
         <footer className="shrink-0 frame-chrome bar-pad-both py-2">
           <LobbyFooterLinks />
@@ -560,7 +560,7 @@ export function Lobby() {
         </div>
       </header>
       <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderRight: "1px solid var(--gold-border)" }} />
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className="zone-pack flex-1 min-h-0 flex flex-col sm:items-center sm:justify-center px-4 py-4 overflow-auto">
             <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md flex-1 min-h-0 overflow-visible sm:flex-none felt-raised-panel">
@@ -884,7 +884,7 @@ export function Lobby() {
           </div>
           <HintsBanner variant="rail" />
         </main>
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" style={{ borderLeft: "1px solid var(--gold-border)" }} />
+        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
       </div>
       <footer className="shrink-0 frame-chrome bar-pad-both py-2">
         <LobbyFooterLinks />

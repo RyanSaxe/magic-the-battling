@@ -1343,21 +1343,20 @@ function GameContent() {
                   </div>
                 </>
               )}
-              <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
-                   style={{ borderRight: '1px solid var(--gold-border)' }} />
+              <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
               <main className="flex-1 flex flex-col min-h-0 min-w-0">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
                 {sizes.isMobile && current_battle && (
-                  <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mb-[2px] mobile-life-bar text-xs">
+                  <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mb-[2px] mobile-life-bar text-[11px] leading-tight">
                     <div className="flex items-center gap-1">
-                      <span className="text-gray-300 truncate max-w-[60px]">{current_battle.opponent_name}</span>
-                      <div className="flex items-center gap-0.5 rounded px-1 py-0.5" style={{ background: 'var(--chrome)' }}>
-                        <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
+                      <span className="text-gray-300 truncate max-w-[60px] leading-tight">{current_battle.opponent_name}</span>
+                      <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
+                        <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
                         <span className="text-white font-bold">{current_battle.opponent_life}</span>
-                        <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life + 1)} className="text-gray-400 hover:text-white px-1">+</button>
+                        <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
                       </div>
                     </div>
-                    <div className="text-center">
+                    <div className="text-center leading-tight">
                       {current_battle.current_turn_name === self_player.name ? (
                         <span className="text-green-400 font-medium">Your turn</span>
                       ) : (
@@ -1365,12 +1364,12 @@ function GameContent() {
                       )}
                     </div>
                     <div className="flex items-center gap-1">
-                      <div className="flex items-center gap-0.5 rounded px-1 py-0.5" style={{ background: 'var(--chrome)' }}>
-                        <button onClick={() => handleYourLifeChange(current_battle.your_life - 1)} className="text-gray-400 hover:text-white px-1">-</button>
+                      <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
+                        <button onClick={() => handleYourLifeChange(current_battle.your_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
                         <span className="text-white font-bold">{current_battle.your_life}</span>
-                        <button onClick={() => handleYourLifeChange(current_battle.your_life + 1)} className="text-gray-400 hover:text-white px-1">+</button>
+                        <button onClick={() => handleYourLifeChange(current_battle.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
                       </div>
-                      <span className="text-gray-300 truncate max-w-[60px]">{self_player.name}</span>
+                      <span className="text-gray-300 truncate max-w-[60px] leading-tight">{self_player.name}</span>
                     </div>
                   </div>
                 )}
@@ -1409,8 +1408,7 @@ function GameContent() {
                   useUpgrades={gameState.use_upgrades}
                 />
               )}
-              <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
-                   style={{ borderLeft: '1px solid var(--gold-border)' }} />
+              <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
             </div>
             {activeDndPanel === 'sideboard' && current_battle && (
               <div onClick={(e) => handlePanelClickToMove(e, 'sideboard', 'player')}>
@@ -1530,8 +1528,7 @@ function GameContent() {
           </FaceDownProvider>
         ) : (
           <div className="flex-1 flex min-h-0 game-surface">
-            <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
-                 style={{ borderRight: '1px solid var(--gold-border)' }} />
+            <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
             <main className="flex-1 flex flex-col min-h-0 min-w-0">
               {currentPhase === "draft" && (
                 <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
@@ -1622,8 +1619,7 @@ function GameContent() {
                 useUpgrades={gameState.use_upgrades}
               />
             )}
-            <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
-                 style={{ borderLeft: '1px solid var(--gold-border)' }} />
+            <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
           </div>
         )}
         {/* Bottom Action Bar */}

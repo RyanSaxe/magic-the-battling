@@ -206,7 +206,6 @@ body {
     background: radial-gradient(ellipse at 50% 50%,
         color-mix(in srgb, var(--chrome) 95%, white) 0%,
         var(--chrome) 70%);
-    border-right: 1px solid rgba(212, 175, 55, 0.6);
     z-index: 2;
   }
 
@@ -319,11 +318,8 @@ body {
       color-mix(in srgb, var(--zone-label-bg) 72%, black 28%) 100%
     ) padding-box,
     linear-gradient(
-      to bottom,
-      var(--seam-ridge-light) 0,
-      var(--seam-ridge-light) 47%,
-      var(--seam-ridge-dark) 47%,
-      var(--seam-ridge-dark) 100%
+      var(--seam-ridge-light),
+      var(--seam-ridge-light)
     ) border-box;
   box-shadow:
     0 -1px 2px rgba(0, 0, 0, 0.1),
@@ -339,6 +335,13 @@ body {
 .mobile-life-bar {
   background: var(--chrome-modal);
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.mobile-life-chip {
+  background: var(--chrome);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.26);
 }
 
 .top-attached-rail {
@@ -504,15 +507,20 @@ body {
 }
 
 .battle-layout .zone-hand,
-.battle-layout .battlefield {
-  box-shadow: none;
+.battle-layout .battlefield,
+.battle-side-cell {
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .battle-side-column {
   box-sizing: border-box;
   position: relative;
   background: var(--zone-column-bg);
-  box-shadow: inset -1px 0 0 rgba(255, 236, 181, 0.1);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
   overflow: hidden;
 }
 

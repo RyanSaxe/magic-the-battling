@@ -508,8 +508,7 @@ export function Play() {
       </header>
 
       <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
-          style={{ borderRight: '1px solid var(--gold-border)' }} />
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
 
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className="zone-pack flex-1 min-h-0 flex flex-col px-4 py-4 sm:py-2 sm:items-center sm:justify-center overflow-auto">
@@ -641,8 +640,7 @@ export function Play() {
           <HintsBanner variant="rail" />
         </main>
 
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
-          style={{ borderLeft: '1px solid var(--gold-border)' }} />
+        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
       </div>
 
       <footer className="shrink-0 frame-chrome bar-pad-both py-2">
