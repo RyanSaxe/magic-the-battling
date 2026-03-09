@@ -31,6 +31,7 @@ export interface CardLayoutConfig {
   minCardWidth?: number;
   maxCardWidth?: number;
   maxBottomRightFraction?: number;
+  maxTopFraction?: number;
   constraints?: ZoneConstraints | null;
   alwaysComputeFrames?: boolean;
 }

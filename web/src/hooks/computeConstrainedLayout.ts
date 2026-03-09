@@ -156,8 +156,13 @@ export function deriveConstraintsFromLayout(
     const gap = config.zones[id]?.gap ?? 6;
     if (d && d.width > 0) topPixels += zoneGridH(d, gap) + sectionPadV;
   }
-  const topFraction =
+  const rawTopFraction =
     hasTop && hasBottom && usableH > 0 ? topPixels / usableH : 0.5;
+  const maxTopFraction = config.maxTopFraction;
+  const topFraction =
+    typeof maxTopFraction === "number"
+      ? Math.min(rawTopFraction, maxTopFraction)
+      : rawTopFraction;
 
   let rightPixels = 0;
   for (const id of brIds) {

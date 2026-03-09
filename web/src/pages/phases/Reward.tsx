@@ -32,6 +32,12 @@ interface RewardPhaseProps {
 
 type RewardItem = { key: string; card: CardType };
 
+const STATIC_DIVIDER_CALLBACKS = {
+  onDragStart: () => {},
+  onDrag: () => {},
+  onDragEnd: () => {},
+};
+
 function EmptyZoneTile({
   dimensions,
   label,
@@ -177,6 +183,7 @@ export function RewardPhase({
     },
     layout: { top: ["rewards"], bottomLeft: ["upgrades", "pool"] },
     ...ZONE_LAYOUT_PADDING,
+    maxTopFraction: hasUpgradeSection ? 0.33 : undefined,
     alwaysComputeFrames: hasUpgradeSection,
   } satisfies CardLayoutConfig;
 
@@ -279,7 +286,7 @@ export function RewardPhase({
 
   return (
     <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-      <div className="shrink-0 top-attached-rail px-4 py-2.5 sm:px-5 sm:py-3 mb-[2px] text-[11px] sm:text-sm">
+      <div className="shrink-0 top-attached-rail px-4 py-2.5 sm:px-5 sm:py-3 text-[11px] sm:text-sm">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-4">
           <div className="min-w-0 truncate text-left text-gray-300 leading-tight">
             {opponentLabel}
@@ -292,6 +299,11 @@ export function RewardPhase({
           </div>
         </div>
       </div>
+      <ZoneDivider
+        orientation="horizontal"
+        interactive={false}
+        {...STATIC_DIVIDER_CALLBACKS}
+      />
 
       <div
         ref={containerRef}
@@ -346,7 +358,7 @@ export function RewardPhase({
         {hasUpgradeSection && dividerCallbacks.topDivider && (
           <ZoneDivider
             orientation="horizontal"
-            interactive={false}
+            interactive={!isMobile}
             {...dividerCallbacks.topDivider}
           />
         )}
@@ -363,7 +375,7 @@ export function RewardPhase({
             >
               <ZoneLabel
                 mobileDragCallbacks={
-                  isMobile ? dividerCallbacks.bottomLeftSplitDivider : null
+                  isMobile ? dividerCallbacks.topDivider : null
                 }
               >
                 Upgrades
