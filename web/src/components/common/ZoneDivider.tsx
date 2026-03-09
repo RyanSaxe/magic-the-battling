@@ -26,13 +26,13 @@ export function ZoneDivider({
 
   return (
     <div
+      className={isHorizontal ? "zone-divider-line zone-divider-line--horizontal" : "zone-divider-line zone-divider-line--vertical"}
       style={{
         position: "relative",
         flexShrink: 0,
         ...(isHorizontal
           ? { height: 2, width: "100%" }
           : { width: 2, height: "100%" }),
-        background: "var(--seam-stroke)",
       }}
     >
       <div

@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   computeConstrainedFrames,
   computeConstrainedLayout,
+  deriveConstraintsFromLayout,
 } from "./computeConstrainedLayout";
-import { ZONE_LAYOUT_PADDING } from "./useCardLayout";
+import { computeLayout, ZONE_LAYOUT_PADDING } from "./useCardLayout";
 import { CARD_ASPECT_RATIO } from "./cardSizeUtils";
 
 describe("computeConstrainedLayout", () => {
@@ -123,6 +124,41 @@ describe("computeConstrainedLayout", () => {
         ZONE_LAYOUT_PADDING.sectionGap * 2;
 
       expect(usedHeight).toBe(700);
+    });
+
+    it("derives stable frames for a top fill zone with two lower primary zones", () => {
+      const config = {
+        zones: {
+          rewards: { count: 3, priority: "fill" as const, maxRows: 1, maxCardWidth: 300 },
+          upgrades: { count: 3, maxCardWidth: 200 },
+          pool: { count: 12, maxCardWidth: 180 },
+        },
+        layout: {
+          top: ["rewards"],
+          bottomLeft: ["upgrades", "pool"],
+        },
+        ...ZONE_LAYOUT_PADDING,
+      };
+
+      const unconstrained = computeLayout(1100, 650, config);
+      const derived = deriveConstraintsFromLayout(
+        unconstrained,
+        config,
+        650,
+        1100,
+      );
+      const frames = computeConstrainedFrames(1100, 650, config, derived);
+
+      const usedHeight =
+        frames.rewards.outerHeight +
+        frames.upgrades.outerHeight +
+        frames.pool.outerHeight +
+        ZONE_LAYOUT_PADDING.sectionGap * 2;
+
+      expect(frames.rewards.innerHeight).toBeGreaterThan(0);
+      expect(frames.upgrades.innerHeight).toBeGreaterThan(0);
+      expect(frames.pool.innerHeight).toBeGreaterThan(0);
+      expect(usedHeight).toBe(650);
     });
   });
 

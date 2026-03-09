@@ -1,255 +1,450 @@
-import { Card } from '../../components/card'
-import { THE_VANQUISHER_IMAGE, TREASURE_TOKEN_IMAGE } from '../../constants/assets'
-import type { GameState, Card as CardType } from '../../types'
-import { useContainerCardSizes } from '../../hooks/useContainerCardSizes'
-import { useCardLayout, ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
-import { useElementHeight } from '../../hooks/useElementHeight'
-import { ZoneLabel } from '../../components/common/ZoneLabel'
+import { useRef, useState } from "react";
+import { Card } from "../../components/card";
+import { CardGrid } from "../../components/common/CardGrid";
+import { LayoutResetControl } from "../../components/common/LayoutResetControl";
+import { ZoneDivider } from "../../components/common/ZoneDivider";
+import { ZoneLabel } from "../../components/common/ZoneLabel";
+import {
+  THE_VANQUISHER_IMAGE,
+  TREASURE_TOKEN_IMAGE,
+} from "../../constants/assets";
+import {
+  useCardLayout,
+  ZONE_LAYOUT_PADDING,
+  type CardLayoutConfig,
+} from "../../hooks/useCardLayout";
+import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
+import { useZoneDividers } from "../../hooks/useZoneDividers";
+import type { GameState, Card as CardType } from "../../types";
 
 interface RewardPhaseProps {
-  gameState: GameState
+  gameState: GameState;
   actions: {
-    rewardPickUpgrade: (upgradeId: string) => void
-    rewardDone: (upgradeId?: string) => void
-  }
-  selectedUpgradeId: string | null
-  onUpgradeSelect: (upgradeId: string | null) => void
-  selectedPoolCardId: string | null
-  onPoolCardSelect: (cardId: string | null) => void
+    rewardPickUpgrade: (upgradeId: string) => void;
+    rewardDone: (upgradeId?: string) => void;
+  };
+  selectedUpgradeId: string | null;
+  onUpgradeSelect: (upgradeId: string | null) => void;
+  selectedPoolCardId: string | null;
+  onPoolCardSelect: (cardId: string | null) => void;
+  isMobile?: boolean;
 }
 
-const REWARD_COMPACT_DIMS = { width: 50, height: 70 }
+type RewardItem = { key: string; card: CardType };
 
-function RewardCard({
-  imageUrl,
-  label,
-  sublabel,
-  compact,
+function EmptyZoneTile({
   dimensions,
+  label,
 }: {
-  imageUrl: string
-  label: string
-  sublabel?: string
-  compact?: boolean
-  dimensions?: { width: number; height: number }
+  dimensions: { width: number; height: number };
+  label: string;
 }) {
-  if (compact) {
-    return (
-      <div className="flex items-center gap-2">
-        <img
-          src={imageUrl}
-          alt={label}
-          className="object-cover shadow-lg shrink-0"
-          style={{ width: REWARD_COMPACT_DIMS.width, height: REWARD_COMPACT_DIMS.height, borderRadius: 'var(--card-border-radius)' }}
-        />
-        <div>
-          <div className="text-white text-sm font-medium">{label}</div>
-          {sublabel && <div className="text-gray-400 text-xs">{sublabel}</div>}
+  return (
+    <div
+      className="modal-chrome border gold-border rounded-lg flex items-center justify-center px-3 text-center text-xs text-gray-300 shadow-md"
+      style={{ width: dimensions.width, height: dimensions.height }}
+    >
+      {label}
+    </div>
+  );
+}
+
+function formatPoisonSummary(
+  poisonDealt: number | undefined,
+  poisonTaken: number | undefined,
+): string {
+  const parts: string[] = [];
+  if (poisonDealt) parts.push(`Dealt ${poisonDealt}`);
+  if (poisonTaken) parts.push(`Took ${poisonTaken}`);
+  return parts.length > 0 ? `${parts.join(" / ")} poison` : "No poison";
+}
+
+function createRewardCard(
+  key: string,
+  name: string,
+  imageUrl: string,
+  typeLine: string,
+  oracleText: string | null,
+): CardType {
+  return {
+    id: key,
+    name,
+    image_url: imageUrl,
+    flip_image_url: null,
+    png_url: imageUrl,
+    flip_png_url: null,
+    type_line: typeLine,
+    tokens: [],
+    elo: null,
+    upgrade_target: null,
+    oracle_text: oracleText,
+    colors: [],
+    cmc: 0,
+  };
+}
+
+export function RewardPhase({
+  gameState,
+  actions,
+  selectedUpgradeId,
+  onUpgradeSelect,
+  selectedPoolCardId,
+  onPoolCardSelect,
+  isMobile = false,
+}: RewardPhaseProps) {
+  void actions;
+
+  const rewardsZoneRef = useRef<HTMLDivElement | null>(null);
+  const upgradesZoneRef = useRef<HTMLDivElement | null>(null);
+  const poolZoneRef = useRef<HTMLDivElement | null>(null);
+  const [selectedRewardCardId, setSelectedRewardCardId] = useState<
+    string | null
+  >(null);
+
+  const { self_player, available_upgrades } = gameState;
+  const { last_battle_result } = self_player;
+  const isStageIncreasing = self_player.is_stage_increasing;
+  const hasUpgradeSection =
+    gameState.use_upgrades && isStageIncreasing && available_upgrades.length > 0;
+  const appliedUpgradesList = self_player.upgrades.filter((u) => u.upgrade_target);
+  const upgradedCardIds = new Set(
+    appliedUpgradesList.map((u) => u.upgrade_target!.id),
+  );
+  const getAppliedUpgrades = (cardId: string) =>
+    appliedUpgradesList.filter((u) => u.upgrade_target!.id === cardId);
+
+  const rewardItems: RewardItem[] = [];
+  if (last_battle_result?.treasures_gained) {
+    rewardItems.push({
+      key: "treasure",
+      card: createRewardCard(
+        "reward:treasure",
+        `Treasure x${last_battle_result.treasures_gained}`,
+        TREASURE_TOKEN_IMAGE,
+        "Token Artifact — Treasure",
+        "Tap, Sacrifice this artifact: Add one mana of any color.",
+      ),
+    });
+  }
+  if (last_battle_result?.vanquisher_gained) {
+    rewardItems.push({
+      key: "vanquisher",
+      card: createRewardCard(
+        "reward:vanquisher",
+        "The Vanquisher",
+        THE_VANQUISHER_IMAGE,
+        "Artifact",
+        "Your hand size increases by 1.",
+      ),
+    });
+  }
+  if (last_battle_result?.card_gained) {
+    rewardItems.push({
+      key: last_battle_result.card_gained.id,
+      card: last_battle_result.card_gained,
+    });
+  }
+
+  const poolCards = [...self_player.hand, ...self_player.sideboard];
+  const rewardsCount = Math.max(rewardItems.length, 1);
+  const poolCount = hasUpgradeSection ? Math.max(poolCards.length, 1) : 0;
+
+  const {
+    constraints,
+    setConstraints,
+    clearConstraints,
+    resolution: persistedLayout,
+  } = usePersistedConstraints({
+    scopeKey: "phase:reward",
+    stage: self_player.stage,
+    round: self_player.round,
+  });
+
+  const activeConstraints = hasUpgradeSection ? constraints : null;
+  const rewardLayoutConfig = {
+    zones: {
+      rewards: {
+        count: rewardsCount,
+        maxCardWidth: 300,
+        priority: "fill",
+        maxRows: 1,
+      },
+      upgrades: {
+        count: hasUpgradeSection ? available_upgrades.length : 0,
+        maxCardWidth: 200,
+      },
+      pool: { count: poolCount, maxCardWidth: 180 },
+    },
+    layout: { top: ["rewards"], bottomLeft: ["upgrades", "pool"] },
+    ...ZONE_LAYOUT_PADDING,
+    alwaysComputeFrames: hasUpgradeSection,
+  } satisfies CardLayoutConfig;
+
+  const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
+    ...rewardLayoutConfig,
+    constraints: activeConstraints,
+  });
+
+  const dividerCallbacks = useZoneDividers({
+    containerHeight: containerSize.height,
+    containerWidth: containerSize.width,
+    currentLayout: dims,
+    layoutConfig: rewardLayoutConfig,
+    allowHorizontalResize: false,
+    measureInitialConstraints: hasUpgradeSection
+      ? () => {
+          const rewardsOuter =
+            rewardsZoneRef.current?.getBoundingClientRect().height ?? 0;
+          const upgradesOuter =
+            upgradesZoneRef.current?.getBoundingClientRect().height ?? 0;
+          const poolOuter = poolZoneRef.current?.getBoundingClientRect().height ?? 0;
+          const sectionGap = ZONE_LAYOUT_PADDING.sectionGap;
+          const sectionPadV =
+            ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom;
+
+          const lowerOuter = upgradesOuter + poolOuter + sectionGap;
+          const usableH = rewardsOuter + lowerOuter;
+          const upgradesInner = Math.max(0, upgradesOuter - sectionPadV);
+          const poolInner = Math.max(0, poolOuter - sectionPadV);
+          const totalInner = upgradesInner + poolInner;
+
+          return usableH > 0
+            ? {
+                topFraction: rewardsOuter / usableH,
+                leftFraction: 0.7,
+                bottomLeftSplit:
+                  totalInner > 0 ? upgradesInner / totalInner : 0.5,
+                usableHeight: usableH,
+                bottomInnerHeight: Math.max(
+                  0,
+                  lowerOuter - sectionGap - 2 * sectionPadV,
+                ),
+                usableWidth: containerSize.width,
+              }
+            : null;
+        }
+      : undefined,
+    constraints: activeConstraints,
+    onConstraintsChange: setConstraints,
+    onConstraintsClear: clearConstraints,
+  });
+
+  const rewardsDims = {
+    width: dims.rewards.width,
+    height: dims.rewards.height,
+  };
+  const upgradesDims = {
+    width: dims.upgrades.width,
+    height: dims.upgrades.height,
+  };
+  const poolDims = {
+    width: dims.pool.width,
+    height: dims.pool.height,
+  };
+
+  const controlledStyle = (height?: number) =>
+    zoneFrames && height != null
+      ? { height, flex: "0 0 auto" as const }
+      : undefined;
+
+  const rewardsStyle = controlledStyle(zoneFrames?.rewards?.outerHeight);
+  const upgradesStyle = controlledStyle(zoneFrames?.upgrades?.outerHeight);
+  const poolStyle = controlledStyle(zoneFrames?.pool?.outerHeight);
+
+  const isWinner = last_battle_result?.winner_name === self_player.name;
+  const isDraw = last_battle_result?.is_draw;
+  const resultLabel = !last_battle_result
+    ? "Rewards"
+    : isDraw
+      ? "Draw"
+      : isWinner
+        ? "Victory!"
+        : "Defeat";
+  const resultClass = !last_battle_result
+    ? "text-amber-300"
+    : isDraw
+      ? "text-yellow-400"
+      : isWinner
+        ? "text-green-400"
+        : "text-red-400";
+  const opponentLabel = last_battle_result
+    ? `vs ${last_battle_result.opponent_name}`
+    : "No battle result";
+  const poisonLabel = last_battle_result
+    ? formatPoisonSummary(
+        last_battle_result.poison_dealt,
+        last_battle_result.poison_taken,
+      )
+    : "No rewards this round";
+
+  return (
+    <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
+      <div className="shrink-0 top-attached-rail px-4 py-2.5 sm:px-5 sm:py-3 mb-[2px] text-[11px] sm:text-sm">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-4">
+          <div className="min-w-0 truncate text-left text-gray-300 leading-tight">
+            {opponentLabel}
+          </div>
+          <div className={`font-semibold text-center leading-tight ${resultClass}`}>
+            {resultLabel}
+          </div>
+          <div className="min-w-0 truncate text-right text-gray-300 leading-tight">
+            {poisonLabel}
+          </div>
         </div>
       </div>
-    )
-  }
 
-  const dims = dimensions ?? { width: 143, height: 200 }
+      <div
+        ref={containerRef}
+        className="relative flex flex-col flex-1 min-h-0"
+        style={{ gap: dividerCallbacks.topDivider ? 0 : 2 }}
+      >
+        {hasUpgradeSection && persistedLayout.canReset && (
+          <LayoutResetControl
+            phaseLabel="Reward"
+            currentStage={self_player.stage}
+            currentRound={self_player.round}
+            originStage={persistedLayout.originStage}
+            originRound={persistedLayout.originRound}
+            isInherited={persistedLayout.source === "inherited"}
+            onConfirm={clearConstraints}
+            position={isMobile ? "bottom-right" : "top-right"}
+          />
+        )}
 
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <img
-        src={imageUrl}
-        alt={label}
-        className="object-cover shadow-lg"
-        style={{ width: dims.width, height: dims.height, borderRadius: 'var(--card-border-radius)' }}
-      />
-      <div className="text-center">
-        <div className="text-white font-medium">{label}</div>
-        {sublabel && <div className="text-gray-400 text-sm">{sublabel}</div>}
-      </div>
-    </div>
-  )
-}
-
-export function RewardPhase({ gameState, selectedUpgradeId, onUpgradeSelect, selectedPoolCardId, onPoolCardSelect }: RewardPhaseProps) {
-  const { self_player, available_upgrades } = gameState
-  const { last_battle_result } = self_player
-  const isStageIncreasing = self_player.is_stage_increasing
-  const hasUpgradeSection = gameState.use_upgrades && isStageIncreasing && available_upgrades.length > 0
-  const appliedUpgradesList = self_player.upgrades.filter((u) => u.upgrade_target)
-  const upgradedCardIds = new Set(appliedUpgradesList.map((u) => u.upgrade_target!.id))
-  const getAppliedUpgrades = (cardId: string) =>
-    appliedUpgradesList.filter((u) => u.upgrade_target!.id === cardId)
-
-  const rewardCount =
-    (last_battle_result?.treasures_gained ? 1 : 0) +
-    (last_battle_result?.vanquisher_gained ? 1 : 0) +
-    (last_battle_result?.card_gained ? 1 : 0)
-  const [rewardRef, rewardCardDims] = useContainerCardSizes({
-    cardCount: Math.max(rewardCount, 1),
-    gap: 24,
-    maxCardWidth: 300,
-  })
-
-  const poolCards = [...self_player.hand, ...self_player.sideboard]
-
-  const [upgradeHeaderRef, upgradeHeaderHeight] = useElementHeight()
-  const fixedHeight = upgradeHeaderHeight + 8
-
-  const [dualRef, { upgrades: upgradeCardDims, pool: poolCardDims }] = useCardLayout({
-    zones: {
-      upgrades: { count: available_upgrades.length, maxCardWidth: 200 },
-      pool: { count: poolCards.length, maxCardWidth: 180 },
-    },
-    layout: { top: ['upgrades'], bottomLeft: ['pool'] },
-    fixedHeight,
-    ...ZONE_LAYOUT_PADDING,
-  })
-
-  const handleUpgradeClick = (upgrade: CardType) => {
-    if (selectedUpgradeId === upgrade.id) {
-      onUpgradeSelect(null)
-    } else {
-      onUpgradeSelect(upgrade.id)
-    }
-  }
-
-  const isWinner = last_battle_result?.winner_name === self_player.name
-  const isDraw = last_battle_result?.is_draw
-  const summaryFrameClass = hasUpgradeSection
-    ? 'zone-divider-soft p-[2px] shrink-0'
-    : 'zone-divider-bg p-[2px] flex-1 min-h-0'
-  const summaryInnerClass = hasUpgradeSection
-    ? 'zone-pack px-5 py-4'
-    : 'zone-pack h-full min-h-0 px-5 py-5 flex flex-col justify-center'
-
-  return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
-      <div className={summaryFrameClass}>
-        <div className={summaryInnerClass}>
-          {last_battle_result ? (
-            <>
-              <div className="flex items-center justify-center gap-4 shrink-0 text-sm">
-                {isDraw ? (
-                  <span className="text-yellow-400 font-bold">Draw</span>
-                ) : isWinner ? (
-                  <span className="text-green-400 font-bold">Victory!</span>
-                ) : (
-                  <span className="text-red-400 font-bold">Defeat</span>
-                )}
-                <span className="text-gray-500">vs {last_battle_result.opponent_name}</span>
-                {last_battle_result.poison_dealt > 0 && (
-                  <span className="text-purple-400">Dealt {last_battle_result.poison_dealt} poison</span>
-                )}
-                {last_battle_result.poison_taken > 0 && (
-                  <span className="text-red-400">Took {last_battle_result.poison_taken} poison</span>
-                )}
-              </div>
-
-              {!hasUpgradeSection && (
-                <div className="text-xs text-gray-400 uppercase tracking-wide text-center mt-4 mb-6">Your Rewards</div>
-              )}
-
-              <div ref={hasUpgradeSection ? undefined : rewardRef} className={`flex justify-center gap-6 w-full ${hasUpgradeSection ? 'mt-3' : ''}`}>
-                {last_battle_result.treasures_gained > 0 && (
-                  <RewardCard
-                    imageUrl={TREASURE_TOKEN_IMAGE}
-                    label={`+${last_battle_result.treasures_gained} Treasure`}
-                    compact={hasUpgradeSection}
-                    dimensions={hasUpgradeSection ? undefined : rewardCardDims}
-                  />
-                )}
-                {last_battle_result.vanquisher_gained && (
-                  <RewardCard
-                    imageUrl={THE_VANQUISHER_IMAGE}
-                    label="Vanquisher"
-                    sublabel="+1 Hand Size"
-                    compact={hasUpgradeSection}
-                    dimensions={hasUpgradeSection ? undefined : rewardCardDims}
-                  />
-                )}
-                {last_battle_result.card_gained && (
-                  hasUpgradeSection ? (
-                    <RewardCard
-                      imageUrl={(last_battle_result.card_gained.png_url ?? last_battle_result.card_gained.image_url)!}
-                      label={`New: ${last_battle_result.card_gained.name}`}
-                      compact
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <Card card={last_battle_result.card_gained} dimensions={rewardCardDims} />
-                      <div className="text-center">
-                        <div className="text-white font-medium">New Card</div>
-                        <div className="text-gray-400 text-sm">{last_battle_result.card_gained.name}</div>
-                      </div>
-                    </div>
-                  )
-                )}
-                {!last_battle_result.treasures_gained &&
-                  !last_battle_result.vanquisher_gained &&
-                  !last_battle_result.card_gained && (
-                    <div className="text-gray-500 text-center">No rewards this round</div>
-                  )}
-              </div>
-            </>
+        <div
+          ref={rewardsZoneRef}
+          className={`zone-pack w-full px-3 pt-5 pb-3 relative ${hasUpgradeSection ? "" : "flex-1 min-h-0"}`}
+          style={rewardsStyle}
+        >
+          <ZoneLabel>Rewards</ZoneLabel>
+          {rewardItems.length === 0 ? (
+            <div className="flex items-center justify-center min-h-full">
+              <EmptyZoneTile
+                dimensions={rewardsDims}
+                label="No rewards this round"
+              />
+            </div>
           ) : (
-            <div className="text-gray-500 text-center py-6">No rewards this round</div>
+            <CardGrid columns={dims.rewards.columns} cardWidth={rewardsDims.width}>
+              {rewardItems.map((item) => (
+                <Card
+                  key={item.key}
+                  card={item.card}
+                  dimensions={rewardsDims}
+                  selected={selectedRewardCardId === item.card.id}
+                  onClick={() =>
+                    setSelectedRewardCardId((current) =>
+                      current === item.card.id ? null : item.card.id,
+                    )
+                  }
+                />
+              ))}
+            </CardGrid>
           )}
         </div>
-      </div>
 
-      {/* Stage upgrade selection */}
-      {hasUpgradeSection && (
-        <div ref={dualRef} className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-          <div className="flex flex-col flex-1 min-h-0" style={{ gap: 2 }}>
-            <div className="zone-upgrades px-3 pt-5 pb-3 relative shrink-0 flex flex-col">
-              <ZoneLabel>Upgrades</ZoneLabel>
-              <div ref={upgradeHeaderRef} className="text-center mb-2 shrink-0">
-                <h3 className="text-lg font-bold text-amber-400">Stage Complete! Select an upgrade</h3>
-              </div>
-              <div className="shrink-0" style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${upgradeCardDims.columns}, ${upgradeCardDims.width}px)`,
-                gap: '6px',
-                justifyContent: 'center',
-                maxWidth: '100%',
-                overflow: 'hidden',
-              }}>
+        {hasUpgradeSection && dividerCallbacks.topDivider && (
+          <ZoneDivider
+            orientation="horizontal"
+            interactive={false}
+            {...dividerCallbacks.topDivider}
+          />
+        )}
+
+        {hasUpgradeSection && (
+          <div
+            className={`flex flex-col min-h-0 w-full ${zoneFrames ? "" : "flex-1"}`}
+            style={zoneFrames ? { flex: "0 0 auto" } : undefined}
+          >
+            <div
+              ref={upgradesZoneRef}
+              className="zone-upgrades w-full px-3 pt-5 pb-3 relative"
+              style={upgradesStyle}
+            >
+              <ZoneLabel
+                mobileDragCallbacks={
+                  isMobile ? dividerCallbacks.bottomLeftSplitDivider : null
+                }
+              >
+                Upgrades
+              </ZoneLabel>
+              <CardGrid
+                columns={dims.upgrades.columns}
+                cardWidth={upgradesDims.width}
+              >
                 {available_upgrades.map((upgrade) => (
                   <Card
                     key={upgrade.id}
                     card={upgrade}
-                    dimensions={upgradeCardDims}
+                    dimensions={upgradesDims}
                     selected={selectedUpgradeId === upgrade.id}
-                    onClick={() => handleUpgradeClick(upgrade)}
+                    onClick={() =>
+                      onUpgradeSelect(
+                        selectedUpgradeId === upgrade.id ? null : upgrade.id,
+                      )
+                    }
                   />
                 ))}
-              </div>
+              </CardGrid>
             </div>
 
-            <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1 min-h-0 flex flex-col">
-              <ZoneLabel>Pool</ZoneLabel>
-              <div className="overflow-hidden flex-1 min-h-0" style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${poolCardDims.columns}, ${poolCardDims.width}px)`,
-                gap: '6px',
-                justifyContent: 'center',
-                alignContent: 'start',
-                maxWidth: '100%',
-              }}>
-                {poolCards.map((card) => (
-                  <Card
-                    key={card.id}
-                    card={card}
-                    dimensions={poolCardDims}
-                    upgraded={upgradedCardIds.has(card.id)}
-                    appliedUpgrades={getAppliedUpgrades(card.id)}
-                    selected={selectedPoolCardId === card.id}
-                    onClick={() => onPoolCardSelect(selectedPoolCardId === card.id ? null : card.id)}
-                  />
-                ))}
-              </div>
+            {dividerCallbacks.bottomLeftSplitDivider && (
+              <ZoneDivider
+                orientation="horizontal"
+                interactive={!isMobile}
+                {...dividerCallbacks.bottomLeftSplitDivider}
+              />
+            )}
+
+            <div
+              ref={poolZoneRef}
+              className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${zoneFrames ? "" : "flex-1"}`}
+              style={poolStyle}
+            >
+              <ZoneLabel
+                mobileDragCallbacks={
+                  isMobile ? dividerCallbacks.bottomLeftSplitDivider : null
+                }
+              >
+                Pool
+              </ZoneLabel>
+              {poolCards.length === 0 ? (
+                <div className="flex items-center justify-center min-h-full">
+                  <EmptyZoneTile dimensions={poolDims} label="No pool cards" />
+                </div>
+              ) : (
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: `repeat(${dims.pool.columns}, ${poolDims.width}px)`,
+                    gap: "6px",
+                    justifyContent: "center",
+                    alignContent: "start",
+                    maxWidth: "100%",
+                    overflow: "hidden",
+                  }}
+                >
+                  {poolCards.map((card) => (
+                    <Card
+                      key={card.id}
+                      card={card}
+                      dimensions={poolDims}
+                      upgraded={upgradedCardIds.has(card.id)}
+                      appliedUpgrades={getAppliedUpgrades(card.id)}
+                      selected={selectedPoolCardId === card.id}
+                      onClick={() =>
+                        onPoolCardSelect(
+                          selectedPoolCardId === card.id ? null : card.id,
+                        )
+                      }
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
-  )
+  );
 }

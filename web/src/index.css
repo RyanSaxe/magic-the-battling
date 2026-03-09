@@ -273,19 +273,42 @@ body {
     inset 0 -2px 0 rgba(0, 0, 0, 0.3);
 }
 
+.zone-divider-line {
+  background-color: var(--seam-stroke);
+}
+
+.zone-divider-line--horizontal {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 181, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.42);
+}
+
+.zone-divider-line--vertical {
+  box-shadow:
+    inset 1px 0 0 rgba(255, 236, 181, 0.08),
+    inset -1px 0 0 rgba(0, 0, 0, 0.42);
+}
+
 .zone-label-pill {
   border-color: var(--seam-stroke);
   box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.26),
-    inset 0 1px 0 rgba(255, 236, 181, 0.22),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.38),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.18);
+    0 1px 0 rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 236, 181, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.32),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.12);
 }
 
 /* Mobile battle life bar: zone-style inset on light walnut */
 .mobile-life-bar {
   background: var(--chrome-modal);
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.top-attached-rail {
+  background: var(--chrome-modal);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
 }
 
 /* Draft mobile token frame: simple outer edge */

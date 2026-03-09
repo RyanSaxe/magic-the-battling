@@ -1557,6 +1557,7 @@ function GameContent() {
                   onUpgradeSelect={setSelectedUpgradeId}
                   selectedPoolCardId={selectedPoolCardId}
                   onPoolCardSelect={setSelectedPoolCardId}
+                  isMobile={sizes.isMobile}
                 />
               )}
               {currentPhase === "awaiting_elimination" && (

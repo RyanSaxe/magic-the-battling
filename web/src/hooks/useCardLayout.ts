@@ -1,7 +1,9 @@
 import { useState, useCallback, useRef, useLayoutEffect } from "react";
 import { CARD_ASPECT_RATIO, bestFit, type ZoneDims } from "./cardSizeUtils";
 import {
+  computeConstrainedFrames,
   computeConstrainedLayoutState,
+  deriveConstraintsFromLayout,
   type ZoneConstraints,
   type ZoneFrameResult,
 } from "./computeConstrainedLayout";
@@ -31,6 +33,7 @@ export interface CardLayoutConfig {
   maxCardWidth?: number;
   maxBottomRightFraction?: number;
   constraints?: ZoneConstraints | null;
+  alwaysComputeFrames?: boolean;
 }
 
 export type CardLayoutResult = Record<string, ZoneDims>;
@@ -184,6 +187,7 @@ export function computeLayout(
   const brZones = brIds.map((id) => allZones.get(id)!);
 
   const primaryTop = topZones.filter((z) => z.priority === "primary");
+  const fillTop = topZones.filter((z) => z.priority === "fill");
   const primaryBL = blZones.filter((z) => z.priority === "primary");
   const fillBL = blZones.filter((z) => z.priority === "fill");
 
@@ -659,6 +663,160 @@ export function computeLayout(
         }
       }
     }
+
+    if (
+      fillTop.length === 1 &&
+      fillBL.length === 0 &&
+      primaryTop.length === 0 &&
+      primaryBL.length === 2 &&
+      !hasBR
+    ) {
+      const fillZone = fillTop[0];
+      const pA = primaryBL[0];
+      const pB = primaryBL[1];
+      const pAAvailW = blAvailW;
+      const pBAvailW = blAvailW;
+      const topFillAvailW = topAvailW;
+
+      for (let aRows = 1; aRows <= Math.min(pA.count, pA.maxRows); aRows++) {
+        const aActual = Math.ceil(pA.count / Math.ceil(pA.count / aRows));
+        if (aActual !== aRows) continue;
+        const aWCap = widthCap(pA, pAAvailW, aRows);
+        if (aWCap < minCardWidth) continue;
+
+        for (let bRows = 1; bRows <= Math.min(pB.count, pB.maxRows); bRows++) {
+          const bActual = Math.ceil(pB.count / Math.ceil(pB.count / bRows));
+          if (bActual !== bRows) continue;
+          const bWCap = widthCap(pB, pBAvailW, bRows);
+          if (bWCap < minCardWidth) continue;
+
+          const aVG = vGaps(pA, aRows);
+          const bVG = vGaps(pB, bRows);
+          const fillRows = Math.min(fillZone.count, fillZone.maxRows);
+          const fillWeightedRows = fillRows * 0.5;
+          const fillVG = vGaps(fillZone, fillRows);
+
+          const totalVG = aVG + bVG + fillVG;
+          const effectiveRows = aRows + bRows + fillWeightedRows;
+          const idealW =
+            (gridAvailH - totalVG) / (CARD_ASPECT_RATIO * effectiveRows);
+
+          let aW = Math.floor(Math.min(aWCap, idealW));
+          let bW = Math.floor(Math.min(bWCap, idealW));
+          if (aW < minCardWidth || bW < minCardWidth) continue;
+
+          if (aW < idealW || bW < idealW) {
+            const cappedA = aW <= bW;
+            const cappedW = Math.min(aW, bW);
+            const cappedRows = cappedA ? aRows : bRows;
+            const otherCap = cappedA ? bWCap : aWCap;
+            const otherRows = cappedA ? bRows : aRows;
+            const otherVG = cappedA ? bVG : aVG;
+            const cappedH =
+              cappedRows * Math.round(cappedW * CARD_ASPECT_RATIO) +
+              (cappedA ? aVG : bVG);
+            const fillMinW = Math.max(minCardWidth, Math.round(cappedW * 0.5));
+            const fillMinH =
+              fillRows * Math.round(fillMinW * CARD_ASPECT_RATIO) + fillVG;
+            const remainingH = gridAvailH - cappedH - fillMinH;
+            const otherW = Math.floor(
+              Math.min(
+                otherCap,
+                (remainingH - otherVG) / (CARD_ASPECT_RATIO * otherRows),
+              ),
+            );
+            if (otherW < minCardWidth) continue;
+            if (cappedA) {
+              bW = otherW;
+            } else {
+              aW = otherW;
+            }
+          }
+
+          const aCardH = Math.round(aW * CARD_ASPECT_RATIO);
+          const bCardH = Math.round(bW * CARD_ASPECT_RATIO);
+          const aGridH = aRows * aCardH + aVG;
+          const bGridH = bRows * bCardH + bVG;
+          const bottomPrimaryH = aGridH + bGridH;
+          const remainingH = gridAvailH - bottomPrimaryH;
+          const fillCols = Math.ceil(fillZone.count / fillRows);
+          const fillHGaps = fillZone.gap * Math.max(0, fillCols - 1);
+          const fillWFromH = Math.floor(
+            (remainingH - fillVG) / (fillRows * CARD_ASPECT_RATIO),
+          );
+          const smallerPrimaryW = Math.min(aW, bW);
+          const fillWCap = Math.min(
+            fillZone.maxCardWidth,
+            Math.floor((topFillAvailW - fillHGaps) / fillCols),
+            smallerPrimaryW,
+          );
+          const fillMinW = Math.max(minCardWidth, Math.round(smallerPrimaryW * 0.5));
+          let fillW = Math.min(fillWCap, fillWFromH);
+          if (fillW < fillMinW) continue;
+          fillW = Math.max(fillMinW, fillW);
+
+          const fillCardH = Math.round(fillW * CARD_ASPECT_RATIO);
+          const fillGridH = fillRows * fillCardH + fillVG;
+          const totalH =
+            fillGridH + topOverhead + columnGap + bottomPrimaryH + blOverhead;
+          const overflow = Math.max(0, totalH - availH);
+          if (overflow > 0) {
+            if (overflow < bestOverflow) {
+              bestOverflow = overflow;
+              const r = makeDefaults(zoneIds);
+              r[fillZone.id] = {
+                width: fillW,
+                height: fillCardH,
+                rows: fillRows,
+                columns: fillCols,
+              };
+              r[pA.id] = {
+                width: aW,
+                height: aCardH,
+                rows: aRows,
+                columns: Math.ceil(pA.count / aRows),
+              };
+              r[pB.id] = {
+                width: bW,
+                height: bCardH,
+                rows: bRows,
+                columns: Math.ceil(pB.count / bRows),
+              };
+              bestOverflowResult = r;
+            }
+            continue;
+          }
+
+          const fill = Math.min(1, totalH / availH);
+          const score =
+            smallerPrimaryW * Math.sqrt(fill) * Math.pow(0.9, aRows + bRows - 2);
+
+          if (score > bestScore) {
+            bestScore = score;
+            const r = makeDefaults(zoneIds);
+            r[fillZone.id] = {
+              width: fillW,
+              height: fillCardH,
+              rows: fillRows,
+              columns: fillCols,
+            };
+            r[pA.id] = {
+              width: aW,
+              height: aCardH,
+              rows: aRows,
+              columns: Math.ceil(pA.count / aRows),
+            };
+            r[pB.id] = {
+              width: bW,
+              height: bCardH,
+              rows: bRows,
+              columns: Math.ceil(pB.count / bRows),
+            };
+            bestResult = r;
+          }
+        }
+      }
+    }
   }
 
   const chosen = bestScore < 0 ? bestOverflowResult : bestResult;
@@ -828,9 +986,17 @@ export function useCardLayout(
       if (cfg.constraints) {
         return computeConstrainedLayoutState(w, h, cfg, cfg.constraints);
       }
+      const dims = computeLayout(w, h, cfg);
       return {
-        dims: computeLayout(w, h, cfg),
-        frames: null,
+        dims,
+        frames: cfg.alwaysComputeFrames
+          ? computeConstrainedFrames(
+              w,
+              h,
+              cfg,
+              deriveConstraintsFromLayout(dims, cfg, h, w),
+            )
+          : null,
       };
     },
     [],
