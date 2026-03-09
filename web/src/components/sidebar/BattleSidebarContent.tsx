@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { BattleView, Card as CardType } from "../../types";
 import { UpgradeStack } from "./UpgradeStack";
-import { POISON_COUNTER_IMAGE } from "../../constants/assets";
 
 interface BattleSidebarContentProps {
   currentBattle: BattleView;
@@ -14,6 +13,10 @@ interface BattleSidebarContentProps {
   onCreateTreasure?: () => void;
   onUntapAll?: () => void;
   onPassTurn?: () => void;
+  canManipulateOpponent?: boolean;
+  onCreateOpponentTreasure?: () => void;
+  onUntapOpponentAll?: () => void;
+  onPassOpponentTurn?: () => void;
 }
 
 function LifeCounter({
@@ -161,12 +164,14 @@ export function BattleSidebarContent({
   onCreateTreasure,
   onUntapAll,
   onPassTurn,
+  canManipulateOpponent,
+  onCreateOpponentTreasure,
+  onUntapOpponentAll,
+  onPassOpponentTurn,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
 
-  const yourPoison = currentBattle.your_poison;
-  const opponentPoison = currentBattle.opponent_poison;
   const isYourTurn = current_turn_name === playerName;
 
   return (
@@ -179,59 +184,76 @@ export function BattleSidebarContent({
         />
       </div>
 
-      {/* Life counters */}
+      {/* Controls panel */}
       <div className="flex items-center justify-center">
-        <div className="p-3 bg-black/40 w-full">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="text-center">
-              <div className="text-xs text-gray-400 uppercase mb-1 truncate max-w-[80px]">
-                {opponent_name}
-              </div>
-              <div className="flex justify-center">
-                <LifeCounter
-                  life={opponentLife}
-                  onChange={onOpponentLifeChange}
-                />
-              </div>
-              <div className="flex items-center justify-center gap-1 mt-1">
-                <img
-                  src={POISON_COUNTER_IMAGE}
-                  alt="Poison"
-                  className="w-6 h-6 rounded object-cover"
-                />
-                <span className="text-purple-400 text-xs font-medium">
-                  {opponentPoison}
-                </span>
-              </div>
+        <div className="p-3 bg-black/40 w-full space-y-2">
+          {canManipulateOpponent && (onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn) && (
+            <div className="flex gap-2">
+              {onCreateOpponentTreasure && (
+                <button
+                  onClick={onCreateOpponentTreasure}
+                  className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+                >
+                  Treasure
+                </button>
+              )}
+              {onUntapOpponentAll && (
+                <button
+                  onClick={onUntapOpponentAll}
+                  className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+                >
+                  Untap
+                </button>
+              )}
+              {onPassOpponentTurn && (
+                <button
+                  onClick={onPassOpponentTurn}
+                  disabled={isYourTurn}
+                  className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
+                    !isYourTurn
+                      ? "bg-indigo-600 hover:bg-indigo-500"
+                      : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
+                  }`}
+                >
+                  Pass
+                </button>
+              )}
             </div>
-            <div className="text-center">
-              <div className="text-xs text-gray-400 uppercase mb-1">You</div>
-              <div className="flex justify-center">
-                <LifeCounter life={yourLife} onChange={onYourLifeChange} />
-              </div>
-              <div className="flex items-center justify-center gap-1 mt-1">
-                <img
-                  src={POISON_COUNTER_IMAGE}
-                  alt="Poison"
-                  className="w-6 h-6 rounded object-cover"
-                />
-                <span className="text-purple-400 text-xs font-medium">
-                  {yourPoison}
-                </span>
-              </div>
+          )}
+
+          <div className="text-center">
+            <div className="text-xs text-gray-400 uppercase mb-1 truncate">
+              {opponent_name}
+            </div>
+            <div className="flex justify-center">
+              <LifeCounter
+                life={opponentLife}
+                onChange={onOpponentLifeChange}
+              />
             </div>
           </div>
+
           {current_turn_name && (
-            <div className="text-center text-xs mt-2">
-              {current_turn_name === playerName ? (
+            <div className="text-center text-xs py-1">
+              {isYourTurn ? (
                 <span className="text-green-400">It is your turn</span>
               ) : (
                 <span className="text-amber-400">Opponent's turn</span>
               )}
             </div>
           )}
+
+          <div className="text-center">
+            <div className="flex justify-center">
+              <LifeCounter life={yourLife} onChange={onYourLifeChange} />
+            </div>
+            <div className="text-xs text-gray-400 uppercase mt-1 truncate">
+              {playerName}
+            </div>
+          </div>
+
           {(onCreateTreasure || onUntapAll || onPassTurn) && (
-            <div className="mt-3 flex gap-2">
+            <div className="flex gap-2">
               {onCreateTreasure && (
                 <button
                   onClick={onCreateTreasure}
