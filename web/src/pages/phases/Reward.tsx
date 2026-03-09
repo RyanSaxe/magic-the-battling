@@ -183,7 +183,7 @@ export function RewardPhase({
     },
     layout: { top: ["rewards"], bottomLeft: ["upgrades", "pool"] },
     ...ZONE_LAYOUT_PADDING,
-    maxTopFraction: hasUpgradeSection ? 0.33 : undefined,
+    maxTopFraction: hasUpgradeSection ? 0.2 : undefined,
     alwaysComputeFrames: hasUpgradeSection,
   } satisfies CardLayoutConfig;
 
@@ -256,7 +256,12 @@ export function RewardPhase({
 
   const rewardsStyle = controlledStyle(zoneFrames?.rewards?.outerHeight);
   const upgradesStyle = controlledStyle(zoneFrames?.upgrades?.outerHeight);
-  const poolStyle = controlledStyle(zoneFrames?.pool?.outerHeight);
+  const poolStyle = zoneFrames
+    ? {
+        minHeight: zoneFrames.pool.outerHeight,
+        flex: "1 1 auto" as const,
+      }
+    : undefined;
 
   const isWinner = last_battle_result?.winner_name === self_player.name;
   const isDraw = last_battle_result?.is_draw;
@@ -286,7 +291,7 @@ export function RewardPhase({
 
   return (
     <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-      <div className="shrink-0 top-attached-rail px-4 py-2.5 sm:px-5 sm:py-3 text-[11px] sm:text-sm">
+      <div className="shrink-0 top-attached-rail top-attached-rail-pad text-[11px] sm:text-sm">
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-4">
           <div className="min-w-0 truncate text-left text-gray-300 leading-tight">
             {opponentLabel}
@@ -336,6 +341,24 @@ export function RewardPhase({
                 label="No rewards this round"
               />
             </div>
+          ) : !hasUpgradeSection ? (
+            <div className="flex items-center justify-center min-h-full">
+              <CardGrid columns={dims.rewards.columns} cardWidth={rewardsDims.width}>
+                {rewardItems.map((item) => (
+                  <Card
+                    key={item.key}
+                    card={item.card}
+                    dimensions={rewardsDims}
+                    selected={selectedRewardCardId === item.card.id}
+                    onClick={() =>
+                      setSelectedRewardCardId((current) =>
+                        current === item.card.id ? null : item.card.id,
+                      )
+                    }
+                  />
+                ))}
+              </CardGrid>
+            </div>
           ) : (
             <CardGrid columns={dims.rewards.columns} cardWidth={rewardsDims.width}>
               {rewardItems.map((item) => (
@@ -366,7 +389,7 @@ export function RewardPhase({
         {hasUpgradeSection && (
           <div
             className={`flex flex-col min-h-0 w-full ${zoneFrames ? "" : "flex-1"}`}
-            style={zoneFrames ? { flex: "0 0 auto" } : undefined}
+            style={zoneFrames ? { flex: "1 1 auto", minHeight: 0 } : undefined}
           >
             <div
               ref={upgradesZoneRef}

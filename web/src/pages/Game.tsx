@@ -1348,7 +1348,7 @@ function GameContent() {
               <main className="flex-1 flex flex-col min-h-0 min-w-0">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
                 {sizes.isMobile && current_battle && (
-                  <div className="shrink-0 flex items-center justify-between px-2 py-1 mb-[2px] mobile-life-bar text-xs">
+                  <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mb-[2px] mobile-life-bar text-xs">
                     <div className="flex items-center gap-1">
                       <span className="text-gray-300 truncate max-w-[60px]">{current_battle.opponent_name}</span>
                       <div className="flex items-center gap-0.5 rounded px-1 py-0.5" style={{ background: 'var(--chrome)' }}>

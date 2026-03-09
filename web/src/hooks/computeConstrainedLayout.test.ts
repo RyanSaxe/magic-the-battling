@@ -138,7 +138,7 @@ describe("computeConstrainedLayout", () => {
           top: ["rewards"],
           bottomLeft: ["upgrades", "pool"],
         },
-        maxTopFraction: 0.33,
+        maxTopFraction: 0.2,
         ...ZONE_LAYOUT_PADDING,
       };
 
@@ -160,7 +160,7 @@ describe("computeConstrainedLayout", () => {
       expect(frames.rewards.innerHeight).toBeGreaterThan(0);
       expect(frames.upgrades.innerHeight).toBeGreaterThan(0);
       expect(frames.pool.innerHeight).toBeGreaterThan(0);
-      expect(derived.topFraction).toBeLessThanOrEqual(0.33);
+      expect(derived.topFraction).toBeLessThanOrEqual(0.2);
       expect(usedHeight).toBe(650);
     });
 
@@ -175,7 +175,7 @@ describe("computeConstrainedLayout", () => {
           top: ["rewards"],
           bottomLeft: ["upgrades", "pool"],
         },
-        maxTopFraction: 0.33,
+        maxTopFraction: 0.2,
         ...ZONE_LAYOUT_PADDING,
       };
 
@@ -207,7 +207,7 @@ describe("computeConstrainedLayout", () => {
       expect(upgradesGridHeight).toBeLessThanOrEqual(frames.upgrades.innerHeight);
       expect(poolGridHeight).toBeLessThanOrEqual(frames.pool.innerHeight);
       expect(frames.rewards.outerHeight).toBeLessThanOrEqual(
-        Math.ceil((520 - ZONE_LAYOUT_PADDING.sectionGap) * 0.33),
+        Math.ceil((520 - ZONE_LAYOUT_PADDING.sectionGap) * 0.2),
       );
     });
   });
