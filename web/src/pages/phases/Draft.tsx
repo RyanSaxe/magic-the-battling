@@ -3,6 +3,7 @@ import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useCardLayout } from '../../hooks/useCardLayout'
 import { ZoneDivider } from '../../components/common/ZoneDivider'
+import { LayoutResetControl } from '../../components/common/LayoutResetControl'
 import { ZoneLabel } from '../../components/common/ZoneLabel'
 import { usePersistedConstraints } from '../../hooks/usePersistedConstraints'
 import { useZoneDividers } from '../../hooks/useZoneDividers'
@@ -36,7 +37,16 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
   const currentPack = self_player.current_pack ?? []
   const pool = [...self_player.hand, ...self_player.sideboard]
 
-  const [constraints, setConstraints, clearConstraints] = usePersistedConstraints('draft')
+  const {
+    constraints,
+    setConstraints,
+    clearConstraints,
+    resolution: persistedLayout,
+  } = usePersistedConstraints({
+    scopeKey: 'phase:draft',
+    stage: self_player.stage,
+    round: self_player.round,
+  })
 
   const draftDefaultLayoutConfig = {
     zones: {
@@ -138,10 +148,22 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
   )
 
   return (
-    <div ref={containerRef} className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col h-full" onClick={handleBackgroundClick}>
+    <div ref={containerRef} className="relative zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col h-full" onClick={handleBackgroundClick}>
+      {persistedLayout.canReset && (
+        <LayoutResetControl
+          phaseLabel="Draft"
+          currentStage={self_player.stage}
+          currentRound={self_player.round}
+          originStage={persistedLayout.originStage}
+          originRound={persistedLayout.originRound}
+          isInherited={persistedLayout.source === 'inherited'}
+          onConfirm={clearConstraints}
+          position={isMobile ? 'bottom-right' : 'top-right'}
+        />
+      )}
       <div className="flex flex-col flex-1 min-h-0" style={{ gap: dividerCallbacks.topDivider ? 0 : 2 }}>
         {/* Pack */}
-        <div ref={packZoneRef} className="zone-pack px-3 pt-5 pb-3 relative" style={packStyle}>
+        <div ref={packZoneRef} className="zone-pack w-full px-3 pt-5 pb-3 relative" style={packStyle}>
           {isMobile && (
             <>
               <div className="absolute top-0 left-0 pointer-events-none z-10">
@@ -208,7 +230,7 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
         )}
 
         {/* Pool */}
-        <div ref={poolZoneRef} className={`zone-sideboard px-3 pt-5 pb-3 relative ${zoneFrames ? '' : 'flex-1'}`} style={poolStyle}>
+        <div ref={poolZoneRef} className={`zone-sideboard w-full px-3 pt-5 pb-3 relative ${zoneFrames ? '' : 'flex-1'}`} style={poolStyle}>
           <ZoneLabel mobileDragCallbacks={isMobile ? dividerCallbacks.topDivider : null}>
             Pool
           </ZoneLabel>

@@ -11,6 +11,7 @@ import { BasicLandSlot } from "../../components/common/BasicLandSlot";
 import { TreasureCard } from "../../components/common/TreasureCard";
 import { PoisonCard } from "../../components/common/PoisonCard";
 import { CardGrid } from "../../components/common/CardGrid";
+import { LayoutResetControl } from "../../components/common/LayoutResetControl";
 import { ZoneLayout } from "../../components/common/ZoneLayout";
 import { useCardLayout, ZONE_LAYOUT_PADDING } from "../../hooks/useCardLayout";
 import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
@@ -224,7 +225,16 @@ export function BuildPhase({
     setStableSBCount(self_player.sideboard.length);
   }
 
-  const [constraints, setConstraints, clearConstraints] = usePersistedConstraints('build');
+  const {
+    constraints,
+    setConstraints,
+    clearConstraints,
+    resolution: persistedLayout,
+  } = usePersistedConstraints({
+    scopeKey: "phase:build",
+    stage: self_player.stage,
+    round: self_player.round,
+  });
 
   const battlefieldCount = 3 + 1 + 1; // 3 basic slots + treasure + poison
   const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
@@ -404,7 +414,7 @@ export function BuildPhase({
 
       <ZoneLayout
         containerRef={containerRef}
-        className={`zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col transition-opacity ${locked ? "opacity-60 pointer-events-none" : ""}`}
+        className={`transition-opacity ${locked ? "opacity-60" : ""}`}
         onClick={handleBackgroundClick}
         isMobile={isMobile}
         zoneHeights={zoneFrames ? {
@@ -423,6 +433,20 @@ export function BuildPhase({
             sideboardZoneRef.current = node;
           },
         }}
+        overlay={
+          persistedLayout.canReset ? (
+            <LayoutResetControl
+              phaseLabel="Build"
+              currentStage={self_player.stage}
+              currentRound={self_player.round}
+              originStage={persistedLayout.originStage}
+              originRound={persistedLayout.originRound}
+              isInherited={persistedLayout.source === "inherited"}
+              onConfirm={clearConstraints}
+              position="top-right"
+            />
+          ) : null
+        }
         hasHand={true}
         hasBattlefield={true}
         hasSideboard={hasSideboard}
