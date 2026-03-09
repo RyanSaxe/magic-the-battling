@@ -3,6 +3,20 @@ import type { DividerCallbacks } from '../../hooks/useZoneDividers'
 import { ZoneDivider } from './ZoneDivider'
 import { ZoneLabel } from './ZoneLabel'
 
+interface ZoneSectionHeights {
+  hand?: number
+  battlefield?: number
+  sideboard?: number
+  upgrades?: number
+}
+
+interface ZoneRefs {
+  hand?: RefCallback<HTMLDivElement>
+  battlefield?: RefCallback<HTMLDivElement>
+  sideboard?: RefCallback<HTMLDivElement>
+  upgrades?: RefCallback<HTMLDivElement>
+}
+
 interface ZoneLayoutProps {
   handContent: ReactNode
   handLabel: ReactNode
@@ -21,6 +35,8 @@ interface ZoneLayoutProps {
   onClick?: React.MouseEventHandler<HTMLDivElement>
   dividerCallbacks?: DividerCallbacks | null
   isMobile?: boolean
+  zoneHeights?: ZoneSectionHeights | null
+  zoneRefs?: ZoneRefs
 }
 
 export function ZoneLayout({
@@ -41,10 +57,13 @@ export function ZoneLayout({
   onClick,
   dividerCallbacks,
   isMobile = false,
+  zoneHeights = null,
+  zoneRefs,
 }: ZoneLayoutProps) {
   const hasLower = hasBattlefield || hasSideboard || hasUpgrades
   const hasRight = hasBattlefield || hasSideboard
   const hasDividers = !!dividerCallbacks
+  const isControlled = !!zoneHeights
   const gap = hasDividers ? 0 : 2
   const mobileTopHandle = isMobile ? dividerCallbacks?.topDivider ?? null : null
   const mobileBottomSplitHandle = isMobile
@@ -55,12 +74,16 @@ export function ZoneLayout({
     ? mobileBottomSplitHandle
     : mobileTopHandle
   const upgradesLabelHandle = hasUpgrades ? mobileTopHandle : null
+  const controlledStyle = (height?: number) =>
+    isControlled && height != null
+      ? { height, flex: '0 0 auto' as const }
+      : undefined
 
   return (
     <div ref={containerRef} className={className ?? 'zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col'} onClick={onClick}>
       <div className="flex flex-col flex-1 min-h-0" style={{ gap }}>
         {hasHand && (
-          <div className="zone-hand px-3 pt-5 pb-3 relative">
+          <div ref={zoneRefs?.hand} className="zone-hand px-3 pt-5 pb-3 relative" style={controlledStyle(zoneHeights?.hand)}>
             <ZoneLabel>{handLabel}</ZoneLabel>
             {handContent}
           </div>
@@ -73,11 +96,11 @@ export function ZoneLayout({
           />
         )}
         {hasLower && (
-          <div className="flex flex-1 min-h-0" style={{ gap }}>
+          <div className={`flex min-h-0 ${isControlled ? '' : 'flex-1'}`} style={{ gap, ...(isControlled ? { flex: '0 0 auto' } : {}) }}>
             {hasRight && (
-              <div className="flex-1 min-w-0 flex flex-col" style={{ gap }}>
+              <div className={`min-w-0 flex flex-col ${isControlled ? '' : 'flex-1'}`} style={{ gap, ...(isControlled ? { flex: '0 0 auto' } : {}) }}>
                 {hasBattlefield && (
-                  <div className="zone-battlefield px-3 pt-5 pb-3 relative">
+                  <div ref={zoneRefs?.battlefield} className="zone-battlefield px-3 pt-5 pb-3 relative" style={controlledStyle(zoneHeights?.battlefield)}>
                     <ZoneLabel mobileDragCallbacks={battlefieldLabelHandle}>
                       {battlefieldLabel}
                     </ZoneLabel>
@@ -92,7 +115,7 @@ export function ZoneLayout({
                   />
                 )}
                 {hasSideboard && (
-                  <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1 min-h-0">
+                  <div ref={zoneRefs?.sideboard} className={`zone-sideboard px-3 pt-5 pb-3 relative min-h-0 ${isControlled ? '' : 'flex-1'}`} style={controlledStyle(zoneHeights?.sideboard)}>
                     <ZoneLabel mobileDragCallbacks={sideboardLabelHandle}>
                       {sideboardLabel}
                     </ZoneLabel>
@@ -109,7 +132,7 @@ export function ZoneLayout({
               />
             )}
             {hasUpgrades && (
-              <div className="zone-upgrades px-3 pt-5 pb-3 relative flex items-center justify-center" style={{ minWidth: '7rem' }}>
+              <div ref={zoneRefs?.upgrades} className="zone-upgrades px-3 pt-5 pb-3 relative flex items-center justify-center" style={{ minWidth: '7rem', ...(controlledStyle(zoneHeights?.upgrades) ?? {}) }}>
                 <ZoneLabel mobileDragCallbacks={upgradesLabelHandle}>
                   {upgradesLabel}
                 </ZoneLabel>

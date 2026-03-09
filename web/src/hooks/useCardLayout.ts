@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useLayoutEffect } from "react";
 import { CARD_ASPECT_RATIO, bestFit, type ZoneDims } from "./cardSizeUtils";
 import {
-  computeConstrainedLayout,
+  computeConstrainedLayoutState,
   type ZoneConstraints,
+  type ZoneFrameResult,
 } from "./computeConstrainedLayout";
 
 export interface ZoneSpec {
@@ -770,9 +771,39 @@ export interface ContainerSize {
   height: number;
 }
 
+function framesEqual(a: ZoneFrameResult | null, b: ZoneFrameResult | null): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+
+  for (const key of aKeys) {
+    const af = a[key];
+    const bf = b[key];
+    if (!bf) return false;
+    if (
+      af.innerWidth !== bf.innerWidth ||
+      af.innerHeight !== bf.innerHeight ||
+      af.outerWidth !== bf.outerWidth ||
+      af.outerHeight !== bf.outerHeight
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function useCardLayout(
   config: CardLayoutConfig,
-): [React.RefCallback<HTMLElement>, CardLayoutResult, ContainerSize] {
+): [
+  React.RefCallback<HTMLElement>,
+  CardLayoutResult,
+  ContainerSize,
+  ZoneFrameResult | null,
+] {
   const zoneIds = Object.keys(config.zones);
 
   const [dims, setDims] = useState<CardLayoutResult>(() =>
@@ -782,6 +813,7 @@ export function useCardLayout(
     width: 0,
     height: 0,
   });
+  const [zoneFrames, setZoneFrames] = useState<ZoneFrameResult | null>(null);
 
   const configRef = useRef(config);
   // eslint-disable-next-line react-hooks/refs -- must sync before useLayoutEffect reads it
@@ -794,9 +826,12 @@ export function useCardLayout(
     (w: number, h: number) => {
       const cfg = configRef.current;
       if (cfg.constraints) {
-        return computeConstrainedLayout(w, h, cfg, cfg.constraints);
+        return computeConstrainedLayoutState(w, h, cfg, cfg.constraints);
       }
-      return computeLayout(w, h, cfg);
+      return {
+        dims: computeLayout(w, h, cfg),
+        frames: null,
+      };
     },
     [],
   );
@@ -809,7 +844,8 @@ export function useCardLayout(
         prev.width === qW && prev.height === qH ? prev : { width: qW, height: qH },
       );
       const next = compute(qW, qH);
-      setDims((prev) => (dimsEqual(prev, next) ? prev : next));
+      setDims((prev) => (dimsEqual(prev, next.dims) ? prev : next.dims));
+      setZoneFrames((prev) => (framesEqual(prev, next.frames) ? prev : next.frames));
     },
     [compute],
   );
@@ -863,5 +899,5 @@ export function useCardLayout(
     }
   });
 
-  return [refCallback, dims, containerSize];
+  return [refCallback, dims, containerSize, zoneFrames];
 }

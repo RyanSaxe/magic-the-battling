@@ -97,8 +97,12 @@ export function BuildPhase({
   const { self_player } = gameState;
   const maxHandSize = self_player.hand_size;
   const locked = self_player.build_ready;
+  const hasSideboard = self_player.sideboard.length > 0;
 
   const hasUserInteracted = useRef(false);
+  const handZoneRef = useRef<HTMLDivElement | null>(null);
+  const battlefieldZoneRef = useRef<HTMLDivElement | null>(null);
+  const sideboardZoneRef = useRef<HTMLDivElement | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
     if (!(e.target as HTMLElement).closest(".card, .card-slot")) {
@@ -223,7 +227,7 @@ export function BuildPhase({
   const [constraints, setConstraints, clearConstraints] = usePersistedConstraints('build');
 
   const battlefieldCount = 3 + 1 + 1; // 3 basic slots + treasure + poison
-  const [containerRef, dims, containerSize] = useCardLayout({
+  const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
     zones: {
       hand: { count: maxHandSize },
       battlefield: { count: battlefieldCount, priority: "fill", maxRows: 1 },
@@ -249,6 +253,44 @@ export function BuildPhase({
     containerWidth: containerSize.width,
     currentLayout: dims,
     layoutConfig,
+    measureInitialConstraints: () => {
+      const handOuter = handZoneRef.current?.getBoundingClientRect().height ?? 0;
+      const battlefieldOuter =
+        battlefieldZoneRef.current?.getBoundingClientRect().height ?? 0;
+      const sideboardOuter =
+        sideboardZoneRef.current?.getBoundingClientRect().height ?? 0;
+      const sectionGap = ZONE_LAYOUT_PADDING.sectionGap;
+      const sectionPadV =
+        ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom;
+
+      const lowerOuter =
+        battlefieldOuter + (hasSideboard ? sideboardOuter + sectionGap : 0);
+      const usableH = handOuter + lowerOuter;
+
+      let bottomLeftSplit = 0.5;
+      if (hasSideboard) {
+        const battlefieldInner = Math.max(0, battlefieldOuter - sectionPadV);
+        const sideboardInner = Math.max(0, sideboardOuter - sectionPadV);
+        const totalInner = battlefieldInner + sideboardInner;
+        if (totalInner > 0) {
+          bottomLeftSplit = battlefieldInner / totalInner;
+        }
+      }
+
+      return usableH > 0
+        ? {
+            topFraction: handOuter / usableH,
+            leftFraction: 0.7,
+            bottomLeftSplit,
+            usableHeight: usableH,
+            bottomInnerHeight: Math.max(
+              0,
+              lowerOuter - (hasSideboard ? sectionGap : 0) - (hasSideboard ? 2 * sectionPadV : sectionPadV),
+            ),
+            usableWidth: containerSize.width,
+          }
+        : null;
+    },
     constraints,
     onConstraintsChange: setConstraints,
     onConstraintsClear: clearConstraints,
@@ -365,9 +407,25 @@ export function BuildPhase({
         className={`zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col transition-opacity ${locked ? "opacity-60 pointer-events-none" : ""}`}
         onClick={handleBackgroundClick}
         isMobile={isMobile}
+        zoneHeights={zoneFrames ? {
+          hand: zoneFrames.hand.outerHeight,
+          battlefield: zoneFrames.battlefield.outerHeight,
+          sideboard: zoneFrames.sideboard.outerHeight,
+        } : null}
+        zoneRefs={{
+          hand: (node) => {
+            handZoneRef.current = node;
+          },
+          battlefield: (node) => {
+            battlefieldZoneRef.current = node;
+          },
+          sideboard: (node) => {
+            sideboardZoneRef.current = node;
+          },
+        }}
         hasHand={true}
         hasBattlefield={true}
-        hasSideboard={self_player.sideboard.length > 0}
+        hasSideboard={hasSideboard}
         hasUpgrades={false}
         dividerCallbacks={locked ? null : dividerCallbacks}
         handLabel="Hand"

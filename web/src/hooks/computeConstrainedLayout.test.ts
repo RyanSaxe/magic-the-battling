@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { computeConstrainedLayout } from "./computeConstrainedLayout";
+import {
+  computeConstrainedFrames,
+  computeConstrainedLayout,
+} from "./computeConstrainedLayout";
 import { ZONE_LAYOUT_PADDING } from "./useCardLayout";
 import { CARD_ASPECT_RATIO } from "./cardSizeUtils";
 
@@ -92,6 +95,34 @@ describe("computeConstrainedLayout", () => {
       expect(result.hand.width).toBeGreaterThan(0);
       expect(result.battlefield.width).toBeGreaterThan(0);
       expect(result.sideboard.width).toBeGreaterThan(0);
+    });
+
+    it("returns zone frames that sum to the constrained vertical space", () => {
+      const frames = computeConstrainedFrames(
+        1000,
+        700,
+        {
+          zones: {
+            hand: { count: 7 },
+            battlefield: { count: 5, priority: "fill", maxRows: 1 },
+            sideboard: { count: 12 },
+          },
+          layout: {
+            top: ["hand"],
+            bottomLeft: ["battlefield", "sideboard"],
+          },
+          ...ZONE_LAYOUT_PADDING,
+        },
+        { topFraction: 0.4, bottomLeftSplit: 0.3 },
+      );
+
+      const usedHeight =
+        frames.hand.outerHeight +
+        frames.battlefield.outerHeight +
+        frames.sideboard.outerHeight +
+        ZONE_LAYOUT_PADDING.sectionGap * 2;
+
+      expect(usedHeight).toBe(700);
     });
   });
 
@@ -196,6 +227,26 @@ describe("computeConstrainedLayout", () => {
           expect(height).toBe(Math.round(width * CARD_ASPECT_RATIO));
         }
       }
+    });
+  });
+
+  describe("manual overrides ignore default max card caps", () => {
+    it("allows cards to grow past the zone maxCardWidth when space exists", () => {
+      const result = computeConstrainedLayout(
+        1600,
+        900,
+        {
+          zones: {
+            pack: { count: 2, maxCardWidth: 120 },
+            pool: { count: 2, maxCardWidth: 120 },
+          },
+          layout: { top: ["pack"], bottomLeft: ["pool"] },
+        },
+        { topFraction: 0.5 },
+      );
+
+      expect(result.pack.width).toBeGreaterThan(120);
+      expect(result.pool.width).toBeGreaterThan(120);
     });
   });
 });

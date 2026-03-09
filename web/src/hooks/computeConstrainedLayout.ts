@@ -11,11 +11,27 @@ export interface ZoneConstraints {
   bottomLeftSplit?: number;
 }
 
+export interface ZoneFrame {
+  innerWidth: number;
+  innerHeight: number;
+  outerWidth: number;
+  outerHeight: number;
+}
+
+export type ZoneFrameResult = Record<string, ZoneFrame>;
+
 const DEFAULT_DIMS: ZoneDims = {
   width: 100,
   height: 140,
   rows: 1,
   columns: 1,
+};
+
+const DEFAULT_FRAME: ZoneFrame = {
+  innerWidth: 0,
+  innerHeight: 0,
+  outerWidth: 0,
+  outerHeight: 0,
 };
 
 interface ResolvedZone {
@@ -35,21 +51,25 @@ function fitZone(
   w: number,
   h: number,
   minCardWidth: number,
+  respectMaxCardWidth: boolean,
 ): ZoneDims {
-  if (w <= 0 || h <= 0) return DEFAULT_DIMS;
+  if (zone.count <= 0 || w <= 0 || h <= 0) return DEFAULT_DIMS;
+  const effectiveMaxWidth = respectMaxCardWidth
+    ? zone.maxCardWidth
+    : Number.POSITIVE_INFINITY;
   const fit = bestFit(
     zone.count,
     w,
     h,
     zone.gap,
-    zone.maxCardWidth,
+    effectiveMaxWidth,
     minCardWidth,
   );
   if (fit.rows > zone.maxRows) {
     const rows = zone.maxRows;
     const cols = Math.ceil(zone.count / rows);
     const hGaps = zone.gap * Math.max(0, cols - 1);
-    const wCap = Math.min(zone.maxCardWidth, Math.floor((w - hGaps) / cols));
+    const wCap = Math.min(effectiveMaxWidth, Math.floor((w - hGaps) / cols));
     const vG = zone.gap * Math.max(0, rows - 1);
     const wFromH = Math.floor((h - vG) / (rows * CARD_ASPECT_RATIO));
     const finalW = Math.max(minCardWidth, Math.min(wCap, wFromH));
@@ -61,6 +81,44 @@ function fitZone(
     };
   }
   return fit;
+}
+
+function makeDefaultDims(zoneIds: string[]): CardLayoutResult {
+  const result: CardLayoutResult = {};
+  for (const id of zoneIds) result[id] = DEFAULT_DIMS;
+  return result;
+}
+
+function makeDefaultFrames(zoneIds: string[]): ZoneFrameResult {
+  const result: ZoneFrameResult = {};
+  for (const id of zoneIds) result[id] = DEFAULT_FRAME;
+  return result;
+}
+
+function getActiveIds(config: CardLayoutConfig) {
+  const topIds = (config.layout.top ?? []).filter(
+    (id) => (config.zones[id]?.count ?? 0) > 0,
+  );
+  const blIds = (config.layout.bottomLeft ?? []).filter(
+    (id) => (config.zones[id]?.count ?? 0) > 0,
+  );
+  const brIds = (config.layout.bottomRight ?? []).filter(
+    (id) => (config.zones[id]?.count ?? 0) > 0,
+  );
+
+  return { topIds, blIds, brIds };
+}
+
+function distributeInnerHeights(totalInner: number, count: number): number[] {
+  if (count <= 0) return [];
+  const base = Math.floor(totalInner / count);
+  let remainder = totalInner - base * count;
+
+  return Array.from({ length: count }, () => {
+    if (remainder <= 0) return base;
+    remainder -= 1;
+    return base + 1;
+  });
 }
 
 export function deriveConstraintsFromLayout(
@@ -86,15 +144,11 @@ export function deriveConstraintsFromLayout(
   } = config;
   const sectionPadV = sectionPadTop + sectionPadBottom;
 
-  const topIds = (config.layout.top ?? []).filter(
-    (id) => (config.zones[id]?.count ?? 0) > 0,
-  );
-  const blIds = (config.layout.bottomLeft ?? []).filter(
-    (id) => (config.zones[id]?.count ?? 0) > 0,
-  );
-  const brIds = (config.layout.bottomRight ?? []).filter(
-    (id) => (config.zones[id]?.count ?? 0) > 0,
-  );
+  const { topIds, blIds, brIds } = getActiveIds(config);
+  const hasTop = topIds.length > 0;
+  const hasBottom = blIds.length > 0 || brIds.length > 0;
+  const columnGap = hasTop && hasBottom ? sectionGap : 0;
+  const usableH = availH - columnGap;
 
   let topPixels = 0;
   for (const id of topIds) {
@@ -102,7 +156,8 @@ export function deriveConstraintsFromLayout(
     const gap = config.zones[id]?.gap ?? 6;
     if (d && d.width > 0) topPixels += zoneGridH(d, gap) + sectionPadV;
   }
-  const topFraction = availH > 0 ? topPixels / availH : 0.5;
+  const topFraction =
+    hasTop && hasBottom && usableH > 0 ? topPixels / usableH : 0.5;
 
   let rightPixels = 0;
   for (const id of brIds) {
@@ -133,15 +188,9 @@ export function deriveConstraintsFromLayout(
       if (i === 0) firstGridH = gh;
     }
     const totalInner = totalGridH > 0 ? totalGridH : 1;
-    // Derive from the unconstrained grid heights, excluding padding
-    // since computeConstrainedLayout applies padding separately
-    const columnGap =
-      topIds.length > 0 && (blIds.length > 0 || brIds.length > 0)
-        ? sectionGap
-        : 0;
-    const bottomH = availH - topPixels - columnGap;
-    const totalInnerH =
-      bottomH - blIds.length * sectionPadV - blGaps;
+    const bottomOuterH =
+      hasTop && hasBottom ? usableH - topPixels : availH;
+    const totalInnerH = bottomOuterH - blIds.length * sectionPadV - blGaps;
     if (totalInnerH > 0 && totalInner > 0) {
       bottomLeftSplit = firstGridH / totalInner;
     }
@@ -150,12 +199,12 @@ export function deriveConstraintsFromLayout(
   return { topFraction, leftFraction, bottomLeftSplit };
 }
 
-export function computeConstrainedLayout(
+export function computeConstrainedFrames(
   containerW: number,
   containerH: number,
   config: CardLayoutConfig,
   constraints: ZoneConstraints,
-): CardLayoutResult {
+): ZoneFrameResult {
   const {
     fixedHeight = 0,
     padding = 0,
@@ -163,42 +212,19 @@ export function computeConstrainedLayout(
     sectionPadTop = 0,
     sectionPadBottom = 0,
     sectionGap = 0,
-    minCardWidth = 1,
-    maxCardWidth = 200,
   } = config;
 
   const zoneIds = Object.keys(config.zones);
-  const result: CardLayoutResult = {};
-  for (const id of zoneIds) result[id] = DEFAULT_DIMS;
+  const frames = makeDefaultFrames(zoneIds);
 
   const availW = containerW - padding;
   const availH = containerH - fixedHeight;
-  if (availW <= 0 || availH <= 0) return result;
+  if (availW <= 0 || availH <= 0) return frames;
 
   const sectionPadV = sectionPadTop + sectionPadBottom;
-
-  const resolve = (id: string): ResolvedZone => {
-    const spec = config.zones[id];
-    return {
-      id,
-      count: spec.count,
-      gap: spec.gap ?? 6,
-      maxCardWidth: spec.maxCardWidth ?? maxCardWidth,
-      maxRows: spec.maxRows ?? Infinity,
-    };
-  };
-
-  const topIds = (config.layout.top ?? []).filter(
-    (id) => (config.zones[id]?.count ?? 0) > 0,
-  );
-  const blIds = (config.layout.bottomLeft ?? []).filter(
-    (id) => (config.zones[id]?.count ?? 0) > 0,
-  );
-  const brIds = (config.layout.bottomRight ?? []).filter(
-    (id) => (config.zones[id]?.count ?? 0) > 0,
-  );
+  const { topIds, blIds, brIds } = getActiveIds(config);
   const activeIds = [...topIds, ...blIds, ...brIds];
-  if (activeIds.length === 0) return result;
+  if (activeIds.length === 0) return frames;
 
   const unconstrained = computeLayout(containerW, containerH, config);
   const derived = deriveConstraintsFromLayout(
@@ -216,67 +242,133 @@ export function computeConstrainedLayout(
   const hasTop = topIds.length > 0;
   const hasBottom = blIds.length > 0 || brIds.length > 0;
   const columnGap = hasTop && hasBottom ? sectionGap : 0;
-
   const usableH = availH - columnGap;
-  const topH = hasTop && hasBottom
+
+  const topOuterH = hasTop && hasBottom
     ? Math.round(usableH * topFraction)
     : hasTop
       ? availH
       : 0;
-  const bottomH = hasTop && hasBottom
-    ? usableH - topH
+  const bottomOuterH = hasTop && hasBottom
+    ? usableH - topOuterH
     : hasBottom
       ? availH
       : 0;
 
-  for (const id of topIds) {
-    const zone = resolve(id);
-    const secW = availW - 2 * sectionPadH;
-    const secH = topH - sectionPadV;
-    result[id] = fitZone(zone, secW, secH, minCardWidth);
-  }
-
   const lrGap = blIds.length > 0 && brIds.length > 0 ? sectionGap : 0;
-  const leftW = brIds.length > 0
+  const leftOuterW = brIds.length > 0
     ? Math.round((availW - lrGap) * leftFraction)
     : availW;
-  const rightW = brIds.length > 0 ? availW - leftW - lrGap : 0;
+  const rightOuterW = brIds.length > 0 ? availW - leftOuterW - lrGap : 0;
+
+  const assignFrame = (
+    id: string,
+    outerWidth: number,
+    outerHeight: number,
+  ) => {
+    frames[id] = {
+      outerWidth,
+      outerHeight,
+      innerWidth: Math.max(0, outerWidth - 2 * sectionPadH),
+      innerHeight: Math.max(0, outerHeight - sectionPadV),
+    };
+  };
+
+  for (const id of topIds) assignFrame(id, availW, topOuterH);
 
   if (blIds.length === 1) {
-    const zone = resolve(blIds[0]);
-    const secW = leftW - 2 * sectionPadH;
-    const secH = bottomH - sectionPadV;
-    result[blIds[0]] = fitZone(zone, secW, secH, minCardWidth);
+    assignFrame(blIds[0], leftOuterW, bottomOuterH);
   } else if (blIds.length >= 2) {
     const blSectionGaps = Math.max(0, blIds.length - 1) * sectionGap;
-    const totalInnerH = bottomH - blIds.length * sectionPadV - blSectionGaps;
-    const firstH =
-      Math.round(totalInnerH * bottomLeftSplit) + sectionPadV;
-    const restH = bottomH - firstH - blSectionGaps;
-
-    const first = resolve(blIds[0]);
-    const secW = leftW - 2 * sectionPadH;
-    result[blIds[0]] = fitZone(
-      first,
-      secW,
-      firstH - sectionPadV,
-      minCardWidth,
+    const totalInnerH = Math.max(
+      0,
+      bottomOuterH - blIds.length * sectionPadV - blSectionGaps,
     );
+    const firstInnerH = Math.max(
+      0,
+      Math.min(totalInnerH, Math.round(totalInnerH * bottomLeftSplit)),
+    );
+    assignFrame(blIds[0], leftOuterW, firstInnerH + sectionPadV);
 
     const remainingIds = blIds.slice(1);
-    const perZoneH = Math.floor(restH / remainingIds.length);
-    for (const id of remainingIds) {
-      const zone = resolve(id);
-      result[id] = fitZone(zone, secW, perZoneH - sectionPadV, minCardWidth);
-    }
+    const remainingInnerH = Math.max(0, totalInnerH - firstInnerH);
+    const distributed = distributeInnerHeights(
+      remainingInnerH,
+      remainingIds.length,
+    );
+
+    remainingIds.forEach((id, index) => {
+      assignFrame(id, leftOuterW, distributed[index] + sectionPadV);
+    });
   }
 
-  for (const id of brIds) {
+  for (const id of brIds) assignFrame(id, rightOuterW, bottomOuterH);
+
+  return frames;
+}
+
+export interface ConstrainedLayoutState {
+  dims: CardLayoutResult;
+  frames: ZoneFrameResult;
+}
+
+export function computeConstrainedLayoutState(
+  containerW: number,
+  containerH: number,
+  config: CardLayoutConfig,
+  constraints: ZoneConstraints,
+): ConstrainedLayoutState {
+  const {
+    minCardWidth = 1,
+    maxCardWidth = 200,
+  } = config;
+
+  const zoneIds = Object.keys(config.zones);
+  const dims = makeDefaultDims(zoneIds);
+  const frames = computeConstrainedFrames(
+    containerW,
+    containerH,
+    config,
+    constraints,
+  );
+
+  const resolve = (id: string): ResolvedZone => {
+    const spec = config.zones[id];
+    return {
+      id,
+      count: spec.count,
+      gap: spec.gap ?? 6,
+      maxCardWidth: spec.maxCardWidth ?? maxCardWidth,
+      maxRows: spec.maxRows ?? Infinity,
+    };
+  };
+
+  for (const id of zoneIds) {
     const zone = resolve(id);
-    const secW = rightW - 2 * sectionPadH;
-    const secH = bottomH - sectionPadV;
-    result[id] = fitZone(zone, secW, secH, minCardWidth);
+    const frame = frames[id];
+    if (!frame || frame.innerWidth <= 0 || frame.innerHeight <= 0) continue;
+    dims[id] = fitZone(
+      zone,
+      frame.innerWidth,
+      frame.innerHeight,
+      minCardWidth,
+      false,
+    );
   }
 
-  return result;
+  return { dims, frames };
+}
+
+export function computeConstrainedLayout(
+  containerW: number,
+  containerH: number,
+  config: CardLayoutConfig,
+  constraints: ZoneConstraints,
+): CardLayoutResult {
+  return computeConstrainedLayoutState(
+    containerW,
+    containerH,
+    config,
+    constraints,
+  ).dims;
 }
