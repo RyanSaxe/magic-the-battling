@@ -13,6 +13,8 @@ import { PoisonCard } from "../../components/common/PoisonCard";
 import { CardGrid } from "../../components/common/CardGrid";
 import { ZoneLayout } from "../../components/common/ZoneLayout";
 import { useCardLayout, ZONE_LAYOUT_PADDING } from "../../hooks/useCardLayout";
+import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
+import { useZoneDividers } from "../../hooks/useZoneDividers";
 
 type Selection =
   | { type: "card"; cardId: string; zone: "hand" | "sideboard" }
@@ -218,8 +220,10 @@ export function BuildPhase({
     setStableSBCount(self_player.sideboard.length);
   }
 
+  const [constraints, setConstraints, clearConstraints] = usePersistedConstraints('build');
+
   const battlefieldCount = 3 + 1 + 1; // 3 basic slots + treasure + poison
-  const [containerRef, dims] = useCardLayout({
+  const [containerRef, dims, containerSize] = useCardLayout({
     zones: {
       hand: { count: maxHandSize },
       battlefield: { count: battlefieldCount, priority: "fill", maxRows: 1 },
@@ -227,6 +231,27 @@ export function BuildPhase({
     },
     layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
     ...ZONE_LAYOUT_PADDING,
+    constraints,
+  });
+
+  const layoutConfig = {
+    zones: {
+      hand: { count: maxHandSize },
+      battlefield: { count: battlefieldCount, priority: "fill" as const, maxRows: 1 },
+      sideboard: { count: stableSBCount },
+    },
+    layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
+    ...ZONE_LAYOUT_PADDING,
+  };
+
+  const dividerCallbacks = useZoneDividers({
+    containerHeight: containerSize.height,
+    containerWidth: containerSize.width,
+    currentLayout: dims,
+    layoutConfig,
+    constraints,
+    onConstraintsChange: setConstraints,
+    onConstraintsClear: clearConstraints,
   });
 
   const handDims = { width: dims.hand.width, height: dims.hand.height };
@@ -343,6 +368,7 @@ export function BuildPhase({
         hasBattlefield={true}
         hasSideboard={self_player.sideboard.length > 0}
         hasUpgrades={false}
+        dividerCallbacks={locked ? null : dividerCallbacks}
         handLabel="Hand"
         handContent={
           <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>

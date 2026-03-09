@@ -1,5 +1,9 @@
 import { useState, useCallback, useRef, useLayoutEffect } from "react";
 import { CARD_ASPECT_RATIO, bestFit, type ZoneDims } from "./cardSizeUtils";
+import {
+  computeConstrainedLayout,
+  type ZoneConstraints,
+} from "./computeConstrainedLayout";
 
 export interface ZoneSpec {
   count: number;
@@ -25,6 +29,7 @@ export interface CardLayoutConfig {
   minCardWidth?: number;
   maxCardWidth?: number;
   maxBottomRightFraction?: number;
+  constraints?: ZoneConstraints | null;
 }
 
 export type CardLayoutResult = Record<string, ZoneDims>;
@@ -760,14 +765,23 @@ function dimsEqual(a: CardLayoutResult, b: CardLayoutResult): boolean {
   return true;
 }
 
+export interface ContainerSize {
+  width: number;
+  height: number;
+}
+
 export function useCardLayout(
   config: CardLayoutConfig,
-): [React.RefCallback<HTMLElement>, CardLayoutResult] {
+): [React.RefCallback<HTMLElement>, CardLayoutResult, ContainerSize] {
   const zoneIds = Object.keys(config.zones);
 
   const [dims, setDims] = useState<CardLayoutResult>(() =>
     makeDefaults(zoneIds),
   );
+  const [containerSize, setContainerSize] = useState<ContainerSize>({
+    width: 0,
+    height: 0,
+  });
 
   const configRef = useRef(config);
   // eslint-disable-next-line react-hooks/refs -- must sync before useLayoutEffect reads it
@@ -777,7 +791,13 @@ export function useCardLayout(
   const elementRef = useRef<HTMLElement | null>(null);
 
   const compute = useCallback(
-    (w: number, h: number) => computeLayout(w, h, configRef.current),
+    (w: number, h: number) => {
+      const cfg = configRef.current;
+      if (cfg.constraints) {
+        return computeConstrainedLayout(w, h, cfg, cfg.constraints);
+      }
+      return computeLayout(w, h, cfg);
+    },
     [],
   );
 
@@ -785,6 +805,9 @@ export function useCardLayout(
     (w: number, h: number) => {
       const qW = Math.floor(w / 4) * 4;
       const qH = Math.floor(h / 4) * 4;
+      setContainerSize((prev) =>
+        prev.width === qW && prev.height === qH ? prev : { width: qW, height: qH },
+      );
       const next = compute(qW, qH);
       setDims((prev) => (dimsEqual(prev, next) ? prev : next));
     },
@@ -840,5 +863,5 @@ export function useCardLayout(
     }
   });
 
-  return [refCallback, dims];
+  return [refCallback, dims, containerSize];
 }

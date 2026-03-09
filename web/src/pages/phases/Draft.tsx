@@ -3,6 +3,9 @@ import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useCardLayout } from '../../hooks/useCardLayout'
 import { badgeCls } from '../../components/common/ZoneLayout'
+import { ZoneDivider } from '../../components/common/ZoneDivider'
+import { usePersistedConstraints } from '../../hooks/usePersistedConstraints'
+import { useZoneDividers } from '../../hooks/useZoneDividers'
 import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
 
 interface DraftPhaseProps {
@@ -31,7 +34,9 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
   const currentPack = self_player.current_pack ?? []
   const pool = [...self_player.hand, ...self_player.sideboard]
 
-  const [containerRef, { pool: poolDims, pack: packDims }] = useCardLayout({
+  const [constraints, setConstraints, clearConstraints] = usePersistedConstraints('draft')
+
+  const draftLayoutConfig = {
     zones: {
       pool: { count: pool.length, maxCardWidth: 300 },
       pack: { count: currentPack.length, maxCardWidth: 400 },
@@ -39,6 +44,21 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
     layout: { top: ['pack'], bottomLeft: ['pool'] },
     fixedHeight: 65,
     padding: 24,
+  }
+
+  const [containerRef, { pool: poolDims, pack: packDims }, containerSize] = useCardLayout({
+    ...draftLayoutConfig,
+    constraints,
+  })
+
+  const dividerCallbacks = useZoneDividers({
+    containerHeight: containerSize.height,
+    containerWidth: containerSize.width,
+    currentLayout: { pool: poolDims, pack: packDims },
+    layoutConfig: draftLayoutConfig,
+    constraints,
+    onConstraintsChange: setConstraints,
+    onConstraintsClear: clearConstraints,
   })
   const appliedUpgradesList = self_player.upgrades.filter((u) => u.upgrade_target)
   const upgradedCardIds = new Set(appliedUpgradesList.map((u) => u.upgrade_target!.id))
@@ -81,7 +101,7 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
 
   return (
     <div ref={containerRef} className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col h-full" onClick={handleBackgroundClick}>
-      <div className="flex flex-col flex-1 min-h-0" style={{ gap: 2 }}>
+      <div className="flex flex-col flex-1 min-h-0" style={{ gap: dividerCallbacks.topDivider ? 0 : 2 }}>
         {/* Pack */}
         <div className="zone-pack px-3 pt-5 pb-3 relative">
           {isMobile && (
@@ -140,6 +160,10 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
             </div>
           )}
         </div>
+
+        {dividerCallbacks.topDivider && (
+          <ZoneDivider orientation="horizontal" {...dividerCallbacks.topDivider} />
+        )}
 
         {/* Pool */}
         <div className="zone-sideboard px-3 pt-5 pb-3 relative flex-1">
