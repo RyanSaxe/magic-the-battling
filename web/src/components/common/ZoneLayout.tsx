@@ -40,6 +40,12 @@ interface ZoneLayoutProps {
   overlay?: ReactNode
 }
 
+const PASSIVE_DIVIDER_CALLBACKS = {
+  onDragStart: () => {},
+  onDrag: () => {},
+  onDragEnd: () => {},
+}
+
 export function ZoneLayout({
   handContent,
   handLabel,
@@ -64,9 +70,8 @@ export function ZoneLayout({
 }: ZoneLayoutProps) {
   const hasLower = hasBattlefield || hasSideboard || hasUpgrades
   const hasRight = hasBattlefield || hasSideboard
-  const hasDividers = !!dividerCallbacks
   const isControlled = !!zoneHeights
-  const gap = hasDividers ? 0 : 2
+  const gap = 0
   const mobileTopHandle = isMobile ? dividerCallbacks?.topDivider ?? null : null
   const mobileBottomSplitHandle = isMobile
     ? dividerCallbacks?.bottomLeftSplitDivider ?? null
@@ -76,6 +81,9 @@ export function ZoneLayout({
     ? mobileBottomSplitHandle
     : mobileTopHandle
   const upgradesLabelHandle = hasUpgrades ? mobileTopHandle : null
+  const showTopDivider = hasHand && hasLower
+  const showBottomSplitDivider = hasBattlefield && hasSideboard
+  const showLeftDivider = hasRight && hasUpgrades
   const controlledStyle = (height?: number) =>
     isControlled && height != null
       ? { height, flex: '0 0 auto' as const }
@@ -96,11 +104,11 @@ export function ZoneLayout({
             {handContent}
           </div>
         )}
-        {hasHand && hasLower && dividerCallbacks?.topDivider && (
+        {showTopDivider && (
           <ZoneDivider
             orientation="horizontal"
-            interactive={!isMobile}
-            {...dividerCallbacks.topDivider}
+            interactive={!!dividerCallbacks?.topDivider && !isMobile}
+            {...(dividerCallbacks?.topDivider ?? PASSIVE_DIVIDER_CALLBACKS)}
           />
         )}
         {hasLower && (
@@ -115,11 +123,11 @@ export function ZoneLayout({
                     {battlefieldContent}
                   </div>
                 )}
-                {hasBattlefield && hasSideboard && dividerCallbacks?.bottomLeftSplitDivider && (
+                {showBottomSplitDivider && (
                   <ZoneDivider
                     orientation="horizontal"
-                    interactive={!isMobile}
-                    {...dividerCallbacks.bottomLeftSplitDivider}
+                    interactive={!!dividerCallbacks?.bottomLeftSplitDivider && !isMobile}
+                    {...(dividerCallbacks?.bottomLeftSplitDivider ?? PASSIVE_DIVIDER_CALLBACKS)}
                   />
                 )}
                 {hasSideboard && (
@@ -132,11 +140,11 @@ export function ZoneLayout({
                 )}
               </div>
             )}
-            {hasRight && hasUpgrades && dividerCallbacks?.leftDivider && (
+            {showLeftDivider && (
               <ZoneDivider
                 orientation="vertical"
-                interactive={!isMobile}
-                {...dividerCallbacks.leftDivider}
+                interactive={!!dividerCallbacks?.leftDivider && !isMobile}
+                {...(dividerCallbacks?.leftDivider ?? PASSIVE_DIVIDER_CALLBACKS)}
               />
             )}
             {hasUpgrades && (
