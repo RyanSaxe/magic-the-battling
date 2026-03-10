@@ -45,11 +45,6 @@ function resolveMinimizedText(content: GuideStepContent, ctx: GuidedWalkthroughC
   return title;
 }
 
-function entranceClass(placement: GuidePlacement): string {
-  if (placement === "top") return "animate-guide-enter-down";
-  return "animate-guide-enter-up";
-}
-
 function arrowPositionClass(placement: GuidePlacement): string {
   switch (placement) {
     case "top": return "guide-arrow-bottom";
@@ -130,6 +125,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const tooltipRef = useRef<HTMLDivElement | null>(null);
+    const [hasRendered, setHasRendered] = useState(false);
     const dragStartRef = useRef({ pointerX: 0, pointerY: 0, offsetX: 0, offsetY: 0, width: 0, height: 0 });
     const activePointerIdRef = useRef<number | null>(null);
     const removeListenersRef = useRef<(() => void) | null>(null);
@@ -231,11 +227,20 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
 
     useEffect(() => () => stopDragging(), [stopDragging]);
 
+    useEffect(() => {
+      const id = requestAnimationFrame(() => setHasRendered(true));
+      return () => cancelAnimationFrame(id);
+    }, []);
+
+    const shouldTransition = hasRendered && !isDragging;
     const mergedStyle: CSSProperties = {
       ...style,
       left: baseLeft + dragOffset.x,
       top: baseTop + dragOffset.y,
       overscrollBehavior: "contain",
+      transition: shouldTransition
+        ? "left 300ms ease, top 300ms ease, opacity 200ms ease"
+        : undefined,
     };
 
     const setTooltipRef = useCallback((node: HTMLDivElement | null) => {
@@ -272,8 +277,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
         ref={setTooltipRef}
         className={`absolute z-[82] pointer-events-auto modal-chrome felt-raised-panel gold-border border rounded-xl
           shadow-[0_8px_32px_rgba(0,0,0,0.55),0_2px_8px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden
-          ${isCollapsed ? "w-[min(19rem,calc(100%-1rem))]" : "w-[min(22rem,calc(100%-1rem))] max-h-[calc(100%-0.5rem)]"}
-          ${entranceClass(placement)}`}
+          ${isCollapsed ? "w-[min(19rem,calc(100%-1rem))]" : "w-[min(22rem,calc(100%-1rem))] max-h-[calc(100%-0.5rem)]"}`}
         style={mergedStyle}
         role="dialog"
         aria-modal={isCollapsed ? undefined : true}
