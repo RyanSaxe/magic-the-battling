@@ -97,6 +97,17 @@ export function ZoneLayout({
     ? controlledStyle(zoneHeights?.battlefield)
     : controlledFillStyle(zoneHeights?.battlefield)
   const sideboardStyle = controlledFillStyle(zoneHeights?.sideboard)
+  const upgradesStyle = {
+    ...(isControlled
+      ? {
+          alignSelf: 'stretch' as const,
+          minHeight: 0,
+          // Keep the right column flush with the outer seam without
+          // doubling the lower edge chrome during manual resize.
+          boxShadow: 'inset 0 2px 6px rgba(0, 0, 0, 0.3)',
+        }
+      : {}),
+  }
   const rootClassName = [
     'relative zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col',
     className,
@@ -159,13 +170,10 @@ export function ZoneLayout({
             {hasUpgrades && (
               <div
                 ref={zoneRefs?.upgrades}
-                className="zone-upgrades min-w-0 px-3 pt-5 pb-3 relative flex items-center justify-center"
-                style={{
-                  minWidth: isMobile ? 0 : '7rem',
-                  ...(controlledStyle(zoneHeights?.upgrades) ?? {}),
-                }}
+                className="zone-upgrades min-w-0 overflow-visible px-3 pt-5 pb-3 relative flex items-center justify-center"
+                style={upgradesStyle}
               >
-                <ZoneLabel dragCallbacks={upgradesLabelHandle}>
+                <ZoneLabel className="min-w-[7rem] justify-center" dragCallbacks={upgradesLabelHandle}>
                   {upgradesLabel}
                 </ZoneLabel>
                 <div className="overflow-hidden">

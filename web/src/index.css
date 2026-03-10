@@ -288,6 +288,27 @@ body {
   background-color: var(--seam-stroke);
 }
 
+.shell-scroll-row,
+.shell-scroll-col {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 640px) and (max-height: 820px) {
+  .shell-scroll-row {
+    align-items: flex-start;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .shell-scroll-col {
+    justify-content: flex-start;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+}
+
 .zone-divider-line--horizontal {
   background:
     linear-gradient(

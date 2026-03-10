@@ -517,7 +517,7 @@ export function Play() {
         <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
 
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
-          <div className="zone-pack flex-1 min-h-0 flex flex-col px-4 py-4 sm:py-2 sm:items-center sm:justify-center overflow-auto">
+          <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col px-4 py-4 sm:py-2 sm:items-center sm:justify-center overflow-auto">
             <section className="w-full max-w-md mx-auto modal-chrome border gold-border rounded-lg overflow-hidden flex-1 min-h-0 flex flex-col sm:flex-none felt-raised-panel">
               <div className="p-4 sm:p-5 flex-1 min-h-0 flex flex-col sm:flex-none">
                 <div className="mb-4">

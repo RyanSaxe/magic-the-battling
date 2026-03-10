@@ -175,6 +175,7 @@ export function deriveConstraintsFromLayout(
         2 * sectionPadH;
     }
   }
+  rightPixels = Math.max(rightPixels, config.minBottomRightOuterWidth ?? 0);
   const lrGap = blIds.length > 0 && brIds.length > 0 ? sectionGap : 0;
   const leftPixels = availW - rightPixels - lrGap;
   const leftFraction =
@@ -261,8 +262,14 @@ export function computeConstrainedFrames(
       : 0;
 
   const lrGap = blIds.length > 0 && brIds.length > 0 ? sectionGap : 0;
+  const minRightOuterW = brIds.length > 0
+    ? Math.min(config.minBottomRightOuterWidth ?? 0, Math.max(0, availW - lrGap))
+    : 0;
+  const maxLeftOuterW = brIds.length > 0
+    ? Math.max(0, availW - lrGap - minRightOuterW)
+    : availW;
   const leftOuterW = brIds.length > 0
-    ? Math.round((availW - lrGap) * leftFraction)
+    ? Math.min(Math.round((availW - lrGap) * leftFraction), maxLeftOuterW)
     : availW;
   const rightOuterW = brIds.length > 0 ? availW - leftOuterW - lrGap : 0;
 

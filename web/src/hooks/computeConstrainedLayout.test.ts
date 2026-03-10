@@ -238,6 +238,46 @@ describe("computeConstrainedLayout", () => {
       expect(result.sideboard.width).toBeGreaterThan(0);
       expect(result.commandZone.width).toBeGreaterThan(0);
     });
+
+    it("preserves the configured minimum outer width for the right column", () => {
+      const config = {
+        zones: {
+          hand: { count: 7 },
+          battlefield: { count: 5, priority: "fill" as const, maxRows: 1 },
+          sideboard: { count: 12 },
+          commandZone: { count: 3 },
+        },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
+        minBottomRightOuterWidth: 112,
+        ...ZONE_LAYOUT_PADDING,
+      };
+
+      const unconstrained = computeLayout(420, 620, config);
+      const derived = deriveConstraintsFromLayout(
+        unconstrained,
+        config,
+        620,
+        420,
+      );
+      const frames = computeConstrainedFrames(
+        420,
+        620,
+        config,
+        {
+          ...derived,
+          leftFraction: 0.95,
+        },
+      );
+
+      expect(frames.commandZone.outerWidth).toBeGreaterThanOrEqual(112);
+      expect(frames.battlefield.outerWidth).toBeLessThanOrEqual(
+        420 - ZONE_LAYOUT_PADDING.sectionGap - 112,
+      );
+    });
   });
 
   describe("min fraction clamping", () => {

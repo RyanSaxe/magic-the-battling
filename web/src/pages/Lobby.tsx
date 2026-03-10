@@ -333,7 +333,7 @@ export function Lobby() {
         <div className="flex-1 flex min-h-0 game-surface">
           <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
           <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
-            <div className="zone-pack h-full min-h-0 flex items-center justify-center">
+            <div className="zone-pack shell-scroll-row h-full min-h-0 flex items-center justify-center">
               <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
                 <h2 className="text-lg font-semibold text-amber-200">
                   Unable to Reconnect
@@ -437,7 +437,7 @@ export function Lobby() {
         <div className="flex-1 flex min-h-0 game-surface">
           <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
           <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
-            <div className="zone-pack h-full min-h-0 flex items-center justify-center">
+            <div className="zone-pack shell-scroll-row h-full min-h-0 flex items-center justify-center">
               {gameNotFound ? (
                 <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
                   <h2 className="text-lg font-semibold text-amber-200">
@@ -561,7 +561,7 @@ export function Lobby() {
       <div className="flex-1 flex min-h-0 game-surface">
         <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
-          <div className="zone-pack flex-1 min-h-0 flex flex-col sm:items-center sm:justify-center px-4 py-4 overflow-auto">
+          <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col sm:items-center sm:justify-center px-4 py-4 overflow-auto">
             <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md flex-1 min-h-0 overflow-visible sm:flex-none felt-raised-panel">
               {lobbyState &&
                 (() => {

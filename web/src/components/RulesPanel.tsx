@@ -22,6 +22,13 @@ interface DesktopWindowState {
   y: number
 }
 
+interface ViewportBox {
+  width: number
+  height: number
+  left: number
+  top: number
+}
+
 type InteractionState =
   | {
       type: 'drag'
@@ -57,41 +64,77 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
 }
 
-function defaultDesktopWindowState(viewportWidth: number, viewportHeight: number): DesktopWindowState {
-  const width = Math.min(
+function currentViewportBox(): ViewportBox {
+  if (typeof window === 'undefined') {
+    return { width: 0, height: 0, left: 0, top: 0 }
+  }
+  const viewport = window.visualViewport
+  return viewport
+    ? {
+        width: Math.round(viewport.width),
+        height: Math.round(viewport.height),
+        left: Math.round(viewport.offsetLeft),
+        top: Math.round(viewport.offsetTop),
+      }
+    : {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        left: 0,
+        top: 0,
+      }
+}
+
+function availableWindowSize(viewport: ViewportBox, margin: number) {
+  return {
+    width: Math.max(1, viewport.width - margin * 2),
+    height: Math.max(1, viewport.height - margin * 2),
+  }
+}
+
+function defaultDesktopWindowState(viewport: ViewportBox): DesktopWindowState {
+  const available = availableWindowSize(viewport, DEFAULT_OUTER_MARGIN_PX)
+  const width = clamp(
     DEFAULT_WINDOW_WIDTH_PX,
-    Math.max(MIN_WINDOW_WIDTH_PX, viewportWidth - DEFAULT_OUTER_MARGIN_PX * 2),
+    Math.min(MIN_WINDOW_WIDTH_PX, available.width),
+    available.width,
   )
-  const height = Math.min(
+  const height = clamp(
     DEFAULT_WINDOW_HEIGHT_PX,
-    Math.max(MIN_WINDOW_HEIGHT_PX, viewportHeight - DEFAULT_OUTER_MARGIN_PX * 2),
+    Math.min(MIN_WINDOW_HEIGHT_PX, available.height),
+    available.height,
   )
   return {
     width,
     height,
-    x: Math.round((viewportWidth - width) / 2),
-    y: Math.round((viewportHeight - height) / 2),
+    x: Math.round(viewport.left + (viewport.width - width) / 2),
+    y: Math.round(viewport.top + (viewport.height - height) / 2),
   }
 }
 
 function clampDesktopWindowState(
   state: DesktopWindowState,
-  viewportWidth: number,
-  viewportHeight: number,
+  viewport: ViewportBox,
 ): DesktopWindowState {
-  const maxWidth = Math.max(MIN_WINDOW_WIDTH_PX, viewportWidth - WINDOW_MARGIN_PX * 2)
-  const maxHeight = Math.max(MIN_WINDOW_HEIGHT_PX, viewportHeight - WINDOW_MARGIN_PX * 2)
-  const width = clamp(state.width, MIN_WINDOW_WIDTH_PX, maxWidth)
-  const height = clamp(state.height, MIN_WINDOW_HEIGHT_PX, maxHeight)
+  const available = availableWindowSize(viewport, WINDOW_MARGIN_PX)
+  const minWidth = Math.min(MIN_WINDOW_WIDTH_PX, available.width)
+  const minHeight = Math.min(MIN_WINDOW_HEIGHT_PX, available.height)
+  const width = clamp(state.width, minWidth, available.width)
+  const height = clamp(state.height, minHeight, available.height)
   const x = clamp(
     state.x,
-    WINDOW_MARGIN_PX,
-    Math.max(WINDOW_MARGIN_PX, viewportWidth - width - WINDOW_MARGIN_PX),
+    viewport.left + WINDOW_MARGIN_PX,
+    Math.max(
+      viewport.left + WINDOW_MARGIN_PX,
+      viewport.left + viewport.width - width - WINDOW_MARGIN_PX,
+    ),
   )
   const y = clamp(
     state.y,
-    WINDOW_MARGIN_PX,
-    Math.max(WINDOW_MARGIN_PX, viewportHeight - height - WINDOW_MARGIN_PX),
+    viewport.top + WINDOW_MARGIN_PX,
+    Math.max(
+      viewport.top + WINDOW_MARGIN_PX,
+      viewport.top + viewport.height - height - WINDOW_MARGIN_PX,
+    ),
   )
   return { width, height, x, y }
 }
@@ -126,11 +169,10 @@ function loadDesktopWindowState(): DesktopWindowState | null {
 
 function resolveInitialDesktopWindowState(): DesktopWindowState | null {
   if (!isDesktopViewport()) return null
-  const viewportWidth = window.innerWidth
-  const viewportHeight = window.innerHeight
+  const viewport = currentViewportBox()
   const stored = loadDesktopWindowState()
-  const fallback = defaultDesktopWindowState(viewportWidth, viewportHeight)
-  return clampDesktopWindowState(stored ?? fallback, viewportWidth, viewportHeight)
+  const fallback = defaultDesktopWindowState(viewport)
+  return clampDesktopWindowState(stored ?? fallback, viewport)
 }
 
 export function RulesPanel({
@@ -149,7 +191,7 @@ export function RulesPanel({
 
   const resetDesktopWindow = useCallback(() => {
     if (typeof window === 'undefined') return
-    setDesktopWindow(defaultDesktopWindowState(window.innerWidth, window.innerHeight))
+    setDesktopWindow(defaultDesktopWindowState(currentViewportBox()))
   }, [])
 
   const stopInteraction = useCallback(() => {
@@ -190,24 +232,31 @@ export function RulesPanel({
   }, [onClose])
 
   useEffect(() => {
-    const onResize = () => {
+    const syncViewport = () => {
       const desktop = isDesktopViewport()
       setIsDesktop(desktop)
       if (!desktop) {
         stopInteraction()
         return
       }
+      const viewport = currentViewportBox()
       setDesktopWindow((previous) => {
         const fallback =
           previous ??
           loadDesktopWindowState() ??
-          defaultDesktopWindowState(window.innerWidth, window.innerHeight)
-        return clampDesktopWindowState(fallback, window.innerWidth, window.innerHeight)
+          defaultDesktopWindowState(viewport)
+        return clampDesktopWindowState(fallback, viewport)
       })
     }
 
-    window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    window.addEventListener('resize', syncViewport)
+    window.visualViewport?.addEventListener('resize', syncViewport)
+    window.visualViewport?.addEventListener('scroll', syncViewport)
+    return () => {
+      window.removeEventListener('resize', syncViewport)
+      window.visualViewport?.removeEventListener('resize', syncViewport)
+      window.visualViewport?.removeEventListener('scroll', syncViewport)
+    }
   }, [stopInteraction])
 
   useEffect(() => {
@@ -229,24 +278,23 @@ export function RulesPanel({
 
     const handlePointerMove = (event: PointerEvent) => {
       setDesktopWindow((previous) => {
+        const viewport = currentViewportBox()
         const current =
           previous ??
-          defaultDesktopWindowState(window.innerWidth, window.innerHeight)
+          defaultDesktopWindowState(viewport)
         if (interaction.type === 'drag') {
           const x = interaction.startX + (event.clientX - interaction.startPointerX)
           const y = interaction.startY + (event.clientY - interaction.startPointerY)
           return clampDesktopWindowState(
             { ...current, x, y },
-            window.innerWidth,
-            window.innerHeight,
+            viewport,
           )
         }
         const width = interaction.startWidth + (event.clientX - interaction.startPointerX)
         const height = interaction.startHeight + (event.clientY - interaction.startPointerY)
         return clampDesktopWindowState(
           { ...current, width, height },
-          window.innerWidth,
-          window.innerHeight,
+          viewport,
         )
       })
     }
@@ -290,8 +338,11 @@ export function RulesPanel({
     )
   }
 
+  const desktopViewport = currentViewportBox()
   const desktopPanel =
-    desktopWindow ?? resolveInitialDesktopWindowState() ?? defaultDesktopWindowState(window.innerWidth, window.innerHeight)
+    desktopWindow ??
+    resolveInitialDesktopWindowState() ??
+    defaultDesktopWindowState(desktopViewport)
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
@@ -302,6 +353,10 @@ export function RulesPanel({
           top: desktopPanel.y,
           width: desktopPanel.width,
           height: desktopPanel.height,
+          maxWidth: Math.max(1, desktopViewport.width - WINDOW_MARGIN_PX * 2),
+          maxHeight: Math.max(1, desktopViewport.height - WINDOW_MARGIN_PX * 2),
+          boxShadow:
+            '0 36px 96px rgba(0, 0, 0, 0.72), 0 14px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 236, 181, 0.08)',
         }}
       >
         <div
@@ -331,7 +386,7 @@ export function RulesPanel({
             Close
           </button>
         </div>
-        <div className="flex-1 min-h-0">
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           <QuickGuide
             key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
             initialDocId={initialDocId}
@@ -346,10 +401,7 @@ export function RulesPanel({
           aria-label="Resize guide window"
           onPointerDown={beginResize}
           className="absolute right-0 bottom-0 w-6 h-6 cursor-se-resize bg-transparent"
-        >
-          <span className="absolute right-1 bottom-1 block w-3 h-3 border-r border-b border-amber-300/80" />
-          <span className="absolute right-2 bottom-2 block w-2 h-2 border-r border-b border-amber-300/40" />
-        </button>
+        />
       </div>
     </div>
   )

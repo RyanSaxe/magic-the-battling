@@ -31,6 +31,7 @@ export interface CardLayoutConfig {
   minCardWidth?: number;
   maxCardWidth?: number;
   maxBottomRightFraction?: number;
+  minBottomRightOuterWidth?: number;
   maxTopFraction?: number;
   constraints?: ZoneConstraints | null;
   alwaysComputeFrames?: boolean;
@@ -102,6 +103,7 @@ export function computeLayout(
     minCardWidth = 1,
     maxCardWidth = 200,
     maxBottomRightFraction = 0.3,
+    minBottomRightOuterWidth = 0,
   } = config;
 
   const zoneIds = Object.keys(config.zones);
@@ -235,6 +237,11 @@ export function computeLayout(
         brCardW = Math.floor(innerW / brCols);
         if (brCardW < minCardWidth) continue;
       }
+
+      brCellW = Math.max(
+        brCellW,
+        Math.min(minBottomRightOuterWidth, Math.max(0, availW - lrGap)),
+      );
     }
 
     const blAvailW = hasBR
