@@ -38,6 +38,7 @@ interface ZoneLayoutProps {
   hasSideboard: boolean
   hasUpgrades: boolean
   containerRef: RefCallback<HTMLElement>
+  containerTargetId?: string
   className?: string
   onClick?: React.MouseEventHandler<HTMLDivElement>
   dividerCallbacks?: DividerCallbacks | null
@@ -68,6 +69,7 @@ export function ZoneLayout({
   hasSideboard,
   hasUpgrades,
   containerRef,
+  containerTargetId,
   className,
   onClick,
   dividerCallbacks,
@@ -125,7 +127,12 @@ export function ZoneLayout({
     .join(' ')
 
   return (
-    <div ref={containerRef} className={rootClassName} onClick={onClick}>
+    <div
+      ref={containerRef}
+      className={rootClassName}
+      onClick={onClick}
+      data-guide-target={containerTargetId}
+    >
       <div className="flex flex-col flex-1 min-h-0" style={{ gap }}>
         {hasHand && (
           <div

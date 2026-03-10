@@ -19,7 +19,7 @@ function buildReplaySteps(): GuideStepDefinition[] {
     {
       id: "setup",
       title: "Build Sets Up The Battle",
-      targetId: "build-battlefield",
+      targetId: "build-workspace",
       placement: "right",
       body: [
         "Your chosen hand is the hand you will actually start the battle with.",
@@ -27,12 +27,13 @@ function buildReplaySteps(): GuideStepDefinition[] {
       ],
     },
     {
-      id: "hand-and-basics",
+      id: "workspace",
       title: "You Are Already Locked In",
-      targetId: "build-hand",
+      targetId: "build-workspace",
       placement: "right",
       body: [
         "When replaying the build guide after readying up, this becomes explanation-only so you are not forced through the build flow again.",
+        "Build is holistic: your basics and your starting hand work together, so when you change something you usually want to reconsider the whole setup.",
         "If you need to change anything, use Change first, then rebuild and resubmit.",
       ],
     },
@@ -54,42 +55,29 @@ function buildInteractiveSteps(): GuideStepDefinition[] {
     {
       id: "setup",
       title: "Build Decides The Battle Setup",
-      targetId: "build-battlefield",
+      targetId: "build-workspace",
       placement: "right",
-      spotlightPadding: 14,
+      spotlightPadding: 8,
       body: [
         "This phase is not deck construction in the abstract. You are choosing the exact setup for the next battle.",
         "Your 3 basics and your treasure start untapped on the battlefield, your chosen hand starts in hand, battles begin at 10 life, and there are no libraries.",
       ],
     },
     {
-      id: "basics",
-      title: "Choose Your Basics",
-      targetId: "build-battlefield",
+      id: "build-setup",
+      title: "Choose Basics And Hand Together",
+      targetId: "build-workspace",
       placement: "right",
-      spotlightPadding: 14,
+      spotlightPadding: 8,
       body: [
-        "Choose all 3 basic lands you want to start with on the battlefield.",
-        "Because they begin untapped, these choices are part of the actual battle plan, not filler setup.",
+        "Now build the full setup in whatever order makes sense to you.",
+        "Choose all 3 basics and your full starting hand together. You need both before you can submit.",
+        "Use the hand slots and the sideboard pool together: click a card or empty slot, then click the card you want to move or swap in.",
       ],
       completion: {
         type: "condition",
-        isComplete: (ctx) => ctx.selectedBasicsCount === 3,
-      },
-    },
-    {
-      id: "hand",
-      title: "Build Your Starting Hand",
-      targetId: "build-hand",
-      placement: "bottom",
-      spotlightPadding: 14,
-      body: [
-        "Now choose the exact starting hand for the next game from your pool.",
-        "Use the hand slots and your sideboard pool together: click a card or empty slot, then click the card you want to move or swap in.",
-      ],
-      completion: {
-        type: "condition",
-        isComplete: (ctx) => ctx.handCount === ctx.handSize,
+        isComplete: (ctx) =>
+          ctx.selectedBasicsCount === 3 && ctx.handCount === ctx.handSize,
       },
     },
     {

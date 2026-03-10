@@ -22,6 +22,8 @@ interface GuidedWalkthroughProps {
   onClose: (guideId: GuidedGuideId, completed: boolean) => void;
 }
 
+type MobileDock = "top" | "bottom";
+
 const CARD_MARGIN = 16;
 const SPOTLIGHT_PADDING = 12;
 const STEP_AUTO_ADVANCE_MS = 180;
@@ -164,7 +166,10 @@ export function GuidedWalkthrough({
     containerHeight: number;
     cardWidth: number;
     cardHeight: number;
+    isMobile: boolean;
+    mobileDock: MobileDock | null;
   } | null>(null);
+  const [collapsedMobileStepKey, setCollapsedMobileStepKey] = useState<string | null>(null);
 
   const cardRef = useRef<HTMLDivElement>(null);
   const stepMetaRef = useRef<GuideStepMeta | undefined>(undefined);
@@ -276,6 +281,7 @@ export function GuidedWalkthrough({
       const nextTargetRect = target
         ? toRelativeRect(nextRoot, target, padding)
         : null;
+      const nextIsMobile = nextRoot.clientWidth <= 768;
 
       const nextRootRect = new DOMRect(
         0,
@@ -284,12 +290,27 @@ export function GuidedWalkthrough({
         nextRoot.clientHeight,
       );
       const nextCardRect = nextCard.getBoundingClientRect();
-      const nextPosition = computeCardPosition(
+      let nextPosition = computeCardPosition(
         step.placement ?? "bottom",
         nextRootRect,
         nextTargetRect,
         nextCardRect,
       );
+      let mobileDock: MobileDock | null = null;
+
+      if (nextIsMobile && nextTargetRect && step.placement !== "center") {
+        const targetMidpoint = nextTargetRect.top + nextTargetRect.height / 2;
+        mobileDock =
+          targetMidpoint > nextRoot.clientHeight * 0.52 ? "top" : "bottom";
+        nextPosition = {
+          left: 8,
+          top:
+            mobileDock === "top"
+              ? 8
+              : Math.max(8, nextRoot.clientHeight - nextCardRect.height - 8),
+          resolvedPlacement: mobileDock === "top" ? "top" : "bottom",
+        };
+      }
 
       setLayoutState({
         targetRect: nextTargetRect,
@@ -300,6 +321,8 @@ export function GuidedWalkthrough({
         containerHeight: nextRoot.clientHeight,
         cardWidth: nextCardRect.width,
         cardHeight: nextCardRect.height,
+        isMobile: nextIsMobile,
+        mobileDock,
       });
     };
 
@@ -324,7 +347,7 @@ export function GuidedWalkthrough({
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [request, rootRef, step]);
+  }, [collapsedMobileStepKey, request, rootRef, step]);
 
   const bodyLines = step
     ? typeof step.body === "function"
@@ -335,6 +358,7 @@ export function GuidedWalkthrough({
   const canGoBack = stepIndex > 0;
   const completionType = step?.completion?.type ?? "manual";
   const nextDisabled = completionType !== "manual";
+  const stepKey = request ? `${request.nonce}:${step?.id ?? stepIndex}` : "";
 
   if (!request || !guide || !step) {
     return null;
@@ -343,6 +367,13 @@ export function GuidedWalkthrough({
   const targetRect = layoutState?.targetRect ?? null;
   const containerWidth = layoutState?.containerWidth ?? 0;
   const containerHeight = layoutState?.containerHeight ?? 0;
+  const isMobile = layoutState?.isMobile ?? false;
+  const isInteractiveStep = completionType !== "manual";
+  const isMobileCollapsed =
+    isMobile &&
+    isInteractiveStep &&
+    collapsedMobileStepKey === stepKey;
+  const targetActionVerb = isMobile ? "Tap" : "Click";
   const cardPosition = layoutState
     ? {
         left: layoutState.left,
@@ -375,7 +406,14 @@ export function GuidedWalkthrough({
     };
   })();
 
+  const spotlightBorderRadius = targetRect
+    ? clamp(Math.min(targetRect.width, targetRect.height) * 0.2, 14, 24)
+    : undefined;
+
   const arrowClassName = (() => {
+    if (isMobileCollapsed) {
+      return "hidden";
+    }
     switch (cardPosition?.placement) {
       case "top":
         return "guide-arrow guide-arrow-bottom";
@@ -406,6 +444,10 @@ export function GuidedWalkthrough({
               top: targetRect.top,
               width: targetRect.width,
               height: targetRect.height,
+              borderRadius:
+                spotlightBorderRadius !== undefined
+                  ? `${spotlightBorderRadius}px`
+                  : undefined,
             }}
           />
         </>
@@ -415,7 +457,11 @@ export function GuidedWalkthrough({
 
       <div
         ref={cardRef}
-        className="guided-card"
+        className={`guided-card modal-chrome felt-raised-panel ${
+          isMobile ? "guided-card-mobile" : ""
+        } ${isMobileCollapsed ? "guided-card-mobile-compact" : ""} ${
+          layoutState?.mobileDock === "top" ? "guided-card-mobile-top" : ""
+        } ${layoutState?.mobileDock === "bottom" ? "guided-card-mobile-bottom" : ""}`}
         style={{
           left: cardPosition?.left ?? CARD_MARGIN,
           top: cardPosition?.top ?? CARD_MARGIN,
@@ -425,51 +471,98 @@ export function GuidedWalkthrough({
         aria-label={`${guide.label} walkthrough`}
       >
         <div className={arrowClassName} style={arrowStyle} />
-        <div className="guided-card-header">
-          <span className="guided-card-kicker">{guide.label} Walkthrough</span>
-          <span className="guided-card-progress">
-            {stepIndex + 1}/{guide.steps.length}
-          </span>
-        </div>
-        <h2 className="guided-card-title">{step.title}</h2>
-        <div className="guided-card-body">
-          {bodyLines.map((line) => (
-            <p key={line}>{line}</p>
-          ))}
-        </div>
-        {completionType === "target-click" && (
-          <p className="guided-card-hint">Click the highlighted area to continue.</p>
-        )}
-        {completionType === "condition" && (
-          <p className="guided-card-hint">Complete the highlighted task to continue.</p>
-        )}
-        <div className="guided-card-actions">
-          <button
-            type="button"
-            onClick={() => finishGuide(false)}
-            className="btn btn-secondary"
-          >
-            Skip
-          </button>
-          <div className="guided-card-actions-right">
-            <button
-              type="button"
-              onClick={() => setStepIndex((current) => Math.max(0, current - 1))}
-              className="btn btn-secondary"
-              disabled={!canGoBack}
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              onClick={advanceStep}
-              className="btn btn-primary"
-              disabled={nextDisabled}
-            >
-              {stepIndex + 1 === guide.steps.length ? "Finish" : "Next"}
-            </button>
+        {isMobileCollapsed ? (
+          <div className="guided-card-compact-row">
+            <div className="guided-card-compact-content">
+              <div className="guided-card-compact-meta">
+                <span className="guided-card-kicker">{guide.label}</span>
+                <span className="guided-card-progress">
+                  {stepIndex + 1}/{guide.steps.length}
+                </span>
+              </div>
+              <p className="guided-card-compact-title">{step.title}</p>
+              <p className="guided-card-compact-copy">
+                {completionType === "target-click"
+                  ? `${targetActionVerb} the highlighted area to continue.`
+                  : "Complete the highlighted task to continue."}
+              </p>
+            </div>
+            <div className="guided-card-compact-actions">
+              <button
+                type="button"
+                onClick={() => setCollapsedMobileStepKey(null)}
+                className="btn btn-secondary"
+              >
+                Details
+              </button>
+              <button
+                type="button"
+                onClick={() => finishGuide(false)}
+                className="btn btn-secondary"
+              >
+                Skip
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="guided-card-header">
+              <span className="guided-card-kicker">{guide.label} Walkthrough</span>
+              <span className="guided-card-progress">
+                {stepIndex + 1}/{guide.steps.length}
+              </span>
+            </div>
+            <h2 className="guided-card-title">{step.title}</h2>
+            <div className="guided-card-body">
+              {bodyLines.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </div>
+            {completionType === "target-click" && (
+              <p className="guided-card-hint">{targetActionVerb} the highlighted area to continue.</p>
+            )}
+            {completionType === "condition" && (
+              <p className="guided-card-hint">Complete the highlighted task to continue.</p>
+            )}
+            <div className="guided-card-actions">
+              <button
+                type="button"
+                onClick={() => finishGuide(false)}
+                className="btn btn-secondary"
+              >
+                Skip
+              </button>
+              <div className="guided-card-actions-right">
+                <button
+                  type="button"
+                  onClick={() => setStepIndex((current) => Math.max(0, current - 1))}
+                  className="btn btn-secondary"
+                  disabled={!canGoBack}
+                >
+                  Back
+                </button>
+                {isMobile && isInteractiveStep ? (
+                  <button
+                    type="button"
+                    onClick={() => setCollapsedMobileStepKey(stepKey)}
+                    className="btn btn-primary"
+                  >
+                    Let Me Do This
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={advanceStep}
+                    className="btn btn-primary"
+                    disabled={nextDisabled}
+                  >
+                    {stepIndex + 1 === guide.steps.length ? "Finish" : "Next"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

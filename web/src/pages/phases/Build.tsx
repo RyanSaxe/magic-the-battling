@@ -99,6 +99,7 @@ export function BuildPhase({
   const maxHandSize = self_player.hand_size;
   const locked = self_player.build_ready;
   const hasSideboard = self_player.sideboard.length > 0;
+  const selectedBasicsCount = selectedBasics.filter(Boolean).length;
 
   const hasUserInteracted = useRef(false);
   const handZoneRef = useRef<HTMLDivElement | null>(null);
@@ -140,11 +141,11 @@ export function BuildPhase({
     if (
       !hasUserInteracted.current &&
       self_player.chosen_basics?.length &&
-      selectedBasics.length === 0
+      selectedBasicsCount === 0
     ) {
       onBasicsChange([...self_player.chosen_basics]);
     }
-  }, [self_player.chosen_basics, selectedBasics.length, onBasicsChange]);
+  }, [self_player.chosen_basics, selectedBasicsCount, onBasicsChange]);
 
   const handleBasicPick = (index: number, name: string) => {
     if (locked) return;
@@ -451,6 +452,7 @@ export function BuildPhase({
         hasBattlefield={true}
         hasSideboard={hasSideboard}
         hasUpgrades={false}
+        containerTargetId="build-workspace"
         dividerCallbacks={locked ? null : dividerCallbacks}
         zoneTargetIds={{
           hand: "build-hand",

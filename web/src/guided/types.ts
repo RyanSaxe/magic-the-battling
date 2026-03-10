@@ -6,6 +6,7 @@ export type GuidedGuideId = "welcome" | Phase;
 export type GuideTargetId =
   | "timeline-stage-round"
   | "timeline-current-phase"
+  | "build-workspace"
   | "build-battlefield"
   | "build-hand"
   | "build-submit"

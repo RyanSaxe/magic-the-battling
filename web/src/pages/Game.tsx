@@ -894,7 +894,7 @@ function GameContent() {
       };
     } else if (phase === 'build') {
       if (showSubmitHandPopover) {
-        const basicsComplete = selectedBasics.length === 3;
+        const basicsComplete = selectedBasics.filter(Boolean).length === 3;
         const handFull = sp.hand.length === sp.hand_size;
         const canReady = basicsComplete && handFull;
         if (canReady) {
@@ -907,7 +907,7 @@ function GameContent() {
           if (sp.build_ready) {
             actions.buildUnready();
           } else {
-            const basicsComplete = selectedBasics.length === 3;
+            const basicsComplete = selectedBasics.filter(Boolean).length === 3;
             const handFull = sp.hand.length === sp.hand_size;
             if (basicsComplete && handFull && !buildReadyPending) {
               toggleBuildSubmitPopover();
@@ -1070,7 +1070,7 @@ function GameContent() {
 
   const maxHandSize = self_player.hand_size;
   const handFull = self_player.hand.length === maxHandSize;
-  const basicsComplete = selectedBasics.length === 3;
+  const basicsComplete = selectedBasics.filter(Boolean).length === 3;
   const canReady = basicsComplete && handFull;
 
   const isStageIncreasing = self_player.is_stage_increasing;
@@ -1092,7 +1092,7 @@ function GameContent() {
     currentBattle: current_battle,
     useUpgrades: gameState.use_upgrades,
     hasRewardUpgradeChoice: needsUpgrade,
-    selectedBasicsCount: selectedBasics.length,
+    selectedBasicsCount: selectedBasics.filter(Boolean).length,
     handCount: self_player.hand.length,
     handSize: maxHandSize,
     buildReady: self_player.build_ready,

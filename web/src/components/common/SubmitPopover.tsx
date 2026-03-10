@@ -35,7 +35,7 @@ export function SubmitPopover({ options, onClose, guideTarget }: SubmitPopoverPr
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-2 right-0 min-w-[120px]"
+      className="absolute bottom-full mb-2 right-0 min-w-[120px] z-[95]"
       data-guide-target={guideTarget}
     >
       <div className="relative translate-y-[3px] modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1.5">
