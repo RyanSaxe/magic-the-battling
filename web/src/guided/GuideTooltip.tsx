@@ -1,4 +1,4 @@
-import { forwardRef, type CSSProperties } from "react";
+import { forwardRef, useCallback, useRef, useState, type CSSProperties } from "react";
 import type { GuidePlacement, GuideStepContent, GuideStepDefinition, GuidedWalkthroughContext } from "./types";
 import { GuideProgress } from "./GuideProgress";
 
@@ -8,7 +8,6 @@ interface GuideTooltipProps {
   stepIndex: number;
   totalSteps: number;
   placement: GuidePlacement;
-  isMobile: boolean;
   context: GuidedWalkthroughContext;
   style?: CSSProperties;
   onNext: () => void;
@@ -28,51 +27,76 @@ function entranceClass(placement: GuidePlacement): string {
 
 export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
   function GuideTooltip(
-    { step, guideLabel, stepIndex, totalSteps, placement, isMobile, context, style, onNext, onBack, onSkip },
+    { step, guideLabel, stepIndex, totalSteps, placement, context, style, onNext, onBack, onSkip },
     ref,
   ) {
     const completionType = step.completion?.type ?? "manual";
     const isManual = completionType === "manual";
     const isLastStep = stepIndex + 1 === totalSteps;
     const actionHint = resolveActionHint(step.content, context);
-    const isInteractive = !isManual;
 
-    if (isMobile && isInteractive) {
-      return (
-        <div
-          ref={ref}
-          className={`absolute z-[82] pointer-events-auto modal-chrome felt-raised-panel gold-border border rounded-xl
-            w-[calc(100%-1rem)] px-3 py-2.5 ${entranceClass(placement)}`}
-          style={style}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`${guideLabel} walkthrough`}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-bold text-amber-50 truncate">{step.title}</h2>
-              {actionHint && (
-                <p className="text-xs text-amber-400/90 mt-0.5 truncate">{actionHint}</p>
-              )}
-            </div>
-            <GuideProgress current={stepIndex} total={totalSteps} />
-          </div>
-        </div>
-      );
-    }
+    const [dragState, setDragState] = useState({ step: stepIndex, x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStartRef = useRef({ pointerX: 0, pointerY: 0, offsetX: 0, offsetY: 0 });
+    const dragOffset = dragState.step === stepIndex ? dragState : { x: 0, y: 0 };
+
+    const onPointerDown = useCallback(
+      (e: React.PointerEvent) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragStartRef.current = {
+          pointerX: e.clientX,
+          pointerY: e.clientY,
+          offsetX: dragOffset.x,
+          offsetY: dragOffset.y,
+        };
+        setIsDragging(true);
+      },
+      [dragOffset],
+    );
+
+    const onPointerMove = useCallback(
+      (e: React.PointerEvent) => {
+        if (!isDragging) return;
+        const dx = e.clientX - dragStartRef.current.pointerX;
+        const dy = e.clientY - dragStartRef.current.pointerY;
+        setDragState({
+          step: stepIndex,
+          x: dragStartRef.current.offsetX + dx,
+          y: dragStartRef.current.offsetY + dy,
+        });
+      },
+      [isDragging, stepIndex],
+    );
+
+    const onPointerUp = useCallback(() => {
+      setIsDragging(false);
+    }, []);
+
+    const mergedStyle: CSSProperties = {
+      ...style,
+      left: (style?.left as number ?? 0) + dragOffset.x,
+      top: (style?.top as number ?? 0) + dragOffset.y,
+    };
 
     return (
       <div
         ref={ref}
         className={`absolute z-[82] pointer-events-auto modal-chrome felt-raised-panel gold-border border rounded-xl
-          w-[min(22rem,calc(100%-2rem))] p-4 ${entranceClass(placement)}`}
-        style={style}
+          w-[min(22rem,calc(100%-2rem))] p-4 shadow-[0_8px_32px_rgba(0,0,0,0.55),0_2px_8px_rgba(0,0,0,0.3)]
+          ${entranceClass(placement)}`}
+        style={mergedStyle}
         role="dialog"
         aria-modal="true"
         aria-label={`${guideLabel} walkthrough`}
       >
-        <div className="flex items-center justify-between gap-3 mb-2 pb-2 border-b border-amber-400/15">
-          <span className="text-[0.68rem] uppercase tracking-widest text-amber-200/90 leading-none">
+        <div
+          className={`flex items-center justify-between gap-3 mb-2 pb-2 border-b border-amber-400/15
+            ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+        >
+          <span className="text-[0.68rem] uppercase tracking-widest text-amber-200/90 leading-none select-none">
             {guideLabel}
           </span>
           <GuideProgress current={stepIndex} total={totalSteps} />

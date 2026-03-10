@@ -39,6 +39,14 @@ function toRelativeRect(root: HTMLElement, target: HTMLElement, padding: number)
   };
 }
 
+function clampSpotlight(rect: SpotlightRect, cw: number, ch: number): SpotlightRect {
+  const x = Math.max(0, rect.x);
+  const y = Math.max(0, rect.y);
+  const right = Math.min(cw, rect.x + rect.width);
+  const bottom = Math.min(ch, rect.y + rect.height);
+  return { x, y, width: right - x, height: bottom - y };
+}
+
 function buildClipPath(spotlight: SpotlightRect | null, cw: number, ch: number): string {
   if (!spotlight) return "none";
   const { x, y, width, height } = spotlight;
@@ -96,13 +104,13 @@ function computePosition(
   }
 
   if (isMobile) {
-    const targetMid = spotlight.y + spotlight.height / 2;
-    const dockBottom = targetMid < ch * 0.67;
-    return {
-      left: 8,
-      top: dockBottom ? Math.max(8, ch - cardH - 8) : 8,
-      resolved: dockBottom ? "bottom" : "top",
-    };
+    const gap = 12;
+    let top = spotlight.y + spotlight.height + gap;
+    if (top + cardH > ch - 8) {
+      top = spotlight.y - cardH - gap;
+    }
+    top = clamp(top, 8, Math.max(8, ch - cardH - 8));
+    return { left: 8, top, resolved: top > spotlight.y ? "bottom" : "top" };
   }
 
   const centeredLeft = clamp(
@@ -161,11 +169,12 @@ export function useGuidePositioning(
       const c = cardRef.current;
       if (!r || !c) return;
 
-      const target = resolveTarget(r, targetId);
-      const padding = spotlightPadding ?? SPOTLIGHT_PADDING;
-      const spotlight = target ? toRelativeRect(r, target, padding) : null;
       const cw = r.clientWidth;
       const ch = r.clientHeight;
+      const target = resolveTarget(r, targetId);
+      const padding = spotlightPadding ?? SPOTLIGHT_PADDING;
+      const rawSpotlight = target ? toRelativeRect(r, target, padding) : null;
+      const spotlight = rawSpotlight ? clampSpotlight(rawSpotlight, cw, ch) : null;
       const isMobile = cw <= MOBILE_BREAKPOINT;
       const cardRect = c.getBoundingClientRect();
       const pos = computePosition(placement, cw, ch, spotlight, cardRect.width, cardRect.height, isMobile);

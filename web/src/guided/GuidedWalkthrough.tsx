@@ -166,7 +166,6 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
         stepIndex={stepIndex}
         totalSteps={guide.steps.length}
         placement={layout?.resolvedPlacement ?? "bottom"}
-        isMobile={layout?.isMobile ?? false}
         context={context}
         onNext={advanceStep}
         onBack={() => setStepIndex((cur) => Math.max(0, cur - 1))}
