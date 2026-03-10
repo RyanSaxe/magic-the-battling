@@ -50,6 +50,16 @@ function entranceClass(placement: GuidePlacement): string {
   return "animate-guide-enter-up";
 }
 
+function arrowPositionClass(placement: GuidePlacement): string {
+  switch (placement) {
+    case "top": return "guide-arrow-bottom";
+    case "bottom": return "guide-arrow-top";
+    case "left": return "guide-arrow-right";
+    case "right": return "guide-arrow-left";
+    default: return "";
+  }
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -269,6 +279,11 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
         aria-modal={isCollapsed ? undefined : true}
         aria-label={`${guideLabel} walkthrough`}
       >
+        {placement !== "center" && !isCollapsed && (
+          <div
+            className={`absolute w-3 h-3 modal-chrome border gold-border rotate-45 ${arrowPositionClass(placement)}`}
+          />
+        )}
         <div
           className={`flex items-center justify-between gap-3 px-4 pt-3 pb-2 select-none shrink-0
             ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
