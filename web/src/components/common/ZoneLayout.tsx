@@ -173,7 +173,14 @@ export function ZoneLayout({
                 className="zone-upgrades min-w-0 overflow-visible px-3 pt-5 pb-3 relative flex items-center justify-center"
                 style={upgradesStyle}
               >
-                <ZoneLabel className="min-w-[7rem] justify-center" dragCallbacks={upgradesLabelHandle}>
+                <ZoneLabel
+                  className="justify-center"
+                  wrapClassName="max-w-[calc(100%-0.25rem)]"
+                  compact={isMobile}
+                  constrainToParent
+                  hideGrip={isMobile}
+                  dragCallbacks={upgradesLabelHandle}
+                >
                   {upgradesLabel}
                 </ZoneLabel>
                 <div className="overflow-hidden">

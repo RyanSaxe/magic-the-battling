@@ -12,6 +12,11 @@ export const badgeCls =
 const badgeWrapCls =
   "absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 z-40 inline-flex px-2 py-1 select-none";
 
+const constrainedWrapCls = "max-w-[calc(100%-0.5rem)]";
+const constrainedBadgeCls = "min-w-0 max-w-full";
+const compactBadgeCls =
+  "px-1.5 gap-1 text-[9px] tracking-[0.18em]";
+
 const noopDragCallbacks: DividerDragCallbacks = {
   onDragStart: () => {},
   onDrag: () => {},
@@ -29,37 +34,63 @@ const gripBarStyle = {
 interface ZoneLabelProps {
   children: ReactNode;
   className?: string;
+  wrapClassName?: string;
   dragCallbacks?: DividerDragCallbacks | null;
+  compact?: boolean;
+  constrainToParent?: boolean;
+  hideGrip?: boolean;
 }
 
 export function ZoneLabel({
   children,
   className,
+  wrapClassName,
   dragCallbacks = null,
+  compact = false,
+  constrainToParent = false,
+  hideGrip = false,
 }: ZoneLabelProps) {
   const dragBindings = useDividerDrag({
     orientation: "horizontal",
     callbacks: dragCallbacks ?? noopDragCallbacks,
     enabled: !!dragCallbacks,
   });
+  const wrapClasses = [
+    badgeWrapCls,
+    constrainToParent ? constrainedWrapCls : "",
+    wrapClassName ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const badgeClasses = [
+    badgeCls,
+    constrainToParent ? constrainedBadgeCls : "",
+    compact ? compactBadgeCls : "",
+    className ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const textClasses = constrainToParent ? "min-w-0 truncate" : "";
 
   return (
     <span
-      className={badgeWrapCls}
+      className={wrapClasses}
       data-drag-handle={dragCallbacks ? "true" : undefined}
       style={dragCallbacks ? { touchAction: "none", cursor: "row-resize" } : undefined}
       {...dragBindings}
     >
-      <span className={className ? `${badgeCls} ${className}` : badgeCls}>
-        <span
-          aria-hidden="true"
-          className="inline-flex items-center gap-[2px] opacity-70"
-        >
-          <span style={gripBarStyle} />
-          <span style={gripBarStyle} />
-          <span style={gripBarStyle} />
-        </span>
-        <span>{children}</span>
+      <span className={badgeClasses}>
+        {!hideGrip && (
+          <span
+            aria-hidden="true"
+            className="inline-flex items-center gap-[2px] opacity-70 shrink-0"
+          >
+            <span style={gripBarStyle} />
+            <span style={gripBarStyle} />
+            <span style={gripBarStyle} />
+          </span>
+        )}
+        <span className={textClasses}>{children}</span>
       </span>
     </span>
   );
