@@ -17,6 +17,13 @@ interface ZoneRefs {
   upgrades?: RefCallback<HTMLDivElement>
 }
 
+interface ZoneTargetIds {
+  hand?: string
+  battlefield?: string
+  sideboard?: string
+  upgrades?: string
+}
+
 interface ZoneLayoutProps {
   handContent: ReactNode
   handLabel: ReactNode
@@ -37,6 +44,7 @@ interface ZoneLayoutProps {
   isMobile?: boolean
   zoneHeights?: ZoneSectionHeights | null
   zoneRefs?: ZoneRefs
+  zoneTargetIds?: ZoneTargetIds
   overlay?: ReactNode
 }
 
@@ -66,6 +74,7 @@ export function ZoneLayout({
   isMobile = false,
   zoneHeights = null,
   zoneRefs,
+  zoneTargetIds,
   overlay,
 }: ZoneLayoutProps) {
   const hasLower = hasBattlefield || hasSideboard || hasUpgrades
@@ -119,7 +128,12 @@ export function ZoneLayout({
     <div ref={containerRef} className={rootClassName} onClick={onClick}>
       <div className="flex flex-col flex-1 min-h-0" style={{ gap }}>
         {hasHand && (
-          <div ref={zoneRefs?.hand} className="zone-hand w-full px-3 pt-5 pb-3 relative" style={handStyle}>
+          <div
+            ref={zoneRefs?.hand}
+            className="zone-hand w-full px-3 pt-5 pb-3 relative"
+            style={handStyle}
+            data-guide-target={zoneTargetIds?.hand}
+          >
             <ZoneLabel>{handLabel}</ZoneLabel>
             {handContent}
           </div>
@@ -136,7 +150,12 @@ export function ZoneLayout({
             {hasRight && (
               <div className="min-w-0 flex flex-1 flex-col" style={{ gap }}>
                 {hasBattlefield && (
-                  <div ref={zoneRefs?.battlefield} className="zone-battlefield w-full px-3 pt-5 pb-3 relative" style={battlefieldStyle}>
+                  <div
+                    ref={zoneRefs?.battlefield}
+                    className="zone-battlefield w-full px-3 pt-5 pb-3 relative"
+                    style={battlefieldStyle}
+                    data-guide-target={zoneTargetIds?.battlefield}
+                  >
                     <ZoneLabel dragCallbacks={battlefieldLabelHandle}>
                       {battlefieldLabel}
                     </ZoneLabel>
@@ -151,7 +170,12 @@ export function ZoneLayout({
                   />
                 )}
                 {hasSideboard && (
-                  <div ref={zoneRefs?.sideboard} className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${isControlled ? '' : 'flex-1'}`} style={sideboardStyle}>
+                  <div
+                    ref={zoneRefs?.sideboard}
+                    className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${isControlled ? '' : 'flex-1'}`}
+                    style={sideboardStyle}
+                    data-guide-target={zoneTargetIds?.sideboard}
+                  >
                     <ZoneLabel dragCallbacks={sideboardLabelHandle}>
                       {sideboardLabel}
                     </ZoneLabel>
@@ -172,6 +196,7 @@ export function ZoneLayout({
                 ref={zoneRefs?.upgrades}
                 className="zone-upgrades min-w-0 overflow-visible px-3 pt-5 pb-3 relative flex items-center justify-center"
                 style={upgradesStyle}
+                data-guide-target={zoneTargetIds?.upgrades}
               >
                 <ZoneLabel
                   className="justify-center"

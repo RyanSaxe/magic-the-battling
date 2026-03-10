@@ -9,9 +9,10 @@ interface SubmitPopoverOption {
 interface SubmitPopoverProps {
   options: SubmitPopoverOption[];
   onClose: () => void;
+  guideTarget?: string;
 }
 
-export function SubmitPopover({ options, onClose }: SubmitPopoverProps) {
+export function SubmitPopover({ options, onClose, guideTarget }: SubmitPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export function SubmitPopover({ options, onClose }: SubmitPopoverProps) {
     <div
       ref={ref}
       className="absolute bottom-full mb-2 right-0 min-w-[120px]"
+      data-guide-target={guideTarget}
     >
       <div className="relative translate-y-[3px] modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1.5">
         {options.map((option) => (

@@ -452,6 +452,10 @@ export function BuildPhase({
         hasSideboard={hasSideboard}
         hasUpgrades={false}
         dividerCallbacks={locked ? null : dividerCallbacks}
+        zoneTargetIds={{
+          hand: "build-hand",
+          battlefield: "build-battlefield",
+        }}
         handLabel="Hand"
         handContent={
           <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>

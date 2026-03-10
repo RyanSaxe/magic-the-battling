@@ -163,7 +163,12 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
       )}
       <div className="flex flex-col flex-1 min-h-0" style={{ gap: dividerCallbacks.topDivider ? 0 : 2 }}>
         {/* Pack */}
-        <div ref={packZoneRef} className="zone-pack w-full px-3 pt-5 pb-3 relative" style={packStyle}>
+        <div
+          ref={packZoneRef}
+          className="zone-pack w-full px-3 pt-5 pb-3 relative"
+          style={packStyle}
+          data-guide-target="draft-pack"
+        >
           {isMobile && (
             <>
               <div className="absolute top-0 left-0 pointer-events-none z-10">
@@ -230,7 +235,12 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
         )}
 
         {/* Pool */}
-        <div ref={poolZoneRef} className={`zone-sideboard w-full px-3 pt-5 pb-3 relative ${zoneFrames ? '' : 'flex-1'}`} style={poolStyle}>
+        <div
+          ref={poolZoneRef}
+          className={`zone-sideboard w-full px-3 pt-5 pb-3 relative ${zoneFrames ? '' : 'flex-1'}`}
+          style={poolStyle}
+          data-guide-target="draft-pool"
+        >
           <ZoneLabel dragCallbacks={dividerCallbacks.topDivider}>
             Pool
           </ZoneLabel>

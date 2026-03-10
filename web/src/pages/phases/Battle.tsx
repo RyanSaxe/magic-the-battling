@@ -308,7 +308,12 @@ export function BattlePhase({
   const playerBottomZoneHeight = handHeight
 
   return (
-    <div ref={containerRef} className="battle-layout flex flex-col h-full min-h-0 overflow-hidden" onClick={handleBackgroundClick}>
+    <div
+      ref={containerRef}
+      className="battle-layout flex flex-col h-full min-h-0 overflow-hidden"
+      onClick={handleBackgroundClick}
+      data-guide-target="battle-board"
+    >
         {/* Sudden Death Banner */}
         {battle.is_sudden_death && (
           <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center shrink-0">

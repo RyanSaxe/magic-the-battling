@@ -8,7 +8,7 @@ import {
   createSpectateRequest,
   getSpectateRequestStatus,
 } from "../api/client";
-import type { GameStatusResponse, ZoneName } from "../types";
+import type { GameState, GameStatusResponse, ZoneName } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
 import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
@@ -19,6 +19,7 @@ import { GameSummary } from "../components/GameSummary";
 import { ShareModal } from "../components/ShareModal";
 import { ActionMenu } from "../components/ActionMenu";
 import { PhaseTimeline } from "../components/PhaseTimeline";
+import { GuidedWalkthrough } from "../components/GuidedWalkthrough";
 import { getOrdinal } from "../utils/format";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { ContextStripProvider, useContextStrip, useToast } from "../contexts";
@@ -33,6 +34,8 @@ import { ZoneDivider } from "../components/common/ZoneDivider";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import type { Phase } from "../constants/phases";
+import type { GuidedGuideId, GuidedWalkthroughContext } from "../guided/types";
+import { getSeenGuidesForGame, markGuideSeenForGame } from "../guided/storage";
 import {
   getRememberedPlayerForGame,
   pickAutoReconnectPlayer,
@@ -63,8 +66,28 @@ type OverlayKey =
   | "buildSubmit"
   | "battleSubmit"
   | "battlePanel"
-  | "battleZoneModal"
-  | "puppetExplainer";
+  | "battleZoneModal";
+
+function serializeBattleState(gameState: GameState | null): string {
+  if (!gameState?.current_battle) {
+    return "";
+  }
+
+  const battle = gameState.current_battle;
+  const zoneIds = (ids: { id: string }[]) => ids.map((card) => card.id).join(",");
+
+  return [
+    zoneIds(battle.your_zones.hand),
+    zoneIds(battle.your_zones.battlefield),
+    zoneIds(battle.your_zones.graveyard),
+    zoneIds(battle.your_zones.exile),
+    zoneIds(battle.opponent_zones.hand),
+    zoneIds(battle.opponent_zones.battlefield),
+    zoneIds(battle.opponent_zones.graveyard),
+    zoneIds(battle.opponent_zones.exile),
+    battle.current_turn_name,
+  ].join("|");
+}
 
 function scheduledEasternFromNotice(message: string): string | null {
   const match = SCHEDULED_UTC_RE.exec(message);
@@ -470,13 +493,16 @@ function GameContent() {
 
   const isSpectator = !!spectatorConfig;
   const wasInvalidSessionRef = useRef(false);
-  const [isNewPlayerOnboarding, setIsNewPlayerOnboarding] = useState(() =>
+  const [isGuidedMode, setIsGuidedMode] = useState(() =>
     gameId ? resolveNewPlayerPreferenceForGame(gameId, session?.playerId) : false,
   );
-  const [autoOpenTimelinePhase, setAutoOpenTimelinePhase] = useState<Phase | null>(null);
-  const [showPuppetGhostExplainer, setShowPuppetGhostExplainer] = useState(false);
-  const seenTimelinePhasesRef = useRef<Set<Phase>>(new Set());
-  const shownPuppetGhostExplainerRef = useRef(false);
+  const seenGuidesRef = useRef<Set<GuidedGuideId>>(new Set());
+  const guideRootRef = useRef<HTMLDivElement>(null);
+  const [guideRequest, setGuideRequest] = useState<{
+    guideId: GuidedGuideId;
+    isReplay?: boolean;
+    nonce: number;
+  } | null>(null);
   const selfPhase = gameState?.self_player.phase;
   const canManipulateOpponent = gameState?.current_battle?.can_manipulate_opponent ?? false;
 
@@ -484,14 +510,14 @@ function GameContent() {
     const resolved = gameId
       ? resolveNewPlayerPreferenceForGame(gameId, session?.playerId)
       : false;
-    seenTimelinePhasesRef.current = new Set();
-    shownPuppetGhostExplainerRef.current = false;
+    seenGuidesRef.current = gameId
+      ? getSeenGuidesForGame(gameId, session?.playerId)
+      : new Set();
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
-      setIsNewPlayerOnboarding(resolved);
-      setAutoOpenTimelinePhase(null);
-      setShowPuppetGhostExplainer(false);
+      setIsGuidedMode(resolved);
+      setGuideRequest(null);
     });
     return () => {
       cancelled = true;
@@ -517,53 +543,6 @@ function GameContent() {
     }
     rememberPlayerForGame(gameId, playerName);
   }, [gameId, gameState?.self_player.name, isSpectator]);
-
-  useEffect(() => {
-    if (!selfPhase || isSpectator || !isNewPlayerOnboarding) {
-      return;
-    }
-    if (!isTimelinePhase(selfPhase)) {
-      return;
-    }
-    if (seenTimelinePhasesRef.current.has(selfPhase)) {
-      return;
-    }
-    seenTimelinePhasesRef.current.add(selfPhase);
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setAutoOpenTimelinePhase(selfPhase);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [isNewPlayerOnboarding, isSpectator, selfPhase]);
-
-  useEffect(() => {
-    if (
-      selfPhase !== "battle" ||
-      isSpectator ||
-      !isNewPlayerOnboarding ||
-      shownPuppetGhostExplainerRef.current ||
-      !canManipulateOpponent
-    ) {
-      return;
-    }
-    shownPuppetGhostExplainerRef.current = true;
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setShowPuppetGhostExplainer(true);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    canManipulateOpponent,
-    isNewPlayerOnboarding,
-    isSpectator,
-    selfPhase,
-  ]);
 
   useEffect(() => {
     const selfPlayer = gameState?.self_player;
@@ -625,7 +604,6 @@ function GameContent() {
         setActiveBattleZoneModal(null);
         setShowSubmitResultPopover(false);
         setIsChangingResult(false);
-        setShowPuppetGhostExplainer(false);
       });
     }
     if (selfPhase !== "build") {
@@ -715,9 +693,6 @@ function GameContent() {
     if (except !== "battleZoneModal") {
       setActiveBattleZoneModal(null);
     }
-    if (except !== "puppetExplainer") {
-      setShowPuppetGhostExplainer(false);
-    }
   }, []);
 
   const openRulesPanel = useCallback((target?: RulesPanelTarget) => {
@@ -752,28 +727,42 @@ function GameContent() {
     );
   }, [actions, closeGameplayOverlays, gameState, selectedBasics]);
 
-  const toggleBuildSubmitPopover = useCallback(() => {
+  const openBuildSubmitPopover = useCallback(() => {
     if (showSubmitHandPopover || buildReadyPending) {
-      setShowSubmitHandPopover(false);
       return;
     }
     closeGameplayOverlays("buildSubmit");
     setShowSubmitHandPopover(true);
   }, [buildReadyPending, closeGameplayOverlays, showSubmitHandPopover]);
 
+  const toggleBuildSubmitPopover = useCallback(() => {
+    if (showSubmitHandPopover || buildReadyPending) {
+      setShowSubmitHandPopover(false);
+      return;
+    }
+    openBuildSubmitPopover();
+  }, [buildReadyPending, openBuildSubmitPopover, showSubmitHandPopover]);
+
   const openActionMenu = useCallback(() => {
     closeGameplayOverlays("actionMenu");
     setActionMenuOpen(true);
   }, [closeGameplayOverlays]);
+
+  const openBattleSubmitPopover = useCallback(() => {
+    if (showSubmitResultPopover) {
+      return;
+    }
+    closeGameplayOverlays("battleSubmit");
+    setShowSubmitResultPopover(true);
+  }, [closeGameplayOverlays, showSubmitResultPopover]);
 
   const toggleBattleSubmitPopover = useCallback(() => {
     if (showSubmitResultPopover) {
       setShowSubmitResultPopover(false);
       return;
     }
-    closeGameplayOverlays("battleSubmit");
-    setShowSubmitResultPopover(true);
-  }, [closeGameplayOverlays, showSubmitResultPopover]);
+    openBattleSubmitPopover();
+  }, [openBattleSubmitPopover, showSubmitResultPopover]);
 
   const toggleBattlePanel = useCallback((panel: Exclude<ActiveDndPanel, null>) => {
     if (activeDndPanel === panel) {
@@ -804,11 +793,69 @@ function GameContent() {
     setShareOpen(true);
   }, [closeGameplayOverlays]);
 
-  useEffect(() => {
-    if (showPuppetGhostExplainer) {
-      queueMicrotask(() => closeGameplayOverlays("puppetExplainer"));
+  const startGuide = useCallback((guideId: GuidedGuideId, isReplay = false) => {
+    closeGameplayOverlays();
+    setGuideRequest({
+      guideId,
+      isReplay,
+      nonce: Date.now(),
+    });
+  }, [closeGameplayOverlays]);
+
+  const handleGuideClose = useCallback((guideId: GuidedGuideId) => {
+    if (gameId) {
+      markGuideSeenForGame(gameId, guideId, session?.playerId);
     }
-  }, [closeGameplayOverlays, showPuppetGhostExplainer]);
+    seenGuidesRef.current.add(guideId);
+    setGuideRequest(null);
+  }, [gameId, session?.playerId]);
+
+  useEffect(() => {
+    if (
+      !gameId ||
+      !gameState ||
+      !selfPhase ||
+      !isGuidedMode ||
+      isSpectator ||
+      guideRequest !== null
+    ) {
+      return;
+    }
+
+    if (rulesPanelOpen || showUpgradesModal || shareOpen || actionMenuOpen) {
+      return;
+    }
+
+    if (!seenGuidesRef.current.has("welcome")) {
+      queueMicrotask(() => {
+        setGuideRequest((current) =>
+          current ?? { guideId: "welcome", nonce: Date.now() },
+        );
+      });
+      return;
+    }
+
+    if (!isTimelinePhase(selfPhase) || seenGuidesRef.current.has(selfPhase)) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      setGuideRequest((current) =>
+        current ?? { guideId: selfPhase, nonce: Date.now() },
+      );
+    });
+  }, [
+    actionMenuOpen,
+    gameId,
+    gameState,
+    guideRequest,
+    isGuidedMode,
+    isSpectator,
+    rulesPanelOpen,
+    selfPhase,
+    shareOpen,
+    showUpgradesModal,
+  ]);
 
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   const modalOpen =
@@ -818,7 +865,7 @@ function GameContent() {
     activeDndPanel !== null ||
     activeBattleZoneModal !== null ||
     shareOpen ||
-    showPuppetGhostExplainer;
+    guideRequest !== null;
   const hotkeyMap: Record<string, () => void> = (() => {
     const currentPhaseId = gameState?.self_player.phase;
     const map: Record<string, () => void> = {
@@ -1008,6 +1055,7 @@ function GameContent() {
   const currentPhase = gameState.self_player.phase;
 
   const { self_player, current_battle } = gameState;
+  const battleStateHash = serializeBattleState(gameState);
 
   const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
@@ -1037,6 +1085,26 @@ function GameContent() {
       : hasPendingBuildUpgrades
         ? "apply"
         : "view";
+
+  const guideContext: GuidedWalkthroughContext = {
+    currentPhase: isTimelinePhase(currentPhase) ? currentPhase : null,
+    selfPlayer: self_player,
+    currentBattle: current_battle,
+    useUpgrades: gameState.use_upgrades,
+    hasRewardUpgradeChoice: needsUpgrade,
+    selectedBasicsCount: selectedBasics.length,
+    handCount: self_player.hand.length,
+    handSize: maxHandSize,
+    buildReady: self_player.build_ready,
+    buildReadyPending,
+    showBuildSubmitPopover: showSubmitHandPopover,
+    showBattleSubmitPopover: showSubmitResultPopover,
+    canManipulateOpponent,
+    battleStateHash,
+    closeGameplayOverlays,
+    openBuildSubmitPopover,
+    openBattleSubmitPopover,
+  };
 
   const handleContinue = () => {
     actions.rewardDone(selectedUpgradeId ?? undefined);
@@ -1101,7 +1169,7 @@ function GameContent() {
           </button>
         ) : null;
         right = (
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2" data-guide-target="build-submit">
             <span className="text-amber-400 text-sm">Waiting...</span>
             <button
               onClick={actions.buildUnready}
@@ -1126,6 +1194,7 @@ function GameContent() {
               onClick={toggleBuildSubmitPopover}
               disabled={!canReady || buildReadyPending}
               className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              data-guide-target="build-submit"
             >
               {buildReadyPending ? "Submitting..." : "Submit Hand"}
             </button>
@@ -1144,6 +1213,7 @@ function GameContent() {
                   },
                 ]}
                 onClose={() => setShowSubmitHandPopover(false)}
+                guideTarget="build-submit-popover"
               />
             )}
           </div>
@@ -1159,6 +1229,7 @@ function GameContent() {
         <button
           onClick={openActionMenu}
           className="btn btn-secondary"
+          data-guide-target="battle-actions"
         >
           Actions
         </button>
@@ -1196,6 +1267,7 @@ function GameContent() {
             <button
               onClick={toggleBattleSubmitPopover}
               className="btn btn-primary"
+              data-guide-target="battle-submit"
             >
               Submit Result
             </button>
@@ -1231,6 +1303,7 @@ function GameContent() {
                   },
                 ]}
                 onClose={() => setShowSubmitResultPopover(false)}
+                guideTarget="battle-submit-popover"
               />
             )}
           </div>
@@ -1449,6 +1522,7 @@ function GameContent() {
             Watching {spectatingPlayer}'s game (spectator mode)
           </div>
         )}
+        <div ref={guideRootRef} className="relative flex flex-col flex-1 min-h-0">
         {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
         <div className="relative">
           <PhaseTimeline
@@ -1458,14 +1532,9 @@ function GameContent() {
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
             useUpgrades={gameState.use_upgrades}
-            autoOpenPhase={isNewPlayerOnboarding ? autoOpenTimelinePhase : null}
-            onAutoOpenHandled={(phase) => {
-              setAutoOpenTimelinePhase((current) =>
-                current === phase ? null : current,
-              );
-            }}
             headerClassName="py-1.5 bar-pad-left"
             onOpenRules={openRulesPanel}
+            onStartWalkthrough={(guideId) => startGuide(guideId, true)}
             hamburger={sizes.isMobile ? (
               <button onClick={() => setSidebarOpen(o => !o)} className="btn btn-secondary text-xs sm:text-sm">☰</button>
             ) : undefined}
@@ -1485,32 +1554,6 @@ function GameContent() {
             validDropZones={getValidDropZones}
           >
             <div className="flex-1 flex min-h-0 game-surface">
-              {showPuppetGhostExplainer && (
-                <>
-                  <div className="absolute inset-0 z-[45] bg-black/45 backdrop-blur-[2px]" />
-                  <div className="absolute inset-0 z-[55] pointer-events-none flex items-center justify-center p-4">
-                    <div
-                      className="modal-chrome border rounded-lg p-5 w-full max-w-lg text-center pointer-events-auto shadow-xl"
-                      style={{ borderColor: "var(--color-gold)" }}
-                    >
-                      <h2 className="text-lg font-semibold text-amber-300 mb-2">
-                        Puppet/Ghost Opponent
-                      </h2>
-                      <p className="text-sm text-gray-200 mb-4">
-                        This opponent is a puppet/ghost. Their cards are fully visible,
-                        and you can move cards on both sides to play out the battle and
-                        decide who wins.
-                      </p>
-                      <button
-                        onClick={() => setShowPuppetGhostExplainer(false)}
-                        className="btn btn-primary py-2 px-5"
-                      >
-                        Got it
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
               <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
               <main className="flex-1 flex flex-col min-h-0 min-w-0">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
@@ -1806,7 +1849,10 @@ function GameContent() {
         {/* Bottom Action Bar */}
         {!isSpectator && (
           <div className="shrink-0 relative z-40 frame-chrome">
-            <div className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-main timeline-actions">
+            <div
+              className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-main timeline-actions"
+              data-guide-target="phase-action-bar"
+            >
               {isEndPhase && gameId ? (
                 <>
                   <div className="flex items-center gap-1.5 sm:gap-2 py-1">
@@ -1831,6 +1877,16 @@ function GameContent() {
             </div>
           </div>
         )}
+        {guideRequest && !isSpectator && (
+          <GuidedWalkthrough
+            key={guideRequest.nonce}
+            rootRef={guideRootRef}
+            request={guideRequest}
+            context={guideContext}
+            onClose={(guideId) => handleGuideClose(guideId)}
+          />
+        )}
+        </div>
       </div>
       {state.previewCard && (
         <CardPreviewModal

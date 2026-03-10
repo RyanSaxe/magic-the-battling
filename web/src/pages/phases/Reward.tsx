@@ -332,6 +332,7 @@ export function RewardPhase({
           ref={rewardsZoneRef}
           className={`zone-pack w-full px-3 pt-5 pb-3 relative ${hasUpgradeSection ? "" : "flex-1 min-h-0"}`}
           style={rewardsStyle}
+          data-guide-target="reward-summary"
         >
           <ZoneLabel>Rewards</ZoneLabel>
           {rewardItems.length === 0 ? (
@@ -376,6 +377,14 @@ export function RewardPhase({
               ))}
             </CardGrid>
           )}
+          <div
+            data-guide-target="reward-progression"
+            className="mt-4 rounded-lg border border-amber-500/15 bg-black/25 px-3 py-2 text-center text-xs text-gray-300"
+          >
+            <span className="text-amber-300 font-medium">Round progression:</span>{" "}
+            every third reward increases starting hand size by 1.
+            {hasUpgradeSection ? " This reward also includes an upgrade choice." : ""}
+          </div>
         </div>
 
         {hasUpgradeSection && dividerCallbacks.topDivider && (
