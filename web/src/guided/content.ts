@@ -162,8 +162,6 @@ function buildInteractiveSteps(): GuideStepDefinition[] {
         isComplete: (ctx) =>
           ctx.selectedBasicsCount === 3 && ctx.handCount === ctx.handSize,
       },
-      primaryActionLabel: "Try it",
-      primaryActionMode: "minimize",
     },
     {
       id: "submit",
@@ -211,22 +209,53 @@ function buildDraftSteps(ctx: GuidedWalkthroughContext): GuideStepDefinition[] {
         detail: "Decide whether any cards in the current pack should replace part of your pool.",
       },
     },
+    {
+      id: "swap",
+      title: "Make One Real Swap",
+      targetId: ctx.isMobile ? "phase-action-bar" : "draft-pack",
+      placement: ctx.isMobile ? "top" : "right",
+      content: {
+        summary: "Keep both the pack and your pool in view, then swap one card between them.",
+        detail: "Select a card from the pack, then a card from your pool to trade places.",
+        actionHint: "Swap one pack card with one pool card to continue.",
+        minimizedText: "Make one real pack-to-pool swap.",
+      },
+      completion: {
+        type: "condition",
+        allowInteraction: true,
+        isComplete: (ctx, meta) =>
+          differsFromSnapshot(meta?.packIds, ids(currentPack(ctx)).join(","))
+          && differsFromSnapshot(meta?.poolIds, ids(draftPool(ctx)).join(",")),
+      },
+      onEnter: (ctx) => ({
+        packIds: ids(currentPack(ctx)).join(","),
+        poolIds: ids(draftPool(ctx)).join(","),
+      }),
+    },
+    {
+      id: "actions",
+      title: "Spend Treasure Carefully",
+      targetId: "phase-action-bar",
+      placement: "top",
+      content: {
+        summary: "Spend a treasure to roll for a fresh pack — but treasures persist across phases.",
+        detail: "When satisfied, continue on to build the next battle setup.",
+      },
+    },
   ];
 
   if (ctx.isMobile) {
     steps.push({
       id: "open-sidebar",
-      title: "Open The Sidebar",
+      title: "Open The Sidebar Last",
       targetId: "sidebar-toggle",
       placement: "left",
       content: {
-        summary: "On mobile, the player sidebar lives behind the hamburger button.",
-        detail: "You will use it during draft to scout opponents and inspect what they have revealed.",
+        summary: "One last draft tool on mobile lives behind the hamburger button.",
+        detail: "Use it after comparing the pack and your pool to scout opponents before locking in later decisions.",
         actionHint: "Open the sidebar to continue.",
         minimizedText: "Open the mobile sidebar.",
       },
-      primaryActionLabel: "Try it",
-      primaryActionMode: "minimize",
       completion: {
         type: "condition",
         allowInteraction: true,
@@ -241,13 +270,11 @@ function buildDraftSteps(ctx: GuidedWalkthroughContext): GuideStepDefinition[] {
     targetId: "sidebar-tab-opponents",
     placement: "left",
     content: {
-      summary: "The sidebar helps you read the table, not just your own pool.",
-      detail: "Switch to Opponents so you can inspect what other players have shown.",
+      summary: "One last draft input is what your opponents have already shown.",
+      detail: "Switch to Opponents so you can use that information to inform future picks, rolls, and builds.",
       actionHint: "Open the Opponents tab to continue.",
       minimizedText: "Open the Opponents tab in the sidebar.",
     },
-    primaryActionLabel: "Try it",
-    primaryActionMode: "minimize",
     completion: {
       type: "condition",
       allowInteraction: true,
@@ -266,8 +293,6 @@ function buildDraftSteps(ctx: GuidedWalkthroughContext): GuideStepDefinition[] {
       actionHint: "Pick an opponent row to continue.",
       minimizedText: "Choose an opponent from the sidebar.",
     },
-    primaryActionLabel: "Try it",
-    primaryActionMode: "minimize",
     completion: {
       type: "condition",
       allowInteraction: true,
@@ -298,43 +323,6 @@ function buildDraftSteps(ctx: GuidedWalkthroughContext): GuideStepDefinition[] {
     content: {
       summary: "The revealed cards section shows what this player has exposed in recent battles.",
       detail: "That helps you infer colors, likely threats, and whether you should value interaction, mana, or speed more highly.",
-    },
-  });
-
-  steps.push({
-    id: "swap",
-    title: "Make One Real Swap",
-    targetId: "draft-pack",
-    placement: "right",
-    content: {
-      summary: "Now improve your pool by swapping one card between the pack and your pool.",
-      detail: "Select a card from the pack, then a card from your pool to trade places.",
-      actionHint: "Swap one pack card with one pool card to continue.",
-      minimizedText: "Make one real pack-to-pool swap.",
-    },
-    primaryActionLabel: "Try it",
-    primaryActionMode: "minimize",
-    completion: {
-      type: "condition",
-      allowInteraction: true,
-      isComplete: (ctx, meta) =>
-        differsFromSnapshot(meta?.packIds, ids(currentPack(ctx)).join(","))
-        && differsFromSnapshot(meta?.poolIds, ids(draftPool(ctx)).join(",")),
-    },
-    onEnter: (ctx) => ({
-      packIds: ids(currentPack(ctx)).join(","),
-      poolIds: ids(draftPool(ctx)).join(","),
-    }),
-  });
-
-  steps.push({
-    id: "actions",
-    title: "Spend Treasure Carefully",
-    targetId: "phase-action-bar",
-    placement: "top",
-    content: {
-      summary: "Spend a treasure to roll for a fresh pack — but treasures persist across phases.",
-      detail: "When satisfied, continue on to build the next battle setup.",
     },
   });
 
@@ -377,8 +365,6 @@ function buildBattleSteps(includePuppetPractice: boolean): GuideStepDefinition[]
         actionHint: "Double tap one of your permanents to continue.",
         minimizedText: "Double tap one of your permanents.",
       },
-      primaryActionLabel: "Try it",
-      primaryActionMode: "minimize",
       completion: {
         type: "condition",
         allowInteraction: true,
@@ -403,8 +389,6 @@ function buildBattleSteps(includePuppetPractice: boolean): GuideStepDefinition[]
         actionHint: "Move one card from your hand to your battlefield.",
         minimizedText: "Play one card from hand to battlefield.",
       },
-      primaryActionLabel: "Try it",
-      primaryActionMode: "minimize",
       completion: {
         type: "condition",
         allowInteraction: true,
@@ -434,8 +418,6 @@ function buildBattleSteps(includePuppetPractice: boolean): GuideStepDefinition[]
         actionHint: "Tap the card you just moved onto the battlefield.",
         minimizedText: "Select the card you just played.",
       },
-      primaryActionLabel: "Try it",
-      primaryActionMode: "minimize",
       completion: {
         type: "condition",
         allowInteraction: true,
@@ -457,8 +439,6 @@ function buildBattleSteps(includePuppetPractice: boolean): GuideStepDefinition[]
         actionHint: "Open the Actions menu.",
         minimizedText: "Open the Actions menu.",
       },
-      primaryActionLabel: "Try it",
-      primaryActionMode: "minimize",
       completion: {
         type: "condition",
         allowInteraction: true,
@@ -476,8 +456,6 @@ function buildBattleSteps(includePuppetPractice: boolean): GuideStepDefinition[]
         actionHint: "Use Add Counter, then choose any counter type.",
         minimizedText: "Add a counter through the Actions menu.",
       },
-      primaryActionLabel: "Try it",
-      primaryActionMode: "minimize",
       completion: {
         type: "condition",
         allowInteraction: true,
@@ -504,8 +482,6 @@ function buildBattleSteps(includePuppetPractice: boolean): GuideStepDefinition[]
         actionHint: "Move one card from the puppet's hand to the battlefield.",
         minimizedText: "Move one puppet card from hand to battlefield.",
       },
-      primaryActionLabel: "Try it",
-      primaryActionMode: "minimize",
       completion: {
         type: "condition",
         allowInteraction: true,
@@ -546,12 +522,12 @@ function buildRewardSteps(ctx: GuidedWalkthroughContext): GuideStepDefinition[] 
   return [
     {
       id: "result",
-      title: "Read The Last Battle First",
-      targetId: "reward-summary",
-      placement: "right",
+      title: "Read The Result Rail First",
+      targetId: "reward-result",
+      placement: "bottom",
       content: {
-        summary: "Reward starts by summarizing what happened in the battle.",
-        detail: "Use this to confirm the result before thinking about what you gained.",
+        summary: "This rail shows whether the battle was a victory, defeat, or draw, who it was against, and how much poison was dealt or taken.",
+        detail: "Losing battles gives you poison. At 10 poison you are eliminated, so this is the right place to check how dangerous the last result really was.",
       },
     },
     {
@@ -776,7 +752,9 @@ export function buildGuideDefinition(
             content: {
               summary: "Open the phase popup from the timeline to relaunch any walkthrough.",
               detail: "The build guide is next because that is the phase you are actually in.",
+              actionHint: "Click the current phase in the timeline.",
             },
+            completion: { type: "target-click" },
           },
         ],
       };

@@ -27,9 +27,12 @@ function resolveTarget(root: HTMLElement, targetId?: GuideTargetId, targetSelect
   if (targetSelector) {
     const selectorTarget = root.querySelector<HTMLElement>(targetSelector);
     if (selectorTarget) return selectorTarget;
+    const documentSelectorTarget = document.querySelector<HTMLElement>(targetSelector);
+    if (documentSelectorTarget) return documentSelectorTarget;
   }
   if (!targetId) return null;
-  return root.querySelector<HTMLElement>(`[data-guide-target="${targetId}"]`);
+  return root.querySelector<HTMLElement>(`[data-guide-target="${targetId}"]`)
+    ?? document.querySelector<HTMLElement>(`[data-guide-target="${targetId}"]`);
 }
 
 function toRelativeRect(root: HTMLElement, target: HTMLElement, padding: number): SpotlightRect {

@@ -13,6 +13,7 @@ const PHASE_TITLE_COLOR: Record<Phase, string> = {
 
 interface PhasePopoverProps {
   phase: Phase
+  currentPhase: Phase
   anchorRect: DOMRect
   useUpgrades: boolean
   isClosing?: boolean
@@ -23,6 +24,7 @@ interface PhasePopoverProps {
 
 export function PhasePopover({
   phase,
+  currentPhase,
   anchorRect,
   useUpgrades,
   isClosing = false,
@@ -91,7 +93,7 @@ export function PhasePopover({
         position: 'fixed',
         visibility: 'hidden',
       }}
-      className={`modal-chrome border gold-border rounded-lg shadow-xl z-[60] felt-raised-panel min-w-[16rem] w-max max-w-[calc(100vw-1rem)] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      className={`modal-chrome border gold-border rounded-lg shadow-xl z-[84] felt-raised-panel min-w-[16rem] w-max max-w-[calc(100vw-1rem)] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
     >
       <div
         ref={arrowRef}
@@ -105,13 +107,13 @@ export function PhasePopover({
         <div className="flex items-center gap-1.5">
           <button
             onClick={onOpenDetails}
-            className="btn-secondary text-xs py-1 px-2.5 rounded"
+            className="btn btn-secondary text-xs py-1 px-2.5"
           >
             Details
           </button>
           <button
             onClick={onOpenControls}
-            className="btn-secondary text-xs py-1 px-2.5 rounded"
+            className="btn btn-secondary text-xs py-1 px-2.5"
           >
             Controls
           </button>
@@ -135,21 +137,23 @@ export function PhasePopover({
           </p>
         </div>
 
-        <div className="mt-3 pt-3 border-t border-amber-400/10 flex items-center justify-between gap-2">
+        <div className="mt-3 pt-3 border-t border-amber-400/10 flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
             onClick={() => { onClose(); startGuide("welcome", true); }}
-            className="btn-secondary text-xs py-1 px-2.5 rounded"
+            className="btn btn-secondary text-xs py-1 px-3"
           >
             Replay Welcome
           </button>
-          <button
-            type="button"
-            onClick={() => { onClose(); startGuide(phase, true); }}
-            className="btn btn-primary text-xs py-1 px-3"
-          >
-            Interactive Walkthrough
-          </button>
+          {phase === currentPhase && (
+            <button
+              type="button"
+              onClick={() => { onClose(); startGuide(phase, true); }}
+              className="btn btn-primary text-xs py-1 px-3"
+            >
+              Interactive Walkthrough
+            </button>
+          )}
         </div>
       </div>
     </div>,

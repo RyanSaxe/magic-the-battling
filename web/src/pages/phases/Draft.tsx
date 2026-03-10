@@ -165,7 +165,7 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
         {/* Pack */}
         <div
           ref={packZoneRef}
-          className="zone-pack w-full px-3 pt-5 pb-3 relative"
+          className="zone-pack w-full px-3 pt-5 pb-3 relative flex flex-col min-h-0"
           style={packStyle}
           data-guide-target="draft-pack"
         >
@@ -203,30 +203,32 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
             </>
           )}
           <ZoneLabel>Pack</ZoneLabel>
-          {currentPack.length === 0 ? (
-            <div className="text-center">
-              <div className="text-gray-400 text-sm">No pack available</div>
-            </div>
-          ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${packDims.columns}, ${packDims.width}px)`,
-              gap: '6px',
-              justifyContent: 'center',
-              maxWidth: '100%',
-              overflow: 'hidden',
-            }}>
-              {currentPack.map((card, index) => (
-                <Card
-                  key={card.id}
-                  card={card}
-                  onClick={() => handleCardClick(card, index, 'pack', false)}
-                  selected={selectedCard?.card.id === card.id}
-                  dimensions={packDims}
-                />
-              ))}
-            </div>
-          )}
+          <div className="flex-1 min-h-0 overflow-auto">
+            {currentPack.length === 0 ? (
+              <div className="text-center">
+                <div className="text-gray-400 text-sm">No pack available</div>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${packDims.columns}, ${packDims.width}px)`,
+                gap: '6px',
+                justifyContent: 'center',
+                maxWidth: '100%',
+                overflow: 'hidden',
+              }}>
+                {currentPack.map((card, index) => (
+                  <Card
+                    key={card.id}
+                    card={card}
+                    onClick={() => handleCardClick(card, index, 'pack', false)}
+                    selected={selectedCard?.card.id === card.id}
+                    dimensions={packDims}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {dividerCallbacks.topDivider && (
@@ -240,44 +242,46 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
         {/* Pool */}
         <div
           ref={poolZoneRef}
-          className={`zone-sideboard w-full px-3 pt-5 pb-3 relative ${zoneFrames ? '' : 'flex-1'}`}
+          className={`zone-sideboard w-full px-3 pt-5 pb-3 relative flex flex-col min-h-0 ${zoneFrames ? '' : 'flex-1'}`}
           style={poolStyle}
           data-guide-target="draft-pool"
         >
           <ZoneLabel dragCallbacks={dividerCallbacks.topDivider}>
             Pool
           </ZoneLabel>
-          {pool.length === 0 ? (
-            <div className="flex items-center justify-center">
-              <div className="text-gray-500 text-sm text-center">
-                Swap cards from the pack to build your pool
+          <div className="flex-1 min-h-0 overflow-auto">
+            {pool.length === 0 ? (
+              <div className="flex items-center justify-center">
+                <div className="text-gray-500 text-sm text-center">
+                  Swap cards from the pack to build your pool
+                </div>
               </div>
-            </div>
-          ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${poolDims.columns}, ${poolDims.width}px)`,
-              gap: '6px',
-              justifyContent: 'center',
-              maxWidth: '100%',
-              overflow: 'hidden',
-            }}>
-              {pool.map((card, index) => {
-                const isInHand = self_player.hand.some((c) => c.id === card.id)
-                return (
-                  <Card
-                    key={card.id}
-                    card={card}
-                    onClick={() => handleCardClick(card, index, 'pool', isInHand)}
-                    selected={selectedCard?.card.id === card.id}
-                    dimensions={poolDims}
-                    upgraded={upgradedCardIds.has(card.id)}
-                    appliedUpgrades={getAppliedUpgrades(card.id)}
-                  />
-                )
-              })}
-            </div>
-          )}
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${poolDims.columns}, ${poolDims.width}px)`,
+                gap: '6px',
+                justifyContent: 'center',
+                maxWidth: '100%',
+                overflow: 'hidden',
+              }}>
+                {pool.map((card, index) => {
+                  const isInHand = self_player.hand.some((c) => c.id === card.id)
+                  return (
+                    <Card
+                      key={card.id}
+                      card={card}
+                      onClick={() => handleCardClick(card, index, 'pool', isInHand)}
+                      selected={selectedCard?.card.id === card.id}
+                      dimensions={poolDims}
+                      upgraded={upgradedCardIds.has(card.id)}
+                      appliedUpgrades={getAppliedUpgrades(card.id)}
+                    />
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

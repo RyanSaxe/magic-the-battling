@@ -15,13 +15,23 @@ interface GuidedWalkthroughProps {
 }
 
 function resolveTarget(root: HTMLElement | null, targetId?: string, targetSelector?: string): HTMLElement | null {
-  if (!root) return null;
+  if (!root) {
+    if (targetSelector) {
+      const selectorTarget = document.querySelector<HTMLElement>(targetSelector);
+      if (selectorTarget) return selectorTarget;
+    }
+    if (!targetId) return null;
+    return document.querySelector<HTMLElement>(`[data-guide-target="${targetId}"]`);
+  }
   if (targetSelector) {
     const selectorTarget = root.querySelector<HTMLElement>(targetSelector);
     if (selectorTarget) return selectorTarget;
+    const documentSelectorTarget = document.querySelector<HTMLElement>(targetSelector);
+    if (documentSelectorTarget) return documentSelectorTarget;
   }
   if (!targetId) return null;
-  return root.querySelector<HTMLElement>(`[data-guide-target="${targetId}"]`);
+  return root.querySelector<HTMLElement>(`[data-guide-target="${targetId}"]`)
+    ?? document.querySelector<HTMLElement>(`[data-guide-target="${targetId}"]`);
 }
 
 export function GuidedWalkthrough({ rootRef, request, context, onClose }: GuidedWalkthroughProps) {

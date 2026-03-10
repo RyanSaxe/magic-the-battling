@@ -300,6 +300,7 @@ export function PhaseTimeline({
       {popoverPhase && popoverAnchorRect && (
         <PhasePopover
           phase={popoverPhase}
+          currentPhase={currentPhase}
           anchorRect={popoverAnchorRect}
           useUpgrades={useUpgrades}
           isClosing={isPopoverClosing}

@@ -291,7 +291,10 @@ export function RewardPhase({
 
   return (
     <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-      <div className="shrink-0 top-attached-rail top-attached-rail-pad text-[11px] sm:text-sm">
+      <div
+        className="shrink-0 top-attached-rail top-attached-rail-pad text-[11px] sm:text-sm"
+        data-guide-target="reward-result"
+      >
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-4">
           <div className="min-w-0 truncate text-left text-gray-300 leading-tight">
             {opponentLabel}

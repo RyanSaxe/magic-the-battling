@@ -24,6 +24,7 @@ export type GuideTargetId =
   | "battle-action-add-counter"
   | "battle-submit"
   | "battle-opponent-hand"
+  | "reward-result"
   | "reward-summary"
   | "reward-progression"
   | "reward-upgrades"
