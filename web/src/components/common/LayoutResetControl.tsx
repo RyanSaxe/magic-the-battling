@@ -9,6 +9,7 @@ interface LayoutResetControlProps {
   isInherited: boolean;
   onConfirm: () => void;
   position?: "top-right" | "bottom-right";
+  message?: string;
 }
 
 function positionClasses(position: "top-right" | "bottom-right") {
@@ -34,6 +35,7 @@ export function LayoutResetControl({
   isInherited,
   onConfirm,
   position = "top-right",
+  message,
 }: LayoutResetControlProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const { wrapper, popover } = positionClasses(position);
@@ -61,7 +63,8 @@ export function LayoutResetControl({
               </div>
             )}
             <div className="mt-2 text-xs leading-snug text-gray-200">
-              This resets Stage {currentStage}, Round {currentRound} and all future {phaseLabel.toLowerCase()} layouts on this device.
+              {message ??
+                `This resets Stage ${currentStage}, Round ${currentRound} and all future ${phaseLabel.toLowerCase()} layouts on this device.`}
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">
               <button

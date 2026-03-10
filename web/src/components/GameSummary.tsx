@@ -11,6 +11,7 @@ interface GameSummaryProps {
   isMobile?: boolean
   layoutStateKey?: string
   resizeState?: DeckDisplayResizeState
+  showLayoutReset?: boolean
 }
 
 export function GameSummary({
@@ -21,6 +22,7 @@ export function GameSummary({
   isMobile = false,
   layoutStateKey,
   resizeState,
+  showLayoutReset = false,
 }: GameSummaryProps) {
   const [frozenPlayer] = useState(() => ({
     hand: [...player.hand],
@@ -54,6 +56,12 @@ export function GameSummary({
           isMobile={isMobile}
           layoutStateKey={layoutStateKey}
           resizeState={resizeState}
+          resetControl={showLayoutReset ? {
+            phaseLabel: 'Deck Layout',
+            currentStage: frozenPlayer.stage,
+            currentRound: frozenPlayer.round,
+            message: 'This resets the current deck layout for this view on this device.',
+          } : undefined}
         />
       </div>
     </div>

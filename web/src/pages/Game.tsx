@@ -1774,6 +1774,7 @@ function GameContent() {
                   enableResize
                   isMobile={sizes.isMobile}
                   layoutStateKey={`${currentPhase}:${self_player.stage}:${self_player.round}`}
+                  showLayoutReset
                 />
               )}
             </main>

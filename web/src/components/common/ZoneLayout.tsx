@@ -157,7 +157,14 @@ export function ZoneLayout({
               />
             )}
             {hasUpgrades && (
-              <div ref={zoneRefs?.upgrades} className="zone-upgrades px-3 pt-5 pb-3 relative flex items-center justify-center" style={{ minWidth: '7rem', ...(controlledStyle(zoneHeights?.upgrades) ?? {}) }}>
+              <div
+                ref={zoneRefs?.upgrades}
+                className="zone-upgrades min-w-0 px-3 pt-5 pb-3 relative flex items-center justify-center"
+                style={{
+                  minWidth: isMobile ? 0 : '7rem',
+                  ...(controlledStyle(zoneHeights?.upgrades) ?? {}),
+                }}
+              >
                 <ZoneLabel dragCallbacks={upgradesLabelHandle}>
                   {upgradesLabel}
                 </ZoneLabel>

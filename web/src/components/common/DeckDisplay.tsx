@@ -7,6 +7,7 @@ import { useCardLayout, ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
 import { useZoneDividers } from '../../hooks/useZoneDividers'
 import { BasicLandCard } from './BasicLandCard'
 import { CardGrid } from './CardGrid'
+import { LayoutResetControl } from './LayoutResetControl'
 import { TreasureCard } from './TreasureCard'
 import { PoisonCard } from './PoisonCard'
 import { ZoneLayout } from './ZoneLayout'
@@ -15,6 +16,13 @@ export interface DeckDisplayResizeState {
   constraints: ZoneConstraints | null
   setConstraints: (constraints: ZoneConstraints) => void
   clearConstraints: () => void
+}
+
+interface DeckDisplayResetControl {
+  phaseLabel: string
+  currentStage: number
+  currentRound: number
+  message?: string
 }
 
 interface DeckDisplayProps {
@@ -30,6 +38,7 @@ interface DeckDisplayProps {
   isMobile?: boolean
   layoutStateKey?: string
   resizeState?: DeckDisplayResizeState
+  resetControl?: DeckDisplayResetControl
 }
 
 export function DeckDisplay({
@@ -45,6 +54,7 @@ export function DeckDisplay({
   isMobile = false,
   layoutStateKey,
   resizeState,
+  resetControl,
 }: DeckDisplayProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const localLayoutStateKey = layoutStateKey ?? '__default__'
@@ -88,6 +98,7 @@ export function DeckDisplay({
   }, [localLayoutStateKey])
   const setConstraints = resizeState?.setConstraints ?? setLocalConstraints
   const clearConstraints = resizeState?.clearConstraints ?? clearLocalConstraints
+  const showResetControl = enableResize && !!activeConstraints && !!resetControl
 
   const layoutConfig = useMemo(() => ({
     zones: {
@@ -202,6 +213,19 @@ export function DeckDisplay({
       hasSideboard={hasSideboard}
       hasUpgrades={hasUpgrades}
       dividerCallbacks={enableResize ? dividerCallbacks : null}
+      overlay={showResetControl ? (
+        <LayoutResetControl
+          phaseLabel={resetControl.phaseLabel}
+          currentStage={resetControl.currentStage}
+          currentRound={resetControl.currentRound}
+          originStage={null}
+          originRound={null}
+          isInherited={false}
+          onConfirm={clearConstraints}
+          position={isMobile ? 'bottom-right' : 'top-right'}
+          message={resetControl.message}
+        />
+      ) : null}
       handLabel="Hand"
       handContent={
         <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>

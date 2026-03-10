@@ -9,6 +9,7 @@ interface ShareRoundDetailProps {
   isMobile?: boolean
   layoutStateKey?: string
   resizeState?: DeckDisplayResizeState
+  showLayoutReset?: boolean
 }
 
 export function ShareRoundDetail({
@@ -18,6 +19,7 @@ export function ShareRoundDetail({
   isMobile = false,
   layoutStateKey,
   resizeState,
+  showLayoutReset = false,
 }: ShareRoundDetailProps) {
   const upgrades = useUpgrades ? (snapshot.upgrades ?? snapshot.applied_upgrades) : []
   const companionIds = new Set(snapshot.command_zone.map((c) => c.id))
@@ -36,6 +38,12 @@ export function ShareRoundDetail({
         isMobile={isMobile}
         layoutStateKey={layoutStateKey}
         resizeState={resizeState}
+        resetControl={showLayoutReset ? {
+          phaseLabel: 'Deck Layout',
+          currentStage: snapshot.stage,
+          currentRound: snapshot.round,
+          message: 'This resets the current deck layout for this view on this device.',
+        } : undefined}
       />
     </div>
   )

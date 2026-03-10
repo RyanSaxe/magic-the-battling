@@ -243,6 +243,7 @@ export function ShareGame() {
             isMobile={sizes.isMobile}
             layoutStateKey={finalLayoutStateKey}
             resizeState={finalResizeState}
+            showLayoutReset
           />
         )
       }
@@ -256,6 +257,7 @@ export function ShareGame() {
               isMobile={sizes.isMobile}
               layoutStateKey={finalLayoutStateKey}
               resizeState={finalResizeState}
+              showLayoutReset
             />
           </div>
         )
@@ -277,6 +279,7 @@ export function ShareGame() {
             isMobile={sizes.isMobile}
             layoutStateKey={roundLayoutStateKey ?? undefined}
             resizeState={roundResizeState}
+            showLayoutReset
           />
         </div>
       )
