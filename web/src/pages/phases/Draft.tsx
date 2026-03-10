@@ -231,7 +231,7 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
 
         {/* Pool */}
         <div ref={poolZoneRef} className={`zone-sideboard w-full px-3 pt-5 pb-3 relative ${zoneFrames ? '' : 'flex-1'}`} style={poolStyle}>
-          <ZoneLabel mobileDragCallbacks={isMobile ? dividerCallbacks.topDivider : null}>
+          <ZoneLabel dragCallbacks={dividerCallbacks.topDivider}>
             Pool
           </ZoneLabel>
           {pool.length === 0 ? (

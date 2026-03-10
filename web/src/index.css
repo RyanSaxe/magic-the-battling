@@ -493,19 +493,6 @@ body {
     inset 0 -1px 0 rgba(0, 0, 0, 0.48);
 }
 
-.battle-layout::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  box-shadow:
-    inset 14px 0 18px -16px rgba(0, 0, 0, 0.5),
-    inset -14px 0 18px -16px rgba(0, 0, 0, 0.5),
-    inset 0 14px 18px -16px rgba(0, 0, 0, 0.46),
-    inset 0 -14px 18px -16px rgba(0, 0, 0, 0.46);
-  z-index: 3;
-}
-
 .battle-layout .zone-hand,
 .battle-layout .battlefield,
 .battle-side-cell {

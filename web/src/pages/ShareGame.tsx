@@ -7,6 +7,7 @@ import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
 import { buildGameSummaryData } from '../utils/share'
 import { getOrdinal, getPlacementBadgeColor } from '../utils/format'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
+import type { ZoneConstraints } from '../hooks/computeConstrainedLayout'
 import { CardPreviewContext, CardPreviewModal } from '../components/card'
 
 interface RoundOption {
@@ -93,9 +94,21 @@ export function ShareGame() {
   const [roundPopoverOpen, setRoundPopoverOpen] = useState(false)
   const [previewCard, setPreviewCardState] = useState<CardType | null>(null)
   const [previewUpgrades, setPreviewUpgrades] = useState<CardType[]>([])
+  const [deckConstraintsByView, setDeckConstraintsByView] = useState<Record<string, ZoneConstraints>>({})
   const setPreviewCard = useCallback((card: CardType | null, appliedUpgrades?: CardType[]) => {
     setPreviewCardState(card)
     setPreviewUpgrades(appliedUpgrades ?? [])
+  }, [])
+  const setDeckConstraintsForView = useCallback((viewKey: string, constraints: ZoneConstraints) => {
+    setDeckConstraintsByView((prev) => ({ ...prev, [viewKey]: constraints }))
+  }, [])
+  const clearDeckConstraintsForView = useCallback((viewKey: string) => {
+    setDeckConstraintsByView((prev) => {
+      if (!(viewKey in prev)) return prev
+      const next = { ...prev }
+      delete next[viewKey]
+      return next
+    })
   }, [])
 
   useEffect(() => {
@@ -150,6 +163,30 @@ export function ShareGame() {
   const hasPrev = currentIndex > 0
   const hasNext = currentIndex < roundOptions.length - 1
   const currentRoundLabel = roundOptions.find((o) => o.value === selectedRound)?.label ?? 'Latest'
+  const finalLayoutStateKey = `final:${selectedPlayer}`
+  const roundLayoutStateKey = currentSnapshot
+    ? `round:${selectedPlayer}:${currentSnapshot.stage}:${currentSnapshot.round}`
+    : null
+  const finalResizeState = {
+    constraints: deckConstraintsByView[finalLayoutStateKey] ?? null,
+    setConstraints: (constraints: ZoneConstraints) => {
+      setDeckConstraintsForView(finalLayoutStateKey, constraints)
+    },
+    clearConstraints: () => {
+      clearDeckConstraintsForView(finalLayoutStateKey)
+    },
+  }
+  const roundResizeState = roundLayoutStateKey
+    ? {
+        constraints: deckConstraintsByView[roundLayoutStateKey] ?? null,
+        setConstraints: (constraints: ZoneConstraints) => {
+          setDeckConstraintsForView(roundLayoutStateKey, constraints)
+        },
+        clearConstraints: () => {
+          clearDeckConstraintsForView(roundLayoutStateKey)
+        },
+      }
+    : undefined
 
   const playerViews: PlayerView[] = data.players.map((p) => {
     const snap = p.snapshots[p.snapshots.length - 1]
@@ -202,13 +239,24 @@ export function ShareGame() {
             player={gameSummaryData.selfPlayer}
             useUpgrades={data.use_upgrades}
             compact
+            enableResize
+            isMobile={sizes.isMobile}
+            layoutStateKey={finalLayoutStateKey}
+            resizeState={finalResizeState}
           />
         )
       }
       if (lastSnapshot) {
         return (
           <div className="flex-1 min-h-0 flex flex-col">
-            <ShareRoundDetail snapshot={lastSnapshot} useUpgrades={data.use_upgrades} />
+            <ShareRoundDetail
+              snapshot={lastSnapshot}
+              useUpgrades={data.use_upgrades}
+              enableResize
+              isMobile={sizes.isMobile}
+              layoutStateKey={finalLayoutStateKey}
+              resizeState={finalResizeState}
+            />
           </div>
         )
       }
@@ -222,7 +270,14 @@ export function ShareGame() {
     if (currentSnapshot) {
       return (
         <div className="flex-1 min-h-0 flex flex-col">
-          <ShareRoundDetail snapshot={currentSnapshot} useUpgrades={data.use_upgrades} />
+          <ShareRoundDetail
+            snapshot={currentSnapshot}
+            useUpgrades={data.use_upgrades}
+            enableResize
+            isMobile={sizes.isMobile}
+            layoutStateKey={roundLayoutStateKey ?? undefined}
+            resizeState={roundResizeState}
+          />
         </div>
       )
     }

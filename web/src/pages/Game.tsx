@@ -1607,6 +1607,9 @@ function GameContent() {
                 <GameSummary
                   player={self_player}
                   useUpgrades={gameState.use_upgrades}
+                  enableResize
+                  isMobile={sizes.isMobile}
+                  layoutStateKey={`${currentPhase}:${self_player.stage}:${self_player.round}`}
                 />
               )}
             </main>

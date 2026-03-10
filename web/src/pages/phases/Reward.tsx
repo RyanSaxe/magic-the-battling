@@ -397,9 +397,7 @@ export function RewardPhase({
               style={upgradesStyle}
             >
               <ZoneLabel
-                mobileDragCallbacks={
-                  isMobile ? dividerCallbacks.topDivider : null
-                }
+                dragCallbacks={dividerCallbacks.topDivider}
               >
                 Upgrades
               </ZoneLabel>
@@ -433,16 +431,14 @@ export function RewardPhase({
 
             <div
               ref={poolZoneRef}
-              className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${zoneFrames ? "" : "flex-1"}`}
-              style={poolStyle}
-            >
-              <ZoneLabel
-                mobileDragCallbacks={
-                  isMobile ? dividerCallbacks.bottomLeftSplitDivider : null
-                }
+                className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${zoneFrames ? "" : "flex-1"}`}
+                style={poolStyle}
               >
-                Pool
-              </ZoneLabel>
+                <ZoneLabel
+                  dragCallbacks={dividerCallbacks.bottomLeftSplitDivider}
+                >
+                  Pool
+                </ZoneLabel>
               {poolCards.length === 0 ? (
                 <div className="flex items-center justify-center min-h-full">
                   <EmptyZoneTile dimensions={poolDims} label="No pool cards" />

@@ -72,15 +72,13 @@ export function ZoneLayout({
   const hasRight = hasBattlefield || hasSideboard
   const isControlled = !!zoneHeights
   const gap = 0
-  const mobileTopHandle = isMobile ? dividerCallbacks?.topDivider ?? null : null
-  const mobileBottomSplitHandle = isMobile
-    ? dividerCallbacks?.bottomLeftSplitDivider ?? null
-    : null
-  const battlefieldLabelHandle = hasBattlefield ? mobileTopHandle : null
+  const topHandle = dividerCallbacks?.topDivider ?? null
+  const bottomSplitHandle = dividerCallbacks?.bottomLeftSplitDivider ?? null
+  const battlefieldLabelHandle = hasBattlefield ? topHandle : null
   const sideboardLabelHandle = hasBattlefield
-    ? mobileBottomSplitHandle
-    : mobileTopHandle
-  const upgradesLabelHandle = hasUpgrades ? mobileTopHandle : null
+    ? bottomSplitHandle
+    : topHandle
+  const upgradesLabelHandle = hasUpgrades ? topHandle : null
   const showTopDivider = hasHand && hasLower
   const showBottomSplitDivider = hasBattlefield && hasSideboard
   const showLeftDivider = hasRight && hasUpgrades
@@ -128,7 +126,7 @@ export function ZoneLayout({
               <div className="min-w-0 flex flex-1 flex-col" style={{ gap }}>
                 {hasBattlefield && (
                   <div ref={zoneRefs?.battlefield} className="zone-battlefield w-full px-3 pt-5 pb-3 relative" style={battlefieldStyle}>
-                    <ZoneLabel mobileDragCallbacks={battlefieldLabelHandle}>
+                    <ZoneLabel dragCallbacks={battlefieldLabelHandle}>
                       {battlefieldLabel}
                     </ZoneLabel>
                     {battlefieldContent}
@@ -143,7 +141,7 @@ export function ZoneLayout({
                 )}
                 {hasSideboard && (
                   <div ref={zoneRefs?.sideboard} className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${isControlled ? '' : 'flex-1'}`} style={sideboardStyle}>
-                    <ZoneLabel mobileDragCallbacks={sideboardLabelHandle}>
+                    <ZoneLabel dragCallbacks={sideboardLabelHandle}>
                       {sideboardLabel}
                     </ZoneLabel>
                     {sideboardContent}
@@ -160,7 +158,7 @@ export function ZoneLayout({
             )}
             {hasUpgrades && (
               <div ref={zoneRefs?.upgrades} className="zone-upgrades px-3 pt-5 pb-3 relative flex items-center justify-center" style={{ minWidth: '7rem', ...(controlledStyle(zoneHeights?.upgrades) ?? {}) }}>
-                <ZoneLabel mobileDragCallbacks={upgradesLabelHandle}>
+                <ZoneLabel dragCallbacks={upgradesLabelHandle}>
                   {upgradesLabel}
                 </ZoneLabel>
                 <div className="overflow-hidden">

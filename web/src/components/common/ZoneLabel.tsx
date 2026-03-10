@@ -29,25 +29,25 @@ const gripBarStyle = {
 interface ZoneLabelProps {
   children: ReactNode;
   className?: string;
-  mobileDragCallbacks?: DividerDragCallbacks | null;
+  dragCallbacks?: DividerDragCallbacks | null;
 }
 
 export function ZoneLabel({
   children,
   className,
-  mobileDragCallbacks = null,
+  dragCallbacks = null,
 }: ZoneLabelProps) {
   const dragBindings = useDividerDrag({
     orientation: "horizontal",
-    callbacks: mobileDragCallbacks ?? noopDragCallbacks,
-    enabled: !!mobileDragCallbacks,
+    callbacks: dragCallbacks ?? noopDragCallbacks,
+    enabled: !!dragCallbacks,
   });
 
   return (
     <span
       className={badgeWrapCls}
-      data-drag-handle={mobileDragCallbacks ? "true" : undefined}
-      style={mobileDragCallbacks ? { touchAction: "none" } : undefined}
+      data-drag-handle={dragCallbacks ? "true" : undefined}
+      style={dragCallbacks ? { touchAction: "none", cursor: "row-resize" } : undefined}
       {...dragBindings}
     >
       <span className={className ? `${badgeCls} ${className}` : badgeCls}>
