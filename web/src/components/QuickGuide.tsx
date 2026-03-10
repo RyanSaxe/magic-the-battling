@@ -495,7 +495,7 @@ export function QuickGuide({
 
   return (
     <DocNavContext.Provider value={docNav}>
-      <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex h-full flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex items-center justify-between gap-3 px-5 py-3 shrink-0 bg-black/30 border-b border-[rgba(212,175,55,0.45)]">
           <div className="flex gap-2 min-w-0">
             {headerTabs.map((tab) => (
@@ -525,7 +525,7 @@ export function QuickGuide({
 
         {activeTab === 'guide' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="guide-overview"
                 label="Overview"
@@ -585,7 +585,7 @@ export function QuickGuide({
 
         {activeTab === 'controls' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="controls-global"
                 label="Global Controls"
@@ -620,7 +620,7 @@ export function QuickGuide({
 
         {activeTab === 'tips' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="tips-global"
                 label="Global Tips"
@@ -691,7 +691,7 @@ export function QuickGuide({
 
         {activeTab === 'faq' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               {faqEntries.length > 0 ? (
                 faqEntries.map((entry, index) => (
                   <AccordionItem

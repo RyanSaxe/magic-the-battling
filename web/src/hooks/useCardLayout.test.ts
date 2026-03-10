@@ -131,6 +131,23 @@ describe('computeLayout', () => {
       })
       expect(result.battlefield.width).toBeGreaterThan(0)
     })
+
+    it('supports a top fill zone with two primary lower zones', () => {
+      const result = computeLayout(1100, 650, {
+        zones: {
+          rewards: { count: 3, priority: 'fill', maxRows: 1, maxCardWidth: 300 },
+          upgrades: { count: 3, maxCardWidth: 200 },
+          pool: { count: 12, maxCardWidth: 180 },
+        },
+        layout: { top: ['rewards'], bottomLeft: ['upgrades', 'pool'] },
+        ...ZONE_LAYOUT_PADDING,
+      })
+
+      expect(result.rewards.width).toBeGreaterThan(0)
+      expect(result.upgrades.width).toBeGreaterThan(0)
+      expect(result.pool.width).toBeGreaterThan(0)
+      expect(result.rewards.rows).toBe(1)
+    })
   })
 
   describe('right column (command zone)', () => {

@@ -1,6 +1,7 @@
 const DEVICE_ID_KEY = "mtb_device_id";
 const GAME_PLAYER_MAP_KEY = "mtb_game_player_map";
 const GAME_NEW_PLAYER_PREF_MAP_KEY = "mtb_game_new_player_pref_map";
+const GUIDED_MODE_PREFERENCE_KEY = "mtb_guided_mode_preference";
 const PLAYED_BEFORE_KEY = "mtb_played_before";
 const GAME_PLAYER_PREF_KEY_SEP = "::";
 const MAX_TRACKED_GAMES = 100;
@@ -170,8 +171,29 @@ export function markPlayedBefore(): void {
   }
 }
 
+export function getGlobalGuidedModePreference(): boolean | null {
+  if (!canUseStorage()) return null;
+
+  const raw = window.localStorage.getItem(GUIDED_MODE_PREFERENCE_KEY);
+  if (raw === "1") return true;
+  if (raw === "0") return false;
+  return null;
+}
+
+export function setGlobalGuidedModePreference(enabled: boolean): void {
+  if (!canUseStorage()) return;
+  try {
+    window.localStorage.setItem(
+      GUIDED_MODE_PREFERENCE_KEY,
+      enabled ? "1" : "0",
+    );
+  } catch {
+    // Best effort only.
+  }
+}
+
 export function getDefaultNewPlayerPreference(): boolean {
-  return !hasPlayedBefore();
+  return getGlobalGuidedModePreference() ?? true;
 }
 
 function buildScopedGamePreferenceKey(gameId: string, playerId: string): string {

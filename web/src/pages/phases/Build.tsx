@@ -11,8 +11,11 @@ import { BasicLandSlot } from "../../components/common/BasicLandSlot";
 import { TreasureCard } from "../../components/common/TreasureCard";
 import { PoisonCard } from "../../components/common/PoisonCard";
 import { CardGrid } from "../../components/common/CardGrid";
+import { LayoutResetControl } from "../../components/common/LayoutResetControl";
 import { ZoneLayout } from "../../components/common/ZoneLayout";
 import { useCardLayout, ZONE_LAYOUT_PADDING } from "../../hooks/useCardLayout";
+import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
+import { useZoneDividers } from "../../hooks/useZoneDividers";
 
 type Selection =
   | { type: "card"; cardId: string; zone: "hand" | "sideboard" }
@@ -95,8 +98,12 @@ export function BuildPhase({
   const { self_player } = gameState;
   const maxHandSize = self_player.hand_size;
   const locked = self_player.build_ready;
+  const hasSideboard = self_player.sideboard.length > 0;
 
   const hasUserInteracted = useRef(false);
+  const handZoneRef = useRef<HTMLDivElement | null>(null);
+  const battlefieldZoneRef = useRef<HTMLDivElement | null>(null);
+  const sideboardZoneRef = useRef<HTMLDivElement | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
     if (!(e.target as HTMLElement).closest(".card, .card-slot")) {
@@ -218,8 +225,19 @@ export function BuildPhase({
     setStableSBCount(self_player.sideboard.length);
   }
 
+  const {
+    constraints,
+    setConstraints,
+    clearConstraints,
+    resolution: persistedLayout,
+  } = usePersistedConstraints({
+    scopeKey: "phase:build",
+    stage: self_player.stage,
+    round: self_player.round,
+  });
+
   const battlefieldCount = 3 + 1 + 1; // 3 basic slots + treasure + poison
-  const [containerRef, dims] = useCardLayout({
+  const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
     zones: {
       hand: { count: maxHandSize },
       battlefield: { count: battlefieldCount, priority: "fill", maxRows: 1 },
@@ -227,6 +245,65 @@ export function BuildPhase({
     },
     layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
     ...ZONE_LAYOUT_PADDING,
+    constraints,
+  });
+
+  const layoutConfig = {
+    zones: {
+      hand: { count: maxHandSize },
+      battlefield: { count: battlefieldCount, priority: "fill" as const, maxRows: 1 },
+      sideboard: { count: stableSBCount },
+    },
+    layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
+    ...ZONE_LAYOUT_PADDING,
+  };
+
+  const dividerCallbacks = useZoneDividers({
+    containerHeight: containerSize.height,
+    containerWidth: containerSize.width,
+    currentLayout: dims,
+    layoutConfig,
+    measureInitialConstraints: () => {
+      const handOuter = handZoneRef.current?.getBoundingClientRect().height ?? 0;
+      const battlefieldOuter =
+        battlefieldZoneRef.current?.getBoundingClientRect().height ?? 0;
+      const sideboardOuter =
+        sideboardZoneRef.current?.getBoundingClientRect().height ?? 0;
+      const sectionGap = ZONE_LAYOUT_PADDING.sectionGap;
+      const sectionPadV =
+        ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom;
+
+      const lowerOuter =
+        battlefieldOuter + (hasSideboard ? sideboardOuter + sectionGap : 0);
+      const usableH = handOuter + lowerOuter;
+
+      let bottomLeftSplit = 0.5;
+      if (hasSideboard) {
+        const battlefieldInner = Math.max(0, battlefieldOuter - sectionPadV);
+        const sideboardInner = Math.max(0, sideboardOuter - sectionPadV);
+        const totalInner = battlefieldInner + sideboardInner;
+        if (totalInner > 0) {
+          bottomLeftSplit = battlefieldInner / totalInner;
+        }
+      }
+
+      return usableH > 0
+        ? {
+            topFraction: handOuter / usableH,
+            leftFraction: 0.7,
+            bottomLeftSplit,
+            usableHeight: usableH,
+            bottomInnerHeight: Math.max(
+              0,
+              lowerOuter - (hasSideboard ? sectionGap : 0) - (hasSideboard ? 2 * sectionPadV : sectionPadV),
+            ),
+            usableWidth: containerSize.width,
+          }
+        : null;
+    },
+    constraints,
+    onConstraintsChange: setConstraints,
+    onConstraintsClear: clearConstraints,
   });
 
   const handDims = { width: dims.hand.width, height: dims.hand.height };
@@ -337,12 +414,44 @@ export function BuildPhase({
 
       <ZoneLayout
         containerRef={containerRef}
-        className={`zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col transition-opacity ${locked ? "opacity-60 pointer-events-none" : ""}`}
+        className={`transition-opacity ${locked ? "opacity-60" : ""}`}
         onClick={handleBackgroundClick}
+        isMobile={isMobile}
+        zoneHeights={zoneFrames ? {
+          hand: zoneFrames.hand.outerHeight,
+          battlefield: zoneFrames.battlefield.outerHeight,
+          sideboard: zoneFrames.sideboard.outerHeight,
+        } : null}
+        zoneRefs={{
+          hand: (node) => {
+            handZoneRef.current = node;
+          },
+          battlefield: (node) => {
+            battlefieldZoneRef.current = node;
+          },
+          sideboard: (node) => {
+            sideboardZoneRef.current = node;
+          },
+        }}
+        overlay={
+          persistedLayout.canReset ? (
+            <LayoutResetControl
+              phaseLabel="Build"
+              currentStage={self_player.stage}
+              currentRound={self_player.round}
+              originStage={persistedLayout.originStage}
+              originRound={persistedLayout.originRound}
+              isInherited={persistedLayout.source === "inherited"}
+              onConfirm={clearConstraints}
+              position="top-right"
+            />
+          ) : null
+        }
         hasHand={true}
         hasBattlefield={true}
-        hasSideboard={self_player.sideboard.length > 0}
+        hasSideboard={hasSideboard}
         hasUpgrades={false}
+        dividerCallbacks={locked ? null : dividerCallbacks}
         handLabel="Hand"
         handContent={
           <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>

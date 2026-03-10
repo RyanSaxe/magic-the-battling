@@ -12,6 +12,7 @@ import { getLegendaryName } from "../utils/prefetchName";
 import {
   getDefaultNewPlayerPreference,
   rememberPlayerForGame,
+  setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 import { FaDiscord } from "react-icons/fa6";
@@ -368,6 +369,11 @@ export function Play() {
     return () => clearTimeout(timer);
   }, [cubeId]);
 
+  const handleGuidedModeToggle = useCallback((nextValue: boolean) => {
+    setIsGuidedMode(nextValue);
+    setGlobalGuidedModePreference(nextValue);
+  }, []);
+
   const handleCreateLobby = async () => {
     if (!playerName.trim()) {
       addToast("Please enter your name", "error");
@@ -508,11 +514,10 @@ export function Play() {
       </header>
 
       <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome"
-          style={{ borderRight: '1px solid var(--gold-border)' }} />
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
 
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
-          <div className="zone-pack flex-1 min-h-0 flex flex-col px-4 py-4 sm:py-2 sm:items-center sm:justify-center overflow-auto">
+          <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col px-4 py-4 sm:py-2 sm:items-center sm:justify-center overflow-auto">
             <section className="w-full max-w-md mx-auto modal-chrome border gold-border rounded-lg overflow-hidden flex-1 min-h-0 flex flex-col sm:flex-none felt-raised-panel">
               <div className="p-4 sm:p-5 flex-1 min-h-0 flex flex-col sm:flex-none">
                 <div className="mb-4">
@@ -537,7 +542,7 @@ export function Play() {
                       placeholder={nameLoading ? "Generating name..." : "Enter your name"}
                       className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
                     />
-                    <GuidedModeField enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
+                    <GuidedModeField enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
                   </div>
                 </div>
 
@@ -641,8 +646,7 @@ export function Play() {
           <HintsBanner variant="rail" />
         </main>
 
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome"
-          style={{ borderLeft: '1px solid var(--gold-border)' }} />
+        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
       </div>
 
       <footer className="shrink-0 frame-chrome bar-pad-both py-2">

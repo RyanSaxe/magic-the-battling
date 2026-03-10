@@ -223,7 +223,13 @@ export function PlayerList({
     ) {
       setRevealedPlayerName(sortedOthers[0].name);
     }
-  }, [activeTab]);
+  }, [
+    activeTab,
+    setRevealedPlayerName,
+    sortedOpponents,
+    sortedOthers,
+    state.revealedPlayerName,
+  ]);
 
   const appliedUpgrades = currentPlayer.upgrades.filter(
     (u) => u.upgrade_target !== null,

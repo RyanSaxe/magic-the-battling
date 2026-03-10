@@ -37,6 +37,11 @@
   --seam-stroke-soft: rgba(107, 92, 46, 0.72);
   --seam-highlight: rgba(255, 236, 181, 0.24);
   --seam-shadow: rgba(0, 0, 0, 0.55);
+  --seam-ridge-top: rgba(255, 236, 181, 0.08);
+  --seam-ridge-bottom: rgba(0, 0, 0, 0.42);
+  --seam-ridge-light: var(--seam-stroke);
+  --seam-ridge-dark: color-mix(in srgb, var(--seam-stroke) 58%, black 42%);
+  --zone-label-bg: #2a2320;
 
   /* Hand zone (warmer, lighter green) */
   --hand-felt: #2a5e3a;
@@ -146,11 +151,11 @@ body {
 .game-surface {
   position: relative;
   box-shadow:
-    inset 0 0 0 1px rgba(212, 175, 55, 0.6),
-    inset 0 1px 0 0 rgba(255, 231, 163, 0.28),
+    inset 0 0 0 1px rgba(255, 236, 181, 0.58),
+    inset 0 1px 0 0 rgba(255, 231, 163, 0.42),
     inset 0 2px 0 0 rgba(0, 0, 0, 0.32),
-    inset 0 -1px 0 0 rgba(255, 231, 163, 0.26),
-    inset 0 -2px 0 0 rgba(212, 175, 55, 0.5),
+    inset 0 -1px 0 0 rgba(255, 231, 163, 0.36),
+    inset 0 -2px 0 0 rgba(212, 175, 55, 0.64),
     inset 0 -3px 0 0 rgba(0, 0, 0, 0.58),
     inset 0 -4px 0 0 rgba(0, 0, 0, 0.24),
     inset 0 8px 20px -4px rgba(0, 0, 0, 0.38),
@@ -201,7 +206,6 @@ body {
     background: radial-gradient(ellipse at 50% 50%,
         color-mix(in srgb, var(--chrome) 95%, white) 0%,
         var(--chrome) 70%);
-    border-right: 1px solid rgba(212, 175, 55, 0.6);
     z-index: 2;
   }
 
@@ -258,11 +262,16 @@ body {
 .zone-divider-bg {
   background-color: var(--seam-stroke);
   box-shadow:
-    inset 0 1px 0 var(--seam-highlight),
-    inset 0 -1px 0 rgba(255, 236, 181, 0.22),
-    inset 0 -2px 0 rgba(212, 175, 55, 0.42),
-    inset 0 -3px 0 rgba(0, 0, 0, 0.52),
-    inset 0 -4px 0 rgba(0, 0, 0, 0.28);
+    inset 0 1px 0 rgba(255, 236, 181, 0.06),
+    inset 0 2px 0 rgba(107, 92, 46, 0.18),
+    inset 0 3px 0 rgba(0, 0, 0, 0.16),
+    inset 0 -1px 0 rgba(255, 236, 181, 0.06),
+    inset 0 -2px 0 rgba(107, 92, 46, 0.18),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.16),
+    inset 1px 0 0 rgba(255, 236, 181, 0.08),
+    inset 2px 0 0 rgba(0, 0, 0, 0.18),
+    inset -1px 0 0 rgba(255, 236, 181, 0.08),
+    inset -2px 0 0 rgba(0, 0, 0, 0.18);
 }
 
 .zone-divider-soft {
@@ -270,20 +279,107 @@ body {
   box-shadow:
     inset 0 1px 0 rgba(255, 236, 181, 0.14),
     inset 0 -1px 0 rgba(212, 175, 55, 0.2),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.3);
+    inset 0 -2px 0 rgba(0, 0, 0, 0.3),
+    inset 1px 0 0 rgba(255, 236, 181, 0.06),
+    inset -1px 0 0 rgba(0, 0, 0, 0.22);
+}
+
+.zone-divider-line {
+  background-color: var(--seam-stroke);
+}
+
+.shell-scroll-row,
+.shell-scroll-col {
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 640px) and (max-height: 820px) {
+  .shell-scroll-row {
+    align-items: flex-start;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .shell-scroll-col {
+    justify-content: flex-start;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+}
+
+.zone-divider-line--horizontal {
+  background:
+    linear-gradient(
+      to bottom,
+      var(--seam-ridge-light) 0 50%,
+      var(--seam-ridge-dark) 50% 100%
+    );
+}
+
+.zone-divider-line--vertical {
+  background:
+    linear-gradient(
+      to right,
+      var(--seam-ridge-light) 0 50%,
+      var(--seam-ridge-dark) 50% 100%
+    );
 }
 
 .zone-label-pill {
-  border-color: var(--seam-stroke);
+  border: 1px solid transparent;
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--zone-label-bg) 84%, rgb(96, 81, 72) 16%) 0%,
+      color-mix(in srgb, var(--zone-label-bg) 90%, rgb(71, 58, 51) 10%) 18%,
+      color-mix(in srgb, var(--zone-label-bg) 96%, rgb(55, 44, 39) 4%) 46%,
+      color-mix(in srgb, var(--zone-label-bg) 90%, black 10%) 74%,
+      color-mix(in srgb, var(--zone-label-bg) 72%, black 28%) 100%
+    ) padding-box,
+    linear-gradient(
+      var(--seam-ridge-light),
+      var(--seam-ridge-light)
+    ) border-box;
   box-shadow:
-    inset 0 1px 0 rgba(255, 236, 181, 0.16),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.38);
+    0 -1px 2px rgba(0, 0, 0, 0.1),
+    0 1px 0 rgba(0, 0, 0, 0.12),
+    0 2px 3px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 1px 1px rgba(255, 236, 181, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* Mobile battle life bar: zone-style inset on light walnut */
 .mobile-life-bar {
   background: var(--chrome-modal);
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.3), inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.mobile-life-chip {
+  background: var(--chrome);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.26);
+}
+
+.top-attached-rail {
+  background: var(--chrome-modal);
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.top-attached-rail-pad {
+  padding: 0.625rem 1rem;
+}
+
+@media (min-width: 640px) {
+  .top-attached-rail-pad {
+    padding: 0.75rem 1.25rem;
+  }
 }
 
 /* Draft mobile token frame: simple outer edge */
@@ -418,33 +514,38 @@ body {
     inset 0 -1px 0 rgba(0, 0, 0, 0.48);
 }
 
-.battle-layout::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  box-shadow:
-    inset 14px 0 18px -16px rgba(0, 0, 0, 0.5),
-    inset -14px 0 18px -16px rgba(0, 0, 0, 0.5),
-    inset 0 14px 18px -16px rgba(0, 0, 0, 0.46),
-    inset 0 -14px 18px -16px rgba(0, 0, 0, 0.46);
-  z-index: 3;
-}
-
 .battle-layout .zone-hand,
-.battle-layout .battlefield {
-  box-shadow: none;
+.battle-layout .battlefield,
+.battle-side-cell {
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .battle-side-column {
   box-sizing: border-box;
   position: relative;
   background: var(--zone-column-bg);
-  border-left: 2px solid rgba(212, 175, 55, 0.46);
   box-shadow:
-    inset 1px 0 0 rgba(255, 236, 181, 0.14),
-    inset -1px 0 0 rgba(255, 236, 181, 0.14);
+    inset 0 2px 6px rgba(0, 0, 0, 0.3),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
   overflow: hidden;
+}
+
+.battle-side-column::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background:
+    linear-gradient(
+      to right,
+      var(--seam-ridge-light) 0 50%,
+      var(--seam-ridge-dark) 50% 100%
+    );
+  pointer-events: none;
 }
 
 .battle-side-column-opponent {
@@ -463,17 +564,39 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: rgba(212, 175, 55, 0.46);
+  background:
+    linear-gradient(
+      to bottom,
+      var(--seam-ridge-light) 0 50%,
+      var(--seam-ridge-dark) 50% 100%
+    );
   pointer-events: none;
 }
 
 .battle-side-cell {
   box-sizing: border-box;
   background: #3a3431;
+  position: relative;
 }
 
 .battle-side-column > .battle-side-dropzone ~ .battle-side-dropzone .battle-side-cell {
-  border-top: 2px solid rgba(212, 175, 55, 0.46);
+  border-top: 0;
+}
+
+.battle-side-column > .battle-side-dropzone ~ .battle-side-dropzone .battle-side-cell::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background:
+    linear-gradient(
+      to bottom,
+      var(--seam-ridge-light) 0 50%,
+      var(--seam-ridge-dark) 50% 100%
+    );
+  pointer-events: none;
 }
 
 .battle-side-dropzone {
@@ -501,11 +624,43 @@ body {
 }
 
 .battle-hand-separator-bottom {
-  border-bottom: 2px solid rgba(212, 175, 55, 0.46);
+  position: relative;
 }
 
 .battle-hand-separator-top {
-  border-top: 2px solid rgba(212, 175, 55, 0.46);
+  position: relative;
+}
+
+.battle-hand-separator-bottom::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background:
+    linear-gradient(
+      to bottom,
+      var(--seam-ridge-dark) 0 50%,
+      var(--seam-ridge-light) 50% 100%
+    );
+  pointer-events: none;
+}
+
+.battle-hand-separator-top::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background:
+    linear-gradient(
+      to bottom,
+      var(--seam-ridge-light) 0 50%,
+      var(--seam-ridge-dark) 50% 100%
+    );
+  pointer-events: none;
 }
 
 .battle-side-label {

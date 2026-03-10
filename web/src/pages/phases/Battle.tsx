@@ -4,6 +4,7 @@ import { DraggableCard, DroppableZone, type ZoneOwner } from '../../dnd'
 import { HandZone, BattlefieldZone } from '../../components/zones'
 import { CompactZoneDisplay } from '../../components/zones/CompactZoneDisplay'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
+import { ZoneDivider } from '../../components/common/ZoneDivider'
 import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
 
 interface ContextMenuState {
@@ -16,6 +17,11 @@ interface ContextMenuState {
 export interface BattleSelectedCard {
   card: CardType
   zone: ZoneName
+  owner: ZoneOwner
+}
+
+export interface BattleZoneModalState {
+  zone: "graveyard" | "exile" | "command_zone"
   owner: ZoneOwner
 }
 
@@ -32,11 +38,19 @@ interface BattlePhaseProps {
   onCardHover?: (cardId: string, zone: ZoneName) => void
   onOpponentCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
+  activeZoneModal: BattleZoneModalState | null
+  onZoneModalToggle: (zone: BattleZoneModalState["zone"], owner: ZoneOwner) => void
 }
 
 const isLandOrTreasure = (card: CardType) =>
   card.type_line.toLowerCase().includes("land") ||
   card.type_line.toLowerCase().includes("treasure")
+
+const STATIC_DIVIDER_CALLBACKS = {
+  onDragStart: () => {},
+  onDrag: () => {},
+  onDragEnd: () => {},
+}
 
 type CommandZoneRole = 'library' | 'companion'
 
@@ -58,6 +72,8 @@ export function BattlePhase({
   onCardHover,
   onOpponentCardHover,
   onCardHoverEnd,
+  activeZoneModal,
+  onZoneModalToggle,
 }: BattlePhaseProps) {
   const setSelectedCard = onSelectedCardChange
 
@@ -156,8 +172,9 @@ export function BattlePhase({
 
   const HAND_PADDING = 16
   const BF_PADDING = 20
+  const MID_DIVIDER_HEIGHT = 2
   const suddenDeathHeight = battle?.is_sudden_death ? 70 : 0
-  const fixedHeight = (2 * HAND_PADDING) + (2 * BF_PADDING) + suddenDeathHeight
+  const fixedHeight = (2 * HAND_PADDING) + (2 * BF_PADDING) + suddenDeathHeight + MID_DIVIDER_HEIGHT
   const zoneColumnWidth = isMobile ? 64 : 96
 
   const [containerRef, sizes] = useBattleCardSizes({
@@ -262,6 +279,9 @@ export function BattlePhase({
     const isTapped = opponentTappedIds.has(card.id)
     actions.battleUpdateCardState(isTapped ? 'untap' : 'tap', card.id)
   }
+
+  const isZoneModalOpen = (zone: BattleZoneModalState["zone"], owner: ZoneOwner): boolean =>
+    activeZoneModal?.zone === zone && activeZoneModal.owner === owner
 
   const handleOpponentContextMenu = (e: React.MouseEvent, card: CardType, zone: ZoneName) => {
     e.preventDefault()
@@ -395,6 +415,8 @@ export function BattlePhase({
               onZoneClick={() => handleZoneClick('command_zone', 'opponent')}
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
+              isModalOpen={isZoneModalOpen('command_zone', 'opponent')}
+              onModalOpenChange={() => onZoneModalToggle('command_zone', 'opponent')}
             />
             <CompactZoneDisplay
               title="Graveyard"
@@ -412,6 +434,8 @@ export function BattlePhase({
               onZoneClick={() => handleZoneClick('graveyard', 'opponent')}
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
+              isModalOpen={isZoneModalOpen('graveyard', 'opponent')}
+              onModalOpenChange={() => onZoneModalToggle('graveyard', 'opponent')}
             />
             <CompactZoneDisplay
               title="Exile"
@@ -429,9 +453,17 @@ export function BattlePhase({
               onZoneClick={() => handleZoneClick('exile', 'opponent')}
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
+              isModalOpen={isZoneModalOpen('exile', 'opponent')}
+              onModalOpenChange={() => onZoneModalToggle('exile', 'opponent')}
             />
           </div>
         </div>
+
+        <ZoneDivider
+          orientation="horizontal"
+          interactive={false}
+          {...STATIC_DIVIDER_CALLBACKS}
+        />
 
         {/* Your half */}
         <div className="flex shrink-0 overflow-hidden" style={{ height: handHeight + bfHeight }}>
@@ -491,6 +523,8 @@ export function BattlePhase({
               onZoneClick={() => handleZoneClick('exile', 'player')}
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
+              isModalOpen={isZoneModalOpen('exile', 'player')}
+              onModalOpenChange={() => onZoneModalToggle('exile', 'player')}
             />
             <CompactZoneDisplay
               title="Graveyard"
@@ -505,6 +539,8 @@ export function BattlePhase({
               onZoneClick={() => handleZoneClick('graveyard', 'player')}
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
+              isModalOpen={isZoneModalOpen('graveyard', 'player')}
+              onModalOpenChange={() => onZoneModalToggle('graveyard', 'player')}
             />
             <CompactZoneDisplay
               title={playerCommandZoneTitle}
@@ -520,6 +556,8 @@ export function BattlePhase({
               onZoneClick={() => handleZoneClick('command_zone', 'player')}
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
+              isModalOpen={isZoneModalOpen('command_zone', 'player')}
+              onModalOpenChange={() => onZoneModalToggle('command_zone', 'player')}
             />
           </div>
         </div>

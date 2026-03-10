@@ -7,6 +7,7 @@ import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
 import { buildGameSummaryData } from '../utils/share'
 import { getOrdinal, getPlacementBadgeColor } from '../utils/format'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
+import type { ZoneConstraints } from '../hooks/computeConstrainedLayout'
 import { CardPreviewContext, CardPreviewModal } from '../components/card'
 
 interface RoundOption {
@@ -93,9 +94,21 @@ export function ShareGame() {
   const [roundPopoverOpen, setRoundPopoverOpen] = useState(false)
   const [previewCard, setPreviewCardState] = useState<CardType | null>(null)
   const [previewUpgrades, setPreviewUpgrades] = useState<CardType[]>([])
+  const [deckConstraintsByView, setDeckConstraintsByView] = useState<Record<string, ZoneConstraints>>({})
   const setPreviewCard = useCallback((card: CardType | null, appliedUpgrades?: CardType[]) => {
     setPreviewCardState(card)
     setPreviewUpgrades(appliedUpgrades ?? [])
+  }, [])
+  const setDeckConstraintsForView = useCallback((viewKey: string, constraints: ZoneConstraints) => {
+    setDeckConstraintsByView((prev) => ({ ...prev, [viewKey]: constraints }))
+  }, [])
+  const clearDeckConstraintsForView = useCallback((viewKey: string) => {
+    setDeckConstraintsByView((prev) => {
+      if (!(viewKey in prev)) return prev
+      const next = { ...prev }
+      delete next[viewKey]
+      return next
+    })
   }, [])
 
   useEffect(() => {
@@ -150,6 +163,30 @@ export function ShareGame() {
   const hasPrev = currentIndex > 0
   const hasNext = currentIndex < roundOptions.length - 1
   const currentRoundLabel = roundOptions.find((o) => o.value === selectedRound)?.label ?? 'Latest'
+  const finalLayoutStateKey = `final:${selectedPlayer}`
+  const roundLayoutStateKey = currentSnapshot
+    ? `round:${selectedPlayer}:${currentSnapshot.stage}:${currentSnapshot.round}`
+    : null
+  const finalResizeState = {
+    constraints: deckConstraintsByView[finalLayoutStateKey] ?? null,
+    setConstraints: (constraints: ZoneConstraints) => {
+      setDeckConstraintsForView(finalLayoutStateKey, constraints)
+    },
+    clearConstraints: () => {
+      clearDeckConstraintsForView(finalLayoutStateKey)
+    },
+  }
+  const roundResizeState = roundLayoutStateKey
+    ? {
+        constraints: deckConstraintsByView[roundLayoutStateKey] ?? null,
+        setConstraints: (constraints: ZoneConstraints) => {
+          setDeckConstraintsForView(roundLayoutStateKey, constraints)
+        },
+        clearConstraints: () => {
+          clearDeckConstraintsForView(roundLayoutStateKey)
+        },
+      }
+    : undefined
 
   const playerViews: PlayerView[] = data.players.map((p) => {
     const snap = p.snapshots[p.snapshots.length - 1]
@@ -202,13 +239,26 @@ export function ShareGame() {
             player={gameSummaryData.selfPlayer}
             useUpgrades={data.use_upgrades}
             compact
+            enableResize
+            isMobile={sizes.isMobile}
+            layoutStateKey={finalLayoutStateKey}
+            resizeState={finalResizeState}
+            showLayoutReset
           />
         )
       }
       if (lastSnapshot) {
         return (
           <div className="flex-1 min-h-0 flex flex-col">
-            <ShareRoundDetail snapshot={lastSnapshot} useUpgrades={data.use_upgrades} />
+            <ShareRoundDetail
+              snapshot={lastSnapshot}
+              useUpgrades={data.use_upgrades}
+              enableResize
+              isMobile={sizes.isMobile}
+              layoutStateKey={finalLayoutStateKey}
+              resizeState={finalResizeState}
+              showLayoutReset
+            />
           </div>
         )
       }
@@ -222,7 +272,15 @@ export function ShareGame() {
     if (currentSnapshot) {
       return (
         <div className="flex-1 min-h-0 flex flex-col">
-          <ShareRoundDetail snapshot={currentSnapshot} useUpgrades={data.use_upgrades} />
+          <ShareRoundDetail
+            snapshot={currentSnapshot}
+            useUpgrades={data.use_upgrades}
+            enableResize
+            isMobile={sizes.isMobile}
+            layoutStateKey={roundLayoutStateKey ?? undefined}
+            resizeState={roundResizeState}
+            showLayoutReset
+          />
         </div>
       )
     }
@@ -338,7 +396,7 @@ export function ShareGame() {
 
       {/* Main + Sidebar */}
       <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderRight: '1px solid var(--gold-border)' }} />
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
         <main className="flex-1 flex flex-col min-h-0 min-w-0">
           {renderContent()}
         </main>
@@ -356,7 +414,7 @@ export function ShareGame() {
                 sidebarOpen ? 'translate-x-0' : 'translate-x-full'
               }`}
             >
-              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
+              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
                 <div className="px-3 py-2 text-sm font-medium text-gray-400">
                   Players
                 </div>
@@ -367,13 +425,13 @@ export function ShareGame() {
             </div>
           </>
         ) : (
-          <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
+          <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
             <div className="overflow-y-auto flex-1">
               {renderSidebarContent()}
             </div>
           </aside>
         )}
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderLeft: '1px solid var(--gold-border)' }} />
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
       </div>
 
       {/* Bottom Bar */}
