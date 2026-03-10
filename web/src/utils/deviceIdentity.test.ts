@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getDefaultNewPlayerPreference,
+  getGlobalGuidedModePreference,
   getNewPlayerPreferenceForGame,
   markPlayedBefore,
   pickAutoReconnectPlayer,
   resolveNewPlayerPreferenceForGame,
+  setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
   type ReconnectStatusPlayer,
 } from "./deviceIdentity";
@@ -67,8 +69,9 @@ describe("new player preference", () => {
     expect(getDefaultNewPlayerPreference()).toBe(true);
   });
 
-  it("defaults to new-player=false after any played game", () => {
-    markPlayedBefore();
+  it("defaults to the explicit global guided-mode preference", () => {
+    setGlobalGuidedModePreference(false);
+    expect(getGlobalGuidedModePreference()).toBe(false);
     expect(getDefaultNewPlayerPreference()).toBe(false);
   });
 
@@ -87,9 +90,15 @@ describe("new player preference", () => {
     expect(getNewPlayerPreferenceForGame("game-1", "player-c")).toBeNull();
   });
 
-  it("falls back to default when no game-specific value is stored", () => {
-    markPlayedBefore();
+  it("falls back to the global preference when no game-specific value is stored", () => {
+    setGlobalGuidedModePreference(false);
     expect(getNewPlayerPreferenceForGame("missing")).toBeNull();
     expect(resolveNewPlayerPreferenceForGame("missing")).toBe(false);
+  });
+
+  it("ignores played-before when no explicit guided-mode preference is stored", () => {
+    markPlayedBefore();
+    expect(getNewPlayerPreferenceForGame("missing")).toBeNull();
+    expect(resolveNewPlayerPreferenceForGame("missing")).toBe(true);
   });
 });

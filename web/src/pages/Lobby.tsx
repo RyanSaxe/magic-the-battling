@@ -13,6 +13,7 @@ import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import {
   getDefaultNewPlayerPreference,
   getNewPlayerPreferenceForGame,
+  setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 
@@ -183,10 +184,7 @@ export function Lobby() {
   useEffect(() => {
     if (!gameId) return;
     const existing = getNewPlayerPreferenceForGame(gameId, session?.playerId);
-    const initial =
-      existing ??
-      lobbyState?.guided_mode_default ??
-      getDefaultNewPlayerPreference();
+    const initial = existing ?? getDefaultNewPlayerPreference();
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
@@ -198,10 +196,11 @@ export function Lobby() {
     return () => {
       cancelled = true;
     };
-  }, [gameId, lobbyState?.guided_mode_default, session?.playerId]);
+  }, [gameId, session?.playerId]);
 
   const handleGuidedModeToggle = (nextValue: boolean) => {
     setIsGuidedMode(nextValue);
+    setGlobalGuidedModePreference(nextValue);
     if (gameId) {
       setNewPlayerPreferenceForGame(gameId, nextValue, session?.playerId);
     }

@@ -626,6 +626,22 @@ def _handle_spectate_response(payload: dict) -> None:
         game_manager.deny_spectate_request(request_id)
 
 
+async def _handle_phase_error(
+    action: str,
+    player,
+    phase_error: str | None,
+    game_id: str,
+    websocket: WebSocket,
+) -> bool:
+    if not phase_error:
+        return False
+    if action == "build_ready" and player.phase == "battle":
+        await connection_manager.broadcast_game_state(game_id)
+        return True
+    await connection_manager.send_error(websocket, phase_error)
+    return True
+
+
 async def handle_message(game_id: str, player_id: str, data: dict, websocket: WebSocket):
     action = data.get("action", "")
     payload = data.get("payload", {})
@@ -654,8 +670,7 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
             return
 
         phase_error = _validate_action_phase(action, player)
-        if phase_error:
-            await connection_manager.send_error(websocket, phase_error)
+        if await _handle_phase_error(action, player, phase_error, game_id, websocket):
             return
 
         result = _dispatch_game_action(action, payload, game, player, game_id)

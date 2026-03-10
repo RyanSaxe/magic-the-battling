@@ -1,6 +1,11 @@
 """WebSocket connection tests - focus on message shapes, not game logic."""
 
+import asyncio
+from typing import cast
+from unittest.mock import AsyncMock
+
 import pytest
+from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
 import server.routers.ws as ws_module
@@ -127,3 +132,41 @@ class TestGameWebSocket:
             ws.receive_json()
 
         assert exc_info.value.code == 4001
+
+    def test_duplicate_build_ready_after_battle_transition_resyncs_instead_of_error(self, client, game_with_players):
+        game_id = game_with_players["game_id"]
+        alice_player_id = game_with_players["alice"]["player_id"]
+        client.post(f"/api/games/{game_id}/start")
+
+        game = ws_module.game_manager.get_game(game_id)
+        assert game is not None
+        alice = ws_module.game_manager.get_player(game, alice_player_id)
+        assert alice is not None
+
+        alice.phase = "battle"
+
+        broadcast_game_state = AsyncMock()
+        send_error = AsyncMock()
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(ws_module.connection_manager, "broadcast_game_state", broadcast_game_state)
+        monkeypatch.setattr(ws_module.connection_manager, "send_error", send_error)
+        try:
+            asyncio.run(
+                ws_module.handle_message(
+                    game_id,
+                    alice_player_id,
+                    {
+                        "action": "build_ready",
+                        "payload": {
+                            "basics": ["Plains", "Island", "Mountain"],
+                            "play_draw_preference": "play",
+                        },
+                    },
+                    cast(WebSocket, AsyncMock(spec=WebSocket)),
+                )
+            )
+        finally:
+            monkeypatch.undo()
+
+        broadcast_game_state.assert_awaited_once_with(game_id)
+        send_error.assert_not_called()

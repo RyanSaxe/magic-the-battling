@@ -12,6 +12,7 @@ import { getLegendaryName } from "../utils/prefetchName";
 import {
   getDefaultNewPlayerPreference,
   rememberPlayerForGame,
+  setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 import { FaDiscord } from "react-icons/fa6";
@@ -368,6 +369,11 @@ export function Play() {
     return () => clearTimeout(timer);
   }, [cubeId]);
 
+  const handleGuidedModeToggle = useCallback((nextValue: boolean) => {
+    setIsGuidedMode(nextValue);
+    setGlobalGuidedModePreference(nextValue);
+  }, []);
+
   const handleCreateLobby = async () => {
     if (!playerName.trim()) {
       addToast("Please enter your name", "error");
@@ -536,7 +542,7 @@ export function Play() {
                       placeholder={nameLoading ? "Generating name..." : "Enter your name"}
                       className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
                     />
-                    <GuidedModeField enabled={isGuidedMode} setEnabled={setIsGuidedMode} />
+                    <GuidedModeField enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
                   </div>
                 </div>
 

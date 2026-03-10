@@ -26,6 +26,8 @@ interface CompactZoneDisplayProps {
   onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
   containerClassName?: string
   forceFaceDown?: boolean
+  isModalOpen?: boolean
+  onModalOpenChange?: (open: boolean) => void
 }
 
 export function CompactZoneDisplay({
@@ -45,10 +47,14 @@ export function CompactZoneDisplay({
   onCardClick,
   containerClassName,
   forceFaceDown = false,
+  isModalOpen,
+  onModalOpenChange,
 }: CompactZoneDisplayProps) {
-  const [showModal, setShowModal] = useState(false)
+  const [uncontrolledModalOpen, setUncontrolledModalOpen] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+  const showModal = isModalOpen ?? uncontrolledModalOpen
+  const setShowModal = onModalOpenChange ?? setUncontrolledModalOpen
 
   const { activeCard, activeFromZoneId } = useGameDnd()
   const thisZoneId = makeZoneId(zone, zoneOwner)
