@@ -1018,6 +1018,10 @@ function GameContent() {
     currentPhase: isTimelinePhase(currentPhase) ? currentPhase : null,
     selfPlayer: self_player,
     currentBattle: current_battle,
+    isMobile: sizes.isMobile,
+    sidebarOpen,
+    revealedPlayerName: state.revealedPlayerName,
+    revealedPlayerTab: state.revealedPlayerTab,
     useUpgrades: gameState.use_upgrades,
     hasRewardUpgradeChoice: needsUpgrade,
     selectedBasicsCount: selectedBasics.filter(Boolean).length,
@@ -1027,6 +1031,9 @@ function GameContent() {
     buildReadyPending,
     showBuildSubmitPopover: showSubmitHandPopover,
     showBattleSubmitPopover: showSubmitResultPopover,
+    actionMenuOpen,
+    selectedBattleCardId: battleSelectedCard?.card.id ?? null,
+    selectedBattleCardZone: battleSelectedCard?.zone ?? null,
     canManipulateOpponent,
     battleStateHash,
     closeGameplayOverlays,
@@ -1455,6 +1462,7 @@ function GameContent() {
           gameId={gameId}
           playerId={session?.playerId}
           selfPhase={selfPhase}
+          guideContext={guideContext}
           isSpectator={isSpectator}
           hasOverlayOpen={rulesPanelOpen || showUpgradesModal || shareOpen || actionMenuOpen}
           closeGameplayOverlays={closeGameplayOverlays}
@@ -1471,7 +1479,13 @@ function GameContent() {
             headerClassName="py-1.5 bar-pad-left"
             onOpenRules={openRulesPanel}
             hamburger={sizes.isMobile ? (
-              <button onClick={() => setSidebarOpen(o => !o)} className="btn btn-secondary text-xs sm:text-sm">☰</button>
+              <button
+                onClick={() => setSidebarOpen((o) => !o)}
+                className="btn btn-secondary text-xs sm:text-sm"
+                data-guide-target="sidebar-toggle"
+              >
+                ☰
+              </button>
             ) : undefined}
             title={isEndPhase ? (
               <span className={`font-bold ${isWinner ? 'text-amber-400' : 'text-gray-300'}`}>

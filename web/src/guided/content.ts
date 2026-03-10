@@ -1,4 +1,95 @@
-import type { GuideDefinition, GuideStepDefinition, GuidedGuideId, GuidedWalkthroughContext } from "./types";
+import type { Card as GameCard } from "../types";
+import type {
+  ConditionalGuideId,
+  GuideDefinition,
+  GuideStepDefinition,
+  GuidedGuideId,
+  GuidedWalkthroughContext,
+} from "./types";
+
+const TREASURE_EXCEPTION_NAMES = new Set([
+  "An Offer You Can't Refuse",
+]);
+
+const CONDITIONAL_GUIDE_PRIORITY: ConditionalGuideId[] = [
+  "hint_treasure_producer",
+  "hint_treasure_cap",
+  "hint_reward_three_three",
+  "hint_build_unapplied_upgrade",
+];
+
+interface ConditionalGuideOptions {
+  isFirstBuildGuide: boolean;
+}
+
+function escapeSelectorValue(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function cardSelector(cardId?: string | null): string | undefined {
+  if (!cardId) return undefined;
+  return `[data-guide-card-id="${escapeSelectorValue(cardId)}"]`;
+}
+
+function latestBattlefieldCardSelector(ctx: GuidedWalkthroughContext): string | undefined {
+  if (ctx.selectedBattleCardId && ctx.selectedBattleCardZone === "battlefield") {
+    return cardSelector(ctx.selectedBattleCardId);
+  }
+
+  const battlefield = ctx.currentBattle?.your_zones.battlefield ?? [];
+  const card = battlefield[battlefield.length - 1] ?? battlefield[0];
+  return cardSelector(card?.id);
+}
+
+function rewardStageReached(ctx: GuidedWalkthroughContext): boolean {
+  return ctx.currentPhase === "reward"
+    && !!ctx.selfPlayer
+    && ctx.selfPlayer.stage === 3
+    && ctx.selfPlayer.round === 3;
+}
+
+function currentPack(ctx: GuidedWalkthroughContext): GameCard[] {
+  return ctx.selfPlayer?.current_pack ?? [];
+}
+
+function draftPool(ctx: GuidedWalkthroughContext): GameCard[] {
+  if (!ctx.selfPlayer) return [];
+  return [...ctx.selfPlayer.hand, ...ctx.selfPlayer.sideboard];
+}
+
+function buildPool(ctx: GuidedWalkthroughContext): GameCard[] {
+  if (!ctx.selfPlayer) return [];
+  return [...ctx.selfPlayer.hand, ...ctx.selfPlayer.sideboard];
+}
+
+function cardProducesTreasure(card: GameCard): boolean {
+  if (TREASURE_EXCEPTION_NAMES.has(card.name)) return false;
+  return (card.tokens ?? []).some((token) => {
+    const name = token.name.toLowerCase();
+    const typeLine = token.type_line.toLowerCase();
+    return name.includes("treasure") || typeLine.includes("treasure");
+  });
+}
+
+function findTreasureProducer(cards: GameCard[]): GameCard | null {
+  return cards.find(cardProducesTreasure) ?? null;
+}
+
+function counterTotal(counters: Record<string, Record<string, number>>): number {
+  return Object.values(counters).reduce(
+    (outerTotal, counterMap) =>
+      outerTotal + Object.values(counterMap).reduce((inner, count) => inner + count, 0),
+    0,
+  );
+}
+
+function ids(cards: GameCard[]): string[] {
+  return cards.map((card) => card.id);
+}
+
+function differsFromSnapshot(snapshot: string | number | boolean | null | undefined, current: string): boolean {
+  return String(snapshot ?? "") !== current;
+}
 
 function buildReplaySteps(): GuideStepDefinition[] {
   return [
@@ -71,6 +162,8 @@ function buildInteractiveSteps(): GuideStepDefinition[] {
         isComplete: (ctx) =>
           ctx.selectedBasicsCount === 3 && ctx.handCount === ctx.handSize,
       },
+      primaryActionLabel: "Try it",
+      primaryActionMode: "minimize",
     },
     {
       id: "submit",
@@ -106,6 +199,148 @@ function buildInteractiveSteps(): GuideStepDefinition[] {
   ];
 }
 
+function buildDraftSteps(ctx: GuidedWalkthroughContext): GuideStepDefinition[] {
+  const steps: GuideStepDefinition[] = [
+    {
+      id: "pack",
+      title: "Draft Improves Your Pool",
+      targetId: "draft-pack",
+      placement: "right",
+      content: {
+        summary: "Draft is the between-battles improvement phase.",
+        detail: "Decide whether any cards in the current pack should replace part of your pool.",
+      },
+    },
+  ];
+
+  if (ctx.isMobile) {
+    steps.push({
+      id: "open-sidebar",
+      title: "Open The Sidebar",
+      targetId: "sidebar-toggle",
+      placement: "left",
+      content: {
+        summary: "On mobile, the player sidebar lives behind the hamburger button.",
+        detail: "You will use it during draft to scout opponents and inspect what they have revealed.",
+        actionHint: "Open the sidebar to continue.",
+        minimizedText: "Open the mobile sidebar.",
+      },
+      primaryActionLabel: "Try it",
+      primaryActionMode: "minimize",
+      completion: {
+        type: "condition",
+        allowInteraction: true,
+        isComplete: (stepCtx) => stepCtx.sidebarOpen,
+      },
+    });
+  }
+
+  steps.push({
+    id: "open-opponents-tab",
+    title: "Scout The Table",
+    targetId: "sidebar-tab-opponents",
+    placement: "left",
+    content: {
+      summary: "The sidebar helps you read the table, not just your own pool.",
+      detail: "Switch to Opponents so you can inspect what other players have shown.",
+      actionHint: "Open the Opponents tab to continue.",
+      minimizedText: "Open the Opponents tab in the sidebar.",
+    },
+    primaryActionLabel: "Try it",
+    primaryActionMode: "minimize",
+    completion: {
+      type: "condition",
+      allowInteraction: true,
+      isComplete: (ctx) => ctx.revealedPlayerTab === "opponents",
+    },
+  });
+
+  steps.push({
+    id: "pick-opponent",
+    title: "Inspect One Opponent",
+    targetId: "sidebar-opponent-list",
+    placement: "left",
+    content: {
+      summary: "Click any opponent row to inspect what they have revealed so far.",
+      detail: "You are looking for signals about likely archetypes, resource pressure, and how much you may need to prepare for them.",
+      actionHint: "Pick an opponent row to continue.",
+      minimizedText: "Choose an opponent from the sidebar.",
+    },
+    primaryActionLabel: "Try it",
+    primaryActionMode: "minimize",
+    completion: {
+      type: "condition",
+      allowInteraction: true,
+      isComplete: (ctx) => !!ctx.revealedPlayerName,
+    },
+  });
+
+  steps.push({
+    id: "read-opponent-row",
+    title: "Read The Row, Not Just The Name",
+    targetSelector: (ctx) =>
+      ctx.revealedPlayerName
+        ? `[data-guide-player-row="${escapeSelectorValue(ctx.revealedPlayerName)}"]`
+        : undefined,
+    targetId: "sidebar-opponent-list",
+    placement: "left",
+    content: {
+      summary: "This row tells you how likely you are to face them, how much treasure and poison they have, and where they are in the game loop.",
+      detail: "Those numbers should affect how aggressively you draft and how much you respect their likely next battle.",
+    },
+  });
+
+  steps.push({
+    id: "revealed-cards",
+    title: "Use Revealed Cards To Draft Smarter",
+    targetId: "sidebar-revealed-details",
+    placement: "left",
+    content: {
+      summary: "The revealed cards section shows what this player has exposed in recent battles.",
+      detail: "That helps you infer colors, likely threats, and whether you should value interaction, mana, or speed more highly.",
+    },
+  });
+
+  steps.push({
+    id: "swap",
+    title: "Make One Real Swap",
+    targetId: "draft-pack",
+    placement: "right",
+    content: {
+      summary: "Now improve your pool by swapping one card between the pack and your pool.",
+      detail: "Select a card from the pack, then a card from your pool to trade places.",
+      actionHint: "Swap one pack card with one pool card to continue.",
+      minimizedText: "Make one real pack-to-pool swap.",
+    },
+    primaryActionLabel: "Try it",
+    primaryActionMode: "minimize",
+    completion: {
+      type: "condition",
+      allowInteraction: true,
+      isComplete: (ctx, meta) =>
+        differsFromSnapshot(meta?.packIds, ids(currentPack(ctx)).join(","))
+        && differsFromSnapshot(meta?.poolIds, ids(draftPool(ctx)).join(",")),
+    },
+    onEnter: (ctx) => ({
+      packIds: ids(currentPack(ctx)).join(","),
+      poolIds: ids(draftPool(ctx)).join(","),
+    }),
+  });
+
+  steps.push({
+    id: "actions",
+    title: "Spend Treasure Carefully",
+    targetId: "phase-action-bar",
+    placement: "top",
+    content: {
+      summary: "Spend a treasure to roll for a fresh pack — but treasures persist across phases.",
+      detail: "When satisfied, continue on to build the next battle setup.",
+    },
+  });
+
+  return steps;
+}
+
 function buildBattleSteps(includePuppetPractice: boolean): GuideStepDefinition[] {
   const steps: GuideStepDefinition[] = [
     {
@@ -131,36 +366,160 @@ function buildBattleSteps(includePuppetPractice: boolean): GuideStepDefinition[]
       },
     },
     {
-      id: "battle-ui",
-      title: "Use The Board And Controls Together",
+      id: "tap-card",
+      title: "Double Tap To Tap",
+      targetId: "battle-board",
+      placement: "right",
+      spotlightPadding: 12,
+      content: {
+        summary: "Double tap any permanent on your battlefield to tap or untap it.",
+        detail: "That is the fastest way to mark attacks, activated abilities, or mana usage.",
+        actionHint: "Double tap one of your permanents to continue.",
+        minimizedText: "Double tap one of your permanents.",
+      },
+      primaryActionLabel: "Try it",
+      primaryActionMode: "minimize",
+      completion: {
+        type: "condition",
+        allowInteraction: true,
+        isComplete: (ctx, meta) => {
+          const current = ctx.currentBattle?.your_zones.tapped_card_ids.join(",") ?? "";
+          return differsFromSnapshot(meta?.tappedIds, current);
+        },
+      },
+      onEnter: (ctx) => ({
+        tappedIds: ctx.currentBattle?.your_zones.tapped_card_ids.join(",") ?? "",
+      }),
+    },
+    {
+      id: "move-card",
+      title: "Play Onto The Battlefield",
+      targetId: "battle-board",
+      placement: "right",
+      spotlightPadding: 12,
+      content: {
+        summary: "Move a card from your hand onto the battlefield to practice the board flow.",
+        detail: "The board is the main place you will spend your time during battle.",
+        actionHint: "Move one card from your hand to your battlefield.",
+        minimizedText: "Play one card from hand to battlefield.",
+      },
+      primaryActionLabel: "Try it",
+      primaryActionMode: "minimize",
+      completion: {
+        type: "condition",
+        allowInteraction: true,
+        isComplete: (ctx, meta) => {
+          const currentHand = new Set(ids(ctx.currentBattle?.your_zones.hand ?? []));
+          const currentBattlefield = new Set(ids(ctx.currentBattle?.your_zones.battlefield ?? []));
+          const initialHand = String(meta?.handIds ?? "").split(",").filter(Boolean);
+          const initialBattlefield = new Set(String(meta?.battlefieldIds ?? "").split(",").filter(Boolean));
+          return initialHand.some((cardId) => !currentHand.has(cardId) && currentBattlefield.has(cardId) && !initialBattlefield.has(cardId));
+        },
+      },
+      onEnter: (ctx) => ({
+        handIds: ids(ctx.currentBattle?.your_zones.hand ?? []).join(","),
+        battlefieldIds: ids(ctx.currentBattle?.your_zones.battlefield ?? []).join(","),
+      }),
+    },
+    {
+      id: "select-battlefield-card",
+      title: "Select That Card First",
+      targetSelector: latestBattlefieldCardSelector,
+      targetId: "battle-board",
+      placement: "right",
+      spotlightPadding: 8,
+      content: {
+        summary: "Tap the card you just played so it becomes the selected battle card.",
+        detail: "The Actions button works on the currently selected card.",
+        actionHint: "Tap the card you just moved onto the battlefield.",
+        minimizedText: "Select the card you just played.",
+      },
+      primaryActionLabel: "Try it",
+      primaryActionMode: "minimize",
+      completion: {
+        type: "condition",
+        allowInteraction: true,
+        isComplete: (ctx) =>
+          !!ctx.selectedBattleCardId && ctx.selectedBattleCardZone === "battlefield",
+      },
+      onEnter: (ctx) => {
+        ctx.closeGameplayOverlays();
+      },
+    },
+    {
+      id: "open-actions",
+      title: "Now Open Actions",
       targetId: "battle-actions",
       placement: "left",
       content: {
-        summary: "Play on the battlefield and use Actions for common battle utilities.",
-        detail: "The board is the main surface; the bottom controls give you quick access to tools.",
+        summary: "With a battlefield card selected, open Actions to get at the battle utility menu.",
+        detail: "Use this when you need counters, token creation, moving cards, and similar board management tools.",
+        actionHint: "Open the Actions menu.",
+        minimizedText: "Open the Actions menu.",
       },
+      primaryActionLabel: "Try it",
+      primaryActionMode: "minimize",
+      completion: {
+        type: "condition",
+        allowInteraction: true,
+        isComplete: (ctx) => ctx.actionMenuOpen,
+      },
+    },
+    {
+      id: "action-add-counter",
+      title: "Use Add Counter",
+      targetId: "battle-action-add-counter",
+      placement: "left",
+      content: {
+        summary: "Click Add Counter, then choose any counter type to put one on the selected card.",
+        detail: "That is a representative battle utility flow: select the permanent, open Actions, then apply the board change you want.",
+        actionHint: "Use Add Counter, then choose any counter type.",
+        minimizedText: "Add a counter through the Actions menu.",
+      },
+      primaryActionLabel: "Try it",
+      primaryActionMode: "minimize",
+      completion: {
+        type: "condition",
+        allowInteraction: true,
+        isComplete: (ctx, meta) => {
+          const counters = ctx.currentBattle?.your_zones.counters ?? {};
+          return counterTotal(counters) > Number(meta?.counterTotal ?? 0);
+        },
+      },
+      onEnter: (ctx) => ({
+        counterTotal: counterTotal(ctx.currentBattle?.your_zones.counters ?? {}),
+      }),
     },
   ];
 
   if (includePuppetPractice) {
     steps.push({
       id: "puppet-practice",
-      title: "Practice On The Puppet Board",
-      targetId: "battle-board",
-      placement: "right",
-      spotlightPadding: 12,
+      title: "Puppets Are Frozen Real Games",
+      targetId: "battle-opponent-hand",
+      placement: "top",
       content: {
-        summary: "This opponent is a puppet — move cards around to learn the board safely.",
-        actionHint: "Try moving a card to continue.",
+        summary: "A puppet battle is a historical game state you goldfish from both sides, then adjudicate.",
+        detail: "You are expected to move the opponent’s cards too when you are resolving what should happen.",
+        actionHint: "Move one card from the puppet's hand to the battlefield.",
+        minimizedText: "Move one puppet card from hand to battlefield.",
       },
+      primaryActionLabel: "Try it",
+      primaryActionMode: "minimize",
       completion: {
         type: "condition",
         allowInteraction: true,
-        isComplete: (ctx, meta) =>
-          !!meta && ctx.battleStateHash !== String(meta.initialBattleHash ?? ""),
+        isComplete: (ctx, meta) => {
+          const currentHand = new Set(ids(ctx.currentBattle?.opponent_zones.hand ?? []));
+          const currentBattlefield = new Set(ids(ctx.currentBattle?.opponent_zones.battlefield ?? []));
+          const initialHand = String(meta?.handIds ?? "").split(",").filter(Boolean);
+          const initialBattlefield = new Set(String(meta?.battlefieldIds ?? "").split(",").filter(Boolean));
+          return initialHand.some((cardId) => !currentHand.has(cardId) && currentBattlefield.has(cardId) && !initialBattlefield.has(cardId));
+        },
       },
       onEnter: (ctx) => ({
-        initialBattleHash: ctx.battleStateHash,
+        handIds: ids(ctx.currentBattle?.opponent_zones.hand ?? []).join(","),
+        battlefieldIds: ids(ctx.currentBattle?.opponent_zones.battlefield ?? []).join(","),
       }),
     });
   }
@@ -218,39 +577,155 @@ function buildRewardSteps(ctx: GuidedWalkthroughContext): GuideStepDefinition[] 
   ];
 }
 
-function buildDraftSteps(): GuideStepDefinition[] {
-  return [
-    {
-      id: "pack",
-      title: "Draft Improves Your Pool",
-      targetId: "draft-pack",
-      placement: "right",
-      content: {
-        summary: "Draft is the between-battles improvement phase.",
-        detail: "Decide whether any cards in the current pack should replace part of your pool.",
+function buildTreasureProducerHint(ctx: GuidedWalkthroughContext): GuideDefinition {
+  const inBuild = ctx.currentPhase === "build";
+  const sourceCard = inBuild ? findTreasureProducer(buildPool(ctx)) : findTreasureProducer(currentPack(ctx));
+
+  return {
+    id: "hint_treasure_producer",
+    label: inBuild ? "Build Tip" : "Draft Tip",
+    phase: inBuild ? "build" : "draft",
+    steps: [
+      {
+        id: "treasure-producer",
+        title: inBuild ? "You Already Have Treasure Acceleration" : "Treasure Producers Matter",
+        targetSelector: cardSelector(sourceCard?.id),
+        targetId: inBuild ? "build-workspace" : "draft-pack",
+        placement: inBuild ? "right" : "top",
+        content: {
+          summary: inBuild
+            ? "This card can produce treasure, which can turn into a real tempo spike in battle."
+            : "This pack contains a card that can produce treasure, which often means faster or more flexible battle turns later.",
+          detail: inBuild
+            ? "Because this is your first build, consider whether you want that extra burst of mana in your opening hand."
+            : "Treasure production is worth extra attention because unused treasure can carry across phases and influence future turns.",
+        },
       },
-    },
+    ],
+  };
+}
+
+function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
+  return {
+    id: "hint_treasure_cap",
+    label: "Draft Tip",
+    phase: "draft",
+    steps: [
+      {
+        id: "treasure-cap",
+        title: "Use Treasure Before You Lose One",
+        targetId: ctx.isMobile ? "draft-mobile-treasure" : "sidebar-current-player-treasure",
+        placement: ctx.isMobile ? "right" : "left",
+        content: {
+          summary: "You have reached 6 treasures.",
+          detail: "After battle you only keep 5, so either roll now or build a hand that will actually spend the surplus.",
+          minimizedText: "You only keep 5 treasures after battle.",
+        },
+      },
+    ],
+  };
+}
+
+function buildRewardThreeThreeHint(ctx: GuidedWalkthroughContext): GuideDefinition {
+  const steps: GuideStepDefinition[] = [
     {
-      id: "pool",
-      title: "Swap Into Your Pool",
-      targetId: "draft-pool",
+      id: "three-three-progress",
+      title: "3-3 Means A Bigger Starting Hand",
+      targetSelector: cardSelector("reward:vanquisher"),
+      targetId: "reward-progression",
       placement: "top",
       content: {
-        summary: "Swap cards between the pack and your pool to strengthen future builds.",
-        detail: "This is where you shape later hands and future battles.",
-      },
-    },
-    {
-      id: "actions",
-      title: "Spend Treasure Carefully",
-      targetId: "phase-action-bar",
-      placement: "top",
-      content: {
-        summary: "Spend a treasure to roll for a fresh pack — but treasures persist across phases.",
-        detail: "When satisfied, continue on to build the next battle setup.",
+        summary: "This reward pushes your starting hand size up by 1.",
+        detail: "That changes how you should value curve, mana smoothing, and payoff cards going into the next loop.",
       },
     },
   ];
+
+  if (ctx.hasRewardUpgradeChoice) {
+    steps.push({
+      id: "three-three-upgrades",
+      title: "Read The Upgrades As Real Build Decisions",
+      targetId: "reward-upgrades",
+      placement: "top",
+      content: {
+        summary: "Upgrades can make your next battle stronger immediately, but they are also long-term positioning decisions.",
+        detail: "Compare immediate power to whether the effect is worth saving for a better target later.",
+      },
+    });
+  }
+
+  return {
+    id: "hint_reward_three_three",
+    label: "Reward Tip",
+    phase: "reward",
+    steps,
+  };
+}
+
+function buildUnappliedUpgradeHint(): GuideDefinition {
+  return {
+    id: "hint_build_unapplied_upgrade",
+    label: "Build Tip",
+    phase: "build",
+    steps: [
+      {
+        id: "unapplied-upgrade",
+        title: "You Can Apply An Upgrade Right Now",
+        targetId: "build-workspace",
+        placement: "right",
+        content: {
+          summary: "During build, upgrades let you sharpen this specific battle setup instead of improving your pool in the abstract.",
+          detail: "Applying now can make the next fight stronger, but waiting can be better if you expect a more valuable target later.",
+        },
+      },
+      {
+        id: "how-to-apply",
+        title: "Applying Is Card-Centric",
+        targetId: "build-workspace",
+        placement: "right",
+        content: {
+          summary: "Select a card in your hand or sideboard and use the purple Upgrade button that appears on it.",
+          detail: "You do not have to spend the upgrade immediately, but build is where you decide whether this battle is the right moment.",
+        },
+      },
+    ],
+  };
+}
+
+export function isConditionalGuideId(guideId: GuidedGuideId): guideId is ConditionalGuideId {
+  return CONDITIONAL_GUIDE_PRIORITY.includes(guideId as ConditionalGuideId);
+}
+
+export function isConditionalGuideEligible(
+  guideId: ConditionalGuideId,
+  ctx: GuidedWalkthroughContext,
+  options: ConditionalGuideOptions,
+): boolean {
+  switch (guideId) {
+    case "hint_treasure_producer":
+      if (ctx.currentPhase === "build" && options.isFirstBuildGuide) {
+        return !!findTreasureProducer(buildPool(ctx));
+      }
+      if (ctx.currentPhase === "draft") {
+        return !!findTreasureProducer(currentPack(ctx));
+      }
+      return false;
+    case "hint_treasure_cap":
+      return ctx.currentPhase === "draft" && (ctx.selfPlayer?.treasures ?? 0) >= 6;
+    case "hint_reward_three_three":
+      return rewardStageReached(ctx);
+    case "hint_build_unapplied_upgrade":
+      return ctx.currentPhase === "build" && !!ctx.selfPlayer?.upgrades.some((upgrade) => !upgrade.upgrade_target);
+  }
+}
+
+export function getEligibleConditionalGuides(
+  ctx: GuidedWalkthroughContext,
+  options: ConditionalGuideOptions,
+): ConditionalGuideId[] {
+  return CONDITIONAL_GUIDE_PRIORITY.filter((guideId) =>
+    isConditionalGuideEligible(guideId, ctx, options),
+  );
 }
 
 export function buildGuideDefinition(
@@ -331,7 +806,15 @@ export function buildGuideDefinition(
         id: "draft",
         label: "Draft",
         phase: "draft",
-        steps: buildDraftSteps(),
+        steps: buildDraftSteps(ctx),
       };
+    case "hint_treasure_producer":
+      return buildTreasureProducerHint(ctx);
+    case "hint_treasure_cap":
+      return buildTreasureCapHint(ctx);
+    case "hint_reward_three_three":
+      return buildRewardThreeThreeHint(ctx);
+    case "hint_build_unapplied_upgrade":
+      return buildUnappliedUpgradeHint();
   }
 }

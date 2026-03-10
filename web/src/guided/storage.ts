@@ -3,7 +3,7 @@ import type { GuidedGuideId } from "./types";
 const GUIDED_PROGRESS_KEY = "mtb_guided_progress";
 const MAX_TRACKED_SESSIONS = 100;
 
-type StoredProgress = Record<string, GuidedGuideId[]>;
+type StoredProgress = Record<string, string[]>;
 
 function canUseStorage(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -28,12 +28,7 @@ function readProgress(): StoredProgress {
     for (const [scopeKey, value] of Object.entries(parsed)) {
       if (!Array.isArray(value)) continue;
       result[scopeKey] = value.filter(
-        (entry): entry is GuidedGuideId =>
-          entry === "welcome" ||
-          entry === "draft" ||
-          entry === "build" ||
-          entry === "battle" ||
-          entry === "reward",
+        (entry): entry is string => typeof entry === "string" && entry.length > 0,
       );
     }
     return result;
@@ -72,7 +67,9 @@ export function getSeenGuidesForGame(
     return new Set();
   }
   const progress = readProgress();
-  return new Set(progress[buildScopeKey(gameId, playerId)] ?? []);
+  return new Set(
+    (progress[buildScopeKey(gameId, playerId)] ?? []) as GuidedGuideId[],
+  );
 }
 
 export function markGuideSeenForGame(

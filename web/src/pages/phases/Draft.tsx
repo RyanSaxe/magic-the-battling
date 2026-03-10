@@ -172,7 +172,10 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
           {isMobile && (
             <>
               <div className="absolute top-0 left-0 pointer-events-none z-10">
-                <div className="relative draft-token-frame draft-token-frame--treasure">
+                <div
+                  className="relative draft-token-frame draft-token-frame--treasure"
+                  data-guide-target="draft-mobile-treasure"
+                >
                   <img
                     src={TREASURE_TOKEN_IMAGE}
                     alt="Treasure"

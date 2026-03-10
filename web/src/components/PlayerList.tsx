@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import type { PlayerView, LastResult } from "../types";
 import {
   PoisonIcon,
@@ -16,8 +16,7 @@ import {
 import { UpgradeStack } from "./sidebar/UpgradeStack";
 import { ZoneDisplay } from "./sidebar/ZoneDisplay";
 import { PlacementBadge } from "./sidebar/PlacementBadge";
-
-type Tab = "you" | "opponents" | "others";
+import type { ContextStripPlayerTab } from "../contexts/contextStripState";
 
 interface PlayerListProps {
   players: PlayerView[];
@@ -99,6 +98,7 @@ export function PlayerRow({
             ? "bg-cyan-900/20 border border-cyan-800/30"
             : "bg-black/30"
       } ${player.is_ghost ? "opacity-50" : ""}`}
+      data-guide-player-row={player.name}
       onClick={onClick}
     >
       <PlacementBadge player={player} players={players} />
@@ -158,14 +158,15 @@ export function PlayerList({
   currentPlayer,
   useUpgrades,
 }: PlayerListProps) {
-  const { state, setRevealedPlayerName } = useContextStrip();
-  const [activeTab, setActiveTab] = useState<Tab>("you");
+  const { state, setRevealedPlayerName, setRevealedPlayerTab } = useContextStrip();
+  const activeTab = state.revealedPlayerTab;
   const nonSelfPlayers = players.filter((p) => p.name !== currentPlayerName);
   const showOthersTab = players.length > 4;
 
   useEffect(() => {
     setRevealedPlayerName(null);
-  }, [setRevealedPlayerName]);
+    setRevealedPlayerTab("you");
+  }, [setRevealedPlayerName, setRevealedPlayerTab]);
 
   const handlePlayerClick = (player: PlayerView) => {
     if (state.revealedPlayerName === player.name) {
@@ -175,8 +176,8 @@ export function PlayerList({
     }
   };
 
-  const handleTabChange = (tab: Tab) => {
-    setActiveTab(tab);
+  const handleTabChange = (tab: ContextStripPlayerTab) => {
+    setRevealedPlayerTab(tab);
     if (tab === "you") {
       setRevealedPlayerName(null);
     }
@@ -240,19 +241,23 @@ export function PlayerList({
   const allUpgrades = [...appliedUpgrades, ...pendingUpgrades];
   const companionIds = new Set(currentPlayer.command_zone.map((c) => c.id));
 
-  const tabs: { key: Tab; label: string }[] = [
+  const tabs: { key: ContextStripPlayerTab; label: string }[] = [
     { key: "you", label: "You" },
     { key: "opponents", label: "Opponents" },
-    ...(showOthersTab ? [{ key: "others" as Tab, label: "Others" }] : []),
+    ...(showOthersTab ? [{ key: "others" as ContextStripPlayerTab, label: "Others" }] : []),
   ];
 
   return (
     <div className="relative">
-      <div className="flex border-b border-gray-700 mb-3">
+      <div
+        className="flex border-b border-gray-700 mb-3"
+        data-guide-target="sidebar-player-tabs"
+      >
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => handleTabChange(tab.key)}
+            data-guide-target={tab.key === "opponents" ? "sidebar-tab-opponents" : undefined}
             className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
               activeTab === tab.key
                 ? "text-amber-400 border-b-2 border-amber-400 -mb-px"
@@ -284,7 +289,10 @@ export function PlayerList({
                 alt="Treasure"
                 className="h-24 rounded"
               />
-              <span className="absolute bottom-0 right-0 bg-black/70 text-amber-400 text-xs font-bold px-1.5 py-0.5 rounded-full">
+              <span
+                className="absolute bottom-0 right-0 bg-black/70 text-amber-400 text-xs font-bold px-1.5 py-0.5 rounded-full"
+                data-guide-target="sidebar-current-player-treasure"
+              >
                 {currentPlayer.treasures}
               </span>
             </div>
@@ -319,7 +327,7 @@ export function PlayerList({
       )}
 
       {activeTab === "opponents" && (
-        <div className="space-y-2">
+        <div className="space-y-2" data-guide-target="sidebar-opponent-list">
           {sortedOpponents.map((player) => (
             <PlayerRow
               key={player.name}

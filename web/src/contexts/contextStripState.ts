@@ -1,16 +1,20 @@
 import { createContext, useContext } from 'react'
 import type { Card } from '../types'
 
+export type ContextStripPlayerTab = "you" | "opponents" | "others"
+
 export interface ContextStripState {
   previewCard: Card | null
   previewAppliedUpgrades: Card[]
   revealedPlayerName: string | null
+  revealedPlayerTab: ContextStripPlayerTab
 }
 
 export interface ContextStripContextValue {
   state: ContextStripState
   setPreviewCard: (card: Card | null, appliedUpgrades?: Card[]) => void
   setRevealedPlayerName: (name: string | null) => void
+  setRevealedPlayerTab: (tab: ContextStripPlayerTab) => void
 }
 
 export const ContextStripContext = createContext<ContextStripContextValue | null>(null)

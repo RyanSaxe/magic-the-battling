@@ -14,8 +14,13 @@ interface GuidedWalkthroughProps {
   onClose: (guideId: GuidedGuideId, completed: boolean) => void;
 }
 
-function resolveTarget(root: HTMLElement | null, targetId?: string): HTMLElement | null {
-  if (!root || !targetId) return null;
+function resolveTarget(root: HTMLElement | null, targetId?: string, targetSelector?: string): HTMLElement | null {
+  if (!root) return null;
+  if (targetSelector) {
+    const selectorTarget = root.querySelector<HTMLElement>(targetSelector);
+    if (selectorTarget) return selectorTarget;
+  }
+  if (!targetId) return null;
   return root.querySelector<HTMLElement>(`[data-guide-target="${targetId}"]`);
 }
 
@@ -34,6 +39,12 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
 
   const step = guide.steps[stepIndex] ?? null;
   const stepKey = `${request.nonce}:${step?.id ?? stepIndex}`;
+  const resolvedTargetSelector = useMemo(() => {
+    if (!step?.targetSelector) return undefined;
+    return typeof step.targetSelector === "function"
+      ? step.targetSelector(context)
+      : step.targetSelector;
+  }, [context, step]);
 
   const clearAutoAdvance = useCallback(() => {
     if (autoAdvanceRef.current !== null) {
@@ -79,7 +90,7 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
   useEffect(() => {
     if (!step || step.completion?.type !== "target-click") return;
     const root = rootRef.current;
-    const target = resolveTarget(root, step.targetId);
+    const target = resolveTarget(root, step.targetId, resolvedTargetSelector);
     if (!target) return;
 
     const handleClick = (e: MouseEvent) => {
@@ -88,7 +99,7 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
     };
     document.addEventListener("click", handleClick, true);
     return () => document.removeEventListener("click", handleClick, true);
-  }, [advanceStep, rootRef, step]);
+  }, [advanceStep, resolvedTargetSelector, rootRef, step]);
 
   // condition auto-advance
   useEffect(() => {
@@ -129,6 +140,7 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
     rootRef,
     cardRef,
     step?.targetId,
+    resolvedTargetSelector,
     step?.placement ?? "bottom",
     step?.spotlightPadding,
     stepKey,
@@ -142,6 +154,13 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
     completionType === "target-click" ||
     (completionType === "condition" && step.completion?.type === "condition" && !!step.completion.allowInteraction);
   const overlayAllowsInteraction = allowInteraction || isCollapsed;
+  const handlePrimaryAction = () => {
+    if ((step.primaryActionMode ?? "advance") === "minimize") {
+      setCollapsedStepKey(stepKey);
+      return;
+    }
+    advanceStep();
+  };
 
   return (
     <div className="absolute inset-0 z-[80]" style={{ pointerEvents: "none" }} aria-live="polite">
@@ -173,12 +192,11 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
         isCollapsed={isCollapsed}
         boundsWidth={layout?.containerWidth ?? 0}
         boundsHeight={layout?.containerHeight ?? 0}
-        onNext={advanceStep}
+        onPrimaryAction={handlePrimaryAction}
         onBack={() => setStepIndex((cur) => Math.max(0, cur - 1))}
-        onSkip={() => finishGuide(false)}
-        onToggleCollapse={() =>
-          setCollapsedStepKey((current) => (current === stepKey ? null : stepKey))
-        }
+        onDismiss={() => finishGuide(false)}
+        onCollapse={() => setCollapsedStepKey(stepKey)}
+        onExpand={() => setCollapsedStepKey(null)}
         style={{
           left: layout?.cardLeft ?? 16,
           top: layout?.cardTop ?? 16,

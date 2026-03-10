@@ -23,15 +23,25 @@ interface GuideTooltipProps {
   boundsWidth: number;
   boundsHeight: number;
   style?: CSSProperties;
-  onNext: () => void;
+  onPrimaryAction: () => void;
   onBack: () => void;
-  onSkip: () => void;
-  onToggleCollapse: () => void;
+  onDismiss: () => void;
+  onCollapse: () => void;
+  onExpand: () => void;
 }
 
 function resolveActionHint(content: GuideStepContent, ctx: GuidedWalkthroughContext): string | undefined {
   if (!content.actionHint) return undefined;
   return typeof content.actionHint === "function" ? content.actionHint(ctx) : content.actionHint;
+}
+
+function resolveMinimizedText(content: GuideStepContent, ctx: GuidedWalkthroughContext, title: string): string {
+  const actionHint = resolveActionHint(content, ctx);
+  if (actionHint) return actionHint;
+  if (content.minimizedText) {
+    return typeof content.minimizedText === "function" ? content.minimizedText(ctx) : content.minimizedText;
+  }
+  return title;
 }
 
 function entranceClass(placement: GuidePlacement): string {
@@ -87,10 +97,11 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       boundsWidth,
       boundsHeight,
       style,
-      onNext,
+      onPrimaryAction,
       onBack,
-      onSkip,
-      onToggleCollapse,
+      onDismiss,
+      onCollapse,
+      onExpand,
     },
     ref,
   ) {
@@ -98,6 +109,11 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
     const isManual = completionType === "manual";
     const isLastStep = stepIndex + 1 === totalSteps;
     const actionHint = resolveActionHint(step.content, context);
+    const minimizedText = resolveMinimizedText(step.content, context, step.title);
+    const primaryActionMode = step.primaryActionMode ?? "advance";
+    const primaryActionLabel = step.primaryActionLabel
+      ?? (primaryActionMode === "minimize" ? "Try it" : isLastStep ? "Got it" : "Next");
+    const showPrimaryAction = isManual || !!step.primaryActionMode;
 
     const [dragState, setDragState] = useState({ step: stepIndex, x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -235,12 +251,28 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       event.stopPropagation();
     }, []);
 
+    const handleTrafficButtonClick = useCallback(
+      (event: React.MouseEvent<HTMLButtonElement>, action: "dismiss" | "collapse" | "expand") => {
+        event.stopPropagation();
+        if (action === "dismiss") {
+          onDismiss();
+          return;
+        }
+        if (action === "collapse") {
+          onCollapse();
+          return;
+        }
+        onExpand();
+      },
+      [onCollapse, onDismiss, onExpand],
+    );
+
     return (
       <div
         ref={setTooltipRef}
         className={`absolute z-[82] pointer-events-auto modal-chrome felt-raised-panel gold-border border rounded-xl
           shadow-[0_8px_32px_rgba(0,0,0,0.55),0_2px_8px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden
-          ${isCollapsed ? "w-[min(18rem,calc(100%-1rem))]" : "w-[min(22rem,calc(100%-1rem))] max-h-[calc(100%-0.5rem)]"}
+          ${isCollapsed ? "w-[min(19rem,calc(100%-1rem))]" : "w-[min(22rem,calc(100%-1rem))] max-h-[calc(100%-0.5rem)]"}
           ${entranceClass(placement)}`}
         style={mergedStyle}
         role="dialog"
@@ -248,39 +280,59 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
         aria-label={`${guideLabel} walkthrough`}
       >
         <div
-          className={`flex items-center gap-3 px-4 py-3 select-none shrink-0
-            ${isCollapsed ? "" : "border-b border-amber-400/15"}
+          className={`flex items-center justify-between gap-3 px-4 pt-3 pb-2 select-none shrink-0
             ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
           onPointerDown={onPointerDown}
           style={{ touchAction: "none" }}
         >
-          <span aria-hidden="true" className="inline-flex items-center gap-[3px] opacity-80 shrink-0">
-            <span style={gripBarStyle} />
-            <span style={gripBarStyle} />
-            <span style={gripBarStyle} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[0.68rem] uppercase tracking-widest text-amber-200/90 leading-none">
-              {guideLabel}
-            </div>
-            {isCollapsed && (
-              <div className="text-xs text-gray-200/90 truncate mt-1">
-                {step.title}
-              </div>
-            )}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              aria-label="Dismiss guide"
+              title="Dismiss"
+              onPointerDown={handleControlPointerDown}
+              onClick={(event) => handleTrafficButtonClick(event, "dismiss")}
+              className="h-3.5 w-3.5 rounded-full border border-black/25 bg-[#ff5f57] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
+            />
+            <button
+              type="button"
+              aria-label="Minimize guide"
+              title="Minimize"
+              onPointerDown={handleControlPointerDown}
+              onClick={(event) => handleTrafficButtonClick(event, "collapse")}
+              className="h-3.5 w-3.5 rounded-full border border-black/25 bg-[#febc2e] shadow-[inset_0_1px_0_rgba(255,255,255,0.28)]"
+            />
+            <button
+              type="button"
+              aria-label="Expand guide"
+              title="Expand"
+              onPointerDown={handleControlPointerDown}
+              onClick={(event) => handleTrafficButtonClick(event, "expand")}
+              className={`h-3.5 w-3.5 rounded-full border border-black/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] ${
+                isCollapsed ? "bg-[#28c840]" : "bg-[#28c840]/45"
+              }`}
+            />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <GuideProgress current={stepIndex} total={totalSteps} />
-            <button
-              type="button"
-              onPointerDown={handleControlPointerDown}
-              onClick={onToggleCollapse}
-              className="btn btn-secondary text-xs py-1.5 px-2.5"
-              aria-expanded={!isCollapsed}
-            >
-              {isCollapsed ? "Open" : "Hide"}
-            </button>
+            <span aria-hidden="true" className="inline-flex items-center gap-[3px] opacity-80 shrink-0">
+              <span style={gripBarStyle} />
+              <span style={gripBarStyle} />
+              <span style={gripBarStyle} />
+            </span>
           </div>
+        </div>
+
+        <div className={`px-4 pb-3 ${isCollapsed ? "pt-0" : "pt-1"} border-b border-amber-400/15 shrink-0`}>
+          {isCollapsed ? (
+            <div className="text-xs text-amber-300/95 leading-snug truncate">
+              {minimizedText}
+            </div>
+          ) : (
+            <div className="text-[0.68rem] uppercase tracking-widest text-amber-200/90 leading-none">
+              {guideLabel}
+            </div>
+          )}
         </div>
 
         {!isCollapsed && (
@@ -299,10 +351,8 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
             </div>
 
             <div className="flex items-center justify-between gap-2 px-4 py-4 shrink-0">
-              <button type="button" onClick={onSkip} className="btn btn-secondary text-xs">
-                Skip
-              </button>
-              <div className="flex items-center gap-2">
+              <div />
+              <div className="flex items-center gap-2 ml-auto">
                 <button
                   type="button"
                   onClick={onBack}
@@ -311,9 +361,9 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
                 >
                   Back
                 </button>
-                {isManual && (
-                  <button type="button" onClick={onNext} className="btn btn-primary text-xs">
-                    {isLastStep ? "Got it" : "Next"}
+                {showPrimaryAction && (
+                  <button type="button" onClick={onPrimaryAction} className="btn btn-primary text-xs">
+                    {primaryActionLabel}
                   </button>
                 )}
               </div>

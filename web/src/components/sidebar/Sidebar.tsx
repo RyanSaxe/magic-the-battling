@@ -41,7 +41,10 @@ export function Sidebar({
     revealedPlayer && revealedPlayer.name !== currentPlayer.name;
 
   return (
-    <aside className="relative w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
+    <aside
+      className="relative w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden"
+      data-guide-target="sidebar-panel"
+    >
       {phaseContent ? (
         <div className="overflow-y-auto overflow-x-hidden flex-1">
           {phaseContent}
@@ -55,7 +58,7 @@ export function Sidebar({
             useUpgrades={useUpgrades}
           />
           {showCardsSection && (
-            <div>
+            <div data-guide-target="sidebar-revealed-details">
               <div className="flex flex-wrap">
                 {useUpgrades && allUpgrades.length > 0 && (
                   <ZoneDisplay

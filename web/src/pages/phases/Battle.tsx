@@ -336,7 +336,12 @@ export function BattlePhase({
         <div className="flex shrink-0 overflow-hidden" style={{ height: handHeight + bfHeight }}>
           <div className="flex flex-col flex-1 min-w-0">
             {/* Opponent's hand */}
-            <div id="opponent-hand" className="shrink-0 zone-hand overflow-hidden" style={{ height: handHeight }}>
+            <div
+              id="opponent-hand"
+              className="shrink-0 zone-hand overflow-hidden"
+              style={{ height: handHeight }}
+              data-guide-target="battle-opponent-hand"
+            >
               {canManipulateOpponent ? (
                 <DroppableZone
                   zone="hand"

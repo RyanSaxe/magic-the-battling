@@ -23,7 +23,11 @@ export interface PositionState {
   clipPath: string;
 }
 
-function resolveTarget(root: HTMLElement, targetId?: GuideTargetId): HTMLElement | null {
+function resolveTarget(root: HTMLElement, targetId?: GuideTargetId, targetSelector?: string): HTMLElement | null {
+  if (targetSelector) {
+    const selectorTarget = root.querySelector<HTMLElement>(targetSelector);
+    if (selectorTarget) return selectorTarget;
+  }
   if (!targetId) return null;
   return root.querySelector<HTMLElement>(`[data-guide-target="${targetId}"]`);
 }
@@ -153,6 +157,7 @@ export function useGuidePositioning(
   rootRef: RefObject<HTMLElement | null>,
   cardRef: RefObject<HTMLElement | null>,
   targetId: GuideTargetId | undefined,
+  targetSelector: string | undefined,
   placement: GuidePlacement,
   spotlightPadding: number | undefined,
   stepKey: string,
@@ -171,7 +176,7 @@ export function useGuidePositioning(
 
       const cw = r.clientWidth;
       const ch = r.clientHeight;
-      const target = resolveTarget(r, targetId);
+      const target = resolveTarget(r, targetId, targetSelector);
       const padding = spotlightPadding ?? SPOTLIGHT_PADDING;
       const rawSpotlight = target ? toRelativeRect(r, target, padding) : null;
       const spotlight = rawSpotlight ? clampSpotlight(rawSpotlight, cw, ch) : null;
@@ -191,7 +196,7 @@ export function useGuidePositioning(
       });
     };
 
-    const target = resolveTarget(root, targetId);
+    const target = resolveTarget(root, targetId, targetSelector);
     if (target) {
       target.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
     }
@@ -208,7 +213,7 @@ export function useGuidePositioning(
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [rootRef, cardRef, targetId, placement, spotlightPadding, stepKey]);
+  }, [rootRef, cardRef, targetId, targetSelector, placement, spotlightPadding, stepKey]);
 
   return state;
 }

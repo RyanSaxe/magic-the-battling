@@ -404,6 +404,7 @@ export function RewardPhase({
               ref={upgradesZoneRef}
               className="zone-upgrades w-full px-3 pt-5 pb-3 relative"
               style={upgradesStyle}
+              data-guide-target="reward-upgrades"
             >
               <ZoneLabel
                 dragCallbacks={dividerCallbacks.topDivider}
