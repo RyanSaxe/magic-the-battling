@@ -27,6 +27,7 @@ export type GuideStepCompletion =
   | { type: "target-click" }
   | {
       type: "condition";
+      allowInteraction?: boolean;
       isComplete: (
         ctx: GuidedWalkthroughContext,
         meta: GuideStepMeta | undefined,
@@ -35,6 +36,12 @@ export type GuideStepCompletion =
 
 export interface GuideStepMeta {
   [key: string]: string | number | boolean | null | undefined;
+}
+
+export interface GuideStepContent {
+  summary: string;
+  detail?: string;
+  actionHint?: string | ((ctx: GuidedWalkthroughContext) => string);
 }
 
 export interface GuidedWalkthroughContext {
@@ -60,9 +67,7 @@ export interface GuidedWalkthroughContext {
 export interface GuideStepDefinition {
   id: string;
   title: string;
-  body:
-    | string[]
-    | ((ctx: GuidedWalkthroughContext) => string[]);
+  content: GuideStepContent;
   targetId?: GuideTargetId;
   placement?: GuidePlacement;
   spotlightPadding?: number;
@@ -77,4 +82,10 @@ export interface GuideDefinition {
   label: string;
   phase?: Phase;
   steps: GuideStepDefinition[];
+}
+
+export interface GuideRequest {
+  guideId: GuidedGuideId;
+  isReplay?: boolean;
+  nonce: number;
 }

@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Phase } from "../constants/phases";
-import type { GuidedGuideId } from "../guided/types";
 import type { RulesPanelTarget } from "./RulesPanel";
 import { PhasePopover } from "./PhasePopover";
 
@@ -39,7 +38,6 @@ interface PhaseTimelineProps {
   hamburger?: React.ReactNode;
   title?: React.ReactNode;
   headerClassName?: string;
-  onStartWalkthrough?: (guideId: GuidedGuideId) => void;
 }
 
 function isGamePhase(phase: string): phase is Phase {
@@ -85,7 +83,6 @@ export function PhaseTimeline({
   hamburger,
   title,
   headerClassName,
-  onStartWalkthrough,
 }: PhaseTimelineProps) {
   const [popoverPhase, setPopoverPhase] = useState<Phase | null>(null);
   const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(null);
@@ -309,10 +306,6 @@ export function PhaseTimeline({
           onClose={handleClosePopover}
           onOpenDetails={handleOpenDetailsFromPopover}
           onOpenControls={handleOpenControlsFromPopover}
-          onStartWalkthrough={(guideId) => {
-            closePopoverImmediately();
-            onStartWalkthrough?.(guideId);
-          }}
         />
       )}
     </header>

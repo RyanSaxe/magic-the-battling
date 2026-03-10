@@ -19,7 +19,9 @@ import { GameSummary } from "../components/GameSummary";
 import { ShareModal } from "../components/ShareModal";
 import { ActionMenu } from "../components/ActionMenu";
 import { PhaseTimeline } from "../components/PhaseTimeline";
-import { GuidedWalkthrough } from "../components/GuidedWalkthrough";
+import { GuidedWalkthrough } from "../guided/GuidedWalkthrough";
+import { GuideProvider } from "../guided/GuideContext";
+import { useGuideContext } from "../guided/guideState";
 import { getOrdinal } from "../utils/format";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { ContextStripProvider, useContextStrip, useToast } from "../contexts";
@@ -34,13 +36,11 @@ import { ZoneDivider } from "../components/common/ZoneDivider";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import type { Phase } from "../constants/phases";
-import type { GuidedGuideId, GuidedWalkthroughContext } from "../guided/types";
-import { getSeenGuidesForGame, markGuideSeenForGame } from "../guided/storage";
+import type { GuidedWalkthroughContext } from "../guided/types";
 import {
   getRememberedPlayerForGame,
   pickAutoReconnectPlayer,
   rememberPlayerForGame,
-  resolveNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 
 interface SpectatorConfig {
@@ -460,6 +460,26 @@ function SpectateRequestModal({
   );
 }
 
+function GameGuideLayer({
+  rootRef,
+  context,
+}: {
+  rootRef: React.RefObject<HTMLElement | null>;
+  context: GuidedWalkthroughContext;
+}) {
+  const { guideRequest, handleGuideClose } = useGuideContext();
+  if (!guideRequest) return null;
+  return (
+    <GuidedWalkthrough
+      key={guideRequest.nonce}
+      rootRef={rootRef}
+      request={guideRequest}
+      context={context}
+      onClose={(guideId) => handleGuideClose(guideId)}
+    />
+  );
+}
+
 function GameContent() {
   const { gameId } = useParams<{ gameId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -493,36 +513,9 @@ function GameContent() {
 
   const isSpectator = !!spectatorConfig;
   const wasInvalidSessionRef = useRef(false);
-  const [isGuidedMode, setIsGuidedMode] = useState(() =>
-    gameId ? resolveNewPlayerPreferenceForGame(gameId, session?.playerId) : false,
-  );
-  const seenGuidesRef = useRef<Set<GuidedGuideId>>(new Set());
   const guideRootRef = useRef<HTMLDivElement>(null);
-  const [guideRequest, setGuideRequest] = useState<{
-    guideId: GuidedGuideId;
-    isReplay?: boolean;
-    nonce: number;
-  } | null>(null);
   const selfPhase = gameState?.self_player.phase;
   const canManipulateOpponent = gameState?.current_battle?.can_manipulate_opponent ?? false;
-
-  useEffect(() => {
-    const resolved = gameId
-      ? resolveNewPlayerPreferenceForGame(gameId, session?.playerId)
-      : false;
-    seenGuidesRef.current = gameId
-      ? getSeenGuidesForGame(gameId, session?.playerId)
-      : new Set();
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (cancelled) return;
-      setIsGuidedMode(resolved);
-      setGuideRequest(null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [gameId, session?.playerId]);
 
   useEffect(() => {
     const shouldClear = shouldClearSessionOnInvalidEvent(
@@ -793,70 +786,6 @@ function GameContent() {
     setShareOpen(true);
   }, [closeGameplayOverlays]);
 
-  const startGuide = useCallback((guideId: GuidedGuideId, isReplay = false) => {
-    closeGameplayOverlays();
-    setGuideRequest({
-      guideId,
-      isReplay,
-      nonce: Date.now(),
-    });
-  }, [closeGameplayOverlays]);
-
-  const handleGuideClose = useCallback((guideId: GuidedGuideId) => {
-    if (gameId) {
-      markGuideSeenForGame(gameId, guideId, session?.playerId);
-    }
-    seenGuidesRef.current.add(guideId);
-    setGuideRequest(null);
-  }, [gameId, session?.playerId]);
-
-  useEffect(() => {
-    if (
-      !gameId ||
-      !gameState ||
-      !selfPhase ||
-      !isGuidedMode ||
-      isSpectator ||
-      guideRequest !== null
-    ) {
-      return;
-    }
-
-    if (rulesPanelOpen || showUpgradesModal || shareOpen || actionMenuOpen) {
-      return;
-    }
-
-    if (!seenGuidesRef.current.has("welcome")) {
-      queueMicrotask(() => {
-        setGuideRequest((current) =>
-          current ?? { guideId: "welcome", nonce: Date.now() },
-        );
-      });
-      return;
-    }
-
-    if (!isTimelinePhase(selfPhase) || seenGuidesRef.current.has(selfPhase)) {
-      return;
-    }
-
-    queueMicrotask(() => {
-      setGuideRequest((current) =>
-        current ?? { guideId: selfPhase, nonce: Date.now() },
-      );
-    });
-  }, [
-    actionMenuOpen,
-    gameId,
-    gameState,
-    guideRequest,
-    isGuidedMode,
-    isSpectator,
-    rulesPanelOpen,
-    selfPhase,
-    shareOpen,
-    showUpgradesModal,
-  ]);
-
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   const modalOpen =
     rulesPanelOpen ||
@@ -864,8 +793,7 @@ function GameContent() {
     actionMenuOpen ||
     activeDndPanel !== null ||
     activeBattleZoneModal !== null ||
-    shareOpen ||
-    guideRequest !== null;
+    shareOpen;
   const hotkeyMap: Record<string, () => void> = (() => {
     const currentPhaseId = gameState?.self_player.phase;
     const map: Record<string, () => void> = {
@@ -1523,6 +1451,14 @@ function GameContent() {
           </div>
         )}
         <div ref={guideRootRef} className="relative flex flex-col flex-1 min-h-0">
+        <GuideProvider
+          gameId={gameId}
+          playerId={session?.playerId}
+          selfPhase={selfPhase}
+          isSpectator={isSpectator}
+          hasOverlayOpen={rulesPanelOpen || showUpgradesModal || shareOpen || actionMenuOpen}
+          closeGameplayOverlays={closeGameplayOverlays}
+        >
         {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
         <div className="relative">
           <PhaseTimeline
@@ -1534,7 +1470,6 @@ function GameContent() {
             useUpgrades={gameState.use_upgrades}
             headerClassName="py-1.5 bar-pad-left"
             onOpenRules={openRulesPanel}
-            onStartWalkthrough={(guideId) => startGuide(guideId, true)}
             hamburger={sizes.isMobile ? (
               <button onClick={() => setSidebarOpen(o => !o)} className="btn btn-secondary text-xs sm:text-sm">☰</button>
             ) : undefined}
@@ -1877,15 +1812,10 @@ function GameContent() {
             </div>
           </div>
         )}
-        {guideRequest && !isSpectator && (
-          <GuidedWalkthrough
-            key={guideRequest.nonce}
-            rootRef={guideRootRef}
-            request={guideRequest}
-            context={guideContext}
-            onClose={(guideId) => handleGuideClose(guideId)}
-          />
+        {!isSpectator && (
+          <GameGuideLayer rootRef={guideRootRef} context={guideContext} />
         )}
+        </GuideProvider>
         </div>
       </div>
       {state.previewCard && (
