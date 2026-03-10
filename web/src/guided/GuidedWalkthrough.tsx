@@ -24,6 +24,7 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
   const cardRef = useRef<HTMLDivElement>(null);
   const stepMetaRef = useRef<GuideStepMeta | undefined>(undefined);
   const autoAdvanceRef = useRef<number | null>(null);
+  const lastEnteredStepRef = useRef<number>(-1);
 
   const guide = useMemo(
     () => buildGuideDefinition(request.guideId, context, !!request.isReplay),
@@ -59,11 +60,19 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
     });
   }, [finishGuide, guide.steps.length]);
 
-  // onEnter
+  // auto-close when phase changes away from guide's phase
   useEffect(() => {
-    if (!step) return;
+    if (guide.phase && context.currentPhase && context.currentPhase !== guide.phase) {
+      finishGuide(true);
+    }
+  }, [context.currentPhase, finishGuide, guide.phase]);
+
+  // onEnter — fire only once per step, not on every context change
+  useEffect(() => {
+    if (!step || lastEnteredStepRef.current === stepIndex) return;
+    lastEnteredStepRef.current = stepIndex;
     stepMetaRef.current = step.onEnter?.(context) ?? undefined;
-  }, [context, step]);
+  }, [context, step, stepIndex]);
 
   // target-click handler
   useEffect(() => {
@@ -128,7 +137,8 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
 
   const completionType = step.completion?.type ?? "manual";
   const allowInteraction =
-    completionType === "condition" && step.completion?.type === "condition" && !!step.completion.allowInteraction;
+    completionType === "target-click" ||
+    (completionType === "condition" && step.completion?.type === "condition" && !!step.completion.allowInteraction);
 
   return (
     <div className="absolute inset-0 z-[80]" style={{ pointerEvents: "none" }} aria-live="polite">

@@ -94,8 +94,8 @@ function buildInteractiveSteps(): GuideStepDefinition[] {
       targetId: "build-submit-popover",
       placement: "top",
       content: {
-        summary: "Choose play or draw as the final part of your build submission.",
-        detail: "If you have the most poison, you get your choice here.",
+        summary: "Play/draw is part of your build — this choice is submitted along with your basics and hand.",
+        detail: "The player with the most poison gets their choice; ties are broken randomly.",
         actionHint: "Select play or draw to finish.",
       },
       completion: {
