@@ -21,6 +21,7 @@ function resolveTarget(root: HTMLElement | null, targetId?: string): HTMLElement
 
 export function GuidedWalkthrough({ rootRef, request, context, onClose }: GuidedWalkthroughProps) {
   const [stepIndex, setStepIndex] = useState(0);
+  const [collapsedStepKey, setCollapsedStepKey] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const stepMetaRef = useRef<GuideStepMeta | undefined>(undefined);
   const autoAdvanceRef = useRef<number | null>(null);
@@ -136,15 +137,17 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
   if (!step) return null;
 
   const completionType = step.completion?.type ?? "manual";
+  const isCollapsed = collapsedStepKey === stepKey;
   const allowInteraction =
     completionType === "target-click" ||
     (completionType === "condition" && step.completion?.type === "condition" && !!step.completion.allowInteraction);
+  const overlayAllowsInteraction = allowInteraction || isCollapsed;
 
   return (
     <div className="absolute inset-0 z-[80]" style={{ pointerEvents: "none" }} aria-live="polite">
       <GuideOverlay
         clipPath={layout?.clipPath ?? "none"}
-        allowInteraction={allowInteraction}
+        allowInteraction={overlayAllowsInteraction}
       />
 
       {layout?.spotlight && (
@@ -167,9 +170,15 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
         totalSteps={guide.steps.length}
         placement={layout?.resolvedPlacement ?? "bottom"}
         context={context}
+        isCollapsed={isCollapsed}
+        boundsWidth={layout?.containerWidth ?? 0}
+        boundsHeight={layout?.containerHeight ?? 0}
         onNext={advanceStep}
         onBack={() => setStepIndex((cur) => Math.max(0, cur - 1))}
         onSkip={() => finishGuide(false)}
+        onToggleCollapse={() =>
+          setCollapsedStepKey((current) => (current === stepKey ? null : stepKey))
+        }
         style={{
           left: layout?.cardLeft ?? 16,
           top: layout?.cardTop ?? 16,
