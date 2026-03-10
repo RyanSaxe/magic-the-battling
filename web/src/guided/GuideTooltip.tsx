@@ -115,21 +115,15 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       ?? (primaryActionMode === "minimize" ? "Try it" : isLastStep ? "Got it" : "Next");
     const showPrimaryAction = isManual || !!step.primaryActionMode;
 
-    const [dragState, setDragState] = useState({ step: stepIndex, x: 0, y: 0 });
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const tooltipRef = useRef<HTMLDivElement | null>(null);
     const dragStartRef = useRef({ pointerX: 0, pointerY: 0, offsetX: 0, offsetY: 0, width: 0, height: 0 });
-    const stepIndexRef = useRef(stepIndex);
     const activePointerIdRef = useRef<number | null>(null);
     const removeListenersRef = useRef<(() => void) | null>(null);
     const userSelectRef = useRef("");
-    const dragOffset = dragState.step === stepIndex ? dragState : { x: 0, y: 0 };
     const baseLeft = resolveStyleNumber(style?.left);
     const baseTop = resolveStyleNumber(style?.top);
-
-    useEffect(() => {
-      stepIndexRef.current = stepIndex;
-    }, [stepIndex]);
 
     const stopDragging = useCallback(() => {
       if (activePointerIdRef.current === null) return;
@@ -158,10 +152,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
         boundsHeight,
       );
 
-      setDragState({
-        step: stepIndexRef.current,
-        ...next,
-      });
+      setDragOffset(next);
     }, [baseLeft, baseTop, boundsHeight, boundsWidth]);
 
     const handleWindowPointerEnd = useCallback((event: PointerEvent) => {
@@ -222,12 +213,9 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       );
 
       if (next.x !== dragOffset.x || next.y !== dragOffset.y) {
-        setDragState({
-          step: stepIndex,
-          ...next,
-        });
+        setDragOffset(next);
       }
-    }, [baseLeft, baseTop, boundsHeight, boundsWidth, dragOffset.x, dragOffset.y, isCollapsed, stepIndex]);
+    }, [baseLeft, baseTop, boundsHeight, boundsWidth, dragOffset.x, dragOffset.y, isCollapsed]);
 
     useEffect(() => () => stopDragging(), [stopDragging]);
 
