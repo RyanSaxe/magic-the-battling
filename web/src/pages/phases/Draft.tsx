@@ -80,7 +80,7 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
     ? { height: zoneFrames.pack.outerHeight, flex: '0 0 auto' as const }
     : undefined
   const poolStyle = zoneFrames?.pool
-    ? { height: zoneFrames.pool.outerHeight, flex: '0 0 auto' as const }
+    ? { minHeight: zoneFrames.pool.outerHeight, flex: '1 1 auto' as const }
     : undefined
 
   const dividerCallbacks = useZoneDividers({

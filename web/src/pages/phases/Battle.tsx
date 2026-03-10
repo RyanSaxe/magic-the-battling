@@ -4,6 +4,7 @@ import { DraggableCard, DroppableZone, type ZoneOwner } from '../../dnd'
 import { HandZone, BattlefieldZone } from '../../components/zones'
 import { CompactZoneDisplay } from '../../components/zones/CompactZoneDisplay'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
+import { ZoneDivider } from '../../components/common/ZoneDivider'
 import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
 
 interface ContextMenuState {
@@ -37,6 +38,12 @@ interface BattlePhaseProps {
 const isLandOrTreasure = (card: CardType) =>
   card.type_line.toLowerCase().includes("land") ||
   card.type_line.toLowerCase().includes("treasure")
+
+const STATIC_DIVIDER_CALLBACKS = {
+  onDragStart: () => {},
+  onDrag: () => {},
+  onDragEnd: () => {},
+}
 
 type CommandZoneRole = 'library' | 'companion'
 
@@ -156,8 +163,9 @@ export function BattlePhase({
 
   const HAND_PADDING = 16
   const BF_PADDING = 20
+  const MID_DIVIDER_HEIGHT = 2
   const suddenDeathHeight = battle?.is_sudden_death ? 70 : 0
-  const fixedHeight = (2 * HAND_PADDING) + (2 * BF_PADDING) + suddenDeathHeight
+  const fixedHeight = (2 * HAND_PADDING) + (2 * BF_PADDING) + suddenDeathHeight + MID_DIVIDER_HEIGHT
   const zoneColumnWidth = isMobile ? 64 : 96
 
   const [containerRef, sizes] = useBattleCardSizes({
@@ -432,6 +440,12 @@ export function BattlePhase({
             />
           </div>
         </div>
+
+        <ZoneDivider
+          orientation="horizontal"
+          interactive={false}
+          {...STATIC_DIVIDER_CALLBACKS}
+        />
 
         {/* Your half */}
         <div className="flex shrink-0 overflow-hidden" style={{ height: handHeight + bfHeight }}>

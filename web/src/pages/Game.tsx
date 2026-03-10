@@ -29,6 +29,7 @@ import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
+import { ZoneDivider } from "../components/common/ZoneDivider";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import type { Phase } from "../constants/phases";
@@ -47,6 +48,11 @@ interface SpectatorConfig {
 
 const SCHEDULED_UTC_RE = /scheduled for (\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}) UTC/i;
 const TOP_NOTICE_Z_INDEX = 2147483647;
+const STATIC_DIVIDER_CALLBACKS = {
+  onDragStart: () => {},
+  onDrag: () => {},
+  onDragEnd: () => {},
+};
 
 function scheduledEasternFromNotice(message: string): string | null {
   const match = SCHEDULED_UTC_RE.exec(message);
@@ -1347,7 +1353,7 @@ function GameContent() {
               <main className="flex-1 flex flex-col min-h-0 min-w-0">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
                 {sizes.isMobile && current_battle && (
-                  <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mb-[2px] mobile-life-bar text-[11px] leading-tight">
+                  <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight">
                     <div className="flex items-center gap-1">
                       <span className="text-gray-300 truncate max-w-[60px] leading-tight">{current_battle.opponent_name}</span>
                       <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
@@ -1372,6 +1378,13 @@ function GameContent() {
                       <span className="text-gray-300 truncate max-w-[60px] leading-tight">{self_player.name}</span>
                     </div>
                   </div>
+                )}
+                {sizes.isMobile && current_battle && (
+                  <ZoneDivider
+                    orientation="horizontal"
+                    interactive={false}
+                    {...STATIC_DIVIDER_CALLBACKS}
+                  />
                 )}
                   <BattlePhase
                     gameState={gameState}

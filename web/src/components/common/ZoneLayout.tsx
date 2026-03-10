@@ -88,6 +88,17 @@ export function ZoneLayout({
     isControlled && height != null
       ? { height, flex: '0 0 auto' as const }
       : undefined
+  const controlledFillStyle = (height?: number) =>
+    isControlled && height != null
+      ? { minHeight: height, flex: '1 1 auto' as const }
+      : undefined
+  const handStyle = hasLower
+    ? controlledStyle(zoneHeights?.hand)
+    : controlledFillStyle(zoneHeights?.hand)
+  const battlefieldStyle = hasSideboard
+    ? controlledStyle(zoneHeights?.battlefield)
+    : controlledFillStyle(zoneHeights?.battlefield)
+  const sideboardStyle = controlledFillStyle(zoneHeights?.sideboard)
   const rootClassName = [
     'relative zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col',
     className,
@@ -99,7 +110,7 @@ export function ZoneLayout({
     <div ref={containerRef} className={rootClassName} onClick={onClick}>
       <div className="flex flex-col flex-1 min-h-0" style={{ gap }}>
         {hasHand && (
-          <div ref={zoneRefs?.hand} className="zone-hand w-full px-3 pt-5 pb-3 relative" style={controlledStyle(zoneHeights?.hand)}>
+          <div ref={zoneRefs?.hand} className="zone-hand w-full px-3 pt-5 pb-3 relative" style={handStyle}>
             <ZoneLabel>{handLabel}</ZoneLabel>
             {handContent}
           </div>
@@ -112,11 +123,11 @@ export function ZoneLayout({
           />
         )}
         {hasLower && (
-          <div className={`flex min-h-0 w-full ${isControlled ? '' : 'flex-1'}`} style={{ gap, ...(isControlled ? { flex: '0 0 auto' } : {}) }}>
+          <div className={`flex min-h-0 w-full ${isControlled ? '' : 'flex-1'}`} style={{ gap, ...(isControlled ? { flex: '1 1 auto', minHeight: 0 } : {}) }}>
             {hasRight && (
               <div className="min-w-0 flex flex-1 flex-col" style={{ gap }}>
                 {hasBattlefield && (
-                  <div ref={zoneRefs?.battlefield} className="zone-battlefield w-full px-3 pt-5 pb-3 relative" style={controlledStyle(zoneHeights?.battlefield)}>
+                  <div ref={zoneRefs?.battlefield} className="zone-battlefield w-full px-3 pt-5 pb-3 relative" style={battlefieldStyle}>
                     <ZoneLabel mobileDragCallbacks={battlefieldLabelHandle}>
                       {battlefieldLabel}
                     </ZoneLabel>
@@ -131,7 +142,7 @@ export function ZoneLayout({
                   />
                 )}
                 {hasSideboard && (
-                  <div ref={zoneRefs?.sideboard} className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${isControlled ? '' : 'flex-1'}`} style={controlledStyle(zoneHeights?.sideboard)}>
+                  <div ref={zoneRefs?.sideboard} className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${isControlled ? '' : 'flex-1'}`} style={sideboardStyle}>
                     <ZoneLabel mobileDragCallbacks={sideboardLabelHandle}>
                       {sideboardLabel}
                     </ZoneLabel>
