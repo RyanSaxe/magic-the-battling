@@ -28,6 +28,7 @@ interface GuideTooltipProps {
   onDismiss: () => void;
   onCollapse: () => void;
   onExpand: () => void;
+  onSecondaryAction?: (actionId: string) => void;
 }
 
 function resolveActionHint(content: GuideStepContent, ctx: GuidedWalkthroughContext): string | undefined {
@@ -102,6 +103,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       onDismiss,
       onCollapse,
       onExpand,
+      onSecondaryAction,
     },
     ref,
   ) {
@@ -339,7 +341,18 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
             </div>
 
             <div className="flex items-center justify-between gap-2 px-4 py-4 shrink-0">
-              <div />
+              {step.secondaryAction && onSecondaryAction ? (
+                <button
+                  type="button"
+                  onClick={() => onSecondaryAction(step.secondaryAction!.actionId)}
+                  onPointerDown={handleControlPointerDown}
+                  className="text-xs text-gray-400/80 hover:text-gray-200 transition-colors"
+                >
+                  {step.secondaryAction.label}
+                </button>
+              ) : (
+                <div />
+              )}
               <div className="flex items-center gap-2 ml-auto">
                 <button
                   type="button"

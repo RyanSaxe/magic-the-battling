@@ -630,6 +630,7 @@ export function buildGuideDefinition(
               summary: "The game alternates between improving your pool and playing short battles until only one player remains.",
               detail: "The battle itself is a real game you play manually, not an auto-battler.",
             },
+            secondaryAction: { label: "Skip — I know the game", actionId: "skip_tutorial" },
           },
           {
             id: "start-state",

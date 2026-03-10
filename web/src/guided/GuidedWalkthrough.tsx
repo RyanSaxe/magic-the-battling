@@ -12,6 +12,7 @@ interface GuidedWalkthroughProps {
   request: GuideRequest;
   context: GuidedWalkthroughContext;
   onClose: (guideId: GuidedGuideId, completed: boolean) => void;
+  onSecondaryAction?: (actionId: string) => void;
 }
 
 function resolveTarget(root: HTMLElement | null, targetId?: string, targetSelector?: string): HTMLElement | null {
@@ -34,7 +35,7 @@ function resolveTarget(root: HTMLElement | null, targetId?: string, targetSelect
     ?? document.querySelector<HTMLElement>(`[data-guide-target="${targetId}"]`);
 }
 
-export function GuidedWalkthrough({ rootRef, request, context, onClose }: GuidedWalkthroughProps) {
+export function GuidedWalkthrough({ rootRef, request, context, onClose, onSecondaryAction }: GuidedWalkthroughProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [isUserCollapsed, setIsUserCollapsed] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -238,6 +239,7 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose }: Guided
         onDismiss={() => finishGuide(false)}
         onCollapse={() => setIsUserCollapsed(true)}
         onExpand={() => setIsUserCollapsed(false)}
+        onSecondaryAction={onSecondaryAction}
         style={{
           left: layout?.cardLeft ?? 16,
           top: layout?.cardTop ?? 16,
