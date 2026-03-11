@@ -51,6 +51,7 @@ function RulesButton({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       className="btn btn-secondary text-xs sm:text-sm"
       title="Guide"
+      data-guide-target="guide-button"
     >
       <span className="hidden sm:inline">Guide</span>
       <span className="sm:hidden">?</span>

@@ -20,16 +20,19 @@ export type GuidedGuideId =
   | ConditionalGuideId;
 
 export type GuideTargetId =
+  | "guide-button"
   | "timeline-stage-round"
   | "timeline-next-stage-round"
   | "timeline-phase-draft"
   | "timeline-phase-build"
   | "timeline-phase-battle"
   | "timeline-phase-reward"
+  | "draft-continue"
   | "build-hand"
   | "build-workspace"
   | "build-battlefield"
   | "build-sideboard"
+  | "build-submit"
   | "build-submit-popover"
   | "build-apply-upgrade"
   | "game-content"
@@ -39,6 +42,7 @@ export type GuideTargetId =
   | "battle-actions"
   | "battle-submit"
   | "battle-submit-popover"
+  | "reward-continue"
   | "reward-summary"
   | "reward-progression"
   | "reward-current-upgrades"

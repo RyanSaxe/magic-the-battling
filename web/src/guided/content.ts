@@ -148,10 +148,24 @@ function buildWelcomeGuide(): GuideDefinition {
         targetId: "timeline-next-stage-round",
         placement: "bottom",
         cardPlacement: "bottom-center",
-        primaryActionLabel: "I understand",
+        primaryActionLabel: "Next",
         content: {
           summary: "When the right side shows 3-2, the repeating loop begins with draft.",
-          detail: "From that point on, the cycle is draft, build, battle, reward. If you want the full reference while you play, open the Guide/? button in the top-right corner.",
+          detail: "From that point on, the cycle is draft, build, battle, reward until only one player remains.",
+        },
+      },
+      {
+        id: "guide",
+        title: "Guide Has The Full Reference",
+        targetId: "guide-button",
+        positionTargetId: "guide-button",
+        placement: "left",
+        cardPlacement: "top-right",
+        mobileCardPlacement: "bottom-center",
+        primaryActionLabel: "I understand",
+        content: {
+          summary: "Open the Guide any time you want the full reference while you play.",
+          detail: "Rules explains the loop and phase structure, Controls shows what each phase can do, Tips collects practical reminders, Cards lets you browse the pool, and FAQ covers edge cases and clarifications.",
         },
       },
     ],
@@ -212,10 +226,24 @@ function buildBuildGuide(): GuideDefinition {
         placement: "bottom",
         cardPlacement: "bottom-right",
         mobileCardPlacement: "bottom-center",
-        primaryActionLabel: "Ready to build",
+        primaryActionLabel: "Next",
         content: {
           summary: "Your hand must be filled to the current hand size, and this exact hand becomes your opening hand in battle.",
           detail: "Once your hand and basics are correct, submit the build to choose play or draw.",
+        },
+      },
+      {
+        id: "submit",
+        title: "This Moves You Into Battle",
+        targetId: "build-submit",
+        positionTargetId: "phase-action-bar",
+        placement: "top",
+        cardPlacement: "top-center",
+        mobileCardPlacement: "top-center",
+        primaryActionLabel: "Ready to build",
+        content: {
+          summary: "Whenever you're ready, click this button to lock in build and move toward battle.",
+          detail: "Submitting opens the play-or-draw choice, then the next battle starts from exactly the hand and basics you built here.",
         },
       },
     ],
@@ -320,6 +348,21 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
     });
   }
 
+  steps.push({
+    id: "submit",
+    title: "This Opens Result Submission",
+    targetId: "battle-submit",
+    positionTargetId: "phase-action-bar",
+    placement: "top",
+    cardPlacement: "top-center",
+    mobileCardPlacement: "top-center",
+    primaryActionLabel: "Ready to battle",
+    content: {
+      summary: "Whenever the battle is over, click this button to submit the result.",
+      detail: "That opens the result chooser. Once the result is submitted, reward handles the next part of the loop.",
+    },
+  });
+
   return {
     id: "battle",
     label: "Battle",
@@ -328,37 +371,56 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   };
 }
 
-function buildRewardGuide(): GuideDefinition {
+function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
+  const steps: GuideStepDefinition[] = [
+    {
+      id: "intro",
+      title: "Reward Phase",
+      placement: "center",
+      cardPlacement: "center",
+      positionTargetId: "game-content",
+      primaryActionLabel: "Show me the rewards",
+      content: {
+        summary: "Reward adds treasure and other progression before the next round starts.",
+        detail: "Every reward gives +1 treasure. On rounds 1 and 2, you also get a random card. The final round of each stage is special — you earn The Vanquisher, your hand size grows, and you advance to the next stage.",
+      },
+    },
+    {
+      id: "reward-basics",
+      title: "Every Reward Adds Resources",
+      targetId: "reward-summary",
+      placement: "right",
+      cardPlacement: "bottom-center",
+      primaryActionLabel: ctx.isStageEnd ? "Got it" : "Next",
+      content: {
+        summary: "Every reward gives you +1 treasure.",
+        detail: "On the first and second round of a stage, reward also gives you +1 random card from the Battler.",
+      },
+    },
+  ];
+
+  if (!ctx.isStageEnd) {
+    steps.push({
+      id: "continue",
+      title: "This Starts The Next Round",
+      targetId: "reward-continue",
+      positionTargetId: "phase-action-bar",
+      placement: "top",
+      cardPlacement: "top-center",
+      mobileCardPlacement: "top-center",
+      primaryActionLabel: "Ready for reward",
+      content: {
+        summary: "Whenever you're ready, click this button to start the draft phase of the next round.",
+        detail: "Reward is the handoff back into the main loop, so this is how you move from payout into the next draft.",
+      },
+    });
+  }
+
   return {
     id: "reward",
     label: "Reward",
     phase: "reward",
-    steps: [
-      {
-        id: "intro",
-        title: "Reward Phase",
-        placement: "center",
-        cardPlacement: "center",
-        positionTargetId: "game-content",
-        primaryActionLabel: "Show me the rewards",
-        content: {
-          summary: "Reward adds treasure and other progression before the next round starts.",
-          detail: "Every reward gives +1 treasure. On rounds 1 and 2, you also get a random card. The final round of each stage is special — you earn The Vanquisher, your hand size grows, and you advance to the next stage.",
-        },
-      },
-      {
-        id: "reward-basics",
-        title: "Every Reward Adds Resources",
-        targetId: "reward-summary",
-        placement: "right",
-        cardPlacement: "bottom-center",
-        primaryActionLabel: "Got it",
-        content: {
-          summary: "Every reward gives you +1 treasure.",
-          detail: "On the first and second round of a stage, reward also gives you +1 random card from the Battler.",
-        },
-      },
-    ],
+    steps,
   };
 }
 
@@ -498,10 +560,24 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         positionTargetId: (ctx) => (ctx.isMobile ? "draft-pool" : "draft-roll"),
         placement: "top",
         cardPlacement: "top-center",
-        primaryActionLabel: "Ready to draft",
+        primaryActionLabel: "Next",
         content: {
           summary: "Rolling spends 1 treasure to exile the current pack and replace it with a new pack of 5 cards.",
           detail: "Treasures matter across phases, so rolling is a real resource decision, not a free redraw.",
+        },
+      },
+      {
+        id: "continue",
+        title: "This Starts Build",
+        targetId: "draft-continue",
+        positionTargetId: "phase-action-bar",
+        placement: "top",
+        cardPlacement: "top-center",
+        mobileCardPlacement: "top-center",
+        primaryActionLabel: "Ready to draft",
+        content: {
+          summary: "Whenever you're ready, click this button to start the build phase.",
+          detail: "That ends draft for this round and moves you into choosing the exact hand and basics for the next battle.",
         },
       },
     ],
@@ -660,7 +736,7 @@ export function buildGuideDefinition(
     case "battle_result_submit":
       return buildBattleResultSubmitGuide(ctx);
     case "reward":
-      return buildRewardGuide();
+      return buildRewardGuide(ctx);
     case "reward_stage_end":
       return buildRewardStageEndGuide(ctx);
     case "draft":

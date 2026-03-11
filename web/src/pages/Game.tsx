@@ -1242,7 +1242,11 @@ function GameContent() {
         </div>
       );
       right = (
-        <button onClick={actions.draftDone} className="btn btn-primary">
+        <button
+          onClick={actions.draftDone}
+          className="btn btn-primary"
+          data-guide-target="draft-continue"
+        >
           Go to Build
         </button>
       );
@@ -1426,6 +1430,7 @@ function GameContent() {
           onClick={handleContinue}
           disabled={!canContinue}
           className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          data-guide-target="reward-continue"
         >
           {buttonLabel}
         </button>
