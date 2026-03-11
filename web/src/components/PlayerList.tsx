@@ -86,48 +86,25 @@ function StatusLine({
   variant: "game" | "share";
 }) {
   if (variant === "share") {
-    return (
-      <span className="flex max-w-full items-center justify-end gap-1 overflow-hidden whitespace-nowrap text-right">
-        {player.is_puppet ? <PuppetIcon size="sm" /> : null}
-        <span className="truncate">{player.is_puppet ? "Puppet" : `${player.stage}-${player.round}`}</span>
-      </span>
-    );
+    return player.is_puppet
+      ? <PuppetIcon size="sm" />
+      : <span className="block truncate text-right">{player.stage}-{player.round}</span>;
   }
 
   if (player.is_ghost && !player.is_most_recent_ghost) {
-    return (
-      <span className="flex max-w-full items-center justify-end gap-1 overflow-hidden whitespace-nowrap text-right">
-        <SkullIcon size="sm" />
-        <span className="truncate">Ghost</span>
-      </span>
-    );
+    return <SkullIcon size="sm" />;
   }
 
   if (player.is_most_recent_ghost) {
-    return (
-      <span className="flex max-w-full items-center justify-end gap-1 overflow-hidden whitespace-nowrap text-right">
-        <GhostIcon size="sm" />
-        <span className="truncate">Recent ghost</span>
-      </span>
-    );
+    return <GhostIcon size="sm" />;
   }
 
   if (player.phase === "awaiting_elimination") {
-    return (
-      <span className="flex max-w-full items-center justify-end gap-1 overflow-hidden whitespace-nowrap text-right">
-        <HourglassIcon size="sm" />
-        <span className="truncate">Awaiting</span>
-      </span>
-    );
+    return <HourglassIcon size="sm" />;
   }
 
   if (player.is_puppet) {
-    return (
-      <span className="flex max-w-full items-center justify-end gap-1 overflow-hidden whitespace-nowrap text-right">
-        <PuppetIcon size="sm" />
-        <span className="truncate">Puppet</span>
-      </span>
-    );
+    return <PuppetIcon size="sm" />;
   }
 
   return (
@@ -158,7 +135,7 @@ export function PlayerRow({
   return (
     <button
       type="button"
-      className={`relative grid w-full appearance-none border-none bg-transparent grid-cols-[minmax(0,1fr)_max-content] grid-rows-2 items-center gap-x-3 gap-y-1 rounded-lg p-3 text-left transition-colors player-row-etched ${
+      className={`relative grid w-full appearance-none overflow-hidden border-none bg-transparent grid-cols-[minmax(0,1fr)_max-content] grid-rows-2 items-center gap-x-3 gap-y-1 rounded-lg p-3 text-left transition-colors player-row-etched ${
         isSelected ? "ring-1 ring-[var(--color-gold)]/60" : ""
       } ${player.is_ghost ? "opacity-50" : ""}`}
       data-guide-player-row={player.name}

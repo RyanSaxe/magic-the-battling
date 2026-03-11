@@ -47,8 +47,10 @@ function getPlacementStyle(rank: number, total: number, variant: "inline" | "cor
     background: getPlacementBackground(rank, total),
     color: getPlacementTextColor(rank, total),
     borderColor: "var(--gold-border)",
+    borderTopColor: variant === "corner" ? "transparent" : "var(--gold-border)",
+    borderLeftColor: variant === "corner" ? "transparent" : "var(--gold-border)",
     boxShadow: variant === "corner"
-      ? "inset 0 1px 0 rgba(255, 231, 163, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.34)"
+      ? "inset 0 1px 0 rgba(255, 231, 163, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.34)"
       : "inset 0 1px 0 rgba(255, 231, 163, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.34), 0 1px 2px rgba(0, 0, 0, 0.18)",
   };
 }
@@ -62,7 +64,7 @@ export function PlacementBadge({
   const rank = getPlacementRank(player, players);
   const total = players.length;
   const baseClassName = variant === "corner"
-    ? "inline-flex min-w-[2.1rem] items-center justify-center rounded-br-md rounded-tl-lg border px-1.5 py-0.5 text-[9px] font-semibold leading-none tracking-[0.06em] uppercase"
+    ? "inline-flex min-w-[2rem] items-center justify-center rounded-br-md border-b border-r px-1.5 py-0.5 text-[9px] font-semibold leading-none tracking-[0.06em] uppercase"
     : "inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tracking-[0.08em] uppercase";
 
   return (
