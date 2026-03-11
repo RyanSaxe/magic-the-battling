@@ -1121,6 +1121,37 @@ function GameContent() {
 
   useHotkeys(hotkeyMap, !modalOpen);
 
+  const guideContext = useMemo<GuidedWalkthroughContext | null>(() => {
+    if (!gameState) return null;
+    const { self_player, current_battle } = gameState;
+    const currentPhase = self_player.phase;
+    const isStageIncreasing = self_player.is_stage_increasing;
+    const needsUpgrade = isStageIncreasing && gameState.available_upgrades.length > 0;
+    const dgo = selectDraftGuideOpponent(gameState.players, self_player.name);
+    return {
+      currentPhase: isTimelinePhase(currentPhase) ? currentPhase : null,
+      selfPlayer: self_player,
+      currentBattle: current_battle,
+      isMobile: sizes.isMobile,
+      sidebarOpen,
+      revealedPlayerName: state.revealedPlayerName,
+      revealedPlayerTab: state.revealedPlayerTab,
+      useUpgrades: gameState.use_upgrades,
+      hasRewardUpgradeChoice: needsUpgrade,
+      showBuildSubmitPopover: showSubmitHandPopover,
+      showBattleSubmitPopover: showSubmitResultPopover,
+      availableRewardUpgrades: gameState.available_upgrades,
+      draftGuideOpponentName: dgo.name,
+      draftGuideOpponentTab: dgo.tab,
+      draftGuideOpponentRevealedCount: dgo.revealedCount,
+      isStageEnd: self_player.is_stage_increasing,
+    };
+  }, [
+    gameState, sizes.isMobile, sidebarOpen,
+    state.revealedPlayerName, state.revealedPlayerTab,
+    showSubmitHandPopover, showSubmitResultPopover,
+  ]);
+
   if (!session || isSpectateMode) {
     return (
       <PlayerSelectionModal
@@ -1162,10 +1193,6 @@ function GameContent() {
   const needsUpgrade =
     isStageIncreasing && gameState.available_upgrades.length > 0;
   const canContinue = !needsUpgrade || !!selectedUpgradeId;
-  const draftGuideOpponent = selectDraftGuideOpponent(
-    gameState.players,
-    self_player.name,
-  );
   const hasPendingBuildUpgrades =
     currentPhase === "build" && self_player.upgrades.some((u) => !u.upgrade_target);
   const upgradesModalMode: "view" | "apply" =
@@ -1174,25 +1201,6 @@ function GameContent() {
       : hasPendingBuildUpgrades
         ? "apply"
         : "view";
-
-  const guideContext: GuidedWalkthroughContext = {
-    currentPhase: isTimelinePhase(currentPhase) ? currentPhase : null,
-    selfPlayer: self_player,
-    currentBattle: current_battle,
-    isMobile: sizes.isMobile,
-    sidebarOpen,
-    revealedPlayerName: state.revealedPlayerName,
-    revealedPlayerTab: state.revealedPlayerTab,
-    useUpgrades: gameState.use_upgrades,
-    hasRewardUpgradeChoice: needsUpgrade,
-    showBuildSubmitPopover: showSubmitHandPopover,
-    showBattleSubmitPopover: showSubmitResultPopover,
-    availableRewardUpgrades: gameState.available_upgrades,
-    draftGuideOpponentName: draftGuideOpponent.name,
-    draftGuideOpponentTab: draftGuideOpponent.tab,
-    draftGuideOpponentRevealedCount: draftGuideOpponent.revealedCount,
-    isStageEnd: self_player.is_stage_increasing,
-  };
 
   const handleContinue = () => {
     actions.rewardDone(selectedUpgradeId ?? undefined);
@@ -1643,7 +1651,7 @@ function GameContent() {
           playerId={session?.playerId}
           playerName={self_player.name}
           selfPhase={selfPhase}
-          guideContext={guideContext}
+          guideContext={guideContext!}
           isSpectator={isSpectator}
           hasOverlayOpen={rulesPanelOpen || showUpgradesModal || shareOpen || actionMenuOpen}
           closeGameplayOverlays={closeGameplayOverlays}
@@ -2010,7 +2018,7 @@ function GameContent() {
         {!isSpectator && (
           <GameGuideLayer
             rootRef={guideRootRef}
-            context={guideContext}
+            context={guideContext!}
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
           />

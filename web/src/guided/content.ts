@@ -610,7 +610,7 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
     steps: [
       {
         id: "treasure-cap",
-        title: "You Are At 6 Treasure",
+        title: `You Have ${ctx.selfPlayer?.treasures ?? 6} Treasure`,
         targetId: ctx.isMobile ? "draft-mobile-treasure" : "sidebar-current-player-treasure",
         positionTargetId: "draft-pool",
         placement: ctx.isMobile ? "right" : "left",
@@ -619,7 +619,7 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
         primaryActionLabel: "Got it",
         content: {
           summary: "After battle, you keep at most 5 treasure that remain on your battlefield.",
-          detail: "At 6 treasure, some value is at risk of being wasted. Spending one now on a roll can be correct even if the current pack is acceptable.",
+          detail: "With this much treasure, some value is at risk of being wasted. Spending one now on a roll can be correct even if the current pack is acceptable.",
         },
       },
     ],

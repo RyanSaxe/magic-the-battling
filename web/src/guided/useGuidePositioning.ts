@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState, type RefObject } from "react";
-import type { GuideCardPlacement, GuidePlacement, GuideTargetId } from "./types";
+import type { GuidePlacement, GuideTargetId } from "./types";
 
 const CARD_MARGIN = 12;
 const SPOTLIGHT_PADDING = 12;
@@ -57,25 +57,12 @@ function clampSpotlight(rect: SpotlightRect, cw: number, ch: number): SpotlightR
 function buildClipPath(spotlight: SpotlightRect | null, cw: number, ch: number): string {
   if (!spotlight) return "none";
   const { x, y, width, height } = spotlight;
-  const r = Math.min(Math.min(width, height) * 0.2, 24);
   const l = x;
   const t = y;
   const ri = x + width;
   const b = y + height;
 
-  return [
-    `polygon(`,
-    // outer rectangle (clockwise)
-    `0 0, ${cw}px 0, ${cw}px ${ch}px, 0 ${ch}px, 0 0,`,
-    // cutout (counter-clockwise with rounded corners approximated)
-    `${l + r}px ${t}px,`,
-    `${l}px ${t}px, ${l}px ${t + r}px,`,
-    `${l}px ${b - r}px, ${l}px ${b}px, ${l + r}px ${b}px,`,
-    `${ri - r}px ${b}px, ${ri}px ${b}px, ${ri}px ${b - r}px,`,
-    `${ri}px ${t + r}px, ${ri}px ${t}px, ${ri - r}px ${t}px,`,
-    `${l + r}px ${t}px`,
-    `)`,
-  ].join(" ");
+  return `polygon(0 0, ${cw}px 0, ${cw}px ${ch}px, 0 ${ch}px, 0 0, ${l}px ${t}px, ${l}px ${b}px, ${ri}px ${b}px, ${ri}px ${t}px, ${l}px ${t}px)`;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -329,8 +316,6 @@ export function useGuidePositioning(
   positionTargetId: GuideTargetId | undefined,
   positionTargetSelector: string | undefined,
   placement: GuidePlacement,
-  _cardPlacement: GuideCardPlacement | undefined,
-  _mobileCardPlacement: GuideCardPlacement | undefined,
   spotlightPadding: number | undefined,
   stepKey: string,
 ): PositionState | null {

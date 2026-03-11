@@ -113,8 +113,6 @@ export function GuidedWalkthrough({
     resolvedPositionTargetId,
     resolvedPositionTargetSelector,
     step?.placement ?? "bottom",
-    step?.cardPlacement,
-    step?.mobileCardPlacement,
     step?.spotlightPadding,
     stepKey,
   );
