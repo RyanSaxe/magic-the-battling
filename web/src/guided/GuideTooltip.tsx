@@ -1,6 +1,5 @@
 import { forwardRef, type CSSProperties } from "react";
 import type { GuideStepDefinition } from "./types";
-import { GuideProgress } from "./GuideProgress";
 
 interface GuideTooltipProps {
   step: GuideStepDefinition;
@@ -11,7 +10,6 @@ interface GuideTooltipProps {
   style?: CSSProperties;
   onPrimaryAction: () => void;
   onBack: () => void;
-  onDismiss: () => void;
   onSkipAll: () => void;
 }
 
@@ -26,7 +24,6 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       style,
       onPrimaryAction,
       onBack,
-      onDismiss,
       onSkipAll,
     },
     ref,
@@ -37,7 +34,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
     return (
       <div
         ref={ref}
-        className="absolute z-[82] pointer-events-auto w-[min(21rem,calc(100%-1rem))] max-h-[calc(100%-1rem)] overflow-hidden rounded-2xl border border-amber-300/25 bg-[linear-gradient(180deg,rgba(38,26,20,0.98),rgba(24,16,13,0.98))] shadow-[0_18px_48px_rgba(0,0,0,0.55)] backdrop-blur"
+        className="absolute z-[82] pointer-events-auto w-[min(17.5rem,calc(100%-1rem))] max-h-[calc(100%-1rem)] overflow-hidden rounded-2xl border border-amber-300/20 bg-[linear-gradient(180deg,rgba(36,24,19,0.98),rgba(23,16,13,0.98))] shadow-[0_16px_36px_rgba(0,0,0,0.5)] backdrop-blur"
         style={{
           ...style,
           overscrollBehavior: "contain",
@@ -45,37 +42,23 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
         }}
         role="dialog"
         aria-modal="true"
-        aria-label={`${guideLabel} guide`}
+        aria-label="Guide"
       >
-        <div className="border-b border-amber-200/10 px-4 py-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[0.68rem] uppercase tracking-[0.24em] text-amber-200/75">
-                {guideLabel}
-              </div>
-              <h2 className="mt-2 text-[1.04rem] font-semibold leading-tight text-amber-50">
-                {step.title}
-              </h2>
-            </div>
-            <button
-              type="button"
-              onClick={onDismiss}
-              className="shrink-0 rounded-full border border-amber-200/15 px-2 py-1 text-[0.7rem] uppercase tracking-[0.18em] text-amber-100/70 transition-colors hover:text-white"
-              aria-label="Dismiss guide"
-            >
-              Close
-            </button>
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <GuideProgress current={stepIndex} total={totalSteps} />
-            <span className="text-[0.72rem] text-gray-400">
+        <div className="flex items-center justify-between gap-3 border-b border-amber-200/10 px-4 py-2.5">
+          <span className="text-[0.68rem] uppercase tracking-[0.18em] text-amber-200/80">
+            {guideLabel}
+          </span>
+          {totalSteps > 1 && (
+            <span className="text-[0.72rem] text-gray-500">
               {stepIndex + 1}/{totalSteps}
             </span>
-          </div>
+          )}
         </div>
-
         <div className="max-h-[min(20rem,calc(100vh-12rem))] overflow-y-auto px-4 py-4">
-          <p className="text-[0.92rem] leading-relaxed text-gray-100">
+          <h2 className="text-[0.98rem] font-semibold leading-tight text-amber-50">
+            {step.title}
+          </h2>
+          <p className="mt-2 text-[0.92rem] leading-relaxed text-gray-100">
             {step.content.summary}
           </p>
           {step.content.detail && (
@@ -92,9 +75,26 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
               />
             </div>
           )}
+          {step.content.gallery && step.content.gallery.length > 0 && (
+            <div className="mt-4 rounded-xl border border-sky-300/15 bg-black/20 p-3">
+              <div className="text-[0.68rem] uppercase tracking-[0.18em] text-sky-100/80">
+                Current upgrades
+              </div>
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {step.content.gallery.map((media) => (
+                  <img
+                    key={`${media.imageUrl}:${media.alt}`}
+                    src={media.imageUrl}
+                    alt={media.alt}
+                    className="w-full rounded-md border border-sky-300/15 shadow-sm"
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-amber-200/10 px-4 py-4">
+        <div className="flex items-center justify-between gap-3 border-t border-amber-200/10 px-4 py-3">
           <div className="flex items-center gap-2">
             {stepIndex > 0 && (
               <button type="button" onClick={onBack} className="btn btn-secondary text-xs">
@@ -111,9 +111,11 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
               </button>
             )}
           </div>
-          <button type="button" onClick={onPrimaryAction} className="btn btn-primary text-xs">
-            {primaryActionLabel}
-          </button>
+          <div className="flex items-center gap-2 ml-auto">
+            <button type="button" onClick={onPrimaryAction} className="btn btn-primary text-xs">
+              {primaryActionLabel}
+            </button>
+          </div>
         </div>
       </div>
     );

@@ -446,7 +446,7 @@ function GameGuideLayer({
   rootRef: React.RefObject<HTMLElement | null>;
   context: GuidedWalkthroughContext;
 }) {
-  const { guideRequest, finishGuide, skipTutorial } = useGuideContext();
+  const { guideRequest, finishGuide, skipTutorial, updateGuideStep } = useGuideContext();
   if (!guideRequest) return null;
   return (
     <GuidedWalkthrough
@@ -456,6 +456,7 @@ function GameGuideLayer({
       context={context}
       onClose={finishGuide}
       onSkipAll={skipTutorial}
+      onStepChange={updateGuideStep}
     />
   );
 }

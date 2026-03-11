@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  clearActiveGuideForGame,
   getGuideProgressForGame,
   markGuideSeenForGame,
+  setActiveGuideForGame,
   skipAllGuidesForGame,
 } from "./storage";
 
@@ -74,5 +76,50 @@ describe("guided storage", () => {
     });
 
     expect(progress.skippedAll).toBe(true);
+  });
+
+  it("persists the active guide step across refresh", () => {
+    setActiveGuideForGame(
+      { gameId: "game-1", playerName: "Alice" },
+      "welcome",
+      3,
+    );
+
+    const progress = getGuideProgressForGame({
+      gameId: "game-1",
+      playerName: "Alice",
+    });
+
+    expect(progress.activeGuide).toEqual({
+      guideId: "welcome",
+      stepIndex: 3,
+    });
+
+    clearActiveGuideForGame({ gameId: "game-1", playerName: "Alice" });
+    expect(
+      getGuideProgressForGame({
+        gameId: "game-1",
+        playerName: "Alice",
+      }).activeGuide,
+    ).toBeNull();
+  });
+
+  it("clears active progress when a guide is completed", () => {
+    setActiveGuideForGame(
+      { gameId: "game-1", playerName: "Alice" },
+      "build",
+      1,
+    );
+    markGuideSeenForGame(
+      { gameId: "game-1", playerName: "Alice" },
+      "build",
+    );
+
+    expect(
+      getGuideProgressForGame({
+        gameId: "game-1",
+        playerName: "Alice",
+      }).activeGuide,
+    ).toBeNull();
   });
 });

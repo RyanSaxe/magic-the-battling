@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState, type RefObject } from "react";
-import type { GuidePlacement, GuideTargetId } from "./types";
+import type { GuideCardPlacement, GuidePlacement, GuideTargetId } from "./types";
 
 const CARD_MARGIN = 12;
 const SPOTLIGHT_PADDING = 12;
@@ -93,6 +93,87 @@ function placementOrder(preferred: GuidePlacement): GuidePlacement[] {
   }
 }
 
+interface RectCandidate {
+  left: number;
+  top: number;
+  resolved: GuidePlacement;
+}
+
+type HorizontalRegion = "left" | "overlap" | "right";
+type VerticalRegion = "top" | "overlap" | "bottom";
+
+interface AxisInterval<TRegion extends string> {
+  min: number;
+  max: number;
+  region: TRegion;
+}
+
+function overlapArea(a: SpotlightRect, b: SpotlightRect): number {
+  const width = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
+  const height = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+  return width * height;
+}
+
+function rectDistanceSquared(a: SpotlightRect, b: SpotlightRect): number {
+  const dx = Math.max(0, Math.max(b.x - (a.x + a.width), a.x - (b.x + b.width)));
+  const dy = Math.max(0, Math.max(b.y - (a.y + a.height), a.y - (b.y + b.height)));
+  return dx * dx + dy * dy;
+}
+
+function placementPenalty(candidate: GuidePlacement, preferred: GuidePlacement): number {
+  if (preferred === "center") {
+    return candidate === "center" ? 0 : 1_000;
+  }
+
+  const order = placementOrder(preferred);
+  const index = order.indexOf(candidate);
+  return index === -1 ? 10_000 : index * 100;
+}
+
+function buildInterval<TRegion extends string>(
+  min: number,
+  max: number,
+  region: TRegion,
+): AxisInterval<TRegion> | null {
+  if (min > max) {
+    return null;
+  }
+  return { min, max, region };
+}
+
+function chooseAxisCoordinate<TRegion extends string>(
+  interval: AxisInterval<TRegion>,
+  preferred: number,
+): number {
+  switch (interval.region) {
+    case "left":
+    case "top":
+      return interval.max;
+    case "right":
+    case "bottom":
+      return interval.min;
+    default:
+      return clamp(preferred, interval.min, interval.max);
+  }
+}
+
+function resolveCandidatePlacement(
+  horizontal: HorizontalRegion,
+  vertical: VerticalRegion,
+  preferred: GuidePlacement,
+): GuidePlacement {
+  if (vertical === "top" && horizontal === "overlap") return "top";
+  if (vertical === "bottom" && horizontal === "overlap") return "bottom";
+  if (horizontal === "left" && vertical === "overlap") return "left";
+  if (horizontal === "right" && vertical === "overlap") return "right";
+  if (preferred !== "center") return preferred;
+  if (vertical === "top") return "top";
+  if (vertical === "bottom") return "bottom";
+  if (horizontal === "left") return "left";
+  if (horizontal === "right") return "right";
+  return "center";
+}
+
 function computePosition(
   placement: GuidePlacement,
   cw: number,
@@ -102,58 +183,100 @@ function computePosition(
   cardH: number,
   isMobile: boolean,
 ): { left: number; top: number; resolved: GuidePlacement } {
+  const xMin = CARD_MARGIN;
+  const yMin = CARD_MARGIN;
+  const xMax = Math.max(CARD_MARGIN, cw - cardW - CARD_MARGIN);
+  const yMax = Math.max(CARD_MARGIN, ch - cardH - CARD_MARGIN);
+
   if (!spotlight || placement === "center") {
     return {
-      left: clamp(cw / 2 - cardW / 2, CARD_MARGIN, Math.max(CARD_MARGIN, cw - cardW - CARD_MARGIN)),
-      top: clamp(ch / 2 - cardH / 2, CARD_MARGIN, Math.max(CARD_MARGIN, ch - cardH - CARD_MARGIN)),
+      left: clamp(cw / 2 - cardW / 2, xMin, xMax),
+      top: clamp(ch / 2 - cardH / 2, yMin, yMax),
       resolved: "center",
     };
   }
 
-  if (isMobile) {
-    const gap = 12;
-    let top = spotlight.y + spotlight.height + gap;
-    if (top + cardH > ch - 8) {
-      top = spotlight.y - cardH - gap;
+  const centeredLeft = clamp(spotlight.x + spotlight.width / 2 - cardW / 2, xMin, xMax);
+  const centeredTop = clamp(spotlight.y + spotlight.height / 2 - cardH / 2, yMin, yMax);
+
+  const horizontalIntervals = [
+    buildInterval(xMin, Math.min(xMax, spotlight.x - cardW), "left"),
+    buildInterval(
+      Math.max(xMin, spotlight.x - cardW),
+      Math.min(xMax, spotlight.x + spotlight.width),
+      "overlap",
+    ),
+    buildInterval(Math.max(xMin, spotlight.x + spotlight.width), xMax, "right"),
+  ].filter((interval): interval is AxisInterval<HorizontalRegion> => interval !== null);
+
+  const verticalIntervals = [
+    buildInterval(yMin, Math.min(yMax, spotlight.y - cardH), "top"),
+    buildInterval(
+      Math.max(yMin, spotlight.y - cardH),
+      Math.min(yMax, spotlight.y + spotlight.height),
+      "overlap",
+    ),
+    buildInterval(Math.max(yMin, spotlight.y + spotlight.height), yMax, "bottom"),
+  ].filter((interval): interval is AxisInterval<VerticalRegion> => interval !== null);
+
+  const legalCandidates: RectCandidate[] = [];
+  for (const horizontal of horizontalIntervals) {
+    for (const vertical of verticalIntervals) {
+      if (horizontal.region === "overlap" && vertical.region === "overlap") {
+        continue;
+      }
+
+      legalCandidates.push({
+        left: chooseAxisCoordinate(horizontal, centeredLeft),
+        top: chooseAxisCoordinate(vertical, centeredTop),
+        resolved: resolveCandidatePlacement(horizontal.region, vertical.region, placement),
+      });
     }
-    top = clamp(top, 8, Math.max(8, ch - cardH - 8));
-    return { left: 8, top, resolved: top > spotlight.y ? "bottom" : "top" };
   }
 
-  const centeredLeft = clamp(
-    spotlight.x + spotlight.width / 2 - cardW / 2,
-    CARD_MARGIN, Math.max(CARD_MARGIN, cw - cardW - CARD_MARGIN),
-  );
-  const centeredTop = clamp(
-    spotlight.y + spotlight.height / 2 - cardH / 2,
-    CARD_MARGIN, Math.max(CARD_MARGIN, ch - cardH - CARD_MARGIN),
+  const fallbackCandidates: RectCandidate[] = [
+    { left: centeredLeft, top: yMin, resolved: "top" },
+    { left: centeredLeft, top: yMax, resolved: "bottom" },
+    { left: xMin, top: centeredTop, resolved: "left" },
+    { left: xMax, top: centeredTop, resolved: "right" },
+    { left: centeredLeft, top: centeredTop, resolved: isMobile ? "bottom" : placement },
+    { left: xMin, top: yMin, resolved: "top" },
+    { left: xMax, top: yMin, resolved: "top" },
+    { left: xMin, top: yMax, resolved: "bottom" },
+    { left: xMax, top: yMax, resolved: "bottom" },
+  ];
+
+  const scored = (legalCandidates.length > 0 ? legalCandidates : fallbackCandidates).map((candidate) => {
+    const cardRect: SpotlightRect = {
+      x: candidate.left,
+      y: candidate.top,
+      width: cardW,
+      height: cardH,
+    };
+    return {
+      ...candidate,
+      overlap: overlapArea(cardRect, spotlight),
+      distance: rectDistanceSquared(cardRect, spotlight),
+      penalty: placementPenalty(candidate.resolved, placement),
+    };
+  });
+
+  scored.sort((a, b) =>
+    a.overlap - b.overlap
+    || a.distance - b.distance
+    || a.penalty - b.penalty,
   );
 
-  const candidates = {
-    top: { left: centeredLeft, top: spotlight.y - cardH - CARD_MARGIN },
-    bottom: { left: centeredLeft, top: spotlight.y + spotlight.height + CARD_MARGIN },
-    left: { left: spotlight.x - cardW - CARD_MARGIN, top: centeredTop },
-    right: { left: spotlight.x + spotlight.width + CARD_MARGIN, top: centeredTop },
-  };
-
-  for (const p of placementOrder(placement)) {
-    if (p === "center") continue;
-    const c = candidates[p];
-    if (
-      c.left >= CARD_MARGIN &&
-      c.left + cardW <= cw - CARD_MARGIN &&
-      c.top >= CARD_MARGIN &&
-      c.top + cardH <= ch - CARD_MARGIN
-    ) {
-      return { left: c.left, top: c.top, resolved: p };
-    }
+  const best = scored[0];
+  if (!best) {
+    return {
+      left: centeredLeft,
+      top: yMax,
+      resolved: isMobile ? "bottom" : placement,
+    };
   }
 
-  return {
-    left: centeredLeft,
-    top: clamp(spotlight.y + spotlight.height + CARD_MARGIN, CARD_MARGIN, Math.max(CARD_MARGIN, ch - cardH - CARD_MARGIN)),
-    resolved: "bottom",
-  };
+  return { left: best.left, top: best.top, resolved: best.resolved };
 }
 
 export function useGuidePositioning(
@@ -161,7 +284,11 @@ export function useGuidePositioning(
   cardRef: RefObject<HTMLElement | null>,
   targetId: GuideTargetId | undefined,
   targetSelector: string | undefined,
+  _positionTargetId: GuideTargetId | undefined,
+  _positionTargetSelector: string | undefined,
   placement: GuidePlacement,
+  _cardPlacement: GuideCardPlacement | undefined,
+  _mobileCardPlacement: GuideCardPlacement | undefined,
   spotlightPadding: number | undefined,
   stepKey: string,
 ): PositionState | null {
@@ -183,9 +310,17 @@ export function useGuidePositioning(
       const padding = spotlightPadding ?? SPOTLIGHT_PADDING;
       const rawSpotlight = target ? toRelativeRect(r, target, padding) : null;
       const spotlight = rawSpotlight ? clampSpotlight(rawSpotlight, cw, ch) : null;
-      const isMobile = cw <= MOBILE_BREAKPOINT;
       const cardRect = c.getBoundingClientRect();
-      const pos = computePosition(placement, cw, ch, spotlight, cardRect.width, cardRect.height, isMobile);
+      const isMobile = cw <= MOBILE_BREAKPOINT;
+      const pos = computePosition(
+        placement,
+        cw,
+        ch,
+        spotlight,
+        cardRect.width,
+        cardRect.height,
+        isMobile,
+      );
 
       setState({
         spotlight,
@@ -208,6 +343,7 @@ export function useGuidePositioning(
 
     const ro = new ResizeObserver(update);
     ro.observe(root);
+    ro.observe(card);
     window.addEventListener("resize", update);
     window.addEventListener("scroll", update, true);
 
@@ -216,7 +352,15 @@ export function useGuidePositioning(
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
     };
-  }, [rootRef, cardRef, targetId, targetSelector, placement, spotlightPadding, stepKey]);
+  }, [
+    rootRef,
+    cardRef,
+    targetId,
+    targetSelector,
+    placement,
+    spotlightPadding,
+    stepKey,
+  ]);
 
   return state;
 }

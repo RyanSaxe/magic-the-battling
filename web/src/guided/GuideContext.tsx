@@ -13,8 +13,10 @@ import type {
   GuidedWalkthroughContext,
 } from "./types";
 import {
+  clearActiveGuideForGame,
   getGuideProgressForGame,
   markGuideSeenForGame,
+  setActiveGuideForGame,
   skipAllGuidesForGame,
 } from "./storage";
 import { resolveNewPlayerPreferenceForGame } from "../utils/deviceIdentity";
@@ -26,6 +28,17 @@ function isTimelinePhase(phase: string | undefined): phase is Phase {
   return phase === "draft" || phase === "build" || phase === "battle" || phase === "reward";
 }
 
+type GuideOverlayException =
+  | "rules"
+  | "upgrades"
+  | "actionMenu"
+  | "share"
+  | "buildSubmit"
+  | "battleSubmit"
+  | "battlePanel"
+  | "battleZoneModal"
+  | null;
+
 interface GuideProviderProps {
   gameId: string | undefined;
   playerId: string | undefined | null;
@@ -34,7 +47,7 @@ interface GuideProviderProps {
   guideContext: GuidedWalkthroughContext;
   isSpectator: boolean;
   hasOverlayOpen: boolean;
-  closeGameplayOverlays: () => void;
+  closeGameplayOverlays: (except?: GuideOverlayException) => void;
   children: ReactNode;
 }
 
@@ -56,6 +69,7 @@ export function GuideProvider({
   const [skippedAll, setSkippedAll] = useState(false);
   const [guideRequest, setGuideRequest] = useState<GuideRequest | null>(null);
   const [guideQueue, setGuideQueue] = useState<ConditionalGuideId[]>([]);
+  const [hydratedScopeKey, setHydratedScopeKey] = useState<string | null>(null);
 
   const storageIdentity = useMemo<GuideStorageIdentity | null>(() => {
     if (!gameId) return null;
@@ -65,6 +79,11 @@ export function GuideProvider({
       playerName,
     };
   }, [gameId, playerId, playerName]);
+  const storageScopeKey = useMemo(
+    () => (gameId ? `${gameId}::${playerId ?? ""}::${playerName ?? ""}` : null),
+    [gameId, playerId, playerName],
+  );
+  const progressHydrated = hydratedScopeKey === storageScopeKey;
 
   useEffect(() => {
     const resolved = gameId
@@ -72,7 +91,11 @@ export function GuideProvider({
       : false;
     const progress = storageIdentity
       ? getGuideProgressForGame(storageIdentity)
-      : { seenGuides: new Set<GuidedGuideId>(), skippedAll: false };
+      : {
+          seenGuides: new Set<GuidedGuideId>(),
+          skippedAll: false,
+          activeGuide: null,
+        };
 
     let cancelled = false;
     queueMicrotask(() => {
@@ -80,19 +103,29 @@ export function GuideProvider({
       setIsGuidedMode(resolved);
       setSeenGuides(progress.seenGuides);
       setSkippedAll(progress.skippedAll);
-      setGuideRequest(null);
+      setGuideRequest(
+        progress.activeGuide
+          ? {
+              guideId: progress.activeGuide.guideId,
+              nonce: Date.now(),
+              stepIndex: progress.activeGuide.stepIndex,
+            }
+          : null,
+      );
       setGuideQueue([]);
+      setHydratedScopeKey(storageScopeKey);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [gameId, playerId, storageIdentity]);
+  }, [gameId, playerId, storageIdentity, storageScopeKey]);
 
   const finishGuide = useCallback(
     (guideId: GuidedGuideId) => {
       if (storageIdentity) {
         markGuideSeenForGame(storageIdentity, guideId);
+        clearActiveGuideForGame(storageIdentity);
       }
       setSeenGuides((current) => {
         const next = new Set(current);
@@ -107,6 +140,7 @@ export function GuideProvider({
   const skipTutorial = useCallback(() => {
     if (storageIdentity) {
       skipAllGuidesForGame(storageIdentity);
+      clearActiveGuideForGame(storageIdentity);
     }
     setSkippedAll(true);
     setGuideRequest(null);
@@ -115,12 +149,23 @@ export function GuideProvider({
 
   const requestGuide = useCallback(
     (guideId: GuidedGuideId) => {
-      closeGameplayOverlays();
+      closeGameplayOverlays(guideId === "build_play_draw" ? "buildSubmit" : null);
+      if (storageIdentity) {
+        setActiveGuideForGame(storageIdentity, guideId, 0);
+      }
       setGuideRequest((current) =>
-        current ?? { guideId, nonce: Date.now() },
+        current ?? { guideId, nonce: Date.now(), stepIndex: 0 },
       );
     },
-    [closeGameplayOverlays],
+    [closeGameplayOverlays, storageIdentity],
+  );
+
+  const updateGuideStep = useCallback(
+    (guideId: GuidedGuideId, stepIndex: number) => {
+      if (!storageIdentity) return;
+      setActiveGuideForGame(storageIdentity, guideId, stepIndex);
+    },
+    [storageIdentity],
   );
 
   const eligibleConditionalGuides = useMemo(
@@ -129,7 +174,7 @@ export function GuideProvider({
   );
 
   useEffect(() => {
-    if (!gameId || !isGuidedMode || isSpectator || skippedAll) {
+    if (!gameId || !progressHydrated || !isGuidedMode || isSpectator || skippedAll) {
       return;
     }
 
@@ -161,6 +206,7 @@ export function GuideProvider({
     gameId,
     guideQueue,
     guideRequest?.guideId,
+    progressHydrated,
     isGuidedMode,
     isSpectator,
     seenGuides,
@@ -171,6 +217,7 @@ export function GuideProvider({
     if (
       !gameId ||
       !selfPhase ||
+      !progressHydrated ||
       !isGuidedMode ||
       isSpectator ||
       skippedAll ||
@@ -230,6 +277,7 @@ export function GuideProvider({
     guideQueue,
     guideRequest,
     hasOverlayOpen,
+    progressHydrated,
     isGuidedMode,
     isSpectator,
     requestGuide,
@@ -239,8 +287,14 @@ export function GuideProvider({
   ]);
 
   const value = useMemo(
-    () => ({ isGuidedMode, guideRequest, finishGuide, skipTutorial }),
-    [finishGuide, guideRequest, isGuidedMode, skipTutorial],
+    () => ({
+      isGuidedMode,
+      guideRequest,
+      finishGuide,
+      skipTutorial,
+      updateGuideStep,
+    }),
+    [finishGuide, guideRequest, isGuidedMode, skipTutorial, updateGuideStep],
   );
 
   return (

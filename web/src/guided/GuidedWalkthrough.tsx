@@ -11,6 +11,7 @@ interface GuidedWalkthroughProps {
   context: GuidedWalkthroughContext;
   onClose: (guideId: GuidedGuideId) => void;
   onSkipAll: () => void;
+  onStepChange: (guideId: GuidedGuideId, stepIndex: number) => void;
 }
 
 export function GuidedWalkthrough({
@@ -19,8 +20,9 @@ export function GuidedWalkthrough({
   context,
   onClose,
   onSkipAll,
+  onStepChange,
 }: GuidedWalkthroughProps) {
-  const [stepIndex, setStepIndex] = useState(0);
+  const [stepIndex, setStepIndex] = useState(request.stepIndex ?? 0);
   const cardRef = useRef<HTMLDivElement>(null);
 
   const guide = useMemo(
@@ -35,6 +37,18 @@ export function GuidedWalkthrough({
     return typeof step.targetSelector === "function"
       ? step.targetSelector(context)
       : step.targetSelector;
+  }, [context, step]);
+  const resolvedPositionTargetId = useMemo(() => {
+    if (!step?.positionTargetId) return undefined;
+    return typeof step.positionTargetId === "function"
+      ? step.positionTargetId(context)
+      : step.positionTargetId;
+  }, [context, step]);
+  const resolvedPositionTargetSelector = useMemo(() => {
+    if (!step?.positionTargetSelector) return undefined;
+    return typeof step.positionTargetSelector === "function"
+      ? step.positionTargetSelector(context)
+      : step.positionTargetSelector;
   }, [context, step]);
 
   const finishGuide = useCallback(() => {
@@ -59,6 +73,10 @@ export function GuidedWalkthrough({
   }, [context.currentPhase, finishGuide, guide.phase]);
 
   useEffect(() => {
+    onStepChange(request.guideId, stepIndex);
+  }, [onStepChange, request.guideId, stepIndex]);
+
+  useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         finishGuide();
@@ -78,7 +96,11 @@ export function GuidedWalkthrough({
     cardRef,
     step?.targetId,
     resolvedTargetSelector,
+    resolvedPositionTargetId,
+    resolvedPositionTargetSelector,
     step?.placement ?? "bottom",
+    step?.cardPlacement,
+    step?.mobileCardPlacement,
     step?.spotlightPadding,
     stepKey,
   );
@@ -121,7 +143,6 @@ export function GuidedWalkthrough({
         showSkipAll={guide.showSkipAll === true}
         onPrimaryAction={advanceStep}
         onBack={() => setStepIndex((current) => Math.max(0, current - 1))}
-        onDismiss={finishGuide}
         onSkipAll={onSkipAll}
         style={{
           left: layout?.cardLeft ?? 16,

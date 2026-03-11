@@ -5,7 +5,8 @@ export type SidebarGuideTab = "you" | "opponents" | "others";
 
 export type ConditionalGuideId =
   | "hint_treasure_producer"
-  | "hint_treasure_cap";
+  | "hint_treasure_cap"
+  | "hint_build_unapplied_upgrade";
 
 export type GuidedGuideId =
   | "welcome"
@@ -24,6 +25,7 @@ export type GuideTargetId =
   | "timeline-phase-battle"
   | "timeline-phase-reward"
   | "build-hand"
+  | "build-workspace"
   | "build-battlefield"
   | "build-sideboard"
   | "build-submit-popover"
@@ -31,6 +33,7 @@ export type GuideTargetId =
   | "battle-battlefield"
   | "battle-opponent-hand"
   | "reward-summary"
+  | "reward-current-upgrades"
   | "reward-upgrades"
   | "draft-pack"
   | "draft-pool"
@@ -39,6 +42,16 @@ export type GuideTargetId =
   | "sidebar-current-player-treasure";
 
 export type GuidePlacement = "top" | "right" | "bottom" | "left" | "center";
+export type GuideCardPlacement =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "middle-left"
+  | "center"
+  | "middle-right"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
 
 export interface GuideMedia {
   alt: string;
@@ -49,6 +62,7 @@ export interface GuideStepContent {
   summary: string;
   detail?: string;
   media?: GuideMedia;
+  gallery?: GuideMedia[];
 }
 
 export interface GuidedWalkthroughContext {
@@ -70,7 +84,11 @@ export interface GuideStepDefinition {
   content: GuideStepContent;
   targetId?: GuideTargetId;
   targetSelector?: string | ((ctx: GuidedWalkthroughContext) => string | undefined);
+  positionTargetId?: GuideTargetId | ((ctx: GuidedWalkthroughContext) => GuideTargetId | undefined);
+  positionTargetSelector?: string | ((ctx: GuidedWalkthroughContext) => string | undefined);
   placement?: GuidePlacement;
+  cardPlacement?: GuideCardPlacement;
+  mobileCardPlacement?: GuideCardPlacement;
   spotlightPadding?: number;
   primaryActionLabel?: string;
 }
@@ -86,11 +104,18 @@ export interface GuideDefinition {
 export interface GuideRequest {
   guideId: GuidedGuideId;
   nonce: number;
+  stepIndex?: number;
+}
+
+export interface ActiveGuideProgress {
+  guideId: GuidedGuideId;
+  stepIndex: number;
 }
 
 export interface GuideProgressState {
   seenGuides: Set<GuidedGuideId>;
   skippedAll: boolean;
+  activeGuide: ActiveGuideProgress | null;
 }
 
 export interface GuideStorageIdentity {

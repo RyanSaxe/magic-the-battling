@@ -9,6 +9,7 @@ import type {
 
 const CONDITIONAL_GUIDE_PRIORITY: ConditionalGuideId[] = [
   "hint_treasure_producer",
+  "hint_build_unapplied_upgrade",
   "hint_treasure_cap",
 ];
 
@@ -67,6 +68,7 @@ function buildWelcomeGuide(): GuideDefinition {
         id: "intro",
         title: "Welcome To Magic: The Battling",
         placement: "center",
+        cardPlacement: "center",
         primaryActionLabel: "Show me the loop",
         content: {
           summary: "You improve your pool between battles, then play short manual games until only one player remains.",
@@ -78,6 +80,7 @@ function buildWelcomeGuide(): GuideDefinition {
         title: "You Start At 3-1",
         targetId: "timeline-stage-round",
         placement: "bottom",
+        cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
           summary: "The left side of the timeline shows your current stage and round. Right now you are at 3-1.",
@@ -89,6 +92,7 @@ function buildWelcomeGuide(): GuideDefinition {
         title: "Draft Improves Your Pool",
         targetId: "timeline-phase-draft",
         placement: "bottom",
+        cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
           summary: "Draft is where you trade cards between the current pack and your pool.",
@@ -100,6 +104,7 @@ function buildWelcomeGuide(): GuideDefinition {
         title: "Build Sets Up The Next Battle",
         targetId: "timeline-phase-build",
         placement: "bottom",
+        cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
           summary: "Build is where you choose your starting hand and battlefield setup for the next battle.",
@@ -111,6 +116,7 @@ function buildWelcomeGuide(): GuideDefinition {
         title: "Battle Is The Real Game",
         targetId: "timeline-phase-battle",
         placement: "bottom",
+        cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
           summary: "Battle is not automated. You play the board state manually.",
@@ -122,6 +128,7 @@ function buildWelcomeGuide(): GuideDefinition {
         title: "Reward Resets You Into The Loop",
         targetId: "timeline-phase-reward",
         placement: "bottom",
+        cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
           summary: "Reward gives you treasure and card progression after battle.",
@@ -133,6 +140,7 @@ function buildWelcomeGuide(): GuideDefinition {
         title: "3-2 Starts The Repeating Loop",
         targetId: "timeline-next-stage-round",
         placement: "bottom",
+        cardPlacement: "bottom-center",
         primaryActionLabel: "I understand",
         content: {
           summary: "When the right side shows 3-2, that means the next round begins with draft.",
@@ -153,7 +161,10 @@ function buildBuildGuide(): GuideDefinition {
         id: "hand",
         title: "This Is Your Starting Hand",
         targetId: "build-hand",
+        positionTargetId: (ctx) => (ctx.isMobile ? "build-battlefield" : "build-hand"),
         placement: "bottom",
+        cardPlacement: "bottom-right",
+        mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
           summary: "Your hand here becomes the hand you start battle with.",
@@ -164,7 +175,10 @@ function buildBuildGuide(): GuideDefinition {
         id: "battlefield",
         title: "This Battlefield Row Is Your Opening Setup",
         targetId: "build-battlefield",
+        positionTargetId: (ctx) => (ctx.isMobile ? "build-hand" : "build-battlefield"),
         placement: "bottom",
+        cardPlacement: "top-right",
+        mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
           summary: "Your basics, treasure, and poison tracker live here.",
@@ -175,7 +189,10 @@ function buildBuildGuide(): GuideDefinition {
         id: "sideboard",
         title: "Everything Else Waits In Sideboard",
         targetId: "build-sideboard",
+        positionTargetId: (ctx) => (ctx.isMobile ? "build-battlefield" : "build-sideboard"),
         placement: "right",
+        cardPlacement: "top-right",
+        mobileCardPlacement: "top-center",
         primaryActionLabel: "Ready to build",
         content: {
           summary: "Your sideboard is the rest of your pool for this round.",
@@ -196,7 +213,9 @@ function buildPlayDrawGuide(): GuideDefinition {
         id: "play-draw",
         title: "Submit Includes Play Or Draw",
         targetId: "build-submit-popover",
+        positionTargetId: "build-battlefield",
         placement: "top",
+        cardPlacement: "top-center",
         primaryActionLabel: "Got it",
         content: {
           summary: "This choice is part of locking in your build for the battle.",
@@ -213,7 +232,10 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       id: "hand",
       title: "Hand To Battlefield Is The Main Flow",
       targetId: "battle-hand" as const,
+      positionTargetId: (ctx) => (ctx.isMobile ? "battle-battlefield" : "battle-hand"),
       placement: "top" as const,
+      cardPlacement: "top-right",
+      mobileCardPlacement: "top-center",
       primaryActionLabel: "Next",
       content: {
         summary: "Drag cards from your hand onto the battlefield as you play them.",
@@ -224,7 +246,10 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       id: "battlefield",
       title: "Use The Battlefield To Track Play",
       targetId: "battle-battlefield" as const,
+      positionTargetId: (ctx) => (ctx.isMobile ? "battle-hand" : "battle-battlefield"),
       placement: "right" as const,
+      cardPlacement: "bottom-right",
+      mobileCardPlacement: "bottom-center",
       primaryActionLabel: ctx.currentBattle?.can_manipulate_opponent ? "Next" : "Got it",
       content: {
         summary: "Double tap or double click your permanents to tap and untap them.",
@@ -238,7 +263,10 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       id: "puppet-hand",
       title: "Puppet Battles Use Their Hand Too",
       targetId: "battle-opponent-hand",
+      positionTargetId: "battle-battlefield",
       placement: "top",
+      cardPlacement: "bottom-right",
+      mobileCardPlacement: "bottom-center",
       primaryActionLabel: "Got it",
       content: {
         summary: "Against a puppet, you can drag and drop their cards too.",
@@ -256,37 +284,33 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
 }
 
 function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
+  const upgradeGallery = (ctx.selfPlayer?.upgrades ?? []).map((upgrade) => ({
+    imageUrl: upgrade.png_url ?? upgrade.image_url,
+    alt: upgrade.name,
+  }));
+
   const steps: GuideStepDefinition[] = [
     {
       id: "rewards",
       title: "Reward Always Gives Treasure Plus Card Progress",
       targetId: "reward-summary" as const,
+      positionTargetId: "reward-summary",
       placement: "right" as const,
-      primaryActionLabel: ctx.hasRewardUpgradeChoice ? "Next" : "Got it",
+      cardPlacement: "bottom-center",
+      primaryActionLabel: "Got it",
       content: {
         summary: "After battle you always get a treasure and a random card.",
-        detail: "At the last round of a stage, when the right side of the timeline shows 4-1, 5-1, and so on, that random card is replaced by a Vanquisher.",
+        detail: ctx.useUpgrades
+          ? `At the last round of a stage, when the right side of the timeline shows 4-1, 5-1, and so on, that random card is replaced by a Vanquisher. Upgrades are permanent boosts, you get a new upgrade choice whenever you finish a stage, and your existing upgrades are shown here for review.${ctx.hasRewardUpgradeChoice ? " Your new upgrade choices are shown below right now." : ""}`
+          : "At the last round of a stage, when the right side of the timeline shows 4-1, 5-1, and so on, that random card is replaced by a Vanquisher.",
         media: {
           imageUrl: THE_VANQUISHER_IMAGE,
           alt: "The Vanquisher",
         },
+        gallery: upgradeGallery,
       },
     },
   ];
-
-  if (ctx.hasRewardUpgradeChoice) {
-    steps.push({
-      id: "upgrades",
-      title: "This Is Also When You Pick An Upgrade",
-      targetId: "reward-upgrades",
-      placement: "top",
-      primaryActionLabel: "Got it",
-      content: {
-        summary: "If upgrades are enabled, the available upgrade choices appear here when you finish a stage.",
-        detail: "Pick one now before you continue into the next loop.",
-      },
-    });
-  }
 
   return {
     id: "reward",
@@ -306,7 +330,10 @@ function buildDraftGuide(): GuideDefinition {
         id: "pack",
         title: "This Is The Current Pack",
         targetId: "draft-pack",
+        positionTargetId: (ctx) => (ctx.isMobile ? "draft-pool" : "draft-pack"),
         placement: "right",
+        cardPlacement: "bottom-center",
+        mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
           summary: "The pack is the temporary set of cards you can draft from right now.",
@@ -317,7 +344,10 @@ function buildDraftGuide(): GuideDefinition {
         id: "pool",
         title: "This Is Your Pool",
         targetId: "draft-pool",
+        positionTargetId: (ctx) => (ctx.isMobile ? "draft-pack" : "draft-pool"),
         placement: "right",
+        cardPlacement: "top-center",
+        mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
           summary: "Your pool is the collection you are improving between battles.",
@@ -328,7 +358,9 @@ function buildDraftGuide(): GuideDefinition {
         id: "roll",
         title: "Roll Spends Treasure For A Fresh Pack",
         targetId: "draft-roll",
+        positionTargetId: (ctx) => (ctx.isMobile ? "draft-pool" : "draft-roll"),
         placement: "top",
+        cardPlacement: "top-center",
         primaryActionLabel: "Ready to draft",
         content: {
           summary: "Use roll if you want to spend treasure on a different pack instead of drafting this one.",
@@ -353,7 +385,10 @@ function buildTreasureProducerHint(ctx: GuidedWalkthroughContext): GuideDefiniti
         title: "Treasure Production Is Worth Extra Attention",
         targetSelector: cardSelector(source?.cardId),
         targetId: isBuild ? "build-sideboard" : "draft-pack",
+        positionTargetId: isBuild ? "build-battlefield" : "draft-pool",
         placement: isBuild ? "right" : "top",
+        cardPlacement: isBuild ? "top-right" : "bottom-center",
+        mobileCardPlacement: isBuild ? "top-center" : "bottom-center",
         primaryActionLabel: "Got it",
         content: {
           summary: "This card can make treasure, which often creates a real tempo spike later.",
@@ -376,11 +411,38 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
         id: "treasure-cap",
         title: "You Are At 6 Treasure",
         targetId: ctx.isMobile ? "draft-mobile-treasure" : "sidebar-current-player-treasure",
+        positionTargetId: "draft-pool",
         placement: ctx.isMobile ? "right" : "left",
+        cardPlacement: "bottom-center",
+        mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Got it",
         content: {
           summary: "After battle you only keep 5 treasure.",
           detail: "If you can, spend one now on a roll or plan to convert the extra treasure in the next fight.",
+        },
+      },
+    ],
+  };
+}
+
+function buildUnappliedUpgradeHint(): GuideDefinition {
+  return {
+    id: "hint_build_unapplied_upgrade",
+    label: "Build Tip",
+    phase: "build",
+    steps: [
+      {
+        id: "unapplied-upgrade",
+        title: "You Have An Upgrade Ready To Apply",
+        targetId: "build-workspace",
+        positionTargetId: "build-battlefield",
+        placement: "right",
+        cardPlacement: "top-right",
+        mobileCardPlacement: "top-center",
+        primaryActionLabel: "Got it",
+        content: {
+          summary: "Upgrades are permanent bonuses, and one of yours does not have a target yet.",
+          detail: "During build, select a card in your hand or sideboard and use its Upgrade button if you want to apply it now. You can also save it for later.",
         },
       },
     ],
@@ -400,6 +462,9 @@ export function isConditionalGuideEligible(
   switch (guideId) {
     case "hint_treasure_producer":
       return !!findTreasureProducer(ctx);
+    case "hint_build_unapplied_upgrade":
+      return ctx.currentPhase === "build"
+        && !!ctx.selfPlayer?.upgrades.some((upgrade) => !upgrade.upgrade_target);
     case "hint_treasure_cap":
       return ctx.currentPhase === "draft" && (ctx.selfPlayer?.treasures ?? 0) >= 6;
   }
@@ -432,6 +497,8 @@ export function buildGuideDefinition(
       return buildDraftGuide();
     case "hint_treasure_producer":
       return buildTreasureProducerHint(ctx);
+    case "hint_build_unapplied_upgrade":
+      return buildUnappliedUpgradeHint();
     case "hint_treasure_cap":
       return buildTreasureCapHint(ctx);
   }

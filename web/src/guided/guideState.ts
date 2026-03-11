@@ -6,6 +6,7 @@ export interface GuideState {
   guideRequest: GuideRequest | null;
   finishGuide: (guideId: GuidedGuideId) => void;
   skipTutorial: () => void;
+  updateGuideStep: (guideId: GuidedGuideId, stepIndex: number) => void;
 }
 
 export const GuideStateContext = createContext<GuideState | null>(null);
