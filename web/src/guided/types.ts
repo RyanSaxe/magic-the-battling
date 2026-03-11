@@ -33,13 +33,19 @@ export type GuideTargetId =
   | "battle-battlefield"
   | "battle-opponent-hand"
   | "reward-summary"
+  | "reward-progression"
   | "reward-current-upgrades"
   | "reward-upgrades"
   | "draft-pack"
   | "draft-pool"
   | "draft-roll"
   | "draft-mobile-treasure"
-  | "sidebar-current-player-treasure";
+  | "sidebar-current-player-treasure"
+  | "sidebar-toggle"
+  | "sidebar-player-tabs"
+  | "sidebar-tab-opponents"
+  | "sidebar-opponent-list"
+  | "sidebar-revealed-details";
 
 export type GuidePlacement = "top" | "right" | "bottom" | "left" | "center";
 export type GuideCardPlacement =
@@ -62,6 +68,7 @@ export interface GuideStepContent {
   summary: string;
   detail?: string;
   media?: GuideMedia;
+  gallery?: GuideMedia[];
 }
 
 export interface GuidedWalkthroughContext {
@@ -75,6 +82,16 @@ export interface GuidedWalkthroughContext {
   useUpgrades: boolean;
   hasRewardUpgradeChoice: boolean;
   showBuildSubmitPopover: boolean;
+  availableRewardUpgrades: GameCard[];
+  draftGuideOpponentName: string | null;
+  draftGuideOpponentTab: SidebarGuideTab;
+  draftGuideOpponentRevealedCount: number;
+}
+
+export interface GuideStepSidebarState {
+  openOnMobile?: boolean | ((ctx: GuidedWalkthroughContext) => boolean | undefined);
+  tab?: SidebarGuideTab | ((ctx: GuidedWalkthroughContext) => SidebarGuideTab | undefined);
+  playerName?: string | null | ((ctx: GuidedWalkthroughContext) => string | null | undefined);
 }
 
 export interface GuideStepDefinition {
@@ -91,6 +108,7 @@ export interface GuideStepDefinition {
   spotlightPadding?: number;
   primaryActionLabel?: string;
   allowTargetInteraction?: boolean;
+  sidebarState?: GuideStepSidebarState;
 }
 
 export interface GuideDefinition {

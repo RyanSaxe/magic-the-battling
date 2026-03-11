@@ -1,3 +1,4 @@
+import { THE_VANQUISHER_IMAGE } from "../constants/assets";
 import type {
   ConditionalGuideId,
   GuideDefinition,
@@ -21,6 +22,13 @@ function escapeSelectorValue(value: string): string {
 function cardSelector(cardId?: string | null): string | undefined {
   if (!cardId) return undefined;
   return `[data-guide-card-id="${escapeSelectorValue(cardId)}"]`;
+}
+
+function draftGuideOpponentSelector(
+  ctx: GuidedWalkthroughContext,
+): string | undefined {
+  if (!ctx.draftGuideOpponentName) return undefined;
+  return `[data-guide-player-row="${escapeSelectorValue(ctx.draftGuideOpponentName)}"]`;
 }
 
 function currentPack(ctx: GuidedWalkthroughContext) {
@@ -70,8 +78,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "center",
         primaryActionLabel: "Show me the loop",
         content: {
-          summary: "You improve your pool between battles, then play short manual games until only one player remains.",
-          detail: "This guide just points out the important parts. It does not make you click through fake actions.",
+          summary: "Magic: The Battling loops through draft, build, battle, and reward until only one player remains.",
+          detail: "Battles are played manually, and if you need the full rules or controls later you can open the Guide/? button in the top-right corner.",
         },
       },
       {
@@ -82,8 +90,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "The left side of the timeline shows your current stage and round. Right now you are at 3-1.",
-          detail: "The very first draft is skipped, so 3-1 starts directly in build. That should be easy to spot here because build is the live phase.",
+          summary: "The left side of the timeline shows your current stage and round. The game begins at stage 3, round 1, so your starting hand size is 3.",
+          detail: "The opening draft is skipped on purpose, which is why 3-1 starts directly in build and build is the live phase here.",
         },
       },
       {
@@ -94,8 +102,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Draft is where you trade cards between the current pack and your pool.",
-          detail: "You do not start there at 3-1, but after this first battle loop draft becomes the first step each round.",
+          summary: "During draft, you are dealt a pack of 5 cards and may swap cards between that pack and your pool.",
+          detail: "You can also spend 1 treasure to roll a new pack. After the opening build, draft becomes the first step of each round.",
         },
       },
       {
@@ -106,8 +114,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Build is where you choose your starting hand and battlefield setup for the next battle.",
-          detail: "That is why your first real tutorial after Welcome is the build intro.",
+          summary: "Build chooses the exact starting hand and the 3 untapped basics you will begin the next battle with.",
+          detail: "This is not abstract deckbuilding. Whatever you select here becomes the opening hand and battlefield you actually play.",
         },
       },
       {
@@ -118,8 +126,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Battle is not automated. You play the board state manually.",
-          detail: "You move cards, tap permanents, and submit the result when the game is over.",
+          summary: "Battle is a short manual game of Magic with 10 life and no libraries.",
+          detail: "Your build choices, your treasure, and your poison all matter here, and you submit the result when the game ends.",
         },
       },
       {
@@ -130,8 +138,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Reward gives you treasure and card progression after battle.",
-          detail: "That is the bridge back into the next draft-build-battle cycle.",
+          summary: "Reward adds treasure and the other progression you earn before the next round starts.",
+          detail: "This is where bonus cards, Vanquishers, hand-size growth, and upgrades are handled before the loop begins again.",
         },
       },
       {
@@ -142,8 +150,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "I understand",
         content: {
-          summary: "When the right side shows 3-2, that means the next round begins with draft.",
-          detail: "That is the full loop from here on: draft, build, battle, reward, then back around again.",
+          summary: "When the right side shows 3-2, the repeating loop begins with draft.",
+          detail: "From that point on, the cycle is draft, build, battle, reward. If you want the full reference while you play, open the Guide/? button in the top-right corner.",
         },
       },
     ],
@@ -157,22 +165,22 @@ function buildBuildGuide(): GuideDefinition {
     phase: "build",
     steps: [
       {
-        id: "hand",
-        title: "This Is Your Starting Hand",
-        targetId: "build-hand",
-        positionTargetId: (ctx) => (ctx.isMobile ? "build-battlefield" : "build-hand"),
-        placement: "bottom",
-        cardPlacement: "bottom-right",
-        mobileCardPlacement: "bottom-center",
+        id: "sideboard",
+        title: "Start With The Pool In Your Sideboard",
+        targetId: "build-sideboard",
+        positionTargetId: (ctx) => (ctx.isMobile ? "build-battlefield" : "build-sideboard"),
+        placement: "right",
+        cardPlacement: "top-right",
+        mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Your hand here becomes the hand you start battle with.",
-          detail: "Use build to decide exactly which cards you want available on turn one.",
+          summary: "Your sideboard is the pool of cards available for this round's build.",
+          detail: "Move cards between sideboard and hand to decide what you want to start with. If you use upgrades, this is also one of the places where you can apply them.",
         },
       },
       {
         id: "battlefield",
-        title: "This Battlefield Row Is Your Opening Setup",
+        title: "Choose Your Battlefield Setup",
         targetId: "build-battlefield",
         positionTargetId: (ctx) => (ctx.isMobile ? "build-hand" : "build-battlefield"),
         placement: "bottom",
@@ -180,22 +188,22 @@ function buildBuildGuide(): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Your basics, treasure, and poison tracker live here.",
-          detail: "Those basics are part of your battle setup, not just deck construction bookkeeping.",
+          summary: "In build, you choose the 3 basic lands that will start untapped on the battlefield in the next battle.",
+          detail: "Your treasure tokens and poison counters also carry into battle, so this row is part of your actual opening position.",
         },
       },
       {
-        id: "sideboard",
-        title: "Everything Else Waits In Sideboard",
-        targetId: "build-sideboard",
-        positionTargetId: (ctx) => (ctx.isMobile ? "build-battlefield" : "build-sideboard"),
-        placement: "right",
-        cardPlacement: "top-right",
-        mobileCardPlacement: "top-center",
+        id: "hand",
+        title: "Lock In Your Starting Hand",
+        targetId: "build-hand",
+        positionTargetId: (ctx) => (ctx.isMobile ? "build-battlefield" : "build-hand"),
+        placement: "bottom",
+        cardPlacement: "bottom-right",
+        mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Ready to build",
         content: {
-          summary: "Your sideboard is the rest of your pool for this round.",
-          detail: "Move cards between sideboard and hand until the setup looks right, then submit.",
+          summary: "Your hand must be filled to the current hand size, and this exact hand becomes your opening hand in battle.",
+          detail: "Once your hand and basics are correct, submit the build to choose play or draw.",
         },
       },
     ],
@@ -218,8 +226,8 @@ function buildPlayDrawGuide(): GuideDefinition {
         primaryActionLabel: "Got it",
         allowTargetInteraction: true,
         content: {
-          summary: "This choice is part of locking in your build for the battle.",
-          detail: "Choose whether you want to be on the play or on the draw, then your setup is submitted.",
+          summary: "Play or draw is submitted as part of your build.",
+          detail: "Outside the finals, the player with the most poison chooses play or draw here; if poison is tied, that choice is random. In the finals after game one, the loser of the previous game chooses instead.",
         },
       },
     ],
@@ -238,8 +246,8 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       mobileCardPlacement: "top-center",
       primaryActionLabel: "Next",
       content: {
-        summary: "Drag cards from your hand onto the battlefield as you play them.",
-        detail: "That is the core board interaction you will use most often in battle.",
+        summary: "Battle is manual. Drag cards from your hand to the battlefield when you cast or play them.",
+        detail: "The starting hand and battlefield were chosen in build, so use this zone to play out the game state exactly as it happens.",
       },
     },
     {
@@ -252,8 +260,8 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       mobileCardPlacement: "bottom-center",
       primaryActionLabel: ctx.currentBattle?.can_manipulate_opponent ? "Next" : "Got it",
       content: {
-        summary: "Double tap or double click your permanents to tap and untap them.",
-        detail: "Battle is manual, so this board is where you track the game state directly.",
+        summary: "Double click or double tap permanents to tap and untap them while you play.",
+        detail: "Battles start at 10 life with no libraries, and up to 5 treasure that remain on the battlefield will carry forward after the battle ends.",
       },
     },
   ];
@@ -269,8 +277,8 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       mobileCardPlacement: "bottom-center",
       primaryActionLabel: "Got it",
       content: {
-        summary: "Against a puppet, you can drag and drop their cards too.",
-        detail: "Play out what you think would happen from both sides, then submit who would have won.",
+        summary: "Against a puppet, their hand is visible and you can move their cards too.",
+        detail: "Use both hands and battlefields to play out the likely game, then submit the player who would have won.",
       },
     });
   }
@@ -283,20 +291,58 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   };
 }
 
-function buildRewardGuide(_ctx: GuidedWalkthroughContext): GuideDefinition {
+function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   const steps: GuideStepDefinition[] = [
     {
-      id: "reward-placeholder",
-      title: "Rewards",
-      placement: "center",
-      cardPlacement: "center",
-      primaryActionLabel: "Got it",
+      id: "reward-basics",
+      title: "Every Reward Adds Resources",
+      targetId: "reward-summary",
+      placement: "right",
+      cardPlacement: "bottom-center",
+      primaryActionLabel: "Next",
       content: {
-        summary: "This reward tutorial is temporarily simplified while the reward screen is being cleaned up.",
-        detail: "For now, just review your rewards and continue when you are ready.",
+        summary: "Every reward gives you +1 treasure.",
+        detail: "On the first and second round of a stage, reward also gives you +1 random card from the Battler.",
       },
     },
+    {
+      id: "reward-stage-end",
+      title: "Stage-End Rewards Work Differently",
+      targetId: "reward-progression",
+      placement: "top",
+      cardPlacement: "top-center",
+      primaryActionLabel: ctx.useUpgrades ? "Next" : "Got it",
+        content: {
+          summary: "On the last reward of a stage, the random card is replaced by The Vanquisher.",
+          detail: "That reward also advances the stage, increases your starting hand size by 1, and starts the next loop at the new stage.",
+          media: {
+            imageUrl: THE_VANQUISHER_IMAGE,
+            alt: "The Vanquisher",
+          },
+        },
+      },
   ];
+
+  if (ctx.useUpgrades) {
+    steps.push({
+      id: "reward-upgrades",
+      title: "Stage-End Rewards Can Also Offer Upgrades",
+      targetId: ctx.hasRewardUpgradeChoice ? "reward-upgrades" : "reward-summary",
+      placement: ctx.hasRewardUpgradeChoice ? "left" : "right",
+      cardPlacement: "top-center",
+      primaryActionLabel: "Got it",
+      content: {
+        summary: "If upgrades are enabled, stage-end rewards also require you to choose one upgrade before you continue.",
+        detail: ctx.hasRewardUpgradeChoice
+          ? "Upgrades are permanent hidden-agenda effects. Choose one here, then apply it later during build to a card in your pool."
+          : "When that reward is available, the offered upgrade cards appear here and you must choose one before moving on.",
+        gallery: ctx.availableRewardUpgrades.map((upgrade) => ({
+          imageUrl: upgrade.png_url ?? upgrade.image_url,
+          alt: upgrade.name,
+        })),
+      },
+    });
+  }
 
   return {
     id: "reward",
@@ -306,7 +352,7 @@ function buildRewardGuide(_ctx: GuidedWalkthroughContext): GuideDefinition {
   };
 }
 
-function buildDraftGuide(): GuideDefinition {
+function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   return {
     id: "draft",
     label: "Draft",
@@ -322,8 +368,8 @@ function buildDraftGuide(): GuideDefinition {
         mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "The pack is the temporary set of cards you can draft from right now.",
-          detail: "Click a card here, then click a card in your pool to swap them.",
+          summary: "Each draft starts with a pack of 5 cards.",
+          detail: "Draft improves your pool between battles by replacing weaker cards with stronger ones from this pack.",
         },
       },
       {
@@ -336,8 +382,49 @@ function buildDraftGuide(): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Your pool is the collection you are improving between battles.",
-          detail: "Each swap trades one pack card for one pool card.",
+          summary: "Your pool is the set of cards you can use in future builds.",
+          detail: "To make a pick, click a card in the pack and a card in your pool to swap them.",
+        },
+      },
+      {
+        id: "opponent-row",
+        title: "Scout A Likely Opponent",
+        targetSelector: draftGuideOpponentSelector,
+        targetId: "sidebar-opponent-list",
+        placement: "left",
+        cardPlacement: "middle-left",
+        mobileCardPlacement: "bottom-center",
+        primaryActionLabel: "Next",
+        sidebarState: {
+          openOnMobile: true,
+          tab: (ctx) => ctx.draftGuideOpponentTab,
+          playerName: (ctx) => ctx.draftGuideOpponentName,
+        },
+        content: {
+          summary: "This row shows pairing likelihood, current treasure, current poison, and where that opponent is in the loop.",
+          detail: "Monitoring this information can change the value of cards and help you set yourself up for positive matchups.",
+        },
+      },
+      {
+        id: "revealed-cards",
+        title: "Use Revealed Cards As Draft Signals",
+        targetId: "sidebar-revealed-details",
+        placement: "left",
+        cardPlacement: "middle-left",
+        mobileCardPlacement: "bottom-center",
+        primaryActionLabel: "Next",
+        sidebarState: {
+          openOnMobile: true,
+          tab: (ctx) => ctx.draftGuideOpponentTab,
+          playerName: (ctx) => ctx.draftGuideOpponentName,
+        },
+        content: {
+          summary: ctx.draftGuideOpponentRevealedCount > 0
+            ? "This panel shows the most recent cards that opponent has revealed in battle."
+            : "This panel is where revealed cards will appear after an opponent has shown cards in battle.",
+          detail: ctx.draftGuideOpponentRevealedCount > 0
+            ? "Use those cards to infer what they are building, then adjust your picks, rolls, and later build decisions."
+            : "When this area is populated, use it as scouting information. What opponents have shown can change the value of cards and help you set up positive matchups.",
         },
       },
       {
@@ -349,8 +436,8 @@ function buildDraftGuide(): GuideDefinition {
         cardPlacement: "top-center",
         primaryActionLabel: "Ready to draft",
         content: {
-          summary: "Use roll if you want to spend treasure on a different pack instead of drafting this one.",
-          detail: "Once you understand the pack, pool, and roll, close this and draft normally.",
+          summary: "Rolling spends 1 treasure to exile the current pack and replace it with a new pack of 5 cards.",
+          detail: "Treasures matter across phases, so rolling is a real resource decision, not a free redraw.",
         },
       },
     ],
@@ -377,10 +464,10 @@ function buildTreasureProducerHint(ctx: GuidedWalkthroughContext): GuideDefiniti
         mobileCardPlacement: isBuild ? "top-center" : "bottom-center",
         primaryActionLabel: "Got it",
         content: {
-          summary: "This card can make treasure, which often creates a real tempo spike later.",
+          summary: "Cards that make treasure have extra value because treasure can win battles now or be converted into future draft rolls.",
           detail: isBuild
-            ? "Because build chooses your exact opening setup, it is worth thinking about whether you want this effect immediately."
-            : "Treasures carry real value across phases, so treasure-producing cards are often stronger than they first look.",
+            ? "If you can start this effect early, it may change both the next battle and the next draft that follows it."
+            : "Even a modest treasure producer can be worth prioritizing because economy carries across phases.",
         },
       },
     ],
@@ -403,8 +490,8 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
         mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Got it",
         content: {
-          summary: "After battle you only keep 5 treasure.",
-          detail: "If you can, spend one now on a roll or plan to convert the extra treasure in the next fight.",
+          summary: "After battle, you keep at most 5 treasure that remain on your battlefield.",
+          detail: "At 6 treasure, some value is at risk of being wasted. Spending one now on a roll can be correct even if the current pack is acceptable.",
         },
       },
     ],
@@ -427,8 +514,8 @@ function buildUnappliedUpgradeHint(): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Got it",
         content: {
-          summary: "Upgrades are permanent bonuses, and one of yours does not have a target yet.",
-          detail: "During build, select a card in your hand or sideboard and use its Upgrade button if you want to apply it now. You can also save it for later.",
+          summary: "You have at least one upgrade that has not been applied to a card yet.",
+          detail: "Upgrades are permanent once named. During build, use the Upgrade action on a card in your hand or sideboard if you want that effect online for future rounds.",
         },
       },
     ],
@@ -480,7 +567,7 @@ export function buildGuideDefinition(
     case "reward":
       return buildRewardGuide(ctx);
     case "draft":
-      return buildDraftGuide();
+      return buildDraftGuide(ctx);
     case "hint_treasure_producer":
       return buildTreasureProducerHint(ctx);
     case "hint_build_unapplied_upgrade":

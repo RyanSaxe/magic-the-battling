@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
@@ -8,7 +8,7 @@ import {
   createSpectateRequest,
   getSpectateRequestStatus,
 } from "../api/client";
-import type { GameStatusResponse, ZoneName } from "../types";
+import type { GameStatusResponse, PlayerView, ZoneName } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
 import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
@@ -22,6 +22,7 @@ import { PhaseTimeline } from "../components/PhaseTimeline";
 import { GuidedWalkthrough } from "../guided/GuidedWalkthrough";
 import { GuideProvider } from "../guided/GuideContext";
 import { useGuideContext } from "../guided/guideState";
+import { buildGuideDefinition } from "../guided/content";
 import { getOrdinal } from "../utils/format";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { ContextStripProvider, useContextStrip, useToast } from "../contexts";
@@ -36,7 +37,10 @@ import { ZoneDivider } from "../components/common/ZoneDivider";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import type { Phase } from "../constants/phases";
-import type { GuidedWalkthroughContext } from "../guided/types";
+import type {
+  GuidedWalkthroughContext,
+  SidebarGuideTab,
+} from "../guided/types";
 import {
   getRememberedPlayerForGame,
   pickAutoReconnectPlayer,
@@ -103,6 +107,53 @@ function drainingMessageWithEasternTime(message: string, easternTime: string | n
 
 function isTimelinePhase(phase: string | undefined): phase is Phase {
   return phase === "draft" || phase === "build" || phase === "battle" || phase === "reward";
+}
+
+function sortPlayersForSidebar(a: PlayerView, b: PlayerView): number {
+  if (a.placement === 0 && b.placement === 0) {
+    const poisonDiff = a.poison - b.poison;
+    if (poisonDiff !== 0) return poisonDiff;
+    return a.name.localeCompare(b.name);
+  }
+  if (a.placement === 0) return -1;
+  if (b.placement === 0) return 1;
+  if (a.placement !== b.placement) return a.placement - b.placement;
+  return a.name.localeCompare(b.name);
+}
+
+function selectDraftGuideOpponent(
+  players: PlayerView[],
+  currentPlayerName: string,
+): {
+  name: string | null;
+  tab: SidebarGuideTab;
+  revealedCount: number;
+} {
+  const nonSelfPlayers = players.filter((player) => player.name !== currentPlayerName);
+  const showOthersTab = players.length > 4;
+  const opponents = showOthersTab
+    ? nonSelfPlayers.filter(
+        (player) => player.pairing_probability !== null && player.pairing_probability > 0,
+      )
+    : nonSelfPlayers;
+  const fallbackPool = opponents.length > 0 ? opponents : nonSelfPlayers;
+  const tab: SidebarGuideTab =
+    opponents.length > 0 ? "opponents" : showOthersTab ? "others" : "opponents";
+
+  const bestOpponent = [...fallbackPool].sort((a, b) => {
+    const revealedDiff =
+      b.most_recently_revealed_cards.length - a.most_recently_revealed_cards.length;
+    if (revealedDiff !== 0) return revealedDiff;
+    const pairingDiff = (b.pairing_probability ?? -1) - (a.pairing_probability ?? -1);
+    if (pairingDiff !== 0) return pairingDiff;
+    return sortPlayersForSidebar(a, b);
+  })[0] ?? null;
+
+  return {
+    name: bestOpponent?.name ?? null,
+    tab,
+    revealedCount: bestOpponent?.most_recently_revealed_cards.length ?? 0,
+  };
 }
 
 function PlayerSelectionModal({
@@ -442,11 +493,127 @@ function SpectateRequestModal({
 function GameGuideLayer({
   rootRef,
   context,
+  sidebarOpen,
+  setSidebarOpen,
 }: {
   rootRef: React.RefObject<HTMLElement | null>;
   context: GuidedWalkthroughContext;
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
 }) {
+  const { state, setRevealedPlayerName, setRevealedPlayerTab } = useContextStrip();
   const { guideRequest, finishGuide, skipTutorial, updateGuideStep } = useGuideContext();
+  const [activeStepState, setActiveStepState] = useState<{
+    nonce: number | null;
+    stepIndex: number;
+  }>({
+    nonce: guideRequest?.nonce ?? null,
+    stepIndex: guideRequest?.stepIndex ?? 0,
+  });
+  const sidebarRestoreRef = useRef<{
+    sidebarOpen: boolean;
+    revealedPlayerName: string | null;
+    revealedPlayerTab: SidebarGuideTab;
+  } | null>(null);
+  const activeStepIndex =
+    guideRequest && activeStepState.nonce === guideRequest.nonce
+      ? activeStepState.stepIndex
+      : (guideRequest?.stepIndex ?? 0);
+
+  const guide = useMemo(
+    () => (guideRequest ? buildGuideDefinition(guideRequest.guideId, context) : null),
+    [context, guideRequest],
+  );
+  const activeStep = guide?.steps[activeStepIndex] ?? null;
+
+  const restoreSidebarState = useCallback(() => {
+    const snapshot = sidebarRestoreRef.current;
+    if (!snapshot) {
+      return;
+    }
+
+    sidebarRestoreRef.current = null;
+    if (context.isMobile && sidebarOpen !== snapshot.sidebarOpen) {
+      setSidebarOpen(snapshot.sidebarOpen);
+    }
+    if (state.revealedPlayerTab !== snapshot.revealedPlayerTab) {
+      setRevealedPlayerTab(snapshot.revealedPlayerTab);
+    }
+    if (state.revealedPlayerName !== snapshot.revealedPlayerName) {
+      setRevealedPlayerName(snapshot.revealedPlayerName);
+    }
+  }, [
+    context.isMobile,
+    setRevealedPlayerName,
+    setRevealedPlayerTab,
+    setSidebarOpen,
+    sidebarOpen,
+    state.revealedPlayerName,
+    state.revealedPlayerTab,
+  ]);
+
+  const resolvedSidebarState = useMemo(() => {
+    const sidebarState = activeStep?.sidebarState;
+    if (!sidebarState) {
+      return null;
+    }
+
+    const resolveValue = <T,>(
+      value: T | ((ctx: GuidedWalkthroughContext) => T | undefined) | undefined,
+    ): T | undefined => (
+      typeof value === "function"
+        ? (value as (ctx: GuidedWalkthroughContext) => T | undefined)(context)
+        : value
+    );
+
+    return {
+      openOnMobile: resolveValue(sidebarState.openOnMobile),
+      tab: resolveValue(sidebarState.tab),
+      playerName: resolveValue(sidebarState.playerName),
+    };
+  }, [activeStep?.sidebarState, context]);
+
+  useEffect(() => {
+    if (!guideRequest || !resolvedSidebarState) {
+      restoreSidebarState();
+      return;
+    }
+
+    if (!sidebarRestoreRef.current) {
+      sidebarRestoreRef.current = {
+        sidebarOpen,
+        revealedPlayerName: state.revealedPlayerName,
+        revealedPlayerTab: state.revealedPlayerTab,
+      };
+    }
+
+    if (context.isMobile && resolvedSidebarState.openOnMobile && !sidebarOpen) {
+      setSidebarOpen(true);
+    }
+    if (resolvedSidebarState.tab && state.revealedPlayerTab !== resolvedSidebarState.tab) {
+      setRevealedPlayerTab(resolvedSidebarState.tab);
+    }
+    if (
+      resolvedSidebarState.playerName !== undefined
+      && state.revealedPlayerName !== resolvedSidebarState.playerName
+    ) {
+      setRevealedPlayerName(resolvedSidebarState.playerName);
+    }
+  }, [
+    context.isMobile,
+    guideRequest,
+    resolvedSidebarState,
+    restoreSidebarState,
+    setRevealedPlayerName,
+    setRevealedPlayerTab,
+    setSidebarOpen,
+    sidebarOpen,
+    state.revealedPlayerName,
+    state.revealedPlayerTab,
+  ]);
+
+  useEffect(() => restoreSidebarState, [restoreSidebarState]);
+
   if (!guideRequest) return null;
   return (
     <GuidedWalkthrough
@@ -456,7 +623,13 @@ function GameGuideLayer({
       context={context}
       onClose={finishGuide}
       onSkipAll={skipTutorial}
-      onStepChange={updateGuideStep}
+      onStepChange={(guideId, stepIndex) => {
+        setActiveStepState({
+          nonce: guideRequest.nonce,
+          stepIndex,
+        });
+        updateGuideStep(guideId, stepIndex);
+      }}
     />
   );
 }
@@ -985,6 +1158,10 @@ function GameContent() {
   const needsUpgrade =
     isStageIncreasing && gameState.available_upgrades.length > 0;
   const canContinue = !needsUpgrade || !!selectedUpgradeId;
+  const draftGuideOpponent = selectDraftGuideOpponent(
+    gameState.players,
+    self_player.name,
+  );
   const hasPendingBuildUpgrades =
     currentPhase === "build" && self_player.upgrades.some((u) => !u.upgrade_target);
   const upgradesModalMode: "view" | "apply" =
@@ -1005,6 +1182,10 @@ function GameContent() {
     useUpgrades: gameState.use_upgrades,
     hasRewardUpgradeChoice: needsUpgrade,
     showBuildSubmitPopover: showSubmitHandPopover,
+    availableRewardUpgrades: gameState.available_upgrades,
+    draftGuideOpponentName: draftGuideOpponent.name,
+    draftGuideOpponentTab: draftGuideOpponent.tab,
+    draftGuideOpponentRevealedCount: draftGuideOpponent.revealedCount,
   };
 
   const handleContinue = () => {
@@ -1796,7 +1977,12 @@ function GameContent() {
           </div>
         )}
         {!isSpectator && (
-          <GameGuideLayer rootRef={guideRootRef} context={guideContext} />
+          <GameGuideLayer
+            rootRef={guideRootRef}
+            context={guideContext}
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+          />
         )}
         </GuideProvider>
         </div>
