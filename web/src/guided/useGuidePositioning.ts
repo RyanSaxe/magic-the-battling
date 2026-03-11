@@ -4,6 +4,7 @@ import type { GuidePlacement, GuideTargetId } from "./types";
 const CARD_MARGIN = 12;
 const SPOTLIGHT_PADDING = 12;
 const MOBILE_BREAKPOINT = 640;
+const SCROLL_MARGIN = 12;
 
 export interface SpotlightRect {
   x: number;
@@ -67,6 +68,89 @@ function buildClipPath(spotlight: SpotlightRect | null, cw: number, ch: number):
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+interface RectLike {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+export function computeScrollDeltaForVisibility(
+  containerRect: RectLike,
+  targetRect: RectLike,
+  margin: number = SCROLL_MARGIN,
+): { top: number; left: number } | null {
+  let top = 0;
+  let left = 0;
+
+  if (targetRect.top < containerRect.top + margin) {
+    top = targetRect.top - containerRect.top - margin;
+  } else if (targetRect.bottom > containerRect.bottom - margin) {
+    top = targetRect.bottom - containerRect.bottom + margin;
+  }
+
+  if (targetRect.left < containerRect.left + margin) {
+    left = targetRect.left - containerRect.left - margin;
+  } else if (targetRect.right > containerRect.right - margin) {
+    left = targetRect.right - containerRect.right + margin;
+  }
+
+  return top !== 0 || left !== 0 ? { top, left } : null;
+}
+
+function isScrollableElement(element: HTMLElement): boolean {
+  const style = window.getComputedStyle(element);
+  const overflowY = style.overflowY;
+  const overflowX = style.overflowX;
+  const allowsScroll = (value: string) =>
+    value === "auto" || value === "scroll" || value === "overlay";
+
+  return (
+    (allowsScroll(overflowY) && element.scrollHeight > element.clientHeight + 1)
+    || (allowsScroll(overflowX) && element.scrollWidth > element.clientWidth + 1)
+  );
+}
+
+function findNearestScrollableAncestor(
+  target: HTMLElement,
+  root: HTMLElement,
+): HTMLElement | null {
+  let current = target.parentElement;
+
+  while (current) {
+    if (isScrollableElement(current)) {
+      return current;
+    }
+    if (current === root) {
+      break;
+    }
+    current = current.parentElement;
+  }
+
+  return isScrollableElement(root) ? root : null;
+}
+
+function scrollTargetIntoVisibleArea(target: HTMLElement, root: HTMLElement): void {
+  const scrollContainer = findNearestScrollableAncestor(target, root);
+  if (!scrollContainer) {
+    return;
+  }
+
+  const delta = computeScrollDeltaForVisibility(
+    scrollContainer.getBoundingClientRect(),
+    target.getBoundingClientRect(),
+  );
+  if (!delta) {
+    return;
+  }
+
+  scrollContainer.scrollBy({
+    top: delta.top,
+    left: delta.left,
+    behavior: "smooth",
+  });
 }
 
 function placementOrder(preferred: GuidePlacement): GuidePlacement[] {
@@ -366,7 +450,7 @@ export function useGuidePositioning(
 
     const target = resolveTarget(root, targetId, targetSelector);
     if (target) {
-      target.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+      scrollTargetIntoVisibleArea(target, root);
     }
 
     update();
