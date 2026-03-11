@@ -5,10 +5,10 @@ import type { ShareGameResponse, SharePlayerSnapshot, PlayerView, Card as CardTy
 import { GameSummary } from '../components/GameSummary'
 import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
 import { buildGameSummaryData } from '../utils/share'
-import { getOrdinal, getPlacementBadgeColor } from '../utils/format'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
 import type { ZoneConstraints } from '../hooks/computeConstrainedLayout'
 import { CardPreviewContext, CardPreviewModal } from '../components/card'
+import { PlayerRow } from '../components/PlayerList'
 
 interface RoundOption {
   label: string
@@ -296,44 +296,20 @@ export function ShareGame() {
 
   const renderSidebarContent = () => (
     <div className="flex flex-col gap-1 p-3">
-      {sortedPlayerViews.map((pv) => {
-        const isSelected = pv.name === selectedPlayer
-        const colors = pv.placement !== 0
-          ? getPlacementBadgeColor(pv.placement, playerViews.length)
-          : null
-        return (
-          <button
-            key={pv.name}
-            onClick={() => {
-              setSelectedPlayer(pv.name)
-              if (sizes.isMobile) setSidebarOpen(false)
-            }}
-            className={`flex items-center gap-2 px-3 py-2 rounded text-left text-sm transition-colors ${
-              isSelected
-                ? 'bg-amber-600/20 ring-1 ring-amber-500/50 text-white'
-                : 'text-gray-300 hover:bg-gray-700/40'
-            }`}
-          >
-            {pv.placement !== 0 && colors && (
-              <span
-                className="text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none shrink-0"
-                style={{ backgroundColor: colors.bg, color: colors.text }}
-              >
-                {getOrdinal(pv.placement)}
-              </span>
-            )}
-            <span className="truncate flex-1">
-              {pv.name}
-              {pv.name === data.owner_name && (
-                <span className="text-gray-500 ml-1">(You)</span>
-              )}
-            </span>
-            {pv.is_puppet && (
-              <span className="text-[10px] text-gray-500 shrink-0">PUPPET</span>
-            )}
-          </button>
-        )
-      })}
+      {sortedPlayerViews.map((pv) => (
+        <PlayerRow
+          key={pv.name}
+          player={pv}
+          players={playerViews}
+          currentPlayerName={data.owner_name}
+          isSelected={pv.name === selectedPlayer}
+          variant="share"
+          onClick={() => {
+            setSelectedPlayer(pv.name)
+            if (sizes.isMobile) setSidebarOpen(false)
+          }}
+        />
+      ))}
     </div>
   )
 

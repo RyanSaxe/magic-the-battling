@@ -53,7 +53,7 @@ function LifeCounter({
     <div className="flex items-center gap-1">
       <button
         onClick={() => onChange(life - 1)}
-        className="w-6 h-6 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
+        className="w-6 h-6 rounded text-white text-sm font-bold" style={{ background: 'var(--chrome)' }}
       >
         -
       </button>
@@ -64,7 +64,7 @@ function LifeCounter({
           onChange={(e) => setInputValue(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="w-10 h-6 text-center bg-gray-800 text-white text-sm rounded border border-gray-600 focus:outline-none focus:border-amber-500"
+          className="w-10 h-6 text-center text-white text-sm rounded border border-[var(--gold-border)] focus:outline-none focus:border-amber-500" style={{ background: 'var(--chrome)' }}
           autoFocus
         />
       ) : (
@@ -73,14 +73,14 @@ function LifeCounter({
             setInputValue(life.toString());
             setIsEditing(true);
           }}
-          className="w-10 h-6 text-center bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
+          className="w-10 h-6 text-center text-white text-sm rounded" style={{ background: 'var(--chrome)' }}
         >
           {life}
         </button>
       )}
       <button
         onClick={() => onChange(life + 1)}
-        className="w-6 h-6 rounded bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
+        className="w-6 h-6 rounded text-white text-sm font-bold" style={{ background: 'var(--chrome)' }}
       >
         +
       </button>
@@ -177,7 +177,7 @@ export function BattleSidebarContent({
   return (
     <div className="flex flex-col h-full">
       {/* Opponent section - top */}
-      <div className="flex-1 pb-3 pl-3 pr-3 border-b border-gray-700">
+      <div className="flex-1 pb-3 pl-3 pr-3 border-b border-[var(--gold-border-opaque)]">
         <PlayerSection
           upgrades={opponent_zones.upgrades}
           isReversed
@@ -186,7 +186,7 @@ export function BattleSidebarContent({
 
       {/* Controls panel */}
       <div className="flex items-center justify-center">
-        <div className="p-3 bg-black/40 w-full space-y-2">
+        <div className="p-3 w-full space-y-2" style={{ background: 'var(--chrome-modal)' }}>
           {canManipulateOpponent && (onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn) && (
             <div className="flex gap-2">
               {onCreateOpponentTreasure && (
@@ -289,7 +289,7 @@ export function BattleSidebarContent({
       </div>
 
       {/* Your section - bottom */}
-      <div className="flex-1 p-3 border-t border-gray-700">
+      <div className="flex-1 p-3 border-t border-[var(--gold-border-opaque)]">
         <PlayerSection
           upgrades={selfUpgrades}
         />

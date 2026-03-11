@@ -1,8 +1,6 @@
 import type { BattleView, Card as GameCard, SelfPlayerView } from "../types";
 import type { Phase } from "../constants/phases";
 
-export type SidebarGuideTab = "you" | "opponents" | "others";
-
 export type ConditionalGuideId =
   | "hint_treasure_producer"
   | "hint_treasure_cap"
@@ -51,10 +49,7 @@ export type GuideTargetId =
   | "draft-pool"
   | "draft-roll"
   | "draft-mobile-treasure"
-  | "sidebar-current-player-treasure"
   | "sidebar-toggle"
-  | "sidebar-player-tabs"
-  | "sidebar-tab-opponents"
   | "sidebar-opponent-list"
   | "sidebar-revealed-details"
   | "phase-action-bar";
@@ -90,22 +85,20 @@ export interface GuidedWalkthroughContext {
   isMobile: boolean;
   sidebarOpen: boolean;
   revealedPlayerName: string | null;
-  revealedPlayerTab: SidebarGuideTab;
   useUpgrades: boolean;
   hasRewardUpgradeChoice: boolean;
   showBuildSubmitPopover: boolean;
   showBattleSubmitPopover: boolean;
   availableRewardUpgrades: GameCard[];
   draftGuideOpponentName: string | null;
-  draftGuideOpponentTab: SidebarGuideTab;
   draftGuideOpponentRevealedCount: number;
   isStageEnd: boolean;
 }
 
 export interface GuideStepSidebarState {
   openOnMobile?: boolean | ((ctx: GuidedWalkthroughContext) => boolean | undefined);
-  tab?: SidebarGuideTab | ((ctx: GuidedWalkthroughContext) => SidebarGuideTab | undefined);
   playerName?: string | null | ((ctx: GuidedWalkthroughContext) => string | null | undefined);
+  openPanel?: boolean | ((ctx: GuidedWalkthroughContext) => boolean | undefined);
 }
 
 export interface GuideStepDefinition {

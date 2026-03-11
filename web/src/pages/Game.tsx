@@ -39,7 +39,6 @@ import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import type { Phase } from "../constants/phases";
 import type {
   GuidedWalkthroughContext,
-  SidebarGuideTab,
 } from "../guided/types";
 import {
   getRememberedPlayerForGame,
@@ -124,36 +123,26 @@ function sortPlayersForSidebar(a: PlayerView, b: PlayerView): number {
 function selectDraftGuideOpponent(
   players: PlayerView[],
   currentPlayerName: string,
-): {
-  name: string | null;
-  tab: SidebarGuideTab;
-  revealedCount: number;
-} {
-  const nonSelfPlayers = players.filter((player) => player.name !== currentPlayerName);
-  const showOthersTab = players.length > 4;
-  const opponents = showOthersTab
-    ? nonSelfPlayers.filter(
-        (player) => player.pairing_probability !== null && player.pairing_probability > 0,
-      )
-    : nonSelfPlayers;
-  const fallbackPool = opponents.length > 0 ? opponents : nonSelfPlayers;
-  const tab: SidebarGuideTab =
-    opponents.length > 0 ? "opponents" : showOthersTab ? "others" : "opponents";
+): { name: string | null; revealedCount: number } {
+  const opponents = players.filter(
+    (p) =>
+      p.name !== currentPlayerName &&
+      p.pairing_probability !== null &&
+      p.pairing_probability > 0,
+  );
 
-  const bestOpponent = [...fallbackPool].sort((a, b) => {
+  if (opponents.length === 0) return { name: null, revealedCount: 0 };
+
+  const best = [...opponents].sort((a, b) => {
     const revealedDiff =
       b.most_recently_revealed_cards.length - a.most_recently_revealed_cards.length;
     if (revealedDiff !== 0) return revealedDiff;
     const pairingDiff = (b.pairing_probability ?? -1) - (a.pairing_probability ?? -1);
     if (pairingDiff !== 0) return pairingDiff;
     return sortPlayersForSidebar(a, b);
-  })[0] ?? null;
+  })[0];
 
-  return {
-    name: bestOpponent?.name ?? null,
-    tab,
-    revealedCount: bestOpponent?.most_recently_revealed_cards.length ?? 0,
-  };
+  return { name: best.name, revealedCount: best.most_recently_revealed_cards.length };
 }
 
 function PlayerSelectionModal({
@@ -501,7 +490,7 @@ function GameGuideLayer({
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
 }) {
-  const { state, setRevealedPlayerName, setRevealedPlayerTab } = useContextStrip();
+  const { state, setRevealedPlayerName } = useContextStrip();
   const { guideRequest, finishGuide, skipTutorial, updateGuideStep } = useGuideContext();
   const [activeStepState, setActiveStepState] = useState<{
     nonce: number | null;
@@ -513,7 +502,6 @@ function GameGuideLayer({
   const sidebarRestoreRef = useRef<{
     sidebarOpen: boolean;
     revealedPlayerName: string | null;
-    revealedPlayerTab: SidebarGuideTab;
   } | null>(null);
   const activeStepIndex =
     guideRequest && activeStepState.nonce === guideRequest.nonce
@@ -540,20 +528,15 @@ function GameGuideLayer({
     } else if (sidebarOpen !== snapshot.sidebarOpen) {
       setSidebarOpen(snapshot.sidebarOpen);
     }
-    if (state.revealedPlayerTab !== snapshot.revealedPlayerTab) {
-      setRevealedPlayerTab(snapshot.revealedPlayerTab);
-    }
     if (state.revealedPlayerName !== snapshot.revealedPlayerName) {
       setRevealedPlayerName(snapshot.revealedPlayerName);
     }
   }, [
     context.isMobile,
     setRevealedPlayerName,
-    setRevealedPlayerTab,
     setSidebarOpen,
     sidebarOpen,
     state.revealedPlayerName,
-    state.revealedPlayerTab,
   ]);
 
   const resolvedSidebarState = useMemo(() => {
@@ -572,8 +555,8 @@ function GameGuideLayer({
 
     return {
       openOnMobile: resolveValue(sidebarState.openOnMobile),
-      tab: resolveValue(sidebarState.tab),
       playerName: resolveValue(sidebarState.playerName),
+      openPanel: resolveValue(sidebarState.openPanel),
     };
   }, [activeStep?.sidebarState, context]);
 
@@ -587,15 +570,11 @@ function GameGuideLayer({
       sidebarRestoreRef.current = {
         sidebarOpen,
         revealedPlayerName: state.revealedPlayerName,
-        revealedPlayerTab: state.revealedPlayerTab,
       };
     }
 
     if (context.isMobile && resolvedSidebarState.openOnMobile && !sidebarOpen) {
       setSidebarOpen(true);
-    }
-    if (resolvedSidebarState.tab && state.revealedPlayerTab !== resolvedSidebarState.tab) {
-      setRevealedPlayerTab(resolvedSidebarState.tab);
     }
     if (
       resolvedSidebarState.playerName !== undefined
@@ -609,11 +588,9 @@ function GameGuideLayer({
     resolvedSidebarState,
     restoreSidebarState,
     setRevealedPlayerName,
-    setRevealedPlayerTab,
     setSidebarOpen,
     sidebarOpen,
     state.revealedPlayerName,
-    state.revealedPlayerTab,
   ]);
 
   useLayoutEffect(() => restoreSidebarState, [restoreSidebarState]);
@@ -667,7 +644,7 @@ function GameContent() {
     spectatorConfig,
     handleServerError,
   );
-  const { state, setPreviewCard } = useContextStrip();
+  const { state, setPreviewCard, setRevealedPlayerName } = useContextStrip();
 
   const isSpectator = !!spectatorConfig;
   const wasInvalidSessionRef = useRef(false);
@@ -748,6 +725,7 @@ function GameContent() {
   }
 
   useEffect(() => {
+    setRevealedPlayerName(null);
     if (selfPhase !== "battle") {
       queueMicrotask(() => {
         setActionMenuOpen(false);
@@ -760,7 +738,7 @@ function GameContent() {
     if (selfPhase !== "build") {
       queueMicrotask(() => setShowSubmitHandPopover(false));
     }
-  }, [selfPhase]);
+  }, [selfPhase, setRevealedPlayerName]);
 
   // Rules panel state
   const [rulesPanelOpen, setRulesPanelOpen] = useState(false);
@@ -1135,20 +1113,18 @@ function GameContent() {
       isMobile: sizes.isMobile,
       sidebarOpen,
       revealedPlayerName: state.revealedPlayerName,
-      revealedPlayerTab: state.revealedPlayerTab,
       useUpgrades: gameState.use_upgrades,
       hasRewardUpgradeChoice: needsUpgrade,
       showBuildSubmitPopover: showSubmitHandPopover,
       showBattleSubmitPopover: showSubmitResultPopover,
       availableRewardUpgrades: gameState.available_upgrades,
       draftGuideOpponentName: dgo.name,
-      draftGuideOpponentTab: dgo.tab,
       draftGuideOpponentRevealedCount: dgo.revealedCount,
       isStageEnd: self_player.is_stage_increasing,
     };
   }, [
     gameState, sizes.isMobile, sidebarOpen,
-    state.revealedPlayerName, state.revealedPlayerTab,
+    state.revealedPlayerName,
     showSubmitHandPopover, showSubmitResultPopover,
   ]);
 
@@ -1753,8 +1729,8 @@ function GameContent() {
                       players={gameState.players}
                       currentPlayer={self_player}
                       phaseContent={renderPhaseContent()}
-
                       useUpgrades={gameState.use_upgrades}
+                      isMobile
                     />
                   </div>
                 </>
@@ -1970,6 +1946,7 @@ function GameContent() {
                     currentPlayer={self_player}
                     phaseContent={renderPhaseContent()}
                     useUpgrades={gameState.use_upgrades}
+                    isMobile
                   />
                 </div>
               </>

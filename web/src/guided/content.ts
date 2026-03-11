@@ -511,7 +511,6 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         primaryActionLabel: "Next",
         sidebarState: {
           openOnMobile: true,
-          tab: (ctx) => ctx.draftGuideOpponentTab,
           playerName: (ctx) => ctx.draftGuideOpponentName,
         },
         content: {
@@ -529,8 +528,8 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         primaryActionLabel: "Next",
         sidebarState: {
           openOnMobile: true,
-          tab: (ctx) => ctx.draftGuideOpponentTab,
           playerName: (ctx) => ctx.draftGuideOpponentName,
+          openPanel: true,
         },
         content: {
           summary: ctx.draftGuideOpponentRevealedCount > 0
@@ -611,9 +610,9 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
       {
         id: "treasure-cap",
         title: `You Have ${ctx.selfPlayer?.treasures ?? 6} Treasure`,
-        targetId: ctx.isMobile ? "draft-mobile-treasure" : "sidebar-current-player-treasure",
+        targetId: "draft-mobile-treasure",
         positionTargetId: "draft-pool",
-        placement: ctx.isMobile ? "right" : "left",
+        placement: "right",
         cardPlacement: "bottom-center",
         mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Got it",

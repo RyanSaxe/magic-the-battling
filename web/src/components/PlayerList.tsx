@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import type { PlayerView, LastResult } from "../types";
 import {
   PoisonIcon,
@@ -9,20 +8,11 @@ import {
   HourglassIcon,
 } from "./icons";
 import { useContextStrip } from "../contexts";
-import {
-  POISON_COUNTER_IMAGE,
-  TREASURE_TOKEN_IMAGE,
-} from "../constants/assets";
-import { UpgradeStack } from "./sidebar/UpgradeStack";
-import { ZoneDisplay } from "./sidebar/ZoneDisplay";
 import { PlacementBadge } from "./sidebar/PlacementBadge";
-import type { ContextStripPlayerTab } from "../contexts/contextStripState";
 
 interface PlayerListProps {
   players: PlayerView[];
-  currentPlayerName?: string;
-  currentPlayer: PlayerView;
-  useUpgrades: boolean;
+  currentPlayerName: string;
 }
 
 function ResultBadge({
@@ -71,7 +61,7 @@ function PairingProbability({ probability }: { probability: number | null }) {
     return <span className="text-[10px] text-gray-500">??%</span>;
   }
   const pct = Math.round(probability * 100);
-  return <span className="text-[10px] text-blue-400">{pct}%</span>;
+  return <span className="text-[10px] text-amber-400/80">{pct}%</span>;
 }
 
 export function PlayerRow({
@@ -80,23 +70,27 @@ export function PlayerRow({
   currentPlayerName,
   isSelected,
   onClick,
+  variant = "game",
 }: {
   player: PlayerView;
   players: PlayerView[];
   currentPlayerName: string;
   isSelected: boolean;
   onClick: () => void;
+  variant?: "game" | "share";
 }) {
+  const isSelf = player.name === currentPlayerName;
+
   return (
     <div
-      className={`relative p-3 rounded-lg transition-colors cursor-pointer hover:bg-gray-800/50 ${
-        isSelected ? "ring-2 ring-blue-500" : ""
+      className={`relative p-3 rounded-lg transition-colors cursor-pointer player-row-etched ${
+        isSelected ? "ring-1 ring-[var(--color-gold)]/60" : ""
       } ${
-        player.name === currentPlayerName
-          ? "bg-amber-900/30 border border-amber-700/50"
+        isSelf
+          ? "player-row-etched--self"
           : player.is_puppet
-            ? "bg-cyan-900/20 border border-cyan-800/30"
-            : "bg-black/30"
+            ? "player-row-etched--puppet"
+            : ""
       } ${player.is_ghost ? "opacity-50" : ""}`}
       data-guide-player-row={player.name}
       onClick={onClick}
@@ -105,7 +99,7 @@ export function PlayerRow({
       <div className="flex gap-2">
         <div className="flex-1 min-w-0">
           <div className="mb-1">
-            <span className="text-white font-medium truncate block">
+            <span className="text-amber-50 font-medium truncate block">
               {player.name}
             </span>
           </div>
@@ -122,19 +116,25 @@ export function PlayerRow({
             >
               <MoneyBagIcon size="sm" /> {player.treasures}
             </span>
-            {player.name !== currentPlayerName &&
+            {variant !== "share" && !isSelf &&
               (!player.is_ghost || player.is_most_recent_ghost) && (
                 <PairingProbability probability={player.pairing_probability} />
               )}
           </div>
         </div>
-        <div className="flex flex-col items-center justify-between shrink-0">
+        <div className="flex flex-col items-center gap-1 shrink-0">
           <ResultBadge
             result={player.last_result}
             inSuddenDeath={player.in_sudden_death}
           />
-          <span className="text-gray-500 text-xs">
-            {player.is_ghost && !player.is_most_recent_ghost ? (
+          <span className="text-gray-400 text-xs">
+            {variant === "share" ? (
+              player.is_puppet ? (
+                <PuppetIcon size="sm" />
+              ) : (
+                `${player.stage}-${player.round}`
+              )
+            ) : player.is_ghost && !player.is_most_recent_ghost ? (
               <SkullIcon size="sm" />
             ) : player.is_most_recent_ghost ? (
               <GhostIcon size="sm" />
@@ -155,18 +155,8 @@ export function PlayerRow({
 export function PlayerList({
   players,
   currentPlayerName,
-  currentPlayer,
-  useUpgrades,
 }: PlayerListProps) {
-  const { state, setRevealedPlayerName, setRevealedPlayerTab } = useContextStrip();
-  const activeTab = state.revealedPlayerTab;
-  const nonSelfPlayers = players.filter((p) => p.name !== currentPlayerName);
-  const showOthersTab = players.length > 4;
-
-  useEffect(() => {
-    setRevealedPlayerName(null);
-    setRevealedPlayerTab("you");
-  }, [setRevealedPlayerName, setRevealedPlayerTab]);
+  const { state, setRevealedPlayerName } = useContextStrip();
 
   const handlePlayerClick = (player: PlayerView) => {
     if (state.revealedPlayerName === player.name) {
@@ -175,25 +165,6 @@ export function PlayerList({
       setRevealedPlayerName(player.name);
     }
   };
-
-  const handleTabChange = (tab: ContextStripPlayerTab) => {
-    setRevealedPlayerTab(tab);
-    if (tab === "you") {
-      setRevealedPlayerName(null);
-    }
-  };
-
-  const opponents = showOthersTab
-    ? nonSelfPlayers.filter(
-        (p) => p.pairing_probability !== null && p.pairing_probability > 0,
-      )
-    : nonSelfPlayers;
-
-  const others = showOthersTab
-    ? nonSelfPlayers.filter(
-        (p) => p.pairing_probability === null || p.pairing_probability === 0,
-      )
-    : [];
 
   const byPlacement = (a: PlayerView, b: PlayerView) => {
     if (a.placement === 0 && b.placement === 0) {
@@ -207,164 +178,25 @@ export function PlayerList({
     return a.name.localeCompare(b.name);
   };
 
-  const sortedOpponents = [...opponents].sort(byPlacement);
-  const sortedOthers = [...others].sort(byPlacement);
-
-  useEffect(() => {
-    if (
-      activeTab === "opponents" &&
-      !state.revealedPlayerName &&
-      sortedOpponents.length > 0
-    ) {
-      setRevealedPlayerName(sortedOpponents[0].name);
-    } else if (
-      activeTab === "others" &&
-      !state.revealedPlayerName &&
-      sortedOthers.length > 0
-    ) {
-      setRevealedPlayerName(sortedOthers[0].name);
-    }
-  }, [
-    activeTab,
-    setRevealedPlayerName,
-    sortedOpponents,
-    sortedOthers,
-    state.revealedPlayerName,
-  ]);
-
-  const appliedUpgrades = currentPlayer.upgrades.filter(
-    (u) => u.upgrade_target !== null,
-  );
-  const pendingUpgrades = currentPlayer.upgrades.filter(
-    (u) => u.upgrade_target === null,
-  );
-  const allUpgrades = [...appliedUpgrades, ...pendingUpgrades];
-  const companionIds = new Set(currentPlayer.command_zone.map((c) => c.id));
-
-  const tabs: { key: ContextStripPlayerTab; label: string }[] = [
-    { key: "you", label: "You" },
-    { key: "opponents", label: "Opponents" },
-    ...(showOthersTab ? [{ key: "others" as ContextStripPlayerTab, label: "Others" }] : []),
-  ];
+  const sortedPlayers = [...players].sort(byPlacement);
 
   return (
-    <div className="relative">
+    <div className="relative pt-1">
       <div
-        className="flex border-b border-gray-700 mb-3"
-        data-guide-target="sidebar-player-tabs"
+        className="space-y-2"
+        data-guide-target="sidebar-opponent-list"
       >
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => handleTabChange(tab.key)}
-            data-guide-target={tab.key === "opponents" ? "sidebar-tab-opponents" : undefined}
-            className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? "text-amber-400 border-b-2 border-amber-400 -mb-px"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            {tab.label}
-          </button>
+        {sortedPlayers.map((player) => (
+          <PlayerRow
+            key={player.name}
+            player={player}
+            players={players}
+            currentPlayerName={currentPlayerName}
+            isSelected={state.revealedPlayerName === player.name}
+            onClick={() => handlePlayerClick(player)}
+          />
         ))}
       </div>
-
-      {activeTab === "you" && (
-        <div className="space-y-2">
-          <div className="relative flex items-center justify-center gap-6">
-            <PlacementBadge player={currentPlayer} players={players} />
-            <div className="relative">
-              <img
-                src={POISON_COUNTER_IMAGE}
-                alt="Poison"
-                className="h-24 rounded"
-              />
-              <span className="absolute bottom-0 right-0 bg-black/70 text-purple-400 text-xs font-bold px-1.5 py-0.5 rounded-full">
-                {currentPlayer.poison}
-              </span>
-            </div>
-            <div className="relative">
-              <img
-                src={TREASURE_TOKEN_IMAGE}
-                alt="Treasure"
-                className="h-24 rounded"
-              />
-              <span
-                className="absolute bottom-0 right-0 bg-black/70 text-amber-400 text-xs font-bold px-1.5 py-0.5 rounded-full"
-                data-guide-target="sidebar-current-player-treasure"
-              >
-                {currentPlayer.treasures}
-              </span>
-            </div>
-          </div>
-
-          {useUpgrades && allUpgrades.length > 0 && (
-            <div>
-              <div className="text-[10px] text-gray-400 uppercase mb-1">
-                Upgrades
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {allUpgrades.map((upgrade) => (
-                  <UpgradeStack
-                    key={upgrade.id}
-                    upgrade={upgrade}
-                    dimensions={{ width: 70, height: 98 }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {currentPlayer.most_recently_revealed_cards.length > 0 && (
-            <ZoneDisplay
-              title="Seen in Battle"
-              cards={currentPlayer.most_recently_revealed_cards}
-              maxThumbnails={6}
-              companionIds={companionIds}
-            />
-          )}
-        </div>
-      )}
-
-      {activeTab === "opponents" && (
-        <div className="space-y-2" data-guide-target="sidebar-opponent-list">
-          {sortedOpponents.map((player) => (
-            <PlayerRow
-              key={player.name}
-              player={player}
-              players={players}
-              currentPlayerName={currentPlayerName ?? ""}
-              isSelected={state.revealedPlayerName === player.name}
-              onClick={() => handlePlayerClick(player)}
-            />
-          ))}
-          {sortedOpponents.length === 0 && (
-            <div className="text-gray-500 text-sm text-center py-4">
-              No opponents
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === "others" && (
-        <div className="space-y-2">
-          {sortedOthers.map((player) => (
-            <PlayerRow
-              key={player.name}
-              player={player}
-              players={players}
-              currentPlayerName={currentPlayerName ?? ""}
-              isSelected={state.revealedPlayerName === player.name}
-              onClick={() => handlePlayerClick(player)}
-            />
-          ))}
-          {sortedOthers.length === 0 && (
-            <div className="text-gray-500 text-sm text-center py-4">
-              No other players
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
