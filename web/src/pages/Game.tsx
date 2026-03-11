@@ -504,7 +504,7 @@ function GameGuideLayer({
     revealedPlayerName: string | null;
     revealedPlayerTab: "seen" | "overview";
   } | null>(null);
-  const activeStepIndex =
+  const stepIndex =
     guideRequest && activeStepState.nonce === guideRequest.nonce
       ? activeStepState.stepIndex
       : (guideRequest?.stepIndex ?? 0);
@@ -513,7 +513,7 @@ function GameGuideLayer({
     () => (guideRequest ? buildGuideDefinition(guideRequest.guideId, context) : null),
     [context, guideRequest],
   );
-  const activeStep = guide?.steps[activeStepIndex] ?? null;
+  const activeStep = guide?.steps[stepIndex] ?? null;
 
   const restoreSidebarState = useCallback(() => {
     const snapshot = sidebarRestoreRef.current;
@@ -611,6 +611,54 @@ function GameGuideLayer({
 
   useLayoutEffect(() => restoreSidebarState, [restoreSidebarState]);
 
+  const handleAdvanceStep = useCallback(() => {
+    if (!guideRequest || !guide) {
+      return;
+    }
+
+    setActiveStepState((current) => {
+      const baseStepIndex =
+        current.nonce === guideRequest.nonce
+          ? current.stepIndex
+          : (guideRequest.stepIndex ?? 0);
+      const next = baseStepIndex + 1;
+      if (next >= guide.steps.length) {
+        queueMicrotask(() => finishGuide(guideRequest.guideId));
+        return {
+          nonce: guideRequest.nonce,
+          stepIndex: baseStepIndex,
+        };
+      }
+
+      updateGuideStep(guideRequest.guideId, next);
+      return {
+        nonce: guideRequest.nonce,
+        stepIndex: next,
+      };
+    });
+  }, [finishGuide, guide, guideRequest, updateGuideStep]);
+
+  const handleBackStep = useCallback(() => {
+    if (!guideRequest) {
+      return;
+    }
+
+    setActiveStepState((current) => {
+      const baseStepIndex =
+        current.nonce === guideRequest.nonce
+          ? current.stepIndex
+          : (guideRequest.stepIndex ?? 0);
+      const next = Math.max(0, baseStepIndex - 1);
+      if (next !== baseStepIndex) {
+        updateGuideStep(guideRequest.guideId, next);
+      }
+      return {
+        nonce: guideRequest.nonce,
+        stepIndex: next,
+      };
+    });
+  }, [guideRequest, updateGuideStep]);
+
   if (!guideRequest) return null;
   return (
     <GuidedWalkthrough
@@ -618,15 +666,11 @@ function GameGuideLayer({
       rootRef={rootRef}
       request={guideRequest}
       context={context}
+      stepIndex={stepIndex}
       onClose={finishGuide}
       onSkipAll={skipTutorial}
-      onStepChange={(guideId, stepIndex) => {
-        setActiveStepState({
-          nonce: guideRequest.nonce,
-          stepIndex,
-        });
-        updateGuideStep(guideId, stepIndex);
-      }}
+      onAdvanceStep={handleAdvanceStep}
+      onBackStep={handleBackStep}
     />
   );
 }

@@ -9,20 +9,23 @@ interface GuidedWalkthroughProps {
   rootRef: React.RefObject<HTMLElement | null>;
   request: GuideRequest;
   context: GuidedWalkthroughContext;
+  stepIndex: number;
   onClose: (guideId: GuidedGuideId) => void;
   onSkipAll: () => void;
-  onStepChange: (guideId: GuidedGuideId, stepIndex: number) => void;
+  onAdvanceStep: () => void;
+  onBackStep: () => void;
 }
 
 export function GuidedWalkthrough({
   rootRef,
   request,
   context,
+  stepIndex,
   onClose,
   onSkipAll,
-  onStepChange,
+  onAdvanceStep,
+  onBackStep,
 }: GuidedWalkthroughProps) {
-  const [stepIndex, setStepIndex] = useState(request.stepIndex ?? 0);
   const cardRef = useRef<HTMLDivElement>(null);
   const [transitionsEnabled, setTransitionsEnabled] = useState(false);
 
@@ -56,26 +59,11 @@ export function GuidedWalkthrough({
     onClose(request.guideId);
   }, [onClose, request.guideId]);
 
-  const advanceStep = useCallback(() => {
-    setStepIndex((current) => {
-      const next = current + 1;
-      if (next >= guide.steps.length) {
-        queueMicrotask(finishGuide);
-        return current;
-      }
-      return next;
-    });
-  }, [finishGuide, guide.steps.length]);
-
   useEffect(() => {
     if (guide.phase && context.currentPhase && context.currentPhase !== guide.phase) {
       finishGuide();
     }
   }, [context.currentPhase, finishGuide, guide.phase]);
-
-  useEffect(() => {
-    onStepChange(request.guideId, stepIndex);
-  }, [onStepChange, request.guideId, stepIndex]);
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
@@ -95,15 +83,15 @@ export function GuidedWalkthrough({
       if (event.key === "Escape") {
         finishGuide();
       } else if ((event.key === "ArrowRight" || event.key === "Enter")) {
-        advanceStep();
+        onAdvanceStep();
       } else if (event.key === "ArrowLeft" && stepIndex > 0) {
-        setStepIndex((current) => Math.max(0, current - 1));
+        onBackStep();
       }
     };
 
     window.addEventListener("keydown", handleKey, true);
     return () => window.removeEventListener("keydown", handleKey, true);
-  }, [advanceStep, finishGuide, stepIndex]);
+  }, [finishGuide, onAdvanceStep, onBackStep, stepIndex]);
 
   const layout = useGuidePositioning(
     rootRef,
@@ -176,8 +164,8 @@ export function GuidedWalkthrough({
         stepIndex={stepIndex}
         totalSteps={guide.steps.length}
         showSkipAll={guide.showSkipAll === true}
-        onPrimaryAction={advanceStep}
-        onBack={() => setStepIndex((current) => Math.max(0, current - 1))}
+        onPrimaryAction={onAdvanceStep}
+        onBack={onBackStep}
         onSkipAll={onSkipAll}
         style={tooltipStyle}
       />

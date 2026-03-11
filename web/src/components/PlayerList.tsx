@@ -26,44 +26,25 @@ function ResultBadge({
 }) {
   if (inSuddenDeath) {
     return (
-      <span
-        className="inline-flex min-w-[2rem] items-center justify-center rounded-full border border-red-800/70 bg-red-950/55 px-2 py-0.5 text-[10px] font-bold text-red-300"
-        title="Sudden Death"
-      >
+      <span className="text-[10px] font-bold text-red-300" title="Sudden Death">
         SD
       </span>
     );
   }
 
   if (result === null) {
-    return (
-      <span className="inline-flex min-w-[2rem] items-center justify-center rounded-full border border-transparent px-2 py-0.5 text-[10px] font-semibold text-gray-500">
-        -
-      </span>
-    );
+    return <span className="text-[10px] font-semibold text-gray-500">-</span>;
   }
 
   if (result === "win") {
-    return (
-      <span className="inline-flex min-w-[2rem] items-center justify-center rounded-full border border-emerald-800/70 bg-emerald-950/45 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-        W
-      </span>
-    );
+    return <span className="text-[10px] font-bold text-emerald-300">W</span>;
   }
 
   if (result === "draw") {
-    return (
-      <span className="inline-flex min-w-[2rem] items-center justify-center rounded-full border border-amber-800/70 bg-amber-950/45 px-2 py-0.5 text-[10px] font-bold text-amber-200">
-        D
-      </span>
-    );
+    return <span className="text-[10px] font-bold text-amber-200">D</span>;
   }
 
-  return (
-    <span className="inline-flex min-w-[2rem] items-center justify-center rounded-full border border-red-800/70 bg-red-950/45 px-2 py-0.5 text-[10px] font-bold text-red-300">
-      L
-    </span>
-  );
+  return <span className="text-[10px] font-bold text-red-300">L</span>;
 }
 
 function PairingProbability({ probability }: { probability: number | null }) {
@@ -72,7 +53,7 @@ function PairingProbability({ probability }: { probability: number | null }) {
   }
 
   return (
-    <span className="text-[10px] text-amber-300/85">
+    <span className="text-[10px] text-cyan-300/90">
       {Math.round(probability * 100)}%
     </span>
   );
@@ -129,8 +110,9 @@ export function PlayerRow({
   onClick: () => void;
   variant?: "game" | "share";
 }) {
+  const isSelf = player.name === currentPlayerName;
   const showPairingProbability =
-    variant !== "share" && player.name !== currentPlayerName && (!player.is_ghost || player.is_most_recent_ghost);
+    variant !== "share" && !isSelf && (!player.is_ghost || player.is_most_recent_ghost);
 
   return (
     <button
@@ -175,6 +157,11 @@ export function PlayerRow({
           >
             <MoneyBagIcon size="sm" /> {player.treasures}
           </span>
+          {variant !== "share" && isSelf && (
+            <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-gray-300">
+              You
+            </span>
+          )}
           {showPairingProbability && (
             <PairingProbability probability={player.pairing_probability} />
           )}
