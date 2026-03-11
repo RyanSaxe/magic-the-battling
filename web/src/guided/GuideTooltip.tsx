@@ -34,24 +34,32 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
     return (
       <div
         ref={ref}
-        className="absolute z-[82] pointer-events-auto w-[min(17.5rem,calc(100%-1rem))] max-h-[calc(100%-1rem)] overflow-hidden rounded-2xl border border-amber-300/20 bg-[linear-gradient(180deg,rgba(36,24,19,0.98),rgba(23,16,13,0.98))] shadow-[0_16px_36px_rgba(0,0,0,0.5)] backdrop-blur"
+        className="absolute z-[82] pointer-events-auto w-[min(17.5rem,calc(100%-1rem))] sm:w-[min(22rem,calc(100%-2rem))] max-h-[calc(100%-1rem)] overflow-hidden rounded-2xl modal-chrome gold-border shadow-[0_16px_36px_rgba(0,0,0,0.5)]"
         style={{
           ...style,
           overscrollBehavior: "contain",
-          transition: "left 220ms ease, top 220ms ease, opacity 180ms ease",
         }}
         role="dialog"
         aria-modal="true"
         aria-label="Guide"
       >
-        <div className="flex items-center justify-between gap-3 border-b border-amber-200/10 px-4 py-2.5">
-          <span className="text-[0.68rem] uppercase tracking-[0.18em] text-amber-200/80">
+        <div className="flex items-center justify-between gap-3 border-b gold-divider px-4 py-2.5">
+          <span className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--color-gold)]">
             {guideLabel}
           </span>
           {totalSteps > 1 && (
-            <span className="text-[0.72rem] text-gray-500">
-              {stepIndex + 1}/{totalSteps}
-            </span>
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: totalSteps }, (_, i) => (
+                <span
+                  key={i}
+                  className={`inline-block h-2 w-2 rounded-full ${
+                    i === stepIndex
+                      ? "bg-[var(--color-gold)]"
+                      : "bg-white/25"
+                  }`}
+                />
+              ))}
+            </div>
           )}
         </div>
         <div className="max-h-[min(20rem,calc(100vh-12rem))] overflow-y-auto px-4 py-4">
@@ -94,7 +102,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
           )}
         </div>
 
-        <div className="flex flex-nowrap items-center justify-between gap-2 border-t border-amber-200/10 px-4 py-3">
+        <div className="flex flex-nowrap items-center justify-between gap-2 border-t gold-divider px-4 py-3">
           <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
             {stepIndex > 0 && (
               <button

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { GuidedGuideId, GuideRequest, GuidedWalkthroughContext } from "./types";
 import { buildGuideDefinition } from "./content";
 import { useGuidePositioning } from "./useGuidePositioning";
@@ -24,6 +24,7 @@ export function GuidedWalkthrough({
 }: GuidedWalkthroughProps) {
   const [stepIndex, setStepIndex] = useState(request.stepIndex ?? 0);
   const cardRef = useRef<HTMLDivElement>(null);
+  const [transitionsEnabled, setTransitionsEnabled] = useState(false);
 
   const guide = useMemo(
     () => buildGuideDefinition(request.guideId, context),
@@ -118,6 +119,27 @@ export function GuidedWalkthrough({
     stepKey,
   );
 
+  useEffect(() => {
+    if (!layout || transitionsEnabled) return;
+    const id = requestAnimationFrame(() => setTransitionsEnabled(true));
+    return () => cancelAnimationFrame(id);
+  }, [layout, transitionsEnabled]);
+
+  const tooltipStyle: CSSProperties = transitionsEnabled
+    ? {
+        left: layout?.cardLeft ?? 16,
+        top: layout?.cardTop ?? 16,
+        opacity: 1,
+        transition:
+          "left 280ms cubic-bezier(0.22,1,0.36,1), top 280ms cubic-bezier(0.22,1,0.36,1), opacity 200ms ease",
+      }
+    : {
+        left: layout?.cardLeft ?? 16,
+        top: layout?.cardTop ?? 16,
+        opacity: 0,
+        transition: "opacity 200ms ease",
+      };
+
   if (!step) return null;
 
   return (
@@ -159,10 +181,7 @@ export function GuidedWalkthrough({
         onPrimaryAction={advanceStep}
         onBack={() => setStepIndex((current) => Math.max(0, current - 1))}
         onSkipAll={onSkipAll}
-        style={{
-          left: layout?.cardLeft ?? 16,
-          top: layout?.cardTop ?? 16,
-        }}
+        style={tooltipStyle}
       />
     </div>
   );

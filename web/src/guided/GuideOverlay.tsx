@@ -6,7 +6,7 @@ interface GuideOverlayProps {
 export function GuideOverlay({ clipPath, allowInteraction }: GuideOverlayProps) {
   return (
     <div
-      className="absolute inset-0 transition-[clip-path] duration-300 ease-in-out"
+      className="absolute inset-0 transition-[clip-path] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
       style={{
         clipPath: clipPath === "none" ? undefined : clipPath,
         background:

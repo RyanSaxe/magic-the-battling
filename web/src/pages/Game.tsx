@@ -1186,6 +1186,7 @@ function GameContent() {
     draftGuideOpponentName: draftGuideOpponent.name,
     draftGuideOpponentTab: draftGuideOpponent.tab,
     draftGuideOpponentRevealedCount: draftGuideOpponent.revealedCount,
+    isStageEnd: self_player.is_stage_increasing,
   };
 
   const handleContinue = () => {

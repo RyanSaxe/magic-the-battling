@@ -1,4 +1,3 @@
-import { THE_VANQUISHER_IMAGE } from "../constants/assets";
 import type {
   ConditionalGuideId,
   GuideDefinition,
@@ -165,6 +164,17 @@ function buildBuildGuide(): GuideDefinition {
     phase: "build",
     steps: [
       {
+        id: "intro",
+        title: "Build Phase",
+        placement: "center",
+        cardPlacement: "center",
+        primaryActionLabel: "Show me the zones",
+        content: {
+          summary: "Build chooses the exact starting hand and the 3 untapped basics you begin the next battle with.",
+          detail: "Whatever you lock in here is your actual opening position. Your sideboard holds the pool of cards available for this round.",
+        },
+      },
+      {
         id: "sideboard",
         title: "Start With The Pool In Your Sideboard",
         targetId: "build-sideboard",
@@ -237,6 +247,17 @@ function buildPlayDrawGuide(): GuideDefinition {
 function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   const steps: GuideStepDefinition[] = [
     {
+      id: "intro",
+      title: "Battle Phase",
+      placement: "center",
+      cardPlacement: "center",
+      primaryActionLabel: "Show me the zones",
+      content: {
+        summary: "Battle is a short manual game of Magic with 10 life and no libraries.",
+        detail: "Drag cards between zones to play out the game, then submit the result when one player wins. Up to 5 treasure on the battlefield carry forward.",
+      },
+    },
+    {
       id: "hand",
       title: "Hand To Battlefield Is The Main Flow",
       targetId: "battle-hand" as const,
@@ -291,61 +312,73 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   };
 }
 
-function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
+function buildRewardGuide(): GuideDefinition {
+  return {
+    id: "reward",
+    label: "Reward",
+    phase: "reward",
+    steps: [
+      {
+        id: "intro",
+        title: "Reward Phase",
+        placement: "center",
+        cardPlacement: "center",
+        primaryActionLabel: "Show me the rewards",
+        content: {
+          summary: "Reward adds treasure and other progression before the next round starts.",
+          detail: "Every reward gives +1 treasure. On rounds 1 and 2, you also get a random card. The final round of each stage is special — you earn The Vanquisher, your hand size grows, and you advance to the next stage.",
+        },
+      },
+      {
+        id: "reward-basics",
+        title: "Every Reward Adds Resources",
+        targetId: "reward-summary",
+        placement: "right",
+        cardPlacement: "bottom-center",
+        primaryActionLabel: "Got it",
+        content: {
+          summary: "Every reward gives you +1 treasure.",
+          detail: "On the first and second round of a stage, reward also gives you +1 random card from the Battler.",
+        },
+      },
+    ],
+  };
+}
+
+function buildRewardStageEndGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   const steps: GuideStepDefinition[] = [
     {
-      id: "reward-basics",
-      title: "Every Reward Adds Resources",
-      targetId: "reward-summary",
-      placement: "right",
-      cardPlacement: "bottom-center",
-      primaryActionLabel: "Next",
-      content: {
-        summary: "Every reward gives you +1 treasure.",
-        detail: "On the first and second round of a stage, reward also gives you +1 random card from the Battler.",
-      },
-    },
-    {
-      id: "reward-stage-end",
+      id: "vanquisher",
       title: "Stage-End Rewards Work Differently",
       targetId: "reward-progression",
       placement: "top",
       cardPlacement: "top-center",
-      primaryActionLabel: ctx.useUpgrades ? "Next" : "Got it",
-        content: {
-          summary: "On the last reward of a stage, the random card is replaced by The Vanquisher.",
-          detail: "That reward also advances the stage, increases your starting hand size by 1, and starts the next loop at the new stage.",
-          media: {
-            imageUrl: THE_VANQUISHER_IMAGE,
-            alt: "The Vanquisher",
-          },
-        },
+      primaryActionLabel:
+        ctx.useUpgrades && ctx.hasRewardUpgradeChoice ? "Next" : "Got it",
+      content: {
+        summary: "On the last reward of a stage, the random card is replaced by The Vanquisher.",
+        detail: "That reward also advances the stage, increases your starting hand size by 1, and starts the next loop at the new stage.",
       },
+    },
   ];
 
-  if (ctx.useUpgrades) {
+  if (ctx.useUpgrades && ctx.hasRewardUpgradeChoice) {
     steps.push({
-      id: "reward-upgrades",
+      id: "upgrades",
       title: "Stage-End Rewards Can Also Offer Upgrades",
-      targetId: ctx.hasRewardUpgradeChoice ? "reward-upgrades" : "reward-summary",
-      placement: ctx.hasRewardUpgradeChoice ? "left" : "right",
+      targetId: "reward-upgrades",
+      placement: "left",
       cardPlacement: "top-center",
       primaryActionLabel: "Got it",
       content: {
         summary: "If upgrades are enabled, stage-end rewards also require you to choose one upgrade before you continue.",
-        detail: ctx.hasRewardUpgradeChoice
-          ? "Upgrades are permanent hidden-agenda effects. Choose one here, then apply it later during build to a card in your pool."
-          : "When that reward is available, the offered upgrade cards appear here and you must choose one before moving on.",
-        gallery: ctx.availableRewardUpgrades.map((upgrade) => ({
-          imageUrl: upgrade.png_url ?? upgrade.image_url,
-          alt: upgrade.name,
-        })),
+        detail: "Upgrades are permanent hidden-agenda effects. Choose one here, then apply it later during build to a card in your pool.",
       },
     });
   }
 
   return {
-    id: "reward",
+    id: "reward_stage_end",
     label: "Reward",
     phase: "reward",
     steps,
@@ -358,6 +391,17 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
     label: "Draft",
     phase: "draft",
     steps: [
+      {
+        id: "intro",
+        title: "Draft Phase",
+        placement: "center",
+        cardPlacement: "center",
+        primaryActionLabel: "Show me the zones",
+        content: {
+          summary: "Draft improves your pool by swapping weaker cards for stronger ones from a pack.",
+          detail: "You receive a pack of 5 cards and may swap cards between the pack and your pool. Spending 1 treasure rolls a new pack.",
+        },
+      },
       {
         id: "pack",
         title: "This Is The Current Pack",
@@ -565,7 +609,9 @@ export function buildGuideDefinition(
     case "battle":
       return buildBattleGuide(ctx);
     case "reward":
-      return buildRewardGuide(ctx);
+      return buildRewardGuide();
+    case "reward_stage_end":
+      return buildRewardStageEndGuide(ctx);
     case "draft":
       return buildDraftGuide(ctx);
     case "hint_treasure_producer":

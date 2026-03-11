@@ -14,6 +14,7 @@ export type GuidedGuideId =
   | "build_play_draw"
   | "battle"
   | "reward"
+  | "reward_stage_end"
   | "draft"
   | ConditionalGuideId;
 
@@ -86,6 +87,7 @@ export interface GuidedWalkthroughContext {
   draftGuideOpponentName: string | null;
   draftGuideOpponentTab: SidebarGuideTab;
   draftGuideOpponentRevealedCount: number;
+  isStageEnd: boolean;
 }
 
 export interface GuideStepSidebarState {

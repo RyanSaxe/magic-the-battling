@@ -264,6 +264,15 @@ export function GuideProvider({
       return;
     }
 
+    if (
+      selfPhase === "reward"
+      && guideContext.isStageEnd
+      && !seenGuides.has("reward_stage_end")
+    ) {
+      queueMicrotask(() => requestGuide("reward_stage_end"));
+      return;
+    }
+
     if (nextQueue.length > 0) {
       const [nextGuide, ...rest] = nextQueue;
       queueMicrotask(() => {

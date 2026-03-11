@@ -379,6 +379,7 @@ export function useGuidePositioning(
     }
 
     update();
+    const delayedUpdate = setTimeout(update, 350);
 
     const ro = new ResizeObserver(update);
     ro.observe(root);
@@ -387,6 +388,7 @@ export function useGuidePositioning(
     window.addEventListener("scroll", update, true);
 
     return () => {
+      clearTimeout(delayedUpdate);
       ro.disconnect();
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
