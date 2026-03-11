@@ -13,6 +13,7 @@ export type GuidedGuideId =
   | "build"
   | "build_play_draw"
   | "battle"
+  | "battle_result_submit"
   | "reward"
   | "reward_stage_end"
   | "draft"
@@ -30,9 +31,14 @@ export type GuideTargetId =
   | "build-battlefield"
   | "build-sideboard"
   | "build-submit-popover"
+  | "build-apply-upgrade"
+  | "game-content"
   | "battle-hand"
   | "battle-battlefield"
   | "battle-opponent-hand"
+  | "battle-actions"
+  | "battle-submit"
+  | "battle-submit-popover"
   | "reward-summary"
   | "reward-progression"
   | "reward-current-upgrades"
@@ -46,7 +52,8 @@ export type GuideTargetId =
   | "sidebar-player-tabs"
   | "sidebar-tab-opponents"
   | "sidebar-opponent-list"
-  | "sidebar-revealed-details";
+  | "sidebar-revealed-details"
+  | "phase-action-bar";
 
 export type GuidePlacement = "top" | "right" | "bottom" | "left" | "center";
 export type GuideCardPlacement =
@@ -83,6 +90,7 @@ export interface GuidedWalkthroughContext {
   useUpgrades: boolean;
   hasRewardUpgradeChoice: boolean;
   showBuildSubmitPopover: boolean;
+  showBattleSubmitPopover: boolean;
   availableRewardUpgrades: GameCard[];
   draftGuideOpponentName: string | null;
   draftGuideOpponentTab: SidebarGuideTab;

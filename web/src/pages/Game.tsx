@@ -1182,6 +1182,7 @@ function GameContent() {
     useUpgrades: gameState.use_upgrades,
     hasRewardUpgradeChoice: needsUpgrade,
     showBuildSubmitPopover: showSubmitHandPopover,
+    showBattleSubmitPopover: showSubmitResultPopover,
     availableRewardUpgrades: gameState.available_upgrades,
     draftGuideOpponentName: draftGuideOpponent.name,
     draftGuideOpponentTab: draftGuideOpponent.tab,
@@ -1248,9 +1249,19 @@ function GameContent() {
     } else if (currentPhase === "build") {
       if (self_player.build_ready) {
         left = self_player.upgrades.length > 0 ? (
-          <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
-            View Upgrades
-          </button>
+          hasPendingBuildUpgrades ? (
+            <button
+              onClick={() => openUpgradesModal(undefined, 'auto')}
+              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              data-guide-target="build-apply-upgrade"
+            >
+              Apply Upgrade
+            </button>
+          ) : (
+            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+              View Upgrades
+            </button>
+          )
         ) : null;
         right = (
           <div className="flex items-center gap-1.5 sm:gap-2" data-guide-target="build-submit">
@@ -1265,12 +1276,22 @@ function GameContent() {
         );
       } else {
         left = self_player.upgrades.length > 0 ? (
-          <button
-            onClick={() => openUpgradesModal(undefined, 'view')}
-            className="btn bg-gray-600 hover:bg-gray-500 text-white"
-          >
-            View Upgrades
-          </button>
+          hasPendingBuildUpgrades ? (
+            <button
+              onClick={() => openUpgradesModal(undefined, 'auto')}
+              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              data-guide-target="build-apply-upgrade"
+            >
+              Apply Upgrade
+            </button>
+          ) : (
+            <button
+              onClick={() => openUpgradesModal(undefined, 'view')}
+              className="btn bg-gray-600 hover:bg-gray-500 text-white"
+            >
+              View Upgrades
+            </button>
+          )
         ) : null;
         right = (
           <div className="relative flex items-center gap-1.5 sm:gap-2">
@@ -1655,7 +1676,7 @@ function GameContent() {
           >
             <div className="flex-1 flex min-h-0 game-surface">
               <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-              <main className="flex-1 flex flex-col min-h-0 min-w-0">
+              <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
                 {sizes.isMobile && current_battle && (
                   <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight">
@@ -1849,7 +1870,7 @@ function GameContent() {
         ) : (
           <div className="flex-1 flex min-h-0 game-surface">
             <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-            <main className="flex-1 flex flex-col min-h-0 min-w-0">
+            <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
               {currentPhase === "draft" && (
                 <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
               )}

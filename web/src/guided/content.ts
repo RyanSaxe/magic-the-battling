@@ -75,6 +75,7 @@ function buildWelcomeGuide(): GuideDefinition {
         title: "Welcome To Magic: The Battling",
         placement: "center",
         cardPlacement: "center",
+        positionTargetId: "game-content",
         primaryActionLabel: "Show me the loop",
         content: {
           summary: "Magic: The Battling loops through draft, build, battle, and reward until only one player remains.",
@@ -168,6 +169,7 @@ function buildBuildGuide(): GuideDefinition {
         title: "Build Phase",
         placement: "center",
         cardPlacement: "center",
+        positionTargetId: "game-content",
         primaryActionLabel: "Show me the zones",
         content: {
           summary: "Build chooses the exact starting hand and the 3 untapped basics you begin the next battle with.",
@@ -251,6 +253,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       title: "Battle Phase",
       placement: "center",
       cardPlacement: "center",
+      positionTargetId: "game-content",
       primaryActionLabel: "Show me the zones",
       content: {
         summary: "Battle is a short manual game of Magic with 10 life and no libraries.",
@@ -279,10 +282,23 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       placement: "right" as const,
       cardPlacement: "bottom-right",
       mobileCardPlacement: "bottom-center",
-      primaryActionLabel: ctx.currentBattle?.can_manipulate_opponent ? "Next" : "Got it",
+      primaryActionLabel: "Next",
       content: {
         summary: "Double click or double tap permanents to tap and untap them while you play.",
-        detail: "Battles start at 10 life with no libraries, and up to 5 treasure that remain on the battlefield will carry forward after the battle ends.",
+        detail: "Right-click a card for more options like counters, tokens, and zone moves. Those same options appear in the Actions menu when a card is selected.",
+      },
+    },
+    {
+      id: "actions",
+      title: "Actions Menu For Everything Else",
+      targetId: "battle-actions",
+      positionTargetId: "battle-battlefield",
+      placement: "top",
+      cardPlacement: "top-center",
+      primaryActionLabel: ctx.currentBattle?.can_manipulate_opponent ? "Next" : "Got it",
+      content: {
+        summary: "This button opens the full actions menu with general utilities and card-specific options.",
+        detail: "Standard actions like untapping all permanents, creating treasure tokens, and passing the turn live here. If a card is selected, its specific actions also appear at the top of the menu.",
       },
     },
   ];
@@ -323,6 +339,7 @@ function buildRewardGuide(): GuideDefinition {
         title: "Reward Phase",
         placement: "center",
         cardPlacement: "center",
+        positionTargetId: "game-content",
         primaryActionLabel: "Show me the rewards",
         content: {
           summary: "Reward adds treasure and other progression before the next round starts.",
@@ -349,15 +366,17 @@ function buildRewardStageEndGuide(ctx: GuidedWalkthroughContext): GuideDefinitio
   const steps: GuideStepDefinition[] = [
     {
       id: "vanquisher",
-      title: "Stage-End Rewards Work Differently",
-      targetId: "reward-progression",
-      placement: "top",
-      cardPlacement: "top-center",
+      title: "The Vanquisher Increases Hand Size",
+      targetSelector: '[data-guide-card-id="reward:vanquisher"]',
+      targetId: "reward-summary",
+      positionTargetId: "reward-summary",
+      placement: "right",
+      cardPlacement: "bottom-center",
       primaryActionLabel:
         ctx.useUpgrades && ctx.hasRewardUpgradeChoice ? "Next" : "Got it",
       content: {
-        summary: "On the last reward of a stage, the random card is replaced by The Vanquisher.",
-        detail: "That reward also advances the stage, increases your starting hand size by 1, and starts the next loop at the new stage.",
+        summary: "On the final round of a stage, you earn The Vanquisher instead of a random card.",
+        detail: "This advances your stage and permanently increases your starting hand size by 1, making future builds stronger.",
       },
     },
   ];
@@ -396,6 +415,7 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         title: "Draft Phase",
         placement: "center",
         cardPlacement: "center",
+        positionTargetId: "game-content",
         primaryActionLabel: "Show me the zones",
         content: {
           summary: "Draft improves your pool by swapping weaker cards for stronger ones from a pack.",
@@ -542,6 +562,35 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
   };
 }
 
+function buildBattleResultSubmitGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
+  const isPuppet = !!ctx.currentBattle?.can_manipulate_opponent;
+  return {
+    id: "battle_result_submit",
+    label: "Battle",
+    phase: "battle",
+    steps: [
+      {
+        id: "result-submit",
+        title: "Submit The Battle Result",
+        targetId: "battle-submit-popover",
+        positionTargetId: "battle-battlefield",
+        placement: "top",
+        cardPlacement: "top-center",
+        primaryActionLabel: "Got it",
+        allowTargetInteraction: true,
+        content: {
+          summary: isPuppet
+            ? "Choose who won this puppet battle based on how you think it would play out."
+            : "Choose who won, then wait for your opponent to submit their result too.",
+          detail: isPuppet
+            ? "A draw counts as a loss for both players. Since this is a puppet battle, the result is applied immediately."
+            : "A draw counts as a loss for both players. Both players must agree on the result before the game moves on — if results conflict, you will both be asked to resubmit.",
+        },
+      },
+    ],
+  };
+}
+
 function buildUnappliedUpgradeHint(): GuideDefinition {
   return {
     id: "hint_build_unapplied_upgrade",
@@ -551,15 +600,15 @@ function buildUnappliedUpgradeHint(): GuideDefinition {
       {
         id: "unapplied-upgrade",
         title: "You Have An Upgrade Ready To Apply",
-        targetId: "build-workspace",
+        targetId: "build-apply-upgrade",
         positionTargetId: "build-battlefield",
-        placement: "right",
-        cardPlacement: "top-right",
+        placement: "top",
+        cardPlacement: "top-center",
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Got it",
         content: {
           summary: "You have at least one upgrade that has not been applied to a card yet.",
-          detail: "Upgrades are permanent once named. During build, use the Upgrade action on a card in your hand or sideboard if you want that effect online for future rounds.",
+          detail: "Tap this button to open the upgrade panel, choose an upgrade, and apply it to a card in your pool.",
         },
       },
     ],
@@ -608,6 +657,8 @@ export function buildGuideDefinition(
       return buildPlayDrawGuide();
     case "battle":
       return buildBattleGuide(ctx);
+    case "battle_result_submit":
+      return buildBattleResultSubmitGuide(ctx);
     case "reward":
       return buildRewardGuide();
     case "reward_stage_end":

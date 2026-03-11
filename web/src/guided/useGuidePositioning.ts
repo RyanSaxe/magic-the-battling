@@ -211,6 +211,7 @@ function computePosition(
   cardW: number,
   cardH: number,
   isMobile: boolean,
+  centerAnchor?: SpotlightRect | null,
 ): { left: number; top: number; resolved: GuidePlacement } {
   const xMin = CARD_MARGIN;
   const yMin = CARD_MARGIN;
@@ -218,9 +219,11 @@ function computePosition(
   const yMax = Math.max(CARD_MARGIN, ch - cardH - CARD_MARGIN);
 
   if (!spotlight || placement === "center") {
+    const cx = centerAnchor ? centerAnchor.x + centerAnchor.width / 2 : cw / 2;
+    const cy = centerAnchor ? centerAnchor.y + centerAnchor.height / 2 : ch / 2;
     return {
-      left: clamp(cw / 2 - cardW / 2, xMin, xMax),
-      top: clamp(ch / 2 - cardH / 2, yMin, yMax),
+      left: clamp(cx - cardW / 2, xMin, xMax),
+      top: clamp(cy - cardH / 2, yMin, yMax),
       resolved: "center",
     };
   }
@@ -323,8 +326,8 @@ export function useGuidePositioning(
   cardRef: RefObject<HTMLElement | null>,
   targetId: GuideTargetId | undefined,
   targetSelector: string | undefined,
-  _positionTargetId: GuideTargetId | undefined,
-  _positionTargetSelector: string | undefined,
+  positionTargetId: GuideTargetId | undefined,
+  positionTargetSelector: string | undefined,
   placement: GuidePlacement,
   _cardPlacement: GuideCardPlacement | undefined,
   _mobileCardPlacement: GuideCardPlacement | undefined,
@@ -346,11 +349,13 @@ export function useGuidePositioning(
       const cw = r.clientWidth;
       const ch = r.clientHeight;
       const target = resolveTarget(r, targetId, targetSelector);
+      const posTarget = resolveTarget(r, positionTargetId, positionTargetSelector);
       const padding = spotlightPadding ?? SPOTLIGHT_PADDING;
       const rawSpotlight = target ? toRelativeRect(r, target, padding) : null;
       const spotlight = rawSpotlight ? clampSpotlight(rawSpotlight, cw, ch) : null;
       const cardRect = c.getBoundingClientRect();
       const isMobile = cw <= MOBILE_BREAKPOINT;
+      const centerAnchor = posTarget ? toRelativeRect(r, posTarget, 0) : null;
       const pos = computePosition(
         placement,
         cw,
@@ -359,6 +364,7 @@ export function useGuidePositioning(
         cardRect.width,
         cardRect.height,
         isMobile,
+        centerAnchor,
       );
 
       setState({
@@ -379,7 +385,12 @@ export function useGuidePositioning(
     }
 
     update();
-    const delayedUpdate = setTimeout(update, 350);
+
+    let delayedUpdate: ReturnType<typeof setTimeout> | null = null;
+    const handleTransitionEnd = () => {
+      delayedUpdate = setTimeout(update, 50);
+    };
+    root.addEventListener("transitionend", handleTransitionEnd);
 
     const ro = new ResizeObserver(update);
     ro.observe(root);
@@ -388,7 +399,8 @@ export function useGuidePositioning(
     window.addEventListener("scroll", update, true);
 
     return () => {
-      clearTimeout(delayedUpdate);
+      if (delayedUpdate) clearTimeout(delayedUpdate);
+      root.removeEventListener("transitionend", handleTransitionEnd);
       ro.disconnect();
       window.removeEventListener("resize", update);
       window.removeEventListener("scroll", update, true);
@@ -398,6 +410,8 @@ export function useGuidePositioning(
     cardRef,
     targetId,
     targetSelector,
+    positionTargetId,
+    positionTargetSelector,
     placement,
     spotlightPadding,
     stepKey,

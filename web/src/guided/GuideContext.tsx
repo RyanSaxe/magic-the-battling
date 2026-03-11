@@ -149,7 +149,11 @@ export function GuideProvider({
 
   const requestGuide = useCallback(
     (guideId: GuidedGuideId) => {
-      closeGameplayOverlays(guideId === "build_play_draw" ? "buildSubmit" : null);
+      const overlayException =
+        guideId === "build_play_draw" ? "buildSubmit" as const
+        : guideId === "battle_result_submit" ? "battleSubmit" as const
+        : null;
+      closeGameplayOverlays(overlayException);
       if (storageIdentity) {
         setActiveGuideForGame(storageIdentity, guideId, 0);
       }
@@ -253,6 +257,17 @@ export function GuideProvider({
     ) {
       queueMicrotask(() => {
         requestGuide("build_play_draw");
+      });
+      return;
+    }
+
+    if (
+      selfPhase === "battle"
+      && guideContext.showBattleSubmitPopover
+      && !seenGuides.has("battle_result_submit")
+    ) {
+      queueMicrotask(() => {
+        requestGuide("battle_result_submit");
       });
       return;
     }
