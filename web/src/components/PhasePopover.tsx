@@ -2,7 +2,6 @@ import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
 import type { Phase } from '../constants/phases'
-import { useGuideContext } from '../guided/guideState'
 
 const PHASE_TITLE_COLOR: Record<Phase, string> = {
   draft: 'text-purple-300',
@@ -13,7 +12,6 @@ const PHASE_TITLE_COLOR: Record<Phase, string> = {
 
 interface PhasePopoverProps {
   phase: Phase
-  currentPhase: Phase
   anchorRect: DOMRect
   useUpgrades: boolean
   isClosing?: boolean
@@ -24,7 +22,6 @@ interface PhasePopoverProps {
 
 export function PhasePopover({
   phase,
-  currentPhase,
   anchorRect,
   useUpgrades,
   isClosing = false,
@@ -34,7 +31,6 @@ export function PhasePopover({
 }: PhasePopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null)
   const arrowRef = useRef<HTMLDivElement>(null)
-  const { startGuide } = useGuideContext()
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -135,25 +131,6 @@ export function PhasePopover({
             <span className="text-amber-400/90 font-semibold text-[10px] uppercase tracking-wide mr-1.5">Tip</span>
             {getPhaseTip(phase)}
           </p>
-        </div>
-
-        <div className="mt-3 pt-3 border-t border-amber-400/10 flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => { onClose(); startGuide("welcome", true); }}
-            className="btn btn-secondary text-xs py-1 px-3"
-          >
-            Replay Welcome
-          </button>
-          {phase === currentPhase && (
-            <button
-              type="button"
-              onClick={() => { onClose(); startGuide(phase, true); }}
-              className="btn btn-primary text-xs py-1 px-3"
-            >
-              Interactive Walkthrough
-            </button>
-          )}
         </div>
       </div>
     </div>,

@@ -457,6 +457,7 @@ export function BuildPhase({
         zoneTargetIds={{
           hand: "build-hand",
           battlefield: "build-battlefield",
+          sideboard: "build-sideboard",
         }}
         handLabel="Hand"
         handContent={

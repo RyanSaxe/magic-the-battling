@@ -1,4 +1,4 @@
-import type { Card as GameCard } from "../types";
+import { THE_VANQUISHER_IMAGE } from "../constants/assets";
 import type {
   ConditionalGuideId,
   GuideDefinition,
@@ -7,20 +7,12 @@ import type {
   GuidedWalkthroughContext,
 } from "./types";
 
-const TREASURE_EXCEPTION_NAMES = new Set([
-  "An Offer You Can't Refuse",
-]);
-
 const CONDITIONAL_GUIDE_PRIORITY: ConditionalGuideId[] = [
   "hint_treasure_producer",
   "hint_treasure_cap",
-  "hint_reward_three_three",
-  "hint_build_unapplied_upgrade",
 ];
 
-interface ConditionalGuideOptions {
-  isFirstBuildGuide: boolean;
-}
+const TREASURE_EXCEPTION_NAMES = new Set(["An Offer You Can't Refuse"]);
 
 function escapeSelectorValue(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -31,38 +23,16 @@ function cardSelector(cardId?: string | null): string | undefined {
   return `[data-guide-card-id="${escapeSelectorValue(cardId)}"]`;
 }
 
-function latestBattlefieldCardSelector(ctx: GuidedWalkthroughContext): string | undefined {
-  if (ctx.selectedBattleCardId && ctx.selectedBattleCardZone === "battlefield") {
-    return cardSelector(ctx.selectedBattleCardId);
-  }
-
-  const battlefield = ctx.currentBattle?.your_zones.battlefield ?? [];
-  const card = battlefield[battlefield.length - 1] ?? battlefield[0];
-  return cardSelector(card?.id);
-}
-
-function rewardStageReached(ctx: GuidedWalkthroughContext): boolean {
-  return ctx.currentPhase === "reward"
-    && !!ctx.selfPlayer
-    && ctx.selfPlayer.stage === 3
-    && ctx.selfPlayer.round === 3;
-}
-
-function currentPack(ctx: GuidedWalkthroughContext): GameCard[] {
+function currentPack(ctx: GuidedWalkthroughContext) {
   return ctx.selfPlayer?.current_pack ?? [];
 }
 
-function draftPool(ctx: GuidedWalkthroughContext): GameCard[] {
+function buildPool(ctx: GuidedWalkthroughContext) {
   if (!ctx.selfPlayer) return [];
   return [...ctx.selfPlayer.hand, ...ctx.selfPlayer.sideboard];
 }
 
-function buildPool(ctx: GuidedWalkthroughContext): GameCard[] {
-  if (!ctx.selfPlayer) return [];
-  return [...ctx.selfPlayer.hand, ...ctx.selfPlayer.sideboard];
-}
-
-function cardProducesTreasure(card: GameCard): boolean {
+function cardProducesTreasure(card: { name: string; tokens?: { name: string; type_line: string }[] }): boolean {
   if (TREASURE_EXCEPTION_NAMES.has(card.name)) return false;
   return (card.tokens ?? []).some((token) => {
     const name = token.name.toLowerCase();
@@ -71,510 +41,325 @@ function cardProducesTreasure(card: GameCard): boolean {
   });
 }
 
-function findTreasureProducer(cards: GameCard[]): GameCard | null {
-  return cards.find(cardProducesTreasure) ?? null;
-}
-
-function counterTotal(counters: Record<string, Record<string, number>>): number {
-  return Object.values(counters).reduce(
-    (outerTotal, counterMap) =>
-      outerTotal + Object.values(counterMap).reduce((inner, count) => inner + count, 0),
-    0,
-  );
-}
-
-function ids(cards: GameCard[]): string[] {
-  return cards.map((card) => card.id);
-}
-
-function differsFromSnapshot(snapshot: string | number | boolean | null | undefined, current: string): boolean {
-  return String(snapshot ?? "") !== current;
-}
-
-function buildReplaySteps(): GuideStepDefinition[] {
-  return [
-    {
-      id: "setup",
-      title: "Build Sets Up The Battle",
-      targetId: "build-workspace",
-      placement: "right",
-      content: {
-        summary: "Your chosen hand is the hand you start the battle with.",
-        detail: "3 basics and your treasure begin untapped on the battlefield. Battles start at 10 life with no libraries.",
-      },
-    },
-    {
-      id: "workspace",
-      title: "You Are Already Locked In",
-      targetId: "build-workspace",
-      placement: "right",
-      content: {
-        summary: "Since you already submitted, this guide is explanation-only.",
-        detail: "If you need to change anything, use Change first, then rebuild and resubmit.",
-      },
-    },
-    {
-      id: "ready-state",
-      title: "Waiting For The Next Phase",
-      targetId: "build-submit",
-      placement: "top",
-      content: {
-        summary: "You have already submitted this build.",
-        detail: "Once everyone is ready, the game moves into battle.",
-      },
-    },
-  ];
-}
-
-function buildInteractiveSteps(): GuideStepDefinition[] {
-  return [
-    {
-      id: "setup",
-      title: "Build Decides The Battle Setup",
-      targetId: "build-workspace",
-      placement: "right",
-      spotlightPadding: 8,
-      content: {
-        summary: "You are choosing the exact setup for the next battle, not building a deck in the abstract.",
-        detail: "3 basics and your treasure start untapped on the battlefield, your chosen hand starts in hand, and battles begin at 10 life with no libraries.",
-      },
-    },
-    {
-      id: "build-setup",
-      title: "Choose Basics And Hand Together",
-      targetId: "build-workspace",
-      placement: "right",
-      spotlightPadding: 8,
-      content: {
-        summary: "Choose all 3 basics and your full starting hand. Click a slot, then click the card to place.",
-        actionHint: (ctx) => {
-          const basicsLeft = 3 - ctx.selectedBasicsCount;
-          const handLeft = ctx.handSize - ctx.handCount;
-          if (basicsLeft > 0 && handLeft > 0) return `${basicsLeft} basics and ${handLeft} hand slots remaining.`;
-          if (basicsLeft > 0) return `${basicsLeft} basics remaining.`;
-          if (handLeft > 0) return `${handLeft} hand slots remaining.`;
-          return "Setup complete — submit when ready.";
-        },
-      },
-      completion: {
-        type: "condition",
-        allowInteraction: true,
-        isComplete: (ctx) =>
-          ctx.selectedBasicsCount === 3 && ctx.handCount === ctx.handSize,
-      },
-    },
-    {
-      id: "submit",
-      title: "Open The Build Submission",
-      targetId: "build-submit",
-      placement: "top",
-      content: {
-        summary: "Submit your build here to open the play/draw choice.",
-        actionHint: "Click the submit button to continue.",
-      },
-      completion: { type: "target-click" },
-      onEnter: (ctx) => {
-        if (ctx.showBuildSubmitPopover) {
-          ctx.closeGameplayOverlays();
-        }
-      },
-    },
-    {
-      id: "play-draw",
-      title: "Pick Play Or Draw",
-      targetId: "build-submit-popover",
-      placement: "top",
-      content: {
-        summary: "Play/draw is part of your build — this choice is submitted along with your basics and hand.",
-        detail: "The player with the most poison gets their choice; ties are broken randomly.",
-        actionHint: "Select play or draw to finish.",
-      },
-      completion: {
-        type: "condition",
-        isComplete: (ctx) => ctx.buildReady || ctx.buildReadyPending,
-      },
-    },
-  ];
-}
-
-function buildDraftSteps(ctx: GuidedWalkthroughContext): GuideStepDefinition[] {
-  const steps: GuideStepDefinition[] = [
-    {
-      id: "pack",
-      title: "Draft Improves Your Pool",
-      targetId: "draft-pack",
-      placement: "right",
-      content: {
-        summary: "Draft is the between-battles improvement phase.",
-        detail: "Decide whether any cards in the current pack should replace part of your pool.",
-      },
-    },
-    {
-      id: "swap",
-      title: "Make One Real Swap",
-      targetId: ctx.isMobile ? "phase-action-bar" : "draft-pack",
-      placement: ctx.isMobile ? "top" : "right",
-      content: {
-        summary: "Keep both the pack and your pool in view, then swap one card between them.",
-        detail: "Select a card from the pack, then a card from your pool to trade places.",
-        actionHint: "Swap one pack card with one pool card to continue.",
-        minimizedText: "Make one real pack-to-pool swap.",
-      },
-      completion: {
-        type: "condition",
-        allowInteraction: true,
-        isComplete: (ctx, meta) =>
-          differsFromSnapshot(meta?.packIds, ids(currentPack(ctx)).join(","))
-          && differsFromSnapshot(meta?.poolIds, ids(draftPool(ctx)).join(",")),
-      },
-      onEnter: (ctx) => ({
-        packIds: ids(currentPack(ctx)).join(","),
-        poolIds: ids(draftPool(ctx)).join(","),
-      }),
-    },
-    {
-      id: "actions",
-      title: "Spend Treasure Carefully",
-      targetId: "phase-action-bar",
-      placement: "top",
-      content: {
-        summary: "Spend a treasure to roll for a fresh pack — but treasures persist across phases.",
-        detail: "When satisfied, continue on to build the next battle setup.",
-      },
-    },
-  ];
-
-  if (ctx.isMobile) {
-    steps.push({
-      id: "open-sidebar",
-      title: "Open The Sidebar Last",
-      targetId: "sidebar-toggle",
-      placement: "left",
-      content: {
-        summary: "One last draft tool on mobile lives behind the hamburger button.",
-        detail: "Use it after comparing the pack and your pool to scout opponents before locking in later decisions.",
-        actionHint: "Open the sidebar to continue.",
-        minimizedText: "Open the mobile sidebar.",
-      },
-      completion: {
-        type: "condition",
-        allowInteraction: true,
-        isComplete: (stepCtx) => stepCtx.sidebarOpen,
-      },
-    });
+function findTreasureProducer(
+  ctx: GuidedWalkthroughContext,
+): { cardId: string; phase: "build" | "draft" } | null {
+  if (ctx.currentPhase === "build") {
+    const source = buildPool(ctx).find(cardProducesTreasure);
+    return source ? { cardId: source.id, phase: "build" } : null;
   }
 
-  steps.push({
-    id: "open-opponents-tab",
-    title: "Scout The Table",
-    targetId: "sidebar-tab-opponents",
-    placement: "left",
-    content: {
-      summary: "One last draft input is what your opponents have already shown.",
-      detail: "Switch to Opponents so you can use that information to inform future picks, rolls, and builds.",
-      actionHint: "Open the Opponents tab to continue.",
-      minimizedText: "Open the Opponents tab in the sidebar.",
-    },
-    completion: {
-      type: "condition",
-      allowInteraction: true,
-      isComplete: (ctx) => ctx.revealedPlayerTab === "opponents",
-    },
-  });
+  if (ctx.currentPhase === "draft") {
+    const source = currentPack(ctx).find(cardProducesTreasure);
+    return source ? { cardId: source.id, phase: "draft" } : null;
+  }
 
-  steps.push({
-    id: "pick-opponent",
-    title: "Inspect One Opponent",
-    targetId: "sidebar-opponent-list",
-    placement: "left",
-    content: {
-      summary: "Click any opponent row to inspect what they have revealed so far.",
-      detail: "You are looking for signals about likely archetypes, resource pressure, and how much you may need to prepare for them.",
-      actionHint: "Pick an opponent row to continue.",
-      minimizedText: "Choose an opponent from the sidebar.",
-    },
-    completion: {
-      type: "condition",
-      allowInteraction: true,
-      isComplete: (ctx) => !!ctx.revealedPlayerName,
-    },
-  });
-
-  steps.push({
-    id: "read-opponent-row",
-    title: "Read The Row, Not Just The Name",
-    targetSelector: (ctx) =>
-      ctx.revealedPlayerName
-        ? `[data-guide-player-row="${escapeSelectorValue(ctx.revealedPlayerName)}"]`
-        : undefined,
-    targetId: "sidebar-opponent-list",
-    placement: "left",
-    content: {
-      summary: "This row tells you how likely you are to face them, how much treasure and poison they have, and where they are in the game loop.",
-      detail: "Those numbers should affect how aggressively you draft and how much you respect their likely next battle.",
-    },
-  });
-
-  steps.push({
-    id: "revealed-cards",
-    title: "Use Revealed Cards To Draft Smarter",
-    targetId: "sidebar-revealed-details",
-    placement: "left",
-    content: {
-      summary: "The revealed cards section shows what this player has exposed in recent battles.",
-      detail: "That helps you infer colors, likely threats, and whether you should value interaction, mana, or speed more highly.",
-    },
-  });
-
-  return steps;
+  return null;
 }
 
-function buildBattleSteps(includePuppetPractice: boolean): GuideStepDefinition[] {
+function buildWelcomeGuide(): GuideDefinition {
+  return {
+    id: "welcome",
+    label: "Welcome",
+    showSkipAll: true,
+    steps: [
+      {
+        id: "intro",
+        title: "Welcome To Magic: The Battling",
+        placement: "center",
+        primaryActionLabel: "Show me the loop",
+        content: {
+          summary: "You improve your pool between battles, then play short manual games until only one player remains.",
+          detail: "This guide just points out the important parts. It does not make you click through fake actions.",
+        },
+      },
+      {
+        id: "three-one",
+        title: "You Start At 3-1",
+        targetId: "timeline-stage-round",
+        placement: "bottom",
+        primaryActionLabel: "Next",
+        content: {
+          summary: "The left side of the timeline shows your current stage and round. Right now you are at 3-1.",
+          detail: "The very first draft is skipped, so 3-1 starts directly in build. That should be easy to spot here because build is the live phase.",
+        },
+      },
+      {
+        id: "draft",
+        title: "Draft Improves Your Pool",
+        targetId: "timeline-phase-draft",
+        placement: "bottom",
+        primaryActionLabel: "Next",
+        content: {
+          summary: "Draft is where you trade cards between the current pack and your pool.",
+          detail: "You do not start there at 3-1, but after this first battle loop draft becomes the first step each round.",
+        },
+      },
+      {
+        id: "build",
+        title: "Build Sets Up The Next Battle",
+        targetId: "timeline-phase-build",
+        placement: "bottom",
+        primaryActionLabel: "Next",
+        content: {
+          summary: "Build is where you choose your starting hand and battlefield setup for the next battle.",
+          detail: "That is why your first real tutorial after Welcome is the build intro.",
+        },
+      },
+      {
+        id: "battle",
+        title: "Battle Is The Real Game",
+        targetId: "timeline-phase-battle",
+        placement: "bottom",
+        primaryActionLabel: "Next",
+        content: {
+          summary: "Battle is not automated. You play the board state manually.",
+          detail: "You move cards, tap permanents, and submit the result when the game is over.",
+        },
+      },
+      {
+        id: "reward",
+        title: "Reward Resets You Into The Loop",
+        targetId: "timeline-phase-reward",
+        placement: "bottom",
+        primaryActionLabel: "Next",
+        content: {
+          summary: "Reward gives you treasure and card progression after battle.",
+          detail: "That is the bridge back into the next draft-build-battle cycle.",
+        },
+      },
+      {
+        id: "three-two",
+        title: "3-2 Starts The Repeating Loop",
+        targetId: "timeline-next-stage-round",
+        placement: "bottom",
+        primaryActionLabel: "I understand",
+        content: {
+          summary: "When the right side shows 3-2, that means the next round begins with draft.",
+          detail: "That is the full loop from here on: draft, build, battle, reward, then back around again.",
+        },
+      },
+    ],
+  };
+}
+
+function buildBuildGuide(): GuideDefinition {
+  return {
+    id: "build",
+    label: "Build",
+    phase: "build",
+    steps: [
+      {
+        id: "hand",
+        title: "This Is Your Starting Hand",
+        targetId: "build-hand",
+        placement: "bottom",
+        primaryActionLabel: "Next",
+        content: {
+          summary: "Your hand here becomes the hand you start battle with.",
+          detail: "Use build to decide exactly which cards you want available on turn one.",
+        },
+      },
+      {
+        id: "battlefield",
+        title: "This Battlefield Row Is Your Opening Setup",
+        targetId: "build-battlefield",
+        placement: "bottom",
+        primaryActionLabel: "Next",
+        content: {
+          summary: "Your basics, treasure, and poison tracker live here.",
+          detail: "Those basics are part of your battle setup, not just deck construction bookkeeping.",
+        },
+      },
+      {
+        id: "sideboard",
+        title: "Everything Else Waits In Sideboard",
+        targetId: "build-sideboard",
+        placement: "right",
+        primaryActionLabel: "Ready to build",
+        content: {
+          summary: "Your sideboard is the rest of your pool for this round.",
+          detail: "Move cards between sideboard and hand until the setup looks right, then submit.",
+        },
+      },
+    ],
+  };
+}
+
+function buildPlayDrawGuide(): GuideDefinition {
+  return {
+    id: "build_play_draw",
+    label: "Build",
+    phase: "build",
+    steps: [
+      {
+        id: "play-draw",
+        title: "Submit Includes Play Or Draw",
+        targetId: "build-submit-popover",
+        placement: "top",
+        primaryActionLabel: "Got it",
+        content: {
+          summary: "This choice is part of locking in your build for the battle.",
+          detail: "Choose whether you want to be on the play or on the draw, then your setup is submitted.",
+        },
+      },
+    ],
+  };
+}
+
+function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   const steps: GuideStepDefinition[] = [
     {
-      id: "manual-not-auto",
-      title: "Battle Is A Real Game",
-      targetId: "battle-board",
-      placement: "right",
-      spotlightPadding: 12,
+      id: "hand",
+      title: "Hand To Battlefield Is The Main Flow",
+      targetId: "battle-hand" as const,
+      placement: "top" as const,
+      primaryActionLabel: "Next",
       content: {
-        summary: "This is not an auto-battle — you are playing a real mini-game of Magic on this board.",
-        detail: "New players get tripped up here most often, so keep that mental model front and center.",
+        summary: "Drag cards from your hand onto the battlefield as you play them.",
+        detail: "That is the core board interaction you will use most often in battle.",
       },
     },
     {
-      id: "battle-setup",
-      title: "The Special Battle Rules",
-      targetId: "battle-board",
-      placement: "right",
-      spotlightPadding: 12,
+      id: "battlefield",
+      title: "Use The Battlefield To Track Play",
+      targetId: "battle-battlefield" as const,
+      placement: "right" as const,
+      primaryActionLabel: ctx.currentBattle?.can_manipulate_opponent ? "Next" : "Got it",
       content: {
-        summary: "Battles start at 10 life with the hand and basics you chose in build already set up.",
-        detail: "Treasures persist across phases, so using them now is a real strategic decision.",
+        summary: "Double tap or double click your permanents to tap and untap them.",
+        detail: "Battle is manual, so this board is where you track the game state directly.",
       },
-    },
-    {
-      id: "tap-card",
-      title: "Double Tap To Tap",
-      targetId: "battle-board",
-      placement: "right",
-      spotlightPadding: 12,
-      content: {
-        summary: "Double tap any permanent on your battlefield to tap or untap it.",
-        detail: "That is the fastest way to mark attacks, activated abilities, or mana usage.",
-        actionHint: "Double tap one of your permanents to continue.",
-        minimizedText: "Double tap one of your permanents.",
-      },
-      completion: {
-        type: "condition",
-        allowInteraction: true,
-        isComplete: (ctx, meta) => {
-          const current = ctx.currentBattle?.your_zones.tapped_card_ids.join(",") ?? "";
-          return differsFromSnapshot(meta?.tappedIds, current);
-        },
-      },
-      onEnter: (ctx) => ({
-        tappedIds: ctx.currentBattle?.your_zones.tapped_card_ids.join(",") ?? "",
-      }),
-    },
-    {
-      id: "move-card",
-      title: "Play Onto The Battlefield",
-      targetId: "battle-board",
-      placement: "right",
-      spotlightPadding: 12,
-      content: {
-        summary: "Move a card from your hand onto the battlefield to practice the board flow.",
-        detail: "The board is the main place you will spend your time during battle.",
-        actionHint: "Move one card from your hand to your battlefield.",
-        minimizedText: "Play one card from hand to battlefield.",
-      },
-      completion: {
-        type: "condition",
-        allowInteraction: true,
-        isComplete: (ctx, meta) => {
-          const currentHand = new Set(ids(ctx.currentBattle?.your_zones.hand ?? []));
-          const currentBattlefield = new Set(ids(ctx.currentBattle?.your_zones.battlefield ?? []));
-          const initialHand = String(meta?.handIds ?? "").split(",").filter(Boolean);
-          const initialBattlefield = new Set(String(meta?.battlefieldIds ?? "").split(",").filter(Boolean));
-          return initialHand.some((cardId) => !currentHand.has(cardId) && currentBattlefield.has(cardId) && !initialBattlefield.has(cardId));
-        },
-      },
-      onEnter: (ctx) => ({
-        handIds: ids(ctx.currentBattle?.your_zones.hand ?? []).join(","),
-        battlefieldIds: ids(ctx.currentBattle?.your_zones.battlefield ?? []).join(","),
-      }),
-    },
-    {
-      id: "select-battlefield-card",
-      title: "Select That Card First",
-      targetSelector: latestBattlefieldCardSelector,
-      targetId: "battle-board",
-      placement: "right",
-      spotlightPadding: 8,
-      content: {
-        summary: "Tap the card you just played so it becomes the selected battle card.",
-        detail: "The Actions button works on the currently selected card.",
-        actionHint: "Tap the card you just moved onto the battlefield.",
-        minimizedText: "Select the card you just played.",
-      },
-      completion: {
-        type: "condition",
-        allowInteraction: true,
-        isComplete: (ctx) =>
-          !!ctx.selectedBattleCardId && ctx.selectedBattleCardZone === "battlefield",
-      },
-      onEnter: (ctx) => {
-        ctx.closeGameplayOverlays();
-      },
-    },
-    {
-      id: "open-actions",
-      title: "Now Open Actions",
-      targetId: "battle-actions",
-      placement: "left",
-      content: {
-        summary: "With a battlefield card selected, open Actions to get at the battle utility menu.",
-        detail: "Use this when you need counters, token creation, moving cards, and similar board management tools.",
-        actionHint: "Open the Actions menu.",
-        minimizedText: "Open the Actions menu.",
-      },
-      completion: {
-        type: "condition",
-        allowInteraction: true,
-        isComplete: (ctx) => ctx.actionMenuOpen,
-      },
-    },
-    {
-      id: "action-add-counter",
-      title: "Use Add Counter",
-      targetId: "battle-action-add-counter",
-      placement: "left",
-      content: {
-        summary: "Click Add Counter, then choose any counter type to put one on the selected card.",
-        detail: "That is a representative battle utility flow: select the permanent, open Actions, then apply the board change you want.",
-        actionHint: "Use Add Counter, then choose any counter type.",
-        minimizedText: "Add a counter through the Actions menu.",
-      },
-      completion: {
-        type: "condition",
-        allowInteraction: true,
-        isComplete: (ctx, meta) => {
-          const counters = ctx.currentBattle?.your_zones.counters ?? {};
-          return counterTotal(counters) > Number(meta?.counterTotal ?? 0);
-        },
-      },
-      onEnter: (ctx) => ({
-        counterTotal: counterTotal(ctx.currentBattle?.your_zones.counters ?? {}),
-      }),
     },
   ];
 
-  if (includePuppetPractice) {
+  if (ctx.currentBattle?.can_manipulate_opponent) {
     steps.push({
-      id: "puppet-practice",
-      title: "Puppets Are Frozen Real Games",
+      id: "puppet-hand",
+      title: "Puppet Battles Use Their Hand Too",
       targetId: "battle-opponent-hand",
       placement: "top",
+      primaryActionLabel: "Got it",
       content: {
-        summary: "A puppet battle is a historical game state you goldfish from both sides, then adjudicate.",
-        detail: "You are expected to move the opponent’s cards too when you are resolving what should happen.",
-        actionHint: "Move one card from the puppet's hand to the battlefield.",
-        minimizedText: "Move one puppet card from hand to battlefield.",
+        summary: "Against a puppet, you can drag and drop their cards too.",
+        detail: "Play out what you think would happen from both sides, then submit who would have won.",
       },
-      completion: {
-        type: "condition",
-        allowInteraction: true,
-        isComplete: (ctx, meta) => {
-          const currentHand = new Set(ids(ctx.currentBattle?.opponent_zones.hand ?? []));
-          const currentBattlefield = new Set(ids(ctx.currentBattle?.opponent_zones.battlefield ?? []));
-          const initialHand = String(meta?.handIds ?? "").split(",").filter(Boolean);
-          const initialBattlefield = new Set(String(meta?.battlefieldIds ?? "").split(",").filter(Boolean));
-          return initialHand.some((cardId) => !currentHand.has(cardId) && currentBattlefield.has(cardId) && !initialBattlefield.has(cardId));
-        },
-      },
-      onEnter: (ctx) => ({
-        handIds: ids(ctx.currentBattle?.opponent_zones.hand ?? []).join(","),
-        battlefieldIds: ids(ctx.currentBattle?.opponent_zones.battlefield ?? []).join(","),
-      }),
     });
   }
 
-  steps.push({
-    id: "submit-result",
-    title: "Submit The Result",
-    targetId: "battle-submit",
-    placement: "top",
-    content: {
-      summary: "When the battle ends, submit win, draw, or loss here.",
-      detail: "You can change your report if needed, and conflicts between players are shown in the UI.",
-    },
-  });
-
-  return steps;
+  return {
+    id: "battle",
+    label: "Battle",
+    phase: "battle",
+    steps,
+  };
 }
 
-function buildRewardSteps(ctx: GuidedWalkthroughContext): GuideStepDefinition[] {
-  const progressionDetail = ctx.hasRewardUpgradeChoice
-    ? "If upgrades are enabled and you just finished the stage, choose one before moving on."
-    : undefined;
-
-  return [
-    {
-      id: "result",
-      title: "Read The Result Rail First",
-      targetId: "reward-result",
-      placement: "bottom",
-      content: {
-        summary: "This rail shows whether the battle was a victory, defeat, or draw, who it was against, and how much poison was dealt or taken.",
-        detail: "Losing battles gives you poison. At 10 poison you are eliminated, so this is the right place to check how dangerous the last result really was.",
-      },
-    },
+function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
+  const steps: GuideStepDefinition[] = [
     {
       id: "rewards",
-      title: "This Is What You Gained",
-      targetId: "reward-summary",
-      placement: "right",
+      title: "Reward Always Gives Treasure Plus Card Progress",
+      targetId: "reward-summary" as const,
+      placement: "right" as const,
+      primaryActionLabel: ctx.hasRewardUpgradeChoice ? "Next" : "Got it",
       content: {
-        summary: "Rewards can include treasure, bonus cards, and progression rewards.",
-        detail: "This is the payoff phase before you loop back into improving your pool.",
-      },
-    },
-    {
-      id: "progression",
-      title: "Watch For Stage Changes",
-      targetId: "reward-progression",
-      placement: "top",
-      content: {
-        summary: "Every third reward step advances the stage and increases your starting hand size by 1.",
-        detail: progressionDetail,
+        summary: "After battle you always get a treasure and a random card.",
+        detail: "At the last round of a stage, when the right side of the timeline shows 4-1, 5-1, and so on, that random card is replaced by a Vanquisher.",
+        media: {
+          imageUrl: THE_VANQUISHER_IMAGE,
+          alt: "The Vanquisher",
+        },
       },
     },
   ];
+
+  if (ctx.hasRewardUpgradeChoice) {
+    steps.push({
+      id: "upgrades",
+      title: "This Is Also When You Pick An Upgrade",
+      targetId: "reward-upgrades",
+      placement: "top",
+      primaryActionLabel: "Got it",
+      content: {
+        summary: "If upgrades are enabled, the available upgrade choices appear here when you finish a stage.",
+        detail: "Pick one now before you continue into the next loop.",
+      },
+    });
+  }
+
+  return {
+    id: "reward",
+    label: "Reward",
+    phase: "reward",
+    steps,
+  };
+}
+
+function buildDraftGuide(): GuideDefinition {
+  return {
+    id: "draft",
+    label: "Draft",
+    phase: "draft",
+    steps: [
+      {
+        id: "pack",
+        title: "This Is The Current Pack",
+        targetId: "draft-pack",
+        placement: "right",
+        primaryActionLabel: "Next",
+        content: {
+          summary: "The pack is the temporary set of cards you can draft from right now.",
+          detail: "Click a card here, then click a card in your pool to swap them.",
+        },
+      },
+      {
+        id: "pool",
+        title: "This Is Your Pool",
+        targetId: "draft-pool",
+        placement: "right",
+        primaryActionLabel: "Next",
+        content: {
+          summary: "Your pool is the collection you are improving between battles.",
+          detail: "Each swap trades one pack card for one pool card.",
+        },
+      },
+      {
+        id: "roll",
+        title: "Roll Spends Treasure For A Fresh Pack",
+        targetId: "draft-roll",
+        placement: "top",
+        primaryActionLabel: "Ready to draft",
+        content: {
+          summary: "Use roll if you want to spend treasure on a different pack instead of drafting this one.",
+          detail: "Once you understand the pack, pool, and roll, close this and draft normally.",
+        },
+      },
+    ],
+  };
 }
 
 function buildTreasureProducerHint(ctx: GuidedWalkthroughContext): GuideDefinition {
-  const inBuild = ctx.currentPhase === "build";
-  const sourceCard = inBuild ? findTreasureProducer(buildPool(ctx)) : findTreasureProducer(currentPack(ctx));
+  const source = findTreasureProducer(ctx);
+  const isBuild = source?.phase === "build";
 
   return {
     id: "hint_treasure_producer",
-    label: inBuild ? "Build Tip" : "Draft Tip",
-    phase: inBuild ? "build" : "draft",
+    label: isBuild ? "Build Tip" : "Draft Tip",
+    phase: isBuild ? "build" : "draft",
     steps: [
       {
         id: "treasure-producer",
-        title: inBuild ? "You Already Have Treasure Acceleration" : "Treasure Producers Matter",
-        targetSelector: cardSelector(sourceCard?.id),
-        targetId: inBuild ? "build-workspace" : "draft-pack",
-        placement: inBuild ? "right" : "top",
+        title: "Treasure Production Is Worth Extra Attention",
+        targetSelector: cardSelector(source?.cardId),
+        targetId: isBuild ? "build-sideboard" : "draft-pack",
+        placement: isBuild ? "right" : "top",
+        primaryActionLabel: "Got it",
         content: {
-          summary: inBuild
-            ? "This card can produce treasure, which can turn into a real tempo spike in battle."
-            : "This pack contains a card that can produce treasure, which often means faster or more flexible battle turns later.",
-          detail: inBuild
-            ? "Because this is your first build, consider whether you want that extra burst of mana in your opening hand."
-            : "Treasure production is worth extra attention because unused treasure can carry across phases and influence future turns.",
+          summary: "This card can make treasure, which often creates a real tempo spike later.",
+          detail: isBuild
+            ? "Because build chooses your exact opening setup, it is worth thinking about whether you want this effect immediately."
+            : "Treasures carry real value across phases, so treasure-producing cards are often stronger than they first look.",
         },
       },
     ],
@@ -589,210 +374,65 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
     steps: [
       {
         id: "treasure-cap",
-        title: "Use Treasure Before You Lose One",
+        title: "You Are At 6 Treasure",
         targetId: ctx.isMobile ? "draft-mobile-treasure" : "sidebar-current-player-treasure",
         placement: ctx.isMobile ? "right" : "left",
+        primaryActionLabel: "Got it",
         content: {
-          summary: "You have reached 6 treasures.",
-          detail: "After battle you only keep 5, so either roll now or build a hand that will actually spend the surplus.",
-          minimizedText: "You only keep 5 treasures after battle.",
+          summary: "After battle you only keep 5 treasure.",
+          detail: "If you can, spend one now on a roll or plan to convert the extra treasure in the next fight.",
         },
       },
     ],
   };
 }
 
-function buildRewardThreeThreeHint(ctx: GuidedWalkthroughContext): GuideDefinition {
-  const steps: GuideStepDefinition[] = [
-    {
-      id: "three-three-progress",
-      title: "3-3 Means A Bigger Starting Hand",
-      targetSelector: cardSelector("reward:vanquisher"),
-      targetId: "reward-progression",
-      placement: "top",
-      content: {
-        summary: "This reward pushes your starting hand size up by 1.",
-        detail: "That changes how you should value curve, mana smoothing, and payoff cards going into the next loop.",
-      },
-    },
-  ];
-
-  if (ctx.hasRewardUpgradeChoice) {
-    steps.push({
-      id: "three-three-upgrades",
-      title: "Read The Upgrades As Real Build Decisions",
-      targetId: "reward-upgrades",
-      placement: "top",
-      content: {
-        summary: "Upgrades can make your next battle stronger immediately, but they are also long-term positioning decisions.",
-        detail: "Compare immediate power to whether the effect is worth saving for a better target later.",
-      },
-    });
-  }
-
-  return {
-    id: "hint_reward_three_three",
-    label: "Reward Tip",
-    phase: "reward",
-    steps,
-  };
-}
-
-function buildUnappliedUpgradeHint(): GuideDefinition {
-  return {
-    id: "hint_build_unapplied_upgrade",
-    label: "Build Tip",
-    phase: "build",
-    steps: [
-      {
-        id: "unapplied-upgrade",
-        title: "You Can Apply An Upgrade Right Now",
-        targetId: "build-workspace",
-        placement: "right",
-        content: {
-          summary: "During build, upgrades let you sharpen this specific battle setup instead of improving your pool in the abstract.",
-          detail: "Applying now can make the next fight stronger, but waiting can be better if you expect a more valuable target later.",
-        },
-      },
-      {
-        id: "how-to-apply",
-        title: "Applying Is Card-Centric",
-        targetId: "build-workspace",
-        placement: "right",
-        content: {
-          summary: "Select a card in your hand or sideboard and use the purple Upgrade button that appears on it.",
-          detail: "You do not have to spend the upgrade immediately, but build is where you decide whether this battle is the right moment.",
-        },
-      },
-    ],
-  };
-}
-
-export function isConditionalGuideId(guideId: GuidedGuideId): guideId is ConditionalGuideId {
+export function isConditionalGuideId(
+  guideId: GuidedGuideId,
+): guideId is ConditionalGuideId {
   return CONDITIONAL_GUIDE_PRIORITY.includes(guideId as ConditionalGuideId);
 }
 
 export function isConditionalGuideEligible(
   guideId: ConditionalGuideId,
   ctx: GuidedWalkthroughContext,
-  options: ConditionalGuideOptions,
 ): boolean {
   switch (guideId) {
     case "hint_treasure_producer":
-      if (ctx.currentPhase === "build" && options.isFirstBuildGuide) {
-        return !!findTreasureProducer(buildPool(ctx));
-      }
-      if (ctx.currentPhase === "draft") {
-        return !!findTreasureProducer(currentPack(ctx));
-      }
-      return false;
+      return !!findTreasureProducer(ctx);
     case "hint_treasure_cap":
       return ctx.currentPhase === "draft" && (ctx.selfPlayer?.treasures ?? 0) >= 6;
-    case "hint_reward_three_three":
-      return rewardStageReached(ctx);
-    case "hint_build_unapplied_upgrade":
-      return ctx.currentPhase === "build" && !!ctx.selfPlayer?.upgrades.some((upgrade) => !upgrade.upgrade_target);
   }
 }
 
 export function getEligibleConditionalGuides(
   ctx: GuidedWalkthroughContext,
-  options: ConditionalGuideOptions,
 ): ConditionalGuideId[] {
   return CONDITIONAL_GUIDE_PRIORITY.filter((guideId) =>
-    isConditionalGuideEligible(guideId, ctx, options),
+    isConditionalGuideEligible(guideId, ctx),
   );
 }
 
 export function buildGuideDefinition(
   guideId: GuidedGuideId,
   ctx: GuidedWalkthroughContext,
-  isReplay: boolean,
 ): GuideDefinition {
   switch (guideId) {
     case "welcome":
-      return {
-        id: "welcome",
-        label: "Welcome",
-        steps: [
-          {
-            id: "intro",
-            title: "Welcome To Magic: The Battling",
-            placement: "center",
-            content: {
-              summary: "The game alternates between improving your pool and playing short battles until only one player remains.",
-              detail: "The battle itself is a real game you play manually, not an auto-battler.",
-            },
-          },
-          {
-            id: "start-state",
-            title: "You Start In Build",
-            targetId: "timeline-current-phase",
-            placement: "bottom",
-            content: {
-              summary: "You are starting in build right now.",
-              detail: "Draft normally comes first, but the game skips it at the very start so everyone builds a first battle setup.",
-            },
-          },
-          {
-            id: "loop",
-            title: "Track The Game Loop Here",
-            targetId: "timeline-stage-round",
-            placement: "bottom",
-            content: {
-              summary: "This header shows your current stage and round. Your stage matches your starting hand size.",
-              detail: "The main loop is draft → build → battle → reward. Build picks your setup, battle is the real game, and reward resets you for the next cycle.",
-            },
-          },
-          {
-            id: "handoff",
-            title: "You Can Reopen Guides Later",
-            targetId: "timeline-current-phase",
-            placement: "bottom",
-            content: {
-              summary: "Open the phase popup from the timeline to relaunch any walkthrough.",
-              detail: "The build guide is next because that is the phase you are actually in.",
-              actionHint: "Click the current phase in the timeline.",
-            },
-            completion: { type: "target-click" },
-          },
-        ],
-      };
+      return buildWelcomeGuide();
     case "build":
-      return {
-        id: "build",
-        label: "Build",
-        phase: "build",
-        steps: isReplay && ctx.buildReady ? buildReplaySteps() : buildInteractiveSteps(),
-      };
+      return buildBuildGuide();
+    case "build_play_draw":
+      return buildPlayDrawGuide();
     case "battle":
-      return {
-        id: "battle",
-        label: "Battle",
-        phase: "battle",
-        steps: buildBattleSteps(ctx.canManipulateOpponent),
-      };
+      return buildBattleGuide(ctx);
     case "reward":
-      return {
-        id: "reward",
-        label: "Reward",
-        phase: "reward",
-        steps: buildRewardSteps(ctx),
-      };
+      return buildRewardGuide(ctx);
     case "draft":
-      return {
-        id: "draft",
-        label: "Draft",
-        phase: "draft",
-        steps: buildDraftSteps(ctx),
-      };
+      return buildDraftGuide();
     case "hint_treasure_producer":
       return buildTreasureProducerHint(ctx);
     case "hint_treasure_cap":
       return buildTreasureCapHint(ctx);
-    case "hint_reward_three_three":
-      return buildRewardThreeThreeHint(ctx);
-    case "hint_build_unapplied_upgrade":
-      return buildUnappliedUpgradeHint();
   }
 }

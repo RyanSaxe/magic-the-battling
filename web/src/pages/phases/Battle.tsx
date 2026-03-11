@@ -479,7 +479,10 @@ export function BattlePhase({
         <div className="flex shrink-0 overflow-hidden" style={{ height: handHeight + bfHeight }}>
           <div className="flex flex-col flex-1 min-w-0">
             {/* Your battlefield */}
-            <div className="relative flex-1 min-w-0 battlefield overflow-hidden">
+            <div
+              className="relative flex-1 min-w-0 battlefield overflow-hidden"
+              data-guide-target="battle-battlefield"
+            >
               <BattlefieldZone
                 cards={your_zones.battlefield}
                 selectedCardId={selectedCard?.card.id}
@@ -503,7 +506,11 @@ export function BattlePhase({
               />
             </div>
             {/* Your hand */}
-            <div className="shrink-0 zone-hand overflow-hidden battle-hand-separator-top" style={{ height: handHeight }}>
+            <div
+              className="shrink-0 zone-hand overflow-hidden battle-hand-separator-top"
+              style={{ height: handHeight }}
+              data-guide-target="battle-hand"
+            >
               <HandZone
                 cards={your_zones.hand}
                 selectedCardId={selectedCard?.card.id}

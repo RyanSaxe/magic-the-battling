@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import type { Phase } from "../constants/phases";
 import type { RulesPanelTarget } from "./RulesPanel";
 import { PhasePopover } from "./PhasePopover";
+import { GuideStateContext } from "../guided/guideState";
 
 const PHASES: Phase[] = ["draft", "build", "battle", "reward"];
 
@@ -84,6 +85,8 @@ export function PhaseTimeline({
   title,
   headerClassName,
 }: PhaseTimelineProps) {
+  const guideState = useContext(GuideStateContext);
+  const welcomeGuideActive = guideState?.guideRequest?.guideId === "welcome";
   const [popoverPhase, setPopoverPhase] = useState<Phase | null>(null);
   const [popoverAnchorRect, setPopoverAnchorRect] = useState<DOMRect | null>(null);
   const [isPopoverClosing, setIsPopoverClosing] = useState(false);
@@ -166,12 +169,15 @@ export function PhaseTimeline({
   }, [beginClosingPopover]);
 
   const handlePhaseClick = useCallback((phase: Phase) => {
+    if (welcomeGuideActive) {
+      return;
+    }
     if (popoverPhase === phase) {
       handleClosePopover();
       return;
     }
     openPopoverForPhase(phase);
-  }, [handleClosePopover, openPopoverForPhase, popoverPhase]);
+  }, [handleClosePopover, openPopoverForPhase, popoverPhase, welcomeGuideActive]);
 
   useEffect(() => {
     if (!autoOpenPhase) return;
@@ -267,13 +273,14 @@ export function PhaseTimeline({
                 <span className="text-gray-600 text-xs">→</span>
                 <button
                   ref={(el) => { phaseButtonRefs.current[phase] = el; }}
+                  disabled={welcomeGuideActive}
                   onClick={() => handlePhaseClick(phase)}
-                  data-guide-target={isActive ? "timeline-current-phase" : undefined}
+                  data-guide-target={`timeline-phase-${phase}`}
                   className={`text-xs sm:text-sm font-medium capitalize transition-colors cursor-pointer
                     ${isActive ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
                     ${isCompleted ? "text-gray-500 line-through decoration-gray-600" : ""}
                     ${isUpcoming ? "text-gray-500" : ""}
-                    hover:brightness-125
+                    ${welcomeGuideActive ? "cursor-default hover:brightness-100" : "hover:brightness-125"}
                   `}
                 >
                   {phase}
@@ -283,7 +290,10 @@ export function PhaseTimeline({
           })}
 
           <span className="text-gray-600 text-xs">→</span>
-          <span className="text-xs sm:text-sm text-gray-500 font-mono">
+          <span
+            className="text-xs sm:text-sm text-gray-500 font-mono"
+            data-guide-target="timeline-next-stage-round"
+          >
             {nextStage}-{nextRound}
           </span>
         </div>
@@ -300,7 +310,6 @@ export function PhaseTimeline({
       {popoverPhase && popoverAnchorRect && (
         <PhasePopover
           phase={popoverPhase}
-          currentPhase={currentPhase}
           anchorRect={popoverAnchorRect}
           useUpgrades={useUpgrades}
           isClosing={isPopoverClosing}

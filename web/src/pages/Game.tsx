@@ -8,7 +8,7 @@ import {
   createSpectateRequest,
   getSpectateRequestStatus,
 } from "../api/client";
-import type { GameState, GameStatusResponse, ZoneName } from "../types";
+import type { GameStatusResponse, ZoneName } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
 import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
@@ -67,27 +67,6 @@ type OverlayKey =
   | "battleSubmit"
   | "battlePanel"
   | "battleZoneModal";
-
-function serializeBattleState(gameState: GameState | null): string {
-  if (!gameState?.current_battle) {
-    return "";
-  }
-
-  const battle = gameState.current_battle;
-  const zoneIds = (ids: { id: string }[]) => ids.map((card) => card.id).join(",");
-
-  return [
-    zoneIds(battle.your_zones.hand),
-    zoneIds(battle.your_zones.battlefield),
-    zoneIds(battle.your_zones.graveyard),
-    zoneIds(battle.your_zones.exile),
-    zoneIds(battle.opponent_zones.hand),
-    zoneIds(battle.opponent_zones.battlefield),
-    zoneIds(battle.opponent_zones.graveyard),
-    zoneIds(battle.opponent_zones.exile),
-    battle.current_turn_name,
-  ].join("|");
-}
 
 function scheduledEasternFromNotice(message: string): string | null {
   const match = SCHEDULED_UTC_RE.exec(message);
@@ -467,7 +446,7 @@ function GameGuideLayer({
   rootRef: React.RefObject<HTMLElement | null>;
   context: GuidedWalkthroughContext;
 }) {
-  const { guideRequest, handleGuideClose } = useGuideContext();
+  const { guideRequest, finishGuide, skipTutorial } = useGuideContext();
   if (!guideRequest) return null;
   return (
     <GuidedWalkthrough
@@ -475,7 +454,8 @@ function GameGuideLayer({
       rootRef={rootRef}
       request={guideRequest}
       context={context}
-      onClose={(guideId) => handleGuideClose(guideId)}
+      onClose={finishGuide}
+      onSkipAll={skipTutorial}
     />
   );
 }
@@ -983,7 +963,6 @@ function GameContent() {
   const currentPhase = gameState.self_player.phase;
 
   const { self_player, current_battle } = gameState;
-  const battleStateHash = serializeBattleState(gameState);
 
   const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
@@ -1024,21 +1003,7 @@ function GameContent() {
     revealedPlayerTab: state.revealedPlayerTab,
     useUpgrades: gameState.use_upgrades,
     hasRewardUpgradeChoice: needsUpgrade,
-    selectedBasicsCount: selectedBasics.filter(Boolean).length,
-    handCount: self_player.hand.length,
-    handSize: maxHandSize,
-    buildReady: self_player.build_ready,
-    buildReadyPending,
     showBuildSubmitPopover: showSubmitHandPopover,
-    showBattleSubmitPopover: showSubmitResultPopover,
-    actionMenuOpen,
-    selectedBattleCardId: battleSelectedCard?.card.id ?? null,
-    selectedBattleCardZone: battleSelectedCard?.zone ?? null,
-    canManipulateOpponent,
-    battleStateHash,
-    closeGameplayOverlays,
-    openBuildSubmitPopover,
-    openBattleSubmitPopover,
   };
 
   const handleContinue = () => {
@@ -1086,6 +1051,7 @@ function GameContent() {
               (self_player.current_pack?.length ?? 0) === 0
             }
             className="btn bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            data-guide-target="draft-roll"
           >
             Roll for 1💰
           </button>
@@ -1461,6 +1427,7 @@ function GameContent() {
         <GuideProvider
           gameId={gameId}
           playerId={session?.playerId}
+          playerName={self_player.name}
           selfPhase={selfPhase}
           guideContext={guideContext}
           isSpectator={isSpectator}
