@@ -266,7 +266,7 @@ export function RewardPhase({
   const isWinner = last_battle_result?.winner_name === self_player.name;
   const isDraw = last_battle_result?.is_draw;
   const resultLabel = !last_battle_result
-    ? "Rewards"
+    ? "Round Wrap-Up"
     : isDraw
       ? "Draw"
       : isWinner
@@ -287,7 +287,7 @@ export function RewardPhase({
         last_battle_result.poison_dealt,
         last_battle_result.poison_taken,
       )
-    : "No rewards this round";
+    : "No loot this round";
 
   return (
     <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
@@ -320,7 +320,7 @@ export function RewardPhase({
       >
         {hasUpgradeSection && persistedLayout.canReset && (
           <LayoutResetControl
-            phaseLabel="Reward"
+            phaseLabel="Round Wrap-Up"
             currentStage={self_player.stage}
             currentRound={self_player.round}
             originStage={persistedLayout.originStage}
@@ -337,12 +337,12 @@ export function RewardPhase({
           style={rewardsStyle}
           data-guide-target="reward-summary"
         >
-          <ZoneLabel>Rewards</ZoneLabel>
+          <ZoneLabel>Loot</ZoneLabel>
           {rewardItems.length === 0 ? (
             <div className="flex items-center justify-center min-h-full">
               <EmptyZoneTile
                 dimensions={rewardsDims}
-                label="No rewards this round"
+                label="No loot this round"
               />
             </div>
           ) : !hasUpgradeSection ? (
@@ -385,8 +385,8 @@ export function RewardPhase({
             className="mt-4 rounded-lg border border-amber-500/15 bg-black/25 px-3 py-2 text-center text-xs text-gray-300"
           >
             <span className="text-amber-300 font-medium">Round progression:</span>{" "}
-            every third reward increases starting hand size by 1.
-            {hasUpgradeSection ? " This reward also includes an upgrade choice." : ""}
+            the third round of each stage adds The Vanquisher, increases starting hand size by 1, and advances you to the next stage.
+            {hasUpgradeSection ? " This stage-end wrap-up also includes an upgrade choice." : ""}
           </div>
         </div>
 

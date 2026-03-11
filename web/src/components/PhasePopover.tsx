@@ -1,6 +1,6 @@
 import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
+import { getPhaseReferenceLabel, getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
 import type { Phase } from '../constants/phases'
 
 const PHASE_TITLE_COLOR: Record<Phase, string> = {
@@ -97,8 +97,8 @@ export function PhasePopover({
       />
 
       <div className="modal-chrome border-b gold-border rounded-t-lg px-3 py-2 flex items-center justify-between gap-2">
-        <span className={`text-sm font-semibold capitalize ${PHASE_TITLE_COLOR[phase]}`}>
-          {phase} Phase
+        <span className={`text-sm font-semibold ${PHASE_TITLE_COLOR[phase]}`}>
+          {getPhaseReferenceLabel(phase)}
         </span>
         <div className="flex items-center gap-1.5">
           <button

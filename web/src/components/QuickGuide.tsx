@@ -3,7 +3,13 @@ import { FaDiscord } from 'react-icons/fa6'
 import { DOCS, getPhaseDoc, type DocEntry } from '../docs'
 import { DocRenderer } from './DocRenderer'
 import { CardsView } from './CardsView'
-import { PHASES, type Phase } from '../constants/phases'
+import {
+  getPhaseControlsLabel,
+  getPhaseReferenceLabel,
+  getPhaseTipsLabel,
+  PHASES,
+  type Phase,
+} from '../constants/phases'
 import { PHASE_HOTKEYS } from '../constants/hotkeys'
 import { HotkeyRow } from './HotkeyRow'
 import { DocNavContext } from '../contexts/DocNavContext'
@@ -62,21 +68,21 @@ function guideSectionLabel(section: GuideSection | null): string | null {
   if (section === 'game-pieces') {
     return 'Game Pieces'
   }
-  return `${toTitleCase(section)} Phase`
+  return getPhaseReferenceLabel(section)
 }
 
 function controlsSectionLabel(section: ControlsSection | null): string | null {
   if (!section) {
     return null
   }
-  return section === 'global' ? 'Global Controls' : `${toTitleCase(section)} Phase Controls`
+  return section === 'global' ? 'Global Controls' : getPhaseControlsLabel(section)
 }
 
 function tipsSectionLabel(section: TipsSection | null): string | null {
   if (!section) {
     return null
   }
-  return section === 'global' ? 'Global Tips' : `${toTitleCase(section)} Phase Tips`
+  return section === 'global' ? 'Global Tips' : getPhaseTipsLabel(section)
 }
 
 function buildLocationLabel({
@@ -127,10 +133,6 @@ function buildLocationLabel({
   }
 
   return detail ? `${tabLabel} -> ${detail}` : tabLabel
-}
-
-function toTitleCase(value: string): string {
-  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`
 }
 
 function toSlug(value: string): string {
@@ -658,7 +660,7 @@ export function QuickGuide({
                   <AccordionItem
                     id={`guide-${phase}`}
                     key={phase}
-                    label={`${toTitleCase(phase)} Phase`}
+                    label={getPhaseReferenceLabel(phase)}
                     expanded={guideOpenId === phase}
     
                     onToggle={() => toggleGuideSection(phase)}
@@ -700,7 +702,7 @@ export function QuickGuide({
                 <AccordionItem
                   id={`controls-${phase}`}
                   key={phase}
-                  label={`${toTitleCase(phase)} Phase Controls`}
+                  label={getPhaseControlsLabel(phase)}
                   expanded={controlsOpenId === phase}
   
                   onToggle={() => toggleControlsSection(phase)}
@@ -735,7 +737,7 @@ export function QuickGuide({
                 <AccordionItem
                   id={`tips-${phase}`}
                   key={phase}
-                  label={`${toTitleCase(phase)} Phase Tips`}
+                  label={getPhaseTipsLabel(phase)}
                   expanded={tipsOpenId === phase}
   
                   onToggle={() => toggleTipsSection(phase)}

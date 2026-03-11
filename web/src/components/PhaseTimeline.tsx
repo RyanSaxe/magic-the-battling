@@ -7,6 +7,13 @@ import { GuideStateContext } from "../guided/guideState";
 
 const PHASES: Phase[] = ["draft", "build", "battle", "reward"];
 
+const PHASE_TIMELINE_LABELS: Record<Phase, string> = {
+  draft: "draft",
+  build: "build",
+  battle: "battle",
+  reward: "advance",
+};
+
 const PHASE_ACTIVE_STYLE: Record<Phase, string> = {
   draft: "bg-purple-500/30 text-purple-300 ring-1 ring-purple-400/60",
   build: "bg-blue-500/30 text-blue-300 ring-1 ring-blue-400/60",
@@ -268,35 +275,47 @@ export function PhaseTimeline({
             const isActive = index === currentIndex;
             const isCompleted = index < currentIndex;
             const isUpcoming = index > currentIndex;
+            const phaseButton = (
+              <button
+                ref={(el) => { phaseButtonRefs.current[phase] = el; }}
+                disabled={welcomeGuideActive}
+                onClick={() => handlePhaseClick(phase)}
+                data-guide-target={`timeline-phase-${phase}`}
+                className={`text-xs sm:text-sm font-medium capitalize transition-colors cursor-pointer
+                  ${isActive ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
+                  ${isCompleted ? "text-gray-500 line-through decoration-gray-600" : ""}
+                  ${isUpcoming ? "text-gray-500" : ""}
+                  ${welcomeGuideActive ? "cursor-default hover:brightness-100" : "hover:brightness-125"}
+                `}
+              >
+                {PHASE_TIMELINE_LABELS[phase]}
+              </button>
+            );
+
+            if (phase === "reward") {
+              return (
+                <div key={phase} className="flex items-center gap-1 sm:gap-1.5">
+                  <span className="text-gray-600 text-xs">→</span>
+                  <div
+                    className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+                    data-guide-target="timeline-next-stage-round"
+                  >
+                    {phaseButton}
+                    <span className="text-xs sm:text-sm text-gray-500">
+                      to <span className="font-mono">{nextStage}-{nextRound}</span>
+                    </span>
+                  </div>
+                </div>
+              );
+            }
 
             return (
               <div key={phase} className="flex items-center gap-1 sm:gap-1.5">
                 <span className="text-gray-600 text-xs">→</span>
-                <button
-                  ref={(el) => { phaseButtonRefs.current[phase] = el; }}
-                  disabled={welcomeGuideActive}
-                  onClick={() => handlePhaseClick(phase)}
-                  data-guide-target={`timeline-phase-${phase}`}
-                  className={`text-xs sm:text-sm font-medium capitalize transition-colors cursor-pointer
-                    ${isActive ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
-                    ${isCompleted ? "text-gray-500 line-through decoration-gray-600" : ""}
-                    ${isUpcoming ? "text-gray-500" : ""}
-                    ${welcomeGuideActive ? "cursor-default hover:brightness-100" : "hover:brightness-125"}
-                  `}
-                >
-                  {phase}
-                </button>
+                {phaseButton}
               </div>
             );
           })}
-
-          <span className="text-gray-600 text-xs">→</span>
-          <span
-            className="text-xs sm:text-sm text-gray-500 font-mono"
-            data-guide-target="timeline-next-stage-round"
-          >
-            {nextStage}-{nextRound}
-          </span>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0 timeline-actions">

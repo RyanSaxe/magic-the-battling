@@ -78,7 +78,7 @@ function buildWelcomeGuide(): GuideDefinition {
         positionTargetId: "game-content",
         primaryActionLabel: "Show me the loop",
         content: {
-          summary: "Magic: The Battling loops through draft, build, battle, and reward until only one player remains.",
+          summary: "Magic: The Battling loops through draft, build, battle, and round wrap-up until only one player remains.",
           detail: "Battles are played manually, and if you need the full rules or controls later you can open the Guide/? button in the top-right corner.",
         },
       },
@@ -131,27 +131,15 @@ function buildWelcomeGuide(): GuideDefinition {
         },
       },
       {
-        id: "reward",
-        title: "Reward Resets You Into The Loop",
-        targetId: "timeline-phase-reward",
-        placement: "bottom",
-        cardPlacement: "bottom-center",
-        primaryActionLabel: "Next",
-        content: {
-          summary: "Reward adds treasure and the other progression you earn before the next round starts.",
-          detail: "This is where bonus cards, Vanquishers, hand-size growth, and upgrades are handled before the loop begins again.",
-        },
-      },
-      {
-        id: "three-two",
-        title: "3-2 Starts The Repeating Loop",
+        id: "wrap-up-loop",
+        title: "Round Wrap-Up Advances The Loop",
         targetId: "timeline-next-stage-round",
         placement: "bottom",
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "When the right side shows 3-2, the repeating loop begins with draft.",
-          detail: "From that point on, the cycle is draft, build, battle, reward until only one player remains.",
+          summary: "After each battle, round wrap-up gives loot and then advances you to the next stage-round shown on the right.",
+          detail: "When that right side shows 3-2, the repeating loop is draft, build, battle, and round wrap-up until only one player remains.",
         },
       },
       {
@@ -359,7 +347,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
     primaryActionLabel: "Ready to battle",
     content: {
       summary: "Whenever the battle is over, click this button to submit the result.",
-      detail: "That opens the result chooser. Once the result is submitted, reward handles the next part of the loop.",
+      detail: "That opens the result chooser. Once the result is submitted, round wrap-up handles the next part of the loop.",
     },
   });
 
@@ -375,26 +363,26 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   const steps: GuideStepDefinition[] = [
     {
       id: "intro",
-      title: "Reward Phase",
+      title: "Round Wrap-Up",
       placement: "center",
       cardPlacement: "center",
       positionTargetId: "game-content",
-      primaryActionLabel: "Show me the rewards",
+      primaryActionLabel: "Show me the loot",
       content: {
-        summary: "Reward adds treasure and other progression before the next round starts.",
-        detail: "Every reward gives +1 treasure. On rounds 1 and 2, you also get a random card. The final round of each stage is special — you earn The Vanquisher, your hand size grows, and you advance to the next stage.",
+        summary: "Round wrap-up adds loot and other progression before the next round starts.",
+        detail: "Every wrap-up gives +1 treasure. On rounds 1 and 2, you also get a random card. The final round of each stage is special — you earn The Vanquisher, your hand size grows, and you advance to the next stage.",
       },
     },
     {
       id: "reward-basics",
-      title: "Every Reward Adds Resources",
+      title: "Every Wrap-Up Adds Loot",
       targetId: "reward-summary",
       placement: "right",
       cardPlacement: "bottom-center",
       primaryActionLabel: ctx.isStageEnd ? "Got it" : "Next",
       content: {
-        summary: "Every reward gives you +1 treasure.",
-        detail: "On the first and second round of a stage, reward also gives you +1 random card from the Battler.",
+        summary: "Every wrap-up gives you +1 treasure.",
+        detail: "On the first and second round of a stage, you also get +1 random card from the Battler.",
       },
     },
   ];
@@ -408,17 +396,17 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       placement: "top",
       cardPlacement: "top-center",
       mobileCardPlacement: "top-center",
-      primaryActionLabel: "Ready for reward",
+      primaryActionLabel: "Ready to continue",
       content: {
         summary: "Whenever you're ready, click this button to start the draft phase of the next round.",
-        detail: "Reward is the handoff back into the main loop, so this is how you move from payout into the next draft.",
+        detail: "Round wrap-up is the handoff back into the main loop, so this is how you move from loot into the next draft.",
       },
     });
   }
 
   return {
     id: "reward",
-    label: "Reward",
+    label: "Round Wrap-Up",
     phase: "reward",
     steps,
   };
@@ -446,13 +434,13 @@ function buildRewardStageEndGuide(ctx: GuidedWalkthroughContext): GuideDefinitio
   if (ctx.useUpgrades && ctx.hasRewardUpgradeChoice) {
     steps.push({
       id: "upgrades",
-      title: "Stage-End Rewards Can Also Offer Upgrades",
+      title: "Stage-End Wrap-Up Can Also Offer Upgrades",
       targetId: "reward-upgrades",
       placement: "left",
       cardPlacement: "top-center",
       primaryActionLabel: "Got it",
       content: {
-        summary: "If upgrades are enabled, stage-end rewards also require you to choose one upgrade before you continue.",
+        summary: "If upgrades are enabled, a stage-end wrap-up also requires you to choose one upgrade before you continue.",
         detail: "Upgrades are permanent hidden-agenda effects. Choose one here, then apply it later during build to a card in your pool.",
       },
     });
@@ -460,7 +448,7 @@ function buildRewardStageEndGuide(ctx: GuidedWalkthroughContext): GuideDefinitio
 
   return {
     id: "reward_stage_end",
-    label: "Reward",
+    label: "Round Wrap-Up",
     phase: "reward",
     steps,
   };
