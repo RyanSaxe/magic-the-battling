@@ -6,7 +6,6 @@ export interface GuideState {
   guideRequest: GuideRequest | null;
   startGuide: (guideId: GuidedGuideId, isReplay?: boolean) => void;
   handleGuideClose: (guideId: GuidedGuideId) => void;
-  skipTutorial: () => void;
 }
 
 export const GuideStateContext = createContext<GuideState | null>(null);

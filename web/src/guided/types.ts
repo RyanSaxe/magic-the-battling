@@ -96,11 +96,6 @@ export interface GuidedWalkthroughContext {
   openBattleSubmitPopover: () => void;
 }
 
-export interface GuideSecondaryAction {
-  label: string;
-  actionId: string;
-}
-
 export interface GuideStepDefinition {
   id: string;
   title: string;
@@ -111,7 +106,6 @@ export interface GuideStepDefinition {
   spotlightPadding?: number;
   primaryActionLabel?: string;
   primaryActionMode?: GuidePrimaryActionMode;
-  secondaryAction?: GuideSecondaryAction;
   completion?: GuideStepCompletion;
   onEnter?: (
     ctx: GuidedWalkthroughContext,

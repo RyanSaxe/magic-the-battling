@@ -467,15 +467,8 @@ function GameGuideLayer({
   rootRef: React.RefObject<HTMLElement | null>;
   context: GuidedWalkthroughContext;
 }) {
-  const { guideRequest, handleGuideClose, skipTutorial } = useGuideContext();
+  const { guideRequest, handleGuideClose } = useGuideContext();
   if (!guideRequest) return null;
-
-  const handleSecondaryAction = (actionId: string) => {
-    if (actionId === "skip_tutorial") {
-      skipTutorial();
-    }
-  };
-
   return (
     <GuidedWalkthrough
       key={guideRequest.nonce}
@@ -483,7 +476,6 @@ function GameGuideLayer({
       request={guideRequest}
       context={context}
       onClose={(guideId) => handleGuideClose(guideId)}
-      onSecondaryAction={handleSecondaryAction}
     />
   );
 }

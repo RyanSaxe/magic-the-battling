@@ -78,22 +78,6 @@ function buildClipPath(spotlight: SpotlightRect | null, cw: number, ch: number):
   ].join(" ");
 }
 
-interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-function rectsOverlap(a: Rect, b: Rect): boolean {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
-  );
-}
-
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
@@ -128,16 +112,12 @@ function computePosition(
 
   if (isMobile) {
     const gap = 12;
-    const belowTop = clamp(spotlight.y + spotlight.height + gap, 8, Math.max(8, ch - cardH - 8));
-    const aboveTop = clamp(spotlight.y - cardH - gap, 8, Math.max(8, ch - cardH - 8));
-    const belowRect: Rect = { x: 8, y: belowTop, width: cardW, height: cardH };
-    const aboveRect: Rect = { x: 8, y: aboveTop, width: cardW, height: cardH };
-    const belowOverlaps = rectsOverlap(belowRect, spotlight);
-    const aboveOverlaps = rectsOverlap(aboveRect, spotlight);
-
-    if (!belowOverlaps) return { left: 8, top: belowTop, resolved: "bottom" };
-    if (!aboveOverlaps) return { left: 8, top: aboveTop, resolved: "top" };
-    return { left: 8, top: belowTop, resolved: "bottom" };
+    let top = spotlight.y + spotlight.height + gap;
+    if (top + cardH > ch - 8) {
+      top = spotlight.y - cardH - gap;
+    }
+    top = clamp(top, 8, Math.max(8, ch - cardH - 8));
+    return { left: 8, top, resolved: top > spotlight.y ? "bottom" : "top" };
   }
 
   const centeredLeft = clamp(
@@ -159,38 +139,21 @@ function computePosition(
   for (const p of placementOrder(placement)) {
     if (p === "center") continue;
     const c = candidates[p];
-    const cardRect: Rect = { x: c.left, y: c.top, width: cardW, height: cardH };
     if (
       c.left >= CARD_MARGIN &&
       c.left + cardW <= cw - CARD_MARGIN &&
       c.top >= CARD_MARGIN &&
-      c.top + cardH <= ch - CARD_MARGIN &&
-      !rectsOverlap(cardRect, spotlight)
+      c.top + cardH <= ch - CARD_MARGIN
     ) {
       return { left: c.left, top: c.top, resolved: p };
     }
   }
 
-  const spotCx = spotlight.x + spotlight.width / 2;
-  const spotCy = spotlight.y + spotlight.height / 2;
-  const corners = [
-    { left: CARD_MARGIN, top: CARD_MARGIN },
-    { left: Math.max(CARD_MARGIN, cw - cardW - CARD_MARGIN), top: CARD_MARGIN },
-    { left: CARD_MARGIN, top: Math.max(CARD_MARGIN, ch - cardH - CARD_MARGIN) },
-    { left: Math.max(CARD_MARGIN, cw - cardW - CARD_MARGIN), top: Math.max(CARD_MARGIN, ch - cardH - CARD_MARGIN) },
-  ];
-  let best = corners[0];
-  let bestDist = 0;
-  for (const corner of corners) {
-    const cx = corner.left + cardW / 2;
-    const cy = corner.top + cardH / 2;
-    const dist = (cx - spotCx) ** 2 + (cy - spotCy) ** 2;
-    if (dist > bestDist) {
-      bestDist = dist;
-      best = corner;
-    }
-  }
-  return { left: best.left, top: best.top, resolved: "bottom" };
+  return {
+    left: centeredLeft,
+    top: clamp(spotlight.y + spotlight.height + CARD_MARGIN, CARD_MARGIN, Math.max(CARD_MARGIN, ch - cardH - CARD_MARGIN)),
+    resolved: "bottom",
+  };
 }
 
 export function useGuidePositioning(

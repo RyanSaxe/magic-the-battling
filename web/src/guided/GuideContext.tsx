@@ -87,20 +87,6 @@ export function GuideProvider({
     [gameId, playerId],
   );
 
-  const skipTutorial = useCallback(() => {
-    setIsGuidedMode(false);
-    if (gameId) {
-      markGuideSeenForGame(gameId, "welcome", playerId);
-    }
-    setSeenGuides((current) => {
-      const next = new Set(current);
-      next.add("welcome");
-      return next;
-    });
-    setGuideRequest(null);
-    setGuideQueue([]);
-  }, [gameId, playerId]);
-
   const conditionalOptions = useMemo(
     () => ({ isFirstBuildGuide: !seenGuides.has("build") }),
     [seenGuides],
@@ -221,8 +207,8 @@ export function GuideProvider({
   ]);
 
   const value = useMemo(
-    () => ({ isGuidedMode, guideRequest, startGuide, handleGuideClose, skipTutorial }),
-    [isGuidedMode, guideRequest, startGuide, handleGuideClose, skipTutorial],
+    () => ({ isGuidedMode, guideRequest, startGuide, handleGuideClose }),
+    [isGuidedMode, guideRequest, startGuide, handleGuideClose],
   );
 
   return (

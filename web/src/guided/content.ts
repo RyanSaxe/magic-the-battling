@@ -31,6 +31,16 @@ function cardSelector(cardId?: string | null): string | undefined {
   return `[data-guide-card-id="${escapeSelectorValue(cardId)}"]`;
 }
 
+function latestBattlefieldCardSelector(ctx: GuidedWalkthroughContext): string | undefined {
+  if (ctx.selectedBattleCardId && ctx.selectedBattleCardZone === "battlefield") {
+    return cardSelector(ctx.selectedBattleCardId);
+  }
+
+  const battlefield = ctx.currentBattle?.your_zones.battlefield ?? [];
+  const card = battlefield[battlefield.length - 1] ?? battlefield[0];
+  return cardSelector(card?.id);
+}
+
 function rewardStageReached(ctx: GuidedWalkthroughContext): boolean {
   return ctx.currentPhase === "reward"
     && !!ctx.selfPlayer
@@ -63,6 +73,14 @@ function cardProducesTreasure(card: GameCard): boolean {
 
 function findTreasureProducer(cards: GameCard[]): GameCard | null {
   return cards.find(cardProducesTreasure) ?? null;
+}
+
+function counterTotal(counters: Record<string, Record<string, number>>): number {
+  return Object.values(counters).reduce(
+    (outerTotal, counterMap) =>
+      outerTotal + Object.values(counterMap).reduce((inner, count) => inner + count, 0),
+    0,
+  );
 }
 
 function ids(cards: GameCard[]): string[] {
@@ -314,24 +332,60 @@ function buildDraftSteps(ctx: GuidedWalkthroughContext): GuideStepDefinition[] {
 function buildBattleSteps(includePuppetPractice: boolean): GuideStepDefinition[] {
   const steps: GuideStepDefinition[] = [
     {
-      id: "battle-overview",
+      id: "manual-not-auto",
       title: "Battle Is A Real Game",
       targetId: "battle-board",
       placement: "right",
       spotlightPadding: 12,
       content: {
-        summary: "This is not an auto-battler — you are playing a real mini-game of Magic on this board.",
-        detail: "Battles start at 10 life with the hand and basics from build. There are no libraries. Treasures persist across phases, so spending them is a real decision.",
+        summary: "This is not an auto-battle — you are playing a real mini-game of Magic on this board.",
+        detail: "New players get tripped up here most often, so keep that mental model front and center.",
       },
     },
     {
-      id: "move-card",
-      title: "Play A Card",
+      id: "battle-setup",
+      title: "The Special Battle Rules",
       targetId: "battle-board",
       placement: "right",
       spotlightPadding: 12,
       content: {
-        summary: "Move a card from your hand onto the battlefield.",
+        summary: "Battles start at 10 life with the hand and basics you chose in build already set up.",
+        detail: "Treasures persist across phases, so using them now is a real strategic decision.",
+      },
+    },
+    {
+      id: "tap-card",
+      title: "Double Tap To Tap",
+      targetId: "battle-board",
+      placement: "right",
+      spotlightPadding: 12,
+      content: {
+        summary: "Double tap any permanent on your battlefield to tap or untap it.",
+        detail: "That is the fastest way to mark attacks, activated abilities, or mana usage.",
+        actionHint: "Double tap one of your permanents to continue.",
+        minimizedText: "Double tap one of your permanents.",
+      },
+      completion: {
+        type: "condition",
+        allowInteraction: true,
+        isComplete: (ctx, meta) => {
+          const current = ctx.currentBattle?.your_zones.tapped_card_ids.join(",") ?? "";
+          return differsFromSnapshot(meta?.tappedIds, current);
+        },
+      },
+      onEnter: (ctx) => ({
+        tappedIds: ctx.currentBattle?.your_zones.tapped_card_ids.join(",") ?? "",
+      }),
+    },
+    {
+      id: "move-card",
+      title: "Play Onto The Battlefield",
+      targetId: "battle-board",
+      placement: "right",
+      spotlightPadding: 12,
+      content: {
+        summary: "Move a card from your hand onto the battlefield to practice the board flow.",
+        detail: "The board is the main place you will spend your time during battle.",
         actionHint: "Move one card from your hand to your battlefield.",
         minimizedText: "Play one card from hand to battlefield.",
       },
@@ -352,27 +406,66 @@ function buildBattleSteps(includePuppetPractice: boolean): GuideStepDefinition[]
       }),
     },
     {
-      id: "tap-card",
-      title: "Tap And Manage Cards",
+      id: "select-battlefield-card",
+      title: "Select That Card First",
+      targetSelector: latestBattlefieldCardSelector,
       targetId: "battle-board",
       placement: "right",
-      spotlightPadding: 12,
+      spotlightPadding: 8,
       content: {
-        summary: "Double tap any permanent on your battlefield to tap or untap it.",
-        detail: "For counters, tokens, and other board management, select a card and use the Actions button.",
-        actionHint: "Double tap one of your permanents to continue.",
-        minimizedText: "Double tap one of your permanents.",
+        summary: "Tap the card you just played so it becomes the selected battle card.",
+        detail: "The Actions button works on the currently selected card.",
+        actionHint: "Tap the card you just moved onto the battlefield.",
+        minimizedText: "Select the card you just played.",
+      },
+      completion: {
+        type: "condition",
+        allowInteraction: true,
+        isComplete: (ctx) =>
+          !!ctx.selectedBattleCardId && ctx.selectedBattleCardZone === "battlefield",
+      },
+      onEnter: (ctx) => {
+        ctx.closeGameplayOverlays();
+      },
+    },
+    {
+      id: "open-actions",
+      title: "Now Open Actions",
+      targetId: "battle-actions",
+      placement: "left",
+      content: {
+        summary: "With a battlefield card selected, open Actions to get at the battle utility menu.",
+        detail: "Use this when you need counters, token creation, moving cards, and similar board management tools.",
+        actionHint: "Open the Actions menu.",
+        minimizedText: "Open the Actions menu.",
+      },
+      completion: {
+        type: "condition",
+        allowInteraction: true,
+        isComplete: (ctx) => ctx.actionMenuOpen,
+      },
+    },
+    {
+      id: "action-add-counter",
+      title: "Use Add Counter",
+      targetId: "battle-action-add-counter",
+      placement: "left",
+      content: {
+        summary: "Click Add Counter, then choose any counter type to put one on the selected card.",
+        detail: "That is a representative battle utility flow: select the permanent, open Actions, then apply the board change you want.",
+        actionHint: "Use Add Counter, then choose any counter type.",
+        minimizedText: "Add a counter through the Actions menu.",
       },
       completion: {
         type: "condition",
         allowInteraction: true,
         isComplete: (ctx, meta) => {
-          const current = ctx.currentBattle?.your_zones.tapped_card_ids.join(",") ?? "";
-          return differsFromSnapshot(meta?.tappedIds, current);
+          const counters = ctx.currentBattle?.your_zones.counters ?? {};
+          return counterTotal(counters) > Number(meta?.counterTotal ?? 0);
         },
       },
       onEnter: (ctx) => ({
-        tappedIds: ctx.currentBattle?.your_zones.tapped_card_ids.join(",") ?? "",
+        counterTotal: counterTotal(ctx.currentBattle?.your_zones.counters ?? {}),
       }),
     },
   ];
@@ -630,7 +723,6 @@ export function buildGuideDefinition(
               summary: "The game alternates between improving your pool and playing short battles until only one player remains.",
               detail: "The battle itself is a real game you play manually, not an auto-battler.",
             },
-            secondaryAction: { label: "Skip — I know the game", actionId: "skip_tutorial" },
           },
           {
             id: "start-state",

@@ -12,7 +12,6 @@ interface GuidedWalkthroughProps {
   request: GuideRequest;
   context: GuidedWalkthroughContext;
   onClose: (guideId: GuidedGuideId, completed: boolean) => void;
-  onSecondaryAction?: (actionId: string) => void;
 }
 
 function resolveTarget(root: HTMLElement | null, targetId?: string, targetSelector?: string): HTMLElement | null {
@@ -35,9 +34,9 @@ function resolveTarget(root: HTMLElement | null, targetId?: string, targetSelect
     ?? document.querySelector<HTMLElement>(`[data-guide-target="${targetId}"]`);
 }
 
-export function GuidedWalkthrough({ rootRef, request, context, onClose, onSecondaryAction }: GuidedWalkthroughProps) {
+export function GuidedWalkthrough({ rootRef, request, context, onClose }: GuidedWalkthroughProps) {
   const [stepIndex, setStepIndex] = useState(0);
-  const [isUserCollapsed, setIsUserCollapsed] = useState(false);
+  const [collapsedStepKey, setCollapsedStepKey] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const stepMetaRef = useRef<GuideStepMeta | undefined>(undefined);
   const autoAdvanceRef = useRef<number | null>(null);
@@ -72,13 +71,6 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose, onSecond
     [clearAutoAdvance, onClose, request.guideId],
   );
 
-  const resetCollapsedIfManual = useCallback((nextIndex: number) => {
-    const nextStep = guide.steps[nextIndex];
-    if (!nextStep?.completion || nextStep.completion.type === "manual") {
-      setIsUserCollapsed(false);
-    }
-  }, [guide.steps]);
-
   const advanceStep = useCallback(() => {
     setStepIndex((cur) => {
       const next = cur + 1;
@@ -86,10 +78,9 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose, onSecond
         queueMicrotask(() => finishGuide(true));
         return cur;
       }
-      resetCollapsedIfManual(next);
       return next;
     });
-  }, [finishGuide, guide.steps.length, resetCollapsedIfManual]);
+  }, [finishGuide, guide.steps.length]);
 
   // auto-close when phase changes away from guide's phase
   useEffect(() => {
@@ -104,23 +95,6 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose, onSecond
     lastEnteredStepRef.current = stepIndex;
     stepMetaRef.current = step.onEnter?.(context) ?? undefined;
   }, [context, step, stepIndex]);
-
-  // auto-minimize when user interacts outside tooltip during interactive steps
-  useEffect(() => {
-    if (!step) return;
-    const completionType = step.completion?.type ?? "manual";
-    const isInteractive =
-      completionType === "target-click" ||
-      (completionType === "condition" && step.completion?.type === "condition" && !!step.completion.allowInteraction);
-    if (!isInteractive || isUserCollapsed) return;
-
-    const handlePointerDown = (e: PointerEvent) => {
-      if (cardRef.current?.contains(e.target as Node)) return;
-      setIsUserCollapsed(true);
-    };
-    document.addEventListener("pointerdown", handlePointerDown, true);
-    return () => document.removeEventListener("pointerdown", handlePointerDown, true);
-  }, [isUserCollapsed, step]);
 
   // target-click handler
   useEffect(() => {
@@ -165,14 +139,12 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose, onSecond
       } else if ((e.key === "ArrowRight" || e.key === "Enter") && (step?.completion?.type ?? "manual") === "manual") {
         advanceStep();
       } else if (e.key === "ArrowLeft" && stepIndex > 0) {
-        const prev = stepIndex - 1;
-        resetCollapsedIfManual(prev);
-        setStepIndex(prev);
+        setStepIndex((cur) => Math.max(0, cur - 1));
       }
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [advanceStep, finishGuide, resetCollapsedIfManual, step, stepIndex]);
+  }, [advanceStep, finishGuide, step, stepIndex]);
 
   const layout = useGuidePositioning(
     rootRef,
@@ -187,14 +159,14 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose, onSecond
   if (!step) return null;
 
   const completionType = step.completion?.type ?? "manual";
-  const isCollapsed = isUserCollapsed;
+  const isCollapsed = collapsedStepKey === stepKey;
   const allowInteraction =
     completionType === "target-click" ||
     (completionType === "condition" && step.completion?.type === "condition" && !!step.completion.allowInteraction);
   const overlayAllowsInteraction = allowInteraction || isCollapsed;
   const handlePrimaryAction = () => {
     if ((step.primaryActionMode ?? "advance") === "minimize") {
-      setIsUserCollapsed(true);
+      setCollapsedStepKey(stepKey);
       return;
     }
     advanceStep();
@@ -225,21 +197,15 @@ export function GuidedWalkthrough({ rootRef, request, context, onClose, onSecond
         guideLabel={guide.label}
         stepIndex={stepIndex}
         totalSteps={guide.steps.length}
-        placement={layout?.resolvedPlacement ?? "bottom"}
         context={context}
         isCollapsed={isCollapsed}
         boundsWidth={layout?.containerWidth ?? 0}
         boundsHeight={layout?.containerHeight ?? 0}
         onPrimaryAction={handlePrimaryAction}
-        onBack={() => {
-          const prev = Math.max(0, stepIndex - 1);
-          resetCollapsedIfManual(prev);
-          setStepIndex(prev);
-        }}
+        onBack={() => setStepIndex((cur) => Math.max(0, cur - 1))}
         onDismiss={() => finishGuide(false)}
-        onCollapse={() => setIsUserCollapsed(true)}
-        onExpand={() => setIsUserCollapsed(false)}
-        onSecondaryAction={onSecondaryAction}
+        onCollapse={() => setCollapsedStepKey(stepKey)}
+        onExpand={() => setCollapsedStepKey(null)}
         style={{
           left: layout?.cardLeft ?? 16,
           top: layout?.cardTop ?? 16,

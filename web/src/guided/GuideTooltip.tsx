@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import type { GuidePlacement, GuideStepContent, GuideStepDefinition, GuidedWalkthroughContext } from "./types";
+import type { GuideStepContent, GuideStepDefinition, GuidedWalkthroughContext } from "./types";
 import { GuideProgress } from "./GuideProgress";
 
 const TOOLTIP_MARGIN = 8;
@@ -17,7 +17,6 @@ interface GuideTooltipProps {
   guideLabel: string;
   stepIndex: number;
   totalSteps: number;
-  placement: GuidePlacement;
   context: GuidedWalkthroughContext;
   isCollapsed: boolean;
   boundsWidth: number;
@@ -28,7 +27,6 @@ interface GuideTooltipProps {
   onDismiss: () => void;
   onCollapse: () => void;
   onExpand: () => void;
-  onSecondaryAction?: (actionId: string) => void;
 }
 
 function resolveActionHint(content: GuideStepContent, ctx: GuidedWalkthroughContext): string | undefined {
@@ -43,16 +41,6 @@ function resolveMinimizedText(content: GuideStepContent, ctx: GuidedWalkthroughC
     return typeof content.minimizedText === "function" ? content.minimizedText(ctx) : content.minimizedText;
   }
   return title;
-}
-
-function arrowPositionClass(placement: GuidePlacement): string {
-  switch (placement) {
-    case "top": return "guide-arrow-bottom";
-    case "bottom": return "guide-arrow-top";
-    case "left": return "guide-arrow-right";
-    case "right": return "guide-arrow-left";
-    default: return "";
-  }
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -97,7 +85,6 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       guideLabel,
       stepIndex,
       totalSteps,
-      placement,
       context,
       isCollapsed,
       boundsWidth,
@@ -108,7 +95,6 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       onDismiss,
       onCollapse,
       onExpand,
-      onSecondaryAction,
     },
     ref,
   ) {
@@ -122,16 +108,22 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       ?? (primaryActionMode === "minimize" ? "Try it" : isLastStep ? "Got it" : "Next");
     const showPrimaryAction = isManual || !!step.primaryActionMode;
 
-    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const [dragState, setDragState] = useState({ step: stepIndex, x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
-    const tooltipRef = useRef<HTMLDivElement | null>(null);
     const [hasRendered, setHasRendered] = useState(false);
+    const tooltipRef = useRef<HTMLDivElement | null>(null);
     const dragStartRef = useRef({ pointerX: 0, pointerY: 0, offsetX: 0, offsetY: 0, width: 0, height: 0 });
+    const stepIndexRef = useRef(stepIndex);
     const activePointerIdRef = useRef<number | null>(null);
     const removeListenersRef = useRef<(() => void) | null>(null);
     const userSelectRef = useRef("");
+    const dragOffset = dragState.step === stepIndex ? dragState : { x: 0, y: 0 };
     const baseLeft = resolveStyleNumber(style?.left);
     const baseTop = resolveStyleNumber(style?.top);
+
+    useEffect(() => {
+      stepIndexRef.current = stepIndex;
+    }, [stepIndex]);
 
     const stopDragging = useCallback(() => {
       if (activePointerIdRef.current === null) return;
@@ -160,7 +152,10 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
         boundsHeight,
       );
 
-      setDragOffset(next);
+      setDragState({
+        step: stepIndexRef.current,
+        ...next,
+      });
     }, [baseLeft, baseTop, boundsHeight, boundsWidth]);
 
     const handleWindowPointerEnd = useCallback((event: PointerEvent) => {
@@ -221,9 +216,12 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       );
 
       if (next.x !== dragOffset.x || next.y !== dragOffset.y) {
-        setDragOffset(next);
+        setDragState({
+          step: stepIndex,
+          ...next,
+        });
       }
-    }, [baseLeft, baseTop, boundsHeight, boundsWidth, dragOffset.x, dragOffset.y, isCollapsed]);
+    }, [baseLeft, baseTop, boundsHeight, boundsWidth, dragOffset.x, dragOffset.y, isCollapsed, stepIndex]);
 
     useEffect(() => () => stopDragging(), [stopDragging]);
 
@@ -283,11 +281,6 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
         aria-modal={isCollapsed ? undefined : true}
         aria-label={`${guideLabel} walkthrough`}
       >
-        {placement !== "center" && !isCollapsed && (
-          <div
-            className={`absolute w-3 h-3 modal-chrome border gold-border rotate-45 ${arrowPositionClass(placement)}`}
-          />
-        )}
         <div
           className={`flex items-center justify-between gap-3 px-4 pt-3 pb-2 select-none shrink-0
             ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
@@ -360,18 +353,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
             </div>
 
             <div className="flex items-center justify-between gap-2 px-4 py-4 shrink-0">
-              {step.secondaryAction && onSecondaryAction ? (
-                <button
-                  type="button"
-                  onClick={() => onSecondaryAction(step.secondaryAction!.actionId)}
-                  onPointerDown={handleControlPointerDown}
-                  className="text-xs text-gray-400/80 hover:text-gray-200 transition-colors"
-                >
-                  {step.secondaryAction.label}
-                </button>
-              ) : (
-                <div />
-              )}
+              <div />
               <div className="flex items-center gap-2 ml-auto">
                 <button
                   type="button"
