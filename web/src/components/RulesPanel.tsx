@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { QuickGuide } from './QuickGuide'
 import {
   DESKTOP_BREAKPOINT_PX,
+  DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
   WINDOW_MARGIN_PX,
   clampDesktopPanelOrigin,
   clampDesktopWindowForMode,
@@ -119,6 +120,7 @@ function resolveInitialDesktopWindowState(): DesktopWindowState | null {
     stored?.windowState ?? defaultDesktopWindowState(viewport),
     viewport,
     stored?.isCollapsed ?? false,
+    DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
   )
 }
 
@@ -126,8 +128,8 @@ function resolveInitialCollapsedState(): boolean {
   return loadStoredWindowState()?.isCollapsed ?? false
 }
 
-function defaultMobileCollapsedOrigin(viewport: ViewportBox) {
-  const panel = collapsedPanelSize(viewport)
+function defaultMobileCollapsedOrigin(viewport: ViewportBox, collapsedHeight: number) {
+  const panel = collapsedPanelSize(viewport, collapsedHeight)
   return clampDesktopPanelOrigin(
     Math.round(viewport.left + (viewport.width - panel.width) / 2),
     viewport.top + WINDOW_MARGIN_PX,
@@ -175,6 +177,8 @@ export function RulesPanel({
   const [navigationHint, setNavigationHint] = useState(MOBILE_COLLAPSED_LABEL_FALLBACK)
   const [mobileCollapsedOrigin, setMobileCollapsedOrigin] = useState<{ x: number; y: number } | null>(null)
   const [interaction, setInteraction] = useState<InteractionState>(null)
+  const [collapsedPanelHeight, setCollapsedPanelHeight] = useState(DEFAULT_COLLAPSED_PANEL_HEIGHT_PX)
+  const collapsedPanelRef = useRef<HTMLDivElement | null>(null)
 
   const stopInteraction = useCallback(() => {
     setInteraction(null)
@@ -186,16 +190,17 @@ export function RulesPanel({
         desktopWindow ?? defaultDesktopWindowState(desktopViewport),
         desktopViewport,
         isCollapsed,
+        collapsedPanelHeight,
       )
     : null
   const desktopPanel = resolvedDesktopWindow && desktopViewport
-    ? getDesktopPanelRect(resolvedDesktopWindow, desktopViewport, isCollapsed)
+    ? getDesktopPanelRect(resolvedDesktopWindow, desktopViewport, isCollapsed, collapsedPanelHeight)
     : null
   const mobileViewport = !isDesktop ? currentViewportBox() : null
   const mobileCollapsedRect = mobileViewport
     ? (() => {
-        const panel = collapsedPanelSize(mobileViewport)
-        const origin = mobileCollapsedOrigin ?? defaultMobileCollapsedOrigin(mobileViewport)
+        const panel = collapsedPanelSize(mobileViewport, collapsedPanelHeight)
+        const origin = mobileCollapsedOrigin ?? defaultMobileCollapsedOrigin(mobileViewport, collapsedPanelHeight)
         return {
           width: panel.width,
           height: panel.height,
@@ -211,10 +216,10 @@ export function RulesPanel({
     const viewport = currentViewportBox()
     setDesktopWindow((previous) => {
       const fallback = previous ?? loadStoredWindowState()?.windowState ?? defaultDesktopWindowState(viewport)
-      const next = clampDesktopWindowForMode(fallback, viewport, collapsed)
+      const next = clampDesktopWindowForMode(fallback, viewport, collapsed, collapsedPanelHeight)
       return sameWindowState(previous, next) ? previous : next
     })
-  }, [])
+  }, [collapsedPanelHeight])
 
   const handleCollapse = useCallback(() => {
     stopInteraction()
@@ -328,6 +333,40 @@ export function RulesPanel({
     }
   }, [isCollapsed, stopInteraction, syncDesktopWindow])
 
+  useLayoutEffect(() => {
+    if (!isCollapsed) {
+      return
+    }
+
+    const node = collapsedPanelRef.current
+    if (!node) {
+      return
+    }
+
+    const updateHeight = () => {
+      const nextHeight = Math.max(
+        DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
+        Math.ceil(node.getBoundingClientRect().height),
+      )
+      setCollapsedPanelHeight((previous) => (previous === nextHeight ? previous : nextHeight))
+    }
+
+    updateHeight()
+
+    if (typeof ResizeObserver === 'undefined') {
+      return
+    }
+
+    const observer = new ResizeObserver(() => {
+      updateHeight()
+    })
+    observer.observe(node)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [isCollapsed, navigationHint])
+
   useEffect(() => {
     if (!desktopWindow) {
       return
@@ -361,7 +400,7 @@ export function RulesPanel({
           return
         }
         const viewport = currentViewportBox()
-        const panel = collapsedPanelSize(viewport)
+        const panel = collapsedPanelSize(viewport, collapsedPanelHeight)
         const nextX = interaction.startX + (event.clientX - interaction.startPointerX)
         const nextY = interaction.startY + (event.clientY - interaction.startPointerY)
         setMobileCollapsedOrigin(
@@ -382,7 +421,7 @@ export function RulesPanel({
             const origin = clampDesktopPanelOrigin(
               nextX,
               nextY,
-              collapsedPanelSize(viewport),
+              collapsedPanelSize(viewport, collapsedPanelHeight),
               viewport,
             )
             return clampDesktopWindowForMode(
@@ -392,6 +431,7 @@ export function RulesPanel({
               },
               viewport,
               true,
+              collapsedPanelHeight,
             )
           }
 
@@ -431,7 +471,7 @@ export function RulesPanel({
       window.removeEventListener('pointermove', handlePointerMove)
       window.removeEventListener('pointerup', handlePointerUp)
     }
-  }, [interaction, isCollapsed, isDesktop])
+  }, [collapsedPanelHeight, interaction, isCollapsed, isDesktop])
 
   if (!isDesktop) {
     if (!mobileViewport) {
@@ -445,11 +485,12 @@ export function RulesPanel({
     )
     const expandedWidth = Math.min(MOBILE_PANEL_MAX_WIDTH_PX, mobileViewport.width - WINDOW_MARGIN_PX * 2)
     const expandedLeft = mobileViewport.left + Math.round((mobileViewport.width - expandedWidth) / 2)
-    const panelTitle = isCollapsed ? navigationHint || MOBILE_COLLAPSED_LABEL_FALLBACK : 'Guide'
+    const collapsedLocation = navigationHint || MOBILE_COLLAPSED_LABEL_FALLBACK
 
     return (
       <div className="fixed inset-0 z-50 pointer-events-none">
         <div
+          ref={isCollapsed ? collapsedPanelRef : null}
           className={`absolute pointer-events-auto modal-chrome felt-raised-panel border gold-border rounded-2xl shadow-[0_24px_60px_rgba(0,0,0,0.55)] flex flex-col overflow-hidden ${
             interaction ? 'transition-none' : 'transition-[left,top,width,height] duration-200 ease-out'
           }`}
@@ -457,14 +498,12 @@ export function RulesPanel({
             left: isCollapsed ? mobileCollapsedRect?.x : expandedLeft,
             top: isCollapsed ? mobileCollapsedRect?.y : mobileViewport.top + MOBILE_PANEL_TOP_GAP_PX,
             width: isCollapsed ? mobileCollapsedRect?.width : expandedWidth,
-            height: isCollapsed ? mobileCollapsedRect?.height : expandedHeight,
+            height: isCollapsed ? undefined : expandedHeight,
             maxHeight: mobileViewport.height - WINDOW_MARGIN_PX * 2,
           }}
         >
           <div
-            className={`relative flex items-center gap-3 px-4 py-3 shrink-0 select-none bg-black/30 ${
-              isCollapsed ? '' : 'border-b border-[rgba(212,175,55,0.3)]'
-            } ${
+            className={`relative flex items-center gap-3 px-4 py-3 shrink-0 select-none border-b border-[rgba(212,175,55,0.3)] bg-black/30 ${
               isCollapsed
                 ? interaction?.type === 'drag'
                   ? 'cursor-grabbing'
@@ -500,22 +539,33 @@ export function RulesPanel({
             </div>
             <div className="absolute inset-x-0 flex justify-center pointer-events-none px-20">
               <span className="truncate text-[0.7rem] uppercase tracking-[0.2em] text-amber-100/70">
-                {panelTitle}
+                Guide
               </span>
             </div>
           </div>
 
-          <div className={isCollapsed ? 'hidden' : 'flex flex-1 min-h-0 flex-col overflow-hidden'}>
-            <QuickGuide
-              key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
-              initialDocId={initialDocId}
-              initialTab={initialTab}
-              gameId={gameId}
-              useUpgrades={useUpgrades}
-              useVanguards={useVanguards}
-              onLocationChange={setNavigationHint}
-            />
-          </div>
+          {isCollapsed ? (
+            <div className="flex flex-1 min-h-0 flex-col justify-center px-4 pb-3 pt-2">
+              <span className="text-[0.58rem] uppercase tracking-[0.18em] text-amber-200/45">
+                Current section
+              </span>
+              <span className="mt-1 text-sm font-medium leading-snug text-amber-50/95 break-words">
+                {collapsedLocation}
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+              <QuickGuide
+                key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
+                initialDocId={initialDocId}
+                initialTab={initialTab}
+                gameId={gameId}
+                useUpgrades={useUpgrades}
+                useVanguards={useVanguards}
+                onLocationChange={setNavigationHint}
+              />
+            </div>
+          )}
         </div>
       </div>
     )
@@ -525,11 +575,12 @@ export function RulesPanel({
     return null
   }
 
-  const desktopPanelTitle = isCollapsed ? navigationHint || MOBILE_COLLAPSED_LABEL_FALLBACK : 'Guide'
+  const collapsedLocation = navigationHint || MOBILE_COLLAPSED_LABEL_FALLBACK
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
       <div
+        ref={isCollapsed ? collapsedPanelRef : null}
         className={`absolute pointer-events-auto modal-chrome felt-raised-panel border gold-border rounded-2xl flex flex-col overflow-hidden shadow-[0_36px_96px_rgba(0,0,0,0.72),0_14px_40px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,236,181,0.08)] ${
           interaction ? 'transition-none' : 'transition-[left,top,width,height] duration-200 ease-out'
         }`}
@@ -537,15 +588,13 @@ export function RulesPanel({
           left: desktopPanel.x,
           top: desktopPanel.y,
           width: desktopPanel.width,
-          height: desktopPanel.height,
+          height: isCollapsed ? undefined : desktopPanel.height,
           maxWidth: Math.max(1, desktopViewport.width - WINDOW_MARGIN_PX * 2),
           maxHeight: Math.max(1, desktopViewport.height - WINDOW_MARGIN_PX * 2),
         }}
       >
         <div
-          className={`relative flex items-center gap-3 px-4 py-3 shrink-0 select-none bg-black/30 ${
-            isCollapsed ? '' : 'border-b border-[rgba(212,175,55,0.3)]'
-          } ${interaction?.type === 'drag' ? 'cursor-grabbing' : 'cursor-grab'}`}
+          className={`relative flex items-center gap-3 px-4 py-3 shrink-0 select-none border-b border-[rgba(212,175,55,0.3)] bg-black/30 ${interaction?.type === 'drag' ? 'cursor-grabbing' : 'cursor-grab'}`}
           onPointerDown={beginDrag}
           style={{ touchAction: 'none' }}
         >
@@ -575,22 +624,33 @@ export function RulesPanel({
           </div>
           <div className="absolute inset-x-0 flex justify-center pointer-events-none px-28">
             <span className="truncate text-[0.7rem] uppercase tracking-[0.2em] text-amber-100/70">
-              {desktopPanelTitle}
+              Guide
             </span>
           </div>
         </div>
 
-        <div className={isCollapsed ? 'hidden' : 'flex flex-1 min-h-0 flex-col overflow-hidden'}>
-          <QuickGuide
-            key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
-            initialDocId={initialDocId}
-            initialTab={initialTab}
-            gameId={gameId}
-            useUpgrades={useUpgrades}
-            useVanguards={useVanguards}
-            onLocationChange={setNavigationHint}
-          />
-        </div>
+        {isCollapsed ? (
+          <div className="flex flex-1 min-h-0 flex-col justify-center px-4 pb-3 pt-2">
+            <span className="text-[0.58rem] uppercase tracking-[0.18em] text-amber-200/45">
+              Current section
+            </span>
+            <span className="mt-1 text-sm font-medium leading-snug text-amber-50/95 break-words">
+              {collapsedLocation}
+            </span>
+          </div>
+        ) : (
+          <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+            <QuickGuide
+              key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
+              initialDocId={initialDocId}
+              initialTab={initialTab}
+              gameId={gameId}
+              useUpgrades={useUpgrades}
+              useVanguards={useVanguards}
+              onLocationChange={setNavigationHint}
+            />
+          </div>
+        )}
 
         {!isCollapsed && (
           <button

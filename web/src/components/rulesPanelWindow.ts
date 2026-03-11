@@ -39,7 +39,7 @@ const STORAGE_VERSION = 2
 export const DESKTOP_BREAKPOINT_PX = 640
 export const WINDOW_MARGIN_PX = 16
 export const COLLAPSED_PANEL_WIDTH_PX = 312
-export const COLLAPSED_PANEL_HEIGHT_PX = 58
+export const DEFAULT_COLLAPSED_PANEL_HEIGHT_PX = 84
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max)
@@ -134,11 +134,14 @@ export function clampDesktopWindowState(
   return { ...sized, x, y }
 }
 
-export function collapsedPanelSize(viewport: ViewportBox): PanelSize {
+export function collapsedPanelSize(
+  viewport: ViewportBox,
+  height = DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
+): PanelSize {
   const available = availableWindowSize(viewport, WINDOW_MARGIN_PX)
   return {
     width: Math.min(COLLAPSED_PANEL_WIDTH_PX, available.width),
-    height: Math.min(COLLAPSED_PANEL_HEIGHT_PX, available.height),
+    height: Math.min(Math.max(1, Math.round(height)), available.height),
   }
 }
 
@@ -172,6 +175,7 @@ export function clampDesktopWindowForMode(
   state: DesktopWindowState,
   viewport: ViewportBox,
   isCollapsed: boolean,
+  collapsedHeight = DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
 ): DesktopWindowState {
   const sized = clampDesktopWindowSize(state, viewport)
   if (!isCollapsed) {
@@ -182,7 +186,7 @@ export function clampDesktopWindowForMode(
     ...clampDesktopPanelOrigin(
       sized.x,
       sized.y,
-      collapsedPanelSize(viewport),
+      collapsedPanelSize(viewport, collapsedHeight),
       viewport,
     ),
   }
@@ -192,12 +196,13 @@ export function getDesktopPanelRect(
   state: DesktopWindowState,
   viewport: ViewportBox,
   isCollapsed: boolean,
+  collapsedHeight = DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
 ): DesktopWindowState {
   if (!isCollapsed) {
     return clampDesktopWindowState(state, viewport)
   }
   const sized = clampDesktopWindowSize(state, viewport)
-  const panel = collapsedPanelSize(viewport)
+  const panel = collapsedPanelSize(viewport, collapsedHeight)
   return {
     width: panel.width,
     height: panel.height,

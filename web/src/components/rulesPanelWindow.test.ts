@@ -49,7 +49,7 @@ describe('rules panel window helpers', () => {
       width: 840,
       height: 700,
       x: 672,
-      y: 726,
+      y: 700,
     })
   })
 
@@ -62,9 +62,9 @@ describe('rules panel window helpers', () => {
 
     expect(rect).toEqual({
       width: 312,
-      height: 58,
+      height: 84,
       x: 672,
-      y: 726,
+      y: 700,
     })
   })
 })
