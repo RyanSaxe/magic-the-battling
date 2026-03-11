@@ -26,7 +26,9 @@ export function Sidebar({
 
   return (
     <aside
-      className="relative w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden"
+      className={`relative w-[var(--sidebar-width)] h-full frame-chrome flex flex-col ${
+        isMobile ? "overflow-hidden" : "overflow-visible"
+      }`}
       data-guide-target="sidebar-panel"
     >
       {phaseContent ? (
@@ -40,10 +42,12 @@ export function Sidebar({
           players={players}
           useUpgrades={useUpgrades}
           isMobile
+          activeTab={state.revealedPlayerTab}
+          onTabChange={(tab) => setRevealedPlayerName(revealedPlayer.name, tab)}
           onClose={() => setRevealedPlayerName(null)}
         />
       ) : (
-        <div className="pl-4 pr-4 overflow-auto flex-1 flex flex-col">
+        <div className="px-4 py-4 overflow-auto flex-1 flex flex-col">
           <PlayerList
             players={players}
             currentPlayerName={currentPlayer.name}
@@ -57,6 +61,8 @@ export function Sidebar({
           players={players}
           useUpgrades={useUpgrades}
           isMobile={false}
+          activeTab={state.revealedPlayerTab}
+          onTabChange={(tab) => setRevealedPlayerName(revealedPlayer.name, tab)}
           onClose={() => setRevealedPlayerName(null)}
         />
       )}

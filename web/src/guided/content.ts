@@ -511,7 +511,7 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         primaryActionLabel: "Next",
         sidebarState: {
           openOnMobile: true,
-          playerName: (ctx) => ctx.draftGuideOpponentName,
+          playerName: null,
         },
         content: {
           summary: "This row shows pairing likelihood, current treasure, current poison, and where that opponent is in the loop.",
@@ -521,7 +521,7 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       {
         id: "revealed-cards",
         title: "Use Revealed Cards As Draft Signals",
-        targetId: "sidebar-revealed-details",
+        targetId: "sidebar-seen-in-battle",
         placement: "left",
         cardPlacement: "middle-left",
         mobileCardPlacement: "bottom-center",
@@ -529,7 +529,7 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         sidebarState: {
           openOnMobile: true,
           playerName: (ctx) => ctx.draftGuideOpponentName,
-          openPanel: true,
+          detailTab: "seen",
         },
         content: {
           summary: ctx.draftGuideOpponentRevealedCount > 0

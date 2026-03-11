@@ -502,6 +502,7 @@ function GameGuideLayer({
   const sidebarRestoreRef = useRef<{
     sidebarOpen: boolean;
     revealedPlayerName: string | null;
+    revealedPlayerTab: "seen" | "overview";
   } | null>(null);
   const activeStepIndex =
     guideRequest && activeStepState.nonce === guideRequest.nonce
@@ -528,8 +529,11 @@ function GameGuideLayer({
     } else if (sidebarOpen !== snapshot.sidebarOpen) {
       setSidebarOpen(snapshot.sidebarOpen);
     }
-    if (state.revealedPlayerName !== snapshot.revealedPlayerName) {
-      setRevealedPlayerName(snapshot.revealedPlayerName);
+    if (
+      state.revealedPlayerName !== snapshot.revealedPlayerName
+      || state.revealedPlayerTab !== snapshot.revealedPlayerTab
+    ) {
+      setRevealedPlayerName(snapshot.revealedPlayerName, snapshot.revealedPlayerTab);
     }
   }, [
     context.isMobile,
@@ -537,6 +541,7 @@ function GameGuideLayer({
     setSidebarOpen,
     sidebarOpen,
     state.revealedPlayerName,
+    state.revealedPlayerTab,
   ]);
 
   const resolvedSidebarState = useMemo(() => {
@@ -556,7 +561,7 @@ function GameGuideLayer({
     return {
       openOnMobile: resolveValue(sidebarState.openOnMobile),
       playerName: resolveValue(sidebarState.playerName),
-      openPanel: resolveValue(sidebarState.openPanel),
+      detailTab: resolveValue(sidebarState.detailTab),
     };
   }, [activeStep?.sidebarState, context]);
 
@@ -570,6 +575,7 @@ function GameGuideLayer({
       sidebarRestoreRef.current = {
         sidebarOpen,
         revealedPlayerName: state.revealedPlayerName,
+        revealedPlayerTab: state.revealedPlayerTab,
       };
     }
 
@@ -578,9 +584,18 @@ function GameGuideLayer({
     }
     if (
       resolvedSidebarState.playerName !== undefined
-      && state.revealedPlayerName !== resolvedSidebarState.playerName
+      && (
+        state.revealedPlayerName !== resolvedSidebarState.playerName
+        || (
+          resolvedSidebarState.detailTab !== undefined
+          && state.revealedPlayerTab !== resolvedSidebarState.detailTab
+        )
+      )
     ) {
-      setRevealedPlayerName(resolvedSidebarState.playerName);
+      setRevealedPlayerName(
+        resolvedSidebarState.playerName,
+        resolvedSidebarState.detailTab ?? state.revealedPlayerTab,
+      );
     }
   }, [
     context.isMobile,
@@ -591,6 +606,7 @@ function GameGuideLayer({
     setSidebarOpen,
     sidebarOpen,
     state.revealedPlayerName,
+    state.revealedPlayerTab,
   ]);
 
   useLayoutEffect(() => restoreSidebarState, [restoreSidebarState]);
@@ -1724,7 +1740,7 @@ function GameContent() {
                   {sidebarOpen && (
                     <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
                   )}
-                  <div className={`fixed top-0 right-0 h-full z-50 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                  <div className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <Sidebar
                       players={gameState.players}
                       currentPlayer={self_player}
@@ -1940,7 +1956,7 @@ function GameContent() {
                 {sidebarOpen && (
                   <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
                 )}
-                <div className={`fixed top-0 right-0 h-full z-50 transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                   <Sidebar
                     players={gameState.players}
                     currentPlayer={self_player}

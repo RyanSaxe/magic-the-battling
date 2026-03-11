@@ -8,7 +8,7 @@ import { buildGameSummaryData } from '../utils/share'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
 import type { ZoneConstraints } from '../hooks/computeConstrainedLayout'
 import { CardPreviewContext, CardPreviewModal } from '../components/card'
-import { PlayerRow } from '../components/PlayerList'
+import { PLAYER_ROW_STACK_CLASS, PlayerRow } from '../components/PlayerList'
 
 interface RoundOption {
   label: string
@@ -295,21 +295,23 @@ export function ShareGame() {
   }
 
   const renderSidebarContent = () => (
-    <div className="flex flex-col gap-1 p-3">
-      {sortedPlayerViews.map((pv) => (
-        <PlayerRow
-          key={pv.name}
-          player={pv}
-          players={playerViews}
-          currentPlayerName={data.owner_name}
-          isSelected={pv.name === selectedPlayer}
-          variant="share"
-          onClick={() => {
-            setSelectedPlayer(pv.name)
-            if (sizes.isMobile) setSidebarOpen(false)
-          }}
-        />
-      ))}
+    <div className="px-4 py-4">
+      <div className={PLAYER_ROW_STACK_CLASS}>
+        {sortedPlayerViews.map((pv) => (
+          <PlayerRow
+            key={pv.name}
+            player={pv}
+            players={playerViews}
+            currentPlayerName={data.owner_name}
+            isSelected={pv.name === selectedPlayer}
+            variant="share"
+            onClick={() => {
+              setSelectedPlayer(pv.name)
+              if (sizes.isMobile) setSidebarOpen(false)
+            }}
+          />
+        ))}
+      </div>
     </div>
   )
 
@@ -386,7 +388,7 @@ export function ShareGame() {
               />
             )}
             <div
-              className={`fixed top-0 right-0 h-full z-50 transition-transform duration-300 ${
+              className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${
                 sidebarOpen ? 'translate-x-0' : 'translate-x-full'
               }`}
             >

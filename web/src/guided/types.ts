@@ -1,5 +1,6 @@
 import type { BattleView, Card as GameCard, SelfPlayerView } from "../types";
 import type { Phase } from "../constants/phases";
+import type { RevealedPlayerTab } from "../contexts/contextStripState";
 
 export type ConditionalGuideId =
   | "hint_treasure_producer"
@@ -52,6 +53,7 @@ export type GuideTargetId =
   | "sidebar-toggle"
   | "sidebar-opponent-list"
   | "sidebar-revealed-details"
+  | "sidebar-seen-in-battle"
   | "phase-action-bar";
 
 export type GuidePlacement = "top" | "right" | "bottom" | "left" | "center";
@@ -98,7 +100,7 @@ export interface GuidedWalkthroughContext {
 export interface GuideStepSidebarState {
   openOnMobile?: boolean | ((ctx: GuidedWalkthroughContext) => boolean | undefined);
   playerName?: string | null | ((ctx: GuidedWalkthroughContext) => string | null | undefined);
-  openPanel?: boolean | ((ctx: GuidedWalkthroughContext) => boolean | undefined);
+  detailTab?: RevealedPlayerTab | ((ctx: GuidedWalkthroughContext) => RevealedPlayerTab | undefined);
 }
 
 export interface GuideStepDefinition {
