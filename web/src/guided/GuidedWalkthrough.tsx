@@ -78,6 +78,19 @@ export function GuidedWalkthrough({
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
+      const handled = event.key === "Escape"
+        || event.key === "ArrowRight"
+        || event.key === "Enter"
+        || (event.key === "ArrowLeft" && stepIndex > 0);
+
+      if (!handled) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
       if (event.key === "Escape") {
         finishGuide();
       } else if ((event.key === "ArrowRight" || event.key === "Enter")) {
@@ -87,8 +100,8 @@ export function GuidedWalkthrough({
       }
     };
 
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
+    window.addEventListener("keydown", handleKey, true);
+    return () => window.removeEventListener("keydown", handleKey, true);
   }, [advanceStep, finishGuide, stepIndex]);
 
   const layout = useGuidePositioning(
@@ -122,15 +135,17 @@ export function GuidedWalkthrough({
               height: layout.spotlight.height,
             }}
           />
-          <div
-            className="absolute pointer-events-auto"
-            style={{
-              left: layout.spotlight.x,
-              top: layout.spotlight.y,
-              width: layout.spotlight.width,
-              height: layout.spotlight.height,
-            }}
-          />
+          {!step.allowTargetInteraction && (
+            <div
+              className="absolute pointer-events-auto"
+              style={{
+                left: layout.spotlight.x,
+                top: layout.spotlight.y,
+                width: layout.spotlight.width,
+                height: layout.spotlight.height,
+              }}
+            />
+          )}
         </>
       )}
 

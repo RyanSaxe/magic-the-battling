@@ -10,14 +10,20 @@ interface SubmitPopoverProps {
   options: SubmitPopoverOption[];
   onClose: () => void;
   guideTarget?: string;
+  closeOnOutsideClick?: boolean;
 }
 
-export function SubmitPopover({ options, onClose, guideTarget }: SubmitPopoverProps) {
+export function SubmitPopover({
+  options,
+  onClose,
+  guideTarget,
+  closeOnOutsideClick = true,
+}: SubmitPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (closeOnOutsideClick && ref.current && !ref.current.contains(e.target as Node)) {
         onClose();
       }
     };
@@ -30,7 +36,7 @@ export function SubmitPopover({ options, onClose, guideTarget }: SubmitPopoverPr
       document.removeEventListener("mousedown", handleClick);
       document.removeEventListener("keydown", handleKey);
     };
-  }, [onClose]);
+  }, [closeOnOutsideClick, onClose]);
 
   return (
     <div

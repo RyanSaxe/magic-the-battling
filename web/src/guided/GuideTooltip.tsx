@@ -75,29 +75,16 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
               />
             </div>
           )}
-          {step.content.gallery && step.content.gallery.length > 0 && (
-            <div className="mt-4 rounded-xl border border-sky-300/15 bg-black/20 p-3">
-              <div className="text-[0.68rem] uppercase tracking-[0.18em] text-sky-100/80">
-                Current upgrades
-              </div>
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                {step.content.gallery.map((media) => (
-                  <img
-                    key={`${media.imageUrl}:${media.alt}`}
-                    src={media.imageUrl}
-                    alt={media.alt}
-                    className="w-full rounded-md border border-sky-300/15 shadow-sm"
-                  />
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-amber-200/10 px-4 py-3">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-nowrap items-center justify-between gap-2 border-t border-amber-200/10 px-4 py-3">
+          <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
             {stepIndex > 0 && (
-              <button type="button" onClick={onBack} className="btn btn-secondary text-xs">
+              <button
+                type="button"
+                onClick={onBack}
+                className="btn btn-secondary shrink-0 whitespace-nowrap px-2 py-1 text-[11px] leading-none"
+              >
                 Back
               </button>
             )}
@@ -105,14 +92,18 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
               <button
                 type="button"
                 onClick={onSkipAll}
-                className="btn btn-secondary text-xs"
+                className="btn btn-secondary shrink-0 whitespace-nowrap px-2 py-1 text-[11px] leading-none"
               >
                 Skip Tutorial
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2 ml-auto">
-            <button type="button" onClick={onPrimaryAction} className="btn btn-primary text-xs">
+          <div className="ml-auto flex shrink-0 flex-nowrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onPrimaryAction}
+              className="btn btn-primary shrink-0 whitespace-nowrap px-2.5 py-1 text-[11px] leading-none"
+            >
               {primaryActionLabel}
             </button>
           </div>

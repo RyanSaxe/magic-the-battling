@@ -120,6 +120,35 @@ function rectDistanceSquared(a: SpotlightRect, b: SpotlightRect): number {
   return dx * dx + dy * dy;
 }
 
+function preferredAnchorOffsetSquared(
+  candidate: RectCandidate,
+  preferred: GuidePlacement,
+  spotlight: SpotlightRect,
+  centeredLeft: number,
+  centeredTop: number,
+  cardW: number,
+  cardH: number,
+): number {
+  switch (preferred) {
+    case "top":
+      return (candidate.left - centeredLeft) ** 2
+        + (candidate.top - (spotlight.y - cardH)) ** 2;
+    case "bottom":
+      return (candidate.left - centeredLeft) ** 2
+        + (candidate.top - (spotlight.y + spotlight.height)) ** 2;
+    case "left":
+      return (candidate.left - (spotlight.x - cardW)) ** 2
+        + (candidate.top - centeredTop) ** 2;
+    case "right":
+      return (candidate.left - (spotlight.x + spotlight.width)) ** 2
+        + (candidate.top - centeredTop) ** 2;
+    case "center":
+    default:
+      return (candidate.left - centeredLeft) ** 2
+        + (candidate.top - centeredTop) ** 2;
+  }
+}
+
 function placementPenalty(candidate: GuidePlacement, preferred: GuidePlacement): number {
   if (preferred === "center") {
     return candidate === "center" ? 0 : 1_000;
@@ -256,15 +285,25 @@ function computePosition(
     return {
       ...candidate,
       overlap: overlapArea(cardRect, spotlight),
-      distance: rectDistanceSquared(cardRect, spotlight),
       penalty: placementPenalty(candidate.resolved, placement),
+      anchorOffset: preferredAnchorOffsetSquared(
+        candidate,
+        placement,
+        spotlight,
+        centeredLeft,
+        centeredTop,
+        cardW,
+        cardH,
+      ),
+      distance: rectDistanceSquared(cardRect, spotlight),
     };
   });
 
   scored.sort((a, b) =>
     a.overlap - b.overlap
-    || a.distance - b.distance
-    || a.penalty - b.penalty,
+    || a.penalty - b.penalty
+    || a.anchorOffset - b.anchorOffset
+    || a.distance - b.distance,
   );
 
   const best = scored[0];

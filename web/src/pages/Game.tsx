@@ -1116,6 +1116,7 @@ function GameContent() {
                 ]}
                 onClose={() => setShowSubmitHandPopover(false)}
                 guideTarget="build-submit-popover"
+                closeOnOutsideClick={false}
               />
             )}
           </div>

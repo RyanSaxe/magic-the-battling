@@ -1,4 +1,3 @@
-import { THE_VANQUISHER_IMAGE } from "../constants/assets";
 import type {
   ConditionalGuideId,
   GuideDefinition,
@@ -217,6 +216,7 @@ function buildPlayDrawGuide(): GuideDefinition {
         placement: "top",
         cardPlacement: "top-center",
         primaryActionLabel: "Got it",
+        allowTargetInteraction: true,
         content: {
           summary: "This choice is part of locking in your build for the battle.",
           detail: "Choose whether you want to be on the play or on the draw, then your setup is submitted.",
@@ -283,31 +283,17 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   };
 }
 
-function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
-  const upgradeGallery = (ctx.selfPlayer?.upgrades ?? []).map((upgrade) => ({
-    imageUrl: upgrade.png_url ?? upgrade.image_url,
-    alt: upgrade.name,
-  }));
-
+function buildRewardGuide(_ctx: GuidedWalkthroughContext): GuideDefinition {
   const steps: GuideStepDefinition[] = [
     {
-      id: "rewards",
-      title: "Reward Always Gives Treasure Plus Card Progress",
-      targetId: "reward-summary" as const,
-      positionTargetId: "reward-summary",
-      placement: "right" as const,
-      cardPlacement: "bottom-center",
+      id: "reward-placeholder",
+      title: "Rewards",
+      placement: "center",
+      cardPlacement: "center",
       primaryActionLabel: "Got it",
       content: {
-        summary: "After battle you always get a treasure and a random card.",
-        detail: ctx.useUpgrades
-          ? `At the last round of a stage, when the right side of the timeline shows 4-1, 5-1, and so on, that random card is replaced by a Vanquisher. Upgrades are permanent boosts, you get a new upgrade choice whenever you finish a stage, and your existing upgrades are shown here for review.${ctx.hasRewardUpgradeChoice ? " Your new upgrade choices are shown below right now." : ""}`
-          : "At the last round of a stage, when the right side of the timeline shows 4-1, 5-1, and so on, that random card is replaced by a Vanquisher.",
-        media: {
-          imageUrl: THE_VANQUISHER_IMAGE,
-          alt: "The Vanquisher",
-        },
-        gallery: upgradeGallery,
+        summary: "This reward tutorial is temporarily simplified while the reward screen is being cleaned up.",
+        detail: "For now, just review your rewards and continue when you are ready.",
       },
     },
   ];

@@ -62,7 +62,6 @@ export interface GuideStepContent {
   summary: string;
   detail?: string;
   media?: GuideMedia;
-  gallery?: GuideMedia[];
 }
 
 export interface GuidedWalkthroughContext {
@@ -91,6 +90,7 @@ export interface GuideStepDefinition {
   mobileCardPlacement?: GuideCardPlacement;
   spotlightPadding?: number;
   primaryActionLabel?: string;
+  allowTargetInteraction?: boolean;
 }
 
 export interface GuideDefinition {
