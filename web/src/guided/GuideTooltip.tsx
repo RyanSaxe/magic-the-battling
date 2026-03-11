@@ -30,6 +30,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
   ) {
     const isLastStep = stepIndex + 1 === totalSteps;
     const primaryActionLabel = step.primaryActionLabel ?? (isLastStep ? "Got it" : "Next");
+    const showSkipTutorial = showSkipAll && stepIndex === 0;
 
     return (
       <div
@@ -113,11 +114,11 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
                 Back
               </button>
             )}
-            {showSkipAll && (
+            {showSkipTutorial && (
               <button
                 type="button"
                 onClick={onSkipAll}
-                className="btn btn-secondary shrink-0 whitespace-nowrap px-2 py-1 text-[11px] leading-none"
+                className="btn btn-danger shrink-0 whitespace-nowrap px-2 py-1 text-[11px] leading-none"
               >
                 Skip Tutorial
               </button>

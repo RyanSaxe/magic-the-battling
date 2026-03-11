@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
@@ -533,7 +533,11 @@ function GameGuideLayer({
     }
 
     sidebarRestoreRef.current = null;
-    if (context.isMobile && sidebarOpen !== snapshot.sidebarOpen) {
+    if (context.isMobile) {
+      if (sidebarOpen) {
+        setSidebarOpen(false);
+      }
+    } else if (sidebarOpen !== snapshot.sidebarOpen) {
       setSidebarOpen(snapshot.sidebarOpen);
     }
     if (state.revealedPlayerTab !== snapshot.revealedPlayerTab) {
@@ -573,7 +577,7 @@ function GameGuideLayer({
     };
   }, [activeStep?.sidebarState, context]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!guideRequest || !resolvedSidebarState) {
       restoreSidebarState();
       return;
@@ -612,7 +616,7 @@ function GameGuideLayer({
     state.revealedPlayerTab,
   ]);
 
-  useEffect(() => restoreSidebarState, [restoreSidebarState]);
+  useLayoutEffect(() => restoreSidebarState, [restoreSidebarState]);
 
   if (!guideRequest) return null;
   return (

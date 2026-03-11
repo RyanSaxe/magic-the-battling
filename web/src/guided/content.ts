@@ -162,7 +162,7 @@ function buildWelcomeGuide(): GuideDefinition {
         placement: "left",
         cardPlacement: "top-right",
         mobileCardPlacement: "bottom-center",
-        primaryActionLabel: "I understand",
+        primaryActionLabel: "Begin game",
         content: {
           summary: "Open the Guide any time you want the full reference while you play.",
           detail: "Rules explains the loop and phase structure, Controls shows what each phase can do, Tips collects practical reminders, Cards lets you browse the pool, and FAQ covers edge cases and clarifications.",
