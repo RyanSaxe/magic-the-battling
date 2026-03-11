@@ -34,7 +34,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
     return (
       <div
         ref={ref}
-        className="absolute z-[82] pointer-events-auto w-[min(17.5rem,calc(100%-1rem))] sm:w-[min(22rem,calc(100%-2rem))] max-h-[calc(100%-1rem)] overflow-hidden rounded-2xl modal-chrome gold-border shadow-[0_16px_36px_rgba(0,0,0,0.5)]"
+        className="absolute z-[82] pointer-events-auto w-[min(17.5rem,calc(100%-1rem))] sm:w-[min(22rem,calc(100%-2rem))] max-h-[calc(100%-1rem)] overflow-hidden rounded-xl border modal-chrome felt-raised-panel gold-border shadow-[0_18px_42px_rgba(0,0,0,0.58),0_6px_18px_rgba(0,0,0,0.3)]"
         style={{
           ...style,
           overscrollBehavior: "contain",
