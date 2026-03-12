@@ -284,7 +284,6 @@ export function Lobby() {
 
   const clearBattler = () => {
     if (!hasLoadedBattler) return;
-    setBattlerIdInput("");
     actions.clearBattler();
   };
 
@@ -667,6 +666,13 @@ export function Lobby() {
                     availablePuppets !== null &&
                     puppetCount < availablePuppets &&
                     total < 8;
+                  const summaryBattlerId =
+                    lobbyState.play_mode === "limited"
+                      ? lobbyState.cube_id
+                      : currentPlayer?.battler_id ?? null;
+                  const canBrowseCards =
+                    lobbyState.play_mode === "limited" ||
+                    currentPlayer?.battler_status === "ready";
 
                   const openGuide = (target?: RulesPanelTarget) => {
                     setRulesPanelTarget(target);
@@ -725,59 +731,55 @@ export function Lobby() {
                             {copied ? "Copied!" : "Copy"}
                           </button>
                         </div>
-                        <div className="border-t border-black/40 mt-2 pt-2 flex items-center justify-center gap-2 text-xs text-gray-500">
-                          <span>
-                            Mode:{" "}
-                            <span className="text-amber-500">
-                              {lobbyState.play_mode === "constructed" ? "Constructed" : "Limited"}
-                            </span>
-                          </span>
-                          <span>&middot;</span>
-                          {lobbyState.play_mode === "limited" ? (
-                            <>
-                              <span>
-                                Battler:{" "}
-                                <a
-                                  href={cubeCobraUrl(lobbyState.cube_id)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-amber-500 hover:text-amber-400 transition-colors"
-                                >
-                                  {lobbyState.cube_id}
-                                </a>
-                              </span>
-                              <span>&middot;</span>
-                            </>
-                          ) : currentPlayer?.battler_id ? (
-                            <>
-                              <span>
-                                Battler:{" "}
-                                <a
-                                  href={cubeCobraUrl(currentPlayer.battler_id)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-amber-500 hover:text-amber-400 transition-colors"
-                                >
-                                  {currentPlayer.battler_id}
-                                </a>
-                              </span>
-                              <span>&middot;</span>
-                            </>
-                          ) : null}
-                          <span>
-                            Upgrades: {lobbyState.use_upgrades ? "On" : "Off"}
-                          </span>
-                          {(lobbyState.play_mode === "limited" || currentPlayer?.battler_status === "ready") && (
-                            <>
-                              <span>&middot;</span>
-                              <button
-                                onClick={() => openGuide({ docId: "__cards__" })}
-                                className="text-amber-500/70 hover:text-amber-400 transition-colors"
+                        <div className="border-t border-black/40 mt-2 pt-2 grid grid-cols-[0.9fr_1.85fr_0.7fr_0.8fr] text-left">
+                          <div className="min-w-0 px-1.5 first:pl-0">
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                              Mode
+                            </div>
+                            <div className="mt-0.5 truncate text-[11px] text-amber-400">
+                              {lobbyState.play_mode === "constructed" ? "Const." : "Limited"}
+                            </div>
+                          </div>
+                          <div className="min-w-0 border-l border-black/40 px-2">
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                              Battler
+                            </div>
+                            {summaryBattlerId ? (
+                              <a
+                                href={cubeCobraUrl(summaryBattlerId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={summaryBattlerId}
+                                className="mt-0.5 block truncate text-[11px] text-amber-400 hover:text-amber-300 transition-colors"
                               >
-                                Browse Cards
-                              </button>
-                            </>
-                          )}
+                                {summaryBattlerId}
+                              </a>
+                            ) : (
+                              <div className="mt-0.5 truncate text-[11px] text-gray-500">
+                                Missing
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 border-l border-black/40 px-2">
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                              Upgr.
+                            </div>
+                            <div className="mt-0.5 truncate text-[11px] text-amber-400">
+                              {lobbyState.use_upgrades ? "On" : "Off"}
+                            </div>
+                          </div>
+                          <div className="min-w-0 border-l border-black/40 pl-2 pr-0">
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                              Browse
+                            </div>
+                            <button
+                              onClick={() => openGuide({ docId: "__cards__" })}
+                              disabled={!canBrowseCards}
+                              className="mt-0.5 block w-full truncate text-left text-[11px] text-amber-400 transition-colors hover:text-amber-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+                            >
+                              Cards
+                            </button>
+                          </div>
                         </div>
                       </div>
 
@@ -785,24 +787,28 @@ export function Lobby() {
                         <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
                           <h2 className="text-white font-medium text-sm">Your Battler</h2>
                           <div className="mt-3 flex gap-2">
-                            <input
-                              type="text"
-                              value={battlerIdInput}
-                              onChange={(event) => setBattlerIdInput(event.target.value)}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" && !hasLoadedBattler && !isBattlerLoading) {
-                                  submitBattler();
-                                }
-                              }}
-                              placeholder="CubeCobra battler ID"
-                              readOnly={hasLoadedBattler}
-                              disabled={isBattlerLoading}
-                              className={`w-full h-[42px] border border-black/40 rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed ${
-                                hasLoadedBattler
-                                  ? "bg-black/20 text-gray-300"
-                                  : "bg-black/40 text-white"
-                              }`}
-                            />
+                            {hasLoadedBattler ? (
+                              <div
+                                title={battlerIdInput}
+                                className="w-full h-[42px] border border-black/40 rounded px-3 py-2 text-base bg-black/20 text-gray-300 overflow-hidden text-ellipsis whitespace-nowrap select-none cursor-default"
+                              >
+                                {battlerIdInput}
+                              </div>
+                            ) : (
+                              <input
+                                type="text"
+                                value={battlerIdInput}
+                                onChange={(event) => setBattlerIdInput(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" && !isBattlerLoading) {
+                                    submitBattler();
+                                  }
+                                }}
+                                placeholder="CubeCobra battler ID"
+                                disabled={isBattlerLoading}
+                                className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                            )}
                             <button
                               onClick={handleBattlerButtonClick}
                               disabled={isBattlerLoading}

@@ -763,8 +763,8 @@ export function Play() {
           title="Friends Options"
           onClose={() => setShowFriendsAdvanced(false)}
         >
-          <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
           <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
+          <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
           <UpgradesCheckbox
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
@@ -787,8 +787,8 @@ export function Play() {
           title="Solo Options"
           onClose={() => setShowSoloAdvanced(false)}
         >
-          <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
           <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
+          <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
           <UpgradesCheckbox
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}

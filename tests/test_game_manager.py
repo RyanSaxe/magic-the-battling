@@ -397,7 +397,16 @@ class TestBattlerValidation:
         )
 
         with pytest.raises(ValueError, match="has 99 playable cards"):
-            game_manager._load_battler("too_small", use_upgrades=False, use_vanguards=False)
+            game_manager._load_battler("too_small", use_upgrades=False, use_vanguards=False, play_mode="constructed")
+
+    def test_load_battler_applies_shared_bans_to_limited_battlers(self, game_manager, monkeypatch, card_factory):
+        monkeypatch.setattr(
+            "mtb.utils.cubecobra.get_cube_data",
+            lambda cube_id: [card_factory(f"card{i}") for i in range(99)] + [card_factory("Unexpected Potential")],
+        )
+
+        with pytest.raises(ValueError, match="Unexpected Potential is banned"):
+            game_manager._load_battler("limited_ban", use_upgrades=False, use_vanguards=False, play_mode="limited")
 
 
 class TestPersistPlacementOnElimination:

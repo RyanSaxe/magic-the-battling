@@ -1,13 +1,16 @@
 import random
-import warnings
 
 from pydantic import BaseModel, Field
 
-from mtb.models.types import UPGRADE_TYPE, VANGUARD_TYPE
+from mtb.models.types import UPGRADE_TYPE, VANGUARD_TYPE, PlayMode
 
 CONSTRUCTED_MIN_CARDS = 100
-CONSTRUCTED_BANNED_KEYWORDS = {"toxic", "poisonous", "proliferate"}
-CONSTRUCTED_BANNED_CARD_NAMES = {"thassa's oracle", "laboratory maniac"}
+SHARED_BANNED_KEYWORDS = {"toxic", "poisonous", "proliferate"}
+CONSTRUCTED_BANNED_KEYWORDS: set[str] = set()
+LIMITED_BANNED_KEYWORDS: set[str] = set()
+SHARED_BANNED_CARD_NAMES = {"thassa's oracle", "laboratory maniac", "unexpected potential"}
+CONSTRUCTED_BANNED_CARD_NAMES: set[str] = set()
+LIMITED_BANNED_CARD_NAMES: set[str] = set()
 
 
 class Card(BaseModel):
@@ -79,30 +82,22 @@ def build_battler(
     from mtb.utils.cubecobra import get_cube_data  # noqa: PLC0415
 
     cards = get_cube_data(battler_id)
+    source_vanguards = [card for card in cards if card.type_line.lower() == VANGUARD_TYPE]
+    source_upgrades = [card for card in cards if card.type_line.lower() == UPGRADE_TYPE]
 
-    vanguards = [card for card in cards if card.type_line.lower() == VANGUARD_TYPE]
-    if vanguards_id is not None:
-        if len(vanguards) > 0:
-            warnings.warn(
-                "Vanguards found in battler. Replacing them with vanguards from the passed vanguard id.",
-                stacklevel=2,
-            )
-        vanguards = get_cube_data(vanguards_id)
-
-    upgrades = [card for card in cards if card.type_line.lower() == UPGRADE_TYPE]
-    if upgrades_id is not None:
-        if len(upgrades) > 0:
-            warnings.warn(
-                "Upgrades found in battler. Replacing them with upgrades from the passed upgrades id.",
-                stacklevel=2,
-            )
-        upgrades = get_cube_data(upgrades_id)
-
-    cards = [card for card in cards if card.type_line.lower() not in (VANGUARD_TYPE, UPGRADE_TYPE)]
-    if not cards:
+    if source_vanguards or source_upgrades:
+        # Temporary guard: battlers cannot supply their own Conspiracies/Vanguards yet.
+        # The only supported path right now is the separate default MTB supplemental cubes.
         raise ValueError(
-            f"Battler '{battler_id}' is illegal: it has no playable cards after filtering out upgrades and vanguards."
+            f"Battler '{battler_id}' is illegal: battler-defined Conspiracy and Vanguard cards "
+            "are not supported right now. Use the default MTB upgrades/vanguards instead."
         )
+
+    vanguards = get_cube_data(vanguards_id) if vanguards_id is not None else []
+
+    upgrades = get_cube_data(upgrades_id) if upgrades_id is not None else []
+    if not cards:
+        raise ValueError(f"Battler '{battler_id}' is illegal: it has no playable cards.")
 
     elo = sum(card.elo for card in cards) / len(cards)
     return Battler(
@@ -120,7 +115,19 @@ def _normalize_card_name(name: str) -> str:
     return name.strip().casefold().replace("\u2019", "'")
 
 
-def validate_constructed_battler(battler: Battler) -> None:
+def _get_banned_card_names(play_mode: PlayMode) -> set[str]:
+    if play_mode == "constructed":
+        return SHARED_BANNED_CARD_NAMES | CONSTRUCTED_BANNED_CARD_NAMES
+    return SHARED_BANNED_CARD_NAMES | LIMITED_BANNED_CARD_NAMES
+
+
+def _get_banned_keywords(play_mode: PlayMode) -> set[str]:
+    if play_mode == "constructed":
+        return SHARED_BANNED_KEYWORDS | CONSTRUCTED_BANNED_KEYWORDS
+    return SHARED_BANNED_KEYWORDS | LIMITED_BANNED_KEYWORDS
+
+
+def validate_battler(battler: Battler, play_mode: PlayMode = "constructed") -> None:
     playable_cards = battler.cards
     if len(playable_cards) < CONSTRUCTED_MIN_CARDS:
         battler_id = battler.source_id or "unknown"
@@ -147,13 +154,17 @@ def validate_constructed_battler(battler: Battler) -> None:
 
     for card in playable_cards:
         normalized_name = _normalize_card_name(card.name)
-        if normalized_name in CONSTRUCTED_BANNED_CARD_NAMES:
+        if normalized_name in _get_banned_card_names(play_mode):
             battler_id = battler.source_id or "unknown"
             raise ValueError(f"Battler '{battler_id}' is illegal: {card.name} is banned.")
 
         keywords = {keyword.strip().casefold() for keyword in card.keywords}
-        banned_keywords = sorted(CONSTRUCTED_BANNED_KEYWORDS & keywords)
+        banned_keywords = sorted(_get_banned_keywords(play_mode) & keywords)
         if banned_keywords:
             battler_id = battler.source_id or "unknown"
             keyword = banned_keywords[0]
             raise ValueError(f"Battler '{battler_id}' is illegal: {card.name} has the banned keyword {keyword}.")
+
+
+def validate_constructed_battler(battler: Battler) -> None:
+    validate_battler(battler, play_mode="constructed")

@@ -22,7 +22,7 @@ from mtb.models.cards import (
     Battler,
     Card,
     build_battler,
-    validate_constructed_battler,
+    validate_battler,
 )
 from mtb.models.game import (
     Battle,
@@ -807,7 +807,12 @@ class GameManager:
         game = create_game(pending.player_names, len(pending.player_names), config)
         target_elo = 1200.0
         if pending.play_mode == "limited":
-            battler = self._load_battler(pending.cube_id, pending.use_upgrades, pending.use_vanguards)
+            battler = self._load_battler(
+                pending.cube_id,
+                pending.use_upgrades,
+                pending.use_vanguards,
+                play_mode=pending.play_mode,
+            )
             set_battler(game, battler)
             target_elo = battler.elo or 1200.0
         else:
@@ -886,7 +891,12 @@ class GameManager:
                     loop = asyncio.get_running_loop()
                     try:
                         pending.battler = await loop.run_in_executor(
-                            None, self._load_battler, pending.cube_id, pending.use_upgrades, pending.use_vanguards
+                            None,
+                            self._load_battler,
+                            pending.cube_id,
+                            pending.use_upgrades,
+                            pending.use_vanguards,
+                            pending.play_mode,
                         )
                     except Exception:
                         return None
@@ -1093,15 +1103,15 @@ class GameManager:
         if not preserve_snapshot:
             self.delete_snapshot(game_id)
 
-    def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
+    def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool, play_mode: PlayMode) -> Battler:
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
         vanguards_id = DEFAULT_VANGUARD_ID if use_vanguards else None
         battler = build_battler(cube_id, upgrades_id, vanguards_id)
-        validate_constructed_battler(battler)
+        validate_battler(battler, play_mode=play_mode)
         return battler
 
     def _load_constructed_battler(self, battler_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
-        return self._load_battler(battler_id, use_upgrades, use_vanguards)
+        return self._load_battler(battler_id, use_upgrades, use_vanguards, play_mode="constructed")
 
     def _normalize_battler_error(self, battler_id: str, error: Exception) -> str:
         if isinstance(error, ValueError):
@@ -1126,7 +1136,12 @@ class GameManager:
             async with self._battler_preload_slots:
                 loop = asyncio.get_running_loop()
                 battler = await loop.run_in_executor(
-                    None, self._load_battler, pending.cube_id, pending.use_upgrades, pending.use_vanguards
+                    None,
+                    self._load_battler,
+                    pending.cube_id,
+                    pending.use_upgrades,
+                    pending.use_vanguards,
+                    pending.play_mode,
                 )
             pending.battler = battler
         except Exception as e:
