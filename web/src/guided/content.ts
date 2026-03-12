@@ -340,7 +340,6 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
     primaryActionLabel: "Ready to battle",
     content: {
       summary: "Whenever the battle is over, click this button to submit the result.",
-      detail: "Note: a Draw is considered a loss for both players.",
     },
   });
 
@@ -460,7 +459,6 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         primaryActionLabel: "Show me the zones",
         content: {
           summary: "Draft improves your pool by swapping weaker cards for stronger ones from a pack.",
-          detail: "You receive a pack of 5 cards and may swap cards between the pack and your pool. Spending 1 treasure rolls a new pack.",
         },
       },
       {
@@ -474,7 +472,6 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         primaryActionLabel: "Next",
         content: {
           summary: "Each draft starts with a pack of 5 cards.",
-          detail: "Draft improves your pool between battles by replacing weaker cards with stronger ones from this pack.",
         },
       },
       {
@@ -487,8 +484,8 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Your pool is the set of cards you can use in future builds.",
-          detail: "To make a pick, click a card in the pack and a card in your pool to swap them.",
+          summary: "To make a pick, click a card in the pack and a card in your pool to swap them.",
+          detail: "You can do this as many times as you want.",
         },
       },
       {
@@ -506,12 +503,11 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         },
         content: {
           summary: "This row shows pairing likelihood, current treasure, current poison, and where that opponent is in the loop.",
-          detail: "Monitoring this information can change the value of cards and help you set yourself up for positive matchups.",
         },
       },
       {
         id: "revealed-cards",
-        title: "Use Revealed Cards As Draft Signals",
+        title: "Draft Signals",
         targetId: "sidebar-seen-in-battle",
         waitForLayoutTargetId: (ctx) => (
           ctx.isMobile ? undefined : "sidebar-detail-drawer"
@@ -549,7 +545,7 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       },
       {
         id: "continue",
-        title: "This Starts Build",
+        title: "Done Drafting?",
         targetId: "draft-continue",
         positionTargetId: "phase-action-bar",
         placement: "top",
@@ -558,7 +554,6 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         primaryActionLabel: "Ready to draft",
         content: {
           summary: "Whenever you're ready, click this button to start the build phase.",
-          detail: "That ends draft for this round and moves you into choosing the exact hand and basics for the next battle.",
         },
       },
     ],
@@ -585,9 +580,9 @@ function buildTreasureProducerHint(ctx: GuidedWalkthroughContext): GuideDefiniti
         mobileCardPlacement: isBuild ? "top-center" : "bottom-center",
         primaryActionLabel: "Got it",
         content: {
-          summary: "Cards that make treasure have extra value because treasure can win battles now or be converted into future draft rolls.",
+          summary: "Cards that make treasure have extra value because treasure can be used to win battles now or see more cards during the draft to make your hand stronger long term.",
           detail: isBuild
-            ? "If you can start this effect early, it may change both the next battle and the next draft that follows it."
+            ? "If you can start this card early, it may be something you can turn into an advantage."
             : "Even a modest treasure producer can be worth prioritizing because economy carries across phases.",
         },
       },
@@ -612,7 +607,7 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
         primaryActionLabel: "Got it",
         content: {
           summary: "After battle, you keep at most 5 treasure that remain on your battlefield.",
-          detail: "With this much treasure, some value is at risk of being wasted. Spending one now on a roll can be correct even if the current pack is acceptable.",
+          detail: "With this much treasure, some value is at risk of being wasted. Spending one now on a roll is likely correct.",
         },
       },
     ],
@@ -640,8 +635,8 @@ function buildBattleResultSubmitGuide(ctx: GuidedWalkthroughContext): GuideDefin
             ? "Choose who won this puppet battle based on how you think it would play out."
             : "Choose who won, then wait for your opponent to submit their result too.",
           detail: isPuppet
-            ? "A draw counts as a loss for both players. Since this is a puppet battle, the result is applied immediately."
-            : "A draw counts as a loss for both players. Both players must agree on the result before the game moves on — if results conflict, you will both be asked to resubmit.",
+            ? "Since this is a puppet battle, the result is applied immediately."
+            : "Both players must agree on the result before the game moves on — if results conflict, you will both be asked to resubmit.",
         },
       },
     ],
@@ -665,7 +660,7 @@ function buildUnappliedUpgradeHint(): GuideDefinition {
         primaryActionLabel: "Got it",
         content: {
           summary: "You have at least one upgrade that has not been applied to a card yet.",
-          detail: "Tap this button to open the upgrade panel, choose an upgrade, and apply it to a card in your pool.",
+          detail: "Applying an upgrade is permanent and cannot be undone. Choose wisely!",
         },
       },
     ],
