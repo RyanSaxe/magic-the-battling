@@ -217,6 +217,19 @@ export function Lobby() {
     (p) => p.player_id === session?.playerId,
   );
   const isConstructed = lobbyState?.play_mode === "constructed";
+  const battlerStatus = currentPlayer?.battler_status ?? null;
+  const hasLoadedBattler = battlerStatus === "ready";
+  const isBattlerLoading = battlerStatus === "loading";
+  const readyActionDisabled =
+    !!currentPlayer &&
+    isConstructed === true &&
+    !currentPlayer.is_ready &&
+    battlerStatus !== "ready";
+
+  const toggleReady = () => {
+    if (!currentPlayer || readyActionDisabled) return;
+    actions.setReady(!currentPlayer.is_ready);
+  };
 
   useEffect(() => {
     const nextBattlerId = currentPlayer?.battler_id ?? "";
@@ -269,6 +282,20 @@ export function Lobby() {
     actions.submitBattler(battlerId);
   };
 
+  const clearBattler = () => {
+    if (!hasLoadedBattler) return;
+    setBattlerIdInput("");
+    actions.clearBattler();
+  };
+
+  const handleBattlerButtonClick = () => {
+    if (hasLoadedBattler) {
+      clearBattler();
+      return;
+    }
+    submitBattler();
+  };
+
   const lobbyHotkeyMap: Record<string, () => void> = {
     "?": () => {
       setRulesPanelTarget(undefined);
@@ -277,17 +304,19 @@ export function Lobby() {
   };
   if (lobbyState && currentPlayer && !showRulesPanel) {
     const isHost = currentPlayer.is_host;
-    const isReady = currentPlayer.is_ready;
-    lobbyHotkeyMap["r"] = () => actions.setReady(!isReady);
+    lobbyHotkeyMap["r"] = toggleReady;
     if (isConstructed) {
-      lobbyHotkeyMap["b"] = submitBattler;
+      lobbyHotkeyMap["b"] = () => {
+        if (isBattlerLoading) return;
+        handleBattlerButtonClick();
+      };
     }
     lobbyHotkeyMap["Enter"] = () => {
       if (isHost && lobbyState.can_start && !startingGame) {
         setStartingGame(true);
         actions.startGame();
       } else {
-        actions.setReady(!isReady);
+        toggleReady();
       }
     };
   }
@@ -761,19 +790,25 @@ export function Lobby() {
                               value={battlerIdInput}
                               onChange={(event) => setBattlerIdInput(event.target.value)}
                               onKeyDown={(event) => {
-                                if (event.key === "Enter") {
+                                if (event.key === "Enter" && !hasLoadedBattler && !isBattlerLoading) {
                                   submitBattler();
                                 }
                               }}
                               placeholder="CubeCobra battler ID"
-                              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+                              readOnly={hasLoadedBattler}
+                              disabled={isBattlerLoading}
+                              className={`w-full h-[42px] border border-black/40 rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                hasLoadedBattler
+                                  ? "bg-black/20 text-gray-300"
+                                  : "bg-black/40 text-white"
+                              }`}
                             />
                             <button
-                              onClick={submitBattler}
-                              disabled={currentPlayer.battler_status === "loading"}
+                              onClick={handleBattlerButtonClick}
+                              disabled={isBattlerLoading}
                               className="btn btn-primary btn-dark-border px-4 py-2 shrink-0"
                             >
-                              Submit
+                              {hasLoadedBattler ? "Change" : isBattlerLoading ? "Loading..." : "Submit"}
                             </button>
                           </div>
                         </div>
@@ -949,11 +984,14 @@ export function Lobby() {
 
                   <div className={isHost ? "grid grid-cols-2 gap-2" : ""}>
                     <button
-                      onClick={() => actions.setReady(!isReady)}
-                      className={`btn btn-dark-border w-full py-2 ${
+                      onClick={toggleReady}
+                      disabled={readyActionDisabled}
+                      className={`btn btn-dark-border w-full py-2 disabled:cursor-not-allowed ${
                         isReady
                           ? "bg-gray-600 text-white hover:bg-gray-500"
-                          : "bg-green-600 text-white hover:bg-green-500"
+                          : readyActionDisabled
+                            ? "bg-gray-700 text-gray-400"
+                            : "bg-green-600 text-white hover:bg-green-500"
                       }`}
                     >
                       {isReady ? "Unready" : "Ready"}

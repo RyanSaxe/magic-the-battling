@@ -13,6 +13,7 @@ import {
   POISON_COUNTER_IMAGE,
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
+import { getPlayerPhaseStatusLabel } from "../../utils/format";
 
 interface PlayerDetailPanelProps {
   player: PlayerView;
@@ -47,10 +48,7 @@ function getPlayerStatus(player: PlayerView): string {
   if (player.is_most_recent_ghost) return "Recent ghost";
   if (player.is_ghost) return "Ghost";
   if (player.is_puppet) return "Puppet";
-  if (player.phase === "build" && player.build_ready) {
-    return `${player.stage}-${player.round} @ ready`;
-  }
-  return `${player.stage}-${player.round} @ ${player.phase}`;
+  return `${player.stage}-${player.round} @ ${getPlayerPhaseStatusLabel(player.phase, player.build_ready)}`;
 }
 
 function countLabel(count: number): string {

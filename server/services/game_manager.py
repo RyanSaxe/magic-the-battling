@@ -719,6 +719,29 @@ class GameManager:
         pending.player_ready[player_id] = is_ready
         return True, None
 
+    def clear_player_battler(self, game_id: str, player_id: str) -> tuple[bool, str | None]:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.is_started:
+            return False, "Game not found"
+
+        if pending.play_mode != "constructed":
+            return False, "Battler submission is only available in constructed mode"
+
+        if player_id not in pending.player_ids:
+            return False, "Player not found"
+
+        player_battler = self._get_pending_player_battler(pending, player_id)
+        if player_battler._loading_task and not player_battler._loading_task.done():
+            player_battler._loading_task.cancel()
+
+        player_battler.battler_id = None
+        player_battler.battler = None
+        player_battler.battler_loading = False
+        player_battler.battler_error = None
+        player_battler._loading_task = None
+        pending.player_ready[player_id] = False
+        return True, None
+
     def can_start_game(self, game_id: str, player_id: str) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
         if not pending:

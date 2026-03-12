@@ -80,6 +80,49 @@ class TestLobbyWebSocket:
             assert "loading" in statuses
             assert statuses[-1] == "ready"
 
+    def test_constructed_clear_battler_updates_lobby_state(self, client, monkeypatch, card_factory):
+        def fake_get_cube_data(cube_id: str):
+            if cube_id in {DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID}:
+                return []
+            return [card_factory(f"{cube_id}_{i}") for i in range(100)]
+
+        monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", fake_get_cube_data)
+
+        create = client.post(
+            "/api/games",
+            json={"player_name": "Alice", "cube_id": "ignored", "play_mode": "constructed"},
+        )
+        game_id = create.json()["game_id"]
+        session_id = create.json()["session_id"]
+
+        with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
+            initial = ws.receive_json()
+            assert initial["type"] == "lobby_state"
+
+            ws.send_json({"action": "submit_battler", "payload": {"battler_id": "deck_alpha"}})
+            latest_lobby_payload = initial["payload"]
+            for _ in range(3):
+                message = ws.receive_json()
+                if message["type"] != "lobby_state":
+                    continue
+                latest_lobby_payload = message["payload"]
+                if latest_lobby_payload["players"][0]["battler_status"] == "ready":
+                    break
+
+            assert latest_lobby_payload["players"][0]["battler_status"] == "ready"
+
+            ws.send_json({"action": "set_ready", "payload": {"is_ready": True}})
+            ready_message = ws.receive_json()
+            assert ready_message["type"] == "lobby_state"
+            assert ready_message["payload"]["players"][0]["is_ready"] is True
+
+            ws.send_json({"action": "clear_battler", "payload": {}})
+            cleared_message = ws.receive_json()
+            assert cleared_message["type"] == "lobby_state"
+            assert cleared_message["payload"]["players"][0]["battler_id"] is None
+            assert cleared_message["payload"]["players"][0]["battler_status"] == "missing"
+            assert cleared_message["payload"]["players"][0]["is_ready"] is False
+
 
 class TestGameWebSocket:
     def test_connect_to_started_game_receives_game_state(self, client, game_with_players):

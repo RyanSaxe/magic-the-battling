@@ -1,3 +1,5 @@
+import type { Phase } from "../types"
+
 export function getOrdinal(n: number): string {
   const suffixes = ['th', 'st', 'nd', 'rd']
   const v = n % 100
@@ -10,4 +12,10 @@ export function getPlacementBadgeColor(position: number, total: number): { bg: s
   if (position === 3) return { bg: '#cd7f32', text: '#ffffff' }
   if (position === total) return { bg: '#ef4444', text: '#ffffff' }
   return { bg: '#6b7280', text: '#ffffff' }
+}
+
+export function getPlayerPhaseStatusLabel(phase: Phase, buildReady: boolean): string {
+  if (phase === "build" && buildReady) return "ready"
+  if (phase === "reward") return "end"
+  return phase
 }

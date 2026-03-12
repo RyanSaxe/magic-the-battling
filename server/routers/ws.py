@@ -506,6 +506,14 @@ async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
             await connection_manager.broadcast_lobby_state(game_id)
         return True
 
+    if action == "clear_battler":
+        success, error = game_manager.clear_player_battler(game_id, player_id)
+        if success:
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, error or "Failed to clear battler")
+        return True
+
     if action == "start_game":
         if ops_manager.blocks_new_games():
             await connection_manager.send_error(websocket, "Server is updating. New games are temporarily blocked.")

@@ -343,6 +343,34 @@ class TestConstructedLobbyRules:
         assert lobby.players[0].battler_id == "alice_deck"
         assert lobby.players[0].battler_status == "ready"
 
+    def test_clear_player_battler_resets_state_and_unreadies(self, game_manager, card_factory):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
+        loading_task = MagicMock()
+        loading_task.done.return_value = False
+
+        pending.player_battlers["alice_pid"].battler_id = "alice_deck"
+        pending.player_battlers["alice_pid"].battler = Battler(
+            cards=[card_factory(f"a{i}") for i in range(100)],
+            upgrades=[],
+            vanguards=[],
+        )
+        pending.player_battlers["alice_pid"].battler_loading = True
+        pending.player_battlers["alice_pid"].battler_error = "bad battler"
+        pending.player_battlers["alice_pid"]._loading_task = loading_task
+        pending.player_ready["alice_pid"] = True
+
+        success, error = game_manager.clear_player_battler(pending.game_id, "alice_pid")
+
+        assert success is True
+        assert error is None
+        loading_task.cancel.assert_called_once()
+        assert pending.player_battlers["alice_pid"].battler_id is None
+        assert pending.player_battlers["alice_pid"].battler is None
+        assert pending.player_battlers["alice_pid"].battler_loading is False
+        assert pending.player_battlers["alice_pid"].battler_error is None
+        assert pending.player_battlers["alice_pid"]._loading_task is None
+        assert pending.player_ready["alice_pid"] is False
+
     def test_start_game_supports_constructed_puppets_in_sync_path(self, game_manager, mock_db_session, card_factory):
         pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
         pending.puppet_count = 1
