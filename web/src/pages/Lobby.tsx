@@ -20,6 +20,10 @@ import {
 const DESKTOP_SUBTITLE = "An MtG format inspired by autobattlers";
 const MOBILE_SUBTITLE = "An MtG format inspired by autobattlers";
 
+function cubeCobraUrl(battlerId: string) {
+  return `https://cubecobra.com/cube/overview/${encodeURIComponent(battlerId)}`;
+}
+
 function GuidedModeSwitch({
   enabled,
   setEnabled,
@@ -176,10 +180,13 @@ export function Lobby() {
   const [isGuidedMode, setIsGuidedMode] = useState(() =>
     getDefaultNewPlayerPreference(),
   );
+  const [battlerIdInput, setBattlerIdInput] = useState("");
   const [rulesPanelTarget, setRulesPanelTarget] = useState<
     RulesPanelTarget | undefined
   >(undefined);
   const wasInvalidSessionRef = useRef(false);
+  const lastCubeLoadingErrorRef = useRef<string | null>(null);
+  const lastBattlerErrorRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!gameId) return;
@@ -209,6 +216,84 @@ export function Lobby() {
   const currentPlayer = lobbyState?.players.find(
     (p) => p.player_id === session?.playerId,
   );
+  const isConstructed = lobbyState?.play_mode === "constructed";
+  const battlerStatus = currentPlayer?.battler_status ?? null;
+  const hasLoadedBattler = battlerStatus === "ready";
+  const isBattlerLoading = battlerStatus === "loading";
+  const readyActionDisabled =
+    !!currentPlayer &&
+    isConstructed === true &&
+    !currentPlayer.is_ready &&
+    battlerStatus !== "ready";
+
+  const toggleReady = () => {
+    if (!currentPlayer || readyActionDisabled) return;
+    actions.setReady(!currentPlayer.is_ready);
+  };
+
+  useEffect(() => {
+    const nextBattlerId = currentPlayer?.battler_id ?? "";
+    queueMicrotask(() => {
+      setBattlerIdInput((previous) =>
+        previous === nextBattlerId ? previous : nextBattlerId,
+      );
+    });
+  }, [currentPlayer?.battler_id]);
+
+  useEffect(() => {
+    const nextError =
+      lobbyState?.play_mode === "limited" &&
+      lobbyState.cube_loading_status === "error"
+        ? lobbyState.cube_loading_error
+        : null;
+    if (!nextError || nextError === lastCubeLoadingErrorRef.current) {
+      if (!nextError) {
+        lastCubeLoadingErrorRef.current = null;
+      }
+      return;
+    }
+    lastCubeLoadingErrorRef.current = nextError;
+    addToast(nextError, "error");
+  }, [
+    addToast,
+    lobbyState?.cube_loading_error,
+    lobbyState?.cube_loading_status,
+    lobbyState?.play_mode,
+  ]);
+
+  useEffect(() => {
+    const nextError = currentPlayer?.battler_error ?? null;
+    if (!nextError || nextError === lastBattlerErrorRef.current) {
+      if (!nextError) {
+        lastBattlerErrorRef.current = null;
+      }
+      return;
+    }
+    lastBattlerErrorRef.current = nextError;
+    addToast(nextError, "error");
+  }, [addToast, currentPlayer?.battler_error]);
+
+  const submitBattler = () => {
+    const battlerId = battlerIdInput.trim();
+    if (!battlerId) {
+      addToast("Please enter a battler ID", "error");
+      return;
+    }
+    actions.submitBattler(battlerId);
+  };
+
+  const clearBattler = () => {
+    if (!hasLoadedBattler) return;
+    actions.clearBattler();
+  };
+
+  const handleBattlerButtonClick = () => {
+    if (hasLoadedBattler) {
+      clearBattler();
+      return;
+    }
+    submitBattler();
+  };
 
   const lobbyHotkeyMap: Record<string, () => void> = {
     "?": () => {
@@ -218,14 +303,19 @@ export function Lobby() {
   };
   if (lobbyState && currentPlayer && !showRulesPanel) {
     const isHost = currentPlayer.is_host;
-    const isReady = currentPlayer.is_ready;
-    lobbyHotkeyMap["r"] = () => actions.setReady(!isReady);
+    lobbyHotkeyMap["r"] = toggleReady;
+    if (isConstructed) {
+      lobbyHotkeyMap["b"] = () => {
+        if (isBattlerLoading) return;
+        handleBattlerButtonClick();
+      };
+    }
     lobbyHotkeyMap["Enter"] = () => {
       if (isHost && lobbyState.can_start && !startingGame) {
         setStartingGame(true);
         actions.startGame();
       } else {
-        actions.setReady(!isReady);
+        toggleReady();
       }
     };
   }
@@ -370,6 +460,7 @@ export function Lobby() {
             initialDocId={rulesPanelTarget?.docId}
             initialTab={rulesPanelTarget?.tab}
             gameId={gameId}
+            playerName={currentPlayer?.name}
             useUpgrades={undefined}
           />
         )}
@@ -484,6 +575,7 @@ export function Lobby() {
             initialDocId={rulesPanelTarget?.docId}
             initialTab={rulesPanelTarget?.tab}
             gameId={gameId}
+            playerName={currentPlayer?.name}
             useUpgrades={undefined}
           />
         )}
@@ -574,6 +666,13 @@ export function Lobby() {
                     availablePuppets !== null &&
                     puppetCount < availablePuppets &&
                     total < 8;
+                  const summaryBattlerId =
+                    lobbyState.play_mode === "limited"
+                      ? lobbyState.cube_id
+                      : currentPlayer?.battler_id ?? null;
+                  const canBrowseCards =
+                    lobbyState.play_mode === "limited" ||
+                    currentPlayer?.battler_status === "ready";
 
                   const openGuide = (target?: RulesPanelTarget) => {
                     setRulesPanelTarget(target);
@@ -632,31 +731,94 @@ export function Lobby() {
                             {copied ? "Copied!" : "Copy"}
                           </button>
                         </div>
-                        <div className="border-t border-black/40 mt-2 pt-2 flex items-center justify-center gap-2 text-xs text-gray-500">
-                          <span>
-                            Cube:{" "}
-                            <a
-                              href={`https://cubecobra.com/cube/overview/${lobbyState.cube_id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-amber-500 hover:text-amber-400 transition-colors"
+                        <div className="border-t border-black/40 mt-2 pt-2 grid grid-cols-[0.9fr_1.85fr_0.7fr_0.8fr] text-left">
+                          <div className="min-w-0 px-1.5 first:pl-0">
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                              Mode
+                            </div>
+                            <div className="mt-0.5 truncate text-[11px] text-amber-400">
+                              {lobbyState.play_mode === "constructed" ? "Const." : "Limited"}
+                            </div>
+                          </div>
+                          <div className="min-w-0 border-l border-black/40 px-2">
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                              Battler
+                            </div>
+                            {summaryBattlerId ? (
+                              <a
+                                href={cubeCobraUrl(summaryBattlerId)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={summaryBattlerId}
+                                className="mt-0.5 block truncate text-[11px] text-amber-400 hover:text-amber-300 transition-colors"
+                              >
+                                {summaryBattlerId}
+                              </a>
+                            ) : (
+                              <div className="mt-0.5 truncate text-[11px] text-gray-500">
+                                Missing
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 border-l border-black/40 px-2">
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                              Upgr.
+                            </div>
+                            <div className="mt-0.5 truncate text-[11px] text-amber-400">
+                              {lobbyState.use_upgrades ? "On" : "Off"}
+                            </div>
+                          </div>
+                          <div className="min-w-0 border-l border-black/40 pl-2 pr-0">
+                            <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                              Browse
+                            </div>
+                            <button
+                              onClick={() => openGuide({ docId: "__cards__" })}
+                              disabled={!canBrowseCards}
+                              className="mt-0.5 block w-full truncate text-left text-[11px] text-amber-400 transition-colors hover:text-amber-300 disabled:text-gray-500 disabled:cursor-not-allowed"
                             >
-                              {lobbyState.cube_id}
-                            </a>
-                          </span>
-                          <span>&middot;</span>
-                          <span>
-                            Upgrades: {lobbyState.use_upgrades ? "On" : "Off"}
-                          </span>
-                          <span>&middot;</span>
-                          <button
-                            onClick={() => openGuide({ docId: "__cards__" })}
-                            className="text-amber-500/70 hover:text-amber-400 transition-colors"
-                          >
-                            Browse Cards
-                          </button>
+                              Cards
+                            </button>
+                          </div>
                         </div>
                       </div>
+
+                      {lobbyState.play_mode === "constructed" && currentPlayer && (
+                        <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
+                          <h2 className="text-white font-medium text-sm">Your Battler</h2>
+                          <div className="mt-3 flex gap-2">
+                            {hasLoadedBattler ? (
+                              <div
+                                title={battlerIdInput}
+                                className="w-full h-[42px] border border-black/40 rounded px-3 py-2 text-base bg-black/20 text-gray-300 overflow-hidden text-ellipsis whitespace-nowrap select-none cursor-default"
+                              >
+                                {battlerIdInput}
+                              </div>
+                            ) : (
+                              <input
+                                type="text"
+                                value={battlerIdInput}
+                                onChange={(event) => setBattlerIdInput(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" && !isBattlerLoading) {
+                                    submitBattler();
+                                  }
+                                }}
+                                placeholder="CubeCobra battler ID"
+                                disabled={isBattlerLoading}
+                                className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                            )}
+                            <button
+                              onClick={handleBattlerButtonClick}
+                              disabled={isBattlerLoading}
+                              className="btn btn-primary btn-dark-border px-4 py-2 shrink-0"
+                            >
+                              {hasLoadedBattler ? "Change" : isBattlerLoading ? "Loading..." : "Submit"}
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
                 <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
                   <div className="flex items-center justify-between mb-2">
@@ -713,9 +875,11 @@ export function Lobby() {
                                 player.is_ready ? "bg-green-500" : "bg-gray-500"
                               }`}
                             />
-                            <span className="text-white text-sm truncate">
-                              {player.name}
-                            </span>
+                            <div className="min-w-0">
+                              <div className="text-white text-sm truncate">
+                                {player.name}
+                              </div>
+                            </div>
                             {player.is_host && (
                               <span className="text-amber-400 text-xs shrink-0 ml-auto">
                                 Host
@@ -826,11 +990,14 @@ export function Lobby() {
 
                   <div className={isHost ? "grid grid-cols-2 gap-2" : ""}>
                     <button
-                      onClick={() => actions.setReady(!isReady)}
-                      className={`btn btn-dark-border w-full py-2 ${
+                      onClick={toggleReady}
+                      disabled={readyActionDisabled}
+                      className={`btn btn-dark-border w-full py-2 disabled:cursor-not-allowed ${
                         isReady
                           ? "bg-gray-600 text-white hover:bg-gray-500"
-                          : "bg-green-600 text-white hover:bg-green-500"
+                          : readyActionDisabled
+                            ? "bg-gray-700 text-gray-400"
+                            : "bg-green-600 text-white hover:bg-green-500"
                       }`}
                     >
                       {isReady ? "Unready" : "Ready"}
@@ -894,6 +1061,7 @@ export function Lobby() {
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
           gameId={gameId}
+          playerName={currentPlayer?.name}
           useUpgrades={lobbyState?.use_upgrades}
         />
       )}

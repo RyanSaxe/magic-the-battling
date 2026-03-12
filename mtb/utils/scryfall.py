@@ -29,6 +29,7 @@ def get_card_from_scryfall(card_id: str) -> Card:
         id=card_json["id"],
         oracle_text=oracle_text,
         colors=card_json.get("colors", []),
+        keywords=card_json.get("keywords", []),
         cmc=card_json.get("cmc", 0),
     )
 

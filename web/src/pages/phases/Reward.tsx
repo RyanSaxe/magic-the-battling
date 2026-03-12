@@ -32,12 +32,6 @@ interface RewardPhaseProps {
 
 type RewardItem = { key: string; card: CardType };
 
-const STATIC_DIVIDER_CALLBACKS = {
-  onDragStart: () => {},
-  onDrag: () => {},
-  onDragEnd: () => {},
-};
-
 function EmptyZoneTile({
   dimensions,
   label,
@@ -53,16 +47,6 @@ function EmptyZoneTile({
       {label}
     </div>
   );
-}
-
-function formatPoisonSummary(
-  poisonDealt: number | undefined,
-  poisonTaken: number | undefined,
-): string {
-  const parts: string[] = [];
-  if (poisonDealt) parts.push(`Dealt ${poisonDealt}`);
-  if (poisonTaken) parts.push(`Took ${poisonTaken}`);
-  return parts.length > 0 ? `${parts.join(" / ")} poison` : "No poison";
 }
 
 function createRewardCard(
@@ -263,56 +247,10 @@ export function RewardPhase({
       }
     : undefined;
 
-  const isWinner = last_battle_result?.winner_name === self_player.name;
-  const isDraw = last_battle_result?.is_draw;
-  const resultLabel = !last_battle_result
-    ? "Round Wrap-Up"
-    : isDraw
-      ? "Draw"
-      : isWinner
-        ? "Victory!"
-        : "Defeat";
-  const resultClass = !last_battle_result
-    ? "text-amber-300"
-    : isDraw
-      ? "text-yellow-400"
-      : isWinner
-        ? "text-green-400"
-        : "text-red-400";
-  const opponentLabel = last_battle_result
-    ? `vs ${last_battle_result.opponent_name}`
-    : "No battle result";
-  const poisonLabel = last_battle_result
-    ? formatPoisonSummary(
-        last_battle_result.poison_dealt,
-        last_battle_result.poison_taken,
-      )
-    : "No loot this round";
+  void last_battle_result;
 
   return (
     <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-      <div
-        className="shrink-0 top-attached-rail top-attached-rail-pad text-[11px] sm:text-sm"
-        data-guide-target="reward-result"
-      >
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-4">
-          <div className="min-w-0 truncate text-left text-gray-300 leading-tight">
-            {opponentLabel}
-          </div>
-          <div className={`font-semibold text-center leading-tight ${resultClass}`}>
-            {resultLabel}
-          </div>
-          <div className="min-w-0 truncate text-right text-gray-300 leading-tight">
-            {poisonLabel}
-          </div>
-        </div>
-      </div>
-      <ZoneDivider
-        orientation="horizontal"
-        interactive={false}
-        {...STATIC_DIVIDER_CALLBACKS}
-      />
-
       <div
         ref={containerRef}
         className="relative flex flex-col flex-1 min-h-0"

@@ -10,6 +10,7 @@ import {
 import { useContextStrip } from "../contexts";
 import { PlacementBadge } from "./sidebar/PlacementBadge";
 import { getSidebarPlayerOrder } from "../utils/playerPlacement";
+import { getPlayerPhaseStatusLabel } from "../utils/format";
 
 interface PlayerListProps {
   players: PlayerView[];
@@ -112,7 +113,7 @@ function StatusLine({
 
   return (
     <span className="block truncate text-right">
-      {player.stage}-{player.round} @ {player.phase === "build" && player.build_ready ? "ready" : player.phase}
+      {player.stage}-{player.round} @ {getPlayerPhaseStatusLabel(player.phase, player.build_ready)}
     </span>
   );
 }

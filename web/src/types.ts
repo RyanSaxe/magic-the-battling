@@ -1,6 +1,8 @@
 export type Phase = 'draft' | 'build' | 'battle' | 'reward' | 'awaiting_elimination' | 'eliminated' | 'winner' | 'game_over'
+export type PlayMode = 'limited' | 'constructed'
 export type LastResult = 'win' | 'loss' | 'draw'
 export type CubeLoadingStatus = 'loading' | 'ready' | 'error'
+export type BattlerLoadingStatus = 'missing' | 'loading' | 'ready' | 'error'
 export type ZoneName = 'battlefield' | 'graveyard' | 'exile' | 'hand' | 'sideboard' | 'upgrades' | 'command_zone' | 'library'
 export type CardStateAction = 'tap' | 'untap' | 'flip' | 'face_down' | 'counter' | 'attach' | 'detach' | 'spawn' | 'create_treasure'
 export type CardDestination = 'hand' | 'sideboard' | 'upgrades'
@@ -19,6 +21,7 @@ export interface Card {
   upgrade_target: Card | null
   oracle_text: string | null
   colors: string[]
+  keywords?: string[]
   cmc: number
 }
 
@@ -82,6 +85,32 @@ export interface LastBattleResult {
   pre_battle_treasures: number
 }
 
+export interface BattleResolutionEvent {
+  event_type: 'base_increment' | 'upgrade_beam'
+  source_card_id: string | null
+}
+
+export interface BattleResolutionSide {
+  name: string
+  starting_poison: number
+  ending_poison: number
+  poison_delta: number
+  took_damage: boolean
+  is_lethal: boolean
+  show_death_animation: boolean
+  events: BattleResolutionEvent[]
+}
+
+export interface BattleResolution {
+  resolution_id: string
+  winner_name: string | null
+  is_draw: boolean
+  is_sudden_death: boolean
+  continue_sudden_death: boolean
+  your_side: BattleResolutionSide
+  opponent_side: BattleResolutionSide
+}
+
 export interface SelfPlayerView extends PlayerView {
   hand: Card[]
   sideboard: Card[]
@@ -119,8 +148,10 @@ export interface GameState {
   self_player: SelfPlayerView
   available_upgrades: Card[]
   current_battle: BattleView | null
+  battle_resolution: BattleResolution | null
   use_upgrades: boolean
   cube_id: string
+  play_mode: PlayMode
 }
 
 export interface LobbyPlayer {
@@ -128,6 +159,9 @@ export interface LobbyPlayer {
   name: string
   is_ready: boolean
   is_host: boolean
+  battler_id: string | null
+  battler_status: BattlerLoadingStatus | null
+  battler_error: string | null
 }
 
 export interface LobbyState {
@@ -144,6 +178,7 @@ export interface LobbyState {
   available_puppet_count: number | null
   use_upgrades: boolean
   guided_mode_default: boolean
+  play_mode: PlayMode
 }
 
 export interface CreateGameResponse {

@@ -1,5 +1,10 @@
 """REST endpoint tests - focus on contracts/shapes, not game logic."""
 
+import server.routers.games as games_module
+import server.services.game_manager as gm_module
+from mtb.models.cards import Battler
+from mtb.models.game import Config, create_game, set_player_battlers
+
 
 class TestCreateGame:
     def test_returns_expected_fields(self, client):
@@ -81,6 +86,57 @@ class TestGetLobby:
         response = client.get("/api/games/nonexistent/lobby")
 
         assert response.status_code == 404
+
+    def test_constructed_lobby_returns_mode_and_battler_fields(self, client):
+        create = client.post(
+            "/api/games",
+            json={"player_name": "Alice", "cube_id": "test", "play_mode": "constructed"},
+        )
+        game_id = create.json()["game_id"]
+
+        response = client.get(f"/api/games/{game_id}/lobby")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["play_mode"] == "constructed"
+        assert data["players"][0]["battler_id"] == "test"
+        assert data["players"][0]["battler_status"] in {"loading", "ready"}
+
+
+class TestGetGameCards:
+    def test_constructed_returns_requested_players_battler(self, client, card_factory):
+        game = create_game(
+            ["Alice", "Bob"],
+            num_players=2,
+            config=Config(play_mode="constructed", starting_pool_size=0),
+        )
+        alice_cards = [card_factory(f"alice_{i}") for i in range(10)]
+        bob_cards = [card_factory(f"bob_{i}") for i in range(10)]
+        set_player_battlers(
+            game,
+            {
+                "Alice": Battler(
+                    cards=alice_cards.copy(),
+                    upgrades=[],
+                    vanguards=[],
+                    original_cards=alice_cards.copy(),
+                ),
+                "Bob": Battler(
+                    cards=bob_cards.copy(),
+                    upgrades=[],
+                    vanguards=[],
+                    original_cards=bob_cards.copy(),
+                ),
+            },
+        )
+        gm_module.game_manager._active_games["constructed-cards"] = game
+        games_module.game_manager._active_games["constructed-cards"] = game
+
+        response = client.get("/api/games/constructed-cards/cards", params={"player_name": "Alice"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert all(card["name"].startswith("alice_") for card in data["cards"])
 
 
 class TestStartGame:

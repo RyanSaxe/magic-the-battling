@@ -77,6 +77,7 @@ def _request_fingerprint(request: CreateGameRequest) -> str:
             "puppet_count": request.puppet_count,
             "auto_approve_spectators": request.auto_approve_spectators,
             "guided_mode_default": request.guided_mode_default,
+            "play_mode": request.play_mode,
         },
         sort_keys=True,
     )
@@ -207,6 +208,7 @@ def _create_game_response(request: CreateGameRequest) -> CreateGameResponse:
         target_player_count=request.target_player_count,
         auto_approve_spectators=request.auto_approve_spectators,
         guided_mode_default=request.guided_mode_default,
+        play_mode=request.play_mode,
     )
     pending.puppet_count = request.puppet_count
     session_manager.update_game_id(session.session_id, pending.game_id)
@@ -214,7 +216,19 @@ def _create_game_response(request: CreateGameRequest) -> CreateGameResponse:
     async def broadcast_lobby():
         await connection_manager.broadcast_lobby_state(pending.game_id)
 
-    game_manager.start_battler_preload(pending, on_complete=broadcast_lobby)
+    if request.play_mode == "limited":
+        game_manager.start_battler_preload(pending, on_complete=broadcast_lobby)
+    else:
+        error = game_manager.start_player_battler_preload(
+            pending,
+            session.player_id,
+            request.cube_id,
+            on_complete=broadcast_lobby,
+        )
+        if error:
+            host_battler = pending.player_battlers.get(session.player_id)
+            if host_battler is not None:
+                host_battler.battler_error = error
     return CreateGameResponse(
         game_id=pending.game_id,
         join_code=pending.join_code,
@@ -409,13 +423,21 @@ def get_lobby(game_id: str):
 
 
 @router.get("/{game_id}/cards", response_model=GameCardsResponse)
-def get_game_cards(game_id: str):
+def get_game_cards(game_id: str, player_name: str | None = None):
     pending = game_manager.get_pending_game(game_id)
     game = game_manager.get_game(game_id)
 
     battler = None
-    if pending and pending.battler:
+    if pending and pending.play_mode == "constructed" and player_name:
+        player_id = game_manager.get_player_id_by_name(game_id, player_name)
+        if player_id:
+            player_battler = pending.player_battlers.get(player_id)
+            battler = player_battler.battler if player_battler else None
+    elif pending and pending.battler:
         battler = pending.battler
+    elif game and game.config.play_mode == "constructed" and player_name:
+        player = next((candidate for candidate in game.players if candidate.name == player_name), None)
+        battler = player.battler if player else None
     elif game and game.battler:
         battler = game.battler
 

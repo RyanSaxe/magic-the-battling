@@ -116,6 +116,36 @@ def test_find_historical_players_filters_by_elo_range(game_manager, mock_db_sess
     assert 5 not in result_ids
 
 
+def test_find_historical_players_treats_legacy_draft_mode_as_limited(game_manager, mock_db_session):
+    histories = [create_mock_history(1, "LegacyLimited", 1200.0)]
+    config_data = {
+        "use_upgrades": True,
+        "use_vanguards": False,
+        "cube_id": "test_cube",
+        "play_mode": "draft",
+    }
+
+    mock_query = MagicMock()
+    mock_db_session.query.return_value = mock_query
+    mock_query.options.return_value = mock_query
+    mock_query.filter.return_value = mock_query
+    mock_query.all.return_value = histories
+    mock_query.first.return_value = MagicMock(config_json=json.dumps(config_data))
+
+    result = game_manager._find_historical_players(
+        mock_db_session,
+        target_elo=1200.0,
+        count=1,
+        exclude_ids=[],
+        use_upgrades=True,
+        use_vanguards=False,
+        cube_id="test_cube",
+        play_mode="limited",
+    )
+
+    assert [history.id for history in result] == [1]
+
+
 class TestSuspiciousNameFiltering:
     def test_single_character_is_suspicious(self, game_manager):
         assert game_manager._is_suspicious_name("A") is True
@@ -261,6 +291,122 @@ class TestGameStartQueueGuards:
         assert can_start is False
         assert reason is not None
         assert "starting many games" in reason.lower()
+
+
+class TestConstructedLobbyRules:
+    def test_set_player_ready_requires_valid_constructed_battler(self, game_manager):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
+
+        success, error = game_manager.set_player_ready(pending.game_id, "alice_pid", True)
+
+        assert success is False
+        assert error is not None
+        assert "battler" in error.lower()
+
+    def test_can_start_constructed_game_once_all_battlers_are_loaded(self, game_manager, card_factory):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
+        game_manager.join_game(pending.join_code, "Bob", "bob_pid")
+
+        pending.player_battlers["alice_pid"].battler = Battler(
+            cards=[card_factory(f"a{i}") for i in range(100)],
+            upgrades=[],
+            vanguards=[],
+            elo=1150.0,
+        )
+        pending.player_battlers["bob_pid"].battler = Battler(
+            cards=[card_factory(f"b{i}") for i in range(100)],
+            upgrades=[],
+            vanguards=[],
+            elo=1250.0,
+        )
+        pending.player_ready["alice_pid"] = True
+        pending.player_ready["bob_pid"] = True
+
+        can_start, error = game_manager.can_start_game(pending.game_id, "alice_pid")
+
+        assert can_start is True
+        assert error is None
+
+    def test_get_lobby_state_includes_constructed_battler_status(self, game_manager, card_factory):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
+        pending.player_battlers["alice_pid"].battler = Battler(
+            cards=[card_factory(f"a{i}") for i in range(100)],
+            upgrades=[],
+            vanguards=[],
+        )
+        pending.player_battlers["alice_pid"].battler_id = "alice_deck"
+
+        lobby = game_manager.get_lobby_state(pending.game_id)
+
+        assert lobby is not None
+        assert lobby.play_mode == "constructed"
+        assert lobby.players[0].battler_id == "alice_deck"
+        assert lobby.players[0].battler_status == "ready"
+
+    def test_clear_player_battler_resets_state_and_unreadies(self, game_manager, card_factory):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
+        loading_task = MagicMock()
+        loading_task.done.return_value = False
+
+        pending.player_battlers["alice_pid"].battler_id = "alice_deck"
+        pending.player_battlers["alice_pid"].battler = Battler(
+            cards=[card_factory(f"a{i}") for i in range(100)],
+            upgrades=[],
+            vanguards=[],
+        )
+        pending.player_battlers["alice_pid"].battler_loading = True
+        pending.player_battlers["alice_pid"].battler_error = "bad battler"
+        pending.player_battlers["alice_pid"]._loading_task = loading_task
+        pending.player_ready["alice_pid"] = True
+
+        success, error = game_manager.clear_player_battler(pending.game_id, "alice_pid")
+
+        assert success is True
+        assert error is None
+        loading_task.cancel.assert_called_once()
+        assert pending.player_battlers["alice_pid"].battler_id is None
+        assert pending.player_battlers["alice_pid"].battler is None
+        assert pending.player_battlers["alice_pid"].battler_loading is False
+        assert pending.player_battlers["alice_pid"].battler_error is None
+        assert pending.player_battlers["alice_pid"]._loading_task is None
+        assert pending.player_ready["alice_pid"] is False
+
+    def test_start_game_supports_constructed_puppets_in_sync_path(self, game_manager, mock_db_session, card_factory):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
+        pending.puppet_count = 1
+        pending.player_battlers["alice_pid"].battler = Battler(
+            cards=[card_factory(f"a{i}") for i in range(100)],
+            upgrades=[],
+            vanguards=[],
+            elo=1234.0,
+        )
+        pending.player_ready["alice_pid"] = True
+        game_manager.load_fake_players_for_game = MagicMock()
+
+        game = game_manager.start_game(pending.game_id, mock_db_session)
+
+        assert game is not None
+        game_manager.load_fake_players_for_game.assert_called_once()
+
+
+class TestBattlerValidation:
+    def test_load_battler_applies_legality_to_all_battlers(self, game_manager, monkeypatch, card_factory):
+        monkeypatch.setattr(
+            "mtb.utils.cubecobra.get_cube_data",
+            lambda cube_id: [card_factory(f"card{i}") for i in range(99)],
+        )
+
+        with pytest.raises(ValueError, match="has 99 playable cards"):
+            game_manager._load_battler("too_small", use_upgrades=False, use_vanguards=False, play_mode="constructed")
+
+    def test_load_battler_applies_shared_bans_to_limited_battlers(self, game_manager, monkeypatch, card_factory):
+        monkeypatch.setattr(
+            "mtb.utils.cubecobra.get_cube_data",
+            lambda cube_id: [card_factory(f"card{i}") for i in range(99)] + [card_factory("Unexpected Potential")],
+        )
+
+        with pytest.raises(ValueError, match="Unexpected Potential is banned"):
+            game_manager._load_battler("limited_ban", use_upgrades=False, use_vanguards=False, play_mode="limited")
 
 
 class TestPersistPlacementOnElimination:

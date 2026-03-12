@@ -32,10 +32,17 @@ def test_count_applied_upgrades(card_factory, upgrade_factory):
     assert reward.count_applied_upgrades(player) == 0
 
     target = card_factory("target")
+    player.hand = [target]
     u1.upgrade_target = target
     assert reward.count_applied_upgrades(player) == 1
 
-    u2.upgrade_target = card_factory("target2")
+    off_hand_target = card_factory("target2")
+    u2.upgrade_target = off_hand_target
+    assert reward.count_applied_upgrades(player) == 1
+
+    companion = card_factory("companion")
+    player.command_zone = [companion]
+    u3.upgrade_target = companion
     assert reward.count_applied_upgrades(player) == 2
 
 
@@ -43,8 +50,10 @@ def test_apply_poison(card_factory, upgrade_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
 
+    target = card_factory("t1")
+    alice.hand = [target]
     u1 = upgrade_factory("u1")
-    u1.upgrade_target = card_factory("t1")
+    u1.upgrade_target = target
     alice.upgrades = [u1]
 
     poison = reward.apply_poison(alice, bob)
@@ -205,8 +214,10 @@ def test_start_reward_draw_applies_poison_to_both(card_factory, upgrade_factory)
     alice.treasures = 2
     bob.treasures = 1
 
+    target = card_factory("target")
+    alice.hand = [target]
     u1 = upgrade_factory("u1")
-    u1.upgrade_target = card_factory("target")
+    u1.upgrade_target = target
     alice.upgrades = [u1]
 
     reward.start(game, alice, bob, is_draw=True)

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { startTransition, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { createGame, warmCubeCache } from "../api/client";
 import { useSession } from "../hooks/useSession";
@@ -16,7 +16,7 @@ import {
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 import { FaDiscord } from "react-icons/fa6";
-import type { LobbyState } from "../types";
+import type { LobbyState, PlayMode } from "../types";
 
 type SoloPhase =
   | "idle"
@@ -41,6 +41,7 @@ function useSoloLobbyWatcher(
   lobbyState: LobbyState | null,
   pendingGameId: string | null,
   soloPhaseRef: React.RefObject<SoloPhase>,
+  autoStartEnabled: boolean,
   opponents: OpponentCount,
   actions: { setReady: (r: boolean) => void; startGame: () => void },
   onNotEnoughPuppets: (available: number) => void,
@@ -58,7 +59,14 @@ function useSoloLobbyWatcher(
   }, []);
 
   useEffect(() => {
-    if (!pendingGameId || !lobbyState) return;
+    if (
+      !autoStartEnabled ||
+      !pendingGameId ||
+      !lobbyState ||
+      lobbyState.game_id !== pendingGameId
+    ) {
+      return;
+    }
 
     const cubeJustReady =
       lobbyState.cube_loading_status === "ready" &&
@@ -88,8 +96,7 @@ function useSoloLobbyWatcher(
       onNavigating();
       actions.startGame();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lobbyState, pendingGameId]);
+  }, [actions, autoStartEnabled, lobbyState, onNavigating, onNotEnoughPuppets, onStarting, opponents, pendingGameId, soloPhaseRef]);
 
   return { reset };
 }
@@ -213,6 +220,30 @@ function UpgradesCheckbox({
   );
 }
 
+function ConstructedCheckbox({
+  playMode,
+  setPlayMode,
+}: {
+  playMode: PlayMode;
+  setPlayMode: (mode: PlayMode) => void;
+}) {
+  const isConstructed = playMode === "constructed";
+  return (
+    <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={isConstructed}
+        onChange={(e) => setPlayMode(e.target.checked ? "constructed" : "limited")}
+        className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+      />
+      <span className="text-white text-sm">Constructed</span>
+      <span className="text-gray-500 text-xs">
+        — bring your own battler
+      </span>
+    </label>
+  );
+}
+
 function GuidedModeField({
   enabled,
   setEnabled,
@@ -304,6 +335,7 @@ export function Play() {
   const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
   const [cubeId, setCubeId] = useState("auto");
   const [useUpgrades, setUseUpgrades] = useState(true);
+  const [playMode, setPlayMode] = useState<PlayMode>("limited");
   const [opponents, setOpponents] = useState<OpponentCount>(3);
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [activeMode, setActiveMode] = useState<ActiveMode>("solo");
@@ -332,11 +364,13 @@ export function Play() {
     null,
     addToast,
   );
+  const lastLobbyErrorRef = useRef<string | null>(null);
 
   const { reset: resetWatcher } = useSoloLobbyWatcher(
     lobbyState,
     pendingGameId,
     soloPhaseRef,
+    true,
     opponents,
     actions,
     (available) => {
@@ -348,20 +382,64 @@ export function Play() {
   );
 
   useEffect(() => {
-    if (gameState && pendingGameId) {
+    if (gameState?.game_id === pendingGameId && pendingGameId) {
       navigate(`/game/${pendingGameId}/play`);
     }
-  }, [gameState, pendingGameId, navigate]);
+  }, [gameState?.game_id, navigate, pendingGameId]);
 
   useEffect(() => {
     if (
       friendsLoading &&
       pendingGameId &&
-      lobbyState?.cube_loading_status === "ready"
+      lobbyState?.game_id === pendingGameId &&
+      lobbyState.cube_loading_status === "ready"
     ) {
       navigate(`/game/${pendingGameId}/lobby`);
     }
-  }, [friendsLoading, pendingGameId, lobbyState?.cube_loading_status, navigate]);
+  }, [friendsLoading, lobbyState?.cube_loading_status, lobbyState?.game_id, navigate, pendingGameId]);
+
+  useEffect(() => {
+    const nextError =
+      lobbyState?.game_id === pendingGameId && lobbyState.cube_loading_status === "error"
+        ? lobbyState.cube_loading_error
+        : null;
+    if (!nextError || nextError === lastLobbyErrorRef.current) {
+      if (!nextError) {
+        lastLobbyErrorRef.current = null;
+      }
+      return;
+    }
+    lastLobbyErrorRef.current = nextError;
+    addToast(nextError, "error");
+    startTransition(() => {
+      if (friendsLoading) {
+        setFriendsLoading(false);
+      }
+      if (soloPhase === "loading") {
+        updateSoloPhase("idle");
+        setMaxAvailablePuppets(null);
+        resetWatcher();
+      }
+      setPendingGameId(null);
+      setPendingSessionId(null);
+    });
+  }, [
+    addToast,
+    friendsLoading,
+    lobbyState?.cube_loading_error,
+    lobbyState?.cube_loading_status,
+    lobbyState?.game_id,
+    pendingGameId,
+    resetWatcher,
+    soloPhase,
+    updateSoloPhase,
+  ]);
+
+  useEffect(() => {
+    if (!pendingGameId) {
+      lastLobbyErrorRef.current = null;
+    }
+  }, [pendingGameId]);
 
   useEffect(() => {
     if (!cubeId) return;
@@ -379,13 +457,20 @@ export function Play() {
       addToast("Please enter your name", "error");
       return;
     }
+    const submittedCubeId = cubeId.trim();
+    if (playMode === "constructed" && !submittedCubeId) {
+      addToast("Please enter a CubeCobra ID", "error");
+      return;
+    }
+    lastLobbyErrorRef.current = null;
     setFriendsLoading(true);
     try {
       const response = await createGame(playerName, {
-        cubeId: cubeId || "auto",
+        cubeId: submittedCubeId || "auto",
         useUpgrades,
         autoApproveSpectators,
         guidedModeDefault: isGuidedMode,
+        playMode,
       });
       saveSession(response.session_id, response.player_id);
       rememberPlayerForGame(response.game_id, playerName.trim());
@@ -408,16 +493,23 @@ export function Play() {
       addToast("Please enter your name", "error");
       return;
     }
+    const submittedCubeId = cubeId.trim();
+    if (playMode === "constructed" && !submittedCubeId) {
+      addToast("Please enter a CubeCobra ID", "error");
+      return;
+    }
+    lastLobbyErrorRef.current = null;
     updateSoloPhase("loading");
     resetWatcher();
     try {
       const targetCount = count + 1;
       const response = await createGame(playerName, {
-        cubeId: cubeId || "auto",
+        cubeId: submittedCubeId || "auto",
         useUpgrades,
         targetPlayerCount: targetCount,
         puppetCount: count,
         guidedModeDefault: isGuidedMode,
+        playMode,
       });
       saveSession(response.session_id, response.player_id);
       rememberPlayerForGame(response.game_id, playerName.trim());
@@ -438,6 +530,7 @@ export function Play() {
     setFriendsLoading(false);
     setPendingGameId(null);
     setPendingSessionId(null);
+    lastLobbyErrorRef.current = null;
   };
 
   const handleCancelSolo = () => {
@@ -446,6 +539,7 @@ export function Play() {
     setPendingSessionId(null);
     setMaxAvailablePuppets(null);
     resetWatcher();
+    lastLobbyErrorRef.current = null;
   };
 
   const validRecoveryCounts = OPPONENT_OPTIONS.filter(
@@ -670,6 +764,7 @@ export function Play() {
           onClose={() => setShowFriendsAdvanced(false)}
         >
           <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
+          <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
           <UpgradesCheckbox
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
@@ -693,6 +788,7 @@ export function Play() {
           onClose={() => setShowSoloAdvanced(false)}
         >
           <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
+          <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
           <UpgradesCheckbox
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}

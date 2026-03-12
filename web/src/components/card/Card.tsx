@@ -24,6 +24,7 @@ interface CardProps {
   appliedUpgrades?: CardType[]
   canPeekFaceDown?: boolean
   style?: React.CSSProperties
+  trackDomId?: boolean
 }
 
 const sizeStyles = {
@@ -69,6 +70,7 @@ export function Card({
   appliedUpgrades,
   canPeekFaceDown = true,
   style: externalStyle,
+  trackDomId = true,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -129,6 +131,7 @@ export function Card({
     <div
       className={baseClasses}
       data-guide-card-id={card.id}
+      data-card-id={trackDomId ? card.id : undefined}
       style={{
         ...externalStyle,
         width: dims.width,

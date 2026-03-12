@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 from uuid import uuid4
 
+from httpx import HTTPStatusError, RequestError
 from sqlalchemy import true as sql_true
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session, joinedload
@@ -21,9 +22,13 @@ from mtb.models.cards import (
     Battler,
     Card,
     build_battler,
+    validate_battler,
 )
 from mtb.models.game import (
     Battle,
+    BattleResolution,
+    BattleResolutionEvent,
+    BattleResolutionSide,
     BattleSnapshotData,
     Config,
     Game,
@@ -34,8 +39,9 @@ from mtb.models.game import (
     Zones,
     create_game,
     set_battler,
+    set_player_battlers,
 )
-from mtb.models.types import BuildSource, CardDestination, ZoneName
+from mtb.models.types import BuildSource, CardDestination, PlayMode, ZoneName, normalize_play_mode
 from mtb.phases import battle, build, draft, reward
 from mtb.phases.battle import get_pairing_probabilities
 from mtb.phases.elimination import (
@@ -122,6 +128,15 @@ class PendingSpectateRequest:
 
 
 @dataclass
+class PendingPlayerBattler:
+    battler_id: str | None = None
+    battler: Battler | None = None
+    battler_loading: bool = False
+    battler_error: str | None = None
+    _loading_task: asyncio.Task | None = field(default=None, repr=False)
+
+
+@dataclass
 class PendingGame:
     game_id: str
     join_code: str
@@ -135,7 +150,9 @@ class PendingGame:
     target_player_count: int = 4
     auto_approve_spectators: bool = False
     guided_mode_default: bool = False
+    play_mode: PlayMode = "limited"
     player_ready: dict[str, bool] = field(default_factory=dict)
+    player_battlers: dict[str, PendingPlayerBattler] = field(default_factory=dict)
     puppet_count: int = 0
     battler: Battler | None = None
     battler_loading: bool = False
@@ -411,7 +428,12 @@ class GameManager:
         return recovered
 
     def _normalize_restored_game(self, game: Game) -> bool:
+        before_battlers = [id(player.battler) if player.battler is not None else None for player in game.players]
+        game.normalize_player_battlers()
         changed = self._canonicalize_active_battles(game)
+        after_battlers = [id(player.battler) if player.battler is not None else None for player in game.players]
+        if before_battlers != after_battlers:
+            changed = True
         recovered = self._recover_missing_active_battles(game)
         if recovered > 0:
             changed = True
@@ -612,7 +634,9 @@ class GameManager:
         target_player_count: int = 4,
         auto_approve_spectators: bool = False,
         guided_mode_default: bool = False,
+        play_mode: PlayMode = "limited",
     ) -> PendingGame:
+        play_mode = normalize_play_mode(play_mode)
         game_id = secrets.token_urlsafe(8)
         join_code = secrets.token_urlsafe(4).upper()[:6]
 
@@ -628,7 +652,9 @@ class GameManager:
             target_player_count=target_player_count,
             auto_approve_spectators=auto_approve_spectators,
             guided_mode_default=guided_mode_default,
+            play_mode=play_mode,
             player_ready={player_id: False},
+            player_battlers={player_id: PendingPlayerBattler()},
         )
         self._pending_games[game_id] = pending
         self._join_code_to_game[join_code] = game_id
@@ -662,21 +688,62 @@ class GameManager:
         pending.player_names.append(player_name)
         pending.player_ids.append(player_id)
         pending.player_ready[player_id] = False
+        pending.player_battlers[player_id] = PendingPlayerBattler()
         self._player_to_game[player_id] = pending.game_id
         self._player_id_to_name[player_id] = player_name
 
         return pending
 
-    def set_player_ready(self, game_id: str, player_id: str, is_ready: bool) -> bool:
+    def _can_player_ready(self, pending: PendingGame, player_id: str, is_ready: bool) -> tuple[bool, str | None]:
+        if player_id not in pending.player_ids:
+            return False, "Player not found"
+
+        if not is_ready or pending.play_mode != "constructed":
+            return True, None
+
+        player_battler = pending.player_battlers.get(player_id)
+        if player_battler is None or player_battler.battler is None:
+            return False, "Submit a valid battler before readying up"
+        if player_battler.battler_loading:
+            return False, "Battler is still loading"
+        if player_battler.battler_error:
+            return False, player_battler.battler_error
+        return True, None
+
+    def set_player_ready(self, game_id: str, player_id: str, is_ready: bool) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
         if not pending or pending.is_started:
-            return False
+            return False, "Game not found"
 
-        if player_id not in pending.player_ids:
-            return False
+        can_ready, error = self._can_player_ready(pending, player_id, is_ready)
+        if not can_ready:
+            return False, error
 
         pending.player_ready[player_id] = is_ready
-        return True
+        return True, None
+
+    def clear_player_battler(self, game_id: str, player_id: str) -> tuple[bool, str | None]:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.is_started:
+            return False, "Game not found"
+
+        if pending.play_mode != "constructed":
+            return False, "Battler submission is only available in constructed mode"
+
+        if player_id not in pending.player_ids:
+            return False, "Player not found"
+
+        player_battler = self._get_pending_player_battler(pending, player_id)
+        if player_battler._loading_task and not player_battler._loading_task.done():
+            player_battler._loading_task.cancel()
+
+        player_battler.battler_id = None
+        player_battler.battler = None
+        player_battler.battler_loading = False
+        player_battler.battler_error = None
+        player_battler._loading_task = None
+        pending.player_ready[player_id] = False
+        return True, None
 
     def can_start_game(self, game_id: str, player_id: str) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
@@ -699,6 +766,15 @@ class GameManager:
         all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
         if not all_ready:
             return False, "Not all players are ready"
+
+        if pending.play_mode == "constructed":
+            missing_players = [
+                pending.player_names[i]
+                for i, pid in enumerate(pending.player_ids)
+                if pending.player_battlers.get(pid) is None or pending.player_battlers[pid].battler is None
+            ]
+            if missing_players:
+                return False, "All players must submit a valid battler"
 
         allowed, reason = self.can_accept_loaded_game()
         if not allowed:
@@ -726,16 +802,32 @@ class GameManager:
             use_vanguards=pending.use_vanguards,
             auto_approve_spectators=pending.auto_approve_spectators,
             cube_id=pending.cube_id,
+            play_mode=pending.play_mode,
         )
         game = create_game(pending.player_names, len(pending.player_names), config)
-        battler = self._load_battler(pending.cube_id, pending.use_upgrades, pending.use_vanguards)
-        set_battler(game, battler)
+        target_elo = 1200.0
+        if pending.play_mode == "limited":
+            battler = self._load_battler(
+                pending.cube_id,
+                pending.use_upgrades,
+                pending.use_vanguards,
+                play_mode=pending.play_mode,
+            )
+            set_battler(game, battler)
+            target_elo = battler.elo or 1200.0
+        else:
+            battlers_by_player = self._build_constructed_battlers_by_player(pending)
+            if battlers_by_player is None:
+                return None
+            set_player_battlers(game, battlers_by_player)
+            target_elo = self._get_game_target_elo(game)
 
         if db is not None:
             config_data = {
                 "use_upgrades": pending.use_upgrades,
                 "use_vanguards": pending.use_vanguards,
                 "cube_id": pending.cube_id,
+                "play_mode": pending.play_mode,
             }
             game_record = GameRecord(
                 id=game_id,
@@ -750,7 +842,6 @@ class GameManager:
             db.commit()
 
             if pending.puppet_count > 0:
-                target_elo = battler.elo or 1200.0
                 self.load_fake_players_for_game(
                     db,
                     game,
@@ -758,7 +849,8 @@ class GameManager:
                     target_elo,
                     pending.use_upgrades,
                     pending.use_vanguards,
-                    pending.cube_id,
+                    pending.cube_id if pending.play_mode == "limited" else None,
+                    pending.play_mode,
                 )
 
         logger.info(
@@ -775,7 +867,7 @@ class GameManager:
 
         return game
 
-    async def start_game_async(self, game_id: str, db: Session | None = None) -> Game | None:
+    async def start_game_async(self, game_id: str, db: Session | None = None) -> Game | None:  # noqa: PLR0912
         try:
             async with self._acquire_game_start_slot():
                 pending = self._pending_games.get(game_id)
@@ -786,20 +878,25 @@ class GameManager:
                 if not allowed:
                     return None
 
-                if pending._loading_task and not pending._loading_task.done():
+                if pending.play_mode == "limited" and pending._loading_task and not pending._loading_task.done():
                     try:
                         await asyncio.wait_for(pending._loading_task, timeout=30.0)
                     except TimeoutError:
                         pass
 
-                if pending.battler_error:
+                if pending.play_mode == "limited" and pending.battler_error:
                     return None
 
-                if not pending.battler:
+                if pending.play_mode == "limited" and not pending.battler:
                     loop = asyncio.get_running_loop()
                     try:
                         pending.battler = await loop.run_in_executor(
-                            None, self._load_battler, pending.cube_id, pending.use_upgrades, pending.use_vanguards
+                            None,
+                            self._load_battler,
+                            pending.cube_id,
+                            pending.use_upgrades,
+                            pending.use_vanguards,
+                            pending.play_mode,
                         )
                     except Exception:
                         return None
@@ -812,16 +909,29 @@ class GameManager:
                     use_vanguards=pending.use_vanguards,
                     auto_approve_spectators=pending.auto_approve_spectators,
                     cube_id=pending.cube_id,
+                    play_mode=pending.play_mode,
                 )
                 game = create_game(pending.player_names, len(pending.player_names), config)
-                battler = pending.battler
-                set_battler(game, battler)
+                target_elo = 1200.0
+                if pending.play_mode == "limited":
+                    battler = pending.battler
+                    if battler is None:
+                        return None
+                    set_battler(game, battler)
+                    target_elo = battler.elo or 1200.0
+                else:
+                    battlers_by_player = self._build_constructed_battlers_by_player(pending)
+                    if battlers_by_player is None:
+                        return None
+                    set_player_battlers(game, battlers_by_player)
+                    target_elo = self._get_game_target_elo(game)
 
                 if db is not None:
                     config_data = {
                         "use_upgrades": pending.use_upgrades,
                         "use_vanguards": pending.use_vanguards,
                         "cube_id": pending.cube_id,
+                        "play_mode": pending.play_mode,
                     }
                     game_record = GameRecord(
                         id=game_id,
@@ -836,7 +946,6 @@ class GameManager:
                     db.commit()
 
                     if pending.puppet_count > 0:
-                        target_elo = battler.elo or 1200.0
                         self.load_fake_players_for_game(
                             db,
                             game,
@@ -844,7 +953,8 @@ class GameManager:
                             target_elo,
                             pending.use_upgrades,
                             pending.use_vanguards,
-                            pending.cube_id,
+                            pending.cube_id if pending.play_mode == "limited" else None,
+                            pending.play_mode,
                         )
 
                 logger.info(
@@ -977,6 +1087,9 @@ class GameManager:
         if pending:
             if pending._loading_task and not pending._loading_task.done():
                 pending._loading_task.cancel()
+            for player_battler in pending.player_battlers.values():
+                if player_battler._loading_task and not player_battler._loading_task.done():
+                    player_battler._loading_task.cancel()
             self._join_code_to_game.pop(pending.join_code, None)
 
         self._active_games.pop(game_id, None)
@@ -990,24 +1103,50 @@ class GameManager:
         if not preserve_snapshot:
             self.delete_snapshot(game_id)
 
-    def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
+    def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool, play_mode: PlayMode) -> Battler:
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
         vanguards_id = DEFAULT_VANGUARD_ID if use_vanguards else None
-        return build_battler(cube_id, upgrades_id, vanguards_id)
+        battler = build_battler(cube_id, upgrades_id, vanguards_id)
+        validate_battler(battler, play_mode=play_mode)
+        return battler
+
+    def _load_constructed_battler(self, battler_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
+        return self._load_battler(battler_id, use_upgrades, use_vanguards, play_mode="constructed")
+
+    def _normalize_battler_error(self, battler_id: str, error: Exception) -> str:
+        if isinstance(error, ValueError):
+            return str(error)
+        if isinstance(error, HTTPStatusError):
+            if error.response.status_code in {403, 404}:
+                return (
+                    f"Couldn't load battler '{battler_id}'. "
+                    "Check that the CubeCobra ID is correct and the battler is public."
+                )
+            return f"Couldn't load battler '{battler_id}' right now. Please try again."
+        if isinstance(error, RequestError):
+            return f"Couldn't load battler '{battler_id}' right now. Please try again."
+        return f"Couldn't load battler '{battler_id}'. Please try again."
 
     async def _preload_battler(
         self, pending: PendingGame, on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None
     ) -> None:
         pending.battler_loading = True
+        pending.battler_error = None
         try:
             async with self._battler_preload_slots:
                 loop = asyncio.get_running_loop()
                 battler = await loop.run_in_executor(
-                    None, self._load_battler, pending.cube_id, pending.use_upgrades, pending.use_vanguards
+                    None,
+                    self._load_battler,
+                    pending.cube_id,
+                    pending.use_upgrades,
+                    pending.use_vanguards,
+                    pending.play_mode,
                 )
             pending.battler = battler
         except Exception as e:
-            pending.battler_error = str(e)
+            logger.warning("Failed to preload battler %s: %s", pending.cube_id, e)
+            pending.battler_error = self._normalize_battler_error(pending.cube_id, e)
         finally:
             pending.battler_loading = False
             if on_complete:
@@ -1022,6 +1161,91 @@ class GameManager:
             pending._loading_task = task
         except RuntimeError:
             pending.battler_loading = False
+
+    def _get_pending_player_battler(self, pending: PendingGame, player_id: str) -> PendingPlayerBattler:
+        player_battler = pending.player_battlers.get(player_id)
+        if player_battler is None:
+            player_battler = PendingPlayerBattler()
+            pending.player_battlers[player_id] = player_battler
+        return player_battler
+
+    def _get_pending_player_battler_status(
+        self,
+        player_battler: PendingPlayerBattler,
+    ) -> Literal["missing", "loading", "ready", "error"]:
+        if player_battler.battler_error:
+            return "error"
+        if player_battler.battler_loading:
+            return "loading"
+        if player_battler.battler is not None:
+            return "ready"
+        return "missing"
+
+    async def _preload_player_battler(
+        self,
+        pending: PendingGame,
+        player_id: str,
+        battler_id: str,
+        on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None,
+    ) -> None:
+        player_battler = self._get_pending_player_battler(pending, player_id)
+        try:
+            async with self._battler_preload_slots:
+                loop = asyncio.get_running_loop()
+                battler = await loop.run_in_executor(
+                    None,
+                    self._load_constructed_battler,
+                    battler_id,
+                    pending.use_upgrades,
+                    pending.use_vanguards,
+                )
+            if player_battler.battler_id == battler_id:
+                player_battler.battler = battler
+                player_battler.battler_error = None
+        except Exception as e:
+            if player_battler.battler_id == battler_id:
+                logger.warning("Failed to preload player battler %s: %s", battler_id, e)
+                player_battler.battler = None
+                player_battler.battler_error = self._normalize_battler_error(battler_id, e)
+        finally:
+            if player_battler.battler_id == battler_id:
+                player_battler.battler_loading = False
+            if on_complete:
+                await on_complete()
+
+    def start_player_battler_preload(
+        self,
+        pending: PendingGame,
+        player_id: str,
+        battler_id: str,
+        on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None,
+    ) -> str | None:
+        battler_id = battler_id.strip()
+        if pending.play_mode != "constructed":
+            return "Battler submission is only available in constructed mode"
+        if player_id not in pending.player_ids:
+            return "Player not found"
+        if not battler_id:
+            return "Please provide a battler ID"
+
+        player_battler = self._get_pending_player_battler(pending, player_id)
+        player_battler.battler_id = battler_id
+        player_battler.battler = None
+        player_battler.battler_error = None
+        player_battler.battler_loading = True
+        pending.player_ready[player_id] = False
+
+        if player_battler._loading_task and not player_battler._loading_task.done():
+            player_battler._loading_task.cancel()
+
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(self._preload_player_battler(pending, player_id, battler_id, on_complete))
+            player_battler._loading_task = task
+            return None
+        except RuntimeError:
+            player_battler.battler_loading = False
+            return "Unable to load battler right now"
 
     def _ensure_unique_name(self, name: str, existing_names: set[str]) -> str:
         """Return a unique version of the name, adding suffix if needed."""
@@ -1059,13 +1283,16 @@ class GameManager:
         use_upgrades: bool | None = None,
         use_vanguards: bool | None = None,
         cube_id: str | None = None,
+        play_mode: PlayMode = "limited",
     ) -> list[PlayerGameHistory]:
+        play_mode = normalize_play_mode(play_mode)
         query = (
             db.query(PlayerGameHistory)
             .options(joinedload(PlayerGameHistory.snapshots))
             .filter(
                 PlayerGameHistory.id.notin_(exclude_ids) if exclude_ids else sql_true(),
                 PlayerGameHistory.max_stage >= 6,
+                PlayerGameHistory.is_puppet.is_(False),
             )
         )
 
@@ -1088,12 +1315,15 @@ class GameManager:
             if not game_record or not game_record.config_json:
                 continue
             config = json.loads(str(game_record.config_json))
+            saved_play_mode = normalize_play_mode(cast(str | None, config.get("play_mode")))
+            if saved_play_mode != play_mode:
+                continue
             if use_upgrades is not None and config.get("use_upgrades") != use_upgrades:
                 continue
             if use_vanguards is not None and config.get("use_vanguards") != use_vanguards:
                 continue
 
-            if cube_id and config.get("cube_id") == cube_id:
+            if play_mode == "limited" and cube_id and config.get("cube_id") == cube_id:
                 same_cube.append(history)
             else:
                 other_cube.append(history)
@@ -1131,6 +1361,21 @@ class GameManager:
             player_history_id=history_id,
             snapshots=snapshots_dict,
         )
+
+    def _build_constructed_battlers_by_player(self, pending: PendingGame) -> dict[str, Battler] | None:
+        battlers_by_player: dict[str, Battler] = {}
+        for player_id, player_name in zip(pending.player_ids, pending.player_names, strict=False):
+            player_battler = pending.player_battlers.get(player_id)
+            if player_battler is None or player_battler.battler is None:
+                return None
+            battlers_by_player[player_name] = player_battler.battler
+        return battlers_by_player
+
+    def _get_game_target_elo(self, game: Game) -> float:
+        elos = [player.battler.elo for player in game.players if player.battler is not None and player.battler.elo]
+        if not elos:
+            return 1200.0
+        return sum(elos) / len(elos)
 
     def _record_snapshot(self, db: Session, game_id: str, player: Player, battler_elo: float) -> None:
         history = (
@@ -1231,6 +1476,7 @@ class GameManager:
         use_upgrades: bool | None = None,
         use_vanguards: bool | None = None,
         cube_id: str | None = None,
+        play_mode: PlayMode = "limited",
     ) -> None:
         if count <= 0:
             return
@@ -1238,7 +1484,16 @@ class GameManager:
         existing_names = {p.name for p in game.players}
         existing_names.update(fp.name for fp in game.puppets)
 
-        histories = self._find_historical_players(db, target_elo, count, [], use_upgrades, use_vanguards, cube_id)
+        histories = self._find_historical_players(
+            db,
+            target_elo,
+            count,
+            [],
+            use_upgrades,
+            use_vanguards,
+            cube_id,
+            play_mode,
+        )
         for history in histories:
             fake_player = self._load_fake_player(db, history, existing_names)
             existing_names.add(fake_player.name)
@@ -1404,6 +1659,9 @@ class GameManager:
         pending.player_names.pop(idx)
         pending.player_ids.pop(idx)
         pending.player_ready.pop(target_player_id, None)
+        player_battler = pending.player_battlers.pop(target_player_id, None)
+        if player_battler and player_battler._loading_task and not player_battler._loading_task.done():
+            player_battler._loading_task.cancel()
         self._player_to_game.pop(target_player_id, None)
         self._player_id_to_name.pop(target_player_id, None)
         return True
@@ -1462,7 +1720,30 @@ class GameManager:
                 removed += 1
         return removed
 
+    def _get_pending_target_elo(self, pending: PendingGame) -> float | None:
+        if pending.play_mode == "limited":
+            if pending.battler is None:
+                return None
+            return pending.battler.elo or 1200.0
+
+        elos = [
+            entry.battler.elo
+            for entry in pending.player_battlers.values()
+            if entry.battler is not None and entry.battler.elo
+        ]
+        if not elos:
+            return None
+        return sum(elos) / len(elos)
+
     def _get_cube_loading_status(self, pending: PendingGame) -> CubeLoadingStatus:
+        if pending.play_mode == "constructed":
+            if any(entry.battler_error for entry in pending.player_battlers.values()):
+                return "error"
+            if any(entry.battler_loading for entry in pending.player_battlers.values()):
+                return "loading"
+            if any(entry.battler is None for entry in pending.player_battlers.values()):
+                return "loading"
+            return "ready"
         if pending.battler_error:
             return "error"
         if pending.battler is not None:
@@ -1470,7 +1751,8 @@ class GameManager:
         return "loading"
 
     def _count_available_bots(self, pending: PendingGame) -> int | None:
-        if pending.battler is None:
+        target_elo = self._get_pending_target_elo(pending)
+        if target_elo is None:
             return None
 
         max_puppets = 8 - len(pending.player_names)
@@ -1479,9 +1761,15 @@ class GameManager:
 
         db_session = db.SessionLocal()
         try:
-            target_elo = pending.battler.elo or 1200.0
             histories = self._find_historical_players(
-                db_session, target_elo, max_puppets, [], pending.use_upgrades, pending.use_vanguards, pending.cube_id
+                db_session,
+                target_elo,
+                max_puppets,
+                [],
+                pending.use_upgrades,
+                pending.use_vanguards,
+                pending.cube_id if pending.play_mode == "limited" else None,
+                pending.play_mode,
             )
             return len(histories)
         finally:
@@ -1495,12 +1783,20 @@ class GameManager:
         players = []
         for i, name in enumerate(pending.player_names):
             player_id = pending.player_ids[i]
+            player_battler = pending.player_battlers.get(player_id)
             players.append(
                 LobbyPlayer(
                     player_id=player_id,
                     name=name,
                     is_ready=pending.player_ready.get(player_id, False),
                     is_host=player_id == pending.host_player_id,
+                    battler_id=player_battler.battler_id if player_battler else None,
+                    battler_status=(
+                        self._get_pending_player_battler_status(player_battler)
+                        if player_battler and pending.play_mode == "constructed"
+                        else None
+                    ),
+                    battler_error=player_battler.battler_error if player_battler else None,
                 )
             )
 
@@ -1509,6 +1805,16 @@ class GameManager:
         available = self._count_available_bots(pending)
         has_enough_bots = pending.puppet_count == 0 or (available is not None and available >= pending.puppet_count)
         can_start = total >= 2 and total % 2 == 0 and all_ready and has_enough_bots
+        loading_error = pending.battler_error
+        if pending.play_mode == "constructed":
+            loading_error = next(
+                (
+                    player_battler.battler_error
+                    for player_battler in pending.player_battlers.values()
+                    if player_battler.battler_error
+                ),
+                None,
+            )
 
         return LobbyStateResponse(
             game_id=game_id,
@@ -1519,11 +1825,12 @@ class GameManager:
             target_player_count=total,
             puppet_count=pending.puppet_count,
             cube_loading_status=self._get_cube_loading_status(pending),
-            cube_loading_error=pending.battler_error,
+            cube_loading_error=loading_error,
             available_puppet_count=available,
             cube_id=pending.cube_id,
             use_upgrades=pending.use_upgrades,
             guided_mode_default=pending.guided_mode_default,
+            play_mode=pending.play_mode,
         )
 
     def get_game_state(self, game_id: str, player_id: str) -> GameStateResponse | None:
@@ -1599,7 +1906,9 @@ class GameManager:
             ),
             available_upgrades=game.available_upgrades,
             current_battle=current_battle,
+            battle_resolution=player.battle_resolution,
             cube_id=game.config.cube_id,
+            play_mode=game.config.play_mode,
         )
 
     def _determine_game_phase(self, game: Game) -> str:
@@ -1780,6 +2089,192 @@ class GameManager:
                 if fp.player_history_id == opponent.source_player_history_id:
                     return fp.poison
         return opponent.poison
+
+    def _build_resolution_events(
+        self, attacker: Player | StaticOpponent | None, damage: int, use_upgrades: bool
+    ) -> list[BattleResolutionEvent]:
+        if attacker is None or damage <= 0:
+            return []
+
+        if use_upgrades:
+            return reward.build_damage_events(attacker)
+
+        return [BattleResolutionEvent(event_type="base_increment") for _ in range(damage)]
+
+    def _make_resolution_side(
+        self,
+        name: str,
+        starting_poison: int,
+        ending_poison: int,
+        damage_taken: int,
+        show_death_animation: bool,
+        attacker: Player | StaticOpponent | None,
+        use_upgrades: bool,
+        poison_to_lose: int,
+    ) -> BattleResolutionSide:
+        took_lethal_damage = damage_taken > 0 and ending_poison >= poison_to_lose
+        return BattleResolutionSide(
+            name=name,
+            starting_poison=starting_poison,
+            ending_poison=ending_poison,
+            poison_delta=damage_taken,
+            took_damage=damage_taken > 0,
+            is_lethal=ending_poison >= poison_to_lose,
+            show_death_animation=show_death_animation or took_lethal_damage,
+            events=self._build_resolution_events(attacker, damage_taken, use_upgrades),
+        )
+
+    def _set_battle_resolution_for_player(
+        self,
+        viewer: Player,
+        opponent_name: str,
+        winner_name: str | None,
+        is_draw: bool,
+        is_sudden_death: bool,
+        continue_sudden_death: bool,
+        your_side: BattleResolutionSide,
+        opponent_side: BattleResolutionSide,
+    ) -> None:
+        viewer.battle_resolution = BattleResolution(
+            resolution_id=f"{viewer.name}:{viewer.stage}:{viewer.round}:{opponent_name}:{uuid4().hex[:8]}",
+            winner_name=winner_name,
+            is_draw=is_draw,
+            is_sudden_death=is_sudden_death,
+            continue_sudden_death=continue_sudden_death,
+            your_side=your_side,
+            opponent_side=opponent_side,
+        )
+
+    def _set_pvp_battle_resolution(
+        self,
+        game: Game,
+        player: Player,
+        opponent: Player,
+        *,
+        winner_name: str | None,
+        is_draw: bool,
+        is_sudden_death: bool,
+        continue_sudden_death: bool,
+        player_start_poison: int,
+        opponent_start_poison: int,
+        player_display_end_poison: int,
+        opponent_display_end_poison: int,
+        player_damage_taken: int,
+        opponent_damage_taken: int,
+        player_show_death: bool,
+        opponent_show_death: bool,
+    ) -> None:
+        poison_to_lose = game.config.poison_to_lose
+        use_upgrades = game.config.use_upgrades
+
+        self._set_battle_resolution_for_player(
+            player,
+            opponent.name,
+            winner_name,
+            is_draw,
+            is_sudden_death,
+            continue_sudden_death,
+            your_side=self._make_resolution_side(
+                player.name,
+                player_start_poison,
+                player_display_end_poison,
+                player_damage_taken,
+                player_show_death,
+                opponent if player_damage_taken > 0 else None,
+                use_upgrades,
+                poison_to_lose,
+            ),
+            opponent_side=self._make_resolution_side(
+                opponent.name,
+                opponent_start_poison,
+                opponent_display_end_poison,
+                opponent_damage_taken,
+                opponent_show_death,
+                player if opponent_damage_taken > 0 else None,
+                use_upgrades,
+                poison_to_lose,
+            ),
+        )
+
+        self._set_battle_resolution_for_player(
+            opponent,
+            player.name,
+            winner_name,
+            is_draw,
+            is_sudden_death,
+            continue_sudden_death,
+            your_side=self._make_resolution_side(
+                opponent.name,
+                opponent_start_poison,
+                opponent_display_end_poison,
+                opponent_damage_taken,
+                opponent_show_death,
+                player if opponent_damage_taken > 0 else None,
+                use_upgrades,
+                poison_to_lose,
+            ),
+            opponent_side=self._make_resolution_side(
+                player.name,
+                player_start_poison,
+                player_display_end_poison,
+                player_damage_taken,
+                player_show_death,
+                opponent if player_damage_taken > 0 else None,
+                use_upgrades,
+                poison_to_lose,
+            ),
+        )
+
+    def _set_static_battle_resolution(
+        self,
+        game: Game,
+        player: Player,
+        opponent: StaticOpponent,
+        *,
+        winner_name: str | None,
+        is_draw: bool,
+        is_sudden_death: bool,
+        continue_sudden_death: bool,
+        player_start_poison: int,
+        opponent_start_poison: int,
+        player_display_end_poison: int,
+        opponent_display_end_poison: int,
+        player_damage_taken: int,
+        opponent_damage_taken: int,
+        player_show_death: bool,
+        opponent_show_death: bool,
+    ) -> None:
+        poison_to_lose = game.config.poison_to_lose
+        use_upgrades = game.config.use_upgrades
+
+        self._set_battle_resolution_for_player(
+            player,
+            opponent.name,
+            winner_name,
+            is_draw,
+            is_sudden_death,
+            continue_sudden_death,
+            your_side=self._make_resolution_side(
+                player.name,
+                player_start_poison,
+                player_display_end_poison,
+                player_damage_taken,
+                player_show_death,
+                opponent if player_damage_taken > 0 else None,
+                use_upgrades,
+                poison_to_lose,
+            ),
+            opponent_side=self._make_resolution_side(
+                opponent.name,
+                opponent_start_poison,
+                opponent_display_end_poison,
+                opponent_damage_taken,
+                opponent_show_death,
+                player if opponent_damage_taken > 0 else None,
+                use_upgrades,
+                poison_to_lose,
+            ),
+        )
 
     def _make_battle_view(self, b: Battle, player: Player, game: Game) -> BattleView:
         is_player = b.player.name == player.name
@@ -2004,15 +2499,12 @@ class GameManager:
         Does NOT return cards from the ghost (they still need their cards for pairing).
         Does NOT return cards from bots (they have their own card pools).
         """
-        if game.battler is None:
-            return
-
         ghost_name = game.most_recent_ghost.name if game.most_recent_ghost else None
 
         for player in game.players:
-            if player.phase == "eliminated" and player.name != ghost_name:
-                game.battler.cards.extend(player.hand)
-                game.battler.cards.extend(player.sideboard)
+            if player.phase == "eliminated" and player.name != ghost_name and player.battler is not None:
+                player.battler.cards.extend(player.hand)
+                player.battler.cards.extend(player.sideboard)
                 # Clear to prevent double-returning
                 player.hand = []
                 player.sideboard = []
@@ -2035,10 +2527,11 @@ class GameManager:
             player.phase = "battle"
             player.build_ready = False
 
-        if db is not None and game_id is not None and game.battler is not None:
-            battler_elo = game.battler.elo or 1200.0
+        if db is not None and game_id is not None:
             for player in live_players:
+                battler_elo = player.battler.elo if player.battler is not None else 1200.0
                 self._record_snapshot(db, game_id, player, battler_elo)
+            battler_elo = self._get_game_target_elo(game)
             for fp in game.puppets:
                 if not fp.is_eliminated:
                     self._record_bot_poison(db, game_id, fp, battler_elo, stage, round_num)
@@ -2196,14 +2689,34 @@ class GameManager:
 
     def _end_battle(self, game: Game, b: Battle, game_id: str | None = None, db: Session | None = None) -> str | None:
         was_sudden_death = b.is_sudden_death
+        player_start_poison = b.player.poison
+        opponent_start_poison = self._get_opponent_poison(b.opponent, game)
 
         result = battle.end(game, b)
 
         if isinstance(b.opponent, StaticOpponent):
-            return self._handle_post_battle_static(game, b.player, b.opponent, result, was_sudden_death, game_id, db)
+            return self._handle_post_battle_static(
+                game,
+                b.player,
+                b.opponent,
+                result,
+                was_sudden_death,
+                player_start_poison,
+                opponent_start_poison,
+                game_id,
+                db,
+            )
         else:
             return self._handle_post_battle_pvp(
-                game, b.player, cast(Player, b.opponent), result, was_sudden_death, game_id, db
+                game,
+                b.player,
+                cast(Player, b.opponent),
+                result,
+                was_sudden_death,
+                player_start_poison,
+                opponent_start_poison,
+                game_id,
+                db,
             )
 
     def _is_finale(self, game: Game) -> bool:
@@ -2225,6 +2738,10 @@ class GameManager:
         player: Player,
         opponent: StaticOpponent,
         fake_player: Puppet,
+        player_start_poison: int,
+        opponent_start_poison: int,
+        player_display_end_poison: int,
+        opponent_display_end_poison: int,
         player_at_lethal: bool,
         bot_at_lethal: bool,
         winner_name: str | None,
@@ -2237,6 +2754,23 @@ class GameManager:
     ) -> str | None:
         """Handle sudden death battle outcomes against static opponent."""
         if not player_at_lethal and not bot_at_lethal:
+            self._set_static_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=True,
+                continue_sudden_death=True,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=poison_taken,
+                opponent_damage_taken=poison_dealt,
+                player_show_death=False,
+                opponent_show_death=False,
+            )
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
@@ -2251,6 +2785,23 @@ class GameManager:
             return None
 
         if player_at_lethal and bot_at_lethal:
+            self._set_static_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=True,
+                continue_sudden_death=True,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=poison_taken,
+                opponent_damage_taken=poison_dealt,
+                player_show_death=False,
+                opponent_show_death=False,
+            )
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
@@ -2270,6 +2821,23 @@ class GameManager:
         fake_player.in_sudden_death = False
 
         if player_at_lethal:
+            self._set_static_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=True,
+                continue_sudden_death=False,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=poison_taken,
+                opponent_damage_taken=poison_dealt,
+                player_show_death=poison_taken > 0 and player_display_end_poison >= game.config.poison_to_lose,
+                opponent_show_death=False,
+            )
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
@@ -2288,6 +2856,23 @@ class GameManager:
         process_puppet_eliminations(game)
         winner, is_game_over = check_game_over(game)
         if is_game_over and winner is not None:
+            self._set_static_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=True,
+                continue_sudden_death=False,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=poison_taken,
+                opponent_damage_taken=poison_dealt,
+                player_show_death=False,
+                opponent_show_death=poison_dealt > 0 and opponent_display_end_poison >= game.config.poison_to_lose,
+            )
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
@@ -2303,24 +2888,53 @@ class GameManager:
             self.complete_game(game_id or "", winner, db)
             return "game_over"
 
+        self._set_static_battle_resolution(
+            game,
+            player,
+            opponent,
+            winner_name=winner_name,
+            is_draw=is_draw,
+            is_sudden_death=True,
+            continue_sudden_death=False,
+            player_start_poison=player_start_poison,
+            opponent_start_poison=opponent_start_poison,
+            player_display_end_poison=player_display_end_poison,
+            opponent_display_end_poison=opponent_display_end_poison,
+            player_damage_taken=poison_taken,
+            opponent_damage_taken=poison_dealt,
+            player_show_death=False,
+            opponent_show_death=False,
+        )
         player.phase = "reward"
         reward.start_vs_static_rewards_only(game, player, opponent, player_won, is_draw, poison_dealt, poison_taken)
         return None
 
-    def _handle_post_battle_static(
+    def _handle_post_battle_static(  # noqa: PLR0912, PLR0915
         self,
         game: Game,
         player: Player,
         opponent: StaticOpponent,
         result: battle.BattleResult,
         was_sudden_death: bool,
-        game_id: str | None,
-        db: Session | None,
+        player_start_poison: int | None = None,
+        opponent_start_poison: int | None = None,
+        game_id: str | None = None,
+        db: Session | None = None,
     ) -> str | None:
         """Handle phase transition after static opponent battle."""
+        if isinstance(player_start_poison, str) and game_id is None:
+            game_id = player_start_poison
+            player_start_poison = None
+
+        if player_start_poison is None:
+            player_start_poison = player.poison
+        if opponent_start_poison is None:
+            opponent_start_poison = self._get_opponent_poison(opponent, game)
+
         player_won = result.winner is not None and result.winner.name == player.name
         is_draw = result.is_draw
         is_finale = self._is_finale(game)
+        poison_to_lose = game.config.poison_to_lose
 
         poison_info = reward.apply_poison_static(game, player, opponent, player_won, is_draw)
         poison_dealt = poison_info["poison_dealt"]
@@ -2334,9 +2948,14 @@ class GameManager:
         else:
             winner_name = opponent.name
 
+        fake_player = self._get_fake_player_for_opponent(game, opponent)
+        player_display_end_poison = player.poison
+        opponent_display_end_poison = (
+            fake_player.poison if fake_player is not None else opponent_start_poison + poison_dealt
+        )
+
         player_at_lethal = player.poison >= game.config.poison_to_lose
 
-        fake_player = self._get_fake_player_for_opponent(game, opponent)
         bot_at_lethal = fake_player is not None and fake_player.poison >= game.config.poison_to_lose
 
         if was_sudden_death and fake_player is not None:
@@ -2345,6 +2964,10 @@ class GameManager:
                 player,
                 opponent,
                 fake_player,
+                player_start_poison,
+                opponent_start_poison,
+                player_display_end_poison,
+                opponent_display_end_poison,
                 player_at_lethal,
                 bot_at_lethal,
                 winner_name,
@@ -2358,6 +2981,23 @@ class GameManager:
 
         # Handle sudden death for finale mutual lethal (before any eliminations)
         if is_finale and player_at_lethal and bot_at_lethal and fake_player is not None:
+            self._set_static_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=was_sudden_death,
+                continue_sudden_death=True,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=poison_taken,
+                opponent_damage_taken=poison_dealt,
+                player_show_death=False,
+                opponent_show_death=False,
+            )
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
@@ -2369,6 +3009,23 @@ class GameManager:
 
         # Non-finale: player at lethal gets no rewards and awaits elimination
         if not is_finale and player_at_lethal:
+            self._set_static_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=was_sudden_death,
+                continue_sudden_death=False,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=poison_taken,
+                opponent_damage_taken=poison_dealt,
+                player_show_death=poison_taken > 0 and player_display_end_poison >= poison_to_lose,
+                opponent_show_death=False,
+            )
             reward.set_last_battle_result_no_rewards(
                 player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
             )
@@ -2377,6 +3034,23 @@ class GameManager:
 
         # Non-finale: sudden death needed (2+ bots at lethal) but player is alive — give rewards
         if not is_finale and needs_sudden_death(game):
+            self._set_static_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=was_sudden_death,
+                continue_sudden_death=False,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=poison_taken,
+                opponent_damage_taken=poison_dealt,
+                player_show_death=False,
+                opponent_show_death=False,
+            )
             player.phase = "reward"
             reward.start_vs_static_rewards_only(game, player, opponent, player_won, is_draw, poison_dealt, poison_taken)
             return self._check_sudden_death_ready(game, game_id, db)
@@ -2387,6 +3061,23 @@ class GameManager:
         if is_finale:
             # Player at lethal = eliminated
             if player_at_lethal:
+                self._set_static_battle_resolution(
+                    game,
+                    player,
+                    opponent,
+                    winner_name=winner_name,
+                    is_draw=is_draw,
+                    is_sudden_death=was_sudden_death,
+                    continue_sudden_death=False,
+                    player_start_poison=player_start_poison,
+                    opponent_start_poison=opponent_start_poison,
+                    player_display_end_poison=player_display_end_poison,
+                    opponent_display_end_poison=opponent_display_end_poison,
+                    player_damage_taken=poison_taken,
+                    opponent_damage_taken=poison_dealt,
+                    player_show_death=poison_taken > 0 and player_display_end_poison >= poison_to_lose,
+                    opponent_show_death=False,
+                )
                 reward.set_last_battle_result_no_rewards(
                     player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
                 )
@@ -2397,6 +3088,23 @@ class GameManager:
             # Check if game is actually over (bot eliminated)
             winner, is_game_over = check_game_over(game)
             if is_game_over and winner is not None:
+                self._set_static_battle_resolution(
+                    game,
+                    player,
+                    opponent,
+                    winner_name=winner_name,
+                    is_draw=is_draw,
+                    is_sudden_death=was_sudden_death,
+                    continue_sudden_death=False,
+                    player_start_poison=player_start_poison,
+                    opponent_start_poison=opponent_start_poison,
+                    player_display_end_poison=player_display_end_poison,
+                    opponent_display_end_poison=opponent_display_end_poison,
+                    player_damage_taken=poison_taken,
+                    opponent_damage_taken=poison_dealt,
+                    player_show_death=False,
+                    opponent_show_death=poison_dealt > 0 and opponent_display_end_poison >= poison_to_lose,
+                )
                 reward.set_last_battle_result_no_rewards(
                     player, opponent.name, winner_name, is_draw, poison_dealt, poison_taken
                 )
@@ -2407,6 +3115,23 @@ class GameManager:
 
             # Game not over in finale - continue to rewards (fall through)
 
+        self._set_static_battle_resolution(
+            game,
+            player,
+            opponent,
+            winner_name=winner_name,
+            is_draw=is_draw,
+            is_sudden_death=was_sudden_death,
+            continue_sudden_death=False,
+            player_start_poison=player_start_poison,
+            opponent_start_poison=opponent_start_poison,
+            player_display_end_poison=player_display_end_poison,
+            opponent_display_end_poison=opponent_display_end_poison,
+            player_damage_taken=poison_taken,
+            opponent_damage_taken=poison_dealt,
+            player_show_death=False,
+            opponent_show_death=False,
+        )
         player.phase = "reward"
         reward.start_vs_static_rewards_only(game, player, opponent, player_won, is_draw, poison_dealt, poison_taken)
 
@@ -2450,7 +3175,7 @@ class GameManager:
         self.complete_game(game_id or "", winner, db)
         return "game_over"
 
-    def _handle_pvp_finale(
+    def _handle_pvp_finale(  # noqa: PLR0912, PLR0915
         self,
         game: Game,
         player: Player,
@@ -2461,15 +3186,48 @@ class GameManager:
         p1_poison: int,
         p2_poison: int,
         poison_dealt: int,
-        player_at_lethal: bool,
-        opponent_at_lethal: bool,
-        was_sudden_death: bool,
-        game_id: str | None,
-        db: Session | None,
+        player_start_poison: int | None = None,
+        opponent_start_poison: int | None = None,
+        player_display_end_poison: int | None = None,
+        opponent_display_end_poison: int | None = None,
+        player_at_lethal: bool = False,
+        opponent_at_lethal: bool = False,
+        was_sudden_death: bool = False,
+        game_id: str | None = None,
+        db: Session | None = None,
     ) -> str | None:
         """Handle finale PvP outcomes."""
+        if player_start_poison is None:
+            player_start_poison = player.poison
+        if opponent_start_poison is None:
+            opponent_start_poison = opponent.poison
+        if player_display_end_poison is None:
+            player_display_end_poison = player.poison
+        if opponent_display_end_poison is None:
+            opponent_display_end_poison = opponent.poison
+
+        player_damage_taken = p1_poison if is_draw else (0 if winner_name == player.name else poison_dealt)
+        opponent_damage_taken = p2_poison if is_draw else (poison_dealt if winner_name == player.name else 0)
+
         # Handle ongoing sudden death - neither died, loop back to build
         if was_sudden_death and not player_at_lethal and not opponent_at_lethal:
+            self._set_pvp_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=True,
+                continue_sudden_death=True,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=player_damage_taken,
+                opponent_damage_taken=opponent_damage_taken,
+                player_show_death=False,
+                opponent_show_death=False,
+            )
             self._set_pvp_battle_results_no_rewards(
                 player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
             )
@@ -2481,6 +3239,23 @@ class GameManager:
         if was_sudden_death:
             if player_at_lethal and opponent_at_lethal:
                 # Draw in sudden death — loop back to build with poison reset
+                self._set_pvp_battle_resolution(
+                    game,
+                    player,
+                    opponent,
+                    winner_name=winner_name,
+                    is_draw=is_draw,
+                    is_sudden_death=True,
+                    continue_sudden_death=True,
+                    player_start_poison=player_start_poison,
+                    opponent_start_poison=opponent_start_poison,
+                    player_display_end_poison=player_display_end_poison,
+                    opponent_display_end_poison=opponent_display_end_poison,
+                    player_damage_taken=player_damage_taken,
+                    opponent_damage_taken=opponent_damage_taken,
+                    player_show_death=False,
+                    opponent_show_death=False,
+                )
                 self._set_pvp_battle_results_no_rewards(
                     player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
                 )
@@ -2494,12 +3269,48 @@ class GameManager:
             opponent.in_sudden_death = False
 
             if player_at_lethal:
+                self._set_pvp_battle_resolution(
+                    game,
+                    player,
+                    opponent,
+                    winner_name=winner_name,
+                    is_draw=is_draw,
+                    is_sudden_death=True,
+                    continue_sudden_death=False,
+                    player_start_poison=player_start_poison,
+                    opponent_start_poison=opponent_start_poison,
+                    player_display_end_poison=player_display_end_poison,
+                    opponent_display_end_poison=opponent_display_end_poison,
+                    player_damage_taken=player_damage_taken,
+                    opponent_damage_taken=opponent_damage_taken,
+                    player_show_death=player_damage_taken > 0
+                    and player_display_end_poison >= game.config.poison_to_lose,
+                    opponent_show_death=False,
+                )
                 self._set_pvp_battle_results_no_rewards(
                     player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
                 )
                 return self._end_pvp_with_winner(game, player, opponent, game_id, db)
 
             if opponent_at_lethal:
+                self._set_pvp_battle_resolution(
+                    game,
+                    player,
+                    opponent,
+                    winner_name=winner_name,
+                    is_draw=is_draw,
+                    is_sudden_death=True,
+                    continue_sudden_death=False,
+                    player_start_poison=player_start_poison,
+                    opponent_start_poison=opponent_start_poison,
+                    player_display_end_poison=player_display_end_poison,
+                    opponent_display_end_poison=opponent_display_end_poison,
+                    player_damage_taken=player_damage_taken,
+                    opponent_damage_taken=opponent_damage_taken,
+                    player_show_death=False,
+                    opponent_show_death=opponent_damage_taken > 0
+                    and opponent_display_end_poison >= game.config.poison_to_lose,
+                )
                 self._set_pvp_battle_results_no_rewards(
                     player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
                 )
@@ -2507,6 +3318,23 @@ class GameManager:
 
         # Not sudden death yet: both at lethal triggers sudden death
         if player_at_lethal and opponent_at_lethal:
+            self._set_pvp_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=False,
+                continue_sudden_death=True,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=player_damage_taken,
+                opponent_damage_taken=opponent_damage_taken,
+                player_show_death=False,
+                opponent_show_death=False,
+            )
             self._set_pvp_battle_results_no_rewards(
                 player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
             )
@@ -2518,18 +3346,70 @@ class GameManager:
             return "sudden_death"
 
         if player_at_lethal:
+            self._set_pvp_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=False,
+                continue_sudden_death=False,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=player_damage_taken,
+                opponent_damage_taken=opponent_damage_taken,
+                player_show_death=(player_damage_taken > 0 and player_display_end_poison >= game.config.poison_to_lose),
+                opponent_show_death=False,
+            )
             self._set_pvp_battle_results_no_rewards(
                 player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
             )
             return self._end_pvp_with_winner(game, player, opponent, game_id, db)
 
         if opponent_at_lethal:
+            self._set_pvp_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=False,
+                continue_sudden_death=False,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=player_damage_taken,
+                opponent_damage_taken=opponent_damage_taken,
+                player_show_death=False,
+                opponent_show_death=opponent_damage_taken > 0
+                and opponent_display_end_poison >= game.config.poison_to_lose,
+            )
             self._set_pvp_battle_results_no_rewards(
                 player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
             )
             return self._end_pvp_with_winner(game, opponent, player, game_id, db)
 
         # Neither at lethal in finale - continue with rewards
+        self._set_pvp_battle_resolution(
+            game,
+            player,
+            opponent,
+            winner_name=winner_name,
+            is_draw=is_draw,
+            is_sudden_death=was_sudden_death,
+            continue_sudden_death=False,
+            player_start_poison=player_start_poison,
+            opponent_start_poison=opponent_start_poison,
+            player_display_end_poison=player_display_end_poison,
+            opponent_display_end_poison=opponent_display_end_poison,
+            player_damage_taken=player_damage_taken,
+            opponent_damage_taken=opponent_damage_taken,
+            player_show_death=False,
+            opponent_show_death=False,
+        )
         player.phase = "reward"
         opponent.phase = "reward"
         if is_draw:
@@ -2551,15 +3431,48 @@ class GameManager:
         p1_poison: int,
         p2_poison: int,
         poison_dealt: int,
-        player_at_lethal: bool,
-        opponent_at_lethal: bool,
-        was_sudden_death: bool,
-        game_id: str | None,
-        db: Session | None,
+        player_start_poison: int | None = None,
+        opponent_start_poison: int | None = None,
+        player_display_end_poison: int | None = None,
+        opponent_display_end_poison: int | None = None,
+        player_at_lethal: bool = False,
+        opponent_at_lethal: bool = False,
+        was_sudden_death: bool = False,
+        game_id: str | None = None,
+        db: Session | None = None,
     ) -> str | None:
         """Handle non-finale PvP outcomes."""
+        if player_start_poison is None:
+            player_start_poison = player.poison
+        if opponent_start_poison is None:
+            opponent_start_poison = opponent.poison
+        if player_display_end_poison is None:
+            player_display_end_poison = player.poison
+        if opponent_display_end_poison is None:
+            opponent_display_end_poison = opponent.poison
+
+        player_damage_taken = p1_poison if is_draw else (0 if winner_name == player.name else poison_dealt)
+        opponent_damage_taken = p2_poison if is_draw else (poison_dealt if winner_name == player.name else 0)
+
         if was_sudden_death:
             if not player_at_lethal and not opponent_at_lethal:
+                self._set_pvp_battle_resolution(
+                    game,
+                    player,
+                    opponent,
+                    winner_name=winner_name,
+                    is_draw=is_draw,
+                    is_sudden_death=True,
+                    continue_sudden_death=True,
+                    player_start_poison=player_start_poison,
+                    opponent_start_poison=opponent_start_poison,
+                    player_display_end_poison=player_display_end_poison,
+                    opponent_display_end_poison=opponent_display_end_poison,
+                    player_damage_taken=player_damage_taken,
+                    opponent_damage_taken=opponent_damage_taken,
+                    player_show_death=False,
+                    opponent_show_death=False,
+                )
                 self._set_pvp_battle_results_no_rewards(
                     player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
                 )
@@ -2571,6 +3484,24 @@ class GameManager:
             opponent.in_sudden_death = False
 
         if player_at_lethal and opponent_at_lethal:
+            self._set_pvp_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=was_sudden_death,
+                continue_sudden_death=False,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=player_damage_taken,
+                opponent_damage_taken=opponent_damage_taken,
+                player_show_death=player_damage_taken > 0 and player_display_end_poison >= game.config.poison_to_lose,
+                opponent_show_death=opponent_damage_taken > 0
+                and opponent_display_end_poison >= game.config.poison_to_lose,
+            )
             self._set_pvp_battle_results_no_rewards(
                 player, opponent, is_draw, winner_name, p1_poison, p2_poison, poison_dealt
             )
@@ -2579,6 +3510,23 @@ class GameManager:
             return self._check_sudden_death_ready(game, game_id, db)
 
         if player_at_lethal:
+            self._set_pvp_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=was_sudden_death,
+                continue_sudden_death=False,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=player_damage_taken,
+                opponent_damage_taken=opponent_damage_taken,
+                player_show_death=player_damage_taken > 0 and player_display_end_poison >= game.config.poison_to_lose,
+                opponent_show_death=False,
+            )
             self._set_player_result_no_rewards(player, opponent.name, is_draw, winner_name, p1_poison, poison_dealt)
             player.phase = "awaiting_elimination"
             opponent.phase = "reward"
@@ -2588,6 +3536,24 @@ class GameManager:
             return self._check_sudden_death_ready(game, game_id, db)
 
         if opponent_at_lethal:
+            self._set_pvp_battle_resolution(
+                game,
+                player,
+                opponent,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                is_sudden_death=was_sudden_death,
+                continue_sudden_death=False,
+                player_start_poison=player_start_poison,
+                opponent_start_poison=opponent_start_poison,
+                player_display_end_poison=player_display_end_poison,
+                opponent_display_end_poison=opponent_display_end_poison,
+                player_damage_taken=player_damage_taken,
+                opponent_damage_taken=opponent_damage_taken,
+                player_show_death=False,
+                opponent_show_death=opponent_damage_taken > 0
+                and opponent_display_end_poison >= game.config.poison_to_lose,
+            )
             self._set_player_result_no_rewards(opponent, player.name, is_draw, winner_name, p2_poison, poison_dealt)
             opponent.phase = "awaiting_elimination"
             player.phase = "reward"
@@ -2598,6 +3564,23 @@ class GameManager:
 
         # Neither at lethal - both get rewards
         process_puppet_eliminations(game)
+        self._set_pvp_battle_resolution(
+            game,
+            player,
+            opponent,
+            winner_name=winner_name,
+            is_draw=is_draw,
+            is_sudden_death=was_sudden_death,
+            continue_sudden_death=False,
+            player_start_poison=player_start_poison,
+            opponent_start_poison=opponent_start_poison,
+            player_display_end_poison=player_display_end_poison,
+            opponent_display_end_poison=opponent_display_end_poison,
+            player_damage_taken=player_damage_taken,
+            opponent_damage_taken=opponent_damage_taken,
+            player_show_death=False,
+            opponent_show_death=False,
+        )
         player.phase = "reward"
         opponent.phase = "reward"
         if is_draw:
@@ -2653,10 +3636,21 @@ class GameManager:
         opponent: Player,
         result: battle.BattleResult,
         was_sudden_death: bool,
-        game_id: str | None,
-        db: Session | None,
+        player_start_poison: int | None = None,
+        opponent_start_poison: int | None = None,
+        game_id: str | None = None,
+        db: Session | None = None,
     ) -> str | None:
         """Handle phase transition after PvP battle."""
+        if isinstance(player_start_poison, str) and game_id is None:
+            game_id = player_start_poison
+            player_start_poison = None
+
+        if player_start_poison is None:
+            player_start_poison = player.poison
+        if opponent_start_poison is None:
+            opponent_start_poison = opponent.poison
+
         is_draw = result.is_draw
         is_finale = self._is_finale(game)
 
@@ -2679,6 +3673,8 @@ class GameManager:
             poison_dealt = poison_info["poison"]
             winner_name = winner.name
 
+        player_display_end_poison = player.poison
+        opponent_display_end_poison = opponent.poison
         player_at_lethal = player.poison >= game.config.poison_to_lose
         opponent_at_lethal = opponent.poison >= game.config.poison_to_lose
 
@@ -2694,6 +3690,10 @@ class GameManager:
                 p1_poison,
                 p2_poison,
                 poison_dealt,
+                player_start_poison,
+                opponent_start_poison,
+                player_display_end_poison,
+                opponent_display_end_poison,
                 player_at_lethal,
                 opponent_at_lethal,
                 was_sudden_death,
@@ -2711,6 +3711,10 @@ class GameManager:
             p1_poison,
             p2_poison,
             poison_dealt,
+            player_start_poison,
+            opponent_start_poison,
+            player_display_end_poison,
+            opponent_display_end_poison,
             player_at_lethal,
             opponent_at_lethal,
             was_sudden_death,
