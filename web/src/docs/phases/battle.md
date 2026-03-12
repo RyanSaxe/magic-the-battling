@@ -25,7 +25,7 @@ The battle phase is where you play a quick mini-game of magic with a few modifie
 
 ## After the Battle Ends
 
-- The losing player(s) get N [poison counters](doc:game-pieces#poison), where N is 1 + the number of [upgrades](doc:game-pieces#upgrades) their opponent has applied (unapplied upgrades do not count!). If you are not playing with upgrades, N is Fibonacci(stage - 2).
+- The losing player(s) get N [poison counters](doc:game-pieces#poison), where N is 1 + the number of [upgrades](doc:game-pieces#upgrades) their opponent has applied to cards in their submitted hand, plus their companion if they have one selected. If you are not playing with upgrades, N is Fibonacci(stage - 2).
 - Each player keeps up to 5 [treasures](doc:game-pieces#treasures) that are still on their battlefield and exiles the rest.
 
 ## Controls
