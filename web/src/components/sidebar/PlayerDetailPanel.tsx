@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Card as CardType, LastResult, PlayerView } from "../../types";
 import type { RevealedPlayerTab } from "../../contexts/contextStripState";
+import { useContextStrip } from "../../contexts";
 import { bestFit, type ZoneDims } from "../../hooks/cardSizeUtils";
 import { PlacementBadge } from "./PlacementBadge";
 import { Card } from "../card";
@@ -19,6 +20,7 @@ interface PlayerDetailPanelProps {
   activeTab: RevealedPlayerTab;
   onTabChange: (tab: RevealedPlayerTab) => void;
   onClose: () => void;
+  isOpen?: boolean;
 }
 
 const DEFAULT_CARD_DIMS: ZoneDims = {
@@ -54,32 +56,74 @@ function countLabel(count: number): string {
 }
 
 function OverviewToken({
-  title,
   value,
   imageSrc,
   badgeClassName,
 }: {
-  title: string;
   value: number;
   imageSrc: string;
   badgeClassName: string;
 }) {
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div className="relative">
-        <img
-          src={imageSrc}
-          alt={title}
-          className="h-16 rounded"
-          style={{ borderRadius: "var(--card-border-radius)" }}
-        />
-        <span className={`absolute bottom-0 right-0 rounded-full bg-black/70 px-1.5 py-0.5 text-xs font-bold ${badgeClassName}`}>
-          {value}
-        </span>
-      </div>
-      <span className="text-[10px] uppercase tracking-[0.12em] text-gray-400">
-        {title}
+    <div className="relative">
+      <img
+        src={imageSrc}
+        alt=""
+        className="h-[72px] block shadow-lg"
+        style={{ borderRadius: "var(--card-border-radius)" }}
+      />
+      <span className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/80 px-1.5 py-0.5 text-xs font-bold leading-none ${badgeClassName}`}>
+        {value}
       </span>
+    </div>
+  );
+}
+
+function buildAppliedUpgradeMap(
+  upgrades: CardType[],
+): {
+  upgradedCardIds: Set<string>;
+  appliedUpgradesByCardId: Map<string, CardType[]>;
+} {
+  const upgradedCardIds = new Set<string>();
+  const appliedUpgradesByCardId = new Map<string, CardType[]>();
+
+  upgrades.forEach((upgrade) => {
+    if (!upgrade.upgrade_target) return;
+
+    const targetId = upgrade.upgrade_target.id;
+    upgradedCardIds.add(targetId);
+    const existing = appliedUpgradesByCardId.get(targetId) ?? [];
+    existing.push(upgrade);
+    appliedUpgradesByCardId.set(targetId, existing);
+  });
+
+  return { upgradedCardIds, appliedUpgradesByCardId };
+}
+
+function OverviewTokenRow({
+  poison,
+  treasures,
+}: {
+  poison: number;
+  treasures: number;
+}) {
+  return (
+    <div className="flex items-start justify-center gap-5">
+      <div className="relative">
+        <OverviewToken
+          value={poison}
+          imageSrc={POISON_COUNTER_IMAGE}
+          badgeClassName="text-purple-300"
+        />
+      </div>
+      <div className="relative">
+        <OverviewToken
+          value={treasures}
+          imageSrc={TREASURE_TOKEN_IMAGE}
+          badgeClassName="text-amber-300"
+        />
+      </div>
     </div>
   );
 }
@@ -169,6 +213,8 @@ function AdaptiveCardSection({
   cards,
   showUpgradeTargets = false,
   companionIds,
+  upgradedCardIds,
+  appliedUpgradesByCardId,
   emptyText,
   guideTarget,
   maxWidth = 108,
@@ -178,6 +224,8 @@ function AdaptiveCardSection({
   cards: CardType[];
   showUpgradeTargets?: boolean;
   companionIds?: Set<string>;
+  upgradedCardIds?: Set<string>;
+  appliedUpgradesByCardId?: Map<string, CardType[]>;
   emptyText: string;
   guideTarget?: string;
   maxWidth?: number;
@@ -261,6 +309,8 @@ function AdaptiveCardSection({
                   card={card}
                   dimensions={{ width: dims.width, height: dims.height }}
                   isCompanion={companionIds?.has(card.id)}
+                  upgraded={upgradedCardIds?.has(card.id)}
+                  appliedUpgrades={appliedUpgradesByCardId?.get(card.id)}
                 />
               ),
             )}
@@ -304,8 +354,11 @@ export function PlayerDetailPanel({
   activeTab,
   onTabChange,
   onClose,
+  isOpen = true,
 }: PlayerDetailPanelProps) {
   const panelRef = useRef<HTMLDivElement>(null);
+  const { state } = useContextStrip();
+  const [renderOpen, setRenderOpen] = useState(false);
 
   const isViewingSelf = player.name === currentPlayer.name;
   const appliedUpgrades = player.upgrades.filter(
@@ -317,6 +370,9 @@ export function PlayerDetailPanel({
   const allUpgrades = isViewingSelf
     ? [...appliedUpgrades, ...pendingUpgrades]
     : appliedUpgrades;
+  const { upgradedCardIds, appliedUpgradesByCardId } = buildAppliedUpgradeMap(
+    appliedUpgrades,
+  );
   const companionIds = new Set(player.command_zone.map((card) => card.id));
   const lastResultLabel = getLastResultLabel(player.last_result, player.in_sudden_death);
   const showPairingChance =
@@ -328,15 +384,20 @@ export function PlayerDetailPanel({
   });
 
   useEffect(() => {
-    if (isMobile) return;
+    if (isMobile || !isOpen) return;
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
-        onClose();
-      }
+      const target = event.target as HTMLElement | null;
+      const panel = panelRef.current;
+      if (!panel || !target) return;
+      if (target.closest("[data-card-preview-modal='true']")) return;
+      if (panel.contains(target)) return;
+      const sidebarRoot = panel.closest("[data-guide-target='sidebar-panel']");
+      if (sidebarRoot instanceof HTMLElement && sidebarRoot.contains(target)) return;
+      onClose();
     };
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && state.previewCard === null) onClose();
     };
 
     document.addEventListener("mousedown", handleClickOutside);
@@ -345,24 +406,21 @@ export function PlayerDetailPanel({
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [isMobile, onClose]);
+  }, [isMobile, isOpen, onClose, state.previewCard]);
+
+  useEffect(() => {
+    if (isMobile) return;
+
+    const frame = requestAnimationFrame(() => {
+      setRenderOpen(isOpen);
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [isMobile, isOpen]);
 
   const overviewContent = (
     <div className="flex h-full flex-col gap-3">
-      <div className="flex items-start justify-center gap-6">
-        <OverviewToken
-          title="Poison"
-          value={player.poison}
-          imageSrc={POISON_COUNTER_IMAGE}
-          badgeClassName="text-purple-300"
-        />
-        <OverviewToken
-          title="Treasure"
-          value={player.treasures}
-          imageSrc={TREASURE_TOKEN_IMAGE}
-          badgeClassName="text-amber-300"
-        />
-      </div>
+      <OverviewTokenRow poison={player.poison} treasures={player.treasures} />
 
       <SectionHeading title="Overview" />
       <div className="-mt-1">
@@ -387,6 +445,8 @@ export function PlayerDetailPanel({
       title="Seen in Battle"
       cards={player.most_recently_revealed_cards}
       companionIds={companionIds}
+      upgradedCardIds={upgradedCardIds}
+      appliedUpgradesByCardId={appliedUpgradesByCardId}
       emptyText="Nothing was revealed in battle yet."
       guideTarget="sidebar-seen-in-battle"
     />
@@ -413,13 +473,13 @@ export function PlayerDetailPanel({
               </span>
             </div>
             <div className="mt-1 text-xs text-gray-400">
-              Opponent scouting
+              Scouting
             </div>
           </div>
         </div>
       </div>
 
-      <div className="px-4 pb-3 pt-3">
+      <div className="flex justify-center px-4 pb-3 pt-3">
         <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
           <DetailTabButton
             isActive={activeTab === "seen"}
@@ -447,12 +507,18 @@ export function PlayerDetailPanel({
   return (
     <div
       ref={panelRef}
-      className="absolute top-0 z-30 h-full w-[var(--sidebar-width)] overflow-hidden rounded-lg border gold-border modal-chrome felt-raised-panel"
+      aria-hidden={!isOpen}
+      className={`absolute inset-y-0 z-0 overflow-hidden border border-r-0 gold-border modal-chrome felt-raised-panel ${
+        isOpen ? "pointer-events-auto" : "pointer-events-none"
+      }`}
       style={{
-        right: "calc(var(--sidebar-width) + 8px)",
+        right: "calc(100% - 16px)",
+        width: "var(--sidebar-width)",
         boxShadow:
-          "0 18px 42px rgba(0, 0, 0, 0.58), 0 6px 18px rgba(0, 0, 0, 0.3)",
-        transition: "transform 200ms ease-out",
+          "-16px 18px 42px rgba(0, 0, 0, 0.48), -6px 6px 18px rgba(0, 0, 0, 0.24)",
+        opacity: renderOpen ? 1 : 0,
+        transform: renderOpen ? "translateX(0)" : "translateX(calc(100% - 16px))",
+        transition: "transform 220ms ease-out, opacity 180ms ease-out",
       }}
     >
       {shell}

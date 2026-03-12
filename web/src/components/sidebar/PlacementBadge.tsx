@@ -1,22 +1,13 @@
 import type { CSSProperties } from "react";
 import type { PlayerView } from "../../types";
 import { getOrdinal } from "../../utils/format";
+import { getSidebarPlacementRank } from "../../utils/playerPlacement";
 
 interface PlacementBadgeProps {
   player: PlayerView;
   players: PlayerView[];
   className?: string;
   variant?: "inline" | "corner";
-}
-
-function getPlacementRank(player: PlayerView, players: PlayerView[]): number {
-  if (player.placement !== 0) {
-    return player.placement;
-  }
-
-  const alivePlayers = players.filter((candidate) => candidate.placement === 0 && !candidate.is_ghost);
-  const lowerPoisonCount = alivePlayers.filter((candidate) => candidate.poison < player.poison).length;
-  return 1 + lowerPoisonCount;
 }
 
 function getPlacementTextColor(rank: number, total: number): string {
@@ -61,7 +52,7 @@ export function PlacementBadge({
   className = "",
   variant = "inline",
 }: PlacementBadgeProps) {
-  const rank = getPlacementRank(player, players);
+  const rank = getSidebarPlacementRank(player, players);
   const total = players.length;
   const baseClassName = variant === "corner"
     ? "inline-flex min-w-[1.55rem] items-center justify-center rounded-br-[6px] border-b border-r px-1 py-[2px] text-[7px] font-semibold leading-none tracking-[0.03em] uppercase"

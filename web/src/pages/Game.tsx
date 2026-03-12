@@ -36,6 +36,10 @@ import { SubmitPopover } from "../components/common/SubmitPopover";
 import { ZoneDivider } from "../components/common/ZoneDivider";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
+import {
+  comparePlayersForSidebar,
+  getSidebarPlayerOrder,
+} from "../utils/playerPlacement";
 import type { Phase } from "../constants/phases";
 import type {
   GuidedWalkthroughContext,
@@ -109,18 +113,6 @@ function isTimelinePhase(phase: string | undefined): phase is Phase {
   return phase === "draft" || phase === "build" || phase === "battle" || phase === "reward";
 }
 
-function sortPlayersForSidebar(a: PlayerView, b: PlayerView): number {
-  if (a.placement === 0 && b.placement === 0) {
-    const poisonDiff = a.poison - b.poison;
-    if (poisonDiff !== 0) return poisonDiff;
-    return a.name.localeCompare(b.name);
-  }
-  if (a.placement === 0) return -1;
-  if (b.placement === 0) return 1;
-  if (a.placement !== b.placement) return a.placement - b.placement;
-  return a.name.localeCompare(b.name);
-}
-
 function selectDraftGuideOpponent(
   players: PlayerView[],
   currentPlayerName: string,
@@ -140,7 +132,7 @@ function selectDraftGuideOpponent(
     if (revealedDiff !== 0) return revealedDiff;
     const pairingDiff = (b.pairing_probability ?? -1) - (a.pairing_probability ?? -1);
     if (pairingDiff !== 0) return pairingDiff;
-    return sortPlayersForSidebar(a, b);
+    return comparePlayersForSidebar(a, b);
   })[0];
 
   return { name: best.name, revealedCount: best.most_recently_revealed_cards.length };
@@ -991,7 +983,12 @@ function GameContent() {
     actionMenuOpen ||
     activeDndPanel !== null ||
     activeBattleZoneModal !== null ||
-    shareOpen;
+    shareOpen ||
+    state.previewCard !== null;
+  const sidebarPlayers = useMemo(
+    () => (gameState ? getSidebarPlayerOrder(gameState.players) : []),
+    [gameState],
+  );
   const hotkeyMap: Record<string, () => void> = (() => {
     const currentPhaseId = gameState?.self_player.phase;
     const map: Record<string, () => void> = {
@@ -1007,6 +1004,14 @@ function GameContent() {
 
     const { self_player: sp, current_battle: cb } = gameState;
     const phase = sp.phase;
+
+    if (!sizes.isMobile && phase !== "battle") {
+      sidebarPlayers.slice(0, 8).forEach((player, index) => {
+        map[String(index + 1)] = () => {
+          setRevealedPlayerName(player.name, "seen");
+        };
+      });
+    }
 
     if (phase === 'draft') {
       map['r'] = () => {

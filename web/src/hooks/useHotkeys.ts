@@ -13,8 +13,12 @@ export function useHotkeys(hotkeys: HotkeyMap, enabled = true) {
     if (!enabled) return
 
     const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement).tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      const target = e.target as HTMLElement | null
+      const tag = target?.tagName
+      if (e.altKey || e.ctrlKey || e.metaKey) return
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
+        return
+      }
 
       const key = e.key === 'Enter' ? 'Enter' : e.key.toLowerCase()
       const action = hotkeysRef.current[key]

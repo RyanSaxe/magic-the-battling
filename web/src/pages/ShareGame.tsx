@@ -9,6 +9,8 @@ import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
 import type { ZoneConstraints } from '../hooks/computeConstrainedLayout'
 import { CardPreviewContext, CardPreviewModal } from '../components/card'
 import { PLAYER_ROW_STACK_CLASS, PlayerRow } from '../components/PlayerList'
+import { useHotkeys } from '../hooks/useHotkeys'
+import { getSidebarPlayerOrder } from '../utils/playerPlacement'
 
 interface RoundOption {
   label: string
@@ -24,6 +26,42 @@ function buildRoundOptions(rounds: SharePlayerSnapshot[]): RoundOption[] {
     })
   }
   return options
+}
+
+function buildSharePlayerViews(data: ShareGameResponse | null): PlayerView[] {
+  if (!data) return []
+
+  return data.players.map((p) => {
+    const snap = p.snapshots[p.snapshots.length - 1]
+    return {
+      name: p.name,
+      treasures: snap?.treasures ?? 0,
+      poison: p.final_poison,
+      phase: 'game_over',
+      round: snap?.round ?? 0,
+      stage: snap?.stage ?? 0,
+      vanquishers: 0,
+      is_ghost: false,
+      is_puppet: p.is_puppet,
+      time_of_death: null,
+      hand_count: snap?.hand.length ?? 0,
+      sideboard_count: snap?.sideboard.length ?? 0,
+      hand_size: snap?.hand.length ?? 0,
+      is_stage_increasing: false,
+      upgrades: snap?.upgrades?.length ? snap.upgrades : (snap?.applied_upgrades ?? []),
+      vanguard: snap?.vanguard ?? null,
+      chosen_basics: snap?.basic_lands ?? [],
+      most_recently_revealed_cards: [],
+      last_result: null,
+      pairing_probability: null,
+      is_most_recent_ghost: false,
+      full_sideboard: [],
+      command_zone: snap?.command_zone ?? [],
+      placement: p.final_placement ?? 0,
+      in_sudden_death: false,
+      build_ready: false,
+    }
+  })
 }
 
 function RoundPopover({
@@ -122,6 +160,19 @@ export function ShareGame() {
       .finally(() => setLoading(false))
   }, [gameId, playerName])
 
+  const playerViews = buildSharePlayerViews(data)
+  const sortedPlayerViews = getSidebarPlayerOrder(playerViews)
+  const shareHotkeys: Record<string, () => void> = {}
+  if (!sizes.isMobile && !previewCard && !roundPopoverOpen) {
+    sortedPlayerViews.slice(0, 8).forEach((player, index) => {
+      shareHotkeys[String(index + 1)] = () => {
+        setSelectedPlayer(player.name)
+      }
+    })
+  }
+
+  useHotkeys(shareHotkeys, true)
+
   const handleCloseRoundPopover = useCallback(() => setRoundPopoverOpen(false), [])
 
   if (loading) {
@@ -187,48 +238,6 @@ export function ShareGame() {
         },
       }
     : undefined
-
-  const playerViews: PlayerView[] = data.players.map((p) => {
-    const snap = p.snapshots[p.snapshots.length - 1]
-    return {
-      name: p.name,
-      treasures: snap?.treasures ?? 0,
-      poison: p.final_poison,
-      phase: 'game_over',
-      round: snap?.round ?? 0,
-      stage: snap?.stage ?? 0,
-      vanquishers: 0,
-      is_ghost: false,
-      is_puppet: p.is_puppet,
-      time_of_death: null,
-      hand_count: snap?.hand.length ?? 0,
-      sideboard_count: snap?.sideboard.length ?? 0,
-      hand_size: snap?.hand.length ?? 0,
-      is_stage_increasing: false,
-      upgrades: snap?.upgrades?.length ? snap.upgrades : (snap?.applied_upgrades ?? []),
-      vanguard: snap?.vanguard ?? null,
-      chosen_basics: snap?.basic_lands ?? [],
-      most_recently_revealed_cards: [],
-      last_result: null,
-      pairing_probability: null,
-      is_most_recent_ghost: false,
-      full_sideboard: [],
-      command_zone: snap?.command_zone ?? [],
-      placement: p.final_placement ?? 0,
-      in_sudden_death: false,
-      build_ready: false,
-    }
-  })
-
-  const sortedPlayerViews = [...playerViews].sort((a, b) => {
-    if (a.placement !== 0 && b.placement !== 0) {
-      if (a.placement !== b.placement) return a.placement - b.placement
-      return a.name.localeCompare(b.name)
-    }
-    if (a.placement !== 0) return -1
-    if (b.placement !== 0) return 1
-    return a.name.localeCompare(b.name)
-  })
 
   const renderContent = () => {
     if (isFinal) {

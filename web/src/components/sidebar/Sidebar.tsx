@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { PlayerView } from "../../types";
 import { PlayerList } from "../PlayerList";
 import { PlayerDetailPanel } from "./PlayerDetailPanel";
@@ -22,6 +22,47 @@ export function Sidebar({
   const { state, setRevealedPlayerName } = useContextStrip();
   const revealedPlayer = state.revealedPlayerName
     ? players.find((p) => p.name === state.revealedPlayerName)
+    : null;
+  const shouldRenderDesktopDrawer = !isMobile && !phaseContent;
+  const [desktopDrawer, setDesktopDrawer] = useState<{
+    playerName: string | null;
+    isOpen: boolean;
+  }>({
+    playerName: null,
+    isOpen: false,
+  });
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (!shouldRenderDesktopDrawer) {
+        setDesktopDrawer((prev) => (
+          prev.isOpen
+            ? { ...prev, isOpen: false }
+            : prev
+        ));
+        return;
+      }
+
+      if (!revealedPlayer) {
+        setDesktopDrawer((prev) => (
+          prev.isOpen
+            ? { ...prev, isOpen: false }
+            : prev
+        ));
+        return;
+      }
+
+      setDesktopDrawer({
+        playerName: revealedPlayer.name,
+        isOpen: true,
+      });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [revealedPlayer, shouldRenderDesktopDrawer]);
+
+  const desktopDrawerPlayer = desktopDrawer.playerName
+    ? players.find((player) => player.name === desktopDrawer.playerName) ?? null
     : null;
 
   return (
@@ -47,23 +88,24 @@ export function Sidebar({
           onClose={() => setRevealedPlayerName(null)}
         />
       ) : (
-        <div className="px-3 py-3 sm:py-0 overflow-auto flex-1 flex flex-col">
+        <div className="relative z-10 px-3 py-3 sm:py-0 overflow-auto flex-1 flex flex-col">
           <PlayerList
             players={players}
             currentPlayerName={currentPlayer.name}
           />
         </div>
       )}
-      {!isMobile && !phaseContent && revealedPlayer && (
+      {shouldRenderDesktopDrawer && desktopDrawerPlayer && (
         <PlayerDetailPanel
-          player={revealedPlayer}
+          player={desktopDrawerPlayer}
           currentPlayer={currentPlayer}
           players={players}
           useUpgrades={useUpgrades}
           isMobile={false}
           activeTab={state.revealedPlayerTab}
-          onTabChange={(tab) => setRevealedPlayerName(revealedPlayer.name, tab)}
+          onTabChange={(tab) => setRevealedPlayerName(desktopDrawerPlayer.name, tab)}
           onClose={() => setRevealedPlayerName(null)}
+          isOpen={desktopDrawer.isOpen}
         />
       )}
     </aside>

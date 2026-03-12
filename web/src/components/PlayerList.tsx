@@ -9,6 +9,7 @@ import {
 } from "./icons";
 import { useContextStrip } from "../contexts";
 import { PlacementBadge } from "./sidebar/PlacementBadge";
+import { getSidebarPlayerOrder } from "../utils/playerPlacement";
 
 interface PlayerListProps {
   players: PlayerView[];
@@ -121,7 +122,7 @@ export function PlayerRow({
   return (
     <button
       type="button"
-      className={`relative grid w-full appearance-none overflow-hidden border-none bg-transparent grid-cols-[minmax(0,1fr)_max-content] grid-rows-2 items-center gap-x-3 gap-y-1 rounded-lg px-3 py-3 text-left transition-colors player-row-etched sm:py-0 ${
+      className={`relative grid w-full appearance-none overflow-hidden border-none bg-transparent grid-cols-[minmax(0,1fr)_max-content] grid-rows-2 items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2.5 text-left transition-colors player-row-etched ${
         isSelected ? "ring-1 ring-[var(--color-gold)]/60" : ""
       } ${player.is_ghost ? "opacity-50" : ""}`}
       data-guide-player-row={player.name}
@@ -195,19 +196,7 @@ export function PlayerList({
     }
   };
 
-  const byPlacement = (a: PlayerView, b: PlayerView) => {
-    if (a.placement === 0 && b.placement === 0) {
-      const poisonDiff = a.poison - b.poison;
-      if (poisonDiff !== 0) return poisonDiff;
-      return a.name.localeCompare(b.name);
-    }
-    if (a.placement === 0) return -1;
-    if (b.placement === 0) return 1;
-    if (a.placement !== b.placement) return a.placement - b.placement;
-    return a.name.localeCompare(b.name);
-  };
-
-  const sortedPlayers = [...players].sort(byPlacement);
+  const sortedPlayers = getSidebarPlayerOrder(players);
 
   return (
     <div className="relative">
