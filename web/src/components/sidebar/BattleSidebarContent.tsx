@@ -207,12 +207,16 @@ export function BattleSidebarContent({
       >
         <div
           className="relative grid h-full min-h-0 w-full grid-rows-[1fr_auto_1fr] overflow-hidden"
-          style={{
-            background: 'var(--chrome-modal)',
-            boxShadow:
-              'inset 0 10px 18px -14px rgba(255, 236, 181, 0.18), inset 0 0 24px rgba(0, 0, 0, 0.22)',
-          }}
+          style={{ background: 'var(--chrome-modal)' }}
         >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-[2px]"
+            style={{
+              boxShadow:
+                'inset 0 10px 18px -14px rgba(255, 236, 181, 0.18), inset 0 0 24px rgba(0, 0, 0, 0.22)',
+            }}
+          />
           {middleLaneHeight != null && (
             <>
               <div
@@ -225,7 +229,7 @@ export function BattleSidebarContent({
               />
             </>
           )}
-            <div className="flex min-h-0 flex-col justify-between gap-3 p-3 pb-2">
+            <div className="relative z-10 flex min-h-0 flex-col justify-between gap-3 p-3 pb-2">
               {canManipulateOpponent && (onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn) && (
                 <div className="flex gap-2">
                   {onCreateOpponentTreasure && (
@@ -273,7 +277,7 @@ export function BattleSidebarContent({
               </div>
             </div>
 
-            <div className="flex items-center justify-center px-3 py-1 text-center text-xs">
+            <div className="relative z-10 flex items-center justify-center px-3 py-1 text-center text-xs">
               {current_turn_name && (
                 isYourTurn ? (
                   <span className="text-green-400">It is your turn</span>
@@ -283,7 +287,7 @@ export function BattleSidebarContent({
               )}
             </div>
 
-            <div className="flex min-h-0 flex-col justify-between gap-3 p-3 pt-2">
+            <div className="relative z-10 flex min-h-0 flex-col justify-between gap-3 p-3 pt-2">
               <div className="text-center">
                 <div className="flex justify-center">
                   <LifeCounter life={yourLife} onChange={onYourLifeChange} />

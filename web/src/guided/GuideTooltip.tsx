@@ -71,7 +71,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
             {step.content.summary}
           </p>
           {step.content.detail && (
-            <p className="mt-2 text-[0.84rem] leading-relaxed text-gray-300">
+            <p className="mt-2 text-[0.84rem] leading-relaxed text-amber-100/70">
               {step.content.detail}
             </p>
           )}

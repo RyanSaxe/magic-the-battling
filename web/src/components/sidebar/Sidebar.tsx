@@ -79,7 +79,7 @@ export function Sidebar({
         />
       )}
       {phaseContent ? (
-        <div className="overflow-y-auto overflow-x-hidden flex-1">
+        <div className="overflow-y-auto overflow-x-hidden flex-1 py-[2px]">
           {phaseContent}
         </div>
       ) : isMobile && revealedPlayer ? (
