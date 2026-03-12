@@ -153,33 +153,6 @@ function scrollTargetIntoVisibleArea(target: HTMLElement, root: HTMLElement): vo
   });
 }
 
-function parseCssTimeMs(value: string): number {
-  const trimmed = value.trim();
-  if (trimmed.endsWith("ms")) {
-    return Number.parseFloat(trimmed);
-  }
-  if (trimmed.endsWith("s")) {
-    return Number.parseFloat(trimmed) * 1000;
-  }
-  return 0;
-}
-
-function getMaxTransitionTimeMs(element: HTMLElement): number {
-  const style = window.getComputedStyle(element);
-  const durations = style.transitionDuration.split(",");
-  const delays = style.transitionDelay.split(",");
-  const count = Math.max(durations.length, delays.length);
-  let maxTime = 0;
-
-  for (let index = 0; index < count; index += 1) {
-    const duration = parseCssTimeMs(durations[index % durations.length] ?? "0s");
-    const delay = parseCssTimeMs(delays[index % delays.length] ?? "0s");
-    maxTime = Math.max(maxTime, duration + delay);
-  }
-
-  return maxTime;
-}
-
 function placementOrder(preferred: GuidePlacement): GuidePlacement[] {
   switch (preferred) {
     case "top": return ["top", "bottom", "right", "left"];
@@ -424,18 +397,13 @@ export function useGuidePositioning(
   cardRef: RefObject<HTMLElement | null>,
   targetId: GuideTargetId | undefined,
   targetSelector: string | undefined,
-  waitForLayoutTargetId: GuideTargetId | undefined,
-  waitForLayoutTargetSelector: string | undefined,
   positionTargetId: GuideTargetId | undefined,
   positionTargetSelector: string | undefined,
   placement: GuidePlacement,
   spotlightPadding: number | undefined,
   stepKey: string,
 ): PositionState | null {
-  const [state, setState] = useState<{
-    stepKey: string;
-    position: PositionState | null;
-  } | null>(null);
+  const [state, setState] = useState<PositionState | null>(null);
 
   useLayoutEffect(() => {
     const root = rootRef.current;
@@ -450,14 +418,6 @@ export function useGuidePositioning(
       const cw = r.clientWidth;
       const ch = r.clientHeight;
       const target = resolveTarget(r, targetId, targetSelector);
-      if ((targetId || targetSelector) && !target) {
-        setState((current) => (
-          current?.stepKey === stepKey
-            ? { stepKey, position: null }
-            : current
-        ));
-        return;
-      }
       const posTarget = resolveTarget(r, positionTargetId, positionTargetSelector);
       const padding = spotlightPadding ?? SPOTLIGHT_PADDING;
       const rawSpotlight = target ? toRelativeRect(r, target, padding) : null;
@@ -477,17 +437,14 @@ export function useGuidePositioning(
       );
 
       setState({
-        stepKey,
-        position: {
-          spotlight,
-          cardLeft: pos.left,
-          cardTop: pos.top,
-          resolvedPlacement: pos.resolved,
-          isMobile,
-          containerWidth: cw,
-          containerHeight: ch,
-          clipPath: buildClipPath(spotlight, cw, ch),
-        },
+        spotlight,
+        cardLeft: pos.left,
+        cardTop: pos.top,
+        resolvedPlacement: pos.resolved,
+        isMobile,
+        containerWidth: cw,
+        containerHeight: ch,
+        clipPath: buildClipPath(spotlight, cw, ch),
       });
     };
 
@@ -496,37 +453,7 @@ export function useGuidePositioning(
       scrollTargetIntoVisibleArea(target, root);
     }
 
-    let waitCleanup: (() => void) | null = null;
-    const waitTarget = resolveTarget(root, waitForLayoutTargetId, waitForLayoutTargetSelector);
-    const waitTimeMs = waitTarget ? getMaxTransitionTimeMs(waitTarget) : 0;
-
-    if (waitTarget && waitTimeMs > 0) {
-      let finished = false;
-      const finishWaiting = () => {
-        if (finished) return;
-        finished = true;
-        update();
-      };
-      const handleWaitTransitionEnd = (event: TransitionEvent) => {
-        if (event.target === waitTarget) {
-          finishWaiting();
-        }
-      };
-      const handleWaitTransitionCancel = () => {
-        finishWaiting();
-      };
-      const waitTimeout = window.setTimeout(finishWaiting, waitTimeMs + 80);
-
-      waitTarget.addEventListener("transitionend", handleWaitTransitionEnd);
-      waitTarget.addEventListener("transitioncancel", handleWaitTransitionCancel);
-      waitCleanup = () => {
-        window.clearTimeout(waitTimeout);
-        waitTarget.removeEventListener("transitionend", handleWaitTransitionEnd);
-        waitTarget.removeEventListener("transitioncancel", handleWaitTransitionCancel);
-      };
-    } else {
-      update();
-    }
+    update();
 
     let delayedUpdate: ReturnType<typeof setTimeout> | null = null;
     const handleTransitionEnd = () => {
@@ -541,7 +468,6 @@ export function useGuidePositioning(
     window.addEventListener("scroll", update, true);
 
     return () => {
-      waitCleanup?.();
       if (delayedUpdate) clearTimeout(delayedUpdate);
       root.removeEventListener("transitionend", handleTransitionEnd);
       ro.disconnect();
@@ -553,8 +479,6 @@ export function useGuidePositioning(
     cardRef,
     targetId,
     targetSelector,
-    waitForLayoutTargetId,
-    waitForLayoutTargetSelector,
     positionTargetId,
     positionTargetSelector,
     placement,
@@ -562,5 +486,5 @@ export function useGuidePositioning(
     stepKey,
   ]);
 
-  return state?.stepKey === stepKey ? state.position : null;
+  return state;
 }

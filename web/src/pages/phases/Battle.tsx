@@ -42,9 +42,7 @@ interface BattlePhaseProps {
   onZoneModalToggle: (zone: BattleZoneModalState["zone"], owner: ZoneOwner) => void
   onLayoutMetricsChange?: (metrics: {
     handHeight: number
-    topSpacerHeight: number
-    lifePanelHeight: number
-    bottomSpacerHeight: number
+    middleLaneHeight: number
   }) => void
 }
 
@@ -206,17 +204,12 @@ export function BattlePhase({
   useLayoutEffect(() => {
     onLayoutMetricsChange?.({
       handHeight,
-      topSpacerHeight: opponentMidZoneHeight,
-      lifePanelHeight: opponentBottomZoneHeight + MID_DIVIDER_HEIGHT + playerTopZoneHeight,
-      bottomSpacerHeight: playerMidZoneHeight,
+      middleLaneHeight: (2 * bfHeight) + MID_DIVIDER_HEIGHT,
     })
   }, [
+    bfHeight,
     handHeight,
     onLayoutMetricsChange,
-    opponentMidZoneHeight,
-    opponentBottomZoneHeight,
-    playerTopZoneHeight,
-    playerMidZoneHeight,
     MID_DIVIDER_HEIGHT,
   ])
 

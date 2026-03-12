@@ -67,9 +67,7 @@ type ActiveDndPanel = "sideboard" | "opponentSideboard" | "graveyard" | "exile" 
 type BattleZoneModal = BattleZoneModalState | null;
 type BattleSidebarLayout = {
   handHeight: number;
-  topSpacerHeight: number;
-  lifePanelHeight: number;
-  bottomSpacerHeight: number;
+  middleLaneHeight: number;
 } | null;
 type OverlayKey =
   | "rules"
@@ -107,6 +105,7 @@ function scheduledEasternFromNotice(message: string): string | null {
     timeZoneName: "short",
   }).format(asDate);
 }
+
 
 function drainingMessageWithEasternTime(message: string, easternTime: string | null): string {
   if (!message) return "";
@@ -1582,9 +1581,7 @@ function GameContent() {
           onUntapOpponentAll={handleUntapOpponentAll}
           onPassOpponentTurn={handlePassTurn}
           handZoneHeight={battleSidebarLayout?.handHeight ?? null}
-          topSpacerHeight={battleSidebarLayout?.topSpacerHeight ?? null}
-          lifePanelHeight={battleSidebarLayout?.lifePanelHeight ?? null}
-          bottomSpacerHeight={battleSidebarLayout?.bottomSpacerHeight ?? null}
+          middleLaneHeight={battleSidebarLayout?.middleLaneHeight ?? null}
         />
       );
     }

@@ -18,9 +18,7 @@ interface BattleSidebarContentProps {
   onUntapOpponentAll?: () => void;
   onPassOpponentTurn?: () => void;
   handZoneHeight?: number | null;
-  topSpacerHeight?: number | null;
-  lifePanelHeight?: number | null;
-  bottomSpacerHeight?: number | null;
+  middleLaneHeight?: number | null;
 }
 
 function LifeCounter({
@@ -173,38 +171,20 @@ export function BattleSidebarContent({
   onUntapOpponentAll,
   onPassOpponentTurn,
   handZoneHeight = null,
-  topSpacerHeight = null,
-  lifePanelHeight = null,
-  bottomSpacerHeight = null,
+  middleLaneHeight = null,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
 
   const isYourTurn = current_turn_name === playerName;
-  const hasPreciseCenterLayout =
-    topSpacerHeight != null &&
-    lifePanelHeight != null &&
-    bottomSpacerHeight != null;
-  const precisePanelOffset = hasPreciseCenterLayout
-    ? Math.min(8, Math.max(0, bottomSpacerHeight - 1))
-    : 0;
-  const preciseCenterLayout = hasPreciseCenterLayout
-    ? {
-        topSpacerHeight: Math.max(0, topSpacerHeight - 1) + precisePanelOffset,
-        lifePanelHeight: lifePanelHeight + 2,
-        bottomSpacerHeight: Math.max(
-          0,
-          Math.max(0, bottomSpacerHeight - 1) - precisePanelOffset,
-        ),
-      }
-    : null;
+  const hasMeasuredMiddleLane = middleLaneHeight != null;
 
   return (
     <div className="flex flex-col h-full">
       {/* Opponent section - top */}
       <div
         className={`${handZoneHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden pb-3 pl-3 pr-3 ${
-          hasPreciseCenterLayout
+          hasMeasuredMiddleLane
             ? ""
             : "border-b border-[var(--gold-border-opaque)]"
         }`}
@@ -218,48 +198,33 @@ export function BattleSidebarContent({
 
       {/* Controls panel */}
       <div
-        className={`${hasPreciseCenterLayout ? "box-border shrink-0" : "flex-1"} min-h-0`}
+        className={`${middleLaneHeight != null ? "box-border shrink-0" : "flex-1"} min-h-0`}
         style={
-          preciseCenterLayout
-            ? {
-                height:
-                  preciseCenterLayout.topSpacerHeight +
-                  preciseCenterLayout.lifePanelHeight +
-                  preciseCenterLayout.bottomSpacerHeight,
-              }
+          middleLaneHeight != null
+            ? { height: middleLaneHeight }
             : undefined
         }
       >
         <div
-          className={`grid min-h-0 w-full ${hasPreciseCenterLayout ? "h-full" : "grid-rows-[1fr]"}`}
+          className="relative grid h-full min-h-0 w-full grid-rows-[1fr_auto_1fr] overflow-hidden"
           style={{
-            ...(preciseCenterLayout
-              ? {
-                  gridTemplateRows: `${preciseCenterLayout.topSpacerHeight}px ${preciseCenterLayout.lifePanelHeight}px ${preciseCenterLayout.bottomSpacerHeight}px`,
-                }
-              : {}),
+            background: 'var(--chrome-modal)',
+            boxShadow:
+              'inset 0 10px 18px -14px rgba(255, 236, 181, 0.18), inset 0 0 24px rgba(0, 0, 0, 0.22)',
           }}
         >
-          {hasPreciseCenterLayout && <div aria-hidden="true" />}
-
-          <div
-            className={`relative grid min-h-0 w-full grid-rows-[1fr_auto_1fr] ${
-              hasPreciseCenterLayout ? "overflow-hidden" : ""
-            }`}
-            style={{ background: 'var(--chrome-modal)' }}
-          >
-            {hasPreciseCenterLayout && (
-              <>
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
-                />
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
-                />
-              </>
-            )}
+          {middleLaneHeight != null && (
+            <>
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
+              />
+            </>
+          )}
             <div className="flex min-h-0 flex-col justify-between gap-3 p-3 pb-2">
               {canManipulateOpponent && (onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn) && (
                 <div className="flex gap-2">
@@ -362,16 +327,13 @@ export function BattleSidebarContent({
                 </div>
               )}
             </div>
-          </div>
-
-          {hasPreciseCenterLayout && <div aria-hidden="true" />}
         </div>
       </div>
 
       {/* Your section - bottom */}
       <div
         className={`${handZoneHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden p-3 ${
-          hasPreciseCenterLayout
+          hasMeasuredMiddleLane
             ? ""
             : "border-t border-[var(--gold-border-opaque)]"
         }`}
