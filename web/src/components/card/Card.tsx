@@ -128,6 +128,7 @@ export function Card({
   return (
     <div
       className={baseClasses}
+      data-guide-card-id={card.id}
       style={{
         ...externalStyle,
         width: dims.width,

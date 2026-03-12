@@ -1,4 +1,121 @@
-import type { ShareGameResponse, SelfPlayerView, PlayerView } from '../types'
+import type {
+  ShareGameResponse,
+  SelfPlayerView,
+  PlayerView,
+  SharePlayerData,
+  SharePlayerSnapshot,
+} from '../types'
+
+export type SharePlayerRowBadge = 'viewing' | 'alive' | 'dead'
+
+interface ShareRoundPosition {
+  stage: number
+  round: number
+}
+
+function compareShareRounds(
+  a: ShareRoundPosition,
+  b: ShareRoundPosition,
+): number {
+  if (a.stage !== b.stage) return a.stage - b.stage
+  return a.round - b.round
+}
+
+export function parseShareRoundValue(selectedRound: string): ShareRoundPosition | null {
+  const [stagePart, roundPart] = selectedRound.split('_')
+  const stage = Number(stagePart)
+  const round = Number(roundPart)
+  if (!Number.isInteger(stage) || !Number.isInteger(round)) return null
+
+  return { stage, round }
+}
+
+function getLatestShareSnapshot(player: SharePlayerData): SharePlayerSnapshot | null {
+  return player.snapshots[player.snapshots.length - 1] ?? null
+}
+
+function hasExactShareSnapshotForRound(
+  player: SharePlayerData,
+  selectedRound: string,
+): boolean {
+  const round = parseShareRoundValue(selectedRound)
+  if (!round) return false
+
+  return player.snapshots.some((snapshot) =>
+    snapshot.stage === round.stage && snapshot.round === round.round,
+  )
+}
+
+export function getSharePlayerSnapshotForRound(
+  player: SharePlayerData,
+  selectedRound: string,
+): SharePlayerSnapshot | null {
+  const round = parseShareRoundValue(selectedRound)
+  if (!round) return getLatestShareSnapshot(player)
+
+  let bestSnapshot: SharePlayerSnapshot | null = null
+  for (const snapshot of player.snapshots) {
+    if (compareShareRounds(snapshot, round) > 0) continue
+    if (!bestSnapshot || compareShareRounds(snapshot, bestSnapshot) > 0) {
+      bestSnapshot = snapshot
+    }
+  }
+
+  return bestSnapshot
+}
+
+export function getSharePlayerRowBadge(
+  player: SharePlayerData,
+  selectedPlayer: string,
+  selectedRound: string,
+): SharePlayerRowBadge {
+  if (player.name === selectedPlayer) return 'viewing'
+  return hasExactShareSnapshotForRound(player, selectedRound) ? 'alive' : 'dead'
+}
+
+export function buildSharePlayerViews(
+  data: ShareGameResponse | null,
+  selectedRound: string,
+): PlayerView[] {
+  if (!data) return []
+
+  return data.players.map((player) => {
+    const snapshot = getSharePlayerSnapshotForRound(player, selectedRound)
+    const latestSnapshot = getLatestShareSnapshot(player)
+    const displaySnapshot = snapshot ?? latestSnapshot
+
+    return {
+      name: player.name,
+      treasures: displaySnapshot?.treasures ?? 0,
+      poison: displaySnapshot?.poison ?? player.final_poison,
+      phase: 'game_over',
+      round: displaySnapshot?.round ?? 0,
+      stage: displaySnapshot?.stage ?? 0,
+      vanquishers: 0,
+      is_ghost: false,
+      is_puppet: player.is_puppet,
+      time_of_death: null,
+      hand_count: displaySnapshot?.hand.length ?? 0,
+      sideboard_count: displaySnapshot?.sideboard.length ?? 0,
+      hand_size: displaySnapshot?.hand.length ?? 0,
+      is_stage_increasing: false,
+      upgrades: displaySnapshot?.upgrades?.length
+        ? displaySnapshot.upgrades
+        : (displaySnapshot?.applied_upgrades ?? []),
+      vanguard: displaySnapshot?.vanguard ?? null,
+      chosen_basics: displaySnapshot?.basic_lands ?? [],
+      most_recently_revealed_cards: [],
+      last_result: null,
+      pairing_probability: null,
+      is_most_recent_ghost: false,
+      full_sideboard: [],
+      command_zone: displaySnapshot?.command_zone ?? [],
+      placement: player.final_placement ?? 0,
+      in_sudden_death: false,
+      build_ready: false,
+    }
+  })
+}
 
 export function buildGameSummaryData(
   data: ShareGameResponse,

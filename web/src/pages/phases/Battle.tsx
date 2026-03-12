@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react'
 import type { GameState, Card as CardType, ZoneName, CardStateAction } from '../../types'
 import { DraggableCard, DroppableZone, type ZoneOwner } from '../../dnd'
 import { HandZone, BattlefieldZone } from '../../components/zones'
@@ -40,6 +40,10 @@ interface BattlePhaseProps {
   onCardHoverEnd?: () => void
   activeZoneModal: BattleZoneModalState | null
   onZoneModalToggle: (zone: BattleZoneModalState["zone"], owner: ZoneOwner) => void
+  onLayoutMetricsChange?: (metrics: {
+    handHeight: number
+    middleLaneHeight: number
+  }) => void
 }
 
 const isLandOrTreasure = (card: CardType) =>
@@ -74,6 +78,7 @@ export function BattlePhase({
   onCardHoverEnd,
   activeZoneModal,
   onZoneModalToggle,
+  onLayoutMetricsChange,
 }: BattlePhaseProps) {
   const setSelectedCard = onSelectedCardChange
 
@@ -188,6 +193,26 @@ export function BattlePhase({
     zoneColumnWidth,
   })
 
+  const { rowHeight } = sizes
+  const handHeight = rowHeight + HAND_PADDING
+  const bfHeight = 2 * rowHeight + BF_PADDING
+  const opponentMidZoneHeight = Math.floor(bfHeight / 2)
+  const opponentBottomZoneHeight = bfHeight - opponentMidZoneHeight
+  const playerTopZoneHeight = Math.floor(bfHeight / 2)
+  const playerMidZoneHeight = bfHeight - playerTopZoneHeight
+
+  useLayoutEffect(() => {
+    onLayoutMetricsChange?.({
+      handHeight,
+      middleLaneHeight: (2 * bfHeight) + MID_DIVIDER_HEIGHT,
+    })
+  }, [
+    bfHeight,
+    handHeight,
+    onLayoutMetricsChange,
+    MID_DIVIDER_HEIGHT,
+  ])
+
   if (!battle) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -297,18 +322,16 @@ export function BattlePhase({
     return Object.values(opAttachments).some(children => children.includes(cardId))
   }
 
-  const { rowHeight } = sizes
-  const handHeight = rowHeight + HAND_PADDING
-  const bfHeight = 2 * rowHeight + BF_PADDING
   const opponentTopZoneHeight = handHeight
-  const opponentMidZoneHeight = Math.floor(bfHeight / 2)
-  const opponentBottomZoneHeight = bfHeight - opponentMidZoneHeight
-  const playerTopZoneHeight = Math.floor(bfHeight / 2)
-  const playerMidZoneHeight = bfHeight - playerTopZoneHeight
   const playerBottomZoneHeight = handHeight
 
   return (
-    <div ref={containerRef} className="battle-layout flex flex-col h-full min-h-0 overflow-hidden" onClick={handleBackgroundClick}>
+    <div
+      ref={containerRef}
+      className="battle-layout flex flex-col h-full min-h-0 overflow-hidden"
+      onClick={handleBackgroundClick}
+      data-guide-target="battle-board"
+    >
         {/* Sudden Death Banner */}
         {battle.is_sudden_death && (
           <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center shrink-0">
@@ -331,7 +354,12 @@ export function BattlePhase({
         <div className="flex shrink-0 overflow-hidden" style={{ height: handHeight + bfHeight }}>
           <div className="flex flex-col flex-1 min-w-0">
             {/* Opponent's hand */}
-            <div id="opponent-hand" className="shrink-0 zone-hand overflow-hidden" style={{ height: handHeight }}>
+            <div
+              id="opponent-hand"
+              className="shrink-0 zone-hand overflow-hidden"
+              style={{ height: handHeight }}
+              data-guide-target="battle-opponent-hand"
+            >
               {canManipulateOpponent ? (
                 <DroppableZone
                   zone="hand"
@@ -469,7 +497,10 @@ export function BattlePhase({
         <div className="flex shrink-0 overflow-hidden" style={{ height: handHeight + bfHeight }}>
           <div className="flex flex-col flex-1 min-w-0">
             {/* Your battlefield */}
-            <div className="relative flex-1 min-w-0 battlefield overflow-hidden">
+            <div
+              className="relative flex-1 min-w-0 battlefield overflow-hidden"
+              data-guide-target="battle-battlefield"
+            >
               <BattlefieldZone
                 cards={your_zones.battlefield}
                 selectedCardId={selectedCard?.card.id}
@@ -493,7 +524,11 @@ export function BattlePhase({
               />
             </div>
             {/* Your hand */}
-            <div className="shrink-0 zone-hand overflow-hidden battle-hand-separator-top" style={{ height: handHeight }}>
+            <div
+              className="shrink-0 zone-hand overflow-hidden battle-hand-separator-top"
+              style={{ height: handHeight }}
+              data-guide-target="battle-hand"
+            >
               <HandZone
                 cards={your_zones.hand}
                 selectedCardId={selectedCard?.card.id}

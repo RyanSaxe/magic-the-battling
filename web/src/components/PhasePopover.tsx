@@ -1,6 +1,6 @@
 import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
+import { getPhaseReferenceLabel, getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
 import type { Phase } from '../constants/phases'
 
 const PHASE_TITLE_COLOR: Record<Phase, string> = {
@@ -89,7 +89,7 @@ export function PhasePopover({
         position: 'fixed',
         visibility: 'hidden',
       }}
-      className={`modal-chrome border gold-border rounded-lg shadow-xl z-[60] felt-raised-panel min-w-[16rem] w-max max-w-[calc(100vw-1rem)] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      className={`modal-chrome border gold-border rounded-lg shadow-xl z-[84] felt-raised-panel min-w-[16rem] w-max max-w-[calc(100vw-1rem)] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
     >
       <div
         ref={arrowRef}
@@ -97,19 +97,19 @@ export function PhasePopover({
       />
 
       <div className="modal-chrome border-b gold-border rounded-t-lg px-3 py-2 flex items-center justify-between gap-2">
-        <span className={`text-sm font-semibold capitalize ${PHASE_TITLE_COLOR[phase]}`}>
-          {phase} Phase
+        <span className={`text-sm font-semibold ${PHASE_TITLE_COLOR[phase]}`}>
+          {getPhaseReferenceLabel(phase)}
         </span>
         <div className="flex items-center gap-1.5">
           <button
             onClick={onOpenDetails}
-            className="btn-secondary text-xs py-1 px-2.5 rounded"
+            className="btn btn-secondary text-xs py-1 px-2.5"
           >
             Details
           </button>
           <button
             onClick={onOpenControls}
-            className="btn-secondary text-xs py-1 px-2.5 rounded"
+            className="btn btn-secondary text-xs py-1 px-2.5"
           >
             Controls
           </button>

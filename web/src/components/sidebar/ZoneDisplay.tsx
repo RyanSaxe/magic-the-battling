@@ -19,7 +19,7 @@ const DEFAULT_MODAL_DIMS: ZoneDims = {
   columns: 1,
 };
 
-function ZoneModal({
+export function ZoneModal({
   title,
   cards,
   showUpgradeTargets,

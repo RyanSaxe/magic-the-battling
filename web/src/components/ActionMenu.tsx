@@ -97,9 +97,9 @@ export function ActionMenu({
 
   return (
     <>
-      <div className="fixed inset-0 z-50" onClick={onClose} />
+      <div className="fixed inset-0 z-[86]" onClick={onClose} />
       <div
-        className="fixed bottom-16 left-4 modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-50"
+        className="fixed bottom-16 left-4 modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-[87]"
         style={{ maxWidth: 280 }}
       >
         {card && (
@@ -150,6 +150,7 @@ export function ActionMenu({
                 <MenuItem
                   label="Add Counter"
                   hasSubmenu
+                  guideTarget="battle-action-add-counter"
                   onClick={() => setSubmenu(submenu === 'addCounter' ? 'none' : 'addCounter')}
                 />
                 {submenu === 'addCounter' && (
@@ -317,11 +318,13 @@ function MenuItem({
   onClick,
   hasSubmenu,
   disabled,
+  guideTarget,
 }: {
   label: string
   onClick: () => void
   hasSubmenu?: boolean
   disabled?: boolean
+  guideTarget?: string
 }) {
   return (
     <button
@@ -329,6 +332,7 @@ function MenuItem({
         w-full px-3 py-1.5 text-left text-sm flex items-center justify-between
         ${disabled ? 'text-gray-500 cursor-not-allowed' : 'text-white hover:bg-gray-700'}
       `}
+      data-guide-target={guideTarget}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
     >

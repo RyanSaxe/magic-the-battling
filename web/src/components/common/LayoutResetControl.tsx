@@ -21,7 +21,7 @@ function positionClasses(position: "top-right" | "bottom-right") {
   }
 
   return {
-    wrapper: "absolute right-2 top-2 z-40 pointer-events-auto",
+    wrapper: "absolute right-2 top-2 z-40 pointer-events-auto sm:right-0 sm:top-0 sm:-translate-y-[calc(100%+0.5rem)]",
     popover: "absolute right-0 top-full mt-2",
   };
 }

@@ -6,7 +6,7 @@ order: 6
 ## Global
 
 - Track your economy. If a line wins a battle but burns multiple [treasures](doc:game-pieces#treasures), it might be better to lose.
-- Keep your next stage in mind. A card that is mediocre now can be excellent when your hand size [increases](doc:reward).
+- Keep your next stage in mind. A card that is mediocre now can be excellent when your hand size grows during [round wrap-up](doc:reward).
 - Look at your opponents' details in the [sidebar](doc:controls): [poison](doc:game-pieces#poison) totals, [treasure](doc:game-pieces#treasures) totals, known [upgrades](doc:game-pieces#upgrades), and recent cards cast.
 
 ## Draft

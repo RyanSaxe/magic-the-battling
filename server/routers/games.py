@@ -613,6 +613,11 @@ def _build_human_snapshots(history: PlayerGameHistory) -> list[SharePlayerSnapsh
     return snapshots
 
 
+def _parse_snapshot_key(key: str) -> tuple[int, int]:
+    stage_str, round_str = key.split("_", 1)
+    return int(stage_str), int(round_str)
+
+
 def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[SharePlayerSnapshot]:
     source = (
         db.query(PlayerGameHistory)
@@ -627,16 +632,30 @@ def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[Sha
     poison_map: dict[str, int] = json.loads(raw) if raw else {}
 
     sorted_snaps = sorted(source.snapshots, key=lambda s: (s.stage, s.round))
+    if not sorted_snaps:
+        return []
+
+    sorted_poison_keys = sorted(poison_map.keys(), key=_parse_snapshot_key)
     snapshots: list[SharePlayerSnapshot] = []
-    for snap in sorted_snaps:
-        key = f"{snap.stage}_{snap.round}"
-        if key not in poison_map:
-            continue
-        snapshot_data = BattleSnapshotData.model_validate_json(snap.full_state_json)
+    source_index = 0
+    best_source_snapshot = None
+    for key in sorted_poison_keys:
+        target_stage, target_round = _parse_snapshot_key(key)
+
+        while source_index < len(sorted_snaps):
+            candidate = sorted_snaps[source_index]
+            candidate_round = (candidate.stage, candidate.round)
+            if candidate_round > (target_stage, target_round):
+                break
+            best_source_snapshot = candidate
+            source_index += 1
+
+        source_snapshot = best_source_snapshot or sorted_snaps[0]
+        snapshot_data = BattleSnapshotData.model_validate_json(source_snapshot.full_state_json)
         snapshots.append(
             SharePlayerSnapshot(
-                stage=snap.stage,
-                round=snap.round,
+                stage=target_stage,
+                round=target_round,
                 hand=snapshot_data.hand,
                 sideboard=snapshot_data.sideboard,
                 command_zone=snapshot_data.command_zone,

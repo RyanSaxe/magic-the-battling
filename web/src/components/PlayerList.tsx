@@ -1,78 +1,120 @@
-import { useState, useEffect } from "react";
-import type { PlayerView, LastResult } from "../types";
+import type { LastResult, PlayerView } from "../types";
 import {
-  PoisonIcon,
-  MoneyBagIcon,
   GhostIcon,
+  HourglassIcon,
+  MoneyBagIcon,
+  PoisonIcon,
   PuppetIcon,
   SkullIcon,
-  HourglassIcon,
 } from "./icons";
 import { useContextStrip } from "../contexts";
-import {
-  POISON_COUNTER_IMAGE,
-  TREASURE_TOKEN_IMAGE,
-} from "../constants/assets";
-import { UpgradeStack } from "./sidebar/UpgradeStack";
-import { ZoneDisplay } from "./sidebar/ZoneDisplay";
 import { PlacementBadge } from "./sidebar/PlacementBadge";
-
-type Tab = "you" | "opponents" | "others";
+import { getSidebarPlayerOrder } from "../utils/playerPlacement";
 
 interface PlayerListProps {
   players: PlayerView[];
-  currentPlayerName?: string;
-  currentPlayer: PlayerView;
-  useUpgrades: boolean;
+  currentPlayerName: string;
 }
+
+export const PLAYER_ROW_STACK_CLASS = "space-y-3";
+
+type ShareResultStatus = "viewing" | "alive" | "dead";
 
 function ResultBadge({
   result,
   inSuddenDeath,
+  shareStatus,
 }: {
   result: LastResult | null;
   inSuddenDeath: boolean;
+  shareStatus?: ShareResultStatus;
 }) {
+  const baseClassName = "inline-flex h-4 min-w-[1.25rem] shrink-0 items-center justify-center rounded-[3px] border border-[color:rgba(212,175,55,0.22)] bg-black/18 px-1 text-[10px] font-bold leading-none";
+  const shareBadgeClassName = `${baseClassName} min-w-[3.75rem] whitespace-nowrap px-1.5 text-[9px] font-semibold`;
+
+  if (shareStatus === "viewing") {
+    return <span className={`${shareBadgeClassName} text-cyan-200`}>Viewing</span>;
+  }
+
+  if (shareStatus === "alive") {
+    return <span className={`${shareBadgeClassName} text-emerald-200`}>Alive</span>;
+  }
+
+  if (shareStatus === "dead") {
+    return <span className={`${shareBadgeClassName} text-red-200`}>Dead</span>;
+  }
+
   if (inSuddenDeath) {
     return (
-      <span
-        className="text-[10px] font-bold text-red-400 bg-red-900/50 py-0.5 px-2 rounded"
-        title="Sudden Death"
-      >
-        💀
+      <span className={`${baseClassName} min-w-[1.5rem] text-[9px] text-red-300`} title="Sudden Death">
+        SD
       </span>
     );
   }
 
-  if (result === null) return null;
+  if (result === null) {
+    return <span className={`${baseClassName} font-semibold text-gray-500`}>-</span>;
+  }
 
   if (result === "win") {
-    return (
-      <span className="text-[10px] font-bold text-green-400 bg-green-900/50 py-0.5 px-2 rounded">
-        W
-      </span>
-    );
+    return <span className={`${baseClassName} text-emerald-300`}>W</span>;
   }
+
   if (result === "draw") {
-    return (
-      <span className="text-[10px] font-bold text-yellow-400 bg-yellow-900/50 py-0.5 px-2 rounded">
-        D
-      </span>
-    );
+    return <span className={`${baseClassName} text-amber-200`}>D</span>;
   }
-  return (
-    <span className="text-[10px] font-bold text-red-400 bg-red-900/50 py-0.5 px-2 rounded">
-      L
-    </span>
-  );
+
+  return <span className={`${baseClassName} text-red-300`}>L</span>;
 }
 
 function PairingProbability({ probability }: { probability: number | null }) {
   if (probability === null) {
     return <span className="text-[10px] text-gray-500">??%</span>;
   }
-  const pct = Math.round(probability * 100);
-  return <span className="text-[10px] text-blue-400">{pct}%</span>;
+
+  return (
+    <span className="text-[10px] text-cyan-300/90">
+      {Math.round(probability * 100)}%
+    </span>
+  );
+}
+
+function StatusLine({
+  player,
+  variant,
+}: {
+  player: PlayerView;
+  variant: "game" | "share";
+}) {
+  const iconWrapClassName = "inline-flex h-4 w-[1.25rem] items-center justify-center";
+
+  if (variant === "share") {
+    return player.is_puppet
+      ? <span className={iconWrapClassName}><PuppetIcon size="sm" /></span>
+      : <span className="block truncate text-right">{player.stage}-{player.round}</span>;
+  }
+
+  if (player.is_ghost && !player.is_most_recent_ghost) {
+    return <span className={iconWrapClassName}><SkullIcon size="sm" /></span>;
+  }
+
+  if (player.is_most_recent_ghost) {
+    return <span className={iconWrapClassName}><GhostIcon size="sm" /></span>;
+  }
+
+  if (player.phase === "awaiting_elimination") {
+    return <span className={iconWrapClassName}><HourglassIcon size="sm" /></span>;
+  }
+
+  if (player.is_puppet) {
+    return <span className={iconWrapClassName}><PuppetIcon size="sm" /></span>;
+  }
+
+  return (
+    <span className="block truncate text-right">
+      {player.stage}-{player.round} @ {player.phase === "build" && player.build_ready ? "ready" : player.phase}
+    </span>
+  );
 }
 
 export function PlayerRow({
@@ -81,282 +123,118 @@ export function PlayerRow({
   currentPlayerName,
   isSelected,
   onClick,
+  variant = "game",
+  shareStatus,
 }: {
   player: PlayerView;
   players: PlayerView[];
   currentPlayerName: string;
   isSelected: boolean;
   onClick: () => void;
+  variant?: "game" | "share";
+  shareStatus?: ShareResultStatus;
 }) {
+  const isSelf = player.name === currentPlayerName;
+  const showPairingProbability =
+    variant !== "share" && !isSelf && (!player.is_ghost || player.is_most_recent_ghost);
+
   return (
-    <div
-      className={`relative p-3 rounded-lg transition-colors cursor-pointer hover:bg-gray-800/50 ${
-        isSelected ? "ring-2 ring-blue-500" : ""
-      } ${
-        player.name === currentPlayerName
-          ? "bg-amber-900/30 border border-amber-700/50"
-          : player.is_puppet
-            ? "bg-cyan-900/20 border border-cyan-800/30"
-            : "bg-black/30"
+    <button
+      type="button"
+      className={`relative grid w-full appearance-none overflow-hidden border-none bg-transparent grid-cols-[minmax(0,1fr)_max-content] grid-rows-2 items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2.5 text-left transition-colors player-row-etched ${
+        isSelected ? "ring-1 ring-[var(--color-gold)]/60" : ""
       } ${player.is_ghost ? "opacity-50" : ""}`}
+      data-guide-player-row={player.name}
       onClick={onClick}
     >
-      <PlacementBadge player={player} players={players} />
-      <div className="flex gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="mb-1">
-            <span className="text-white font-medium truncate block">
-              {player.name}
-            </span>
-          </div>
-          <div className="flex items-center gap-4 text-xs">
-            <span
-              className="flex items-center gap-1 text-purple-400"
-              title="Poison"
-            >
-              <PoisonIcon size="sm" /> {player.poison}
-            </span>
-            <span
-              className="flex items-center gap-1 text-amber-400"
-              title="Treasures"
-            >
-              <MoneyBagIcon size="sm" /> {player.treasures}
-            </span>
-            {player.name !== currentPlayerName &&
-              (!player.is_ghost || player.is_most_recent_ghost) && (
-                <PairingProbability probability={player.pairing_probability} />
-              )}
-          </div>
-        </div>
-        <div className="flex flex-col items-center justify-between shrink-0">
-          <ResultBadge
-            result={player.last_result}
-            inSuddenDeath={player.in_sudden_death}
-          />
-          <span className="text-gray-500 text-xs">
-            {player.is_ghost && !player.is_most_recent_ghost ? (
-              <SkullIcon size="sm" />
-            ) : player.is_most_recent_ghost ? (
-              <GhostIcon size="sm" />
-            ) : player.phase === "awaiting_elimination" ? (
-              <HourglassIcon size="sm" />
-            ) : player.is_puppet ? (
-              <PuppetIcon size="sm" />
-            ) : (
-              `${player.stage}-${player.round} @ ${player.phase === "build" && player.build_ready ? "ready" : player.phase}`
-            )}
+      <PlacementBadge
+        player={player}
+        players={players}
+        variant="corner"
+        className="pointer-events-none absolute left-0 top-0 z-10"
+      />
+
+      <div className="min-w-0 self-end">
+        <span className="block truncate text-sm font-medium text-amber-50">
+          {player.name}
+        </span>
+      </div>
+
+      <div className="justify-self-end self-end max-w-[8.5rem] text-xs text-gray-400">
+        <ResultBadge
+          result={player.last_result}
+          inSuddenDeath={player.in_sudden_death}
+          shareStatus={variant === "share" ? shareStatus : undefined}
+        />
+      </div>
+
+      <div className="min-w-0 self-start">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+          <span
+            className="inline-flex items-center gap-1 text-purple-300/90"
+            title="Poison"
+          >
+            <PoisonIcon size="sm" /> {player.poison}
           </span>
+          <span
+            className="inline-flex items-center gap-1 text-amber-300/90"
+            title="Treasures"
+          >
+            <MoneyBagIcon size="sm" /> {player.treasures}
+          </span>
+          {variant !== "share" && isSelf && (
+            <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-cyan-300/90">
+              You
+            </span>
+          )}
+          {showPairingProbability && (
+            <PairingProbability probability={player.pairing_probability} />
+          )}
         </div>
       </div>
-    </div>
+
+      <div className="justify-self-end self-start max-w-[8.5rem] min-w-0 text-xs text-gray-400">
+        <div className="text-right">
+          <StatusLine player={player} variant={variant} />
+        </div>
+      </div>
+    </button>
   );
 }
 
 export function PlayerList({
   players,
   currentPlayerName,
-  currentPlayer,
-  useUpgrades,
 }: PlayerListProps) {
   const { state, setRevealedPlayerName } = useContextStrip();
-  const [activeTab, setActiveTab] = useState<Tab>("you");
-  const nonSelfPlayers = players.filter((p) => p.name !== currentPlayerName);
-  const showOthersTab = players.length > 4;
-
-  useEffect(() => {
-    setRevealedPlayerName(null);
-  }, [setRevealedPlayerName]);
 
   const handlePlayerClick = (player: PlayerView) => {
     if (state.revealedPlayerName === player.name) {
       setRevealedPlayerName(null);
     } else {
-      setRevealedPlayerName(player.name);
+      setRevealedPlayerName(player.name, "seen");
     }
   };
 
-  const handleTabChange = (tab: Tab) => {
-    setActiveTab(tab);
-    if (tab === "you") {
-      setRevealedPlayerName(null);
-    }
-  };
-
-  const opponents = showOthersTab
-    ? nonSelfPlayers.filter(
-        (p) => p.pairing_probability !== null && p.pairing_probability > 0,
-      )
-    : nonSelfPlayers;
-
-  const others = showOthersTab
-    ? nonSelfPlayers.filter(
-        (p) => p.pairing_probability === null || p.pairing_probability === 0,
-      )
-    : [];
-
-  const byPlacement = (a: PlayerView, b: PlayerView) => {
-    if (a.placement === 0 && b.placement === 0) {
-      const poisonDiff = a.poison - b.poison;
-      if (poisonDiff !== 0) return poisonDiff;
-      return a.name.localeCompare(b.name);
-    }
-    if (a.placement === 0) return -1;
-    if (b.placement === 0) return 1;
-    if (a.placement !== b.placement) return a.placement - b.placement;
-    return a.name.localeCompare(b.name);
-  };
-
-  const sortedOpponents = [...opponents].sort(byPlacement);
-  const sortedOthers = [...others].sort(byPlacement);
-
-  useEffect(() => {
-    if (
-      activeTab === "opponents" &&
-      !state.revealedPlayerName &&
-      sortedOpponents.length > 0
-    ) {
-      setRevealedPlayerName(sortedOpponents[0].name);
-    } else if (
-      activeTab === "others" &&
-      !state.revealedPlayerName &&
-      sortedOthers.length > 0
-    ) {
-      setRevealedPlayerName(sortedOthers[0].name);
-    }
-  }, [
-    activeTab,
-    setRevealedPlayerName,
-    sortedOpponents,
-    sortedOthers,
-    state.revealedPlayerName,
-  ]);
-
-  const appliedUpgrades = currentPlayer.upgrades.filter(
-    (u) => u.upgrade_target !== null,
-  );
-  const pendingUpgrades = currentPlayer.upgrades.filter(
-    (u) => u.upgrade_target === null,
-  );
-  const allUpgrades = [...appliedUpgrades, ...pendingUpgrades];
-  const companionIds = new Set(currentPlayer.command_zone.map((c) => c.id));
-
-  const tabs: { key: Tab; label: string }[] = [
-    { key: "you", label: "You" },
-    { key: "opponents", label: "Opponents" },
-    ...(showOthersTab ? [{ key: "others" as Tab, label: "Others" }] : []),
-  ];
+  const sortedPlayers = getSidebarPlayerOrder(players);
 
   return (
     <div className="relative">
-      <div className="flex border-b border-gray-700 mb-3">
-        {tabs.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => handleTabChange(tab.key)}
-            className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? "text-amber-400 border-b-2 border-amber-400 -mb-px"
-                : "text-gray-400 hover:text-white"
-            }`}
-          >
-            {tab.label}
-          </button>
+      <div
+        className={PLAYER_ROW_STACK_CLASS}
+        data-guide-target="sidebar-opponent-list"
+      >
+        {sortedPlayers.map((player) => (
+          <PlayerRow
+            key={player.name}
+            player={player}
+            players={players}
+            currentPlayerName={currentPlayerName}
+            isSelected={state.revealedPlayerName === player.name}
+            onClick={() => handlePlayerClick(player)}
+          />
         ))}
       </div>
-
-      {activeTab === "you" && (
-        <div className="space-y-2">
-          <div className="relative flex items-center justify-center gap-6">
-            <PlacementBadge player={currentPlayer} players={players} />
-            <div className="relative">
-              <img
-                src={POISON_COUNTER_IMAGE}
-                alt="Poison"
-                className="h-24 rounded"
-              />
-              <span className="absolute bottom-0 right-0 bg-black/70 text-purple-400 text-xs font-bold px-1.5 py-0.5 rounded-full">
-                {currentPlayer.poison}
-              </span>
-            </div>
-            <div className="relative">
-              <img
-                src={TREASURE_TOKEN_IMAGE}
-                alt="Treasure"
-                className="h-24 rounded"
-              />
-              <span className="absolute bottom-0 right-0 bg-black/70 text-amber-400 text-xs font-bold px-1.5 py-0.5 rounded-full">
-                {currentPlayer.treasures}
-              </span>
-            </div>
-          </div>
-
-          {useUpgrades && allUpgrades.length > 0 && (
-            <div>
-              <div className="text-[10px] text-gray-400 uppercase mb-1">
-                Upgrades
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {allUpgrades.map((upgrade) => (
-                  <UpgradeStack
-                    key={upgrade.id}
-                    upgrade={upgrade}
-                    dimensions={{ width: 70, height: 98 }}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {currentPlayer.most_recently_revealed_cards.length > 0 && (
-            <ZoneDisplay
-              title="Seen in Battle"
-              cards={currentPlayer.most_recently_revealed_cards}
-              maxThumbnails={6}
-              companionIds={companionIds}
-            />
-          )}
-        </div>
-      )}
-
-      {activeTab === "opponents" && (
-        <div className="space-y-2">
-          {sortedOpponents.map((player) => (
-            <PlayerRow
-              key={player.name}
-              player={player}
-              players={players}
-              currentPlayerName={currentPlayerName ?? ""}
-              isSelected={state.revealedPlayerName === player.name}
-              onClick={() => handlePlayerClick(player)}
-            />
-          ))}
-          {sortedOpponents.length === 0 && (
-            <div className="text-gray-500 text-sm text-center py-4">
-              No opponents
-            </div>
-          )}
-        </div>
-      )}
-
-      {activeTab === "others" && (
-        <div className="space-y-2">
-          {sortedOthers.map((player) => (
-            <PlayerRow
-              key={player.name}
-              player={player}
-              players={players}
-              currentPlayerName={currentPlayerName ?? ""}
-              isSelected={state.revealedPlayerName === player.name}
-              onClick={() => handlePlayerClick(player)}
-            />
-          ))}
-          {sortedOthers.length === 0 && (
-            <div className="text-gray-500 text-sm text-center py-4">
-              No other players
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
