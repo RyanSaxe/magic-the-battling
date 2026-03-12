@@ -449,6 +449,7 @@ export function PlayerDetailPanel({
       appliedUpgradesByCardId={appliedUpgradesByCardId}
       emptyText="Nothing was revealed in battle yet."
       guideTarget="sidebar-seen-in-battle"
+      maxWidth={104}
     />
   );
 
@@ -465,15 +466,11 @@ export function PlayerDetailPanel({
               &larr; Back
             </button>
           )}
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <PlacementBadge player={player} players={players} className="shrink-0" />
-              <span className="truncate text-base font-medium text-amber-50">
-                {player.name}
-              </span>
-            </div>
-            <div className="mt-1 text-xs text-gray-400">
-              Scouting
+          <PlacementBadge player={player} players={players} className="shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-base font-medium text-amber-50">
+              <span className="text-gray-300">Scouting </span>
+              <span>{player.name}</span>
             </div>
           </div>
         </div>
@@ -508,17 +505,16 @@ export function PlayerDetailPanel({
     <div
       ref={panelRef}
       aria-hidden={!isOpen}
-      className={`absolute inset-y-0 z-0 overflow-hidden border border-r-0 gold-border modal-chrome felt-raised-panel ${
+      className={`absolute inset-y-0 z-0 overflow-hidden border-l-2 border-r-0 border-t-0 border-b-0 border-[var(--gold-border-opaque)] frame-chrome ${
         isOpen ? "pointer-events-auto" : "pointer-events-none"
       }`}
       style={{
-        right: "calc(100% - 16px)",
+        right: "calc(100% - 8px)",
         width: "var(--sidebar-width)",
         boxShadow:
-          "-16px 18px 42px rgba(0, 0, 0, 0.48), -6px 6px 18px rgba(0, 0, 0, 0.24)",
-        opacity: renderOpen ? 1 : 0,
-        transform: renderOpen ? "translateX(0)" : "translateX(calc(100% - 16px))",
-        transition: "transform 220ms ease-out, opacity 180ms ease-out",
+          "-10px 16px 28px rgba(0, 0, 0, 0.34)",
+        transform: renderOpen ? "translateX(0)" : "translateX(calc(100% - 8px))",
+        transition: "transform 220ms ease-out",
       }}
     >
       {shell}

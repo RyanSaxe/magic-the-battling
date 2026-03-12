@@ -72,6 +72,12 @@ export function Sidebar({
       }`}
       data-guide-target="sidebar-panel"
     >
+      {shouldRenderDesktopDrawer && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-10 frame-chrome"
+        />
+      )}
       {phaseContent ? (
         <div className="overflow-y-auto overflow-x-hidden flex-1">
           {phaseContent}
@@ -88,7 +94,7 @@ export function Sidebar({
           onClose={() => setRevealedPlayerName(null)}
         />
       ) : (
-        <div className="relative z-10 px-3 py-3 sm:py-0 overflow-auto flex-1 flex flex-col">
+        <div className="relative z-20 px-3 py-3 sm:py-0 overflow-auto flex-1 flex flex-col">
           <PlayerList
             players={players}
             currentPlayerName={currentPlayer.name}
