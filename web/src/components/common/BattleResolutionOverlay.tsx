@@ -475,7 +475,7 @@ export function BattleResolutionOverlay({
       {showContinuation && (
         <div className="fixed inset-0 z-[85] pointer-events-none flex items-center justify-center">
           <div className="battle-resolution-continue-panel">
-            Sudden Death Continues
+            Sudden Death
           </div>
         </div>
       )}
