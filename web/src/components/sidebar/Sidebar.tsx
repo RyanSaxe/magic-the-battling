@@ -86,7 +86,6 @@ export function Sidebar({
         <PlayerDetailPanel
           player={revealedPlayer}
           currentPlayer={currentPlayer}
-          players={players}
           useUpgrades={useUpgrades}
           isMobile
           activeTab={state.revealedPlayerTab}
@@ -105,7 +104,6 @@ export function Sidebar({
         <PlayerDetailPanel
           player={desktopDrawerPlayer}
           currentPlayer={currentPlayer}
-          players={players}
           useUpgrades={useUpgrades}
           isMobile={false}
           activeTab={state.revealedPlayerTab}

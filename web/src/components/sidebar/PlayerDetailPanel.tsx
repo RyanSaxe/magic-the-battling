@@ -7,7 +7,6 @@ import {
   bestFit,
   type ZoneDims,
 } from "../../hooks/cardSizeUtils";
-import { PlacementBadge } from "./PlacementBadge";
 import { Card } from "../card";
 import { UpgradeStack } from "./UpgradeStack";
 import {
@@ -18,7 +17,6 @@ import {
 interface PlayerDetailPanelProps {
   player: PlayerView;
   currentPlayer: PlayerView;
-  players: PlayerView[];
   useUpgrades: boolean;
   isMobile: boolean;
   activeTab: RevealedPlayerTab;
@@ -405,7 +403,6 @@ function DetailTabButton({
 export function PlayerDetailPanel({
   player,
   currentPlayer,
-  players,
   useUpgrades,
   isMobile,
   activeTab,
@@ -525,11 +522,10 @@ export function PlayerDetailPanel({
               &larr; Back
             </button>
           )}
-          <PlacementBadge player={player} players={players} className="shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="truncate text-base font-medium text-amber-50">
-              <span className="text-gray-300">Scouting </span>
-              <span>{player.name}</span>
+              <span className="text-gray-300">scouting </span>
+              <span className="text-[var(--color-gold)]">{player.name}</span>
             </div>
           </div>
         </div>

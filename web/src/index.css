@@ -91,6 +91,12 @@ body {
   background-color: var(--table-dark);
 }
 
+@layer base {
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 /* Walnut-themed scrollbar */
 * {
   scrollbar-width: thin;
