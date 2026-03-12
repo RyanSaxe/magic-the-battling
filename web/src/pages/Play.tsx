@@ -238,7 +238,7 @@ function ConstructedCheckbox({
       />
       <span className="text-white text-sm">Constructed</span>
       <span className="text-gray-500 text-xs">
-        — each player brings their own battler
+        — bring your own battler
       </span>
     </label>
   );
