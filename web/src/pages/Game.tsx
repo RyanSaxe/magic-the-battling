@@ -51,6 +51,7 @@ import {
   pickAutoReconnectPlayer,
   rememberPlayerForGame,
 } from "../utils/deviceIdentity";
+import { shouldBlockGuidesForBattleResolution } from "./gameGuideState";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -786,7 +787,7 @@ function GameContent() {
   const [dismissedServerNoticeAt, setDismissedServerNoticeAt] = useState<string | null>(null);
   const [cachedBattleForResolution, setCachedBattleForResolution] = useState<BattleView | null>(null);
   const [activeBattleResolutionId, setActiveBattleResolutionId] = useState<string | null>(null);
-  const shownBattleResolutionIdsRef = useRef<Set<string>>(new Set());
+  const [shownBattleResolutionIds, setShownBattleResolutionIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (gameState?.self_player.phase === "battle" && gameState.current_battle) {
@@ -934,12 +935,20 @@ function GameContent() {
     if (!resolutionId || !phase || phase === "battle" || !cachedBattleForResolution) {
       return;
     }
-    if (shownBattleResolutionIdsRef.current.has(resolutionId)) {
+    if (shownBattleResolutionIds.has(resolutionId)) {
       return;
     }
 
-    shownBattleResolutionIdsRef.current.add(resolutionId);
     queueMicrotask(() => {
+      setShownBattleResolutionIds((current) => {
+        if (current.has(resolutionId)) {
+          return current;
+        }
+
+        const next = new Set(current);
+        next.add(resolutionId);
+        return next;
+      });
       closeGameplayOverlays();
       setActiveBattleResolutionId(resolutionId);
     });
@@ -949,6 +958,7 @@ function GameContent() {
     gameState?.battle_resolution,
     gameState?.battle_resolution?.resolution_id,
     gameState?.self_player.phase,
+    shownBattleResolutionIds,
   ]);
 
   const openRulesPanel = useCallback((target?: RulesPanelTarget) => {
@@ -956,6 +966,12 @@ function GameContent() {
     setRulesPanelTarget(target);
     setRulesPanelOpen(true);
   }, [closeGameplayOverlays]);
+
+  const closeUpgradesModal = useCallback(() => {
+    setShowUpgradesModal(false);
+    setUpgradeInitialTargetId(undefined);
+    setUpgradesModalOpenMode('auto');
+  }, []);
 
   const openUpgradesModal = useCallback((
     targetCardId?: string,
@@ -1288,6 +1304,13 @@ function GameContent() {
   }
 
   const currentPhase = gameState.self_player.phase;
+  const shouldBlockGuidesForResolution = shouldBlockGuidesForBattleResolution({
+    activeBattleResolutionId,
+    battleResolutionId: gameState.battle_resolution?.resolution_id,
+    hasCachedBattle: cachedBattleForResolution !== null,
+    selfPhase: currentPhase,
+    shownResolutionIds: shownBattleResolutionIds,
+  });
 
   const { self_player, current_battle } = gameState;
   const activeBattleResolution =
@@ -1553,6 +1576,7 @@ function GameContent() {
                 ]}
                 onClose={() => setShowSubmitResultPopover(false)}
                 guideTarget="battle-submit-popover"
+                closeOnOutsideClick={false}
               />
             )}
           </div>
@@ -1787,7 +1811,7 @@ function GameContent() {
             showUpgradesModal ||
             shareOpen ||
             actionMenuOpen ||
-            displayBattleResolution ||
+            shouldBlockGuidesForResolution ||
             activeBuildUpgradeAnimation !== null
           }
           closeGameplayOverlays={closeGameplayOverlays}
@@ -2214,17 +2238,10 @@ function GameContent() {
           mode={upgradesModalMode}
           targets={[...self_player.hand, ...self_player.sideboard]}
           onApply={(upgradeId, targetId) => {
-            setShowUpgradesModal(false);
-            setUpgradeInitialTargetId(undefined);
-            setUpgradesModalOpenMode('auto');
             setPendingBuildUpgradeAnimation({ upgradeId, targetId });
             actions.buildApplyUpgrade(upgradeId, targetId);
           }}
-          onClose={() => {
-            setShowUpgradesModal(false);
-            setUpgradeInitialTargetId(undefined);
-            setUpgradesModalOpenMode('auto');
-          }}
+          onClose={closeUpgradesModal}
           initialTargetId={upgradeInitialTargetId}
         />
       )}

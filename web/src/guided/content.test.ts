@@ -38,4 +38,12 @@ describe("buildGuideDefinition", () => {
     expect(step?.sidebarState?.detailTab).toBe("seen");
     expect(step?.waitForLayoutTargetId).toBeTypeOf("function");
   });
+
+  it("keeps the reward continue step clickable while the guide is open", () => {
+    const guide = buildGuideDefinition("reward", baseContext);
+    const step = guide.steps.find((candidate) => candidate.id === "continue");
+
+    expect(step?.targetId).toBe("reward-continue");
+    expect(step?.allowTargetInteraction).toBe(true);
+  });
 });

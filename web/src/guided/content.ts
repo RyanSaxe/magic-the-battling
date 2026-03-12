@@ -388,6 +388,7 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       cardPlacement: "top-center",
       mobileCardPlacement: "top-center",
       primaryActionLabel: "Ready to continue",
+      allowTargetInteraction: true,
       content: {
         summary: "Whenever you're ready, click this button to start the draft phase of the next round.",
       },
