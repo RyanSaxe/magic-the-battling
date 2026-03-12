@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { startTransition, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { createGame, warmCubeCache } from "../api/client";
 import { useSession } from "../hooks/useSession";
@@ -59,7 +59,14 @@ function useSoloLobbyWatcher(
   }, []);
 
   useEffect(() => {
-    if (!autoStartEnabled || !pendingGameId || !lobbyState) return;
+    if (
+      !autoStartEnabled ||
+      !pendingGameId ||
+      !lobbyState ||
+      lobbyState.game_id !== pendingGameId
+    ) {
+      return;
+    }
 
     const cubeJustReady =
       lobbyState.cube_loading_status === "ready" &&
@@ -226,7 +233,7 @@ function ConstructedCheckbox({
       <input
         type="checkbox"
         checked={isConstructed}
-        onChange={(e) => setPlayMode(e.target.checked ? "constructed" : "draft")}
+        onChange={(e) => setPlayMode(e.target.checked ? "constructed" : "limited")}
         className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
       />
       <span className="text-white text-sm">Constructed</span>
@@ -328,8 +335,7 @@ export function Play() {
   const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
   const [cubeId, setCubeId] = useState("auto");
   const [useUpgrades, setUseUpgrades] = useState(true);
-  const [playMode, setPlayMode] = useState<PlayMode>("draft");
-  const [pendingPlayMode, setPendingPlayMode] = useState<PlayMode | null>(null);
+  const [playMode, setPlayMode] = useState<PlayMode>("limited");
   const [opponents, setOpponents] = useState<OpponentCount>(3);
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [activeMode, setActiveMode] = useState<ActiveMode>("solo");
@@ -358,14 +364,13 @@ export function Play() {
     null,
     addToast,
   );
-
-  const effectivePendingPlayMode = lobbyState?.play_mode ?? pendingPlayMode;
+  const lastLobbyErrorRef = useRef<string | null>(null);
 
   const { reset: resetWatcher } = useSoloLobbyWatcher(
     lobbyState,
     pendingGameId,
     soloPhaseRef,
-    effectivePendingPlayMode !== "constructed",
+    true,
     opponents,
     actions,
     (available) => {
@@ -377,39 +382,70 @@ export function Play() {
   );
 
   useEffect(() => {
-    if (gameState && pendingGameId) {
+    if (gameState?.game_id === pendingGameId && pendingGameId) {
       navigate(`/game/${pendingGameId}/play`);
     }
-  }, [gameState, pendingGameId, navigate]);
+  }, [gameState?.game_id, navigate, pendingGameId]);
 
   useEffect(() => {
     if (
       friendsLoading &&
       pendingGameId &&
-      lobbyState &&
-      (effectivePendingPlayMode === "constructed" ||
-        lobbyState.cube_loading_status === "ready")
+      lobbyState?.game_id === pendingGameId &&
+      lobbyState.cube_loading_status === "ready"
     ) {
       navigate(`/game/${pendingGameId}/lobby`);
     }
-  }, [effectivePendingPlayMode, friendsLoading, lobbyState, navigate, pendingGameId]);
+  }, [friendsLoading, lobbyState?.cube_loading_status, lobbyState?.game_id, navigate, pendingGameId]);
 
   useEffect(() => {
-    if (
-      soloPhase === "loading" &&
-      pendingGameId &&
-      lobbyState &&
-      effectivePendingPlayMode === "constructed"
-    ) {
-      navigate(`/game/${pendingGameId}/lobby`);
+    const nextError =
+      lobbyState?.game_id === pendingGameId && lobbyState.cube_loading_status === "error"
+        ? lobbyState.cube_loading_error
+        : null;
+    if (!nextError || nextError === lastLobbyErrorRef.current) {
+      if (!nextError) {
+        lastLobbyErrorRef.current = null;
+      }
+      return;
     }
-  }, [effectivePendingPlayMode, lobbyState, navigate, pendingGameId, soloPhase]);
+    lastLobbyErrorRef.current = nextError;
+    addToast(nextError, "error");
+    startTransition(() => {
+      if (friendsLoading) {
+        setFriendsLoading(false);
+      }
+      if (soloPhase === "loading") {
+        updateSoloPhase("idle");
+        setMaxAvailablePuppets(null);
+        resetWatcher();
+      }
+      setPendingGameId(null);
+      setPendingSessionId(null);
+    });
+  }, [
+    addToast,
+    friendsLoading,
+    lobbyState?.cube_loading_error,
+    lobbyState?.cube_loading_status,
+    lobbyState?.game_id,
+    pendingGameId,
+    resetWatcher,
+    soloPhase,
+    updateSoloPhase,
+  ]);
 
   useEffect(() => {
-    if (!cubeId || playMode === "constructed") return;
+    if (!pendingGameId) {
+      lastLobbyErrorRef.current = null;
+    }
+  }, [pendingGameId]);
+
+  useEffect(() => {
+    if (!cubeId) return;
     const timer = setTimeout(() => warmCubeCache(cubeId), 2000);
     return () => clearTimeout(timer);
-  }, [cubeId, playMode]);
+  }, [cubeId]);
 
   const handleGuidedModeToggle = useCallback((nextValue: boolean) => {
     setIsGuidedMode(nextValue);
@@ -421,10 +457,16 @@ export function Play() {
       addToast("Please enter your name", "error");
       return;
     }
+    const submittedCubeId = cubeId.trim();
+    if (playMode === "constructed" && !submittedCubeId) {
+      addToast("Please enter a CubeCobra ID", "error");
+      return;
+    }
+    lastLobbyErrorRef.current = null;
     setFriendsLoading(true);
     try {
       const response = await createGame(playerName, {
-        cubeId: playMode === "draft" ? cubeId || "auto" : "auto",
+        cubeId: submittedCubeId || "auto",
         useUpgrades,
         autoApproveSpectators,
         guidedModeDefault: isGuidedMode,
@@ -439,7 +481,6 @@ export function Play() {
       );
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
-      setPendingPlayMode(playMode);
     } catch (err) {
       addToast(normalizeCreateGameError(err), "error");
       setFriendsLoading(false);
@@ -452,12 +493,18 @@ export function Play() {
       addToast("Please enter your name", "error");
       return;
     }
+    const submittedCubeId = cubeId.trim();
+    if (playMode === "constructed" && !submittedCubeId) {
+      addToast("Please enter a CubeCobra ID", "error");
+      return;
+    }
+    lastLobbyErrorRef.current = null;
     updateSoloPhase("loading");
     resetWatcher();
     try {
       const targetCount = count + 1;
       const response = await createGame(playerName, {
-        cubeId: playMode === "draft" ? cubeId || "auto" : "auto",
+        cubeId: submittedCubeId || "auto",
         useUpgrades,
         targetPlayerCount: targetCount,
         puppetCount: count,
@@ -473,7 +520,6 @@ export function Play() {
       );
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
-      setPendingPlayMode(playMode);
     } catch (err) {
       addToast(normalizeCreateGameError(err), "error");
       updateSoloPhase("idle");
@@ -484,16 +530,16 @@ export function Play() {
     setFriendsLoading(false);
     setPendingGameId(null);
     setPendingSessionId(null);
-    setPendingPlayMode(null);
+    lastLobbyErrorRef.current = null;
   };
 
   const handleCancelSolo = () => {
     updateSoloPhase("idle");
     setPendingGameId(null);
     setPendingSessionId(null);
-    setPendingPlayMode(null);
     setMaxAvailablePuppets(null);
     resetWatcher();
+    lastLobbyErrorRef.current = null;
   };
 
   const validRecoveryCounts = OPPONENT_OPTIONS.filter(
@@ -718,9 +764,7 @@ export function Play() {
           onClose={() => setShowFriendsAdvanced(false)}
         >
           <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
-          {playMode === "draft" && (
-            <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
-          )}
+          <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
           <UpgradesCheckbox
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
@@ -744,9 +788,7 @@ export function Play() {
           onClose={() => setShowSoloAdvanced(false)}
         >
           <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
-          {playMode === "draft" && (
-            <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
-          )}
+          <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
           <UpgradesCheckbox
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}

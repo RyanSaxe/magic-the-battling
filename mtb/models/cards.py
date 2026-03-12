@@ -100,7 +100,9 @@ def build_battler(
 
     cards = [card for card in cards if card.type_line.lower() not in (VANGUARD_TYPE, UPGRADE_TYPE)]
     if not cards:
-        raise ValueError(f"Cube '{battler_id}' contains no playable cards after filtering")
+        raise ValueError(
+            f"Battler '{battler_id}' is illegal: it has no playable cards after filtering out upgrades and vanguards."
+        )
 
     elo = sum(card.elo for card in cards) / len(cards)
     return Battler(
@@ -121,27 +123,37 @@ def _normalize_card_name(name: str) -> str:
 def validate_constructed_battler(battler: Battler) -> None:
     playable_cards = battler.cards
     if len(playable_cards) < CONSTRUCTED_MIN_CARDS:
-        msg = f"Constructed battler must contain at least {CONSTRUCTED_MIN_CARDS} playable cards"
+        battler_id = battler.source_id or "unknown"
+        msg = (
+            f"Battler '{battler_id}' is illegal: it has {len(playable_cards)} playable cards "
+            f"and needs at least {CONSTRUCTED_MIN_CARDS}."
+        )
         raise ValueError(msg)
 
     seen_names: set[str] = set()
-    duplicate_names: set[str] = set()
+    duplicate_name: str | None = None
     for card in playable_cards:
         normalized_name = _normalize_card_name(card.name)
         if normalized_name in seen_names:
-            duplicate_names.add(card.name)
+            duplicate_name = card.name
+            break
         seen_names.add(normalized_name)
 
-    if duplicate_names:
-        raise ValueError("Constructed battler must be singleton")
+    if duplicate_name is not None:
+        battler_id = battler.source_id or "unknown"
+        raise ValueError(
+            f"Battler '{battler_id}' is illegal: it is not singleton because {duplicate_name} appears more than once."
+        )
 
     for card in playable_cards:
         normalized_name = _normalize_card_name(card.name)
         if normalized_name in CONSTRUCTED_BANNED_CARD_NAMES:
-            raise ValueError(f"Constructed battler contains banned card: {card.name}")
+            battler_id = battler.source_id or "unknown"
+            raise ValueError(f"Battler '{battler_id}' is illegal: {card.name} is banned.")
 
         keywords = {keyword.strip().casefold() for keyword in card.keywords}
         banned_keywords = sorted(CONSTRUCTED_BANNED_KEYWORDS & keywords)
         if banned_keywords:
-            keyword_list = ", ".join(banned_keywords)
-            raise ValueError(f"Constructed battler contains banned keyword(s): {keyword_list}")
+            battler_id = battler.source_id or "unknown"
+            keyword = banned_keywords[0]
+            raise ValueError(f"Battler '{battler_id}' is illegal: {card.name} has the banned keyword {keyword}.")

@@ -218,7 +218,7 @@ class Config(BaseModel):
     use_vanguards: bool = False
     auto_approve_spectators: bool = False
     cube_id: str = "auto"
-    play_mode: PlayMode = "draft"
+    play_mode: PlayMode = "limited"
 
 
 class Game(BaseModel):
@@ -261,7 +261,7 @@ class Game(BaseModel):
         if not self.players:
             return
 
-        if self.config.play_mode == "draft":
+        if self.config.play_mode == "limited":
             canonical = self.battler
             if canonical is None:
                 canonical = next((player.battler for player in self.players if player.battler is not None), None)
@@ -356,7 +356,7 @@ def set_battler(game: Game, battler: Battler) -> None:
 
 def set_player_battlers(game: Game, battlers_by_player: dict[str, Battler]) -> None:
     first_battler = next(iter(battlers_by_player.values()))
-    game.battler = first_battler if game.config.play_mode == "draft" else None
+    game.battler = first_battler if game.config.play_mode == "limited" else None
 
     upgrades = sorted(first_battler.upgrades, key=lambda u: u.name)
     max_upgrades = game.config.max_available_upgrades

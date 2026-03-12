@@ -216,8 +216,19 @@ def _create_game_response(request: CreateGameRequest) -> CreateGameResponse:
     async def broadcast_lobby():
         await connection_manager.broadcast_lobby_state(pending.game_id)
 
-    if request.play_mode == "draft":
+    if request.play_mode == "limited":
         game_manager.start_battler_preload(pending, on_complete=broadcast_lobby)
+    else:
+        error = game_manager.start_player_battler_preload(
+            pending,
+            session.player_id,
+            request.cube_id,
+            on_complete=broadcast_lobby,
+        )
+        if error:
+            host_battler = pending.player_battlers.get(session.player_id)
+            if host_battler is not None:
+                host_battler.battler_error = error
     return CreateGameResponse(
         game_id=pending.game_id,
         join_code=pending.join_code,

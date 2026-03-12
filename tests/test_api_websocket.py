@@ -65,7 +65,7 @@ class TestLobbyWebSocket:
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             initial = ws.receive_json()
-            assert initial["payload"]["players"][0]["battler_status"] == "missing"
+            assert initial["type"] == "lobby_state"
 
             ws.send_json({"action": "submit_battler", "payload": {"battler_id": "deck_alpha"}})
             statuses: list[str] = []

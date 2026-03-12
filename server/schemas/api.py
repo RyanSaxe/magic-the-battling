@@ -20,7 +20,7 @@ class CreateGameRequest(BaseModel):
     puppet_count: int = 0
     auto_approve_spectators: bool = False
     guided_mode_default: bool = False
-    play_mode: PlayMode = "draft"
+    play_mode: PlayMode = "limited"
 
 
 class CreateGameResponse(BaseModel):
@@ -117,7 +117,7 @@ class GameStateResponse(BaseModel):
     current_battle: BattleView | None = None
     use_upgrades: bool = True
     cube_id: str = "auto"
-    play_mode: PlayMode = "draft"
+    play_mode: PlayMode = "limited"
 
 
 class LobbyPlayer(BaseModel):
@@ -144,7 +144,7 @@ class LobbyStateResponse(BaseModel):
     cube_id: str = "auto"
     use_upgrades: bool = True
     guided_mode_default: bool = False
-    play_mode: PlayMode = "draft"
+    play_mode: PlayMode = "limited"
 
 
 class DraftSwapAction(BaseModel):

@@ -99,7 +99,8 @@ class TestGetLobby:
         assert response.status_code == 200
         data = response.json()
         assert data["play_mode"] == "constructed"
-        assert data["players"][0]["battler_status"] == "missing"
+        assert data["players"][0]["battler_id"] == "test"
+        assert data["players"][0]["battler_status"] in {"loading", "ready"}
 
 
 class TestGetGameCards:

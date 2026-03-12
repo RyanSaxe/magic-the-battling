@@ -1,5 +1,5 @@
 export type Phase = 'draft' | 'build' | 'battle' | 'reward' | 'awaiting_elimination' | 'eliminated' | 'winner' | 'game_over'
-export type PlayMode = 'draft' | 'constructed'
+export type PlayMode = 'limited' | 'constructed'
 export type LastResult = 'win' | 'loss' | 'draw'
 export type CubeLoadingStatus = 'loading' | 'ready' | 'error'
 export type BattlerLoadingStatus = 'missing' | 'loading' | 'ready' | 'error'

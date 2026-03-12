@@ -313,6 +313,34 @@ class TestConstructedLobbyRules:
         assert lobby.players[0].battler_id == "alice_deck"
         assert lobby.players[0].battler_status == "ready"
 
+    def test_start_game_supports_constructed_puppets_in_sync_path(self, game_manager, mock_db_session, card_factory):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
+        pending.puppet_count = 1
+        pending.player_battlers["alice_pid"].battler = Battler(
+            cards=[card_factory(f"a{i}") for i in range(100)],
+            upgrades=[],
+            vanguards=[],
+            elo=1234.0,
+        )
+        pending.player_ready["alice_pid"] = True
+        game_manager.load_fake_players_for_game = MagicMock()
+
+        game = game_manager.start_game(pending.game_id, mock_db_session)
+
+        assert game is not None
+        game_manager.load_fake_players_for_game.assert_called_once()
+
+
+class TestBattlerValidation:
+    def test_load_battler_applies_legality_to_all_battlers(self, game_manager, monkeypatch, card_factory):
+        monkeypatch.setattr(
+            "mtb.utils.cubecobra.get_cube_data",
+            lambda cube_id: [card_factory(f"card{i}") for i in range(99)],
+        )
+
+        with pytest.raises(ValueError, match="has 99 playable cards"):
+            game_manager._load_battler("too_small", use_upgrades=False, use_vanguards=False)
+
 
 class TestPersistPlacementOnElimination:
     def test_persist_player_placement_writes_to_db(self, game_manager, mock_db_session):

@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 from uuid import uuid4
 
+from httpx import HTTPStatusError, RequestError
 from sqlalchemy import true as sql_true
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session, joinedload
@@ -146,7 +147,7 @@ class PendingGame:
     target_player_count: int = 4
     auto_approve_spectators: bool = False
     guided_mode_default: bool = False
-    play_mode: PlayMode = "draft"
+    play_mode: PlayMode = "limited"
     player_ready: dict[str, bool] = field(default_factory=dict)
     player_battlers: dict[str, PendingPlayerBattler] = field(default_factory=dict)
     puppet_count: int = 0
@@ -630,7 +631,7 @@ class GameManager:
         target_player_count: int = 4,
         auto_approve_spectators: bool = False,
         guided_mode_default: bool = False,
-        play_mode: PlayMode = "draft",
+        play_mode: PlayMode = "limited",
     ) -> PendingGame:
         game_id = secrets.token_urlsafe(8)
         join_code = secrets.token_urlsafe(4).upper()[:6]
@@ -778,7 +779,7 @@ class GameManager:
         )
         game = create_game(pending.player_names, len(pending.player_names), config)
         target_elo = 1200.0
-        if pending.play_mode == "draft":
+        if pending.play_mode == "limited":
             battler = self._load_battler(pending.cube_id, pending.use_upgrades, pending.use_vanguards)
             set_battler(game, battler)
             target_elo = battler.elo or 1200.0
@@ -809,7 +810,6 @@ class GameManager:
             db.commit()
 
             if pending.puppet_count > 0:
-                target_elo = battler.elo or 1200.0
                 self.load_fake_players_for_game(
                     db,
                     game,
@@ -817,7 +817,7 @@ class GameManager:
                     target_elo,
                     pending.use_upgrades,
                     pending.use_vanguards,
-                    pending.cube_id if pending.play_mode == "draft" else None,
+                    pending.cube_id if pending.play_mode == "limited" else None,
                     pending.play_mode,
                 )
 
@@ -846,16 +846,16 @@ class GameManager:
                 if not allowed:
                     return None
 
-                if pending.play_mode == "draft" and pending._loading_task and not pending._loading_task.done():
+                if pending.play_mode == "limited" and pending._loading_task and not pending._loading_task.done():
                     try:
                         await asyncio.wait_for(pending._loading_task, timeout=30.0)
                     except TimeoutError:
                         pass
 
-                if pending.play_mode == "draft" and pending.battler_error:
+                if pending.play_mode == "limited" and pending.battler_error:
                     return None
 
-                if pending.play_mode == "draft" and not pending.battler:
+                if pending.play_mode == "limited" and not pending.battler:
                     loop = asyncio.get_running_loop()
                     try:
                         pending.battler = await loop.run_in_executor(
@@ -876,7 +876,7 @@ class GameManager:
                 )
                 game = create_game(pending.player_names, len(pending.player_names), config)
                 target_elo = 1200.0
-                if pending.play_mode == "draft":
+                if pending.play_mode == "limited":
                     battler = pending.battler
                     if battler is None:
                         return None
@@ -916,7 +916,7 @@ class GameManager:
                             target_elo,
                             pending.use_upgrades,
                             pending.use_vanguards,
-                            pending.cube_id if pending.play_mode == "draft" else None,
+                            pending.cube_id if pending.play_mode == "limited" else None,
                             pending.play_mode,
                         )
 
@@ -1069,17 +1069,32 @@ class GameManager:
     def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
         vanguards_id = DEFAULT_VANGUARD_ID if use_vanguards else None
-        return build_battler(cube_id, upgrades_id, vanguards_id)
-
-    def _load_constructed_battler(self, battler_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
-        battler = self._load_battler(battler_id, use_upgrades, use_vanguards)
+        battler = build_battler(cube_id, upgrades_id, vanguards_id)
         validate_constructed_battler(battler)
         return battler
+
+    def _load_constructed_battler(self, battler_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
+        return self._load_battler(battler_id, use_upgrades, use_vanguards)
+
+    def _normalize_battler_error(self, battler_id: str, error: Exception) -> str:
+        if isinstance(error, ValueError):
+            return str(error)
+        if isinstance(error, HTTPStatusError):
+            if error.response.status_code in {403, 404}:
+                return (
+                    f"Couldn't load battler '{battler_id}'. "
+                    "Check that the CubeCobra ID is correct and the battler is public."
+                )
+            return f"Couldn't load battler '{battler_id}' right now. Please try again."
+        if isinstance(error, RequestError):
+            return f"Couldn't load battler '{battler_id}' right now. Please try again."
+        return f"Couldn't load battler '{battler_id}'. Please try again."
 
     async def _preload_battler(
         self, pending: PendingGame, on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None
     ) -> None:
         pending.battler_loading = True
+        pending.battler_error = None
         try:
             async with self._battler_preload_slots:
                 loop = asyncio.get_running_loop()
@@ -1088,7 +1103,8 @@ class GameManager:
                 )
             pending.battler = battler
         except Exception as e:
-            pending.battler_error = str(e)
+            logger.warning("Failed to preload battler %s: %s", pending.cube_id, e)
+            pending.battler_error = self._normalize_battler_error(pending.cube_id, e)
         finally:
             pending.battler_loading = False
             if on_complete:
@@ -1146,8 +1162,9 @@ class GameManager:
                 player_battler.battler_error = None
         except Exception as e:
             if player_battler.battler_id == battler_id:
+                logger.warning("Failed to preload player battler %s: %s", battler_id, e)
                 player_battler.battler = None
-                player_battler.battler_error = str(e)
+                player_battler.battler_error = self._normalize_battler_error(battler_id, e)
         finally:
             if player_battler.battler_id == battler_id:
                 player_battler.battler_loading = False
@@ -1224,7 +1241,7 @@ class GameManager:
         use_upgrades: bool | None = None,
         use_vanguards: bool | None = None,
         cube_id: str | None = None,
-        play_mode: PlayMode = "draft",
+        play_mode: PlayMode = "limited",
     ) -> list[PlayerGameHistory]:
         query = (
             db.query(PlayerGameHistory)
@@ -1255,14 +1272,14 @@ class GameManager:
             if not game_record or not game_record.config_json:
                 continue
             config = json.loads(str(game_record.config_json))
-            if config.get("play_mode", "draft") != play_mode:
+            if config.get("play_mode", "limited") != play_mode:
                 continue
             if use_upgrades is not None and config.get("use_upgrades") != use_upgrades:
                 continue
             if use_vanguards is not None and config.get("use_vanguards") != use_vanguards:
                 continue
 
-            if play_mode == "draft" and cube_id and config.get("cube_id") == cube_id:
+            if play_mode == "limited" and cube_id and config.get("cube_id") == cube_id:
                 same_cube.append(history)
             else:
                 other_cube.append(history)
@@ -1415,7 +1432,7 @@ class GameManager:
         use_upgrades: bool | None = None,
         use_vanguards: bool | None = None,
         cube_id: str | None = None,
-        play_mode: PlayMode = "draft",
+        play_mode: PlayMode = "limited",
     ) -> None:
         if count <= 0:
             return
@@ -1660,7 +1677,7 @@ class GameManager:
         return removed
 
     def _get_pending_target_elo(self, pending: PendingGame) -> float | None:
-        if pending.play_mode == "draft":
+        if pending.play_mode == "limited":
             if pending.battler is None:
                 return None
             return pending.battler.elo or 1200.0
@@ -1679,6 +1696,8 @@ class GameManager:
             if any(entry.battler_error for entry in pending.player_battlers.values()):
                 return "error"
             if any(entry.battler_loading for entry in pending.player_battlers.values()):
+                return "loading"
+            if any(entry.battler is None for entry in pending.player_battlers.values()):
                 return "loading"
             return "ready"
         if pending.battler_error:
@@ -1705,7 +1724,7 @@ class GameManager:
                 [],
                 pending.use_upgrades,
                 pending.use_vanguards,
-                pending.cube_id if pending.play_mode == "draft" else None,
+                pending.cube_id if pending.play_mode == "limited" else None,
                 pending.play_mode,
             )
             return len(histories)

@@ -65,7 +65,7 @@ def mock_cube_data(card_factory, upgrade_factory, monkeypatch):
             return [upgrade_factory(f"upgrade{i}") for i in range(8)]
         if cube_id == DEFAULT_VANGUARD_ID:
             return []
-        return [card_factory(f"card{i}") for i in range(45)]
+        return [card_factory(f"card{i}") for i in range(120)]
 
     monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", _mock)
 

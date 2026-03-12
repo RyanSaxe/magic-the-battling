@@ -61,7 +61,7 @@ def _create_player_packs_from_battler(game: Game, player: Player) -> None:
 def _get_pack_queue(game: Game, player: Player) -> list[list[Card]]:
     if game.draft_state is None:
         raise ValueError("No draft in progress")
-    if game.config.play_mode == "draft":
+    if game.config.play_mode == "limited":
         return game.draft_state.packs
     return game.draft_state.player_packs.setdefault(player.name, [])
 
@@ -72,7 +72,7 @@ def start(game: Game) -> None:
         raise ValueError("Draft already in progress")
 
     game.draft_state = DraftState(packs=[])
-    if game.config.play_mode == "draft":
+    if game.config.play_mode == "limited":
         _create_shared_packs_from_battler(game)
 
 
@@ -83,7 +83,7 @@ def deal_pack_to_player(game: Game, player: Player) -> list[Card]:
 
     queue = _get_pack_queue(game, player)
     if not queue:
-        if game.config.play_mode == "draft":
+        if game.config.play_mode == "limited":
             _create_shared_packs_from_battler(game)
         else:
             _create_player_packs_from_battler(game, player)
@@ -178,7 +178,7 @@ def cleanup_draft(game: Game) -> None:
     if game.draft_state is None:
         return
 
-    if game.config.play_mode == "draft":
+    if game.config.play_mode == "limited":
         if game.battler is not None:
             for pack in game.draft_state.packs:
                 game.battler.cards.extend(pack)

@@ -79,7 +79,7 @@ export async function createGame(
     puppet_count: options.puppetCount ?? 0,
     auto_approve_spectators: options.autoApproveSpectators ?? false,
     guided_mode_default: options.guidedModeDefault ?? false,
-    play_mode: options.playMode ?? 'draft',
+    play_mode: options.playMode ?? 'limited',
   })
 
   for (let attempt = 0; attempt < CREATE_RETRY_MAX_ATTEMPTS; attempt++) {
