@@ -189,7 +189,11 @@ export function BattlefieldZone({
                 </div>
               )}
               {landCardDimensions && (
-                <PoisonCard count={poisonCount} dimensions={landCardDimensions} />
+                <PoisonCard
+                  count={poisonCount}
+                  dimensions={landCardDimensions}
+                  owner={isOpponent ? "opponent" : "player"}
+                />
               )}
             </div>
           )}

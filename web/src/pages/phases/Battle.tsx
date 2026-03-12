@@ -27,6 +27,7 @@ export interface BattleZoneModalState {
 
 interface BattlePhaseProps {
   gameState: GameState
+  battleOverride?: GameState['current_battle']
   actions: {
     battleMove: (cardId: string, fromZone: ZoneName, toZone: ZoneName, fromOwner: ZoneOwner, toOwner: ZoneOwner) => void
     battleSubmitResult: (result: string) => void
@@ -69,6 +70,7 @@ function countTopLevel(cards: CardType[], attachments: Record<string, string[]>,
 
 export function BattlePhase({
   gameState,
+  battleOverride,
   actions,
   isMobile = false,
   selectedCard,
@@ -120,7 +122,7 @@ export function BattlePhase({
 
   const { current_battle } = gameState
 
-  const battle = current_battle
+  const battle = battleOverride ?? current_battle
   const yourZones = battle?.your_zones
   const oppZones = battle?.opponent_zones
 

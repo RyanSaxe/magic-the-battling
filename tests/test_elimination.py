@@ -711,7 +711,7 @@ class TestFinaleVsBot:
         manager = GameManager()
         manager._active_games["test"] = game
 
-        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, False, "test", None)
+        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, False, game_id="test", db=None)
 
         # Bot took damage but not eliminated (started at 5, took ~1-2 damage)
         assert bot.poison > 5
@@ -755,7 +755,7 @@ class TestFinaleVsBot:
         manager._active_games["test"] = game
 
         # Simulate poison already applied, recheck with both at lethal
-        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, False, "test", None)
+        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, False, game_id="test", db=None)
 
         # Should trigger sudden death
         assert end_result == "sudden_death"
@@ -799,7 +799,7 @@ class TestDrawWithOneSurvivor:
         alice.poison = 10  # At lethal
         bob.poison = 5  # Not at lethal
 
-        manager._handle_post_battle_pvp(game, alice, bob, result, False, "test", None)
+        manager._handle_post_battle_pvp(game, alice, bob, result, False, game_id="test", db=None)
 
         # Alice goes to awaiting_elimination first, then gets eliminated since 2 survivors remain
         # (bob + charlie means no sudden death needed)
@@ -815,6 +815,41 @@ class TestDrawWithOneSurvivor:
 
 class TestSuddenDeathRegressions:
     """Regression tests for sudden death bugs."""
+
+    def test_non_finale_mutual_lethal_keeps_death_animation_payload(self):
+        """A later sudden-death transition must not rewrite this battle's death payload."""
+        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
+        alice, bob, charlie = game.players
+
+        alice.poison = 9
+        bob.poison = 9
+
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+        setup_battle_ready(charlie)
+
+        b = battle.start(game, alice, bob)
+        battle.submit_result(b, alice, "draw")
+        battle.submit_result(b, bob, "draw")
+        result = battle.end(game, b)
+        assert result.is_draw
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+
+        end_result = manager._handle_post_battle_pvp(game, alice, bob, result, False, game_id="test", db=None)
+
+        assert end_result == "sudden_death"
+        assert alice.phase == "build"
+        assert bob.phase == "build"
+        assert alice.battle_resolution is not None
+        assert bob.battle_resolution is not None
+        assert alice.battle_resolution.continue_sudden_death is False
+        assert bob.battle_resolution.continue_sudden_death is False
+        assert alice.battle_resolution.your_side.show_death_animation is True
+        assert alice.battle_resolution.opponent_side.show_death_animation is True
+        assert bob.battle_resolution.your_side.show_death_animation is True
+        assert bob.battle_resolution.opponent_side.show_death_animation is True
 
     def test_sudden_death_pvp_draw_loops_back_to_build(self):
         """When both players are at lethal after a sudden death battle, loop back to build."""
@@ -865,6 +900,14 @@ class TestSuddenDeathRegressions:
         assert bob.poison == 9
         assert alice.in_sudden_death is True
         assert bob.in_sudden_death is True
+        assert alice.battle_resolution is not None
+        assert bob.battle_resolution is not None
+        assert alice.battle_resolution.continue_sudden_death is True
+        assert bob.battle_resolution.continue_sudden_death is True
+        assert alice.battle_resolution.your_side.show_death_animation is True
+        assert alice.battle_resolution.opponent_side.show_death_animation is True
+        assert bob.battle_resolution.your_side.show_death_animation is True
+        assert bob.battle_resolution.opponent_side.show_death_animation is True
 
     def test_sudden_death_pve_draw_loops_back_to_build(self):
         """When player and bot are both at lethal after sudden death, loop back to build."""
@@ -897,13 +940,52 @@ class TestSuddenDeathRegressions:
         manager = GameManager()
         manager._active_games["test"] = game
 
-        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, True, "test", None)
+        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, True, game_id="test", db=None)
 
         assert end_result is None
         assert alice.phase == "build"
         assert alice.poison == 9
         assert bot.poison == 9
         assert alice.in_sudden_death is True
+        assert alice.battle_resolution is not None
+        assert alice.battle_resolution.continue_sudden_death is True
+        assert alice.battle_resolution.your_side.show_death_animation is True
+        assert alice.battle_resolution.opponent_side.show_death_animation is True
+
+    def test_non_finale_bot_death_keeps_death_animation_payload(self):
+        """Bot/ghost deaths should animate even when the game is not over."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+
+        bot = Puppet(name="BotPlayer", player_history_id=1, poison=9)
+        extra_bot = Puppet(name="OtherBot", player_history_id=2, poison=0)
+        game.puppets.extend([bot, extra_bot])
+
+        snapshot = BattleSnapshotData(
+            hand=[Card(name="BotCard", image_url="bot", id="bot", type_line="Creature")],
+            vanguard=None,
+            basic_lands=["Forest", "Swamp", "Mountain"],
+            applied_upgrades=[],
+            treasures=1,
+        )
+        static_opp = StaticOpponent.from_snapshot(snapshot, "BotPlayer", 1)
+
+        setup_battle_ready(alice)
+        b = battle.start(game, alice, static_opp)
+        battle.submit_result(b, alice, alice.name)
+        result = battle.end(game, b)
+        assert result.winner is alice
+
+        manager = GameManager()
+        manager._active_games["test"] = game
+
+        end_result = manager._handle_post_battle_static(game, alice, static_opp, result, False, game_id="test", db=None)
+
+        assert end_result is None
+        assert alice.phase == "reward"
+        assert bot.is_eliminated is True
+        assert alice.battle_resolution is not None
+        assert alice.battle_resolution.opponent_side.show_death_animation is True
 
     def test_would_be_dead_returns_false_with_active_battles(self):
         """would_be_dead_ready_for_elimination returns False when battles are in progress."""

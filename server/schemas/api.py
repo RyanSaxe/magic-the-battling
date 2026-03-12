@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 from mtb.models.cards import Card
-from mtb.models.game import LastBattleResult, Zones
+from mtb.models.game import BattleResolution, LastBattleResult, Zones
 from mtb.models.types import BuildSource, CardDestination, Phase, PlayMode, ZoneName, normalize_play_mode
 
 LastResult = Literal["win", "loss", "draw"]
@@ -120,6 +120,7 @@ class GameStateResponse(BaseModel):
     self_player: SelfPlayerView
     available_upgrades: list[Card]
     current_battle: BattleView | None = None
+    battle_resolution: BattleResolution | None = None
     use_upgrades: bool = True
     cube_id: str = "auto"
     play_mode: PlayMode = "limited"

@@ -957,6 +957,256 @@ body {
   transition: opacity 500ms ease-out;
 }
 
+@keyframes battle-resolution-counter-pop {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(192, 132, 252, 0));
+  }
+
+  45% {
+    transform: scale(1.75) translateY(-16px);
+    filter: drop-shadow(0 0 26px rgba(192, 132, 252, 0.95));
+  }
+
+  100% {
+    transform: scale(1.14);
+    filter: drop-shadow(0 0 16px rgba(192, 132, 252, 0.55));
+  }
+}
+
+@keyframes battle-resolution-death {
+  0% {
+    transform: scale(1.14);
+    filter: drop-shadow(0 0 0 rgba(248, 113, 113, 0));
+  }
+
+  40% {
+    transform: scale(1.5);
+    filter: drop-shadow(0 0 28px rgba(248, 113, 113, 0.95));
+  }
+
+  100% {
+    transform: scale(1.24);
+    filter: drop-shadow(0 0 22px rgba(248, 113, 113, 0.8));
+  }
+}
+
+@keyframes battle-resolution-source-stage {
+  0% {
+    opacity: 0.28;
+    transform: translate(var(--battle-enter-x), var(--battle-enter-y)) scale(var(--battle-enter-scale));
+  }
+
+  70% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1.06);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes battle-resolution-source-charge {
+  0% {
+    transform: translate(0, 0) scale(1);
+    filter: drop-shadow(0 0 18px rgba(192, 132, 252, 0.55));
+  }
+
+  50% {
+    transform: translate(0, 0) scale(1.08);
+    filter: drop-shadow(0 0 34px rgba(192, 132, 252, 0.95));
+  }
+
+  100% {
+    transform: translate(0, 0) scale(1.03);
+    filter: drop-shadow(0 0 26px rgba(192, 132, 252, 0.78));
+  }
+}
+
+@keyframes battle-resolution-beam-dash {
+  from {
+    stroke-dashoffset: 260;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes sudden-death-continue-pulse {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 rgba(251, 191, 36, 0);
+  }
+
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 28px rgba(251, 191, 36, 0.7);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 14px rgba(251, 191, 36, 0.35);
+  }
+}
+
+.battle-resolution-counter {
+  transition: transform 240ms ease-out, filter 240ms ease-out;
+  transform-origin: center center;
+}
+
+.battle-resolution-counter-active {
+  animation: battle-resolution-counter-pop 900ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.battle-resolution-counter-dead {
+  animation: battle-resolution-death 1200ms ease-out forwards;
+}
+
+.battle-resolution-counter-dead [data-poison-owner] {
+  outline: 2px solid rgba(248, 113, 113, 0.7);
+}
+
+.battle-resolution-source-card {
+  animation: battle-resolution-source-stage 760ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  filter: drop-shadow(0 0 20px rgba(192, 132, 252, 0.72));
+  transform-origin: center center;
+}
+
+.battle-resolution-source-card-firing .card {
+  animation: battle-resolution-source-charge 760ms ease-in-out infinite;
+}
+
+.battle-resolution-beam-core {
+  stroke: rgba(216, 180, 254, 0.95);
+  stroke-width: 8px;
+  stroke-linecap: round;
+  stroke-dasharray: 34 18;
+  animation: battle-resolution-beam-dash 620ms linear forwards;
+}
+
+.battle-resolution-beam-glow {
+  stroke: rgba(147, 51, 234, 0.75);
+  stroke-width: 22px;
+  stroke-linecap: round;
+  filter: blur(7px);
+  opacity: 0.96;
+}
+
+.battle-resolution-continue-panel {
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  background:
+    radial-gradient(circle at top, rgba(251, 191, 36, 0.18), rgba(0, 0, 0, 0.8)),
+    rgba(17, 24, 39, 0.92);
+  color: #fde68a;
+  font-size: clamp(24px, 4vw, 44px);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 18px 24px;
+  border-radius: 18px;
+  animation: sudden-death-continue-pulse 900ms ease-in-out forwards;
+}
+
+@keyframes build-upgrade-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1.14);
+  }
+}
+
+@keyframes build-upgrade-gold-reveal {
+  0% {
+    opacity: 1;
+    transform: scale(1.14);
+    box-shadow: 0 0 0 rgba(251, 191, 36, 0);
+  }
+
+  55% {
+    opacity: 1;
+    transform: scale(1.24);
+    box-shadow: 0 0 64px rgba(251, 191, 36, 0.95), 0 0 120px rgba(212, 175, 55, 0.45);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1.18);
+    box-shadow: 0 0 28px rgba(251, 191, 36, 0.55);
+  }
+}
+
+@keyframes build-upgrade-source-rise {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes build-upgrade-fade-out {
+  0% {
+    opacity: 1;
+    transform: scale(1.16);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.28);
+  }
+}
+
+.battle-upgrade-target {
+  animation: build-upgrade-enter 540ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  filter: drop-shadow(0 0 18px rgba(251, 191, 36, 0.24));
+}
+
+.battle-upgrade-target-glow {
+  animation: build-upgrade-gold-reveal 1100ms ease-out forwards;
+}
+
+.battle-upgrade-target-fade {
+  animation: build-upgrade-fade-out 760ms ease-in forwards;
+}
+
+.battle-upgrade-gold-flare {
+  position: absolute;
+  inset: -10%;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle, rgba(251, 191, 36, 0.44), rgba(251, 191, 36, 0)),
+    radial-gradient(circle at top, rgba(255, 248, 196, 0.42), rgba(255, 248, 196, 0));
+  opacity: 0;
+  pointer-events: none;
+}
+
+.battle-upgrade-target-glow .battle-upgrade-gold-flare {
+  opacity: 1;
+}
+
+.battle-upgrade-source {
+  animation: build-upgrade-source-rise 540ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  filter: drop-shadow(0 0 20px rgba(245, 158, 11, 0.34));
+}
+
+.battle-upgrade-source-glow {
+  filter: drop-shadow(0 0 32px rgba(251, 191, 36, 0.6));
+}
+
+.battle-upgrade-source-fade {
+  animation: build-upgrade-fade-out 760ms ease-in forwards;
+}
+
 /* Callout styles */
 .callout {
   border-radius: 6px;

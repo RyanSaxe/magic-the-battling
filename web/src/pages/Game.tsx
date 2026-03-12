@@ -8,7 +8,7 @@ import {
   createSpectateRequest,
   getSpectateRequestStatus,
 } from "../api/client";
-import type { GameStatusResponse, PlayerView, ZoneName } from "../types";
+import type { BattleView, Card as CardType, GameStatusResponse, PlayerView, ZoneName } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
 import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
@@ -30,6 +30,8 @@ import { FaceDownProvider } from "../contexts/FaceDownContext";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard, type ZoneOwner } from "../dnd";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
+import { BattleResolutionOverlay } from "../components/common/BattleResolutionOverlay";
+import { BuildUpgradeOverlay } from "../components/common/BuildUpgradeOverlay";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
@@ -69,6 +71,10 @@ type BattleSidebarLayout = {
   handHeight: number;
   middleLaneHeight: number;
 } | null;
+type PendingBuildUpgradeAnimation = {
+  upgradeId: string;
+  targetId: string;
+};
 type OverlayKey =
   | "rules"
   | "upgrades"
@@ -708,7 +714,6 @@ function GameContent() {
   const wasInvalidSessionRef = useRef(false);
   const guideRootRef = useRef<HTMLDivElement>(null);
   const selfPhase = gameState?.self_player.phase;
-  const canManipulateOpponent = gameState?.current_battle?.can_manipulate_opponent ?? false;
 
   useEffect(() => {
     const shouldClear = shouldClearSessionOnInvalidEvent(
@@ -757,6 +762,12 @@ function GameContent() {
     useState<UpgradesModalOpenMode>('auto');
   const [upgradeInitialTargetId, setUpgradeInitialTargetId] = useState<string | undefined>(undefined);
   const handSlotsRef = useRef<(string | null)[]>([]);
+  const [pendingBuildUpgradeAnimation, setPendingBuildUpgradeAnimation] =
+    useState<PendingBuildUpgradeAnimation | null>(null);
+  const [activeBuildUpgradeAnimation, setActiveBuildUpgradeAnimation] = useState<{
+    upgrade: CardType;
+    target: CardType;
+  } | null>(null);
 
   // Lifted state from Reward phase
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(
@@ -773,6 +784,41 @@ function GameContent() {
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
   const [dismissedServerNoticeAt, setDismissedServerNoticeAt] = useState<string | null>(null);
+  const [cachedBattleForResolution, setCachedBattleForResolution] = useState<BattleView | null>(null);
+  const [activeBattleResolutionId, setActiveBattleResolutionId] = useState<string | null>(null);
+  const shownBattleResolutionIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (gameState?.self_player.phase === "battle" && gameState.current_battle) {
+      const battleSnapshot = gameState.current_battle;
+      queueMicrotask(() => setCachedBattleForResolution(battleSnapshot));
+    }
+  }, [gameState?.current_battle, gameState?.self_player.phase]);
+
+  useEffect(() => {
+    const selfPlayer = gameState?.self_player;
+    if (!selfPlayer || !pendingBuildUpgradeAnimation || selfPlayer.phase !== "build") {
+      return;
+    }
+
+    const upgrade = selfPlayer.upgrades.find(
+      (candidate) =>
+        candidate.id === pendingBuildUpgradeAnimation.upgradeId &&
+        candidate.upgrade_target?.id === pendingBuildUpgradeAnimation.targetId,
+    );
+    if (!upgrade?.upgrade_target) {
+      return;
+    }
+
+    const nextAnimation = {
+      upgrade,
+      target: upgrade.upgrade_target,
+    };
+    queueMicrotask(() => {
+      setActiveBuildUpgradeAnimation(nextAnimation);
+      setPendingBuildUpgradeAnimation(null);
+    });
+  }, [gameState?.self_player, pendingBuildUpgradeAnimation]);
 
   const prevPhaseRef = useRef(gameState?.self_player.phase);
   if (gameState?.self_player.phase !== prevPhaseRef.current) {
@@ -882,6 +928,29 @@ function GameContent() {
     }
   }, []);
 
+  useEffect(() => {
+    const resolutionId = gameState?.battle_resolution?.resolution_id;
+    const phase = gameState?.self_player.phase;
+    if (!resolutionId || !phase || phase === "battle" || !cachedBattleForResolution) {
+      return;
+    }
+    if (shownBattleResolutionIdsRef.current.has(resolutionId)) {
+      return;
+    }
+
+    shownBattleResolutionIdsRef.current.add(resolutionId);
+    queueMicrotask(() => {
+      closeGameplayOverlays();
+      setActiveBattleResolutionId(resolutionId);
+    });
+  }, [
+    cachedBattleForResolution,
+    closeGameplayOverlays,
+    gameState?.battle_resolution,
+    gameState?.battle_resolution?.resolution_id,
+    gameState?.self_player.phase,
+  ]);
+
   const openRulesPanel = useCallback((target?: RulesPanelTarget) => {
     closeGameplayOverlays("rules");
     setRulesPanelTarget(target);
@@ -988,7 +1057,9 @@ function GameContent() {
     activeDndPanel !== null ||
     activeBattleZoneModal !== null ||
     shareOpen ||
-    state.previewCard !== null;
+    state.previewCard !== null ||
+    activeBattleResolutionId !== null ||
+    activeBuildUpgradeAnimation !== null;
   const sidebarPlayers = useMemo(
     () => (gameState ? getSidebarPlayerOrder(gameState.players) : []),
     [gameState],
@@ -1219,6 +1290,13 @@ function GameContent() {
   const currentPhase = gameState.self_player.phase;
 
   const { self_player, current_battle } = gameState;
+  const activeBattleResolution =
+    activeBattleResolutionId && gameState.battle_resolution?.resolution_id === activeBattleResolutionId
+      ? gameState.battle_resolution
+      : null;
+  const displayBattleResolution = !!activeBattleResolution && !!cachedBattleForResolution;
+  const battleViewForDisplay = current_battle ?? (displayBattleResolution ? cachedBattleForResolution : null);
+  const canManipulateOpponent = battleViewForDisplay?.can_manipulate_opponent ?? false;
 
   const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
@@ -1555,21 +1633,21 @@ function GameContent() {
   }
 
   const allFaceDownIds = (() => {
-    if (!current_battle) return new Set<string>()
+    if (!battleViewForDisplay) return new Set<string>()
     const ids = new Set<string>()
-    for (const id of current_battle.your_zones.face_down_card_ids ?? []) ids.add(id)
-    for (const id of current_battle.opponent_zones.face_down_card_ids ?? []) ids.add(id)
+    for (const id of battleViewForDisplay.your_zones.face_down_card_ids ?? []) ids.add(id)
+    for (const id of battleViewForDisplay.opponent_zones.face_down_card_ids ?? []) ids.add(id)
     return ids
   })()
 
   const renderPhaseContent = (): ReactNode => {
-    if (currentPhase === "battle" && current_battle) {
+    if ((currentPhase === "battle" || displayBattleResolution) && battleViewForDisplay) {
       return (
         <BattleSidebarContent
-          currentBattle={current_battle}
+          currentBattle={battleViewForDisplay}
           selfUpgrades={self_player.upgrades}
-          yourLife={current_battle.your_life}
-          opponentLife={current_battle.opponent_life}
+          yourLife={battleViewForDisplay.your_life}
+          opponentLife={battleViewForDisplay.opponent_life}
           onYourLifeChange={handleYourLifeChange}
           onOpponentLifeChange={handleOpponentLifeChange}
           playerName={self_player.name}
@@ -1702,7 +1780,14 @@ function GameContent() {
           selfPhase={selfPhase}
           guideContext={guideContext!}
           isSpectator={isSpectator}
-          hasOverlayOpen={rulesPanelOpen || showUpgradesModal || shareOpen || actionMenuOpen}
+          hasOverlayOpen={
+            rulesPanelOpen ||
+            showUpgradesModal ||
+            shareOpen ||
+            actionMenuOpen ||
+            displayBattleResolution ||
+            activeBuildUpgradeAnimation !== null
+          }
           closeGameplayOverlays={closeGameplayOverlays}
         >
         {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
@@ -1734,7 +1819,7 @@ function GameContent() {
         </div>
 
         {/* Main content */}
-        {currentPhase === "battle" ? (
+        {(currentPhase === "battle" || displayBattleResolution) && battleViewForDisplay ? (
           <FaceDownProvider value={{ faceDownCardIds: allFaceDownIds }}>
           <GameDndProvider
             onCardMove={handleCardMove}
@@ -1744,18 +1829,18 @@ function GameContent() {
               <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
               <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-                {sizes.isMobile && current_battle && (
+                {sizes.isMobile && battleViewForDisplay && (
                   <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight">
                     <div className="flex items-center gap-1">
-                      <span className="text-gray-300 truncate max-w-[60px] leading-tight">{current_battle.opponent_name}</span>
+                      <span className="text-gray-300 truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
                       <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                        <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
-                        <span className="text-white font-bold">{current_battle.opponent_life}</span>
-                        <button onClick={() => handleOpponentLifeChange(current_battle.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                        <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                        <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
+                        <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
                       </div>
                     </div>
                     <div className="text-center leading-tight">
-                      {current_battle.current_turn_name === self_player.name ? (
+                      {battleViewForDisplay.current_turn_name === self_player.name ? (
                         <span className="text-green-400 font-medium">Your turn</span>
                       ) : (
                         <span className="text-amber-400 font-medium">Opp's turn</span>
@@ -1763,15 +1848,15 @@ function GameContent() {
                     </div>
                     <div className="flex items-center gap-1">
                       <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                        <button onClick={() => handleYourLifeChange(current_battle.your_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
-                        <span className="text-white font-bold">{current_battle.your_life}</span>
-                        <button onClick={() => handleYourLifeChange(current_battle.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                        <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                        <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
+                        <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
                       </div>
                       <span className="text-gray-300 truncate max-w-[60px] leading-tight">{self_player.name}</span>
                     </div>
                   </div>
                 )}
-                {sizes.isMobile && current_battle && (
+                {sizes.isMobile && battleViewForDisplay && (
                   <ZoneDivider
                     orientation="horizontal"
                     interactive={false}
@@ -1780,6 +1865,7 @@ function GameContent() {
                 )}
                   <BattlePhase
                     gameState={gameState}
+                    battleOverride={displayBattleResolution ? battleViewForDisplay : undefined}
                     actions={actions}
                     isMobile={sizes.isMobile}
                     selectedCard={battleSelectedCard}
@@ -1791,6 +1877,16 @@ function GameContent() {
                     onZoneModalToggle={toggleBattleZoneModal}
                     onLayoutMetricsChange={setBattleSidebarLayout}
                   />
+                  {displayBattleResolution && activeBattleResolution && (
+                    <BattleResolutionOverlay
+                      battle={battleViewForDisplay}
+                      resolution={activeBattleResolution}
+                      onComplete={() => {
+                        setActiveBattleResolutionId(null)
+                        setCachedBattleForResolution(null)
+                      }}
+                    />
+                  )}
                 </div>
               </main>
               {sizes.isMobile ? (
@@ -2036,7 +2132,7 @@ function GameContent() {
           </div>
         )}
         {/* Bottom Action Bar */}
-        {!isSpectator && (
+        {!isSpectator && !displayBattleResolution && (
           <div className="shrink-0 relative z-40 frame-chrome">
             <div
               className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-main timeline-actions"
@@ -2115,13 +2211,26 @@ function GameContent() {
           upgrades={self_player.upgrades}
           mode={upgradesModalMode}
           targets={[...self_player.hand, ...self_player.sideboard]}
-          onApply={(upgradeId, targetId) => actions.buildApplyUpgrade(upgradeId, targetId)}
+          onApply={(upgradeId, targetId) => {
+            setShowUpgradesModal(false);
+            setUpgradeInitialTargetId(undefined);
+            setUpgradesModalOpenMode('auto');
+            setPendingBuildUpgradeAnimation({ upgradeId, targetId });
+            actions.buildApplyUpgrade(upgradeId, targetId);
+          }}
           onClose={() => {
             setShowUpgradesModal(false);
             setUpgradeInitialTargetId(undefined);
             setUpgradesModalOpenMode('auto');
           }}
           initialTargetId={upgradeInitialTargetId}
+        />
+      )}
+      {activeBuildUpgradeAnimation && (
+        <BuildUpgradeOverlay
+          upgrade={activeBuildUpgradeAnimation.upgrade}
+          target={activeBuildUpgradeAnimation.target}
+          onComplete={() => setActiveBuildUpgradeAnimation(null)}
         />
       )}
       {shareOpen && (

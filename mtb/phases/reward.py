@@ -2,7 +2,7 @@ import random
 from uuid import uuid4
 
 from mtb.models.cards import Card
-from mtb.models.game import Game, LastBattleResult, Player, StaticOpponent
+from mtb.models.game import BattleResolutionEvent, Game, LastBattleResult, Player, StaticOpponent
 from mtb.phases.battle import BattleResult
 
 
@@ -10,8 +10,33 @@ def is_stage_increasing(player: Player) -> bool:
     return player.round % player.game.config.num_rounds_per_stage == 0
 
 
-def count_applied_upgrades(player: Player) -> int:
-    return sum(1 for u in player.upgrades if u.upgrade_target is not None)
+def _submitted_damage_cards(player: Player | StaticOpponent) -> list[Card]:
+    return [*player.hand, *player.command_zone]
+
+
+def get_submitted_upgrade_source_ids(player: Player | StaticOpponent) -> list[str]:
+    source_ids: list[str] = []
+    upgrade_targets = {
+        upgrade.upgrade_target.id: upgrade.upgrade_target
+        for upgrade in player.upgrades
+        if upgrade.upgrade_target is not None
+    }
+
+    for card in _submitted_damage_cards(player):
+        target = upgrade_targets.get(card.id)
+        if target is None:
+            continue
+        source_ids.extend(
+            upgrade.upgrade_target.id
+            for upgrade in player.upgrades
+            if upgrade.upgrade_target is not None and upgrade.upgrade_target.id == target.id
+        )
+
+    return source_ids
+
+
+def count_applied_upgrades(player: Player | StaticOpponent) -> int:
+    return len(get_submitted_upgrade_source_ids(player))
 
 
 def _fibonacci(n: int) -> int:
@@ -23,11 +48,28 @@ def _fibonacci(n: int) -> int:
     return a
 
 
-def calculate_damage(player: Player) -> int:
-    if player.game.config.use_upgrades:
+def calculate_damage(player: Player | StaticOpponent) -> int:
+    if isinstance(player, StaticOpponent) or player.game.config.use_upgrades:
         return 1 + count_applied_upgrades(player)
     else:
         return _fibonacci(player.hand_size - 2)
+
+
+def build_damage_events(player: Player | StaticOpponent) -> list[BattleResolutionEvent]:
+    damage = calculate_damage(player)
+    if damage <= 0:
+        return []
+
+    if isinstance(player, StaticOpponent) or player.game.config.use_upgrades:
+        return [
+            BattleResolutionEvent(event_type="base_increment"),
+            *(
+                BattleResolutionEvent(event_type="upgrade_beam", source_card_id=source_id)
+                for source_id in get_submitted_upgrade_source_ids(player)
+            ),
+        ]
+
+    return [BattleResolutionEvent(event_type="base_increment") for _ in range(damage)]
 
 
 def apply_poison(winner: Player, loser: Player) -> int:
@@ -133,8 +175,7 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
 
 
 def calculate_static_opponent_damage(opponent: StaticOpponent) -> int:
-    applied_upgrades = sum(1 for u in opponent.upgrades if u.upgrade_target is not None)
-    return 1 + applied_upgrades
+    return calculate_damage(opponent)
 
 
 def apply_bot_poison(game: Game, opponent: StaticOpponent, poison: int) -> None:

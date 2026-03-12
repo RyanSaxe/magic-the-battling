@@ -1,6 +1,6 @@
 import random
 import weakref
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import AliasChoices, BaseModel, Field, PrivateAttr, field_validator
 
@@ -136,6 +136,32 @@ class LastBattleResult(BaseModel):
     pre_battle_treasures: int = 0
 
 
+class BattleResolutionEvent(BaseModel):
+    event_type: Literal["base_increment", "upgrade_beam"]
+    source_card_id: str | None = None
+
+
+class BattleResolutionSide(BaseModel):
+    name: str
+    starting_poison: int
+    ending_poison: int
+    poison_delta: int
+    took_damage: bool = False
+    is_lethal: bool = False
+    show_death_animation: bool = False
+    events: list[BattleResolutionEvent] = Field(default_factory=list)
+
+
+class BattleResolution(BaseModel):
+    resolution_id: str
+    winner_name: str | None
+    is_draw: bool = False
+    is_sudden_death: bool = False
+    continue_sudden_death: bool = False
+    your_side: BattleResolutionSide
+    opponent_side: BattleResolutionSide
+
+
 class Player(BaseModel):
     name: str
     most_recently_revealed_cards: list[Card] = Field(default_factory=list)
@@ -157,6 +183,7 @@ class Player(BaseModel):
     stage: int = 3
     last_opponent_name: str | None = None
     last_battle_result: "LastBattleResult | None" = None
+    battle_resolution: "BattleResolution | None" = None
 
     upgrades: list[Card] = Field(default_factory=list)
     vanguard: Card | None = None
