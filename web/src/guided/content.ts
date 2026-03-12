@@ -137,13 +137,13 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "After each battle, get some loot and then advances you to the next stage-round shown on the right.",
+          summary: "After each battle, get some loot and then advance to the next round.",
           detail: "After the last battle of a stage, you'll get some special loot",
         },
       },
       {
         id: "guide",
-        title: "Guide Has The Full Reference",
+        title: "Comprehensive Guide",
         targetId: "guide-button",
         positionTargetId: "guide-button",
         placement: "left",
@@ -173,8 +173,7 @@ function buildBuildGuide(): GuideDefinition {
         positionTargetId: "game-content",
         primaryActionLabel: "Show me the zones",
         content: {
-          summary: "Build chooses the exact starting hand and the 3 untapped basics you begin the next battle with.",
-          detail: "Whatever you lock in here is your actual opening position. Your sideboard holds the pool of cards available for this round.",
+          summary: "Build the best starting hand you can from the pool you have in which you start the game with 3 basic lands of your choice on the battlefield untapped.",
         },
       },
       {
@@ -187,13 +186,12 @@ function buildBuildGuide(): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Your sideboard is the pool of cards available for this round's build.",
-          detail: "Move cards between sideboard and hand to decide what you want to start with. If you use upgrades, this is also one of the places where you can apply them.",
+          summary: "The game starts dealing 7 cards to all players. This is your current pool to build your hand from.",
         },
       },
       {
         id: "battlefield",
-        title: "Choose Your Battlefield Setup",
+        title: "Choose Your Lands",
         targetId: "build-battlefield",
         positionTargetId: (ctx) => (ctx.isMobile ? "build-hand" : "build-battlefield"),
         placement: "bottom",
@@ -202,12 +200,12 @@ function buildBuildGuide(): GuideDefinition {
         primaryActionLabel: "Next",
         content: {
           summary: "In build, you choose the 3 basic lands that will start untapped on the battlefield in the next battle.",
-          detail: "Your treasure tokens and poison counters also carry into battle, so this row is part of your actual opening position.",
+          detail: "Your treasure tokens and poison counters also carry into battle. This can change the value of cards over the course of the game.",
         },
       },
       {
         id: "hand",
-        title: "Lock In Your Starting Hand",
+        title: "Choose Your Cards",
         targetId: "build-hand",
         positionTargetId: (ctx) => (ctx.isMobile ? "build-battlefield" : "build-hand"),
         placement: "bottom",
@@ -216,7 +214,6 @@ function buildBuildGuide(): GuideDefinition {
         primaryActionLabel: "Next",
         content: {
           summary: "Your hand must be filled to the current hand size, and this exact hand becomes your opening hand in battle.",
-          detail: "Once your hand and basics are correct, submit the build to choose play or draw.",
         },
       },
       {
@@ -229,8 +226,7 @@ function buildBuildGuide(): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Ready to build",
         content: {
-          summary: "Whenever you're ready, click this button to lock in build and move toward battle.",
-          detail: "Submitting opens the play-or-draw choice, then the next battle starts from exactly the hand and basics you built here.",
+          summary: "Whenever you're ready, click this button to lock in your build.",
         },
       },
     ],
@@ -245,7 +241,7 @@ function buildPlayDrawGuide(): GuideDefinition {
     steps: [
       {
         id: "play-draw",
-        title: "Submit Includes Play Or Draw",
+        title: "Play Or Draw",
         targetId: "build-submit-popover",
         positionTargetId: "build-battlefield",
         placement: "top",
@@ -254,7 +250,7 @@ function buildPlayDrawGuide(): GuideDefinition {
         allowTargetInteraction: true,
         content: {
           summary: "Play or draw is submitted as part of your build.",
-          detail: "Outside the finals, the player with the most poison chooses play or draw here; if poison is tied, that choice is random. In the finals after game one, the loser of the previous game chooses instead.",
+          detail: "The player with the most poison will get their submitted choice of play or draw.",
         },
       },
     ],
@@ -272,12 +268,12 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       primaryActionLabel: "Show me the zones",
       content: {
         summary: "Battle is a short manual game of Magic with 10 life and no libraries.",
-        detail: "Drag cards between zones to play out the game, then submit the result when one player wins. Up to 5 treasure on the battlefield carry forward.",
+        detail: "Treasures are persistent. If you produce some in a battle, you get to keep them (up to 5) for future battles. And if you use them, then you won't have them for later. Choose wisely!",
       },
     },
     {
       id: "hand",
-      title: "Hand To Battlefield Is The Main Flow",
+      title: "Your Hand",
       targetId: "battle-hand" as const,
       positionTargetId: (ctx) => (ctx.isMobile ? "battle-battlefield" : "battle-hand"),
       placement: "top" as const,
@@ -285,13 +281,12 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       mobileCardPlacement: "top-center",
       primaryActionLabel: "Next",
       content: {
-        summary: "Battle is manual. Drag cards from your hand to the battlefield when you cast or play them.",
-        detail: "The starting hand and battlefield were chosen in build, so use this zone to play out the game state exactly as it happens.",
+        summary: "Your opponent cannot see your hand. Drag cards to the battlefield to show them to your opponent and play them.",
       },
     },
     {
       id: "battlefield",
-      title: "Use The Battlefield To Track Play",
+      title: "The Battlefield",
       targetId: "battle-battlefield" as const,
       positionTargetId: (ctx) => (ctx.isMobile ? "battle-hand" : "battle-battlefield"),
       placement: "right" as const,
@@ -299,8 +294,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       mobileCardPlacement: "bottom-center",
       primaryActionLabel: "Next",
       content: {
-        summary: "Double click or double tap permanents to tap and untap them while you play.",
-        detail: "Right-click a card for more options like counters, tokens, and zone moves. Those same options appear in the Actions menu when a card is selected.",
+        summary: "Double click or double tap permanents to tap and untap them while you play. Right click for a full option menu.",
       },
     },
     {
@@ -313,7 +307,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       primaryActionLabel: ctx.currentBattle?.can_manipulate_opponent ? "Next" : "Got it",
       content: {
         summary: "This button opens the full actions menu with general utilities and card-specific options.",
-        detail: "Standard actions like untapping all permanents, creating treasure tokens, and passing the turn live here. If a card is selected, its specific actions also appear at the top of the menu.",
+        detail: "If a card is selected, its specific actions also appear at the top of the menu.",
       },
     },
   ];
@@ -321,7 +315,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   if (ctx.currentBattle?.can_manipulate_opponent) {
     steps.push({
       id: "puppet-hand",
-      title: "Puppet Battles Use Their Hand Too",
+      title: "Your Opponent is a Puppet",
       targetId: "battle-opponent-hand",
       positionTargetId: "battle-battlefield",
       placement: "top",
@@ -329,7 +323,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       mobileCardPlacement: "bottom-center",
       primaryActionLabel: "Got it",
       content: {
-        summary: "Against a puppet, their hand is visible and you can move their cards too.",
+        summary: "A puppet is an opponent created from a historical game to enable goldfishing. Their hand is visible and you can move their cards too.",
         detail: "Use both hands and battlefields to play out the likely game, then submit the player who would have won.",
       },
     });
@@ -337,7 +331,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
 
   steps.push({
     id: "submit",
-    title: "This Opens Result Submission",
+    title: "Submit The Result",
     targetId: "battle-submit",
     positionTargetId: "phase-action-bar",
     placement: "top",
@@ -346,7 +340,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
     primaryActionLabel: "Ready to battle",
     content: {
       summary: "Whenever the battle is over, click this button to submit the result.",
-      detail: "That opens the result chooser. Once the result is submitted, round wrap-up handles the next part of the loop.",
+      detail: "Note: a Draw is considered a loss for both players.",
     },
   });
 
@@ -368,20 +362,19 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       positionTargetId: "game-content",
       primaryActionLabel: "Show me the loot",
       content: {
-        summary: "Round wrap-up adds loot and other progression before the next round starts.",
-        detail: "Every wrap-up gives +1 treasure. On rounds 1 and 2, you also get a random card. The final round of each stage is special — you earn The Vanquisher, your hand size grows, and you advance to the next stage.",
+        summary: "Get some loot. Everybody gets the same amount of loot.",
+        detail: "The loot at the end of a stage is special, so look out for that!",
       },
     },
     {
       id: "reward-basics",
-      title: "Every Wrap-Up Adds Loot",
+      title: "Your Loot",
       targetId: "reward-summary",
       placement: "right",
       cardPlacement: "bottom-center",
       primaryActionLabel: ctx.isStageEnd ? "Got it" : "Next",
       content: {
-        summary: "Every wrap-up gives you +1 treasure.",
-        detail: "On the first and second round of a stage, you also get +1 random card from the Battler.",
+        summary: "You always get +1 treasure and a card",
       },
     },
   ];
@@ -389,7 +382,7 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   if (!ctx.isStageEnd) {
     steps.push({
       id: "continue",
-      title: "This Starts The Next Round",
+      title: "Start The Next Round",
       targetId: "reward-continue",
       positionTargetId: "phase-action-bar",
       placement: "top",
@@ -398,7 +391,6 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       primaryActionLabel: "Ready to continue",
       content: {
         summary: "Whenever you're ready, click this button to start the draft phase of the next round.",
-        detail: "Round wrap-up is the handoff back into the main loop, so this is how you move from loot into the next draft.",
       },
     });
   }

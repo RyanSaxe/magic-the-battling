@@ -223,10 +223,6 @@ export function BattleSidebarContent({
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
               />
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
-              />
             </>
           )}
             <div className="relative z-10 flex min-h-0 flex-col justify-between gap-3 p-3 pb-2">
@@ -336,13 +332,18 @@ export function BattleSidebarContent({
 
       {/* Your section - bottom */}
       <div
-        className={`${handZoneHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden p-3 ${
+        className={`relative min-h-0 flex-1 overflow-hidden p-3 ${
           hasMeasuredMiddleLane
             ? ""
             : "border-t border-[var(--gold-border-opaque)]"
         }`}
-        style={handZoneHeight != null ? { height: handZoneHeight } : undefined}
       >
+        {hasMeasuredMiddleLane && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
+          />
+        )}
         <PlayerSection
           upgrades={selfUpgrades}
         />
