@@ -249,7 +249,7 @@ export function PhaseTimeline({
               {END_STATE_LABELS[currentPhase]}
             </span>
           )}
-          <div className="flex items-center gap-1.5 timeline-actions">
+          <div className="flex items-center gap-1.5 timeline-actions sm:-translate-x-2">
             {onOpenRules && <RulesButton onClick={() => onOpenRules()} />}
             <HomeButton />
             {hamburger && <div className="shrink-0">{hamburger}</div>}
@@ -318,7 +318,7 @@ export function PhaseTimeline({
           })}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 timeline-actions">
+        <div className="flex items-center gap-1.5 shrink-0 timeline-actions sm:-translate-x-2">
           {onOpenRules && <RulesButton onClick={() => onOpenRules()} />}
           <div className="hidden sm:block">
             <HomeButton />

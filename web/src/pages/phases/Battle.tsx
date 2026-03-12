@@ -40,6 +40,7 @@ interface BattlePhaseProps {
   onCardHoverEnd?: () => void
   activeZoneModal: BattleZoneModalState | null
   onZoneModalToggle: (zone: BattleZoneModalState["zone"], owner: ZoneOwner) => void
+  onLayoutMetricsChange?: (metrics: { handHeight: number }) => void
 }
 
 const isLandOrTreasure = (card: CardType) =>
@@ -74,6 +75,7 @@ export function BattlePhase({
   onCardHoverEnd,
   activeZoneModal,
   onZoneModalToggle,
+  onLayoutMetricsChange,
 }: BattlePhaseProps) {
   const setSelectedCard = onSelectedCardChange
 
@@ -188,6 +190,14 @@ export function BattlePhase({
     zoneColumnWidth,
   })
 
+  const { rowHeight } = sizes
+  const handHeight = rowHeight + HAND_PADDING
+  const bfHeight = 2 * rowHeight + BF_PADDING
+
+  useEffect(() => {
+    onLayoutMetricsChange?.({ handHeight })
+  }, [handHeight, onLayoutMetricsChange])
+
   if (!battle) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -297,9 +307,6 @@ export function BattlePhase({
     return Object.values(opAttachments).some(children => children.includes(cardId))
   }
 
-  const { rowHeight } = sizes
-  const handHeight = rowHeight + HAND_PADDING
-  const bfHeight = 2 * rowHeight + BF_PADDING
   const opponentTopZoneHeight = handHeight
   const opponentMidZoneHeight = Math.floor(bfHeight / 2)
   const opponentBottomZoneHeight = bfHeight - opponentMidZoneHeight

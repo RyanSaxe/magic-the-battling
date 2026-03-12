@@ -24,27 +24,29 @@ function ResultBadge({
   result: LastResult | null;
   inSuddenDeath: boolean;
 }) {
+  const baseClassName = "inline-flex h-4 min-w-[1.25rem] shrink-0 items-center justify-center rounded-[3px] border border-[color:rgba(212,175,55,0.22)] bg-black/18 px-1 text-[10px] font-bold leading-none";
+
   if (inSuddenDeath) {
     return (
-      <span className="text-[10px] font-bold text-red-300" title="Sudden Death">
+      <span className={`${baseClassName} min-w-[1.5rem] text-[9px] text-red-300`} title="Sudden Death">
         SD
       </span>
     );
   }
 
   if (result === null) {
-    return <span className="text-[10px] font-semibold text-gray-500">-</span>;
+    return <span className={`${baseClassName} font-semibold text-gray-500`}>-</span>;
   }
 
   if (result === "win") {
-    return <span className="text-[10px] font-bold text-emerald-300">W</span>;
+    return <span className={`${baseClassName} text-emerald-300`}>W</span>;
   }
 
   if (result === "draw") {
-    return <span className="text-[10px] font-bold text-amber-200">D</span>;
+    return <span className={`${baseClassName} text-amber-200`}>D</span>;
   }
 
-  return <span className="text-[10px] font-bold text-red-300">L</span>;
+  return <span className={`${baseClassName} text-red-300`}>L</span>;
 }
 
 function PairingProbability({ probability }: { probability: number | null }) {
@@ -66,26 +68,28 @@ function StatusLine({
   player: PlayerView;
   variant: "game" | "share";
 }) {
+  const iconWrapClassName = "inline-flex h-4 w-[1.25rem] items-center justify-center";
+
   if (variant === "share") {
     return player.is_puppet
-      ? <PuppetIcon size="sm" />
+      ? <span className={iconWrapClassName}><PuppetIcon size="sm" /></span>
       : <span className="block truncate text-right">{player.stage}-{player.round}</span>;
   }
 
   if (player.is_ghost && !player.is_most_recent_ghost) {
-    return <SkullIcon size="sm" />;
+    return <span className={iconWrapClassName}><SkullIcon size="sm" /></span>;
   }
 
   if (player.is_most_recent_ghost) {
-    return <GhostIcon size="sm" />;
+    return <span className={iconWrapClassName}><GhostIcon size="sm" /></span>;
   }
 
   if (player.phase === "awaiting_elimination") {
-    return <HourglassIcon size="sm" />;
+    return <span className={iconWrapClassName}><HourglassIcon size="sm" /></span>;
   }
 
   if (player.is_puppet) {
-    return <PuppetIcon size="sm" />;
+    return <span className={iconWrapClassName}><PuppetIcon size="sm" /></span>;
   }
 
   return (
@@ -117,7 +121,7 @@ export function PlayerRow({
   return (
     <button
       type="button"
-      className={`relative grid w-full appearance-none overflow-hidden border-none bg-transparent grid-cols-[minmax(0,1fr)_max-content] grid-rows-2 items-center gap-x-3 gap-y-1 rounded-lg p-3 text-left transition-colors player-row-etched ${
+      className={`relative grid w-full appearance-none overflow-hidden border-none bg-transparent grid-cols-[minmax(0,1fr)_max-content] grid-rows-2 items-center gap-x-3 gap-y-1 rounded-lg px-3 py-3 text-left transition-colors player-row-etched sm:py-0 ${
         isSelected ? "ring-1 ring-[var(--color-gold)]/60" : ""
       } ${player.is_ghost ? "opacity-50" : ""}`}
       data-guide-player-row={player.name}
@@ -158,7 +162,7 @@ export function PlayerRow({
             <MoneyBagIcon size="sm" /> {player.treasures}
           </span>
           {variant !== "share" && isSelf && (
-            <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-gray-300">
+            <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-cyan-300/90">
               You
             </span>
           )}

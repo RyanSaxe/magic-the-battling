@@ -64,7 +64,7 @@ export function PlacementBadge({
   const rank = getPlacementRank(player, players);
   const total = players.length;
   const baseClassName = variant === "corner"
-    ? "inline-flex min-w-[2rem] items-center justify-center rounded-br-md border-b border-r px-1.5 py-0.5 text-[9px] font-semibold leading-none tracking-[0.06em] uppercase"
+    ? "inline-flex min-w-[1.55rem] items-center justify-center rounded-br-[6px] border-b border-r px-1 py-[2px] text-[7px] font-semibold leading-none tracking-[0.03em] uppercase"
     : "inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-[10px] font-semibold leading-none tracking-[0.08em] uppercase";
 
   return (

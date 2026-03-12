@@ -47,7 +47,7 @@ export function Sidebar({
           onClose={() => setRevealedPlayerName(null)}
         />
       ) : (
-        <div className="px-4 py-4 overflow-auto flex-1 flex flex-col">
+        <div className="px-3 py-3 sm:py-0 overflow-auto flex-1 flex flex-col">
           <PlayerList
             players={players}
             currentPlayerName={currentPlayer.name}

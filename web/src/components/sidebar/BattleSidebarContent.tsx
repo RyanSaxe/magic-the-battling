@@ -17,6 +17,7 @@ interface BattleSidebarContentProps {
   onCreateOpponentTreasure?: () => void;
   onUntapOpponentAll?: () => void;
   onPassOpponentTurn?: () => void;
+  handZoneHeight?: number | null;
 }
 
 function LifeCounter({
@@ -168,6 +169,7 @@ export function BattleSidebarContent({
   onCreateOpponentTreasure,
   onUntapOpponentAll,
   onPassOpponentTurn,
+  handZoneHeight = null,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
@@ -177,7 +179,10 @@ export function BattleSidebarContent({
   return (
     <div className="flex flex-col h-full">
       {/* Opponent section - top */}
-      <div className="flex-1 pb-3 pl-3 pr-3 border-b border-[var(--gold-border-opaque)]">
+      <div
+        className={`${handZoneHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden pb-3 pl-3 pr-3 border-b border-[var(--gold-border-opaque)]`}
+        style={handZoneHeight != null ? { height: handZoneHeight } : undefined}
+      >
         <PlayerSection
           upgrades={opponent_zones.upgrades}
           isReversed
@@ -289,7 +294,10 @@ export function BattleSidebarContent({
       </div>
 
       {/* Your section - bottom */}
-      <div className="flex-1 p-3 border-t border-[var(--gold-border-opaque)]">
+      <div
+        className={`${handZoneHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden p-3 border-t border-[var(--gold-border-opaque)]`}
+        style={handZoneHeight != null ? { height: handZoneHeight } : undefined}
+      >
         <PlayerSection
           upgrades={selfUpgrades}
         />

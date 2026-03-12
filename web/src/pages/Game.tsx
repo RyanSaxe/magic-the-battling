@@ -61,6 +61,7 @@ const STATIC_DIVIDER_CALLBACKS = {
 
 type ActiveDndPanel = "sideboard" | "opponentSideboard" | "graveyard" | "exile" | null;
 type BattleZoneModal = BattleZoneModalState | null;
+type BattleSidebarLayout = { handHeight: number } | null;
 type OverlayKey =
   | "rules"
   | "upgrades"
@@ -685,6 +686,7 @@ function GameContent() {
 
   const sizes = useViewportCardSizes();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [battleSidebarLayout, setBattleSidebarLayout] = useState<BattleSidebarLayout>(null);
 
   const isSpectateMode = searchParams.get("spectate") === "true";
   const { addToast } = useToast();
@@ -1569,6 +1571,7 @@ function GameContent() {
           onCreateOpponentTreasure={handleCreateOpponentTreasure}
           onUntapOpponentAll={handleUntapOpponentAll}
           onPassOpponentTurn={handlePassTurn}
+          handZoneHeight={battleSidebarLayout?.handHeight ?? null}
         />
       );
     }
@@ -1776,6 +1779,7 @@ function GameContent() {
                     onCardHoverEnd={handleCardHoverEnd}
                     activeZoneModal={activeBattleZoneModal}
                     onZoneModalToggle={toggleBattleZoneModal}
+                    onLayoutMetricsChange={setBattleSidebarLayout}
                   />
                 </div>
               </main>
