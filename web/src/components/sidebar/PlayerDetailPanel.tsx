@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Card as CardType, LastResult, PlayerView } from "../../types";
 import type { RevealedPlayerTab } from "../../contexts/contextStripState";
 import { useContextStrip } from "../../contexts";
-import { bestFit, type ZoneDims } from "../../hooks/cardSizeUtils";
+import {
+  CARD_ASPECT_RATIO,
+  bestFit,
+  type ZoneDims,
+} from "../../hooks/cardSizeUtils";
 import { PlacementBadge } from "./PlacementBadge";
 import { Card } from "../card";
 import { UpgradeStack } from "./UpgradeStack";
@@ -219,6 +223,8 @@ function AdaptiveCardSection({
   guideTarget,
   maxWidth = 108,
   minWidth = 46,
+  minColumns = 1,
+  measureKey,
 }: {
   title: string;
   cards: CardType[];
@@ -230,21 +236,54 @@ function AdaptiveCardSection({
   guideTarget?: string;
   maxWidth?: number;
   minWidth?: number;
+  minColumns?: number;
+  measureKey?: string;
 }) {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_CARD_DIMS);
   const observerRef = useRef<ResizeObserver | null>(null);
+  const measureRef = useRef<(() => void) | null>(null);
+
+  const resolveBestFit = useCallback((
+    width: number,
+    height: number,
+  ) => {
+    const next = bestFit(cards.length, width, height, 8, maxWidth, minWidth);
+
+    if (cards.length < minColumns || next.columns >= minColumns) {
+      return next;
+    }
+
+    const columns = Math.min(cards.length, minColumns);
+    const rows = Math.ceil(cards.length / columns);
+    const widthByColumns = Math.floor((width - 8 * Math.max(0, columns - 1)) / columns);
+    const widthByRows = Math.floor(
+      (height - 8 * Math.max(0, rows - 1)) / (rows * CARD_ASPECT_RATIO),
+    );
+    const forcedWidth = Math.max(
+      1,
+      Math.floor(Math.min(maxWidth, widthByColumns, widthByRows)),
+    );
+
+    return {
+      width: forcedWidth,
+      height: Math.round(forcedWidth * CARD_ASPECT_RATIO),
+      rows,
+      columns,
+    };
+  }, [cards.length, maxWidth, minColumns, minWidth]);
 
   const bodyRef = useCallback(
     (node: HTMLDivElement | null) => {
       observerRef.current?.disconnect();
       observerRef.current = null;
+      measureRef.current = null;
 
       if (!node) return;
 
       const measure = () => {
         const width = Math.max(node.clientWidth, 0);
         const height = Math.max(node.clientHeight, 0);
-        const next = bestFit(cards.length, width, height, 8, maxWidth, minWidth);
+        const next = resolveBestFit(width, height);
         setDims((prev) =>
           prev.width === next.width &&
           prev.height === next.height &&
@@ -254,6 +293,7 @@ function AdaptiveCardSection({
             : next,
         );
       };
+      measureRef.current = measure;
 
       measure();
 
@@ -264,7 +304,7 @@ function AdaptiveCardSection({
       observer.observe(node);
       observerRef.current = observer;
     },
-    [cards.length, maxWidth, minWidth],
+    [resolveBestFit],
   );
 
   useEffect(() => {
@@ -272,6 +312,23 @@ function AdaptiveCardSection({
       observerRef.current?.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    let frameOne = 0;
+    let frameTwo = 0;
+
+    frameOne = requestAnimationFrame(() => {
+      measureRef.current?.();
+      frameTwo = requestAnimationFrame(() => {
+        measureRef.current?.();
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(frameOne);
+      cancelAnimationFrame(frameTwo);
+    };
+  }, [measureKey, resolveBestFit]);
 
   return (
     <section className="flex min-h-0 flex-1 flex-col">
@@ -450,6 +507,8 @@ export function PlayerDetailPanel({
       emptyText="Nothing was revealed in battle yet."
       guideTarget="sidebar-seen-in-battle"
       maxWidth={104}
+      minColumns={isMobile ? 1 : 2}
+      measureKey={`${player.name}:${activeTab}:${isOpen ? "open" : "closed"}`}
     />
   );
 
@@ -505,7 +564,7 @@ export function PlayerDetailPanel({
     <div
       ref={panelRef}
       aria-hidden={!isOpen}
-      className={`absolute inset-y-0 z-0 overflow-hidden border-l-2 border-r-0 border-t-0 border-b-0 border-[var(--gold-border-opaque)] frame-chrome ${
+      className={`absolute inset-y-0 z-30 overflow-hidden border-l-2 border-r-0 border-t-0 border-b-0 border-[var(--gold-border-opaque)] frame-chrome ${
         isOpen ? "pointer-events-auto" : "pointer-events-none"
       }`}
       style={{
