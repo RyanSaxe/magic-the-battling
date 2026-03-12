@@ -93,3 +93,9 @@ def test_set_player_battlers_keeps_distinct_constructed_battlers(card_factory):
     assert game.battler is None
     assert game.players[0].battler is alice_battler
     assert game.players[1].battler is bob_battler
+
+
+def test_config_normalizes_legacy_draft_play_mode():
+    config = Config.model_validate({"play_mode": "draft"})
+
+    assert config.play_mode == "limited"

@@ -38,7 +38,7 @@ from mtb.models.game import (
     set_battler,
     set_player_battlers,
 )
-from mtb.models.types import BuildSource, CardDestination, PlayMode, ZoneName
+from mtb.models.types import BuildSource, CardDestination, PlayMode, ZoneName, normalize_play_mode
 from mtb.phases import battle, build, draft, reward
 from mtb.phases.battle import get_pairing_probabilities
 from mtb.phases.elimination import (
@@ -633,6 +633,7 @@ class GameManager:
         guided_mode_default: bool = False,
         play_mode: PlayMode = "limited",
     ) -> PendingGame:
+        play_mode = normalize_play_mode(play_mode)
         game_id = secrets.token_urlsafe(8)
         join_code = secrets.token_urlsafe(4).upper()[:6]
 
@@ -1243,6 +1244,7 @@ class GameManager:
         cube_id: str | None = None,
         play_mode: PlayMode = "limited",
     ) -> list[PlayerGameHistory]:
+        play_mode = normalize_play_mode(play_mode)
         query = (
             db.query(PlayerGameHistory)
             .options(joinedload(PlayerGameHistory.snapshots))
@@ -1272,7 +1274,8 @@ class GameManager:
             if not game_record or not game_record.config_json:
                 continue
             config = json.loads(str(game_record.config_json))
-            if config.get("play_mode", "limited") != play_mode:
+            saved_play_mode = normalize_play_mode(cast(str | None, config.get("play_mode")))
+            if saved_play_mode != play_mode:
                 continue
             if use_upgrades is not None and config.get("use_upgrades") != use_upgrades:
                 continue

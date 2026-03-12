@@ -1,10 +1,10 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from mtb.models.cards import Card
 from mtb.models.game import LastBattleResult, Zones
-from mtb.models.types import BuildSource, CardDestination, Phase, PlayMode, ZoneName
+from mtb.models.types import BuildSource, CardDestination, Phase, PlayMode, ZoneName, normalize_play_mode
 
 LastResult = Literal["win", "loss", "draw"]
 CubeLoadingStatus = Literal["loading", "ready", "error"]
@@ -21,6 +21,11 @@ class CreateGameRequest(BaseModel):
     auto_approve_spectators: bool = False
     guided_mode_default: bool = False
     play_mode: PlayMode = "limited"
+
+    @field_validator("play_mode", mode="before")
+    @classmethod
+    def _normalize_play_mode(cls, value: str | None) -> PlayMode:
+        return normalize_play_mode(value)
 
 
 class CreateGameResponse(BaseModel):

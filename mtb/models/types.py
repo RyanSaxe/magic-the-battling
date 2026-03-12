@@ -9,3 +9,11 @@ CardStateAction = Literal["tap", "untap", "flip", "face_down", "counter", "attac
 
 VANGUARD_TYPE = "vanguard"
 UPGRADE_TYPE = "conspiracy"
+
+
+def normalize_play_mode(value: str | None) -> PlayMode:
+    if value in (None, "draft", "limited"):
+        return "limited"
+    if value == "constructed":
+        return "constructed"
+    raise ValueError(f"Unknown play mode: {value}")

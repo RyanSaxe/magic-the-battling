@@ -116,6 +116,36 @@ def test_find_historical_players_filters_by_elo_range(game_manager, mock_db_sess
     assert 5 not in result_ids
 
 
+def test_find_historical_players_treats_legacy_draft_mode_as_limited(game_manager, mock_db_session):
+    histories = [create_mock_history(1, "LegacyLimited", 1200.0)]
+    config_data = {
+        "use_upgrades": True,
+        "use_vanguards": False,
+        "cube_id": "test_cube",
+        "play_mode": "draft",
+    }
+
+    mock_query = MagicMock()
+    mock_db_session.query.return_value = mock_query
+    mock_query.options.return_value = mock_query
+    mock_query.filter.return_value = mock_query
+    mock_query.all.return_value = histories
+    mock_query.first.return_value = MagicMock(config_json=json.dumps(config_data))
+
+    result = game_manager._find_historical_players(
+        mock_db_session,
+        target_elo=1200.0,
+        count=1,
+        exclude_ids=[],
+        use_upgrades=True,
+        use_vanguards=False,
+        cube_id="test_cube",
+        play_mode="limited",
+    )
+
+    assert [history.id for history in result] == [1]
+
+
 class TestSuspiciousNameFiltering:
     def test_single_character_is_suspicious(self, game_manager):
         assert game_manager._is_suspicious_name("A") is True

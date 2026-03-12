@@ -2,10 +2,10 @@ import random
 import weakref
 from typing import Any
 
-from pydantic import AliasChoices, BaseModel, Field, PrivateAttr
+from pydantic import AliasChoices, BaseModel, Field, PrivateAttr, field_validator
 
 from mtb.models.cards import Battler, Card
-from mtb.models.types import Phase, PlayMode, ZoneName
+from mtb.models.types import Phase, PlayMode, ZoneName, normalize_play_mode
 
 
 class StaticOpponent(BaseModel):
@@ -219,6 +219,11 @@ class Config(BaseModel):
     auto_approve_spectators: bool = False
     cube_id: str = "auto"
     play_mode: PlayMode = "limited"
+
+    @field_validator("play_mode", mode="before")
+    @classmethod
+    def _normalize_play_mode(cls, value: str | None) -> PlayMode:
+        return normalize_play_mode(value)
 
 
 class Game(BaseModel):
