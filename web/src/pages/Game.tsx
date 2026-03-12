@@ -65,7 +65,12 @@ const STATIC_DIVIDER_CALLBACKS = {
 
 type ActiveDndPanel = "sideboard" | "opponentSideboard" | "graveyard" | "exile" | null;
 type BattleZoneModal = BattleZoneModalState | null;
-type BattleSidebarLayout = { handHeight: number } | null;
+type BattleSidebarLayout = {
+  handHeight: number;
+  topSpacerHeight: number;
+  lifePanelHeight: number;
+  bottomSpacerHeight: number;
+} | null;
 type OverlayKey =
   | "rules"
   | "upgrades"
@@ -1278,11 +1283,6 @@ function GameContent() {
     } else if (currentPhase === "draft") {
       left = (
         <div className="flex items-center gap-1.5 sm:gap-2">
-          {self_player.upgrades.length > 0 && (
-            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
-              View Upgrades
-            </button>
-          )}
           <button
             onClick={actions.draftRoll}
             disabled={
@@ -1294,6 +1294,11 @@ function GameContent() {
           >
             Roll for 1💰
           </button>
+          {self_player.upgrades.length > 0 && (
+            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+              View Upgrades
+            </button>
+          )}
         </div>
       );
       right = (
@@ -1577,6 +1582,9 @@ function GameContent() {
           onUntapOpponentAll={handleUntapOpponentAll}
           onPassOpponentTurn={handlePassTurn}
           handZoneHeight={battleSidebarLayout?.handHeight ?? null}
+          topSpacerHeight={battleSidebarLayout?.topSpacerHeight ?? null}
+          lifePanelHeight={battleSidebarLayout?.lifePanelHeight ?? null}
+          bottomSpacerHeight={battleSidebarLayout?.bottomSpacerHeight ?? null}
         />
       );
     }

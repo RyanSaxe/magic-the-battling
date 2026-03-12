@@ -27,7 +27,7 @@ export function GuidedWalkthrough({
   onBackStep,
 }: GuidedWalkthroughProps) {
   const cardRef = useRef<HTMLDivElement>(null);
-  const [transitionsEnabled, setTransitionsEnabled] = useState(false);
+  const [transitionsEnabledStepKey, setTransitionsEnabledStepKey] = useState<string | null>(null);
 
   const guide = useMemo(
     () => buildGuideDefinition(request.guideId, context),
@@ -41,6 +41,18 @@ export function GuidedWalkthrough({
     return typeof step.targetSelector === "function"
       ? step.targetSelector(context)
       : step.targetSelector;
+  }, [context, step]);
+  const resolvedWaitForLayoutTargetId = useMemo(() => {
+    if (!step?.waitForLayoutTargetId) return undefined;
+    return typeof step.waitForLayoutTargetId === "function"
+      ? step.waitForLayoutTargetId(context)
+      : step.waitForLayoutTargetId;
+  }, [context, step]);
+  const resolvedWaitForLayoutTargetSelector = useMemo(() => {
+    if (!step?.waitForLayoutTargetSelector) return undefined;
+    return typeof step.waitForLayoutTargetSelector === "function"
+      ? step.waitForLayoutTargetSelector(context)
+      : step.waitForLayoutTargetSelector;
   }, [context, step]);
   const resolvedPositionTargetId = useMemo(() => {
     if (!step?.positionTargetId) return undefined;
@@ -98,6 +110,8 @@ export function GuidedWalkthrough({
     cardRef,
     step?.targetId,
     resolvedTargetSelector,
+    resolvedWaitForLayoutTargetId,
+    resolvedWaitForLayoutTargetSelector,
     resolvedPositionTargetId,
     resolvedPositionTargetSelector,
     step?.placement ?? "bottom",
@@ -106,12 +120,21 @@ export function GuidedWalkthrough({
   );
 
   useEffect(() => {
-    if (!layout || transitionsEnabled) return;
-    const id = requestAnimationFrame(() => setTransitionsEnabled(true));
+    if (!layout || transitionsEnabledStepKey === stepKey) return;
+    const id = requestAnimationFrame(() => setTransitionsEnabledStepKey(stepKey));
     return () => cancelAnimationFrame(id);
-  }, [layout, transitionsEnabled]);
+  }, [layout, stepKey, transitionsEnabledStepKey]);
 
-  const tooltipStyle: CSSProperties = transitionsEnabled
+  const transitionsEnabled = transitionsEnabledStepKey === stepKey;
+
+  const tooltipStyle: CSSProperties = !layout
+    ? {
+        left: 16,
+        top: 16,
+        opacity: 0,
+        transition: "opacity 200ms ease",
+      }
+    : transitionsEnabled
     ? {
         left: layout?.cardLeft ?? 16,
         top: layout?.cardTop ?? 16,

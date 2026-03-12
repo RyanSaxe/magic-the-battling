@@ -36,5 +36,6 @@ describe("buildGuideDefinition", () => {
     expect(step?.targetId).toBe("sidebar-seen-in-battle");
     expect(step?.sidebarState?.playerName).toBeTypeOf("function");
     expect(step?.sidebarState?.detailTab).toBe("seen");
+    expect(step?.waitForLayoutTargetId).toBeTypeOf("function");
   });
 });

@@ -18,14 +18,31 @@ interface PlayerListProps {
 
 export const PLAYER_ROW_STACK_CLASS = "space-y-3";
 
+type ShareResultStatus = "viewing" | "alive" | "dead";
+
 function ResultBadge({
   result,
   inSuddenDeath,
+  shareStatus,
 }: {
   result: LastResult | null;
   inSuddenDeath: boolean;
+  shareStatus?: ShareResultStatus;
 }) {
   const baseClassName = "inline-flex h-4 min-w-[1.25rem] shrink-0 items-center justify-center rounded-[3px] border border-[color:rgba(212,175,55,0.22)] bg-black/18 px-1 text-[10px] font-bold leading-none";
+  const shareBadgeClassName = `${baseClassName} min-w-[3.75rem] whitespace-nowrap px-1.5 text-[9px] font-semibold`;
+
+  if (shareStatus === "viewing") {
+    return <span className={`${shareBadgeClassName} text-cyan-200`}>Viewing</span>;
+  }
+
+  if (shareStatus === "alive") {
+    return <span className={`${shareBadgeClassName} text-emerald-200`}>Alive</span>;
+  }
+
+  if (shareStatus === "dead") {
+    return <span className={`${shareBadgeClassName} text-red-200`}>Dead</span>;
+  }
 
   if (inSuddenDeath) {
     return (
@@ -107,6 +124,7 @@ export function PlayerRow({
   isSelected,
   onClick,
   variant = "game",
+  shareStatus,
 }: {
   player: PlayerView;
   players: PlayerView[];
@@ -114,6 +132,7 @@ export function PlayerRow({
   isSelected: boolean;
   onClick: () => void;
   variant?: "game" | "share";
+  shareStatus?: ShareResultStatus;
 }) {
   const isSelf = player.name === currentPlayerName;
   const showPairingProbability =
@@ -145,6 +164,7 @@ export function PlayerRow({
         <ResultBadge
           result={player.last_result}
           inSuddenDeath={player.in_sudden_death}
+          shareStatus={variant === "share" ? shareStatus : undefined}
         />
       </div>
 

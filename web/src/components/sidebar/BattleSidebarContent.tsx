@@ -18,6 +18,9 @@ interface BattleSidebarContentProps {
   onUntapOpponentAll?: () => void;
   onPassOpponentTurn?: () => void;
   handZoneHeight?: number | null;
+  topSpacerHeight?: number | null;
+  lifePanelHeight?: number | null;
+  bottomSpacerHeight?: number | null;
 }
 
 function LifeCounter({
@@ -170,17 +173,41 @@ export function BattleSidebarContent({
   onUntapOpponentAll,
   onPassOpponentTurn,
   handZoneHeight = null,
+  topSpacerHeight = null,
+  lifePanelHeight = null,
+  bottomSpacerHeight = null,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
 
   const isYourTurn = current_turn_name === playerName;
+  const hasPreciseCenterLayout =
+    topSpacerHeight != null &&
+    lifePanelHeight != null &&
+    bottomSpacerHeight != null;
+  const precisePanelOffset = hasPreciseCenterLayout
+    ? Math.min(8, Math.max(0, bottomSpacerHeight - 1))
+    : 0;
+  const preciseCenterLayout = hasPreciseCenterLayout
+    ? {
+        topSpacerHeight: Math.max(0, topSpacerHeight - 1) + precisePanelOffset,
+        lifePanelHeight: lifePanelHeight + 2,
+        bottomSpacerHeight: Math.max(
+          0,
+          Math.max(0, bottomSpacerHeight - 1) - precisePanelOffset,
+        ),
+      }
+    : null;
 
   return (
     <div className="flex flex-col h-full">
       {/* Opponent section - top */}
       <div
-        className={`${handZoneHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden pb-3 pl-3 pr-3 border-b border-[var(--gold-border-opaque)]`}
+        className={`${handZoneHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden pb-3 pl-3 pr-3 ${
+          hasPreciseCenterLayout
+            ? ""
+            : "border-b border-[var(--gold-border-opaque)]"
+        }`}
         style={handZoneHeight != null ? { height: handZoneHeight } : undefined}
       >
         <PlayerSection
@@ -190,112 +217,164 @@ export function BattleSidebarContent({
       </div>
 
       {/* Controls panel */}
-      <div className="flex items-center justify-center">
-        <div className="p-3 w-full space-y-2" style={{ background: 'var(--chrome-modal)' }}>
-          {canManipulateOpponent && (onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn) && (
-            <div className="flex gap-2">
-              {onCreateOpponentTreasure && (
-                <button
-                  onClick={onCreateOpponentTreasure}
-                  className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-                >
-                  Treasure
-                </button>
-              )}
-              {onUntapOpponentAll && (
-                <button
-                  onClick={onUntapOpponentAll}
-                  className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-                >
-                  Untap
-                </button>
-              )}
-              {onPassOpponentTurn && (
-                <button
-                  onClick={onPassOpponentTurn}
-                  disabled={isYourTurn}
-                  className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
-                    !isYourTurn
-                      ? "bg-indigo-600 hover:bg-indigo-500"
-                      : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
-                  }`}
-                >
-                  Pass
-                </button>
-              )}
-            </div>
-          )}
+      <div
+        className={`${hasPreciseCenterLayout ? "box-border shrink-0" : "flex-1"} min-h-0`}
+        style={
+          preciseCenterLayout
+            ? {
+                height:
+                  preciseCenterLayout.topSpacerHeight +
+                  preciseCenterLayout.lifePanelHeight +
+                  preciseCenterLayout.bottomSpacerHeight,
+              }
+            : undefined
+        }
+      >
+        <div
+          className={`grid min-h-0 w-full ${hasPreciseCenterLayout ? "h-full" : "grid-rows-[1fr]"}`}
+          style={{
+            ...(preciseCenterLayout
+              ? {
+                  gridTemplateRows: `${preciseCenterLayout.topSpacerHeight}px ${preciseCenterLayout.lifePanelHeight}px ${preciseCenterLayout.bottomSpacerHeight}px`,
+                }
+              : {}),
+          }}
+        >
+          {hasPreciseCenterLayout && <div aria-hidden="true" />}
 
-          <div className="text-center">
-            <div className="text-xs text-gray-400 uppercase mb-1 truncate">
-              {opponent_name}
+          <div
+            className={`relative grid min-h-0 w-full grid-rows-[1fr_auto_1fr] ${
+              hasPreciseCenterLayout ? "overflow-hidden" : ""
+            }`}
+            style={{ background: 'var(--chrome-modal)' }}
+          >
+            {hasPreciseCenterLayout && (
+              <>
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
+                />
+              </>
+            )}
+            <div className="flex min-h-0 flex-col justify-between gap-3 p-3 pb-2">
+              {canManipulateOpponent && (onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn) && (
+                <div className="flex gap-2">
+                  {onCreateOpponentTreasure && (
+                    <button
+                      onClick={onCreateOpponentTreasure}
+                      className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+                    >
+                      Treasure
+                    </button>
+                  )}
+                  {onUntapOpponentAll && (
+                    <button
+                      onClick={onUntapOpponentAll}
+                      className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+                    >
+                      Untap
+                    </button>
+                  )}
+                  {onPassOpponentTurn && (
+                    <button
+                      onClick={onPassOpponentTurn}
+                      disabled={isYourTurn}
+                      className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
+                        !isYourTurn
+                          ? "bg-indigo-600 hover:bg-indigo-500"
+                          : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
+                      }`}
+                    >
+                      Pass
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div className="text-center">
+                <div className="text-xs text-gray-400 uppercase mb-1 truncate">
+                  {opponent_name}
+                </div>
+                <div className="flex justify-center">
+                  <LifeCounter
+                    life={opponentLife}
+                    onChange={onOpponentLifeChange}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="flex justify-center">
-              <LifeCounter
-                life={opponentLife}
-                onChange={onOpponentLifeChange}
-              />
+
+            <div className="flex items-center justify-center px-3 py-1 text-center text-xs">
+              {current_turn_name && (
+                isYourTurn ? (
+                  <span className="text-green-400">It is your turn</span>
+                ) : (
+                  <span className="text-amber-400">Opponent's turn</span>
+                )
+              )}
+            </div>
+
+            <div className="flex min-h-0 flex-col justify-between gap-3 p-3 pt-2">
+              <div className="text-center">
+                <div className="flex justify-center">
+                  <LifeCounter life={yourLife} onChange={onYourLifeChange} />
+                </div>
+                <div className="text-xs text-gray-400 uppercase mt-1 truncate">
+                  {playerName}
+                </div>
+              </div>
+
+              {(onCreateTreasure || onUntapAll || onPassTurn) && (
+                <div className="flex gap-2">
+                  {onCreateTreasure && (
+                    <button
+                      onClick={onCreateTreasure}
+                      className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+                    >
+                      Treasure
+                    </button>
+                  )}
+                  {onUntapAll && (
+                    <button
+                      onClick={onUntapAll}
+                      className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+                    >
+                      Untap
+                    </button>
+                  )}
+                  {onPassTurn && (
+                    <button
+                      onClick={onPassTurn}
+                      disabled={!isYourTurn}
+                      className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
+                        isYourTurn
+                          ? "bg-indigo-600 hover:bg-indigo-500"
+                          : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
+                      }`}
+                    >
+                      Pass
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
-          {current_turn_name && (
-            <div className="text-center text-xs py-1">
-              {isYourTurn ? (
-                <span className="text-green-400">It is your turn</span>
-              ) : (
-                <span className="text-amber-400">Opponent's turn</span>
-              )}
-            </div>
-          )}
-
-          <div className="text-center">
-            <div className="flex justify-center">
-              <LifeCounter life={yourLife} onChange={onYourLifeChange} />
-            </div>
-            <div className="text-xs text-gray-400 uppercase mt-1 truncate">
-              {playerName}
-            </div>
-          </div>
-
-          {(onCreateTreasure || onUntapAll || onPassTurn) && (
-            <div className="flex gap-2">
-              {onCreateTreasure && (
-                <button
-                  onClick={onCreateTreasure}
-                  className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-                >
-                  Treasure
-                </button>
-              )}
-              {onUntapAll && (
-                <button
-                  onClick={onUntapAll}
-                  className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-                >
-                  Untap
-                </button>
-              )}
-              {onPassTurn && (
-                <button
-                  onClick={onPassTurn}
-                  disabled={!isYourTurn}
-                  className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
-                    isYourTurn
-                      ? "bg-indigo-600 hover:bg-indigo-500"
-                      : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
-                  }`}
-                >
-                  Pass
-                </button>
-              )}
-            </div>
-          )}
+          {hasPreciseCenterLayout && <div aria-hidden="true" />}
         </div>
       </div>
 
       {/* Your section - bottom */}
       <div
-        className={`${handZoneHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden p-3 border-t border-[var(--gold-border-opaque)]`}
+        className={`${handZoneHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden p-3 ${
+          hasPreciseCenterLayout
+            ? ""
+            : "border-t border-[var(--gold-border-opaque)]"
+        }`}
         style={handZoneHeight != null ? { height: handZoneHeight } : undefined}
       >
         <PlayerSection

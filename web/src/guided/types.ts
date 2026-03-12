@@ -52,6 +52,7 @@ export type GuideTargetId =
   | "draft-mobile-treasure"
   | "sidebar-toggle"
   | "sidebar-opponent-list"
+  | "sidebar-detail-drawer"
   | "sidebar-revealed-details"
   | "sidebar-seen-in-battle"
   | "phase-action-bar";
@@ -109,6 +110,8 @@ export interface GuideStepDefinition {
   content: GuideStepContent;
   targetId?: GuideTargetId;
   targetSelector?: string | ((ctx: GuidedWalkthroughContext) => string | undefined);
+  waitForLayoutTargetId?: GuideTargetId | ((ctx: GuidedWalkthroughContext) => GuideTargetId | undefined);
+  waitForLayoutTargetSelector?: string | ((ctx: GuidedWalkthroughContext) => string | undefined);
   positionTargetId?: GuideTargetId | ((ctx: GuidedWalkthroughContext) => GuideTargetId | undefined);
   positionTargetSelector?: string | ((ctx: GuidedWalkthroughContext) => string | undefined);
   placement?: GuidePlacement;

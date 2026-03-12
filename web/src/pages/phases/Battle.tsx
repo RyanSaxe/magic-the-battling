@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react'
 import type { GameState, Card as CardType, ZoneName, CardStateAction } from '../../types'
 import { DraggableCard, DroppableZone, type ZoneOwner } from '../../dnd'
 import { HandZone, BattlefieldZone } from '../../components/zones'
@@ -40,7 +40,12 @@ interface BattlePhaseProps {
   onCardHoverEnd?: () => void
   activeZoneModal: BattleZoneModalState | null
   onZoneModalToggle: (zone: BattleZoneModalState["zone"], owner: ZoneOwner) => void
-  onLayoutMetricsChange?: (metrics: { handHeight: number }) => void
+  onLayoutMetricsChange?: (metrics: {
+    handHeight: number
+    topSpacerHeight: number
+    lifePanelHeight: number
+    bottomSpacerHeight: number
+  }) => void
 }
 
 const isLandOrTreasure = (card: CardType) =>
@@ -193,10 +198,27 @@ export function BattlePhase({
   const { rowHeight } = sizes
   const handHeight = rowHeight + HAND_PADDING
   const bfHeight = 2 * rowHeight + BF_PADDING
+  const opponentMidZoneHeight = Math.floor(bfHeight / 2)
+  const opponentBottomZoneHeight = bfHeight - opponentMidZoneHeight
+  const playerTopZoneHeight = Math.floor(bfHeight / 2)
+  const playerMidZoneHeight = bfHeight - playerTopZoneHeight
 
-  useEffect(() => {
-    onLayoutMetricsChange?.({ handHeight })
-  }, [handHeight, onLayoutMetricsChange])
+  useLayoutEffect(() => {
+    onLayoutMetricsChange?.({
+      handHeight,
+      topSpacerHeight: opponentMidZoneHeight,
+      lifePanelHeight: opponentBottomZoneHeight + MID_DIVIDER_HEIGHT + playerTopZoneHeight,
+      bottomSpacerHeight: playerMidZoneHeight,
+    })
+  }, [
+    handHeight,
+    onLayoutMetricsChange,
+    opponentMidZoneHeight,
+    opponentBottomZoneHeight,
+    playerTopZoneHeight,
+    playerMidZoneHeight,
+    MID_DIVIDER_HEIGHT,
+  ])
 
   if (!battle) {
     return (
@@ -308,10 +330,6 @@ export function BattlePhase({
   }
 
   const opponentTopZoneHeight = handHeight
-  const opponentMidZoneHeight = Math.floor(bfHeight / 2)
-  const opponentBottomZoneHeight = bfHeight - opponentMidZoneHeight
-  const playerTopZoneHeight = Math.floor(bfHeight / 2)
-  const playerMidZoneHeight = bfHeight - playerTopZoneHeight
   const playerBottomZoneHeight = handHeight
 
   return (

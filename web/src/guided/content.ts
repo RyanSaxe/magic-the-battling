@@ -522,6 +522,9 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         id: "revealed-cards",
         title: "Use Revealed Cards As Draft Signals",
         targetId: "sidebar-seen-in-battle",
+        waitForLayoutTargetId: (ctx) => (
+          ctx.isMobile ? undefined : "sidebar-detail-drawer"
+        ),
         placement: "left",
         cardPlacement: "middle-left",
         mobileCardPlacement: "bottom-center",
