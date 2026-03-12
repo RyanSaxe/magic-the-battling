@@ -1296,6 +1296,8 @@ function GameContent() {
       : null;
   const displayBattleResolution = !!activeBattleResolution && !!cachedBattleForResolution;
   const battleViewForDisplay = current_battle ?? (displayBattleResolution ? cachedBattleForResolution : null);
+  const actionBarPhase = displayBattleResolution ? "battle" : currentPhase;
+  const actionBarBattle = battleViewForDisplay;
   const canManipulateOpponent = battleViewForDisplay?.can_manipulate_opponent ?? false;
 
   const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
@@ -1341,7 +1343,7 @@ function GameContent() {
     let left: ReactNode = null;
     let right: ReactNode = null;
 
-    if (currentPhase === "eliminated") {
+    if (actionBarPhase === "eliminated") {
       const hasWatchablePlayers = gameState.players.some(
         (p) =>
           !p.is_puppet &&
@@ -1357,7 +1359,7 @@ function GameContent() {
           </button>
         );
       }
-    } else if (currentPhase === "draft") {
+    } else if (actionBarPhase === "draft") {
       left = (
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
@@ -1387,7 +1389,7 @@ function GameContent() {
           Go to Build
         </button>
       );
-    } else if (currentPhase === "build") {
+    } else if (actionBarPhase === "build") {
       if (self_player.build_ready) {
         left = self_player.upgrades.length > 0 ? (
           hasPendingBuildUpgrades ? (
@@ -1466,9 +1468,9 @@ function GameContent() {
           </div>
         );
       }
-    } else if (currentPhase === "battle") {
-      if (!current_battle) return null;
-      const { opponent_name, result_submissions } = current_battle;
+    } else if (actionBarPhase === "battle") {
+      if (!actionBarBattle) return null;
+      const { opponent_name, result_submissions } = actionBarBattle;
       const mySubmission = result_submissions[self_player.name];
       const opponentSubmission = result_submissions[opponent_name];
 
@@ -1556,7 +1558,7 @@ function GameContent() {
           </div>
         );
       }
-    } else if (currentPhase === "reward") {
+    } else if (actionBarPhase === "reward") {
       const buttonLabel = needsUpgrade
         ? selectedUpgradeId
           ? "Claim & Continue"
@@ -2132,8 +2134,8 @@ function GameContent() {
           </div>
         )}
         {/* Bottom Action Bar */}
-        {!isSpectator && !displayBattleResolution && (
-          <div className="shrink-0 relative z-40 frame-chrome">
+        {!isSpectator && (
+          <div className={`shrink-0 relative frame-chrome ${displayBattleResolution ? 'z-[90] pointer-events-none' : 'z-40'}`}>
             <div
               className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-main timeline-actions"
               data-guide-target="phase-action-bar"
