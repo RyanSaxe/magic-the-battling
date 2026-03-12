@@ -26,6 +26,7 @@ interface RulesPanelProps {
   initialDocId?: string
   initialTab?: string
   gameId?: string
+  playerName?: string
   useUpgrades?: boolean
   useVanguards?: boolean
 }
@@ -166,6 +167,7 @@ export function RulesPanel({
   initialDocId,
   initialTab,
   gameId,
+  playerName,
   useUpgrades,
   useVanguards,
 }: RulesPanelProps) {
@@ -560,6 +562,7 @@ export function RulesPanel({
                 initialDocId={initialDocId}
                 initialTab={initialTab}
                 gameId={gameId}
+                playerName={playerName}
                 useUpgrades={useUpgrades}
                 useVanguards={useVanguards}
                 onLocationChange={setNavigationHint}
@@ -645,6 +648,7 @@ export function RulesPanel({
               initialDocId={initialDocId}
               initialTab={initialTab}
               gameId={gameId}
+              playerName={playerName}
               useUpgrades={useUpgrades}
               useVanguards={useVanguards}
               onLocationChange={setNavigationHint}

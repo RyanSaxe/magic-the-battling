@@ -39,6 +39,7 @@ interface QuickGuideProps {
   initialDocId?: string
   initialTab?: string
   gameId?: string
+  playerName?: string
   useUpgrades?: boolean
   useVanguards?: boolean
   onLocationChange?: (label: string) => void
@@ -433,6 +434,7 @@ export function QuickGuide({
   initialDocId,
   initialTab,
   gameId,
+  playerName,
   useUpgrades,
   useVanguards,
   onLocationChange,
@@ -775,6 +777,7 @@ export function QuickGuide({
             <CardsView
               gameId={gameId}
               which={cardType === 'vanguards' ? 'cards' : cardType}
+              playerName={playerName}
             />
           </div>
         )}

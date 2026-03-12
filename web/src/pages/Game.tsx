@@ -2133,6 +2133,7 @@ function GameContent() {
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
           gameId={gameId}
+          playerName={gameState?.self_player.name}
           useUpgrades={gameState.use_upgrades}
         />
       )}

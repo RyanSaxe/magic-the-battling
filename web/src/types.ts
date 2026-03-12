@@ -1,6 +1,8 @@
 export type Phase = 'draft' | 'build' | 'battle' | 'reward' | 'awaiting_elimination' | 'eliminated' | 'winner' | 'game_over'
+export type PlayMode = 'draft' | 'constructed'
 export type LastResult = 'win' | 'loss' | 'draw'
 export type CubeLoadingStatus = 'loading' | 'ready' | 'error'
+export type BattlerLoadingStatus = 'missing' | 'loading' | 'ready' | 'error'
 export type ZoneName = 'battlefield' | 'graveyard' | 'exile' | 'hand' | 'sideboard' | 'upgrades' | 'command_zone' | 'library'
 export type CardStateAction = 'tap' | 'untap' | 'flip' | 'face_down' | 'counter' | 'attach' | 'detach' | 'spawn' | 'create_treasure'
 export type CardDestination = 'hand' | 'sideboard' | 'upgrades'
@@ -19,6 +21,7 @@ export interface Card {
   upgrade_target: Card | null
   oracle_text: string | null
   colors: string[]
+  keywords?: string[]
   cmc: number
 }
 
@@ -121,6 +124,7 @@ export interface GameState {
   current_battle: BattleView | null
   use_upgrades: boolean
   cube_id: string
+  play_mode: PlayMode
 }
 
 export interface LobbyPlayer {
@@ -128,6 +132,9 @@ export interface LobbyPlayer {
   name: string
   is_ready: boolean
   is_host: boolean
+  battler_id: string | null
+  battler_status: BattlerLoadingStatus | null
+  battler_error: string | null
 }
 
 export interface LobbyState {
@@ -144,6 +151,7 @@ export interface LobbyState {
   available_puppet_count: number | null
   use_upgrades: boolean
   guided_mode_default: boolean
+  play_mode: PlayMode
 }
 
 export interface CreateGameResponse {

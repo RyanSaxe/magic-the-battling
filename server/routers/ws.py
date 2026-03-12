@@ -476,13 +476,34 @@ def _validate_action_phase(action: str, player) -> str | None:
     return None
 
 
-async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_id: str, websocket: WebSocket) -> bool:  # noqa: PLR0912
+async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
+    action: str, payload: dict, game_id: str, player_id: str, websocket: WebSocket
+) -> bool:
     if action == "set_ready":
         is_ready = payload.get("is_ready", True)
-        if game_manager.set_player_ready(game_id, player_id, is_ready):
+        success, error = game_manager.set_player_ready(game_id, player_id, is_ready)
+        if success:
             await connection_manager.broadcast_lobby_state(game_id)
         else:
-            await connection_manager.send_error(websocket, "Failed to set ready state")
+            await connection_manager.send_error(websocket, error or "Failed to set ready state")
+        return True
+
+    if action == "submit_battler":
+        pending = game_manager.get_pending_game(game_id)
+        if not pending:
+            await connection_manager.send_error(websocket, "Game not found")
+            return True
+
+        error = game_manager.start_player_battler_preload(
+            pending,
+            player_id,
+            str(payload.get("battler_id", "")),
+            on_complete=lambda: connection_manager.broadcast_lobby_state(game_id),
+        )
+        if error:
+            await connection_manager.send_error(websocket, error)
+        else:
+            await connection_manager.broadcast_lobby_state(game_id)
         return True
 
     if action == "start_game":

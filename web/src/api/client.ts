@@ -6,6 +6,7 @@ import type {
   SpectateRequestStatus,
   ShareGameResponse,
   ServerStatus,
+  PlayMode,
 } from '../types'
 import { getOrCreateDeviceId } from '../utils/deviceIdentity'
 
@@ -60,6 +61,7 @@ export interface GameOptions {
   puppetCount?: number
   autoApproveSpectators?: boolean
   guidedModeDefault?: boolean
+  playMode?: PlayMode
 }
 
 export async function createGame(
@@ -77,6 +79,7 @@ export async function createGame(
     puppet_count: options.puppetCount ?? 0,
     auto_approve_spectators: options.autoApproveSpectators ?? false,
     guided_mode_default: options.guidedModeDefault ?? false,
+    play_mode: options.playMode ?? 'draft',
   })
 
   for (let attempt = 0; attempt < CREATE_RETRY_MAX_ATTEMPTS; attempt++) {
@@ -195,8 +198,9 @@ export interface GameCardsResponse {
   upgrades: Card[]
 }
 
-export async function getGameCards(gameId: string): Promise<GameCardsResponse> {
-  const response = await fetch(`${API_BASE}/games/${gameId}/cards`)
+export async function getGameCards(gameId: string, playerName?: string): Promise<GameCardsResponse> {
+  const query = playerName ? `?player_name=${encodeURIComponent(playerName)}` : ''
+  const response = await fetch(`${API_BASE}/games/${gameId}/cards${query}`)
   if (!response.ok) {
     throw new Error(await getErrorMessage(response, 'Failed to load card pool'))
   }

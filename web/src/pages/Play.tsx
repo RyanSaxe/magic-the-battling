@@ -16,7 +16,7 @@ import {
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 import { FaDiscord } from "react-icons/fa6";
-import type { LobbyState } from "../types";
+import type { LobbyState, PlayMode } from "../types";
 
 type SoloPhase =
   | "idle"
@@ -41,6 +41,7 @@ function useSoloLobbyWatcher(
   lobbyState: LobbyState | null,
   pendingGameId: string | null,
   soloPhaseRef: React.RefObject<SoloPhase>,
+  autoStartEnabled: boolean,
   opponents: OpponentCount,
   actions: { setReady: (r: boolean) => void; startGame: () => void },
   onNotEnoughPuppets: (available: number) => void,
@@ -58,7 +59,7 @@ function useSoloLobbyWatcher(
   }, []);
 
   useEffect(() => {
-    if (!pendingGameId || !lobbyState) return;
+    if (!autoStartEnabled || !pendingGameId || !lobbyState) return;
 
     const cubeJustReady =
       lobbyState.cube_loading_status === "ready" &&
@@ -88,8 +89,7 @@ function useSoloLobbyWatcher(
       onNavigating();
       actions.startGame();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lobbyState, pendingGameId]);
+  }, [actions, autoStartEnabled, lobbyState, onNavigating, onNotEnoughPuppets, onStarting, opponents, pendingGameId, soloPhaseRef]);
 
   return { reset };
 }
@@ -213,6 +213,30 @@ function UpgradesCheckbox({
   );
 }
 
+function ConstructedCheckbox({
+  playMode,
+  setPlayMode,
+}: {
+  playMode: PlayMode;
+  setPlayMode: (mode: PlayMode) => void;
+}) {
+  const isConstructed = playMode === "constructed";
+  return (
+    <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
+      <input
+        type="checkbox"
+        checked={isConstructed}
+        onChange={(e) => setPlayMode(e.target.checked ? "constructed" : "draft")}
+        className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+      />
+      <span className="text-white text-sm">Constructed</span>
+      <span className="text-gray-500 text-xs">
+        — each player brings their own battler
+      </span>
+    </label>
+  );
+}
+
 function GuidedModeField({
   enabled,
   setEnabled,
@@ -304,6 +328,8 @@ export function Play() {
   const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
   const [cubeId, setCubeId] = useState("auto");
   const [useUpgrades, setUseUpgrades] = useState(true);
+  const [playMode, setPlayMode] = useState<PlayMode>("draft");
+  const [pendingPlayMode, setPendingPlayMode] = useState<PlayMode | null>(null);
   const [opponents, setOpponents] = useState<OpponentCount>(3);
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [activeMode, setActiveMode] = useState<ActiveMode>("solo");
@@ -333,10 +359,13 @@ export function Play() {
     addToast,
   );
 
+  const effectivePendingPlayMode = lobbyState?.play_mode ?? pendingPlayMode;
+
   const { reset: resetWatcher } = useSoloLobbyWatcher(
     lobbyState,
     pendingGameId,
     soloPhaseRef,
+    effectivePendingPlayMode !== "constructed",
     opponents,
     actions,
     (available) => {
@@ -357,17 +386,30 @@ export function Play() {
     if (
       friendsLoading &&
       pendingGameId &&
-      lobbyState?.cube_loading_status === "ready"
+      lobbyState &&
+      (effectivePendingPlayMode === "constructed" ||
+        lobbyState.cube_loading_status === "ready")
     ) {
       navigate(`/game/${pendingGameId}/lobby`);
     }
-  }, [friendsLoading, pendingGameId, lobbyState?.cube_loading_status, navigate]);
+  }, [effectivePendingPlayMode, friendsLoading, lobbyState, navigate, pendingGameId]);
 
   useEffect(() => {
-    if (!cubeId) return;
+    if (
+      soloPhase === "loading" &&
+      pendingGameId &&
+      lobbyState &&
+      effectivePendingPlayMode === "constructed"
+    ) {
+      navigate(`/game/${pendingGameId}/lobby`);
+    }
+  }, [effectivePendingPlayMode, lobbyState, navigate, pendingGameId, soloPhase]);
+
+  useEffect(() => {
+    if (!cubeId || playMode === "constructed") return;
     const timer = setTimeout(() => warmCubeCache(cubeId), 2000);
     return () => clearTimeout(timer);
-  }, [cubeId]);
+  }, [cubeId, playMode]);
 
   const handleGuidedModeToggle = useCallback((nextValue: boolean) => {
     setIsGuidedMode(nextValue);
@@ -382,10 +424,11 @@ export function Play() {
     setFriendsLoading(true);
     try {
       const response = await createGame(playerName, {
-        cubeId: cubeId || "auto",
+        cubeId: playMode === "draft" ? cubeId || "auto" : "auto",
         useUpgrades,
         autoApproveSpectators,
         guidedModeDefault: isGuidedMode,
+        playMode,
       });
       saveSession(response.session_id, response.player_id);
       rememberPlayerForGame(response.game_id, playerName.trim());
@@ -396,6 +439,7 @@ export function Play() {
       );
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
+      setPendingPlayMode(playMode);
     } catch (err) {
       addToast(normalizeCreateGameError(err), "error");
       setFriendsLoading(false);
@@ -413,11 +457,12 @@ export function Play() {
     try {
       const targetCount = count + 1;
       const response = await createGame(playerName, {
-        cubeId: cubeId || "auto",
+        cubeId: playMode === "draft" ? cubeId || "auto" : "auto",
         useUpgrades,
         targetPlayerCount: targetCount,
         puppetCount: count,
         guidedModeDefault: isGuidedMode,
+        playMode,
       });
       saveSession(response.session_id, response.player_id);
       rememberPlayerForGame(response.game_id, playerName.trim());
@@ -428,6 +473,7 @@ export function Play() {
       );
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
+      setPendingPlayMode(playMode);
     } catch (err) {
       addToast(normalizeCreateGameError(err), "error");
       updateSoloPhase("idle");
@@ -438,12 +484,14 @@ export function Play() {
     setFriendsLoading(false);
     setPendingGameId(null);
     setPendingSessionId(null);
+    setPendingPlayMode(null);
   };
 
   const handleCancelSolo = () => {
     updateSoloPhase("idle");
     setPendingGameId(null);
     setPendingSessionId(null);
+    setPendingPlayMode(null);
     setMaxAvailablePuppets(null);
     resetWatcher();
   };
@@ -669,7 +717,10 @@ export function Play() {
           title="Friends Options"
           onClose={() => setShowFriendsAdvanced(false)}
         >
-          <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
+          <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
+          {playMode === "draft" && (
+            <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
+          )}
           <UpgradesCheckbox
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
@@ -692,7 +743,10 @@ export function Play() {
           title="Solo Options"
           onClose={() => setShowSoloAdvanced(false)}
         >
-          <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
+          <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
+          {playMode === "draft" && (
+            <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
+          )}
           <UpgradesCheckbox
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}

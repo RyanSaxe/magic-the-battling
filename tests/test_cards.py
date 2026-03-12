@@ -1,6 +1,6 @@
 import pytest
 
-from mtb.models.cards import build_battler
+from mtb.models.cards import Battler, build_battler, validate_constructed_battler
 
 
 def test_card_upgrade_links_target(card_factory):
@@ -89,3 +89,37 @@ def test_build_battler_raises_when_no_main_cards(monkeypatch, card_factory):
 
     with pytest.raises(ValueError):
         build_battler()
+
+
+def test_validate_constructed_battler_requires_100_cards(card_factory):
+    battler = Battler(cards=[card_factory(f"c{i}") for i in range(99)], upgrades=[], vanguards=[])
+
+    with pytest.raises(ValueError, match="at least 100"):
+        validate_constructed_battler(battler)
+
+
+def test_validate_constructed_battler_requires_singleton(card_factory):
+    cards = [card_factory(f"c{i}") for i in range(99)]
+    cards.append(card_factory("c0"))
+    battler = Battler(cards=cards, upgrades=[], vanguards=[])
+
+    with pytest.raises(ValueError, match="singleton"):
+        validate_constructed_battler(battler)
+
+
+def test_validate_constructed_battler_rejects_banned_keywords(card_factory):
+    cards = [card_factory(f"c{i}") for i in range(99)]
+    cards.append(card_factory("toxic-card", keywords=["Toxic"]))
+    battler = Battler(cards=cards, upgrades=[], vanguards=[])
+
+    with pytest.raises(ValueError, match="banned keyword"):
+        validate_constructed_battler(battler)
+
+
+def test_validate_constructed_battler_rejects_banned_names(card_factory):
+    cards = [card_factory(f"c{i}") for i in range(99)]
+    cards.append(card_factory("Thassa's Oracle"))
+    battler = Battler(cards=cards, upgrades=[], vanguards=[])
+
+    with pytest.raises(ValueError, match="Thassa"):
+        validate_constructed_battler(battler)

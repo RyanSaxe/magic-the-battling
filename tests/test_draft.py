@@ -1,7 +1,7 @@
 import pytest
 
 from mtb.models.cards import Battler
-from mtb.models.game import create_game
+from mtb.models.game import Config, create_game, set_player_battlers
 from mtb.phases import draft
 
 
@@ -134,6 +134,28 @@ def test_roll_returns_pack_to_battler_and_deals_new(card_factory):
     assert new_pack != old_pack
     # Old pack should be in battler.cards now (5 cards added)
     assert len(game.battler.cards) == battler_cards_before + 5
+
+
+def test_constructed_draft_uses_player_specific_battlers(card_factory):
+    config = Config(play_mode="constructed", starting_pool_size=0)
+    game = create_game(["Alice", "Bob"], num_players=2, config=config)
+    alice_battler = Battler(cards=[card_factory(f"alice_{i}") for i in range(5)], upgrades=[], vanguards=[])
+    bob_battler = Battler(cards=[card_factory(f"bob_{i}") for i in range(5)], upgrades=[], vanguards=[])
+    set_player_battlers(game, {"Alice": alice_battler, "Bob": bob_battler})
+
+    alice, bob = game.players
+    alice.phase = "draft"
+    bob.phase = "draft"
+
+    draft.start(game)
+    alice_pack = draft.deal_pack_to_player(game, alice)
+    bob_pack = draft.deal_pack_to_player(game, bob)
+
+    assert all(card.name.startswith("alice_") for card in alice_pack)
+    assert all(card.name.startswith("bob_") for card in bob_pack)
+    assert len(game.get_draft_state().packs) == 0
+    assert game.get_draft_state().player_packs["Alice"] == []
+    assert game.get_draft_state().player_packs["Bob"] == []
 
 
 def test_roll_always_succeeds_by_creating_packs(card_factory):

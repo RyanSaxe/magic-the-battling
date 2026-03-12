@@ -37,11 +37,12 @@ def apply_poison(winner: Player, loser: Player) -> int:
 
 
 def award_random_card(game: Game, player: Player) -> Card | None:
-    if game.battler is None or not game.battler.cards:
+    battler = player.battler or game.battler
+    if battler is None or not battler.cards:
         return None
 
-    card = random.choice(game.battler.cards)
-    game.battler.cards.remove(card)
+    card = random.choice(battler.cards)
+    battler.cards.remove(card)
     player.sideboard.append(card)
     return card
 

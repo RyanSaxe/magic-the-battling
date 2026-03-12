@@ -20,6 +20,19 @@ import {
 const DESKTOP_SUBTITLE = "An MtG format inspired by autobattlers";
 const MOBILE_SUBTITLE = "An MtG format inspired by autobattlers";
 
+function battlerStatusLabel(status: string | null | undefined) {
+  switch (status) {
+    case "loading":
+      return "Loading battler..."
+    case "ready":
+      return "Battler ready"
+    case "error":
+      return "Battler invalid"
+    default:
+      return "Battler required"
+  }
+}
+
 function GuidedModeSwitch({
   enabled,
   setEnabled,
@@ -176,6 +189,7 @@ export function Lobby() {
   const [isGuidedMode, setIsGuidedMode] = useState(() =>
     getDefaultNewPlayerPreference(),
   );
+  const [battlerIdInput, setBattlerIdInput] = useState("");
   const [rulesPanelTarget, setRulesPanelTarget] = useState<
     RulesPanelTarget | undefined
   >(undefined);
@@ -209,6 +223,27 @@ export function Lobby() {
   const currentPlayer = lobbyState?.players.find(
     (p) => p.player_id === session?.playerId,
   );
+  const isConstructed = lobbyState?.play_mode === "constructed";
+  const currentBattlerStatus = currentPlayer?.battler_status ?? null;
+  const canReady = !isConstructed || currentBattlerStatus === "ready";
+
+  useEffect(() => {
+    const nextBattlerId = currentPlayer?.battler_id ?? "";
+    queueMicrotask(() => {
+      setBattlerIdInput((previous) =>
+        previous === nextBattlerId ? previous : nextBattlerId,
+      );
+    });
+  }, [currentPlayer?.battler_id]);
+
+  const submitBattler = () => {
+    const battlerId = battlerIdInput.trim();
+    if (!battlerId) {
+      addToast("Please enter a battler ID", "error");
+      return;
+    }
+    actions.submitBattler(battlerId);
+  };
 
   const lobbyHotkeyMap: Record<string, () => void> = {
     "?": () => {
@@ -219,12 +254,17 @@ export function Lobby() {
   if (lobbyState && currentPlayer && !showRulesPanel) {
     const isHost = currentPlayer.is_host;
     const isReady = currentPlayer.is_ready;
-    lobbyHotkeyMap["r"] = () => actions.setReady(!isReady);
+    if (canReady || isReady) {
+      lobbyHotkeyMap["r"] = () => actions.setReady(!isReady);
+    }
+    if (isConstructed) {
+      lobbyHotkeyMap["b"] = submitBattler;
+    }
     lobbyHotkeyMap["Enter"] = () => {
       if (isHost && lobbyState.can_start && !startingGame) {
         setStartingGame(true);
         actions.startGame();
-      } else {
+      } else if (canReady || isReady) {
         actions.setReady(!isReady);
       }
     };
@@ -370,6 +410,7 @@ export function Lobby() {
             initialDocId={rulesPanelTarget?.docId}
             initialTab={rulesPanelTarget?.tab}
             gameId={gameId}
+            playerName={currentPlayer?.name}
             useUpgrades={undefined}
           />
         )}
@@ -484,6 +525,7 @@ export function Lobby() {
             initialDocId={rulesPanelTarget?.docId}
             initialTab={rulesPanelTarget?.tab}
             gameId={gameId}
+            playerName={currentPlayer?.name}
             useUpgrades={undefined}
           />
         )}
@@ -634,29 +676,102 @@ export function Lobby() {
                         </div>
                         <div className="border-t border-black/40 mt-2 pt-2 flex items-center justify-center gap-2 text-xs text-gray-500">
                           <span>
-                            Cube:{" "}
-                            <a
-                              href={`https://cubecobra.com/cube/overview/${lobbyState.cube_id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-amber-500 hover:text-amber-400 transition-colors"
-                            >
-                              {lobbyState.cube_id}
-                            </a>
+                            Mode:{" "}
+                            <span className="text-amber-500">
+                              {lobbyState.play_mode === "constructed" ? "Constructed" : "Draft"}
+                            </span>
                           </span>
                           <span>&middot;</span>
+                          {lobbyState.play_mode === "draft" ? (
+                            <>
+                              <span>
+                                Cube:{" "}
+                                <a
+                                  href={`https://cubecobra.com/cube/overview/${lobbyState.cube_id}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-amber-500 hover:text-amber-400 transition-colors"
+                                >
+                                  {lobbyState.cube_id}
+                                </a>
+                              </span>
+                              <span>&middot;</span>
+                            </>
+                          ) : currentPlayer?.battler_id ? (
+                            <>
+                              <span>
+                                Your Battler:{" "}
+                                <span className="text-amber-500">{currentPlayer.battler_id}</span>
+                              </span>
+                              <span>&middot;</span>
+                            </>
+                          ) : null}
                           <span>
                             Upgrades: {lobbyState.use_upgrades ? "On" : "Off"}
                           </span>
-                          <span>&middot;</span>
-                          <button
-                            onClick={() => openGuide({ docId: "__cards__" })}
-                            className="text-amber-500/70 hover:text-amber-400 transition-colors"
-                          >
-                            Browse Cards
-                          </button>
+                          {(lobbyState.play_mode === "draft" || currentPlayer?.battler_status === "ready") && (
+                            <>
+                              <span>&middot;</span>
+                              <button
+                                onClick={() => openGuide({ docId: "__cards__" })}
+                                className="text-amber-500/70 hover:text-amber-400 transition-colors"
+                              >
+                                Browse Cards
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
+
+                      {lobbyState.play_mode === "constructed" && currentPlayer && (
+                        <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <h2 className="text-white font-medium text-sm">Your Battler</h2>
+                              <p className="text-xs text-gray-400 mt-1">
+                                Enter a battler ID before you ready up. Rules: 100+ cards, singleton, no toxic/poisonous/proliferate, and no Thassa&apos;s Oracle or Laboratory Maniac.
+                              </p>
+                            </div>
+                            <span
+                              className={`text-xs shrink-0 ${
+                                currentPlayer.battler_status === "ready"
+                                  ? "text-green-400"
+                                  : currentPlayer.battler_status === "error"
+                                    ? "text-red-400"
+                                    : "text-amber-300"
+                              }`}
+                            >
+                              {battlerStatusLabel(currentPlayer.battler_status)}
+                            </span>
+                          </div>
+                          <div className="mt-3 flex gap-2">
+                            <input
+                              type="text"
+                              value={battlerIdInput}
+                              onChange={(event) => setBattlerIdInput(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  submitBattler();
+                                }
+                              }}
+                              placeholder="CubeCobra battler ID"
+                              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            />
+                            <button
+                              onClick={submitBattler}
+                              disabled={currentPlayer.battler_status === "loading"}
+                              className="btn btn-primary btn-dark-border px-4 py-2 shrink-0"
+                            >
+                              Submit
+                            </button>
+                          </div>
+                          {currentPlayer.battler_error && (
+                            <p className="mt-2 text-xs text-red-300">
+                              {currentPlayer.battler_error}
+                            </p>
+                          )}
+                        </div>
+                      )}
 
                 <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
                   <div className="flex items-center justify-between mb-2">
@@ -713,9 +828,16 @@ export function Lobby() {
                                 player.is_ready ? "bg-green-500" : "bg-gray-500"
                               }`}
                             />
-                            <span className="text-white text-sm truncate">
-                              {player.name}
-                            </span>
+                            <div className="min-w-0">
+                              <div className="text-white text-sm truncate">
+                                {player.name}
+                              </div>
+                              {lobbyState.play_mode === "constructed" && (
+                                <div className="text-[11px] text-gray-500 truncate">
+                                  {battlerStatusLabel(player.battler_status)}
+                                </div>
+                              )}
+                            </div>
                             {player.is_host && (
                               <span className="text-amber-400 text-xs shrink-0 ml-auto">
                                 Host
@@ -827,10 +949,11 @@ export function Lobby() {
                   <div className={isHost ? "grid grid-cols-2 gap-2" : ""}>
                     <button
                       onClick={() => actions.setReady(!isReady)}
+                      disabled={!canReady && !isReady}
                       className={`btn btn-dark-border w-full py-2 ${
                         isReady
                           ? "bg-gray-600 text-white hover:bg-gray-500"
-                          : "bg-green-600 text-white hover:bg-green-500"
+                          : "bg-green-600 text-white hover:bg-green-500 disabled:bg-gray-700 disabled:text-gray-400"
                       }`}
                     >
                       {isReady ? "Unready" : "Ready"}
@@ -894,6 +1017,7 @@ export function Lobby() {
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
           gameId={gameId}
+          playerName={currentPlayer?.name}
           useUpgrades={lobbyState?.use_upgrades}
         />
       )}

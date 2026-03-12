@@ -5,6 +5,10 @@ from pydantic import BaseModel, Field
 
 from mtb.models.types import UPGRADE_TYPE, VANGUARD_TYPE
 
+CONSTRUCTED_MIN_CARDS = 100
+CONSTRUCTED_BANNED_KEYWORDS = {"toxic", "poisonous", "proliferate"}
+CONSTRUCTED_BANNED_CARD_NAMES = {"thassa's oracle", "laboratory maniac"}
+
 
 class Card(BaseModel):
     name: str
@@ -20,6 +24,7 @@ class Card(BaseModel):
     oracle_text: str | None = None
     original_owner: str | None = None
     colors: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
     cmc: float = 0.0
 
     # vanguard specific properties
@@ -51,6 +56,7 @@ class Battler(BaseModel):
     upgrades: list[Card]
     vanguards: list[Card]
     elo: float = 0.0
+    source_id: str | None = None
     original_cards: list[Card] = Field(default_factory=list)
     original_upgrades: list[Card] = Field(default_factory=list)
 
@@ -102,6 +108,40 @@ def build_battler(
         upgrades=upgrades,
         vanguards=vanguards,
         elo=elo,
+        source_id=battler_id,
         original_cards=list(cards),
         original_upgrades=list(upgrades),
     )
+
+
+def _normalize_card_name(name: str) -> str:
+    return name.strip().casefold().replace("\u2019", "'")
+
+
+def validate_constructed_battler(battler: Battler) -> None:
+    playable_cards = battler.cards
+    if len(playable_cards) < CONSTRUCTED_MIN_CARDS:
+        msg = f"Constructed battler must contain at least {CONSTRUCTED_MIN_CARDS} playable cards"
+        raise ValueError(msg)
+
+    seen_names: set[str] = set()
+    duplicate_names: set[str] = set()
+    for card in playable_cards:
+        normalized_name = _normalize_card_name(card.name)
+        if normalized_name in seen_names:
+            duplicate_names.add(card.name)
+        seen_names.add(normalized_name)
+
+    if duplicate_names:
+        raise ValueError("Constructed battler must be singleton")
+
+    for card in playable_cards:
+        normalized_name = _normalize_card_name(card.name)
+        if normalized_name in CONSTRUCTED_BANNED_CARD_NAMES:
+            raise ValueError(f"Constructed battler contains banned card: {card.name}")
+
+        keywords = {keyword.strip().casefold() for keyword in card.keywords}
+        banned_keywords = sorted(CONSTRUCTED_BANNED_KEYWORDS & keywords)
+        if banned_keywords:
+            keyword_list = ", ".join(banned_keywords)
+            raise ValueError(f"Constructed battler contains banned keyword(s): {keyword_list}")
