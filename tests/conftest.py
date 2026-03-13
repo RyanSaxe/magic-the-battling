@@ -236,6 +236,7 @@ def test_db():
     try:
         yield
     finally:
+        _cleanup_runtime_state()
         close_all_sessions()
         Base.metadata.drop_all(bind=engine)
         engine.dispose()
@@ -245,11 +246,8 @@ def test_db():
 
 @pytest.fixture
 def client(mock_cube_data, test_db):
-    client = TestClient(app)
-    try:
+    with TestClient(app) as client:
         yield client
-    finally:
-        client.close()
 
 
 def _receive_ws_message(websocket: WebSocketTestSession, timeout: float) -> dict[str, Any]:

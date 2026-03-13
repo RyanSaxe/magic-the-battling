@@ -7,6 +7,8 @@ from typing import ClassVar
 
 import pytest
 
+from mtb.utils import json_helpers as json_helpers_module_impl
+
 
 class _JsonHandler(BaseHTTPRequestHandler):
     request_times: ClassVar[list[float]] = []
@@ -35,12 +37,13 @@ def json_endpoint():
         yield url, _JsonHandler.request_times
     finally:
         server.shutdown()
+        server.server_close()
         thread.join(timeout=2)
 
 
 @pytest.fixture
 def json_helpers_module():
-    from mtb.utils import json_helpers as module  # noqa: PLC0415
+    module = json_helpers_module_impl
 
     try:
         module.stop_worker()

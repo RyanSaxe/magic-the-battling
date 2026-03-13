@@ -17,6 +17,7 @@ import sys
 import tempfile
 import time
 from collections import Counter
+from contextlib import closing
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -392,7 +393,7 @@ def seed_puppet_histories(
         }
     )
 
-    with sqlite3.connect(str(db_path)) as conn:
+    with closing(sqlite3.connect(str(db_path))) as conn:
         conn.execute("PRAGMA busy_timeout=5000")
         usable_count = _count_usable_histories(
             conn,

@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from contextlib import closing
 
 import pytest
 
@@ -116,7 +117,7 @@ def test_rss_window_dict():
 
 
 def _init_seed_schema(db_path):
-    with sqlite3.connect(str(db_path)) as conn:
+    with closing(sqlite3.connect(str(db_path))) as conn:
         conn.executescript(
             """
             CREATE TABLE games (
@@ -187,7 +188,7 @@ def test_seed_puppet_histories_backfills_when_existing_histories_miss_target_elo
     _init_seed_schema(db_path)
     config_json = json.dumps({"use_upgrades": True, "use_vanguards": False, "cube_id": "auto"})
 
-    with sqlite3.connect(str(db_path)) as conn:
+    with closing(sqlite3.connect(str(db_path))) as conn:
         for idx in range(25):
             _insert_history(
                 conn,
