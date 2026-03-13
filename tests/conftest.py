@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import close_all_sessions, sessionmaker
 from sqlalchemy.pool import StaticPool
 from starlette.testclient import WebSocketTestSession
 
@@ -220,6 +220,8 @@ def mock_cube_data(card_factory, upgrade_factory, monkeypatch):
 @pytest.fixture
 def test_db():
     """Create an in-memory SQLite database for testing."""
+    original_engine = db_module.engine
+    original_session_local = db_module.SessionLocal
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -231,8 +233,14 @@ def test_db():
     db_module.SessionLocal = testing_session_local
 
     Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
+    try:
+        yield
+    finally:
+        close_all_sessions()
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+        db_module.engine = original_engine
+        db_module.SessionLocal = original_session_local
 
 
 @pytest.fixture
