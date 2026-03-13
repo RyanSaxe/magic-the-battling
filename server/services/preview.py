@@ -39,18 +39,32 @@ class DiskCache:
     def __init__(self, directory: Path, max_bytes: int = DISK_CACHE_MAX_BYTES):
         self._dir = directory
         self._max_bytes = max_bytes
-        self._dir.mkdir(parents=True, exist_ok=True)
+        self._initialized = False
+
+    def _ensure_dir(self) -> bool:
+        if self._initialized:
+            return True
+        try:
+            self._dir.mkdir(parents=True, exist_ok=True)
+            self._initialized = True
+            return True
+        except OSError:
+            return False
 
     def _path(self, key: str) -> Path:
         return self._dir / f"{key}.png"
 
     def get(self, key: str) -> bytes | None:
+        if not self._ensure_dir():
+            return None
         p = self._path(key)
         if p.exists():
             return p.read_bytes()
         return None
 
     def put(self, key: str, data: bytes) -> None:
+        if not self._ensure_dir():
+            return
         self._path(key).write_bytes(data)
         self._evict()
 
