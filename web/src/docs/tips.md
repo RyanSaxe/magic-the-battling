@@ -33,4 +33,4 @@ order: 6
 ## Reward
 
 - Be very careful which [upgrade](doc:game-pieces#upgrades) you choose. You don't need to apply it immediately, but the longer you wait, the weaker you are.
-- Applying [upgrades](doc:game-pieces#upgrades) are permanent. So don't choose one that will go onto a card you don't plan on playing in the lategame.
+- Upgrades are permanent once applied. So don't choose one that will go onto a card you don't plan on playing in the lategame.

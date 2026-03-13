@@ -90,8 +90,7 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "The game is played in a series of stages, each made up of three rounds. Each stage is numbered by your hand size at that point of the game. We start the game with 3 cards in hand, so we start at Stage 3, Round 1.",
-          detail: "The stage number will always be your hand size.",
+          summary: "The game is played in stages of three rounds. Your stage number matches your starting hand size, so the game begins at Stage 3, Round 1.",
         },
       },
       {
@@ -103,7 +102,7 @@ function buildWelcomeGuide(): GuideDefinition {
         primaryActionLabel: "Next",
         content: {
           summary: "You are dealt a pack of 5 cards and may swap any number of cards between that pack and your pool.",
-          detail: "Note: the game starts directly in the build phase of stage 3, round 1. This is to give you a chance to get familiar with the build and battle phases before you have to make draft decisions.",
+          detail: "The game starts in Build on Stage 3, Round 1 so you can learn Build and Battle before making draft picks.",
         },
       },
       {
@@ -125,7 +124,7 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Play a quick game of Magic with a small hand, 10 life, and no libraries.",
+          summary: "Play a quick game of Magic with a small hand, 10 life, and empty libraries.",
         },
       },
       {
@@ -172,7 +171,7 @@ function buildBuildGuide(): GuideDefinition {
         positionTargetId: "game-content",
         primaryActionLabel: "Next",
         content: {
-          summary: "Build the best starting hand you can from the pool you have in which you start the game with 3 basic lands of your choice on the battlefield untapped.",
+          summary: "Build the best starting hand you can from your pool. You begin battle with 3 basic lands of your choice already untapped on the battlefield.",
         },
       },
       {
@@ -185,8 +184,8 @@ function buildBuildGuide(): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "The game starts dealing 7 cards to all players. This is your current pool to build your hand from.",
-          detail: "What remains in this zone will be your sideboard for cards like Living Wish and Companions.",
+          summary: "At the start of the game, you're dealt 7 cards. This is the pool you build from.",
+          detail: "Cards you don't put into your hand stay in your sideboard.",
         },
       },
       {
@@ -200,7 +199,7 @@ function buildBuildGuide(): GuideDefinition {
         primaryActionLabel: "Next",
         content: {
           summary: "The 3 basic lands you choose will start on the battlefield untapped.",
-          detail: "Your treasure tokens and poison counters also carry into battle. This can change the value of cards over the course of the game.",
+          detail: "Treasures and poison carry over from round to round, so they can change which cards are strongest later.",
         },
       },
       {
@@ -219,7 +218,7 @@ function buildBuildGuide(): GuideDefinition {
       },
       {
         id: "submit",
-        title: "This Moves You Into Battle",
+        title: "Lock In Your Build",
         targetId: "build-submit",
         positionTargetId: "phase-action-bar",
         placement: "top",
@@ -251,7 +250,7 @@ function buildPlayDrawGuide(): GuideDefinition {
         allowTargetInteraction: true,
         content: {
           summary: "Play or draw is submitted as part of your build.",
-          detail: "The player with the most poison will get their submitted choice of play or draw.",
+          detail: "The player with the most poison gets their submitted choice of play or draw. If there's a tie, a coin flip decides.",
         },
       },
     ],
@@ -268,8 +267,8 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       positionTargetId: "game-content",
       primaryActionLabel: "Next",
       content: {
-        summary: "Battle is a short manual game of Magic with 10 life and no libraries.",
-        detail: "Treasures are persistent. If you produce some in a battle, you get to keep them (up to 5) for future battles. And if you use them, then you won't have them for later. Choose wisely!",
+        summary: "Battle is a short game of Magic with 10 life and empty libraries.",
+        detail: "You play it out manually against your opponent. You keep any treasures still on your battlefield after battle, up to five.",
       },
     },
     {
@@ -282,7 +281,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       mobileCardPlacement: "top-center",
       primaryActionLabel: "Next",
       content: {
-        summary: "Your opponent cannot see your hand. Drag cards to the battlefield to show them to your opponent and play them.",
+        summary: "Your opponent cannot see your hand. To play a card, move it from your hand onto the battlefield.",
       },
     },
     {
@@ -305,7 +304,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       positionTargetId: "battle-battlefield",
       placement: "top",
       cardPlacement: "top-center",
-      primaryActionLabel: ctx.currentBattle?.can_manipulate_opponent ? "Next" : "Got it",
+      primaryActionLabel: "Next",
       content: {
         summary: "This button opens the full actions menu.",
         detail: "If a card is selected, its specific actions also appear in the menu.",
@@ -356,14 +355,14 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   const steps: GuideStepDefinition[] = [
     {
       id: "intro",
-      title: "That's The End of the Round!",
+      title: "Round Complete",
       placement: "center",
       cardPlacement: "center",
       positionTargetId: "game-content",
       primaryActionLabel: "Next",
       content: {
-        summary: "Take your loot. Everybody gets the same amount.",
-        detail: "The loot at the end of a stage is special, so look out for that!",
+        summary: "After each battle, everyone gets +1 treasure and a random card as loot.",
+        detail: "At the end of a stage, the loot is different and more powerful.",
       },
     },
     {
@@ -466,7 +465,7 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       },
       {
         id: "pack",
-        title: "This Is The Current Pack",
+        title: "Current Pack",
         targetId: "draft-pack",
         positionTargetId: (ctx) => (ctx.isMobile ? "draft-pool" : "draft-pack"),
         placement: "right",
@@ -479,7 +478,7 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       },
       {
         id: "pool",
-        title: "This Is Your Pool",
+        title: "Your Pool",
         targetId: "draft-pool",
         positionTargetId: (ctx) => (ctx.isMobile ? "draft-pack" : "draft-pool"),
         placement: "right",
@@ -505,8 +504,8 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
           playerName: null,
         },
         content: {
-          summary: "This is a summary of information on your opponents such as the likelihood you will battle them.",
-          detail: "Click for further details."
+          summary: "This sidebar shows key info about each opponent, including how likely you are to face them.",
+          detail: "Click a player to inspect their revealed cards and other details.",
         },
       },
       {
@@ -536,7 +535,7 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       },
       {
         id: "roll",
-        title: "Roll Spends Treasure For A Fresh Pack",
+        title: "Open a New Pack",
         targetId: "draft-roll",
         positionTargetId: (ctx) => (ctx.isMobile ? "draft-pool" : "draft-roll"),
         placement: "top",
@@ -575,7 +574,7 @@ function buildTreasureProducerHint(ctx: GuidedWalkthroughContext): GuideDefiniti
     steps: [
       {
         id: "treasure-producer",
-        title: "Treasure Production Is Worth Extra Attention",
+        title: "Treasure Matters Here",
         targetSelector: cardSelector(source?.cardId),
         targetId: isBuild ? "build-sideboard" : "draft-pack",
         positionTargetId: isBuild ? "build-battlefield" : "draft-pool",
@@ -584,7 +583,7 @@ function buildTreasureProducerHint(ctx: GuidedWalkthroughContext): GuideDefiniti
         mobileCardPlacement: isBuild ? "top-center" : "bottom-center",
         primaryActionLabel: "Got it",
         content: {
-          summary: "Cards that make treasure have extra value because treasure can be used to win battles now or see more cards during the draft to make your hand stronger long term.",
+          summary: "Treasure-producing cards are worth extra attention because they help both in battle and in future drafts.",
           detail: isBuild
             ? "If you can start this card early, it may be something you can turn into an advantage."
             : "Even a modest treasure producer can be worth prioritizing because economy carries across phases.",
@@ -602,7 +601,7 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
     steps: [
       {
         id: "treasure-cap",
-        title: `You Have ${ctx.selfPlayer?.treasures ?? 6} Treasure`,
+        title: `You Have ${ctx.selfPlayer?.treasures ?? 6} Treasures`,
         targetId: "draft-mobile-treasure",
         positionTargetId: "draft-pool",
         placement: "right",
@@ -611,7 +610,7 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
         primaryActionLabel: "Got it",
         content: {
           summary: "After battle, you keep at most 5 treasure that remain on your battlefield.",
-          detail: "With this much treasure, some value is at risk of being wasted. Spending one now on a roll is likely correct.",
+          detail: "You're already above the amount you can carry out of battle. Spending one on a roll now is often better than letting that value go to waste later.",
         },
       },
     ],

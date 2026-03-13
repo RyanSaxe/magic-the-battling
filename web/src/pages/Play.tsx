@@ -252,7 +252,7 @@ function GuidedModeField({
   setEnabled: (v: boolean) => void;
 }) {
   const guidedModeHelpText =
-    "When Guided Mode is on, the first time you enter a situation, a simple popup gives you help.";
+    "Guided Mode gives you a brief walkthrough the first time a new phase, action, or situation comes up.";
   const [showGuidedModeHelp, setShowGuidedModeHelp] = useState(false);
   const guidedModeHelpRef = useRef<HTMLDivElement>(null);
 

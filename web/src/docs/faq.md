@@ -17,7 +17,7 @@ No. Conceding is disabled because [treasures](doc:game-pieces#treasures) created
 
 When a player reaches 10 [poison](doc:game-pieces#poison), they are eliminated. Last player standing wins.
 
-## Are there different rules when only 2 players are alive?
+## How do the finals work?
 
 There is exactly one rule that is different, and it's not just 1v1 games, but applies to the finals of a multiplayer game as well.
 
@@ -49,4 +49,4 @@ The best source for in-person logistics is the [CubeCobra Primer](https://cubeco
 
 ## Can I build my own Battler?
 
-Of course! If you click the settings icon on the Play page, you can provide a cubecobra ID for your custom battler to play with. For advice on how to build your own battler, refer to the end of the [CubeCobra Primer](https://cubecobra.com/cube/about/auto?view=primer#advice-for-building-your-own).
+Of course! If you click the settings icon on the Play page, you can provide a CubeCobra ID for your custom battler to play with. For advice on how to build your own battler, refer to the end of the [CubeCobra Primer](https://cubecobra.com/cube/about/auto?view=primer#advice-for-building-your-own).

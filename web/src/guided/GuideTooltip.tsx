@@ -120,7 +120,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
                 onClick={onSkipAll}
                 className="btn btn-danger shrink-0 whitespace-nowrap px-2 py-1 text-[11px] leading-none"
               >
-                Skip Tutorial
+                Skip All Guides
               </button>
             )}
           </div>

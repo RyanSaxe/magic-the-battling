@@ -22,7 +22,7 @@ const PHASE_SUMMARY_ROWS: Record<Phase, PhaseSummaryRow[]> = {
   build: [
     { text: 'Click any two cards to swap them.' },
     { text: 'Basic lands and treasures start on the battlefield.' },
-    { text: 'Next: play magic with 10 life and an empty library.' },
+    { text: 'Next: play Magic with 10 life and empty libraries.' },
   ],
   battle: [
     { text: 'Drag and drop cards between zones to play the game.' },
@@ -57,11 +57,11 @@ export function getPhaseReferenceLabel(phase: Phase): string {
 }
 
 export function getPhaseControlsLabel(phase: Phase): string {
-  return phase === 'reward' ? `${getPhaseDisplayName(phase)} Controls` : `${getPhaseDisplayName(phase)} Phase Controls`
+  return getPhaseDisplayName(phase)
 }
 
 export function getPhaseTipsLabel(phase: Phase): string {
-  return phase === 'reward' ? `${getPhaseDisplayName(phase)} Tips` : `${getPhaseDisplayName(phase)} Phase Tips`
+  return getPhaseDisplayName(phase)
 }
 
 export function getPhaseSummaryRows(phase: Phase, useUpgrades: boolean): string[] {

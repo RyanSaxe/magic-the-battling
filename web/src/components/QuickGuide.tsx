@@ -24,7 +24,7 @@ type TipsSection = 'global' | Phase
 const ACCORDION_STEP_MS = 400
 const DISCORD_INVITE_URL = 'https://discord.gg/2NAjcWXNKn'
 const FACE_UP_FAQ_SLUG = 'why-are-my-opponents-cards-face-up'
-const FINALS_FAQ_SLUG = 'how-do-finals-and-sudden-death-work'
+const FINALS_FAQ_SLUG = 'how-do-the-finals-work'
 
 interface AccordionItemProps {
   id: string
@@ -76,14 +76,14 @@ function controlsSectionLabel(section: ControlsSection | null): string | null {
   if (!section) {
     return null
   }
-  return section === 'global' ? 'Global Controls' : getPhaseControlsLabel(section)
+  return section === 'global' ? 'General' : getPhaseControlsLabel(section)
 }
 
 function tipsSectionLabel(section: TipsSection | null): string | null {
   if (!section) {
     return null
   }
-  return section === 'global' ? 'Global Tips' : getPhaseTipsLabel(section)
+  return section === 'global' ? 'General' : getPhaseTipsLabel(section)
 }
 
 function buildLocationLabel({
@@ -152,7 +152,12 @@ function normalizeFaqSlug(raw?: string): string | undefined {
   if (slug === 'puppets' || slug === 'ghost' || slug === 'why-are-my-opponents-cards-face-up') {
     return FACE_UP_FAQ_SLUG
   }
-  if (slug === 'finals' || slug === 'sudden-death' || slug === 'how-do-finals-and-sudden-death-work') {
+  if (
+    slug === 'finals'
+    || slug === 'sudden-death'
+    || slug === 'how-do-finals-and-sudden-death-work'
+    || slug === 'how-do-the-finals-work'
+  ) {
     return FINALS_FAQ_SLUG
   }
   return slug
@@ -686,7 +691,7 @@ export function QuickGuide({
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="controls-global"
-                label="Global Controls"
+                label="General"
                 expanded={controlsOpenId === 'global'}
 
                 onToggle={() => toggleControlsSection('global')}
@@ -721,7 +726,7 @@ export function QuickGuide({
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="tips-global"
-                label="Global Tips"
+                label="General"
                 expanded={tipsOpenId === 'global'}
 
                 onToggle={() => toggleTipsSection('global')}
