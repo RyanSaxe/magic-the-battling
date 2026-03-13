@@ -564,6 +564,18 @@ class GameManager:
             session.close()
         self._dirty_games.discard(game_id)
 
+    def _close_game_record(self, game_id: str) -> None:
+        session = db.SessionLocal()
+        try:
+            record = session.query(GameRecord).filter(GameRecord.id == game_id).first()
+            if record and record.ended_at is None:
+                record.ended_at = datetime.now(UTC)
+                session.commit()
+        except Exception:
+            logger.debug("Skipping ended_at update for game_id=%s", game_id, exc_info=True)
+        finally:
+            session.close()
+
     def evict_cold_games(self) -> int:
         cutoff = datetime.now(UTC) - timedelta(minutes=IDLE_EVICT_MINUTES)
         candidates: list[str] = []
@@ -1102,6 +1114,7 @@ class GameManager:
         self._action_locks.pop(game_id, None)
         if not preserve_snapshot:
             self.delete_snapshot(game_id)
+        self._close_game_record(game_id)
 
     def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool, play_mode: PlayMode) -> Battler:
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
