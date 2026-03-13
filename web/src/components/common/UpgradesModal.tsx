@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Card as CardType } from '../../types'
 import { Card } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { CardGrid } from './CardGrid'
 import { useCardLayout } from '../../hooks/useCardLayout'
 import { useElementHeight } from '../../hooks/useElementHeight'
+import { applyUpgradeWithModalClose } from './upgradeModalFlow'
 
 interface UpgradesModalProps {
   upgrades: CardType[]
@@ -23,6 +24,15 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
   })
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(initialTargetId ?? null)
 
+  const applyUpgrade = useCallback((upgradeId: string, targetId: string) => {
+    applyUpgradeWithModalClose({
+      upgradeId,
+      targetId,
+      onApply,
+      onClose,
+    })
+  }, [onApply, onClose])
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -34,15 +44,12 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
           onClose()
         }
       } else if (e.key === 'Enter' && selectedUpgradeId && selectedTargetId && onApply) {
-        onApply(selectedUpgradeId, selectedTargetId)
-        setSelectedUpgradeId(null)
-        setSelectedTargetId(null)
-        onClose()
+        applyUpgrade(selectedUpgradeId, selectedTargetId)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose, onApply, selectedUpgradeId, selectedTargetId])
+  }, [applyUpgrade, onClose, onApply, selectedUpgradeId, selectedTargetId])
 
   const applied = upgrades.filter((u) => u.upgrade_target)
   const unapplied = upgrades.filter((u) => !u.upgrade_target)
@@ -74,10 +81,7 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
 
   const handleConfirm = () => {
     if (!selectedUpgrade || !selectedTarget || !onApply) return
-    onApply(selectedUpgrade.id, selectedTarget.id)
-    setSelectedUpgradeId(null)
-    setSelectedTargetId(null)
-    onClose()
+    applyUpgrade(selectedUpgrade.id, selectedTarget.id)
   }
 
   const handleTargetClick = (target: CardType) => {
