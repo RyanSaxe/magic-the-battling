@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from contextlib import closing
 
 import pytest
 
@@ -90,6 +91,16 @@ def test_parse_args_runtime_reset_toggle():
     assert cfg.reset_runtime_between_sweeps is False
 
 
+def test_parse_args_fresh_server_per_sweep_requires_db_copy():
+    with pytest.raises(ValueError, match="requires --db-copy"):
+        parse_args(["--games", "1", "--fresh-server-per-sweep"])
+
+
+def test_parse_args_fresh_server_per_sweep_flag():
+    cfg = parse_args(["--games", "1", "--db-copy", "--fresh-server-per-sweep"])
+    assert cfg.fresh_server_per_sweep is True
+
+
 def test_parse_args_ws_action_jitter():
     cfg = parse_args(["--games", "1", "--ws-action-jitter-ms", "25"])
     assert cfg.ws_action_jitter_ms == 25.0
@@ -106,7 +117,7 @@ def test_rss_window_dict():
 
 
 def _init_seed_schema(db_path):
-    with sqlite3.connect(str(db_path)) as conn:
+    with closing(sqlite3.connect(str(db_path))) as conn:
         conn.executescript(
             """
             CREATE TABLE games (
@@ -177,7 +188,7 @@ def test_seed_puppet_histories_backfills_when_existing_histories_miss_target_elo
     _init_seed_schema(db_path)
     config_json = json.dumps({"use_upgrades": True, "use_vanguards": False, "cube_id": "auto"})
 
-    with sqlite3.connect(str(db_path)) as conn:
+    with closing(sqlite3.connect(str(db_path))) as conn:
         for idx in range(25):
             _insert_history(
                 conn,

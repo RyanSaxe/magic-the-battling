@@ -17,7 +17,7 @@ from server.db.database import init_db
 from server.monitoring import start_monitoring, stop_monitoring
 from server.observability import OBSERVABILITY_LOGGER_NAME, configure_logging, record_http_latency
 from server.routers import games, ops, share_preview, ws
-from server.runtime_config import MAX_SESSIONS_TOTAL, SESSION_TTL_MINUTES
+from server.runtime_config import MAX_SESSIONS_TOTAL, RESTORE_ACTIVE_GAME_SNAPSHOTS, SESSION_TTL_MINUTES
 from server.schemas.api import ServerStatusResponse
 from server.services.game_manager import game_manager
 from server.services.ops_manager import ops_manager
@@ -44,11 +44,11 @@ def _route_template(request: Request) -> str:
 async def lifespan(app: FastAPI):
     init_db()
     ops_manager.load()
-    game_manager.restore_all_snapshots()
-    preview_enabled = not _preview_disabled()
-    if preview_enabled:
-        await preview_service.start()
+    if RESTORE_ACTIVE_GAME_SNAPSHOTS:
+        game_manager.restore_all_snapshots()
     else:
+        logging.getLogger(__name__).info("Active game snapshot restore disabled by MTB_RESTORE_ACTIVE_GAME_SNAPSHOTS")
+    if _preview_disabled():
         logging.getLogger(__name__).info("Preview service disabled by MTB_DISABLE_PREVIEW")
     start_monitoring()
     await game_manager.start_background_tasks()
@@ -58,8 +58,7 @@ async def lifespan(app: FastAPI):
         logging.getLogger(__name__).info("Session cleanup before shutdown removed=%d", removed_sessions)
     await game_manager.stop_background_tasks()
     stop_monitoring()
-    if preview_enabled:
-        await preview_service.stop()
+    await preview_service.stop()
 
 
 app = FastAPI(

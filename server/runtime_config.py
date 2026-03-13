@@ -1,6 +1,18 @@
 import os
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
 def _env_int(name: str, default: int, *, min_value: int = 1) -> int:
     raw = os.getenv(name)
     if raw is None:
@@ -41,4 +53,7 @@ SESSION_TTL_MINUTES = _env_int("MTB_SESSION_TTL_MINUTES", 24 * 60, min_value=1)
 MAX_SPECTATE_REQUESTS_TOTAL = _env_int("MTB_MAX_SPECTATE_REQUESTS_TOTAL", 5_000, min_value=100)
 SPECTATE_REQUEST_TTL_MINUTES = _env_int("MTB_SPECTATE_REQUEST_TTL_MINUTES", 30, min_value=1)
 
+STALE_GAME_CLEANUP_HOURS = _env_int("MTB_STALE_GAME_CLEANUP_HOURS", 48, min_value=1)
+
 OPS_API_TOKEN = os.getenv("MTB_OPS_TOKEN", "")
+RESTORE_ACTIVE_GAME_SNAPSHOTS = _env_bool("MTB_RESTORE_ACTIVE_GAME_SNAPSHOTS", True)

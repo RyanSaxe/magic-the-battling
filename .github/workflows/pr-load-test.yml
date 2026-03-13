@@ -39,7 +39,8 @@ jobs:
             --sweep 10,50,100,200 \
             --puppet-count 3 \
             --disable-caps \
-            --runtime-reset-between-sweeps \
+            --fresh-server-per-sweep \
+            --no-runtime-reset-between-sweeps \
             --game-timeout-sec 900 \
             --json-output "${LOAD_JSON_PATH}"
 
@@ -96,6 +97,7 @@ jobs:
 
           report = json.loads(path.read_text())
           sweeps = report.get("sweeps", [])
+          fresh_server_per_sweep = bool((report.get("config") or {}).get("fresh_server_per_sweep"))
 
           lines = ["## PR Load Test", "", "| Games | Completed | Failed | Wall Time (s) | Throughput (games/s) | Action p95 (ms) | RSS Start (MB) | RSS Peak (MB) | RSS End (MB) | RSS Delta End (MB) |", "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
           for s in sweeps:
@@ -114,10 +116,13 @@ jobs:
               f"| {games} | {completed} | {failed} | {wall:.2f} | {throughput:.3f} | {action_p95:.1f} | {rss_start:.1f} | {rss_peak:.1f} | {rss_end:.1f} | {rss_delta_end:.1f} |"
             )
 
-          reset_count = len(report.get("runtime_resets", []))
           lines.append("")
-          lines.append("- Harness config: `--db-copy --mock-cube-data --sweep 10,50,100,200 --puppet-count 3 --disable-caps --runtime-reset-between-sweeps --game-timeout-sec 900`")
-          lines.append(f"- Runtime resets executed: `{reset_count}` (post-calibration, between sweeps, post-sweeps).")
+          lines.append("- Harness config: `--db-copy --mock-cube-data --sweep 10,50,100,200 --puppet-count 3 --disable-caps --fresh-server-per-sweep --no-runtime-reset-between-sweeps --game-timeout-sec 900`")
+          if fresh_server_per_sweep:
+            lines.append("- Sweep isolation: each sweep ran on a fresh managed server process and fresh DB copy.")
+          else:
+            reset_count = len(report.get("runtime_resets", []))
+            lines.append(f"- Runtime resets executed: `{reset_count}` (post-calibration, between sweeps, post-sweeps).")
           lines.append("- Guardrail: workflow fails if any sweep is not 100% completion.")
           lines.append("")
           lines.append("<sub>Automated comment from PR load-test workflow.</sub>")
