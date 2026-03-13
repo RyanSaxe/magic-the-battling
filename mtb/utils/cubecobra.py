@@ -15,6 +15,8 @@ MOCK_UPGRADES_SIZE = 4
 MOCK_VANGUARDS_SIZE = 4
 MOCK_COLORS = ("W", "U", "B", "R", "G")
 
+_CARD_EXECUTOR = ThreadPoolExecutor(max_workers=8)
+
 
 def _env_flag_enabled(name: str) -> bool:
     raw = os.getenv(name)
@@ -84,8 +86,7 @@ def get_cube_data(cube_id: str) -> list[Card]:
     data = revalidate_and_get(url)
     cube = data["cards"]["mainboard"]
 
-    with ThreadPoolExecutor() as executor:
-        results = list(executor.map(cubecobra_to_card, cube))
+    results = list(_CARD_EXECUTOR.map(cubecobra_to_card, cube))
     return results
 
 
