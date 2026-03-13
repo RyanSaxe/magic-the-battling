@@ -295,6 +295,7 @@ class GameManager:
             return
 
         stale_cleanup_interval = int(3600 / self._snapshot_interval_sec)
+        self.cleanup_stale_game_records()
 
         async def _loop() -> None:
             tick = 0
