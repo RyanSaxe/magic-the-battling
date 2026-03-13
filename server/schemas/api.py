@@ -1,13 +1,14 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from mtb.models.cards import Card
-from mtb.models.game import LastBattleResult, Zones
-from mtb.models.types import BuildSource, CardDestination, Phase, ZoneName
+from mtb.models.game import BattleResolution, LastBattleResult, Zones
+from mtb.models.types import BuildSource, CardDestination, Phase, PlayMode, ZoneName, normalize_play_mode
 
 LastResult = Literal["win", "loss", "draw"]
 CubeLoadingStatus = Literal["loading", "ready", "error"]
+BattlerLoadingStatus = Literal["missing", "loading", "ready", "error"]
 
 
 class CreateGameRequest(BaseModel):
@@ -19,6 +20,12 @@ class CreateGameRequest(BaseModel):
     puppet_count: int = 0
     auto_approve_spectators: bool = False
     guided_mode_default: bool = False
+    play_mode: PlayMode = "limited"
+
+    @field_validator("play_mode", mode="before")
+    @classmethod
+    def _normalize_play_mode(cls, value: str | None) -> PlayMode:
+        return normalize_play_mode(value)
 
 
 class CreateGameResponse(BaseModel):
@@ -113,8 +120,10 @@ class GameStateResponse(BaseModel):
     self_player: SelfPlayerView
     available_upgrades: list[Card]
     current_battle: BattleView | None = None
+    battle_resolution: BattleResolution | None = None
     use_upgrades: bool = True
     cube_id: str = "auto"
+    play_mode: PlayMode = "limited"
 
 
 class LobbyPlayer(BaseModel):
@@ -122,6 +131,9 @@ class LobbyPlayer(BaseModel):
     name: str
     is_ready: bool = False
     is_host: bool = False
+    battler_id: str | None = None
+    battler_status: BattlerLoadingStatus | None = None
+    battler_error: str | None = None
 
 
 class LobbyStateResponse(BaseModel):
@@ -138,6 +150,7 @@ class LobbyStateResponse(BaseModel):
     cube_id: str = "auto"
     use_upgrades: bool = True
     guided_mode_default: bool = False
+    play_mode: PlayMode = "limited"
 
 
 class DraftSwapAction(BaseModel):

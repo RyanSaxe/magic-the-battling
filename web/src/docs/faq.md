@@ -33,7 +33,7 @@ To guarantee a true finishing match, the game can trigger **Sudden Death** when 
 
 If multiple players are eliminated in the same phase and that would leave one or fewer players alive, the two eliminated players with the lowest [poison](doc:game-pieces#poison) are reset to 9 poison and face off in Sudden Death.
 
-Sudden Death loops between [build](doc:build) and [battle](doc:battle) until one player is eliminated. There are no [reward](doc:reward) or [drafting](doc:draft) steps during this loop.
+Sudden Death loops between [build](doc:build) and [battle](doc:battle) until one player is eliminated. There is no [round wrap-up](doc:reward) or [drafting](doc:draft) during this loop.
 
 ## How many players can play?
 

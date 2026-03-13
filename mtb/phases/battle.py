@@ -1,5 +1,6 @@
 import random
 from collections.abc import Callable
+from importlib import import_module
 from typing import NamedTuple
 from uuid import uuid4
 
@@ -27,6 +28,10 @@ class BattleResult(NamedTuple):
     winner: Player | None
     loser: Player | None
     is_draw: bool
+
+
+def _reward_phase():
+    return import_module("mtb.phases.reward")
 
 
 def _create_basic_land(name: str) -> Card:
@@ -77,6 +82,7 @@ def _create_zones(player: Player | StaticOpponent) -> Zones:
         submitted_cards=submitted,
         original_hand_ids=[c.id for c in player.hand],
         revealed_card_ids=revealed_card_ids,
+        spawned_tokens=treasures.copy(),
     )
 
 
@@ -158,8 +164,9 @@ def resolve_puppet_vs_puppet(bot1: Puppet, bot2: Puppet, stage: int, round_num: 
     if not snap1 or not snap2:
         return
 
-    dmg1 = 1 + sum(1 for u in snap1.upgrades if u.upgrade_target)
-    dmg2 = 1 + sum(1 for u in snap2.upgrades if u.upgrade_target)
+    reward_phase = _reward_phase()
+    dmg1 = reward_phase.calculate_damage(snap1)
+    dmg2 = reward_phase.calculate_damage(snap2)
 
     outcome = random.choices(["bot1_wins", "bot2_wins", "draw"], weights=[45, 45, 10], k=1)[0]
     if outcome == "bot1_wins":
@@ -301,7 +308,7 @@ def get_pairing_probabilities(game: Game, player: Player) -> dict[str, float]:
     return {candidate.name: weight for candidate, weight in zip(viable, weights, strict=True)}
 
 
-def pass_turn(battle: Battle, player: Player) -> bool:
+def pass_turn(battle: Battle, player: Player | StaticOpponent) -> bool:
     """Pass turn to opponent. Returns True if successful."""
     if battle.current_turn_name != player.name:
         return False
@@ -370,6 +377,7 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
     player.previous_hand_ids = [c.id for c in player.hand]
     player.previous_basics = player.chosen_basics.copy()
     player.pre_battle_treasures = player.treasures
+    player.battle_resolution = None
 
     battle = Battle(
         player=player,
@@ -414,9 +422,11 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
     player.previous_hand_ids = [c.id for c in player.hand]
     player.previous_basics = player.chosen_basics.copy()
     player.pre_battle_treasures = player.treasures
+    player.battle_resolution = None
     opponent.previous_hand_ids = [c.id for c in opponent.hand]
     opponent.previous_basics = opponent.chosen_basics.copy()
     opponent.pre_battle_treasures = opponent.treasures
+    opponent.battle_resolution = None
 
     battle = Battle(
         player=player,
@@ -450,6 +460,25 @@ def get_zones_for_player(battle: Battle, player: Player | StaticOpponent) -> Zon
 REVEALED_ZONES: set[ZoneName] = {"battlefield", "graveyard", "exile", "command_zone"}
 
 
+def _remove_token_state(zones: Zones, card_id: str) -> None:
+    zones.spawned_tokens[:] = [t for t in zones.spawned_tokens if t.id != card_id]
+    zones.tapped_card_ids[:] = [i for i in zones.tapped_card_ids if i != card_id]
+    zones.flipped_card_ids[:] = [i for i in zones.flipped_card_ids if i != card_id]
+    zones.face_down_card_ids[:] = [i for i in zones.face_down_card_ids if i != card_id]
+    zones.revealed_card_ids[:] = [i for i in zones.revealed_card_ids if i != card_id]
+    zones.counters.pop(card_id, None)
+    zones.attachments.pop(card_id, None)
+    for parent_id, children in list(zones.attachments.items()):
+        if card_id in children:
+            children.remove(card_id)
+            if not children:
+                zones.attachments.pop(parent_id, None)
+
+
+def _is_token(zones: Zones, card_id: str) -> bool:
+    return any(t.id == card_id for t in zones.spawned_tokens)
+
+
 def move_zone(
     battle: Battle, player: Player | StaticOpponent, card: Card, from_zone: ZoneName, to_zone: ZoneName
 ) -> None:
@@ -465,6 +494,11 @@ def move_zone(
     source.remove(card)
     destination = zones.get_zone(to_zone)
     destination.append(card)
+
+    if to_zone != "battlefield" and _is_token(zones, card.id):
+        destination.remove(card)
+        _remove_token_state(zones, card.id)
+        return
 
     if to_zone in REVEALED_ZONES and _is_revealed_card(card) and card.id not in zones.revealed_card_ids:
         zones.revealed_card_ids.append(card.id)

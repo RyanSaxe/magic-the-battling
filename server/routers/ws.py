@@ -476,13 +476,42 @@ def _validate_action_phase(action: str, player) -> str | None:
     return None
 
 
-async def _handle_lobby_action(action: str, payload: dict, game_id: str, player_id: str, websocket: WebSocket) -> bool:  # noqa: PLR0912
+async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
+    action: str, payload: dict, game_id: str, player_id: str, websocket: WebSocket
+) -> bool:
     if action == "set_ready":
         is_ready = payload.get("is_ready", True)
-        if game_manager.set_player_ready(game_id, player_id, is_ready):
+        success, error = game_manager.set_player_ready(game_id, player_id, is_ready)
+        if success:
             await connection_manager.broadcast_lobby_state(game_id)
         else:
-            await connection_manager.send_error(websocket, "Failed to set ready state")
+            await connection_manager.send_error(websocket, error or "Failed to set ready state")
+        return True
+
+    if action == "submit_battler":
+        pending = game_manager.get_pending_game(game_id)
+        if not pending:
+            await connection_manager.send_error(websocket, "Game not found")
+            return True
+
+        error = game_manager.start_player_battler_preload(
+            pending,
+            player_id,
+            str(payload.get("battler_id", "")),
+            on_complete=lambda: connection_manager.broadcast_lobby_state(game_id),
+        )
+        if error:
+            await connection_manager.send_error(websocket, error)
+        else:
+            await connection_manager.broadcast_lobby_state(game_id)
+        return True
+
+    if action == "clear_battler":
+        success, error = game_manager.clear_player_battler(game_id, player_id)
+        if success:
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, error or "Failed to clear battler")
         return True
 
     if action == "start_game":
@@ -626,6 +655,22 @@ def _handle_spectate_response(payload: dict) -> None:
         game_manager.deny_spectate_request(request_id)
 
 
+async def _handle_phase_error(
+    action: str,
+    player,
+    phase_error: str | None,
+    game_id: str,
+    websocket: WebSocket,
+) -> bool:
+    if not phase_error:
+        return False
+    if action == "build_ready" and player.phase == "battle":
+        await connection_manager.broadcast_game_state(game_id)
+        return True
+    await connection_manager.send_error(websocket, phase_error)
+    return True
+
+
 async def handle_message(game_id: str, player_id: str, data: dict, websocket: WebSocket):
     action = data.get("action", "")
     payload = data.get("payload", {})
@@ -654,8 +699,7 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
             return
 
         phase_error = _validate_action_phase(action, player)
-        if phase_error:
-            await connection_manager.send_error(websocket, phase_error)
+        if await _handle_phase_error(action, player, phase_error, game_id, websocket):
             return
 
         result = _dispatch_game_action(action, payload, game, player, game_id)

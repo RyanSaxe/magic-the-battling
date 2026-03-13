@@ -1,7 +1,7 @@
 import pytest
 
 from mtb.models.cards import Battler
-from mtb.models.game import create_game, set_battler
+from mtb.models.game import Config, create_game, set_battler, set_player_battlers
 
 
 def test_create_game_exact_players():
@@ -71,3 +71,31 @@ def test_set_battler_populates_hand_empty(card_factory):
     alice = game.players[0]
     assert len(alice.hand) == 0
     assert len(alice.sideboard) == 7
+
+
+def test_set_battler_assigns_shared_battler_to_all_players(card_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    battler = Battler(cards=[card_factory(f"c{i}") for i in range(30)], upgrades=[], vanguards=[])
+
+    set_battler(game, battler)
+
+    assert all(player.battler is battler for player in game.players)
+
+
+def test_set_player_battlers_keeps_distinct_constructed_battlers(card_factory):
+    config = Config(play_mode="constructed", starting_pool_size=0)
+    game = create_game(["Alice", "Bob"], num_players=2, config=config)
+    alice_battler = Battler(cards=[card_factory(f"a{i}") for i in range(20)], upgrades=[], vanguards=[])
+    bob_battler = Battler(cards=[card_factory(f"b{i}") for i in range(20)], upgrades=[], vanguards=[])
+
+    set_player_battlers(game, {"Alice": alice_battler, "Bob": bob_battler})
+
+    assert game.battler is None
+    assert game.players[0].battler is alice_battler
+    assert game.players[1].battler is bob_battler
+
+
+def test_config_normalizes_legacy_draft_play_mode():
+    config = Config.model_validate({"play_mode": "draft"})
+
+    assert config.play_mode == "limited"

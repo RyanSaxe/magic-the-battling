@@ -1,11 +1,11 @@
 import random
 import weakref
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import AliasChoices, BaseModel, Field, PrivateAttr
+from pydantic import AliasChoices, BaseModel, Field, PrivateAttr, field_validator
 
 from mtb.models.cards import Battler, Card
-from mtb.models.types import Phase, ZoneName
+from mtb.models.types import Phase, PlayMode, ZoneName, normalize_play_mode
 
 
 class StaticOpponent(BaseModel):
@@ -119,6 +119,7 @@ class Puppet(BaseModel):
 
 class DraftState(BaseModel):
     packs: list[list[Card]]
+    player_packs: dict[str, list[list[Card]]] = Field(default_factory=dict)
     discard: list[Card] = Field(default_factory=list)
     current_packs: dict[str, list[Card]] = Field(default_factory=dict)
 
@@ -135,12 +136,39 @@ class LastBattleResult(BaseModel):
     pre_battle_treasures: int = 0
 
 
+class BattleResolutionEvent(BaseModel):
+    event_type: Literal["base_increment", "upgrade_beam"]
+    source_card_id: str | None = None
+
+
+class BattleResolutionSide(BaseModel):
+    name: str
+    starting_poison: int
+    ending_poison: int
+    poison_delta: int
+    took_damage: bool = False
+    is_lethal: bool = False
+    show_death_animation: bool = False
+    events: list[BattleResolutionEvent] = Field(default_factory=list)
+
+
+class BattleResolution(BaseModel):
+    resolution_id: str
+    winner_name: str | None
+    is_draw: bool = False
+    is_sudden_death: bool = False
+    continue_sudden_death: bool = False
+    your_side: BattleResolutionSide
+    opponent_side: BattleResolutionSide
+
+
 class Player(BaseModel):
     name: str
     most_recently_revealed_cards: list[Card] = Field(default_factory=list)
     hand: list[Card] = Field(default_factory=list)
     sideboard: list[Card] = Field(default_factory=list)
     command_zone: list[Card] = Field(default_factory=list)
+    battler: Battler | None = None
 
     vanquishers: int = 0
     poison: int = 0
@@ -155,6 +183,7 @@ class Player(BaseModel):
     stage: int = 3
     last_opponent_name: str | None = None
     last_battle_result: "LastBattleResult | None" = None
+    battle_resolution: "BattleResolution | None" = None
 
     upgrades: list[Card] = Field(default_factory=list)
     vanguard: Card | None = None
@@ -216,6 +245,12 @@ class Config(BaseModel):
     use_vanguards: bool = False
     auto_approve_spectators: bool = False
     cube_id: str = "auto"
+    play_mode: PlayMode = "limited"
+
+    @field_validator("play_mode", mode="before")
+    @classmethod
+    def _normalize_play_mode(cls, value: str | None) -> PlayMode:
+        return normalize_play_mode(value)
 
 
 class Game(BaseModel):
@@ -242,6 +277,7 @@ class Game(BaseModel):
     def model_post_init(self, _context: Any) -> None:
         for player in self.players:
             player.game_ref = weakref.ref(self)
+        self.normalize_player_battlers()
 
     def get_draft_state(self) -> DraftState:
         if self.draft_state is None:
@@ -252,6 +288,27 @@ class Game(BaseModel):
         if self.battler is None:
             raise RuntimeError("Battler not initialized - call set_battler() first")
         return self.battler
+
+    def normalize_player_battlers(self) -> None:
+        if not self.players:
+            return
+
+        if self.config.play_mode == "limited":
+            canonical = self.battler
+            if canonical is None:
+                canonical = next((player.battler for player in self.players if player.battler is not None), None)
+            if canonical is None:
+                return
+            self.battler = canonical
+            for player in self.players:
+                player.battler = canonical
+            return
+
+        if self.battler is not None:
+            for player in self.players:
+                if player.battler is None:
+                    player.battler = self.battler
+            self.battler = None
 
 
 class Zones(BaseModel):
@@ -326,28 +383,40 @@ def create_game(player_names: list[str], num_players: int, config: Config | None
 
 
 def set_battler(game: Game, battler: Battler) -> None:
-    game.battler = battler
+    set_player_battlers(game, {player.name: battler for player in game.players})
 
-    upgrades = sorted(battler.upgrades, key=lambda u: u.name)
+
+def set_player_battlers(game: Game, battlers_by_player: dict[str, Battler]) -> None:
+    first_battler = next(iter(battlers_by_player.values()))
+    game.battler = first_battler if game.config.play_mode == "limited" else None
+
+    upgrades = sorted(first_battler.upgrades, key=lambda u: u.name)
     max_upgrades = game.config.max_available_upgrades
     game.available_upgrades = upgrades[:max_upgrades]
 
+    for player in game.players:
+        battler = battlers_by_player.get(player.name)
+        if battler is None:
+            raise ValueError(f"No battler provided for player {player.name}")
+        player.battler = battler
+
+    game.normalize_player_battlers()
     _deal_starting_pool(game)
 
 
 def _deal_starting_pool(game: Game) -> None:
     """Deal initial cards to all players for round 1 (which starts in build phase)."""
-    if game.battler is None:
-        return
-
-    cards = game.battler.cards.copy()
-    random.shuffle(cards)
-
     pool_size = game.config.starting_pool_size
+    shuffled_battlers: set[int] = set()
     for player in game.players:
-        player_cards = cards[:pool_size]
-        cards = cards[pool_size:]
+        if player.battler is None:
+            raise ValueError(f"Player {player.name} has no battler")
+
+        battler_key = id(player.battler)
+        if battler_key not in shuffled_battlers:
+            random.shuffle(player.battler.cards)
+            shuffled_battlers.add(battler_key)
+        player_cards = player.battler.cards[:pool_size]
+        player.battler.cards = player.battler.cards[pool_size:]
         player.sideboard.extend(player_cards)
         player.populate_hand()
-
-    game.battler.cards = cards

@@ -20,7 +20,15 @@ function colorSortKey(colors: string[]): number {
   return colors.length * 10 + (minIndex >= 0 ? minIndex : 9)
 }
 
-export function CardsView({ gameId, which }: { gameId: string; which: 'cards' | 'upgrades' }) {
+export function CardsView({
+  gameId,
+  which,
+  playerName,
+}: {
+  gameId: string
+  which: 'cards' | 'upgrades'
+  playerName?: string
+}) {
   const [data, setData] = useState<GameCardsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -30,18 +38,21 @@ export function CardsView({ gameId, which }: { gameId: string; which: 'cards' | 
   const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set())
   const [previewCard, setPreviewCard] = useState<Card | null>(null)
   const cacheRef = useRef<GameCardsResponse | null>(null)
+  const cacheKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
-    if (cacheRef.current) {
+    const cacheKey = `${gameId}:${playerName ?? ''}`
+    if (cacheRef.current && cacheKeyRef.current === cacheKey) {
       setData(cacheRef.current)
       setLoading(false)
       return
     }
     let cancelled = false
     setLoading(true)
-    getGameCards(gameId)
+    getGameCards(gameId, playerName)
       .then((result) => {
         if (cancelled) return
+        cacheKeyRef.current = cacheKey
         cacheRef.current = result
         setData(result)
       })
@@ -53,7 +64,7 @@ export function CardsView({ gameId, which }: { gameId: string; which: 'cards' | 
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [gameId])
+  }, [gameId, playerName])
 
   if (loading) {
     return (

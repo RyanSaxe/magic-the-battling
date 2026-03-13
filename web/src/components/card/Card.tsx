@@ -2,7 +2,7 @@ import { useState, useContext, useEffect } from 'react'
 import type { Card as CardType } from '../../types'
 import { CardPreviewContext } from './CardPreviewContext'
 import { useFaceDown } from '../../contexts/faceDownState'
-import { CARD_BACK_IMAGE } from '../../constants/assets'
+import { CARD_BACK_IMAGE, BASIC_LANDS } from '../../constants/assets'
 
 interface CardProps {
   card: CardType
@@ -24,6 +24,7 @@ interface CardProps {
   appliedUpgrades?: CardType[]
   canPeekFaceDown?: boolean
   style?: React.CSSProperties
+  trackDomId?: boolean
 }
 
 const sizeStyles = {
@@ -41,6 +42,13 @@ const glowColors = {
 }
 
 const canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
+
+const BASIC_LAND_NAMES: Set<string> = new Set(BASIC_LANDS.map(l => l.name))
+
+const isBasicLandOrTreasureToken = (card: CardType) =>
+  BASIC_LAND_NAMES.has(card.name) ||
+  (card.type_line.toLowerCase().includes('treasure') &&
+    !card.type_line.toLowerCase().includes('land'))
 
 export function Card({
   card,
@@ -62,6 +70,7 @@ export function Card({
   appliedUpgrades,
   canPeekFaceDown = true,
   style: externalStyle,
+  trackDomId = true,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -72,8 +81,10 @@ export function Card({
 
   const previewContext = useContext(CardPreviewContext)
 
+  const showZoom = !isBasicLandOrTreasureToken(card)
+
   useEffect(() => {
-    if (!isHovered || !previewContext) return
+    if (!isHovered || !previewContext || !showZoom) return
     if (effectiveFaceDown && !canPeekFaceDown) return
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
@@ -88,7 +99,7 @@ export function Card({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isHovered, previewContext, card, appliedUpgrades, effectiveFaceDown, canPeekFaceDown])
+  }, [isHovered, previewContext, card, appliedUpgrades, effectiveFaceDown, canPeekFaceDown, showZoom])
 
   const effectiveFlip = flipped !== showFlip
   const normalUrl = effectiveFaceDown
@@ -119,6 +130,8 @@ export function Card({
   return (
     <div
       className={baseClasses}
+      data-guide-card-id={card.id}
+      data-card-id={trackDomId ? card.id : undefined}
       style={{
         ...externalStyle,
         width: dims.width,
@@ -154,7 +167,7 @@ export function Card({
           Flip
         </button>
       )}
-      {previewContext && (!effectiveFaceDown || canPeekFaceDown) && (isHovered || selected) && (
+      {previewContext && showZoom && (!effectiveFaceDown || canPeekFaceDown) && (isHovered || selected) && (
         <button
           className="absolute top-1 left-1 bg-black/60 rounded p-1 text-white hover:bg-black/80 transition-colors"
           onClick={(e) => {

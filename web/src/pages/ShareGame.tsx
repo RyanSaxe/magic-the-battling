@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getShareGame } from '../api/client'
-import type { ShareGameResponse, SharePlayerSnapshot, PlayerView, Card as CardType } from '../types'
-import { GameSummary } from '../components/GameSummary'
+import type { ShareGameResponse, SharePlayerSnapshot, Card as CardType } from '../types'
 import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
-import { buildGameSummaryData } from '../utils/share'
-import { getOrdinal, getPlacementBadgeColor } from '../utils/format'
+import { buildSharePlayerViews, getSharePlayerRowBadge } from '../utils/share'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
+import type { ZoneConstraints } from '../hooks/computeConstrainedLayout'
 import { CardPreviewContext, CardPreviewModal } from '../components/card'
+import { PLAYER_ROW_STACK_CLASS, PlayerRow } from '../components/PlayerList'
+import { useHotkeys } from '../hooks/useHotkeys'
+import { getSidebarPlayerOrder } from '../utils/playerPlacement'
 
 interface RoundOption {
   label: string
@@ -15,14 +17,15 @@ interface RoundOption {
 }
 
 function buildRoundOptions(rounds: SharePlayerSnapshot[]): RoundOption[] {
-  const options: RoundOption[] = [{ label: 'Latest', value: 'final' }]
-  for (const snap of rounds) {
-    options.push({
-      label: `Stage ${snap.stage} - Round ${snap.round}`,
-      value: `${snap.stage}_${snap.round}`,
-    })
-  }
-  return options
+  return rounds.map((snap) => ({
+    label: `Stage ${snap.stage} - Round ${snap.round}`,
+    value: `${snap.stage}_${snap.round}`,
+  }))
+}
+
+function getLatestRoundValue(rounds: SharePlayerSnapshot[]): string {
+  const latest = rounds[rounds.length - 1]
+  return latest ? `${latest.stage}_${latest.round}` : ''
 }
 
 function RoundPopover({
@@ -87,15 +90,27 @@ export function ShareGame() {
   const [data, setData] = useState<ShareGameResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [selectedRound, setSelectedRound] = useState('final')
+  const [selectedRound, setSelectedRound] = useState('')
   const [selectedPlayer, setSelectedPlayer] = useState('')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [roundPopoverOpen, setRoundPopoverOpen] = useState(false)
   const [previewCard, setPreviewCardState] = useState<CardType | null>(null)
   const [previewUpgrades, setPreviewUpgrades] = useState<CardType[]>([])
+  const [deckConstraintsByView, setDeckConstraintsByView] = useState<Record<string, ZoneConstraints>>({})
   const setPreviewCard = useCallback((card: CardType | null, appliedUpgrades?: CardType[]) => {
     setPreviewCardState(card)
     setPreviewUpgrades(appliedUpgrades ?? [])
+  }, [])
+  const setDeckConstraintsForView = useCallback((viewKey: string, constraints: ZoneConstraints) => {
+    setDeckConstraintsByView((prev) => ({ ...prev, [viewKey]: constraints }))
+  }, [])
+  const clearDeckConstraintsForView = useCallback((viewKey: string) => {
+    setDeckConstraintsByView((prev) => {
+      if (!(viewKey in prev)) return prev
+      const next = { ...prev }
+      delete next[viewKey]
+      return next
+    })
   }, [])
 
   useEffect(() => {
@@ -104,10 +119,33 @@ export function ShareGame() {
       .then((res) => {
         setData(res)
         setSelectedPlayer(res.owner_name)
+        const ownerPlayer = res.players.find((player) => player.name === res.owner_name)
+        const referenceSnapshots = ownerPlayer?.snapshots ?? res.players[0]?.snapshots ?? []
+        setSelectedRound(getLatestRoundValue(referenceSnapshots))
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }, [gameId, playerName])
+
+  const ownerPlayer = data?.players.find((p) => p.name === data.owner_name)
+  const referenceSnapshots = ownerPlayer?.snapshots ?? data?.players[0]?.snapshots ?? []
+  const latestRoundValue = getLatestRoundValue(referenceSnapshots)
+  const selectedRoundExists = referenceSnapshots.some(
+    (snapshot) => `${snapshot.stage}_${snapshot.round}` === selectedRound,
+  )
+  const effectiveSelectedRound = selectedRoundExists ? selectedRound : latestRoundValue
+  const playerViews = buildSharePlayerViews(data, effectiveSelectedRound)
+  const sortedPlayerViews = getSidebarPlayerOrder(playerViews)
+  const shareHotkeys: Record<string, () => void> = {}
+  if (!sizes.isMobile && !previewCard && !roundPopoverOpen) {
+    sortedPlayerViews.slice(0, 8).forEach((player, index) => {
+      shareHotkeys[String(index + 1)] = () => {
+        setSelectedPlayer(player.name)
+      }
+    })
+  }
+
+  useHotkeys(shareHotkeys, true)
 
   const handleCloseRoundPopover = useCallback(() => setRoundPopoverOpen(false), [])
 
@@ -133,88 +171,37 @@ export function ShareGame() {
     )
   }
 
-  const ownerPlayer = data.players.find((p) => p.name === data.owner_name)
-  const referenceSnapshots = ownerPlayer?.snapshots ?? data.players[0]?.snapshots ?? []
-  const isFinal = selectedRound === 'final'
+  const sharePlayersByName = new Map(data.players.map((player) => [player.name, player] as const))
+  const roundOptions = buildRoundOptions(referenceSnapshots)
 
   const currentPlayerData = data.players.find((p) => p.name === selectedPlayer)
-  const currentSnapshot = !isFinal && currentPlayerData
-    ? currentPlayerData.snapshots.find((s) => `${s.stage}_${s.round}` === selectedRound)
+  const currentSnapshot = currentPlayerData
+    ? currentPlayerData.snapshots.find((s) => `${s.stage}_${s.round}` === effectiveSelectedRound)
     : null
-
-  const gameSummaryData = isFinal ? buildGameSummaryData(data, selectedPlayer) : null
-  const lastSnapshot = currentPlayerData?.snapshots[currentPlayerData.snapshots.length - 1] ?? null
-
-  const roundOptions = buildRoundOptions(referenceSnapshots)
-  const currentIndex = roundOptions.findIndex((o) => o.value === selectedRound)
+  const currentIndex = roundOptions.findIndex((o) => o.value === effectiveSelectedRound)
   const hasPrev = currentIndex > 0
   const hasNext = currentIndex < roundOptions.length - 1
-  const currentRoundLabel = roundOptions.find((o) => o.value === selectedRound)?.label ?? 'Latest'
-
-  const playerViews: PlayerView[] = data.players.map((p) => {
-    const snap = p.snapshots[p.snapshots.length - 1]
-    return {
-      name: p.name,
-      treasures: snap?.treasures ?? 0,
-      poison: p.final_poison,
-      phase: 'game_over',
-      round: snap?.round ?? 0,
-      stage: snap?.stage ?? 0,
-      vanquishers: 0,
-      is_ghost: false,
-      is_puppet: p.is_puppet,
-      time_of_death: null,
-      hand_count: snap?.hand.length ?? 0,
-      sideboard_count: snap?.sideboard.length ?? 0,
-      hand_size: snap?.hand.length ?? 0,
-      is_stage_increasing: false,
-      upgrades: snap?.upgrades?.length ? snap.upgrades : (snap?.applied_upgrades ?? []),
-      vanguard: snap?.vanguard ?? null,
-      chosen_basics: snap?.basic_lands ?? [],
-      most_recently_revealed_cards: [],
-      last_result: null,
-      pairing_probability: null,
-      is_most_recent_ghost: false,
-      full_sideboard: [],
-      command_zone: snap?.command_zone ?? [],
-      placement: p.final_placement ?? 0,
-      in_sudden_death: false,
-      build_ready: false,
-    }
-  })
-
-  const sortedPlayerViews = [...playerViews].sort((a, b) => {
-    if (a.placement !== 0 && b.placement !== 0) {
-      if (a.placement !== b.placement) return a.placement - b.placement
-      return a.name.localeCompare(b.name)
-    }
-    if (a.placement !== 0) return -1
-    if (b.placement !== 0) return 1
-    return a.name.localeCompare(b.name)
-  })
+  const currentRoundLabel = roundOptions.find((o) => o.value === effectiveSelectedRound)?.label ?? 'No rounds'
+  const roundLayoutStateKey = currentSnapshot
+    ? `round:${selectedPlayer}:${currentSnapshot.stage}:${currentSnapshot.round}`
+    : null
+  const roundResizeState = roundLayoutStateKey
+    ? {
+        constraints: deckConstraintsByView[roundLayoutStateKey] ?? null,
+        setConstraints: (constraints: ZoneConstraints) => {
+          setDeckConstraintsForView(roundLayoutStateKey, constraints)
+        },
+        clearConstraints: () => {
+          clearDeckConstraintsForView(roundLayoutStateKey)
+        },
+      }
+    : undefined
 
   const renderContent = () => {
-    if (isFinal) {
-      if (gameSummaryData) {
-        return (
-          <GameSummary
-            key={selectedPlayer}
-            player={gameSummaryData.selfPlayer}
-            useUpgrades={data.use_upgrades}
-            compact
-          />
-        )
-      }
-      if (lastSnapshot) {
-        return (
-          <div className="flex-1 min-h-0 flex flex-col">
-            <ShareRoundDetail snapshot={lastSnapshot} useUpgrades={data.use_upgrades} />
-          </div>
-        )
-      }
+    if (roundOptions.length === 0) {
       return (
         <div className="flex-1 flex items-center justify-center text-gray-500">
-          No deck data available for this player.
+          No round data available for this game.
         </div>
       )
     }
@@ -222,7 +209,15 @@ export function ShareGame() {
     if (currentSnapshot) {
       return (
         <div className="flex-1 min-h-0 flex flex-col">
-          <ShareRoundDetail snapshot={currentSnapshot} useUpgrades={data.use_upgrades} />
+          <ShareRoundDetail
+            snapshot={currentSnapshot}
+            useUpgrades={data.use_upgrades}
+            enableResize
+            isMobile={sizes.isMobile}
+            layoutStateKey={roundLayoutStateKey ?? undefined}
+            resizeState={roundResizeState}
+            showLayoutReset
+          />
         </div>
       )
     }
@@ -237,45 +232,31 @@ export function ShareGame() {
   }
 
   const renderSidebarContent = () => (
-    <div className="flex flex-col gap-1 p-3">
-      {sortedPlayerViews.map((pv) => {
-        const isSelected = pv.name === selectedPlayer
-        const colors = pv.placement !== 0
-          ? getPlacementBadgeColor(pv.placement, playerViews.length)
-          : null
-        return (
-          <button
-            key={pv.name}
-            onClick={() => {
-              setSelectedPlayer(pv.name)
-              if (sizes.isMobile) setSidebarOpen(false)
-            }}
-            className={`flex items-center gap-2 px-3 py-2 rounded text-left text-sm transition-colors ${
-              isSelected
-                ? 'bg-amber-600/20 ring-1 ring-amber-500/50 text-white'
-                : 'text-gray-300 hover:bg-gray-700/40'
-            }`}
-          >
-            {pv.placement !== 0 && colors && (
-              <span
-                className="text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none shrink-0"
-                style={{ backgroundColor: colors.bg, color: colors.text }}
-              >
-                {getOrdinal(pv.placement)}
-              </span>
-            )}
-            <span className="truncate flex-1">
-              {pv.name}
-              {pv.name === data.owner_name && (
-                <span className="text-gray-500 ml-1">(You)</span>
-              )}
-            </span>
-            {pv.is_puppet && (
-              <span className="text-[10px] text-gray-500 shrink-0">PUPPET</span>
-            )}
-          </button>
-        )
-      })}
+    <div className="px-3 py-3 sm:py-0">
+      <div className={PLAYER_ROW_STACK_CLASS}>
+        {sortedPlayerViews.map((pv) => {
+          const sharePlayer = sharePlayersByName.get(pv.name)
+          const shareStatus = sharePlayer
+            ? getSharePlayerRowBadge(sharePlayer, selectedPlayer, effectiveSelectedRound)
+            : (pv.name === selectedPlayer ? 'viewing' : 'dead')
+
+          return (
+            <PlayerRow
+              key={pv.name}
+              player={pv}
+              players={playerViews}
+              currentPlayerName={data.owner_name}
+              isSelected={pv.name === selectedPlayer}
+              variant="share"
+              shareStatus={shareStatus}
+              onClick={() => {
+                setSelectedPlayer(pv.name)
+                if (sizes.isMobile) setSidebarOpen(false)
+              }}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 
@@ -338,7 +319,7 @@ export function ShareGame() {
 
       {/* Main + Sidebar */}
       <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderRight: '1px solid var(--gold-border)' }} />
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
         <main className="flex-1 flex flex-col min-h-0 min-w-0">
           {renderContent()}
         </main>
@@ -352,11 +333,11 @@ export function ShareGame() {
               />
             )}
             <div
-              className={`fixed top-0 right-0 h-full z-50 transition-transform duration-300 ${
+              className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${
                 sidebarOpen ? 'translate-x-0' : 'translate-x-full'
               }`}
             >
-              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
+              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
                 <div className="px-3 py-2 text-sm font-medium text-gray-400">
                   Players
                 </div>
@@ -367,13 +348,13 @@ export function ShareGame() {
             </div>
           </>
         ) : (
-          <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
+          <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
             <div className="overflow-y-auto flex-1">
               {renderSidebarContent()}
             </div>
           </aside>
         )}
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" style={{ borderLeft: '1px solid var(--gold-border)' }} />
+        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
       </div>
 
       {/* Bottom Bar */}
@@ -382,14 +363,15 @@ export function ShareGame() {
           <div className="relative">
             <button
               className="btn btn-secondary text-sm py-1.5 px-3"
+              disabled={roundOptions.length === 0}
               onClick={() => setRoundPopoverOpen((o) => !o)}
             >
               {currentRoundLabel}
             </button>
-            {roundPopoverOpen && (
+            {roundPopoverOpen && roundOptions.length > 0 && (
               <RoundPopover
                 options={roundOptions}
-                selectedRound={selectedRound}
+                selectedRound={effectiveSelectedRound}
                 onSelect={setSelectedRound}
                 onClose={handleCloseRoundPopover}
               />

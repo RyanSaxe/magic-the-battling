@@ -77,6 +77,7 @@ def _request_fingerprint(request: CreateGameRequest) -> str:
             "puppet_count": request.puppet_count,
             "auto_approve_spectators": request.auto_approve_spectators,
             "guided_mode_default": request.guided_mode_default,
+            "play_mode": request.play_mode,
         },
         sort_keys=True,
     )
@@ -207,6 +208,7 @@ def _create_game_response(request: CreateGameRequest) -> CreateGameResponse:
         target_player_count=request.target_player_count,
         auto_approve_spectators=request.auto_approve_spectators,
         guided_mode_default=request.guided_mode_default,
+        play_mode=request.play_mode,
     )
     pending.puppet_count = request.puppet_count
     session_manager.update_game_id(session.session_id, pending.game_id)
@@ -214,7 +216,19 @@ def _create_game_response(request: CreateGameRequest) -> CreateGameResponse:
     async def broadcast_lobby():
         await connection_manager.broadcast_lobby_state(pending.game_id)
 
-    game_manager.start_battler_preload(pending, on_complete=broadcast_lobby)
+    if request.play_mode == "limited":
+        game_manager.start_battler_preload(pending, on_complete=broadcast_lobby)
+    else:
+        error = game_manager.start_player_battler_preload(
+            pending,
+            session.player_id,
+            request.cube_id,
+            on_complete=broadcast_lobby,
+        )
+        if error:
+            host_battler = pending.player_battlers.get(session.player_id)
+            if host_battler is not None:
+                host_battler.battler_error = error
     return CreateGameResponse(
         game_id=pending.game_id,
         join_code=pending.join_code,
@@ -409,13 +423,21 @@ def get_lobby(game_id: str):
 
 
 @router.get("/{game_id}/cards", response_model=GameCardsResponse)
-def get_game_cards(game_id: str):
+def get_game_cards(game_id: str, player_name: str | None = None):
     pending = game_manager.get_pending_game(game_id)
     game = game_manager.get_game(game_id)
 
     battler = None
-    if pending and pending.battler:
+    if pending and pending.play_mode == "constructed" and player_name:
+        player_id = game_manager.get_player_id_by_name(game_id, player_name)
+        if player_id:
+            player_battler = pending.player_battlers.get(player_id)
+            battler = player_battler.battler if player_battler else None
+    elif pending and pending.battler:
         battler = pending.battler
+    elif game and game.config.play_mode == "constructed" and player_name:
+        player = next((candidate for candidate in game.players if candidate.name == player_name), None)
+        battler = player.battler if player else None
     elif game and game.battler:
         battler = game.battler
 
@@ -613,6 +635,11 @@ def _build_human_snapshots(history: PlayerGameHistory) -> list[SharePlayerSnapsh
     return snapshots
 
 
+def _parse_snapshot_key(key: str) -> tuple[int, int]:
+    stage_str, round_str = key.split("_", 1)
+    return int(stage_str), int(round_str)
+
+
 def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[SharePlayerSnapshot]:
     source = (
         db.query(PlayerGameHistory)
@@ -627,16 +654,30 @@ def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[Sha
     poison_map: dict[str, int] = json.loads(raw) if raw else {}
 
     sorted_snaps = sorted(source.snapshots, key=lambda s: (s.stage, s.round))
+    if not sorted_snaps:
+        return []
+
+    sorted_poison_keys = sorted(poison_map.keys(), key=_parse_snapshot_key)
     snapshots: list[SharePlayerSnapshot] = []
-    for snap in sorted_snaps:
-        key = f"{snap.stage}_{snap.round}"
-        if key not in poison_map:
-            continue
-        snapshot_data = BattleSnapshotData.model_validate_json(snap.full_state_json)
+    source_index = 0
+    best_source_snapshot = None
+    for key in sorted_poison_keys:
+        target_stage, target_round = _parse_snapshot_key(key)
+
+        while source_index < len(sorted_snaps):
+            candidate = sorted_snaps[source_index]
+            candidate_round = (candidate.stage, candidate.round)
+            if candidate_round > (target_stage, target_round):
+                break
+            best_source_snapshot = candidate
+            source_index += 1
+
+        source_snapshot = best_source_snapshot or sorted_snaps[0]
+        snapshot_data = BattleSnapshotData.model_validate_json(source_snapshot.full_state_json)
         snapshots.append(
             SharePlayerSnapshot(
-                stage=snap.stage,
-                round=snap.round,
+                stage=target_stage,
+                round=target_round,
                 hand=snapshot_data.hand,
                 sideboard=snapshot_data.sideboard,
                 command_zone=snapshot_data.command_zone,

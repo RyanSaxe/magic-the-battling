@@ -15,6 +15,6 @@ Additionally, the player with the most poison gets their choice play or draw dur
 
 ## Upgrades
 
-If you're playing with upgrades, after every third [battle](doc:battle) you will have the option of selecting an upgrade in the following [reward phase](doc:reward). Upgrades are Conspiracies with the mechanic "hidden agenda".
+If you're playing with upgrades, after every third [battle](doc:battle) you will have the option of selecting an upgrade during the stage-end [round wrap-up](doc:reward). Upgrades are Conspiracies with the mechanic "hidden agenda".
 
 During the [build phase](doc:build), you can apply the upgrade to any card in your pool. This action cannot be undone. Basically, once you name a card with the hidden agenda mechanic, you are not allowed to change it for the rest of the game.

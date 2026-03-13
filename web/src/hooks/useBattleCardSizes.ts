@@ -116,7 +116,9 @@ export function computeBattleZones(
     }
   }
 
-  const rowH = Math.floor(availH / NUM_ROWS)
+  // Keep fractional row height so zone rows consume the full available height
+  // and avoid leaving a visible remainder strip at the bottom.
+  const rowH = availH / NUM_ROWS
   const handPadding = 48 // 32px from .hand-zone CSS + 16px from px-2 container
   const bfPadding = 16
   const bfWidth = containerWidth - zoneColumnWidth

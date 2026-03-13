@@ -36,7 +36,8 @@ export function TokenCounterBadge({
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
       <span
-        className={`bg-black/75 font-bold rounded-full leading-none flex items-center justify-center border border-black/40 ${textClassName}`}
+        className={`token-counter-badge bg-black/75 font-bold rounded-full leading-none flex items-center justify-center border border-black/40 ${textClassName}`}
+        data-token-counter-badge
         style={buildBadgeStyle(dimensions, count)}
       >
         {count}

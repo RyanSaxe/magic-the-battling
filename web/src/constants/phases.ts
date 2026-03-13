@@ -6,6 +6,13 @@ interface PhaseSummaryRow {
   requiresUpgrades?: boolean
 }
 
+const PHASE_DISPLAY_NAMES: Record<Phase, string> = {
+  draft: 'Draft',
+  build: 'Build',
+  battle: 'Battle',
+  reward: 'Round Wrap-Up',
+}
+
 const PHASE_SUMMARY_ROWS: Record<Phase, PhaseSummaryRow[]> = {
   draft: [
     { text: 'Click any two cards to swap them.' },
@@ -23,9 +30,10 @@ const PHASE_SUMMARY_ROWS: Record<Phase, PhaseSummaryRow[]> = {
     { text: 'Double tap on any card to tap/untap it.' },
   ],
   reward: [
-    { text: 'After every battle, get a random card and a treasure.' },
-    { text: 'After every 3rd battle, your hand size increases' },
-    { text: 'After every 3rd battle, choose a special upgrade!', requiresUpgrades: true },
+    { text: 'After every battle, collect +1 treasure and your end-of-round loot.' },
+    { text: 'On rounds 1 and 2, you also get +1 random card from the Battler.' },
+    { text: 'At stage end, you gain The Vanquisher, grow your hand size, and advance.' },
+    { text: 'If upgrades are on, stage end also includes an upgrade choice.', requiresUpgrades: true },
   ],
 }
 
@@ -38,6 +46,22 @@ const PHASE_TIPS: Record<Phase, string> = {
 
 export function getPhaseTip(phase: Phase): string {
   return PHASE_TIPS[phase]
+}
+
+export function getPhaseDisplayName(phase: Phase): string {
+  return PHASE_DISPLAY_NAMES[phase]
+}
+
+export function getPhaseReferenceLabel(phase: Phase): string {
+  return phase === 'reward' ? getPhaseDisplayName(phase) : `${getPhaseDisplayName(phase)} Phase`
+}
+
+export function getPhaseControlsLabel(phase: Phase): string {
+  return phase === 'reward' ? `${getPhaseDisplayName(phase)} Controls` : `${getPhaseDisplayName(phase)} Phase Controls`
+}
+
+export function getPhaseTipsLabel(phase: Phase): string {
+  return phase === 'reward' ? `${getPhaseDisplayName(phase)} Tips` : `${getPhaseDisplayName(phase)} Phase Tips`
 }
 
 export function getPhaseSummaryRows(phase: Phase, useUpgrades: boolean): string[] {

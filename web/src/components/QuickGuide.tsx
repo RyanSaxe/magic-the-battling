@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { FaDiscord, FaXmark } from 'react-icons/fa6'
+import { FaDiscord } from 'react-icons/fa6'
 import { DOCS, getPhaseDoc, type DocEntry } from '../docs'
 import { DocRenderer } from './DocRenderer'
 import { CardsView } from './CardsView'
-import { PHASES, type Phase } from '../constants/phases'
+import {
+  getPhaseControlsLabel,
+  getPhaseReferenceLabel,
+  getPhaseTipsLabel,
+  PHASES,
+  type Phase,
+} from '../constants/phases'
 import { PHASE_HOTKEYS } from '../constants/hotkeys'
 import { HotkeyRow } from './HotkeyRow'
 import { DocNavContext } from '../contexts/DocNavContext'
@@ -33,9 +39,10 @@ interface QuickGuideProps {
   initialDocId?: string
   initialTab?: string
   gameId?: string
+  playerName?: string
   useUpgrades?: boolean
   useVanguards?: boolean
-  onClose?: () => void
+  onLocationChange?: (label: string) => void
 }
 
 interface ResolvedTarget {
@@ -52,8 +59,81 @@ interface FaqEntry {
   slug: string
 }
 
-function toTitleCase(value: string): string {
-  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`
+function guideSectionLabel(section: GuideSection | null): string | null {
+  if (!section) {
+    return null
+  }
+  if (section === 'overview') {
+    return 'Overview'
+  }
+  if (section === 'game-pieces') {
+    return 'Game Pieces'
+  }
+  return getPhaseReferenceLabel(section)
+}
+
+function controlsSectionLabel(section: ControlsSection | null): string | null {
+  if (!section) {
+    return null
+  }
+  return section === 'global' ? 'Global Controls' : getPhaseControlsLabel(section)
+}
+
+function tipsSectionLabel(section: TipsSection | null): string | null {
+  if (!section) {
+    return null
+  }
+  return section === 'global' ? 'Global Tips' : getPhaseTipsLabel(section)
+}
+
+function buildLocationLabel({
+  activeTab,
+  guideOpenId,
+  controlsOpenId,
+  tipsOpenId,
+  faqOpenId,
+  faqEntries,
+  cardType,
+}: {
+  activeTab: HeaderTab
+  guideOpenId: GuideSection | null
+  controlsOpenId: ControlsSection | null
+  tipsOpenId: TipsSection | null
+  faqOpenId: number | null
+  faqEntries: FaqEntry[]
+  cardType: CardType
+}): string {
+  let tabLabel = 'Rules'
+  let detail: string | null = null
+
+  switch (activeTab) {
+    case 'guide':
+      tabLabel = 'Rules'
+      detail = guideSectionLabel(guideOpenId)
+      break
+    case 'controls':
+      tabLabel = 'Controls'
+      detail = controlsSectionLabel(controlsOpenId)
+      break
+    case 'tips':
+      tabLabel = 'Tips'
+      detail = tipsSectionLabel(tipsOpenId)
+      break
+    case 'browse':
+      tabLabel = 'Cards'
+      detail = cardType === 'cards'
+        ? null
+        : cardType === 'upgrades'
+          ? 'Upgrades'
+          : 'Vanguards'
+      break
+    case 'faq':
+      tabLabel = 'FAQ'
+      detail = faqOpenId !== null ? faqEntries[faqOpenId]?.question ?? null : null
+      break
+  }
+
+  return detail ? `${tabLabel} -> ${detail}` : tabLabel
 }
 
 function toSlug(value: string): string {
@@ -354,9 +434,10 @@ export function QuickGuide({
   initialDocId,
   initialTab,
   gameId,
+  playerName,
   useUpgrades,
   useVanguards,
-  onClose,
+  onLocationChange,
 }: QuickGuideProps) {
   const quickOverviewDoc = DOCS.find((d) => d.id === 'quick-overview')
   const gamePiecesDoc = DOCS.find((d) => d.id === 'game-pieces')
@@ -493,39 +574,56 @@ export function QuickGuide({
     { id: 'vanguards', label: 'Vanguards', visible: !!useVanguards },
   ]
 
+  useEffect(() => {
+    if (!onLocationChange) {
+      return
+    }
+    onLocationChange(buildLocationLabel({
+      activeTab,
+      guideOpenId,
+      controlsOpenId,
+      tipsOpenId,
+      faqOpenId,
+      faqEntries,
+      cardType,
+    }))
+  }, [
+    activeTab,
+    cardType,
+    controlsOpenId,
+    faqEntries,
+    faqOpenId,
+    guideOpenId,
+    onLocationChange,
+    tipsOpenId,
+  ])
+
   return (
     <DocNavContext.Provider value={docNav}>
-      <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex items-center justify-between gap-3 px-5 py-3 shrink-0 bg-black/30 border-b border-[rgba(212,175,55,0.45)]">
-          <div className="flex gap-2 min-w-0">
-            {headerTabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1.5 text-[0.8125rem] font-medium transition-colors rounded-md ${
-                  tab.id === activeTab
-                    ? 'bg-amber-400/15 text-amber-300'
-                    : 'text-gray-400 hover:text-gray-200 hover:bg-white/5'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
+      <div className="flex h-full flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="shrink-0 border-b border-[rgba(212,175,55,0.24)] bg-black/20">
+          <div className="overflow-x-auto overscroll-contain px-3 py-2.5 sm:px-4">
+            <div className="flex min-w-max gap-1.5">
+              {headerTabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`rounded-full px-3 py-1.5 text-[0.78rem] font-medium transition-colors ${
+                    tab.id === activeTab
+                      ? 'bg-amber-400/14 text-amber-200 ring-1 ring-amber-300/25'
+                      : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
-          {onClose && (
-            <button
-              onClick={onClose}
-              className="inline-flex items-center justify-center w-7 h-7 -mr-2 text-red-400 hover:text-red-300 transition-colors"
-              aria-label="Close guide"
-            >
-              <FaXmark className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
         {activeTab === 'guide' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="guide-overview"
                 label="Overview"
@@ -564,7 +662,7 @@ export function QuickGuide({
                   <AccordionItem
                     id={`guide-${phase}`}
                     key={phase}
-                    label={`${toTitleCase(phase)} Phase`}
+                    label={getPhaseReferenceLabel(phase)}
                     expanded={guideOpenId === phase}
     
                     onToggle={() => toggleGuideSection(phase)}
@@ -585,7 +683,7 @@ export function QuickGuide({
 
         {activeTab === 'controls' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="controls-global"
                 label="Global Controls"
@@ -606,7 +704,7 @@ export function QuickGuide({
                 <AccordionItem
                   id={`controls-${phase}`}
                   key={phase}
-                  label={`${toTitleCase(phase)} Phase Controls`}
+                  label={getPhaseControlsLabel(phase)}
                   expanded={controlsOpenId === phase}
   
                   onToggle={() => toggleControlsSection(phase)}
@@ -620,7 +718,7 @@ export function QuickGuide({
 
         {activeTab === 'tips' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="tips-global"
                 label="Global Tips"
@@ -641,7 +739,7 @@ export function QuickGuide({
                 <AccordionItem
                   id={`tips-${phase}`}
                   key={phase}
-                  label={`${toTitleCase(phase)} Phase Tips`}
+                  label={getPhaseTipsLabel(phase)}
                   expanded={tipsOpenId === phase}
   
                   onToggle={() => toggleTipsSection(phase)}
@@ -679,6 +777,7 @@ export function QuickGuide({
             <CardsView
               gameId={gameId}
               which={cardType === 'vanguards' ? 'cards' : cardType}
+              playerName={playerName}
             />
           </div>
         )}
@@ -691,7 +790,7 @@ export function QuickGuide({
 
         {activeTab === 'faq' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto border-b border-amber-400/10">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               {faqEntries.length > 0 ? (
                 faqEntries.map((entry, index) => (
                   <AccordionItem

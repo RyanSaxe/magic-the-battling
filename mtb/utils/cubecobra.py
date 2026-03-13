@@ -49,6 +49,7 @@ def _mock_card(
         type_line=type_line,
         elo=1000.0 + rng.uniform(-120.0, 120.0),
         colors=colors,
+        keywords=[],
         cmc=float(rng.randint(0, 7)),
         life_modifier=life_modifier,
         hand_modifier=hand_modifier,
@@ -105,5 +106,6 @@ def cubecobra_to_card(card_json: dict) -> Card:
         id=f"{card_json['scryfall_id']}-{uuid4().hex[:8]}",
         oracle_text=card_json.get("oracle_text"),
         colors=card_json.get("colors", []),
+        keywords=card_json.get("keywords", []),
         cmc=card_json.get("cmc", 0),
     )

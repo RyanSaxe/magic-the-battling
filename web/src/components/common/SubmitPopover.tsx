@@ -9,14 +9,21 @@ interface SubmitPopoverOption {
 interface SubmitPopoverProps {
   options: SubmitPopoverOption[];
   onClose: () => void;
+  guideTarget?: string;
+  closeOnOutsideClick?: boolean;
 }
 
-export function SubmitPopover({ options, onClose }: SubmitPopoverProps) {
+export function SubmitPopover({
+  options,
+  onClose,
+  guideTarget,
+  closeOnOutsideClick = true,
+}: SubmitPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (closeOnOutsideClick && ref.current && !ref.current.contains(e.target as Node)) {
         onClose();
       }
     };
@@ -29,12 +36,13 @@ export function SubmitPopover({ options, onClose }: SubmitPopoverProps) {
       document.removeEventListener("mousedown", handleClick);
       document.removeEventListener("keydown", handleKey);
     };
-  }, [onClose]);
+  }, [closeOnOutsideClick, onClose]);
 
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-2 right-0 min-w-[120px]"
+      className="absolute bottom-full mb-2 right-0 min-w-[120px] z-[95]"
+      data-guide-target={guideTarget}
     >
       <div className="relative translate-y-[3px] modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1.5">
         {options.map((option) => (

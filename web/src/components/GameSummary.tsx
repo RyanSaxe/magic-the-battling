@@ -1,17 +1,28 @@
 import { useState } from 'react'
 import type { SelfPlayerView } from '../types'
 import { DeckDisplay } from './common'
+import type { DeckDisplayResizeState } from './common/DeckDisplay'
 
 interface GameSummaryProps {
   player: SelfPlayerView
   useUpgrades?: boolean
   compact?: boolean
+  enableResize?: boolean
+  isMobile?: boolean
+  layoutStateKey?: string
+  resizeState?: DeckDisplayResizeState
+  showLayoutReset?: boolean
 }
 
 export function GameSummary({
   player,
   useUpgrades = true,
   compact = false,
+  enableResize = false,
+  isMobile = false,
+  layoutStateKey,
+  resizeState,
+  showLayoutReset = false,
 }: GameSummaryProps) {
   const [frozenPlayer] = useState(() => ({
     hand: [...player.hand],
@@ -41,6 +52,16 @@ export function GameSummary({
           upgrades={upgrades}
           companionIds={companionIds}
           className={compact ? 'zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col' : undefined}
+          enableResize={enableResize}
+          isMobile={isMobile}
+          layoutStateKey={layoutStateKey}
+          resizeState={resizeState}
+          resetControl={showLayoutReset ? {
+            phaseLabel: 'Deck Layout',
+            currentStage: frozenPlayer.stage,
+            currentRound: frozenPlayer.round,
+            message: 'This resets the current deck layout for this view on this device.',
+          } : undefined}
         />
       </div>
     </div>

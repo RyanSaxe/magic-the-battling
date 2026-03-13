@@ -1022,6 +1022,118 @@ def test_spawn_token_for_player(card_factory):
     assert zombie.name == "Zombie"
 
 
+def _spawn_token(b, player, name="Zombie"):
+    battle.update_card_state(
+        b,
+        player,
+        "spawn",
+        "",
+        data={"token": {"name": name, "image_url": "", "type_line": "Token Creature"}},
+    )
+    return next(c for c in b.player_zones.battlefield if c.name == name)
+
+
+def test_token_removed_when_moved_to_graveyard(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice)
+    static_opp = StaticOpponent(
+        name="Bot",
+        hand=[card_factory("OppCard")],
+        chosen_basics=["Plains", "Island", "Mountain"],
+    )
+    b = battle.start(game, alice, static_opp)
+    token = _spawn_token(b, alice)
+
+    battle.move_zone(b, alice, token, "battlefield", "graveyard")
+
+    assert token not in b.player_zones.graveyard
+    assert token not in b.player_zones.battlefield
+    assert not any(t.id == token.id for t in b.player_zones.spawned_tokens)
+
+
+def test_token_removed_when_moved_to_exile(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice)
+    static_opp = StaticOpponent(
+        name="Bot",
+        hand=[card_factory("OppCard")],
+        chosen_basics=["Plains", "Island", "Mountain"],
+    )
+    b = battle.start(game, alice, static_opp)
+    token = _spawn_token(b, alice)
+
+    battle.move_zone(b, alice, token, "battlefield", "exile")
+
+    assert token not in b.player_zones.exile
+    assert token not in b.player_zones.battlefield
+    assert not any(t.id == token.id for t in b.player_zones.spawned_tokens)
+
+
+def test_token_persists_when_moved_between_battlefields(card_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice)
+    setup_battle_ready(bob)
+    b = battle.start(game, alice, bob)
+    token = _spawn_token(b, alice)
+
+    gm = GameManager()
+    gm.handle_battle_move(
+        game,
+        alice,
+        token.id,
+        "battlefield",
+        "battlefield",
+        from_owner="player",
+        to_owner="opponent",
+    )
+
+    assert token in b.opponent_zones.battlefield
+    assert token not in b.player_zones.battlefield
+
+
+def test_treasure_token_removed_when_moved_to_graveyard(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice)
+    static_opp = StaticOpponent(
+        name="Bot",
+        hand=[card_factory("OppCard")],
+        chosen_basics=["Plains", "Island", "Mountain"],
+    )
+    b = battle.start(game, alice, static_opp)
+
+    battle.update_card_state(b, alice, "create_treasure", "", data={})
+    treasure = b.player_zones.spawned_tokens[-1]
+
+    battle.move_zone(b, alice, treasure, "battlefield", "graveyard")
+
+    assert treasure not in b.player_zones.graveyard
+    assert treasure not in b.player_zones.battlefield
+    assert not any(t.id == treasure.id for t in b.player_zones.spawned_tokens)
+
+
+def test_initial_treasure_removed_when_moved_to_graveyard(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice)
+    static_opp = StaticOpponent(
+        name="Bot",
+        hand=[card_factory("OppCard")],
+        chosen_basics=["Plains", "Island", "Mountain"],
+    )
+    b = battle.start(game, alice, static_opp)
+    treasure = next(c for c in b.player_zones.battlefield if c.id.startswith("treasure-"))
+
+    battle.move_zone(b, alice, treasure, "battlefield", "graveyard")
+
+    assert treasure not in b.player_zones.graveyard
+    assert treasure not in b.player_zones.battlefield
+    assert not any(t.id == treasure.id for t in b.player_zones.spawned_tokens)
+
+
 class TestPlayDrawPreference:
     def test_pvp_winner_prefers_play(self):
         game = create_game(["Alice", "Bob"], num_players=2)
@@ -1276,6 +1388,29 @@ class TestFaceDownScrubbing:
         manager = GameManager()
         view = manager._make_battle_view(b, alice, game)
         assert view.can_manipulate_opponent is False
+
+    def test_pass_turn_for_static_opponent(self, card_factory):
+        """Player should be able to pass the static opponent's turn on their behalf."""
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[card_factory("card1")],
+            chosen_basics=["Plains", "Island", "Mountain"],
+        )
+
+        b = battle.start(game, alice, static_opp)
+        manager = GameManager()
+
+        if b.current_turn_name == alice.name:
+            assert manager.handle_battle_pass_turn(game, alice) is True
+            assert b.current_turn_name == "Bot"
+
+        assert b.current_turn_name == "Bot"
+        assert manager.handle_battle_pass_turn(game, alice) is True
+        assert b.current_turn_name == alice.name
 
     def test_pvp_scrubbing_remaps_tapped_and_counters(self, card_factory):
         """Scrubbing should also remap tapped_card_ids and counters for face-down cards."""

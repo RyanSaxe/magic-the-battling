@@ -31,12 +31,14 @@ interface ActionMenuProps {
   onShowOpponentSideboard: () => void
   onCreateTreasure: () => void
   onPassTurn: () => void
+  onRollDie: (sides: number) => void
   onClose: () => void
 }
 
-type SubmenuType = 'none' | 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo'
+type SubmenuType = 'none' | 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo' | 'rollDie'
 
 const COUNTER_TYPES = ['+1/+1', '-1/-1', 'Loyalty', 'Charge', 'Custom']
+const DIE_SIDES = [2, 4, 6, 8, 10, 12, 20]
 
 export function ActionMenu({
   selectedCard,
@@ -52,6 +54,7 @@ export function ActionMenu({
   onShowOpponentSideboard,
   onCreateTreasure,
   onPassTurn,
+  onRollDie,
   onClose,
 }: ActionMenuProps) {
   const [submenu, setSubmenu] = useState<SubmenuType>('none')
@@ -94,9 +97,9 @@ export function ActionMenu({
 
   return (
     <>
-      <div className="fixed inset-0 z-50" onClick={onClose} />
+      <div className="fixed inset-0 z-[86]" onClick={onClose} />
       <div
-        className="fixed bottom-16 left-4 modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-50"
+        className="fixed bottom-16 left-4 modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-[87]"
         style={{ maxWidth: 280 }}
       >
         {card && (
@@ -147,6 +150,7 @@ export function ActionMenu({
                 <MenuItem
                   label="Add Counter"
                   hasSubmenu
+                  guideTarget="battle-action-add-counter"
                   onClick={() => setSubmenu(submenu === 'addCounter' ? 'none' : 'addCounter')}
                 />
                 {submenu === 'addCounter' && (
@@ -269,6 +273,41 @@ export function ActionMenu({
           onClick={() => handleGeneralAction(onPassTurn)}
           disabled={!isYourTurn}
         />
+
+        <MenuDivider />
+
+        <MenuItem
+          label="Roll a Die"
+          hasSubmenu
+          onClick={() => setSubmenu(submenu === 'rollDie' ? 'none' : 'rollDie')}
+        />
+        {submenu === 'rollDie' && (
+          <Submenu>
+            {DIE_SIDES.map(sides => (
+              <MenuItem
+                key={sides}
+                label={`d${sides}`}
+                onClick={() => {
+                  onRollDie(sides)
+                  onClose()
+                }}
+              />
+            ))}
+            <MenuItem
+              label="Custom..."
+              onClick={() => {
+                const input = prompt('Number of sides:')
+                if (input) {
+                  const sides = parseInt(input, 10)
+                  if (sides > 0) {
+                    onRollDie(sides)
+                    onClose()
+                  }
+                }
+              }}
+            />
+          </Submenu>
+        )}
       </div>
     </>
   )
@@ -279,11 +318,13 @@ function MenuItem({
   onClick,
   hasSubmenu,
   disabled,
+  guideTarget,
 }: {
   label: string
   onClick: () => void
   hasSubmenu?: boolean
   disabled?: boolean
+  guideTarget?: string
 }) {
   return (
     <button
@@ -291,6 +332,7 @@ function MenuItem({
         w-full px-3 py-1.5 text-left text-sm flex items-center justify-between
         ${disabled ? 'text-gray-500 cursor-not-allowed' : 'text-white hover:bg-gray-700'}
       `}
+      data-guide-target={guideTarget}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
     >

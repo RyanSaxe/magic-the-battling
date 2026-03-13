@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { PlayerView } from "../../types";
 import { PlayerList } from "../PlayerList";
-import { ZoneDisplay } from "./ZoneDisplay";
+import { PlayerDetailPanel } from "./PlayerDetailPanel";
 import { useContextStrip } from "../../contexts";
 
 interface SidebarProps {
@@ -9,6 +9,7 @@ interface SidebarProps {
   currentPlayer: PlayerView;
   phaseContent?: ReactNode;
   useUpgrades?: boolean;
+  isMobile?: boolean;
 }
 
 export function Sidebar({
@@ -16,67 +17,102 @@ export function Sidebar({
   currentPlayer,
   phaseContent,
   useUpgrades = true,
+  isMobile = false,
 }: SidebarProps) {
-  const { state } = useContextStrip();
+  const { state, setRevealedPlayerName } = useContextStrip();
   const revealedPlayer = state.revealedPlayerName
     ? players.find((p) => p.name === state.revealedPlayerName)
     : null;
-  const displayPlayer = revealedPlayer ?? currentPlayer;
+  const shouldRenderDesktopDrawer = !isMobile && !phaseContent;
+  const [desktopDrawer, setDesktopDrawer] = useState<{
+    playerName: string | null;
+    isOpen: boolean;
+  }>({
+    playerName: null,
+    isOpen: false,
+  });
 
-  const appliedUpgrades = displayPlayer.upgrades.filter(
-    (u) => u.upgrade_target !== null,
-  );
-  const pendingUpgrades = currentPlayer.upgrades.filter(
-    (u) => u.upgrade_target === null,
-  );
-  const isViewingSelf = displayPlayer.name === currentPlayer.name;
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (!shouldRenderDesktopDrawer) {
+        setDesktopDrawer((prev) => (
+          prev.isOpen
+            ? { ...prev, isOpen: false }
+            : prev
+        ));
+        return;
+      }
 
-  const allUpgrades = isViewingSelf
-    ? [...appliedUpgrades, ...pendingUpgrades]
-    : appliedUpgrades;
+      if (!revealedPlayer) {
+        setDesktopDrawer((prev) => (
+          prev.isOpen
+            ? { ...prev, isOpen: false }
+            : prev
+        ));
+        return;
+      }
 
-  const companionIds = new Set(displayPlayer.command_zone.map((c) => c.id));
+      setDesktopDrawer({
+        playerName: revealedPlayer.name,
+        isOpen: true,
+      });
+    });
 
-  const showCardsSection =
-    revealedPlayer && revealedPlayer.name !== currentPlayer.name;
+    return () => cancelAnimationFrame(frame);
+  }, [revealedPlayer, shouldRenderDesktopDrawer]);
+
+  const desktopDrawerPlayer = desktopDrawer.playerName
+    ? players.find((player) => player.name === desktopDrawer.playerName) ?? null
+    : null;
 
   return (
-    <aside className="relative w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden" style={{ borderLeft: '1px solid var(--gold-border)' }}>
+    <aside
+      className={`relative w-[var(--sidebar-width)] h-full frame-chrome flex flex-col ${
+        isMobile ? "overflow-hidden" : "overflow-visible"
+      }`}
+      data-guide-target="sidebar-panel"
+    >
+      {shouldRenderDesktopDrawer && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-40 frame-chrome"
+        />
+      )}
       {phaseContent ? (
-        <div className="overflow-y-auto overflow-x-hidden flex-1">
-          {phaseContent}
+        <div className="flex flex-col flex-1 min-h-0 py-[2px]">
+          <div className="overflow-y-auto overflow-x-hidden flex-1 min-h-0">
+            {phaseContent}
+          </div>
         </div>
+      ) : isMobile && revealedPlayer ? (
+        <PlayerDetailPanel
+          player={revealedPlayer}
+          currentPlayer={currentPlayer}
+          useUpgrades={useUpgrades}
+          isMobile
+          activeTab={state.revealedPlayerTab}
+          onTabChange={(tab) => setRevealedPlayerName(revealedPlayer.name, tab)}
+          onClose={() => setRevealedPlayerName(null)}
+        />
       ) : (
-        <div className="pl-4 pr-4 overflow-auto flex-1 flex flex-col">
+        <div className="relative z-50 px-3 py-3 sm:py-0 overflow-auto flex-1 flex flex-col">
           <PlayerList
             players={players}
             currentPlayerName={currentPlayer.name}
-            currentPlayer={currentPlayer}
-            useUpgrades={useUpgrades}
           />
-          {showCardsSection && (
-            <div>
-              <div className="flex flex-wrap">
-                {useUpgrades && allUpgrades.length > 0 && (
-                  <ZoneDisplay
-                    key={`upgrades-${displayPlayer.name}`}
-                    title="Upgrades"
-                    cards={allUpgrades}
-                    maxThumbnails={6}
-                    showUpgradeTargets
-                  />
-                )}
-                <ZoneDisplay
-                  key={`revealed-${displayPlayer.name}`}
-                  title="Seen in Battle"
-                  cards={displayPlayer.most_recently_revealed_cards}
-                  maxThumbnails={6}
-                  companionIds={companionIds}
-                />
-              </div>
-            </div>
-          )}
         </div>
+      )}
+      {shouldRenderDesktopDrawer && desktopDrawerPlayer && (
+        <PlayerDetailPanel
+          player={desktopDrawerPlayer}
+          currentPlayer={currentPlayer}
+          useUpgrades={useUpgrades}
+          isMobile={false}
+          activeTab={state.revealedPlayerTab}
+          onTabChange={(tab) => setRevealedPlayerName(desktopDrawerPlayer.name, tab)}
+          onClose={() => setRevealedPlayerName(null)}
+          isOpen={desktopDrawer.isOpen}
+        />
       )}
     </aside>
   );
