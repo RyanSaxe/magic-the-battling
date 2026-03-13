@@ -84,26 +84,26 @@ function buildWelcomeGuide(): GuideDefinition {
       },
       {
         id: "three-one",
-        title: "You Start At 3-1",
+        title: "Stages of the Game",
         targetId: "timeline-stage-round",
         placement: "bottom",
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "The left side of the timeline shows your current stage and round. The game begins at stage 3, round 1. There are 3 rounds in each stage.",
+          summary: "The game is played in a series of stages, each made up of three rounds. Each stage is numbered by your hand size at that point of the game. We start the game with 3 cards in hand, so we start at Stage 3, Round 1.",
           detail: "The stage number will always be your hand size.",
         },
       },
       {
         id: "draft",
-        title: "From Trash to Treasure",
+        title: "The Draft Phase",
         targetId: "timeline-phase-draft",
         placement: "bottom",
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "During draft, you are dealt a pack of 5 cards and may swap any number of cards between that pack and your pool. You can spend 1 treasure to see a new pack.",
-          detail: "We skip the first draft phase, as the game starts directly in the build phase of stage 3, round 1.",
+          summary: "You are dealt a pack of 5 cards and may swap any number of cards between that pack and your pool.",
+          detail: "Note: the game starts directly in the build phase of stage 3, round 1. This is to give you a chance to get familiar with the build and battle phases before you have to make draft decisions.",
         },
       },
       {
@@ -114,7 +114,7 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Choose your exact starting hand and 3 untapped basics you will begin the next battle with untapped on the battlefield.",
+          summary: "Choose your exact starting hand and 3 basic lands to battle with.",
         },
       },
       {
@@ -125,8 +125,7 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Battle is a quick game of Magic with 10 life and no libraries.",
-          detail: "Reminder: yes, you play out the game of magic manually. This game is inspired by autobattlers, but it is not an autobattler itself.",
+          summary: "Play a quick game of Magic with a small hand, 10 life, and no libraries.",
         },
       },
       {
@@ -137,8 +136,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "After each battle, get some loot and then advance to the next round.",
-          detail: "After the last battle of a stage, you'll get some special loot",
+          summary: "After each battle, get a Treasure token, some extra loot, and then advance to the next round.",
+          detail: "After the last battle of a stage, the extra loot is very special and powerful.",
         },
       },
       {
@@ -149,7 +148,7 @@ function buildWelcomeGuide(): GuideDefinition {
         placement: "left",
         cardPlacement: "top-right",
         mobileCardPlacement: "bottom-center",
-        primaryActionLabel: "Begin game",
+        primaryActionLabel: "Begin Game",
         content: {
           summary: "Open the Guide any time you want a reference while you play.",
           detail: "The guide includes comprehensive rules, hotkeys, tips, a searchable card list, and more.",
@@ -167,18 +166,18 @@ function buildBuildGuide(): GuideDefinition {
     steps: [
       {
         id: "intro",
-        title: "Build Phase",
+        title: "The Build Phase",
         placement: "center",
         cardPlacement: "center",
         positionTargetId: "game-content",
-        primaryActionLabel: "Show me the zones",
+        primaryActionLabel: "Next",
         content: {
           summary: "Build the best starting hand you can from the pool you have in which you start the game with 3 basic lands of your choice on the battlefield untapped.",
         },
       },
       {
         id: "sideboard",
-        title: "Start With The Pool In Your Sideboard",
+        title: "Your Pool of Cards",
         targetId: "build-sideboard",
         positionTargetId: (ctx) => (ctx.isMobile ? "build-battlefield" : "build-sideboard"),
         placement: "right",
@@ -187,6 +186,7 @@ function buildBuildGuide(): GuideDefinition {
         primaryActionLabel: "Next",
         content: {
           summary: "The game starts dealing 7 cards to all players. This is your current pool to build your hand from.",
+          detail: "What remains in this zone will be your sideboard for cards like Living Wish and Companions.",
         },
       },
       {
@@ -199,7 +199,7 @@ function buildBuildGuide(): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "In build, you choose the 3 basic lands that will start untapped on the battlefield in the next battle.",
+          summary: "The 3 basic lands you choose will start on the battlefield untapped.",
           detail: "Your treasure tokens and poison counters also carry into battle. This can change the value of cards over the course of the game.",
         },
       },
@@ -214,6 +214,7 @@ function buildBuildGuide(): GuideDefinition {
         primaryActionLabel: "Next",
         content: {
           summary: "Your hand must be filled to the current hand size, and this exact hand becomes your opening hand in battle.",
+          detail: "The game starts with 3 cards in hand, and your hand size increases by 1 after every 3 rounds.",
         },
       },
       {
@@ -224,7 +225,7 @@ function buildBuildGuide(): GuideDefinition {
         placement: "top",
         cardPlacement: "top-center",
         mobileCardPlacement: "top-center",
-        primaryActionLabel: "Ready to build",
+        primaryActionLabel: "Ready to Build",
         content: {
           summary: "Whenever you're ready, click this button to lock in your build.",
         },
@@ -265,7 +266,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       placement: "center",
       cardPlacement: "center",
       positionTargetId: "game-content",
-      primaryActionLabel: "Show me the zones",
+      primaryActionLabel: "Next",
       content: {
         summary: "Battle is a short manual game of Magic with 10 life and no libraries.",
         detail: "Treasures are persistent. If you produce some in a battle, you get to keep them (up to 5) for future battles. And if you use them, then you won't have them for later. Choose wisely!",
@@ -294,20 +295,20 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       mobileCardPlacement: "bottom-center",
       primaryActionLabel: "Next",
       content: {
-        summary: "Double click or double tap permanents to tap and untap them while you play. Right click for a full option menu.",
+        summary: "Double click permanents to tap/untap them. Right click for a full option menu.",
       },
     },
     {
       id: "actions",
-      title: "Actions Menu For Everything Else",
+      title: "Game Actions",
       targetId: "battle-actions",
       positionTargetId: "battle-battlefield",
       placement: "top",
       cardPlacement: "top-center",
       primaryActionLabel: ctx.currentBattle?.can_manipulate_opponent ? "Next" : "Got it",
       content: {
-        summary: "This button opens the full actions menu with general utilities and card-specific options.",
-        detail: "If a card is selected, its specific actions also appear at the top of the menu.",
+        summary: "This button opens the full actions menu.",
+        detail: "If a card is selected, its specific actions also appear in the menu.",
       },
     },
   ];
@@ -337,7 +338,7 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
     placement: "top",
     cardPlacement: "top-center",
     mobileCardPlacement: "top-center",
-    primaryActionLabel: "Ready to battle",
+    primaryActionLabel: "Ready to Battle",
     content: {
       summary: "Whenever the battle is over, click this button to submit the result.",
     },
@@ -355,13 +356,13 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   const steps: GuideStepDefinition[] = [
     {
       id: "intro",
-      title: "Round Wrap-Up",
+      title: "That's The End of the Round!",
       placement: "center",
       cardPlacement: "center",
       positionTargetId: "game-content",
-      primaryActionLabel: "Show me the loot",
+      primaryActionLabel: "Next",
       content: {
-        summary: "Get some loot. Everybody gets the same amount of loot.",
+        summary: "Take your loot. Everybody gets the same amount.",
         detail: "The loot at the end of a stage is special, so look out for that!",
       },
     },
@@ -373,7 +374,7 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       cardPlacement: "bottom-center",
       primaryActionLabel: ctx.isStageEnd ? "Got it" : "Next",
       content: {
-        summary: "You always get +1 treasure and a card",
+        summary: "This card is now in your pool!",
       },
     },
   ];
@@ -387,7 +388,7 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       placement: "top",
       cardPlacement: "top-center",
       mobileCardPlacement: "top-center",
-      primaryActionLabel: "Ready to continue",
+      primaryActionLabel: "Ready to Draft",
       allowTargetInteraction: true,
       content: {
         summary: "Whenever you're ready, click this button to start the draft phase of the next round.",
@@ -407,7 +408,7 @@ function buildRewardStageEndGuide(ctx: GuidedWalkthroughContext): GuideDefinitio
   const steps: GuideStepDefinition[] = [
     {
       id: "vanquisher",
-      title: "The Vanquisher Increases Hand Size",
+      title: "The Vanquisher",
       targetSelector: '[data-guide-card-id="reward:vanquisher"]',
       targetId: "reward-summary",
       positionTargetId: "reward-summary",
@@ -425,14 +426,14 @@ function buildRewardStageEndGuide(ctx: GuidedWalkthroughContext): GuideDefinitio
   if (ctx.useUpgrades && ctx.hasRewardUpgradeChoice) {
     steps.push({
       id: "upgrades",
-      title: "Stage-End Wrap-Up Can Also Offer Upgrades",
+      title: "Take an Upgrade",
       targetId: "reward-upgrades",
       placement: "left",
       cardPlacement: "top-center",
       primaryActionLabel: "Got it",
       content: {
-        summary: "If upgrades are enabled, a stage-end wrap-up also requires you to choose one upgrade before you continue.",
-        detail: "Upgrades are permanent hidden-agenda effects. Choose one here, then apply it later during build to a card in your pool.",
+        summary: "You can apply this upgrade during the build phase to make one of your cards better. This cannot be undone, so choose carefully!",
+        detail: "You deal extra poison to your opponent for each upgrade applied to cards in your hand.",
       },
     });
   }
@@ -457,9 +458,10 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         placement: "center",
         cardPlacement: "center",
         positionTargetId: "game-content",
-        primaryActionLabel: "Show me the zones",
+        primaryActionLabel: "Next",
         content: {
           summary: "Draft improves your pool by swapping weaker cards for stronger ones from a pack.",
+          detail: "Sometimes a card isn't strong now, but could be later. You have to decide if it's worth holding onto.",
         },
       },
       {
@@ -503,7 +505,8 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
           playerName: null,
         },
         content: {
-          summary: "This row shows pairing likelihood, current treasure, current poison, and where that opponent is in the loop.",
+          summary: "This is a summary of information on your opponents such as the likelihood you will battle them.",
+          detail: "Click for further details."
         },
       },
       {
@@ -552,7 +555,7 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         placement: "top",
         cardPlacement: "top-center",
         mobileCardPlacement: "top-center",
-        primaryActionLabel: "Ready to draft",
+        primaryActionLabel: "Ready to Draft",
         content: {
           summary: "Whenever you're ready, click this button to start the build phase.",
         },
