@@ -122,8 +122,8 @@ def _build_og_html(
     <meta property="og:title" content="{title}" />
     <meta property="og:description" content="{description}" />
     <meta property="og:image" content="{image_url}" />
-    <meta property="og:image:width" content="2400" />
-    <meta property="og:image:height" content="1260" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="{title}" />
