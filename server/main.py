@@ -45,10 +45,7 @@ async def lifespan(app: FastAPI):
     init_db()
     ops_manager.load()
     game_manager.restore_all_snapshots()
-    preview_enabled = not _preview_disabled()
-    if preview_enabled:
-        await preview_service.start()
-    else:
+    if _preview_disabled():
         logging.getLogger(__name__).info("Preview service disabled by MTB_DISABLE_PREVIEW")
     start_monitoring()
     await game_manager.start_background_tasks()
@@ -58,8 +55,7 @@ async def lifespan(app: FastAPI):
         logging.getLogger(__name__).info("Session cleanup before shutdown removed=%d", removed_sessions)
     await game_manager.stop_background_tasks()
     stop_monitoring()
-    if preview_enabled:
-        await preview_service.stop()
+    await preview_service.stop()
 
 
 app = FastAPI(
