@@ -90,6 +90,16 @@ def test_parse_args_runtime_reset_toggle():
     assert cfg.reset_runtime_between_sweeps is False
 
 
+def test_parse_args_fresh_server_per_sweep_requires_db_copy():
+    with pytest.raises(ValueError, match="requires --db-copy"):
+        parse_args(["--games", "1", "--fresh-server-per-sweep"])
+
+
+def test_parse_args_fresh_server_per_sweep_flag():
+    cfg = parse_args(["--games", "1", "--db-copy", "--fresh-server-per-sweep"])
+    assert cfg.fresh_server_per_sweep is True
+
+
 def test_parse_args_ws_action_jitter():
     cfg = parse_args(["--games", "1", "--ws-action-jitter-ms", "25"])
     assert cfg.ws_action_jitter_ms == 25.0

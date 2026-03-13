@@ -117,6 +117,7 @@ class HarnessConfig:
     startup_timeout_sec: float
     ops_token: str | None
     reset_runtime_between_sweeps: bool
+    fresh_server_per_sweep: bool
     rss_sample_interval_sec: float
     ws_action_jitter_ms: float
     json_output: bool
@@ -168,6 +169,8 @@ class ManagedServer:
         env["MTB_FAKE_CUBE_DATA"] = "1" if self.config.mock_cube_data else "0"
         # Perf runs do not exercise share-preview screenshots; disable preview startup for stability.
         env["MTB_DISABLE_PREVIEW"] = "1"
+        # Perf baselines should not inherit previously snapshotted active games.
+        env["MTB_RESTORE_ACTIVE_GAME_SNAPSHOTS"] = "0"
 
         cmd = [
             sys.executable,
@@ -1248,6 +1251,56 @@ def _fmt_float(value: float | int | None) -> str:
     return f"{value:.2f}"
 
 
+def timeout_for_sweep(
+    cfg: HarnessConfig,
+    calibration_result: GameResult,
+    timeout_per_game_sec: float,
+    concurrency: int,
+) -> float:
+    if cfg.game_timeout_sec is not None:
+        return timeout_per_game_sec
+    return choose_timeout_seconds(
+        single_game_seconds=calibration_result.duration_sec,
+        concurrency=concurrency,
+        multiplier=cfg.timeout_multiplier,
+        min_timeout=cfg.timeout_min_sec,
+        max_timeout=cfg.timeout_max_sec,
+    )
+
+
+def build_report(
+    cfg: HarnessConfig,
+    *,
+    calibration_result: GameResult,
+    timeout_per_game_sec: float,
+    runtime_reset_results: list[dict[str, Any]],
+    sweeps: list[RunSummary],
+) -> dict[str, Any]:
+    return {
+        "config": {
+            "base_url": cfg.base_url,
+            "sweep_games": cfg.sweep_games,
+            "concurrency_override": cfg.concurrency_override,
+            "puppet_count": cfg.puppet_count,
+            "cube_id": cfg.cube_id,
+            "use_upgrades": cfg.use_upgrades,
+            "disable_caps": cfg.disable_caps,
+            "disable_ws_gzip": cfg.disable_ws_gzip,
+            "mock_cube_data": cfg.mock_cube_data,
+            "db_copy": cfg.db_copy,
+            "seed": cfg.seed,
+            "reset_runtime_between_sweeps": cfg.reset_runtime_between_sweeps,
+            "fresh_server_per_sweep": cfg.fresh_server_per_sweep,
+            "rss_sample_interval_sec": cfg.rss_sample_interval_sec,
+            "ws_action_jitter_ms": cfg.ws_action_jitter_ms,
+        },
+        "calibration": asdict(calibration_result),
+        "timeout_per_game_sec": timeout_per_game_sec,
+        "runtime_resets": runtime_reset_results,
+        "sweeps": [asdict(item) for item in sweeps],
+    }
+
+
 async def run_sweep(
     cfg: HarnessConfig,
     games: int,
@@ -1437,6 +1490,11 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
         help="Do not reset in-memory games/sessions between sweeps",
     )
     parser.add_argument(
+        "--fresh-server-per-sweep",
+        action="store_true",
+        help="When using --db-copy, launch a fresh managed server and DB copy for each sweep",
+    )
+    parser.add_argument(
         "--rss-sample-interval-sec",
         type=float,
         default=0.25,
@@ -1470,6 +1528,8 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
         raise ValueError("--rss-sample-interval-sec must be positive")
     if args.ws_action_jitter_ms < 0:
         raise ValueError("--ws-action-jitter-ms must be non-negative")
+    if args.fresh_server_per_sweep and not args.db_copy:
+        raise ValueError("--fresh-server-per-sweep requires --db-copy")
 
     sweep = parse_sweep(args.sweep, args.games)
     cfg = HarnessConfig(
@@ -1494,6 +1554,7 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
         startup_timeout_sec=args.startup_timeout_sec,
         ops_token=args.ops_token,
         reset_runtime_between_sweeps=args.reset_runtime_between_sweeps,
+        fresh_server_per_sweep=args.fresh_server_per_sweep,
         rss_sample_interval_sec=args.rss_sample_interval_sec,
         ws_action_jitter_ms=args.ws_action_jitter_ms,
         json_output=args.json,
@@ -1504,6 +1565,8 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
 
 async def run_harness(cfg: HarnessConfig) -> dict[str, Any]:
     if cfg.db_copy:
+        if cfg.fresh_server_per_sweep:
+            return await run_with_fresh_server_per_sweep(cfg)
         return await run_with_managed_server(cfg)
     return await run_against_existing_server(cfg)
 
@@ -1543,6 +1606,51 @@ async def run_with_managed_server(cfg: HarnessConfig) -> dict[str, Any]:
         return report
 
 
+async def run_with_fresh_server_per_sweep(cfg: HarnessConfig) -> dict[str, Any]:
+    if cfg.base_url != DEFAULT_BASE_URL:
+        print(f"[harness] --db-copy uses a managed local server; ignoring --base-url={cfg.base_url}")
+
+    first_concurrency = cfg.concurrency_for(cfg.sweep_games[0])
+    async with ManagedServer(cfg) as managed:
+        cfg.base_url = managed.base_url
+        timeout_per_game_sec, calibration_result = await calibrate_timeout(cfg, concurrency=first_concurrency)
+
+    sweeps: list[RunSummary] = []
+    for games in cfg.sweep_games:
+        concurrency = cfg.concurrency_for(games)
+        planned_timeout = timeout_for_sweep(cfg, calibration_result, timeout_per_game_sec, concurrency)
+
+        async with ManagedServer(cfg) as managed:
+            cfg.base_url = managed.base_url
+            sampler = (
+                ProcessSampler(managed.process.pid, interval_sec=cfg.rss_sample_interval_sec)
+                if managed.process is not None
+                else None
+            )
+            if sampler is not None:
+                await sampler.start()
+            try:
+                sweep_summary = await run_sweep(
+                    cfg=cfg,
+                    games=games,
+                    concurrency=concurrency,
+                    timeout_per_game_sec=planned_timeout,
+                    sampler=sampler,
+                )
+            finally:
+                if sampler is not None:
+                    await sampler.stop()
+        sweeps.append(sweep_summary)
+
+    return build_report(
+        cfg,
+        calibration_result=calibration_result,
+        timeout_per_game_sec=timeout_per_game_sec,
+        runtime_reset_results=[],
+        sweeps=sweeps,
+    )
+
+
 async def run_against_existing_server(cfg: HarnessConfig) -> dict[str, Any]:
     await wait_for_health(cfg.base_url, timeout_sec=30.0)
     if cfg.disable_caps:
@@ -1551,6 +1659,8 @@ async def run_against_existing_server(cfg: HarnessConfig) -> dict[str, Any]:
         print("[harness] note: --disable-ws-gzip cannot modify an already-running external server.")
     if cfg.mock_cube_data:
         print("[harness] note: --mock-cube-data only applies when harness manages the server process.")
+    if cfg.fresh_server_per_sweep:
+        print("[harness] note: --fresh-server-per-sweep requires --db-copy and is ignored for external servers.")
     if cfg.reset_runtime_between_sweeps and not cfg.ops_token:
         print("[harness] note: runtime reset requires --ops-token when targeting an external server.")
     return await execute_sweeps(cfg, sampler=None, ops_token=cfg.ops_token)
@@ -1583,22 +1693,13 @@ async def execute_sweeps(
                 print(f"[harness] note: skipping runtime reset before sweep {games}; ops token unavailable.")
 
         concurrency = cfg.concurrency_for(games)
-        if cfg.game_timeout_sec is None:
-            timeout_for_sweep = choose_timeout_seconds(
-                single_game_seconds=calibration_result.duration_sec,
-                concurrency=concurrency,
-                multiplier=cfg.timeout_multiplier,
-                min_timeout=cfg.timeout_min_sec,
-                max_timeout=cfg.timeout_max_sec,
-            )
-        else:
-            timeout_for_sweep = timeout_per_game_sec
+        planned_timeout = timeout_for_sweep(cfg, calibration_result, timeout_per_game_sec, concurrency)
 
         sweep_summary = await run_sweep(
             cfg=cfg,
             games=games,
             concurrency=concurrency,
-            timeout_per_game_sec=timeout_for_sweep,
+            timeout_per_game_sec=planned_timeout,
             sampler=sampler,
         )
         sweeps.append(sweep_summary)
@@ -1610,29 +1711,13 @@ async def execute_sweeps(
         else:
             print("[harness] note: skipping post-sweeps runtime reset; ops token unavailable.")
 
-    report = {
-        "config": {
-            "base_url": cfg.base_url,
-            "sweep_games": cfg.sweep_games,
-            "concurrency_override": cfg.concurrency_override,
-            "puppet_count": cfg.puppet_count,
-            "cube_id": cfg.cube_id,
-            "use_upgrades": cfg.use_upgrades,
-            "disable_caps": cfg.disable_caps,
-            "disable_ws_gzip": cfg.disable_ws_gzip,
-            "mock_cube_data": cfg.mock_cube_data,
-            "db_copy": cfg.db_copy,
-            "seed": cfg.seed,
-            "reset_runtime_between_sweeps": cfg.reset_runtime_between_sweeps,
-            "rss_sample_interval_sec": cfg.rss_sample_interval_sec,
-            "ws_action_jitter_ms": cfg.ws_action_jitter_ms,
-        },
-        "calibration": asdict(calibration_result),
-        "timeout_per_game_sec": timeout_per_game_sec,
-        "runtime_resets": runtime_reset_results,
-        "sweeps": [asdict(item) for item in sweeps],
-    }
-    return report
+    return build_report(
+        cfg,
+        calibration_result=calibration_result,
+        timeout_per_game_sec=timeout_per_game_sec,
+        runtime_reset_results=runtime_reset_results,
+        sweeps=sweeps,
+    )
 
 
 def write_json_report(report: dict[str, Any], output_path: str) -> None:
