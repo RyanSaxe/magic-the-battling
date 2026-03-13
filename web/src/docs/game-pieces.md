@@ -5,7 +5,7 @@ order: 2
 
 ## Treasures
 
-Treasure Tokens are the unit of economy in the game. You can spend one treasure in the [draft phase](doc:draft) to see a new pack. They also start on the battlefield in the [battle phase](doc:battle), so you can use them in a game of magic to try and win.
+Treasure Tokens are the unit of economy in the game. You can spend one treasure in the [draft phase](doc:draft) to see a new pack. They also start on the battlefield in the [battle phase](doc:battle), so you can use them in a game of Magic to try and win.
 
 ## Poison
 

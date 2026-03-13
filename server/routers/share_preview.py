@@ -15,6 +15,7 @@ from server.db import database
 from server.db.models import GameRecord, PlayerGameHistory
 from server.routers.games import _build_human_snapshots, _build_puppet_snapshots
 from server.schemas.api import ShareGameResponse, SharePlayerData
+from server.services.preview import cache_key as preview_cache_key
 from server.services.preview import preview_service
 
 logger = logging.getLogger(__name__)
@@ -121,8 +122,8 @@ def _build_og_html(
     <meta property="og:title" content="{title}" />
     <meta property="og:description" content="{description}" />
     <meta property="og:image" content="{image_url}" />
-    <meta property="og:image:width" content="2400" />
-    <meta property="og:image:height" content="1260" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="{title}" />
@@ -195,8 +196,8 @@ async def preview_image(
 
     data_json = share_data.model_dump_json()
     cache_basis = f"{PREVIEW_RENDER_VERSION}:{data_json}"
-    cache_key = preview_service.cache.cache_key(cache_basis)
-    etag = cache_key[:16]
+    ck = preview_cache_key(cache_basis)
+    etag = ck[:16]
 
     if_none_match = request.headers.get("if-none-match")
     if if_none_match and if_none_match.strip('"') == etag:
@@ -206,7 +207,7 @@ async def preview_image(
     embed_url = f"{base_url}/game/{game_id}/share/{player_name}/embed"
 
     try:
-        png = await preview_service.screenshot(embed_url, cache_key)
+        png = await preview_service.screenshot(embed_url, ck)
     except Exception:
         logger.exception("Failed to generate preview for %s/%s", game_id, player_name)
         return Response(status_code=500)

@@ -71,6 +71,7 @@ from server.runtime_config import (
     MAX_TOTAL_LOADED_GAMES_HARD,
     SNAPSHOT_INTERVAL_SEC,
     SPECTATE_REQUEST_TTL_MINUTES,
+    STALE_GAME_CLEANUP_HOURS,
 )
 from server.schemas.api import (
     BattleView,
@@ -293,12 +294,19 @@ class GameManager:
         if self._snapshot_task and not self._snapshot_task.done():
             return
 
+        stale_cleanup_interval = int(3600 / self._snapshot_interval_sec)
+        self.cleanup_stale_game_records()
+
         async def _loop() -> None:
+            tick = 0
             while True:
                 await asyncio.sleep(self._snapshot_interval_sec)
+                tick += 1
                 self.persist_dirty_games()
                 self.evict_cold_games()
                 self.cleanup_expired_spectate_requests()
+                if tick % stale_cleanup_interval == 0:
+                    self.cleanup_stale_game_records()
 
         self._snapshot_task = asyncio.create_task(_loop())
         logger.info("Started snapshot/eviction loop (every %.1fs)", self._snapshot_interval_sec)
@@ -563,6 +571,46 @@ class GameManager:
         finally:
             session.close()
         self._dirty_games.discard(game_id)
+
+    def _close_game_record(self, game_id: str) -> None:
+        session = db.SessionLocal()
+        try:
+            record = session.query(GameRecord).filter(GameRecord.id == game_id).first()
+            if record and record.ended_at is None:
+                record.ended_at = datetime.now(UTC)
+                session.commit()
+        except Exception:
+            logger.debug("Skipping ended_at update for game_id=%s", game_id, exc_info=True)
+        finally:
+            session.close()
+
+    def cleanup_stale_game_records(self, max_age_hours: int = STALE_GAME_CLEANUP_HOURS) -> int:
+        cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
+        session = db.SessionLocal()
+        try:
+            stale = (
+                session.query(GameRecord).filter(GameRecord.ended_at.is_(None), GameRecord.created_at < cutoff).all()
+            )
+            if not stale:
+                return 0
+
+            stale_ids = [record.id for record in stale]
+            now = datetime.now(UTC)
+            for record in stale:
+                record.ended_at = now
+
+            session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id.in_(stale_ids)).delete(
+                synchronize_session=False
+            )
+            session.commit()
+            logger.info("Closed %d stale game records older than %dh", len(stale_ids), max_age_hours)
+            return len(stale_ids)
+        except Exception:
+            logger.exception("Error cleaning up stale game records")
+            session.rollback()
+            return 0
+        finally:
+            session.close()
 
     def evict_cold_games(self) -> int:
         cutoff = datetime.now(UTC) - timedelta(minutes=IDLE_EVICT_MINUTES)
@@ -1102,6 +1150,7 @@ class GameManager:
         self._action_locks.pop(game_id, None)
         if not preserve_snapshot:
             self.delete_snapshot(game_id)
+        self._close_game_record(game_id)
 
     def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool, play_mode: PlayMode) -> Battler:
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None

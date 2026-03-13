@@ -89,13 +89,15 @@ class TestValidateActionPhase:
 
 
 class TestPhaseValidationIntegration:
-    def test_build_action_during_build_phase_succeeds(self, client, game_with_players):
+    def test_build_action_during_build_phase_succeeds(
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+    ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
         client.post(f"/api/games/{game_id}/start")
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
-            state = ws.receive_json()
+            state = ws_receive_json(ws)
             assert state["type"] == "game_state"
             assert state["payload"]["phase"] == "build"
 
@@ -107,16 +109,22 @@ class TestPhaseValidationIntegration:
                 }
             )
 
-            msg = ws.receive_json()
+            msg = ws_receive_json_until(
+                ws,
+                lambda message: message["type"] == "game_state",
+                description="game_state after build action",
+            )
             assert msg["type"] == "game_state"
 
-    def test_draft_action_during_build_phase_rejected(self, client, game_with_players):
+    def test_draft_action_during_build_phase_rejected(
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+    ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
         client.post(f"/api/games/{game_id}/start")
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
-            state = ws.receive_json()
+            state = ws_receive_json(ws)
             assert state["type"] == "game_state"
             assert state["payload"]["phase"] == "build"
 
@@ -131,18 +139,24 @@ class TestPhaseValidationIntegration:
                 }
             )
 
-            msg = ws.receive_json()
+            msg = ws_receive_json_until(
+                ws,
+                lambda message: message["type"] == "error",
+                description="phase validation error for draft action",
+            )
             assert msg["type"] == "error"
             assert "draft" in msg["payload"]["message"]
             assert "build" in msg["payload"]["message"]
 
-    def test_battle_action_during_build_phase_rejected(self, client, game_with_players):
+    def test_battle_action_during_build_phase_rejected(
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+    ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
         client.post(f"/api/games/{game_id}/start")
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
-            state = ws.receive_json()
+            state = ws_receive_json(ws)
             assert state["payload"]["phase"] == "build"
 
             ws.send_json(
@@ -152,18 +166,24 @@ class TestPhaseValidationIntegration:
                 }
             )
 
-            msg = ws.receive_json()
+            msg = ws_receive_json_until(
+                ws,
+                lambda message: message["type"] == "error",
+                description="phase validation error for battle action",
+            )
             assert msg["type"] == "error"
             assert "battle" in msg["payload"]["message"]
             assert "build" in msg["payload"]["message"]
 
-    def test_reward_action_during_build_phase_rejected(self, client, game_with_players):
+    def test_reward_action_during_build_phase_rejected(
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+    ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
         client.post(f"/api/games/{game_id}/start")
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
-            state = ws.receive_json()
+            state = ws_receive_json(ws)
             assert state["payload"]["phase"] == "build"
 
             ws.send_json(
@@ -173,7 +193,11 @@ class TestPhaseValidationIntegration:
                 }
             )
 
-            msg = ws.receive_json()
+            msg = ws_receive_json_until(
+                ws,
+                lambda message: message["type"] == "error",
+                description="phase validation error for reward action",
+            )
             assert msg["type"] == "error"
             assert "reward" in msg["payload"]["message"]
             assert "build" in msg["payload"]["message"]

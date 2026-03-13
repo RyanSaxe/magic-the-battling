@@ -173,15 +173,32 @@ function PlayerSelectionModal({
   const pollingRef = useRef<number | null>(null);
   const autoReconnectAttemptedRef = useRef(false);
 
+  const consecutiveErrorsRef = useRef(0);
+
   useEffect(() => {
+    let interval: number | null = null;
+
     const fetchStatus = () => {
-      getGameStatus(gameId).then(setStatus).catch(() => {});
+      getGameStatus(gameId)
+        .then((data) => {
+          consecutiveErrorsRef.current = 0;
+          setStatus(data);
+        })
+        .catch(() => {
+          consecutiveErrorsRef.current += 1;
+          if (consecutiveErrorsRef.current >= 3 && interval != null) {
+            clearInterval(interval);
+            interval = null;
+          }
+        });
     };
 
     fetchStatus();
-    const interval = setInterval(fetchStatus, 3000);
+    interval = setInterval(fetchStatus, 3000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (interval != null) clearInterval(interval);
+    };
   }, [gameId]);
 
   useEffect(() => {
