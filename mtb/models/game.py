@@ -2,7 +2,7 @@ import random
 import weakref
 from typing import Any, Literal
 
-from pydantic import AliasChoices, BaseModel, Field, PrivateAttr, field_validator
+from pydantic import AliasChoices, BaseModel, Field, PrivateAttr, field_validator, model_serializer
 
 from mtb.models.cards import Battler, Card
 from mtb.models.types import Phase, PlayMode, ZoneName, normalize_play_mode
@@ -200,6 +200,13 @@ class Player(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     game_ref: weakref.ref["Game"] | None = Field(default=None, exclude=True)
 
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: Any, info: Any) -> dict[str, Any]:
+        data = handler(self)
+        if info.context and info.context.get("exclude_shared_battler"):
+            data.pop("battler", None)
+        return data
+
     @property
     def game(self) -> "Game":
         if self.game_ref is None:
@@ -278,6 +285,11 @@ class Game(BaseModel):
         for player in self.players:
             player.game_ref = weakref.ref(self)
         self.normalize_player_battlers()
+
+    def snapshot_dump_json(self) -> str:
+        if self.battler is not None:
+            return self.model_dump_json(context={"exclude_shared_battler": True})
+        return self.model_dump_json()
 
     def get_draft_state(self) -> DraftState:
         if self.draft_state is None:

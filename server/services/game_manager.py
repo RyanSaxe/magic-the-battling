@@ -337,7 +337,7 @@ class GameManager:
                     self._dirty_games.discard(game_id)
                     continue
 
-                state_json = game.model_dump_json()
+                state_json = game.snapshot_dump_json()
                 activity_at = self._last_human_activity.get(game_id, now)
                 stmt = sqlite_insert(ActiveGameSnapshot).values(
                     game_id=game_id,
