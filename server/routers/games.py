@@ -17,8 +17,8 @@ from server.routers.ws import connection_manager
 from server.schemas.api import (
     CreateGameRequest,
     CreateGameResponse,
+    GameBootstrapResponse,
     GameCardsResponse,
-    GameStateResponse,
     GameStatusPlayer,
     GameStatusResponse,
     JoinGameRequest,
@@ -34,6 +34,7 @@ from server.schemas.api import (
     StartGameResponse,
 )
 from server.services.game_manager import game_manager
+from server.services.game_serialization import catalog_entries_for_cards
 from server.services.ops_manager import ops_manager
 from server.services.session_manager import session_manager
 
@@ -427,8 +428,8 @@ def get_game_cards(game_id: str, player_name: str | None = None):
         raise HTTPException(status_code=404, detail="Card pool not available")
 
     return GameCardsResponse(
-        cards=battler.original_cards or battler.cards,
-        upgrades=battler.original_upgrades or battler.upgrades,
+        cards=catalog_entries_for_cards(battler.original_cards or battler.cards),
+        upgrades=catalog_entries_for_cards(battler.original_upgrades or battler.upgrades),
     )
 
 
@@ -454,17 +455,17 @@ def start_game(game_id: str, db: Session = Depends(get_db)):  # noqa: B008
     return StartGameResponse(success=True)
 
 
-@router.get("/{game_id}", response_model=GameStateResponse)
+@router.get("/{game_id}", response_model=GameBootstrapResponse)
 def get_game_state(game_id: str, session_id: str):
     session = session_manager.get_session(session_id)
     if not session:
         raise HTTPException(status_code=401, detail="Invalid session")
 
-    state = game_manager.get_game_state(game_id, session.player_id)
-    if not state:
+    bootstrap = game_manager.get_game_bootstrap(game_id, session.player_id)
+    if not bootstrap:
         raise HTTPException(status_code=404, detail="Game not found or player not in game")
 
-    return state
+    return bootstrap
 
 
 @router.get("/{game_id}/status", response_model=GameStatusResponse)

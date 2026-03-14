@@ -68,10 +68,15 @@ def register_card_data(scryfall_id: str, data: dict) -> None:
         tokens = data.get("tokens", ())
         ids: list[str] = []
         for t in tokens:
-            if isinstance(t, dict):
+            if hasattr(t, "scryfall_id"):
+                ids.append(t.scryfall_id)
+            elif isinstance(t, dict):
                 t_id = t.get("id", "")
-                if t_id:
-                    ids.append(derive_scryfall_id(t_id))
+                t_sid = t.get("scryfall_id", "") or (derive_scryfall_id(t_id) if t_id else "")
+                if t_sid:
+                    ids.append(t_sid)
+                    if "name" in t:
+                        register_card_data(t_sid, t)
             elif isinstance(t, str):
                 ids.append(t)
         token_scryfall_ids = tuple(ids)
@@ -108,10 +113,31 @@ def get_card_data(scryfall_id: str) -> CardData:
         raise KeyError(f"No CardData registered for scryfall_id={scryfall_id!r}") from None
 
 
-def export_registry() -> dict[str, dict]:
+def _expand_scryfall_ids(scryfall_ids: set[str]) -> set[str]:
+    expanded = set(scryfall_ids)
+    stack = list(scryfall_ids)
+
+    while stack:
+        sid = stack.pop()
+        card_data = _card_registry.get(sid)
+        if card_data is None:
+            continue
+        for token_sid in card_data.token_scryfall_ids:
+            if token_sid in expanded:
+                continue
+            expanded.add(token_sid)
+            stack.append(token_sid)
+
+    return expanded
+
+
+def export_registry(scryfall_ids: set[str] | None = None) -> dict[str, dict]:
     from dataclasses import asdict  # noqa: PLC0415
 
-    return {sid: asdict(cd) for sid, cd in _card_registry.items()}
+    if scryfall_ids is None:
+        return {sid: asdict(cd) for sid, cd in _card_registry.items()}
+    expanded = _expand_scryfall_ids(scryfall_ids)
+    return {sid: asdict(_card_registry[sid]) for sid in expanded if sid in _card_registry}
 
 
 def import_registry(data: dict[str, dict]) -> None:

@@ -98,10 +98,10 @@ class TestPhaseValidationIntegration:
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
-            assert state["type"] == "game_state"
-            assert state["payload"]["phase"] == "build"
+            assert state["type"] == "game_bootstrap"
+            assert state["payload"]["state"]["phase"] == "build"
 
-            card = state["payload"]["self_player"]["sideboard"][0]
+            card = state["payload"]["state"]["self_player"]["sideboard"][0]
             ws.send_json(
                 {
                     "action": "build_move",
@@ -125,8 +125,8 @@ class TestPhaseValidationIntegration:
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
-            assert state["type"] == "game_state"
-            assert state["payload"]["phase"] == "build"
+            assert state["type"] == "game_bootstrap"
+            assert state["payload"]["state"]["phase"] == "build"
 
             ws.send_json(
                 {
@@ -157,7 +157,7 @@ class TestPhaseValidationIntegration:
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
-            assert state["payload"]["phase"] == "build"
+            assert state["payload"]["state"]["phase"] == "build"
 
             ws.send_json(
                 {
@@ -184,7 +184,7 @@ class TestPhaseValidationIntegration:
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
-            assert state["payload"]["phase"] == "build"
+            assert state["payload"]["state"]["phase"] == "build"
 
             ws.send_json(
                 {

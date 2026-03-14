@@ -4,7 +4,6 @@ from typing import Any
 from pydantic import BaseModel, Field, PrivateAttr, computed_field, model_serializer, model_validator
 
 from mtb.models.card_registry import (
-    CARD_DATA_FIELDS,
     CardData,
     derive_scryfall_id,
     get_card_data,
@@ -48,18 +47,18 @@ class Card(BaseModel):
             if "token_scryfall_ids" not in data:
                 tokens = data.get("tokens", ())
                 sids: list[str] = []
-                for t in tokens:
-                    if hasattr(t, "scryfall_id"):
-                        sids.append(t.scryfall_id)
-                    elif isinstance(t, dict):
-                        t_id = t.get("id", "")
-                        t_sid = t.get("scryfall_id", "") or (derive_scryfall_id(t_id) if t_id else "")
-                        if t_sid:
-                            sids.append(t_sid)
-                            if "name" in t:
-                                register_card_data(t_sid, t)
-                    elif isinstance(t, str):
-                        sids.append(t)
+                for token in tokens:
+                    if hasattr(token, "scryfall_id"):
+                        sids.append(token.scryfall_id)
+                    elif isinstance(token, dict):
+                        token_id = token.get("id", "")
+                        token_sid = token.get("scryfall_id", "") or (derive_scryfall_id(token_id) if token_id else "")
+                        if token_sid:
+                            sids.append(token_sid)
+                            if "name" in token:
+                                register_card_data(token_sid, token)
+                    elif isinstance(token, str):
+                        sids.append(token)
                 data["token_scryfall_ids"] = tuple(sids)
 
             register_card_data(scryfall_id, data)
@@ -67,11 +66,12 @@ class Card(BaseModel):
         return data
 
     def model_post_init(self, __context: Any) -> None:
-        if self.scryfall_id:
-            try:
-                self._card_data = get_card_data(self.scryfall_id)
-            except KeyError:
-                pass
+        if not self.scryfall_id:
+            return
+        try:
+            self._card_data = get_card_data(self.scryfall_id)
+        except KeyError:
+            self._card_data = None
 
     def _data(self) -> CardData:
         if self._card_data is not None:
@@ -149,21 +149,27 @@ class Card(BaseModel):
     def tokens(self) -> tuple["Card", ...]:
         if self._tokens_cache is not None:
             return self._tokens_cache
+
         token_sids = self._data().token_scryfall_ids
         if not token_sids:
             self._tokens_cache = ()
             return ()
-        result = tuple(Card(id=sid, scryfall_id=sid) for sid in token_sids)
-        self._tokens_cache = result
-        return result
+
+        self._tokens_cache = tuple(Card(id=sid, scryfall_id=sid) for sid in token_sids)
+        return self._tokens_cache
 
     @model_serializer(mode="wrap")
     def _serialize(self, handler: Any, info: Any) -> dict[str, Any]:
-        data = handler(self)
         if info.context and info.context.get("slim_cards"):
-            for field_name in CARD_DATA_FIELDS:
-                data.pop(field_name, None)
-        return data
+            return {
+                "id": self.id,
+                "scryfall_id": self.scryfall_id,
+                "upgrade_target": (
+                    self.upgrade_target.model_dump(context=info.context) if self.upgrade_target is not None else None
+                ),
+                "original_owner": self.original_owner,
+            }
+        return handler(self)
 
     @property
     def is_upgrade(self) -> bool:

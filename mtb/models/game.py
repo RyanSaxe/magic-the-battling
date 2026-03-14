@@ -293,7 +293,8 @@ class Game(BaseModel):
         if self.battler is not None:
             context["exclude_shared_battler"] = True
         game_data = self.model_dump(context=context)
-        registry_data = export_registry()
+        referenced = _collect_scryfall_ids(game_data)
+        registry_data = export_registry(referenced)
         return json.dumps({"data": game_data, "card_registry": registry_data})
 
     def get_draft_state(self) -> DraftState:
@@ -439,6 +440,23 @@ def _deal_starting_pool(game: Game) -> None:
         player.populate_hand()
 
 
+def _collect_scryfall_ids(data: Any) -> set[str]:
+    ids: set[str] = set()
+    stack: list[Any] = [data]
+
+    while stack:
+        obj = stack.pop()
+        if isinstance(obj, dict):
+            sid = obj.get("scryfall_id")
+            if isinstance(sid, str) and sid:
+                ids.add(sid)
+            stack.extend(obj.values())
+        elif isinstance(obj, list):
+            stack.extend(obj)
+
+    return ids
+
+
 def restore_game_from_snapshot(json_str: str) -> Game:
     data = json.loads(json_str)
     if "card_registry" in data:
@@ -448,9 +466,10 @@ def restore_game_from_snapshot(json_str: str) -> Game:
 
 
 def slim_snapshot_dump(snapshot_data: BattleSnapshotData) -> str:
-    slim = snapshot_data.model_dump(context={"slim_cards": True})
-    registry_data = export_registry()
-    return json.dumps({"data": slim, "card_registry": registry_data})
+    slim_data = snapshot_data.model_dump(context={"slim_cards": True})
+    referenced = _collect_scryfall_ids(slim_data)
+    registry_data = export_registry(referenced)
+    return json.dumps({"data": slim_data, "card_registry": registry_data})
 
 
 def restore_snapshot_data(json_str: str) -> BattleSnapshotData:

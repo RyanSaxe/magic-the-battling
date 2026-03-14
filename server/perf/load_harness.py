@@ -93,6 +93,7 @@ class RunSummary:
     terminal_stage_round_counts: dict[str, int]
     server_rss_mb: dict[str, float | int | None] | None = None
     server_rss_window_mb: dict[str, float | int | None] | None = None
+    server_rss_per_game_mb: dict[str, float | int | None] | None = None
 
 
 @dataclass
@@ -280,18 +281,43 @@ def resolve_db_source(explicit: str | None) -> Path:
 
 
 def _mock_snapshot_card(seed: str, idx: int) -> dict[str, Any]:
+    sid = f"seed-{seed}-{idx:02d}"
     return {
+        "id": sid,
+        "scryfall_id": sid,
+        "upgrade_target": None,
+        "original_owner": None,
+    }
+
+
+def _mock_snapshot_card_data(seed: str, idx: int) -> tuple[str, dict[str, Any]]:
+    sid = f"seed-{seed}-{idx:02d}"
+    return sid, {
         "name": f"seed_card_{seed}_{idx}",
         "image_url": f"https://example.invalid/seed/{seed}/{idx}.jpg",
-        "id": f"seed-{seed}-{idx:02d}",
         "type_line": "creature",
+        "flip_image_url": None,
+        "png_url": None,
+        "flip_png_url": None,
+        "elo": 0.0,
+        "oracle_text": None,
+        "colors": [],
+        "keywords": [],
+        "cmc": 0.0,
+        "life_modifier": None,
+        "hand_modifier": None,
+        "token_scryfall_ids": [],
     }
 
 
 def _seed_history_payload(seed: int) -> tuple[dict[str, Any], list[dict[str, Any]], list[str]]:
     hand = [_mock_snapshot_card(str(seed), idx) for idx in range(7)]
+    registry: dict[str, Any] = {}
+    for idx in range(7):
+        sid, card_data = _mock_snapshot_card_data(str(seed), idx)
+        registry[sid] = card_data
     basics = ["Plains", "Island", "Swamp"]
-    full_state = {
+    snapshot_data = {
         "hand": hand,
         "vanguard": None,
         "basic_lands": basics,
@@ -303,6 +329,7 @@ def _seed_history_payload(seed: int) -> tuple[dict[str, Any], list[dict[str, Any
         "poison": 0,
         "play_draw_preference": "play",
     }
+    full_state = {"data": snapshot_data, "card_registry": registry}
     return full_state, hand, basics
 
 
@@ -689,6 +716,13 @@ async def wait_for_game_state(ctx: PhaseContext) -> dict[str, Any]:
             msg = payload.get("message", "Unknown game error")
             raise GameFlowError(str(msg))
 
+        if msg_type == "game_bootstrap":
+            if isinstance(payload, dict):
+                state = payload.get("state")
+                if isinstance(state, dict):
+                    return state
+            raise GameFlowError("game_bootstrap payload did not contain object state")
+
         if msg_type == "game_state":
             if isinstance(payload, dict):
                 return payload
@@ -762,7 +796,11 @@ async def play_draft_phase(ctx: PhaseContext, state: dict[str, Any]) -> dict[str
 async def apply_pending_build_upgrades(ctx: PhaseContext, state: dict[str, Any]) -> dict[str, Any]:
     while True:
         self_player = state["self_player"]
-        pending = [u for u in self_player.get("upgrades", []) if u.get("upgrade_target") is None]
+        pending = [
+            upgrade
+            for upgrade in self_player.get("upgrades", [])
+            if upgrade.get("upgrade_target_id") is None and upgrade.get("upgrade_target") is None
+        ]
         if not pending:
             return state
         hand = self_player.get("hand", [])
@@ -870,6 +908,13 @@ async def wait_for_lobby_or_game_state(ctx: PhaseContext) -> tuple[str, dict[str
             msg = payload.get("message", "Unknown lobby error")
             raise GameFlowError(str(msg))
 
+        if msg_type == "game_bootstrap":
+            if isinstance(payload, dict):
+                state = payload.get("state")
+                if isinstance(state, dict):
+                    return "game_bootstrap", state
+            raise GameFlowError("game_bootstrap payload did not contain object state")
+
         if msg_type == "game_state":
             if isinstance(payload, dict):
                 return "game_state", payload
@@ -891,7 +936,7 @@ async def enter_game_from_lobby(ctx: PhaseContext) -> dict[str, Any]:
 
     while True:
         msg_type, payload = await wait_for_lobby_or_game_state(ctx)
-        if msg_type == "game_state":
+        if msg_type in {"game_state", "game_bootstrap"}:
             return payload
 
         can_start = bool(payload.get("can_start", False))
@@ -1161,6 +1206,16 @@ def summarize_run(
     if wall_time_sec > 0:
         throughput = succeeded / wall_time_sec
 
+    rss_per_game = None
+    if server_rss_window_mb and succeeded > 0:
+        delta_end = server_rss_window_mb.get("delta_end")
+        delta_peak = server_rss_window_mb.get("delta_peak")
+        rss_per_game = {
+            "count": succeeded,
+            "delta_end_per_game": (float(delta_end) / succeeded) if delta_end is not None else None,
+            "delta_peak_per_game": (float(delta_peak) / succeeded) if delta_peak is not None else None,
+        }
+
     return RunSummary(
         label=label,
         games=games,
@@ -1183,6 +1238,7 @@ def summarize_run(
         terminal_stage_round_counts=dict(terminal_stage_round_counts),
         server_rss_mb=server_rss_mb,
         server_rss_window_mb=server_rss_window_mb,
+        server_rss_per_game_mb=rss_per_game,
     )
 
 
@@ -1218,6 +1274,12 @@ def print_summary(summary: RunSummary) -> None:
             f"peak={_fmt_float(summary.server_rss_window_mb.get('peak'))} "
             f"delta_end={_fmt_float(summary.server_rss_window_mb.get('delta_end'))} "
             f"delta_peak={_fmt_float(summary.server_rss_window_mb.get('delta_peak'))}"
+        )
+    if summary.server_rss_per_game_mb:
+        print(
+            "managed rss per successful game MB: "
+            f"delta_end={_fmt_float(summary.server_rss_per_game_mb.get('delta_end_per_game'))} "
+            f"delta_peak={_fmt_float(summary.server_rss_per_game_mb.get('delta_peak_per_game'))}"
         )
     if summary.failure_reasons:
         print("failure reasons:")

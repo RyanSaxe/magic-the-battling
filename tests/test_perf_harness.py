@@ -5,12 +5,15 @@ from contextlib import closing
 import pytest
 
 from server.perf.load_harness import (
+    GameResult,
+    HarnessConfig,
     cap_overrides_for,
     choose_timeout_seconds,
     parse_args,
     parse_sweep,
     rss_window_dict,
     seed_puppet_histories,
+    summarize_run,
 )
 
 
@@ -114,6 +117,65 @@ def test_rss_window_dict():
     assert window["peak"] == 110.0
     assert window["delta_end"] == 10.0
     assert window["delta_peak"] == 10.0
+
+
+def test_summarize_run_reports_rss_per_successful_game():
+    cfg = HarnessConfig(
+        base_url="http://127.0.0.1:8000",
+        sweep_games=[10],
+        concurrency_override=10,
+        puppet_count=3,
+        cube_id="auto",
+        use_upgrades=True,
+        seed=1337,
+        game_timeout_sec=None,
+        timeout_multiplier=2.5,
+        timeout_min_sec=60.0,
+        timeout_max_sec=900.0,
+        calibration_timeout_sec=300.0,
+        disable_caps=True,
+        disable_ws_gzip=False,
+        mock_cube_data=True,
+        db_copy=False,
+        db_source=None,
+        backend_port=8000,
+        startup_timeout_sec=90.0,
+        ops_token=None,
+        reset_runtime_between_sweeps=True,
+        fresh_server_per_sweep=False,
+        rss_sample_interval_sec=0.25,
+        ws_action_jitter_ms=0.0,
+        json_output=False,
+        json_output_path=None,
+    )
+    results = [
+        GameResult(index=0, success=True, duration_sec=1.0, final_phase="winner"),
+        GameResult(index=1, success=True, duration_sec=1.5, final_phase="winner"),
+    ]
+    summary = summarize_run(
+        label="test",
+        cfg=cfg,
+        games=2,
+        concurrency=2,
+        timeout_per_game_sec=60.0,
+        wall_time_sec=2.0,
+        results=results,
+        server_rss_mb=None,
+        server_rss_window_mb={
+            "count": 4,
+            "start": 100.0,
+            "end": 104.0,
+            "peak": 106.0,
+            "delta_end": 4.0,
+            "delta_peak": 6.0,
+        },
+    )
+
+    assert summary.server_rss_per_game_mb == {
+        "count": 2,
+        "delta_end_per_game": 2.0,
+        "delta_peak_per_game": 3.0,
+    }
 
 
 def _init_seed_schema(db_path):

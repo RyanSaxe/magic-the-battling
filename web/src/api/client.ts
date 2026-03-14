@@ -1,5 +1,6 @@
 import type {
   Card,
+  CardCatalogEntry,
   CreateGameResponse,
   JoinGameResponse,
   GameStatusResponse,
@@ -9,6 +10,7 @@ import type {
   PlayMode,
 } from '../types'
 import { getOrCreateDeviceId } from '../utils/deviceIdentity'
+import { hydrateCardCatalogEntries } from '../utils/catalogHydration'
 
 const API_BASE = '/api'
 const DEVICE_ID_HEADER = 'X-MTB-Device-Id'
@@ -204,7 +206,14 @@ export async function getGameCards(gameId: string, playerName?: string): Promise
   if (!response.ok) {
     throw new Error(await getErrorMessage(response, 'Failed to load card pool'))
   }
-  return response.json()
+  const payload = await response.json() as { cards: CardCatalogEntry[]; upgrades: CardCatalogEntry[] }
+  const mergedCatalog = Object.fromEntries(
+    [...payload.cards, ...payload.upgrades].map((card) => [card.scryfall_id, card]),
+  )
+  return {
+    cards: hydrateCardCatalogEntries(payload.cards, mergedCatalog),
+    upgrades: hydrateCardCatalogEntries(payload.upgrades, mergedCatalog),
+  }
 }
 
 export async function getShareGame(gameId: string, playerName: string): Promise<ShareGameResponse> {

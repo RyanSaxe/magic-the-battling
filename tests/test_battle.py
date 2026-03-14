@@ -641,8 +641,9 @@ class TestUnifiedPairingCandidates:
         manager = GameManager()
         player_view = manager._make_fake_player_view(fake, alice, {})
 
-        assert creature in player_view.most_recently_revealed_cards
-        assert companion in player_view.most_recently_revealed_cards
+        revealed_ids = {card.id for card in player_view.most_recently_revealed_cards}
+        assert creature.id in revealed_ids
+        assert companion.id in revealed_ids
 
 
 class TestViableCandidates:
@@ -1287,8 +1288,7 @@ class TestFaceDownScrubbing:
         face_down_bf = [c for c in view.opponent_zones.battlefield if c.id in view.opponent_zones.face_down_card_ids]
         assert len(face_down_bf) == 1
         scrubbed = face_down_bf[0]
-        assert scrubbed.name == ""
-        assert scrubbed.image_url == ""
+        assert scrubbed.scryfall_id == "__scrubbed__"
         assert scrubbed.id != creature.id
 
     def test_pvp_face_down_opaque_id_not_scryfall_uuid(self, card_factory):
@@ -1358,7 +1358,7 @@ class TestFaceDownScrubbing:
         face_down_bf = [c for c in view.opponent_zones.battlefield if c.id in view.opponent_zones.face_down_card_ids]
         assert len(face_down_bf) == 1
         assert face_down_bf[0].id == creature.id
-        assert face_down_bf[0].name == "SecretCreature"
+        assert face_down_bf[0].scryfall_id == creature.scryfall_id
 
     def test_can_manipulate_opponent_true_for_static(self, card_factory):
         """BattleView.can_manipulate_opponent should be True against StaticOpponent."""

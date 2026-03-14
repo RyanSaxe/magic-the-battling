@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { GameState, LobbyState } from '../types'
+import type { CardCatalogEntry, CompactGameState, GameBootstrap, GameState, LobbyState } from '../types'
+import { hydrateGameState } from '../utils/catalogHydration'
 
 interface SpectateRequest {
   request_id: string
@@ -52,6 +53,7 @@ export function useWebSocket(
   })
 
   const wsRef = useRef<WebSocket | null>(null)
+  const catalogRef = useRef<Record<string, CardCatalogEntry>>({})
   const reconnectTimeoutRef = useRef<number | null>(null)
   const reconnectAttempts = useRef(0)
   const isClosingRef = useRef(false)
@@ -64,6 +66,7 @@ export function useWebSocket(
   useEffect(() => {
     if (!gameId || !sessionId) {
       isClosingRef.current = true
+      catalogRef.current = {}
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
       }
@@ -77,6 +80,7 @@ export function useWebSocket(
     const generation = ++connectionGenerationRef.current
     isClosingRef.current = false
     reconnectAttempts.current = 0
+    catalogRef.current = {}
 
     const connect = () => {
       if (!gameId || !sessionId || generation !== connectionGenerationRef.current) return
@@ -126,8 +130,22 @@ export function useWebSocket(
             } else {
               message = JSON.parse(ev.data)
             }
-            if (message.type === 'game_state') {
-              setState(s => ({ ...s, gameState: message.payload, lobbyState: null }))
+            if (message.type === 'game_bootstrap') {
+              const payload = message.payload as GameBootstrap
+              catalogRef.current = payload.catalog
+              setState(s => ({
+                ...s,
+                gameState: hydrateGameState(payload.state, payload.catalog),
+                lobbyState: null,
+              }))
+            } else if (message.type === 'game_state') {
+              const payload = message.payload as CompactGameState
+              const catalog = catalogRef.current
+              setState(s => ({
+                ...s,
+                gameState: hydrateGameState(payload, catalog),
+                lobbyState: null,
+              }))
             } else if (message.type === 'lobby_state') {
               setState(s => ({ ...s, lobbyState: message.payload }))
             } else if (message.type === 'error') {
