@@ -38,8 +38,11 @@ from mtb.models.game import (
     StaticOpponent,
     Zones,
     create_game,
+    restore_game_from_snapshot,
+    restore_snapshot_data,
     set_battler,
     set_player_battlers,
+    slim_snapshot_dump,
 )
 from mtb.models.types import BuildSource, CardDestination, PlayMode, ZoneName, normalize_play_mode
 from mtb.phases import battle, build, draft, reward
@@ -102,7 +105,7 @@ def _scrub_face_down_cards(cards: list[Card], face_down_ids: set[str], id_map: d
         if card.id in face_down_ids:
             opaque_id = str(uuid4())
             id_map[opaque_id] = card.id
-            result.append(Card(id=opaque_id, name="", image_url="", type_line=""))
+            result.append(Card(id=opaque_id, scryfall_id="__scrubbed__", name="", image_url="", type_line=""))
         else:
             result.append(card)
     return result
@@ -509,7 +512,7 @@ class GameManager:
             row = session.get(ActiveGameSnapshot, game_id)
             if row is None:
                 return False
-            game = Game.model_validate_json(cast(str, row.state_json))
+            game = restore_game_from_snapshot(cast(str, row.state_json))
             self._active_games[game_id] = game
             if self._normalize_restored_game(game):
                 self.mark_game_dirty(game_id, human_activity=False)
@@ -536,7 +539,7 @@ class GameManager:
             for row in rows:
                 snapshot_game_id = cast(str, row.game_id)
                 try:
-                    game = Game.model_validate_json(cast(str, row.state_json))
+                    game = restore_game_from_snapshot(cast(str, row.state_json))
                 except Exception:
                     logger.exception("Invalid snapshot; deleting row for game_id=%s", snapshot_game_id)
                     session.delete(row)
@@ -1401,7 +1404,7 @@ class GameManager:
 
         for snapshot in history.snapshots:
             key = f"{snapshot.stage}_{snapshot.round}"
-            snapshot_data = BattleSnapshotData.model_validate_json(snapshot.full_state_json)
+            snapshot_data = restore_snapshot_data(snapshot.full_state_json)
             static_opp = StaticOpponent.from_snapshot(snapshot_data, bot_name, history_id)
             snapshots_dict[key] = static_opp
 
@@ -1476,7 +1479,7 @@ class GameManager:
             treasures=player.treasures,
             poison=player.poison,
             play_draw_preference=player.play_draw_preference,
-            full_state_json=snapshot_data.model_dump_json(),
+            full_state_json=slim_snapshot_dump(snapshot_data),
         )
         db.add(snapshot)
         db.commit()

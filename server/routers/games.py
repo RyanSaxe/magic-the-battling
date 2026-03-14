@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
-from mtb.models.game import BattleSnapshotData
+from mtb.models.game import restore_snapshot_data
 from mtb.utils.cubecobra import get_cube_data
 from server.db import database
 from server.db.models import GameRecord, PlayerGameHistory
@@ -597,7 +597,7 @@ def _build_human_snapshots(history: PlayerGameHistory) -> list[SharePlayerSnapsh
     snapshots: list[SharePlayerSnapshot] = []
     sorted_snaps = sorted(history.snapshots, key=lambda s: (s.stage, s.round))
     for snap in sorted_snaps:
-        snapshot_data = BattleSnapshotData.model_validate_json(snap.full_state_json)
+        snapshot_data = restore_snapshot_data(snap.full_state_json)
         poison = snap.poison if snap.poison is not None else snapshot_data.poison
         snapshots.append(
             SharePlayerSnapshot(
@@ -655,7 +655,7 @@ def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[Sha
             source_index += 1
 
         source_snapshot = best_source_snapshot or sorted_snaps[0]
-        snapshot_data = BattleSnapshotData.model_validate_json(source_snapshot.full_state_json)
+        snapshot_data = restore_snapshot_data(source_snapshot.full_state_json)
         snapshots.append(
             SharePlayerSnapshot(
                 stage=target_stage,

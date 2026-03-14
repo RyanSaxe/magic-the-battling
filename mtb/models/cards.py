@@ -1,7 +1,15 @@
 import random
+from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr, computed_field, model_serializer, model_validator
 
+from mtb.models.card_registry import (
+    CARD_DATA_FIELDS,
+    CardData,
+    derive_scryfall_id,
+    get_card_data,
+    register_card_data,
+)
 from mtb.models.types import UPGRADE_TYPE, VANGUARD_TYPE, PlayMode
 
 CONSTRUCTED_MIN_CARDS = 100
@@ -14,25 +22,148 @@ LIMITED_BANNED_CARD_NAMES: set[str] = set()
 
 
 class Card(BaseModel):
-    name: str
-    image_url: str
-    id: str
-    type_line: str
-    tokens: tuple["Card", ...] = Field(default_factory=tuple)
-    flip_image_url: str | None = None
-    png_url: str | None = None
-    flip_png_url: str | None = None
-    elo: float = 0.0
-    upgrade_target: "Card | None" = None
-    oracle_text: str | None = None
-    original_owner: str | None = None
-    colors: list[str] = Field(default_factory=list)
-    keywords: list[str] = Field(default_factory=list)
-    cmc: float = 0.0
+    model_config = {"extra": "ignore"}
 
-    # vanguard specific properties
-    life_modifier: int | None = None
-    hand_modifier: int | None = None
+    id: str
+    scryfall_id: str = ""
+    upgrade_target: "Card | None" = None
+    original_owner: str | None = None
+
+    _card_data: CardData | None = PrivateAttr(default=None)
+    _tokens_cache: tuple["Card", ...] | None = PrivateAttr(default=None)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _register_and_derive(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+
+        card_id = data.get("id", "")
+        scryfall_id = data.get("scryfall_id", "")
+        if not scryfall_id and card_id:
+            scryfall_id = derive_scryfall_id(card_id)
+            data["scryfall_id"] = scryfall_id
+
+        if "name" in data and scryfall_id:
+            if "token_scryfall_ids" not in data:
+                tokens = data.get("tokens", ())
+                sids: list[str] = []
+                for t in tokens:
+                    if hasattr(t, "scryfall_id"):
+                        sids.append(t.scryfall_id)
+                    elif isinstance(t, dict):
+                        t_id = t.get("id", "")
+                        t_sid = t.get("scryfall_id", "") or (derive_scryfall_id(t_id) if t_id else "")
+                        if t_sid:
+                            sids.append(t_sid)
+                            if "name" in t:
+                                register_card_data(t_sid, t)
+                    elif isinstance(t, str):
+                        sids.append(t)
+                data["token_scryfall_ids"] = tuple(sids)
+
+            register_card_data(scryfall_id, data)
+
+        return data
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.scryfall_id:
+            try:
+                self._card_data = get_card_data(self.scryfall_id)
+            except KeyError:
+                pass
+
+    def _data(self) -> CardData:
+        if self._card_data is not None:
+            return self._card_data
+        self._card_data = get_card_data(self.scryfall_id)
+        return self._card_data
+
+    @computed_field
+    @property
+    def name(self) -> str:
+        return self._data().name
+
+    @computed_field
+    @property
+    def image_url(self) -> str:
+        return self._data().image_url
+
+    @computed_field
+    @property
+    def type_line(self) -> str:
+        return self._data().type_line
+
+    @computed_field
+    @property
+    def flip_image_url(self) -> str | None:
+        return self._data().flip_image_url
+
+    @computed_field
+    @property
+    def png_url(self) -> str | None:
+        return self._data().png_url
+
+    @computed_field
+    @property
+    def flip_png_url(self) -> str | None:
+        return self._data().flip_png_url
+
+    @computed_field
+    @property
+    def elo(self) -> float:
+        return self._data().elo
+
+    @computed_field
+    @property
+    def oracle_text(self) -> str | None:
+        return self._data().oracle_text
+
+    @computed_field
+    @property
+    def colors(self) -> list[str]:
+        return list(self._data().colors)
+
+    @computed_field
+    @property
+    def keywords(self) -> list[str]:
+        return list(self._data().keywords)
+
+    @computed_field
+    @property
+    def cmc(self) -> float:
+        return self._data().cmc
+
+    @computed_field
+    @property
+    def life_modifier(self) -> int | None:
+        return self._data().life_modifier
+
+    @computed_field
+    @property
+    def hand_modifier(self) -> int | None:
+        return self._data().hand_modifier
+
+    @computed_field
+    @property
+    def tokens(self) -> tuple["Card", ...]:
+        if self._tokens_cache is not None:
+            return self._tokens_cache
+        token_sids = self._data().token_scryfall_ids
+        if not token_sids:
+            self._tokens_cache = ()
+            return ()
+        result = tuple(Card(id=sid, scryfall_id=sid) for sid in token_sids)
+        self._tokens_cache = result
+        return result
+
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: Any, info: Any) -> dict[str, Any]:
+        data = handler(self)
+        if info.context and info.context.get("slim_cards"):
+            for field_name in CARD_DATA_FIELDS:
+                data.pop(field_name, None)
+        return data
 
     @property
     def is_upgrade(self) -> bool:

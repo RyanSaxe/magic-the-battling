@@ -1,9 +1,11 @@
+import json
 import random
 import weakref
 from typing import Any, Literal
 
 from pydantic import AliasChoices, BaseModel, Field, PrivateAttr, field_validator, model_serializer
 
+from mtb.models.card_registry import export_registry, import_registry
 from mtb.models.cards import Battler, Card
 from mtb.models.types import Phase, PlayMode, ZoneName, normalize_play_mode
 
@@ -287,9 +289,12 @@ class Game(BaseModel):
         self.normalize_player_battlers()
 
     def snapshot_dump_json(self) -> str:
+        context: dict[str, Any] = {"slim_cards": True}
         if self.battler is not None:
-            return self.model_dump_json(context={"exclude_shared_battler": True})
-        return self.model_dump_json()
+            context["exclude_shared_battler"] = True
+        game_data = self.model_dump(context=context)
+        registry_data = export_registry()
+        return json.dumps({"data": game_data, "card_registry": registry_data})
 
     def get_draft_state(self) -> DraftState:
         if self.draft_state is None:
@@ -432,3 +437,25 @@ def _deal_starting_pool(game: Game) -> None:
         player.battler.cards = player.battler.cards[pool_size:]
         player.sideboard.extend(player_cards)
         player.populate_hand()
+
+
+def restore_game_from_snapshot(json_str: str) -> Game:
+    data = json.loads(json_str)
+    if "card_registry" in data:
+        import_registry(data["card_registry"])
+        return Game(**data["data"])
+    return Game(**data)
+
+
+def slim_snapshot_dump(snapshot_data: BattleSnapshotData) -> str:
+    slim = snapshot_data.model_dump(context={"slim_cards": True})
+    registry_data = export_registry()
+    return json.dumps({"data": slim, "card_registry": registry_data})
+
+
+def restore_snapshot_data(json_str: str) -> BattleSnapshotData:
+    data = json.loads(json_str)
+    if "card_registry" in data:
+        import_registry(data["card_registry"])
+        return BattleSnapshotData(**data["data"])
+    return BattleSnapshotData(**data)

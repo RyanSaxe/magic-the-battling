@@ -19,7 +19,14 @@ def get_card_from_scryfall(card_id: str) -> Card:
         flip_image_url = None
         flip_png_url = None
         oracle_text = card_json.get("oracle_text")
-    card = Card(
+
+    hand_modifier = None
+    life_modifier = None
+    if card_json["type_line"] == "Vanguard":
+        hand_modifier = int(card_json["hand_modifier"])
+        life_modifier = int(card_json["life_modifier"])
+
+    return Card(
         name=card_json["name"],
         image_url=image_url,
         flip_image_url=flip_image_url,
@@ -27,14 +34,11 @@ def get_card_from_scryfall(card_id: str) -> Card:
         flip_png_url=flip_png_url,
         type_line=card_json["type_line"],
         id=card_json["id"],
+        scryfall_id=card_json["id"],
         oracle_text=oracle_text,
         colors=card_json.get("colors", []),
         keywords=card_json.get("keywords", []),
         cmc=card_json.get("cmc", 0),
+        hand_modifier=hand_modifier,
+        life_modifier=life_modifier,
     )
-
-    if card.type_line == "Vanguard":
-        card.hand_modifier = int(card_json["hand_modifier"])
-        card.life_modifier = int(card_json["life_modifier"])
-
-    return card
