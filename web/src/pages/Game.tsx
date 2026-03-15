@@ -533,6 +533,9 @@ function GameGuideLayer({
     stepIndex: guideRequest?.stepIndex ?? 0,
   });
   const [renderRequest, setRenderRequest] = useState<GuideRequest | null>(guideRequest);
+  const [renderGuide, setRenderGuide] = useState(
+    () => (guideRequest ? buildGuideDefinition(guideRequest.guideId, context) : null),
+  );
   const sidebarRestoreRef = useRef<{
     sidebarOpen: boolean;
     revealedPlayerName: string | null;
@@ -560,11 +563,27 @@ function GameGuideLayer({
     return () => window.clearTimeout(timeoutId);
   }, [guideRequest]);
 
-  const guide = useMemo(
-    () => (activeRequest ? buildGuideDefinition(activeRequest.guideId, context) : null),
-    [activeRequest, context],
+  const liveGuide = useMemo(
+    () => (guideRequest ? buildGuideDefinition(guideRequest.guideId, context) : null),
+    [context, guideRequest],
   );
+  const guide = guideRequest ? liveGuide : renderGuide;
   const activeStep = guide?.steps[stepIndex] ?? null;
+
+  useEffect(() => {
+    if (guideRequest && liveGuide) {
+      queueMicrotask(() => {
+        setRenderGuide(liveGuide);
+      });
+      return;
+    }
+
+    if (!activeRequest) {
+      queueMicrotask(() => {
+        setRenderGuide(null);
+      });
+    }
+  }, [activeRequest, guideRequest, liveGuide]);
 
   const restoreSidebarState = useCallback(() => {
     const snapshot = sidebarRestoreRef.current;
@@ -675,7 +694,10 @@ function GameGuideLayer({
       return;
     }
 
-    queueMicrotask(() => finishGuide(guideRequest.guideId));
+    queueMicrotask(() => {
+      setRenderRequest(null);
+      finishGuide(guideRequest.guideId);
+    });
   }, [activeStep, finishGuide, guideCompletionTrigger, guideRequest]);
 
   const handleAdvanceStep = useCallback(() => {
@@ -1941,65 +1963,65 @@ function GameContent() {
               <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
               <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-                {sizes.isMobile && battleViewForDisplay && (
-                  <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight">
-                    <div className="flex items-center gap-1">
-                      <span className="text-gray-300 truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
-                      <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                        <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
-                        <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
-                        <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                  {sizes.isMobile && battleViewForDisplay && (
+                    <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight">
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-300 truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
+                        <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                          <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                        </div>
+                      </div>
+                      <div className="text-center leading-tight">
+                        {battleViewForDisplay.current_turn_name === self_player.name ? (
+                          <span className="text-green-400 font-medium">Your turn</span>
+                        ) : (
+                          <span className="text-amber-400 font-medium">Opp's turn</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                          <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                        </div>
+                        <span className="text-gray-300 truncate max-w-[60px] leading-tight">{self_player.name}</span>
                       </div>
                     </div>
-                    <div className="text-center leading-tight">
-                      {battleViewForDisplay.current_turn_name === self_player.name ? (
-                        <span className="text-green-400 font-medium">Your turn</span>
-                      ) : (
-                        <span className="text-amber-400 font-medium">Opp's turn</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                        <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
-                        <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
-                        <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
-                      </div>
-                      <span className="text-gray-300 truncate max-w-[60px] leading-tight">{self_player.name}</span>
-                    </div>
-                  </div>
-                )}
-                {sizes.isMobile && battleViewForDisplay && (
-                  <ZoneDivider
-                    orientation="horizontal"
-                    interactive={false}
-                    {...STATIC_DIVIDER_CALLBACKS}
-                  />
-                )}
-                  <BattlePhase
-                    gameState={gameState}
-                    battleOverride={displayBattleResolution ? battleViewForDisplay : undefined}
-                    actions={actions}
-                    isMobile={sizes.isMobile}
-                    selectedCard={battleSelectedCard}
-                    onSelectedCardChange={setBattleSelectedCard}
-                    onCardHover={handleCardHover}
-                    onOpponentCardHover={handleOpponentCardHover}
-                    onCardHoverEnd={handleCardHoverEnd}
-                    activeZoneModal={activeBattleZoneModal}
-                    onZoneModalOpenChange={setBattleZoneModalOpen}
-                    onLayoutMetricsChange={setBattleSidebarLayout}
-                  />
-                  {displayBattleResolution && activeBattleResolution && (
-                    <BattleResolutionOverlay
-                      battle={battleViewForDisplay}
-                      resolution={activeBattleResolution}
-                      onComplete={() => {
-                        setActiveBattleResolutionId(null)
-                        setCachedBattleForResolution(null)
-                      }}
+                  )}
+                  {sizes.isMobile && battleViewForDisplay && (
+                    <ZoneDivider
+                      orientation="horizontal"
+                      interactive={false}
+                      {...STATIC_DIVIDER_CALLBACKS}
                     />
                   )}
-                </div>
+                    <BattlePhase
+                      gameState={gameState}
+                      battleOverride={displayBattleResolution ? battleViewForDisplay : undefined}
+                      actions={actions}
+                      isMobile={sizes.isMobile}
+                      selectedCard={battleSelectedCard}
+                      onSelectedCardChange={setBattleSelectedCard}
+                      onCardHover={handleCardHover}
+                      onOpponentCardHover={handleOpponentCardHover}
+                      onCardHoverEnd={handleCardHoverEnd}
+                      activeZoneModal={activeBattleZoneModal}
+                      onZoneModalOpenChange={setBattleZoneModalOpen}
+                      onLayoutMetricsChange={setBattleSidebarLayout}
+                    />
+                    {displayBattleResolution && activeBattleResolution && (
+                      <BattleResolutionOverlay
+                        battle={battleViewForDisplay}
+                        resolution={activeBattleResolution}
+                        onComplete={() => {
+                          setActiveBattleResolutionId(null)
+                          setCachedBattleForResolution(null)
+                        }}
+                      />
+                    )}
+                  </div>
               </main>
               {sizes.isMobile ? (
                 <>

@@ -115,6 +115,12 @@ export function GuidedWalkthrough({
       ? step.waitForLayoutTargetSelector(context)
       : step.waitForLayoutTargetSelector;
   }, [context, step]);
+  const clearPhaseTimer = useCallback(() => {
+    if (phaseTimerRef.current !== null) {
+      window.clearTimeout(phaseTimerRef.current);
+      phaseTimerRef.current = null;
+    }
+  }, []);
 
   const finishGuide = useCallback(() => {
     onClose(request.guideId);
@@ -127,6 +133,30 @@ export function GuidedWalkthrough({
       finishGuide();
     }
   }, [context.currentPhase, finishGuide, guide.phase]);
+
+  useEffect(() => {
+    if (requestActive || !displayState) {
+      return;
+    }
+
+    if (reducedMotion) {
+      queueMicrotask(() => {
+        setAnimPhase("idle");
+      });
+      return;
+    }
+
+    if (animPhase === "exiting") {
+      return;
+    }
+
+    clearPhaseTimer();
+    const exitId = requestAnimationFrame(() => {
+      setPendingState(null);
+      setAnimPhase("exiting");
+    });
+    return () => cancelAnimationFrame(exitId);
+  }, [animPhase, clearPhaseTimer, displayState, reducedMotion, requestActive]);
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
@@ -168,13 +198,6 @@ export function GuidedWalkthrough({
     step?.spotlightPadding,
     stepKey,
   );
-
-  const clearPhaseTimer = useCallback(() => {
-    if (phaseTimerRef.current !== null) {
-      window.clearTimeout(phaseTimerRef.current);
-      phaseTimerRef.current = null;
-    }
-  }, []);
 
   useEffect(() => {
     if (!layout || !step) return;
@@ -291,12 +314,12 @@ export function GuidedWalkthrough({
     if (animPhase === "exiting") {
       clearPhaseTimer();
       phaseTimerRef.current = window.setTimeout(() => {
-        finishGuide();
+        phaseTimerRef.current = null;
       }, 400);
     }
 
     return () => {};
-  }, [animPhase, clearPhaseTimer, displayState?.layout.spotlight, finishGuide, pendingState, reducedMotion]);
+  }, [animPhase, clearPhaseTimer, displayState?.layout.spotlight, pendingState, reducedMotion]);
 
   useEffect(() => {
     return () => clearPhaseTimer();
