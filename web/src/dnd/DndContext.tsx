@@ -45,6 +45,7 @@ export function GameDndProvider({
   const [activeCard, setActiveCard] = useState<Card | null>(null);
   const [activeFromZone, setActiveFromZone] = useState<ZoneName | null>(null);
   const [activeFromZoneId, setActiveFromZoneId] = useState<string | null>(null);
+  const [activeDraggableId, setActiveDraggableId] = useState<string | null>(null);
   const [activeFaceDown, setActiveFaceDown] = useState(false);
 
   const mouseSensor = useSensor(MouseSensor, {
@@ -70,6 +71,7 @@ export function GameDndProvider({
       setActiveCard(data.card);
       setActiveFromZone(data.fromZone);
       setActiveFromZoneId(data.fromZoneId);
+      setActiveDraggableId(String(event.active.id));
       setActiveFaceDown(data.faceDown ?? false);
     }
   }
@@ -98,6 +100,7 @@ export function GameDndProvider({
     setActiveCard(null);
     setActiveFromZone(null);
     setActiveFromZoneId(null);
+    setActiveDraggableId(null);
     setActiveFaceDown(false);
   }
 
@@ -105,12 +108,13 @@ export function GameDndProvider({
     setActiveCard(null);
     setActiveFromZone(null);
     setActiveFromZoneId(null);
+    setActiveDraggableId(null);
     setActiveFaceDown(false);
   }
 
   return (
     <GameDndContext.Provider
-      value={{ activeCard, activeFromZone, activeFromZoneId }}
+      value={{ activeCard, activeFromZone, activeFromZoneId, activeDraggableId }}
     >
       <DndKitContext
         sensors={sensors}

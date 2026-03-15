@@ -40,7 +40,11 @@ interface BattlePhaseProps {
   onOpponentCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
   activeZoneModal: BattleZoneModalState | null
-  onZoneModalToggle: (zone: BattleZoneModalState["zone"], owner: ZoneOwner) => void
+  onZoneModalOpenChange: (
+    zone: BattleZoneModalState["zone"],
+    owner: ZoneOwner,
+    open: boolean,
+  ) => void
   onLayoutMetricsChange?: (metrics: {
     handHeight: number
     middleLaneHeight: number
@@ -79,7 +83,7 @@ export function BattlePhase({
   onOpponentCardHover,
   onCardHoverEnd,
   activeZoneModal,
-  onZoneModalToggle,
+  onZoneModalOpenChange,
   onLayoutMetricsChange,
 }: BattlePhaseProps) {
   const setSelectedCard = onSelectedCardChange
@@ -446,7 +450,7 @@ export function BattlePhase({
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('command_zone', 'opponent')}
-              onModalOpenChange={() => onZoneModalToggle('command_zone', 'opponent')}
+              onModalOpenChange={(open) => onZoneModalOpenChange('command_zone', 'opponent', open)}
             />
             <CompactZoneDisplay
               title="Graveyard"
@@ -465,7 +469,7 @@ export function BattlePhase({
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('graveyard', 'opponent')}
-              onModalOpenChange={() => onZoneModalToggle('graveyard', 'opponent')}
+              onModalOpenChange={(open) => onZoneModalOpenChange('graveyard', 'opponent', open)}
             />
             <CompactZoneDisplay
               title="Exile"
@@ -484,7 +488,7 @@ export function BattlePhase({
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('exile', 'opponent')}
-              onModalOpenChange={() => onZoneModalToggle('exile', 'opponent')}
+              onModalOpenChange={(open) => onZoneModalOpenChange('exile', 'opponent', open)}
             />
           </div>
         </div>
@@ -561,7 +565,7 @@ export function BattlePhase({
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('exile', 'player')}
-              onModalOpenChange={() => onZoneModalToggle('exile', 'player')}
+              onModalOpenChange={(open) => onZoneModalOpenChange('exile', 'player', open)}
             />
             <CompactZoneDisplay
               title="Graveyard"
@@ -577,7 +581,7 @@ export function BattlePhase({
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('graveyard', 'player')}
-              onModalOpenChange={() => onZoneModalToggle('graveyard', 'player')}
+              onModalOpenChange={(open) => onZoneModalOpenChange('graveyard', 'player', open)}
             />
             <CompactZoneDisplay
               title={playerCommandZoneTitle}
@@ -594,7 +598,7 @@ export function BattlePhase({
               onCardClick={handleCardClick}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('command_zone', 'player')}
-              onModalOpenChange={() => onZoneModalToggle('command_zone', 'player')}
+              onModalOpenChange={(open) => onZoneModalOpenChange('command_zone', 'player', open)}
             />
           </div>
         </div>

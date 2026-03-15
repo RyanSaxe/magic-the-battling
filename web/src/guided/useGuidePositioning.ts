@@ -5,6 +5,7 @@ const CARD_MARGIN = 12;
 const SPOTLIGHT_PADDING = 12;
 const MOBILE_BREAKPOINT = 640;
 const SCROLL_MARGIN = 12;
+const LAYOUT_STABILITY_FRAMES = 2;
 
 export interface SpotlightRect {
   x: number;
@@ -22,6 +23,13 @@ export interface PositionState {
   containerWidth: number;
   containerHeight: number;
   clipPath: string;
+}
+
+interface LayoutMeasurement {
+  state: PositionState | null;
+  signature: string | null;
+  target: HTMLElement | null;
+  observedElements: HTMLElement[];
 }
 
 function resolveTarget(root: HTMLElement, targetId?: GuideTargetId, targetSelector?: string): HTMLElement | null {
@@ -68,6 +76,46 @@ function buildClipPath(spotlight: SpotlightRect | null, cw: number, ch: number):
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function roundRectValue(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+function rectSignature(rect: SpotlightRect | null): string {
+  if (!rect) {
+    return "none";
+  }
+  return [
+    roundRectValue(rect.x),
+    roundRectValue(rect.y),
+    roundRectValue(rect.width),
+    roundRectValue(rect.height),
+  ].join(":");
+}
+
+function hasVisibleArea(element: HTMLElement): boolean {
+  const rect = element.getBoundingClientRect();
+  return rect.width > 1 && rect.height > 1;
+}
+
+function samePositionState(a: PositionState | null, b: PositionState | null): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (!a || !b) {
+    return false;
+  }
+  return (
+    rectSignature(a.spotlight) === rectSignature(b.spotlight)
+    && a.cardLeft === b.cardLeft
+    && a.cardTop === b.cardTop
+    && a.resolvedPlacement === b.resolvedPlacement
+    && a.isMobile === b.isMobile
+    && a.containerWidth === b.containerWidth
+    && a.containerHeight === b.containerHeight
+    && a.clipPath === b.clipPath
+  );
 }
 
 interface RectLike {
@@ -399,6 +447,8 @@ export function useGuidePositioning(
   targetSelector: string | undefined,
   positionTargetId: GuideTargetId | undefined,
   positionTargetSelector: string | undefined,
+  waitForLayoutTargetId: GuideTargetId | undefined,
+  waitForLayoutTargetSelector: string | undefined,
   placement: GuidePlacement,
   spotlightPadding: number | undefined,
   stepKey: string,
@@ -408,17 +458,48 @@ export function useGuidePositioning(
   useLayoutEffect(() => {
     const root = rootRef.current;
     const card = cardRef.current;
-    if (!root || !card) return;
+    if (!root || !card) {
+      return;
+    }
 
-    const update = () => {
+    let animationFrameId: number | null = null;
+    let stableFrameCount = 0;
+    let lastSignature: string | null = null;
+    let active = true;
+    let hasAttemptedInitialScroll = false;
+    const observedElements = new Set<HTMLElement>();
+
+    const measureLayout = (): LayoutMeasurement => {
       const r = rootRef.current;
       const c = cardRef.current;
-      if (!r || !c) return;
+      if (!r || !c) {
+        return {
+          state: null,
+          signature: null,
+          target: null,
+          observedElements: [],
+        };
+      }
+
+      const target = resolveTarget(r, targetId, targetSelector);
+      const posTarget = resolveTarget(r, positionTargetId, positionTargetSelector);
+      const waitTarget = resolveTarget(r, waitForLayoutTargetId, waitForLayoutTargetSelector);
+      const nextObserved = [target, posTarget, waitTarget].filter(
+        (element): element is HTMLElement => element !== null,
+      );
+
+      const requiresWaitTarget = !!(waitForLayoutTargetId || waitForLayoutTargetSelector);
+      if (requiresWaitTarget && (!waitTarget || !hasVisibleArea(waitTarget))) {
+        return {
+          state: null,
+          signature: waitTarget ? `waiting:${stepKey}:hidden` : `waiting:${stepKey}:missing`,
+          target,
+          observedElements: nextObserved,
+        };
+      }
 
       const cw = r.clientWidth;
       const ch = r.clientHeight;
-      const target = resolveTarget(r, targetId, targetSelector);
-      const posTarget = resolveTarget(r, positionTargetId, positionTargetSelector);
       const padding = spotlightPadding ?? SPOTLIGHT_PADDING;
       const rawSpotlight = target ? toRelativeRect(r, target, padding) : null;
       const spotlight = rawSpotlight ? clampSpotlight(rawSpotlight, cw, ch) : null;
@@ -436,7 +517,7 @@ export function useGuidePositioning(
         centerAnchor,
       );
 
-      setState({
+      const nextState = {
         spotlight,
         cardLeft: pos.left,
         cardTop: pos.top,
@@ -445,34 +526,123 @@ export function useGuidePositioning(
         containerWidth: cw,
         containerHeight: ch,
         clipPath: buildClipPath(spotlight, cw, ch),
-      });
+      };
+
+      return {
+        state: nextState,
+        signature: [
+          stepKey,
+          cw,
+          ch,
+          roundRectValue(cardRect.width),
+          roundRectValue(cardRect.height),
+          rectSignature(spotlight),
+          rectSignature(centerAnchor),
+          roundRectValue(pos.left),
+          roundRectValue(pos.top),
+          pos.resolved,
+        ].join("|"),
+        target,
+        observedElements: nextObserved,
+      };
     };
 
-    const target = resolveTarget(root, targetId, targetSelector);
-    if (target) {
-      scrollTargetIntoVisibleArea(target, root);
-    }
-
-    update();
-
-    let delayedUpdate: ReturnType<typeof setTimeout> | null = null;
-    const handleTransitionEnd = () => {
-      delayedUpdate = setTimeout(update, 50);
+    const syncObservedElements = (elements: HTMLElement[]) => {
+      for (const element of observedElements) {
+        if (!elements.includes(element)) {
+          resizeObserver.unobserve(element);
+          observedElements.delete(element);
+        }
+      }
+      for (const element of elements) {
+        if (observedElements.has(element)) {
+          continue;
+        }
+        resizeObserver.observe(element);
+        observedElements.add(element);
+      }
     };
-    root.addEventListener("transitionend", handleTransitionEnd);
 
-    const ro = new ResizeObserver(update);
-    ro.observe(root);
-    ro.observe(card);
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
+    const runStabilityCheck = () => {
+      animationFrameId = null;
+      if (!active) {
+        return;
+      }
+
+      const measurement = measureLayout();
+      syncObservedElements(measurement.observedElements);
+
+      if (!hasAttemptedInitialScroll && measurement.target) {
+        hasAttemptedInitialScroll = true;
+        scrollTargetIntoVisibleArea(measurement.target, root);
+        stableFrameCount = 0;
+        lastSignature = null;
+        scheduleUpdate();
+        return;
+      }
+
+      if (!measurement.state || !measurement.signature) {
+        stableFrameCount = 0;
+        lastSignature = measurement.signature;
+        setState((current) => (current === null ? current : null));
+        return;
+      }
+
+      if (measurement.signature === lastSignature) {
+        stableFrameCount += 1;
+      } else {
+        lastSignature = measurement.signature;
+        stableFrameCount = 1;
+      }
+
+      if (stableFrameCount < LAYOUT_STABILITY_FRAMES) {
+        scheduleUpdate();
+        return;
+      }
+
+      setState((current) => (
+        samePositionState(current, measurement.state) ? current : measurement.state
+      ));
+    };
+
+    const scheduleUpdate = () => {
+      if (!active || animationFrameId !== null) {
+        return;
+      }
+      animationFrameId = window.requestAnimationFrame(runStabilityCheck);
+    };
+
+    const resizeObserver = new ResizeObserver(() => {
+      stableFrameCount = 0;
+      scheduleUpdate();
+    });
+    resizeObserver.observe(root);
+    resizeObserver.observe(card);
+
+    const mutationObserver = new MutationObserver(() => {
+      stableFrameCount = 0;
+      scheduleUpdate();
+    });
+    mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+    });
+
+    window.addEventListener("resize", scheduleUpdate);
+    window.addEventListener("scroll", scheduleUpdate, true);
+
+    scheduleUpdate();
 
     return () => {
-      if (delayedUpdate) clearTimeout(delayedUpdate);
-      root.removeEventListener("transitionend", handleTransitionEnd);
-      ro.disconnect();
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
+      active = false;
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+      mutationObserver.disconnect();
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", scheduleUpdate);
+      window.removeEventListener("scroll", scheduleUpdate, true);
     };
   }, [
     rootRef,
@@ -481,6 +651,8 @@ export function useGuidePositioning(
     targetSelector,
     positionTargetId,
     positionTargetSelector,
+    waitForLayoutTargetId,
+    waitForLayoutTargetSelector,
     placement,
     spotlightPadding,
     stepKey,

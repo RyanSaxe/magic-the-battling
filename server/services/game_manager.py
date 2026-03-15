@@ -2475,14 +2475,19 @@ class GameManager:
         draft.end_for_player(game, player)
         return True
 
-    def handle_build_move(self, player: Player, card_id: str, source: BuildSource, destination: BuildSource) -> bool:
+    def handle_build_move(
+        self, player: Player, card_id: str, source: BuildSource, destination: BuildSource
+    ) -> bool | str:
         source_list = player.hand if source == "hand" else player.sideboard
         card = next((c for c in source_list if c.id == card_id), None)
         if not card:
-            return False
+            return f"Card not found in {source}"
 
-        build.move_card(player, card, source, destination)
-        return True
+        try:
+            build.move_card(player, card, source, destination)
+            return True
+        except ValueError as e:
+            return str(e)
 
     def handle_build_swap(
         self,

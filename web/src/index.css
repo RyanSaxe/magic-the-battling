@@ -829,6 +829,10 @@ body {
   cursor: not-allowed;
 }
 
+.guided-tooltip .btn:disabled {
+  opacity: 1;
+}
+
 .btn-secondary {
   background: rgba(255, 255, 255, 0.1);
   color: white;
@@ -1008,6 +1012,18 @@ body {
   }
 }
 
+@keyframes battle-resolution-counter-settle {
+  from {
+    transform: scale(var(--battle-counter-scale, 1.8));
+    filter: drop-shadow(0 0 20px rgba(196, 181, 253, 0.24));
+  }
+
+  to {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(196, 181, 253, 0));
+  }
+}
+
 @keyframes battle-resolution-skull-phase {
   0% {
     opacity: 0;
@@ -1020,7 +1036,7 @@ body {
   }
 }
 
-@keyframes battle-resolution-source-stage {
+@keyframes battle-resolution-source-stage-enter {
   0% {
     opacity: 0;
     transform: translate(var(--battle-enter-x), var(--battle-enter-y)) scale(var(--battle-enter-scale));
@@ -1029,6 +1045,18 @@ body {
   100% {
     opacity: 1;
     transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes battle-resolution-source-stage-exit {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(var(--battle-enter-x), var(--battle-enter-y)) scale(var(--battle-enter-scale));
   }
 }
 
@@ -1095,6 +1123,10 @@ body {
   animation: battle-resolution-counter-death 520ms ease-out forwards;
 }
 
+.battle-resolution-counter-settling {
+  animation: battle-resolution-counter-settle 800ms ease-out forwards;
+}
+
 .battle-resolution-counter-dead .token-counter-badge {
   opacity: 0;
   transition: opacity 320ms ease-out;
@@ -1117,8 +1149,16 @@ body {
 }
 
 .battle-resolution-source-card {
-  animation: battle-resolution-source-stage 540ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   filter: drop-shadow(0 0 26px rgba(168, 85, 247, 0.45));
+  pointer-events: none;
+}
+
+.battle-resolution-source-card-entering {
+  animation: battle-resolution-source-stage-enter 540ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.battle-resolution-source-card-exiting {
+  animation: battle-resolution-source-stage-exit 220ms ease-in forwards;
 }
 
 .battle-resolution-beam-core {
@@ -1448,6 +1488,100 @@ body {
 
 .animate-guide-spotlight-pulse {
   animation: guide-spotlight-pulse 2s ease-in-out infinite;
+}
+
+@keyframes guide-tooltip-exit {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+}
+
+@keyframes guide-tooltip-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes guide-tooltip-initial {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes guide-tooltip-dismiss {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+}
+
+@keyframes guide-spotlight-enter {
+  from {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes guide-spotlight-exit {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes guide-spotlight-morph-glow {
+  0% {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 0 24px rgba(245, 186, 64, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 0 36px rgba(245, 186, 64, 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25), 0 0 24px rgba(245, 186, 64, 0.18);
+  }
+}
+
+@keyframes guide-overlay-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes guide-overlay-exit {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-guide-spotlight-pulse {
+    animation: none;
+  }
 }
 
 /* Player row — carved/etched into walnut surface */

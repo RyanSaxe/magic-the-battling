@@ -1,3 +1,5 @@
+import type { GuideRequest, GuidedGuideId } from "../guided/types";
+
 export function shouldBlockGuidesForBattleResolution(options: {
   activeBattleResolutionId: string | null;
   battleResolutionId: string | null | undefined;
@@ -22,4 +24,24 @@ export function shouldBlockGuidesForBattleResolution(options: {
   }
 
   return hasCachedBattle && !shownResolutionIds.has(battleResolutionId);
+}
+
+export function matchesGuideCompletionTrigger(options: {
+  activeGuideRequest: GuideRequest | null;
+  activeStepId: string | null | undefined;
+  trigger: {
+    guideId: GuidedGuideId;
+    stepId: string;
+  } | null;
+}): boolean {
+  const { activeGuideRequest, activeStepId, trigger } = options;
+
+  if (!activeGuideRequest || !activeStepId || !trigger) {
+    return false;
+  }
+
+  return (
+    activeGuideRequest.guideId === trigger.guideId
+    && activeStepId === trigger.stepId
+  );
 }

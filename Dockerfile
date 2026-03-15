@@ -28,6 +28,7 @@ RUN cd web && npm ci && npm run build
 
 # Copy the rest of the application
 COPY server/ ./server/
+COPY scripts/ ./scripts/
 
 # Create data directory for SQLite
 RUN mkdir -p /data
@@ -36,4 +37,4 @@ ENV DATABASE_PATH=/data/mtb.db
 
 EXPOSE 8000
 
-CMD ["uv", "run", "uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD ["sh", "scripts/start_server.sh"]

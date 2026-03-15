@@ -44,6 +44,8 @@ import {
 } from "../utils/playerPlacement";
 import type { Phase } from "../constants/phases";
 import type {
+  GuideRequest,
+  GuidedGuideId,
   GuidedWalkthroughContext,
 } from "../guided/types";
 import {
@@ -51,7 +53,10 @@ import {
   pickAutoReconnectPlayer,
   rememberPlayerForGame,
 } from "../utils/deviceIdentity";
-import { shouldBlockGuidesForBattleResolution } from "./gameGuideState";
+import {
+  matchesGuideCompletionTrigger,
+  shouldBlockGuidesForBattleResolution,
+} from "./gameGuideState";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -505,12 +510,19 @@ function GameGuideLayer({
   context,
   sidebarOpen,
   setSidebarOpen,
+  guideCompletionTrigger,
 }: {
   rootRef: React.RefObject<HTMLElement | null>;
   context: GuidedWalkthroughContext;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
+  guideCompletionTrigger: {
+    guideId: GuidedGuideId;
+    stepId: string;
+    nonce: number;
+  } | null;
 }) {
+  const GUIDE_HANDOFF_LINGER_MS = 450;
   const { state, setRevealedPlayerName } = useContextStrip();
   const { guideRequest, finishGuide, skipTutorial, updateGuideStep } = useGuideContext();
   const [activeStepState, setActiveStepState] = useState<{
@@ -520,21 +532,58 @@ function GameGuideLayer({
     nonce: guideRequest?.nonce ?? null,
     stepIndex: guideRequest?.stepIndex ?? 0,
   });
+  const [renderRequest, setRenderRequest] = useState<GuideRequest | null>(guideRequest);
+  const [renderGuide, setRenderGuide] = useState(
+    () => (guideRequest ? buildGuideDefinition(guideRequest.guideId, context) : null),
+  );
   const sidebarRestoreRef = useRef<{
     sidebarOpen: boolean;
     revealedPlayerName: string | null;
     revealedPlayerTab: "seen" | "overview";
   } | null>(null);
+  const activeRequest = guideRequest ?? renderRequest;
+  const requestActive = !!guideRequest && guideRequest.nonce === activeRequest?.nonce;
   const stepIndex =
-    guideRequest && activeStepState.nonce === guideRequest.nonce
+    activeRequest && activeStepState.nonce === activeRequest.nonce
       ? activeStepState.stepIndex
-      : (guideRequest?.stepIndex ?? 0);
+      : (activeRequest?.stepIndex ?? 0);
 
-  const guide = useMemo(
+  useEffect(() => {
+    if (guideRequest) {
+      queueMicrotask(() => {
+        setRenderRequest(guideRequest);
+      });
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setRenderRequest(null);
+    }, GUIDE_HANDOFF_LINGER_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [guideRequest]);
+
+  const liveGuide = useMemo(
     () => (guideRequest ? buildGuideDefinition(guideRequest.guideId, context) : null),
     [context, guideRequest],
   );
+  const guide = guideRequest ? liveGuide : renderGuide;
   const activeStep = guide?.steps[stepIndex] ?? null;
+
+  useEffect(() => {
+    if (guideRequest && liveGuide) {
+      queueMicrotask(() => {
+        setRenderGuide(liveGuide);
+      });
+      return;
+    }
+
+    if (!activeRequest) {
+      queueMicrotask(() => {
+        setRenderGuide(null);
+      });
+    }
+  }, [activeRequest, guideRequest, liveGuide]);
 
   const restoreSidebarState = useCallback(() => {
     const snapshot = sidebarRestoreRef.current;
@@ -632,6 +681,25 @@ function GameGuideLayer({
 
   useLayoutEffect(() => restoreSidebarState, [restoreSidebarState]);
 
+  useEffect(() => {
+    if (!guideRequest || !activeStep) {
+      return;
+    }
+
+    if (!matchesGuideCompletionTrigger({
+      activeGuideRequest: guideRequest,
+      activeStepId: activeStep.id,
+      trigger: guideCompletionTrigger,
+    })) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      setRenderRequest(null);
+      finishGuide(guideRequest.guideId);
+    });
+  }, [activeStep, finishGuide, guideCompletionTrigger, guideRequest]);
+
   const handleAdvanceStep = useCallback(() => {
     if (!guideRequest || !guide) {
       return;
@@ -680,14 +748,14 @@ function GameGuideLayer({
     });
   }, [guideRequest, updateGuideStep]);
 
-  if (!guideRequest) return null;
+  if (!activeRequest) return null;
   return (
     <GuidedWalkthrough
-      key={guideRequest.nonce}
       rootRef={rootRef}
-      request={guideRequest}
+      request={activeRequest}
       context={context}
       stepIndex={stepIndex}
+      requestActive={requestActive}
       onClose={finishGuide}
       onSkipAll={skipTutorial}
       onAdvanceStep={handleAdvanceStep}
@@ -801,10 +869,16 @@ function GameContent() {
   const [activeBattleZoneModal, setActiveBattleZoneModal] = useState<BattleZoneModal>(null);
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
+  const [guideCompletionTrigger, setGuideCompletionTrigger] = useState<{
+    guideId: GuidedGuideId;
+    stepId: string;
+    nonce: number;
+  } | null>(null);
   const [dismissedServerNoticeAt, setDismissedServerNoticeAt] = useState<string | null>(null);
   const [cachedBattleForResolution, setCachedBattleForResolution] = useState<BattleView | null>(null);
   const [activeBattleResolutionId, setActiveBattleResolutionId] = useState<string | null>(null);
   const [shownBattleResolutionIds, setShownBattleResolutionIds] = useState<Set<string>>(new Set());
+  const battleResolutionId = gameState?.battle_resolution?.resolution_id ?? null;
 
   useEffect(() => {
     if (gameState?.self_player.phase === "battle" && gameState.current_battle) {
@@ -871,6 +945,7 @@ function GameContent() {
 
   // Hover tracking for hotkeys
   const [hoveredCard, setHoveredCard] = useState<{ id: string; zone: ZoneName; owner: 'player' | 'opponent' } | null>(null);
+  const guideCompletionNonceRef = useRef(0);
   const handleCardHover = (cardId: string, zone: ZoneName) => {
     setHoveredCard({ id: cardId, zone, owner: 'player' });
   };
@@ -947,33 +1022,31 @@ function GameContent() {
   }, []);
 
   useEffect(() => {
-    const resolutionId = gameState?.battle_resolution?.resolution_id;
     const phase = gameState?.self_player.phase;
-    if (!resolutionId || !phase || phase === "battle" || !cachedBattleForResolution) {
+    if (!battleResolutionId || !phase || phase === "battle" || !cachedBattleForResolution) {
       return;
     }
-    if (shownBattleResolutionIds.has(resolutionId)) {
+    if (shownBattleResolutionIds.has(battleResolutionId)) {
       return;
     }
 
     queueMicrotask(() => {
+      closeGameplayOverlays();
+      setActiveBattleResolutionId(battleResolutionId);
       setShownBattleResolutionIds((current) => {
-        if (current.has(resolutionId)) {
+        if (current.has(battleResolutionId)) {
           return current;
         }
 
         const next = new Set(current);
-        next.add(resolutionId);
+        next.add(battleResolutionId);
         return next;
       });
-      closeGameplayOverlays();
-      setActiveBattleResolutionId(resolutionId);
     });
   }, [
+    battleResolutionId,
     cachedBattleForResolution,
     closeGameplayOverlays,
-    gameState?.battle_resolution,
-    gameState?.battle_resolution?.resolution_id,
     gameState?.self_player.phase,
     shownBattleResolutionIds,
   ]);
@@ -988,6 +1061,15 @@ function GameContent() {
     setShowUpgradesModal(false);
     setUpgradeInitialTargetId(undefined);
     setUpgradesModalOpenMode('auto');
+  }, []);
+
+  const requestGuideCompletion = useCallback((guideId: GuidedGuideId, stepId: string) => {
+    guideCompletionNonceRef.current += 1;
+    setGuideCompletionTrigger({
+      guideId,
+      stepId,
+      nonce: guideCompletionNonceRef.current,
+    });
   }, []);
 
   const openUpgradesModal = useCallback((
@@ -1008,13 +1090,14 @@ function GameContent() {
     }
     buildReadyPendingRef.current = true;
     setBuildReadyPending(true);
+    requestGuideCompletion("build_play_draw", "play-draw");
     closeGameplayOverlays();
     actions.buildReady(
       selectedBasics,
       playDrawPreference,
       handSlotsRef.current.filter((id): id is string => id !== null),
     );
-  }, [actions, closeGameplayOverlays, gameState, selectedBasics]);
+  }, [actions, closeGameplayOverlays, gameState, requestGuideCompletion, selectedBasics]);
 
   const openBuildSubmitPopover = useCallback(() => {
     if (showSubmitHandPopover || buildReadyPending) {
@@ -1062,15 +1145,21 @@ function GameContent() {
     setActiveDndPanel(panel);
   }, [activeDndPanel, closeGameplayOverlays]);
 
-  const toggleBattleZoneModal = useCallback((
+  const setBattleZoneModalOpen = useCallback((
     zone: BattleZoneModalState["zone"],
     owner: ZoneOwner,
+    open: boolean,
   ) => {
     const isSameModal =
       activeBattleZoneModal?.zone === zone &&
       activeBattleZoneModal.owner === owner;
+    if (!open) {
+      if (isSameModal) {
+        setActiveBattleZoneModal(null);
+      }
+      return;
+    }
     if (isSameModal) {
-      setActiveBattleZoneModal(null);
       return;
     }
     closeGameplayOverlays("battleZoneModal");
@@ -1082,6 +1171,26 @@ function GameContent() {
     setShareOpen(true);
   }, [closeGameplayOverlays]);
 
+  const handleBattleResultSubmit = useCallback((result: string) => {
+    requestGuideCompletion("battle_result_submit", "result-submit");
+    actions.battleSubmitResult(result);
+    setIsChangingResult(false);
+    setShowSubmitResultPopover(false);
+  }, [actions, requestGuideCompletion]);
+
+  const handleContinue = useCallback(() => {
+    requestGuideCompletion("reward", "continue");
+    actions.rewardDone(selectedUpgradeId ?? undefined);
+    setSelectedUpgradeId(null);
+    setSelectedPoolCardId(null);
+  }, [actions, requestGuideCompletion, selectedUpgradeId]);
+
+  const hasPendingBattleResolution =
+    !!battleResolutionId &&
+    gameState?.self_player.phase !== "battle" &&
+    cachedBattleForResolution !== null &&
+    !shownBattleResolutionIds.has(battleResolutionId);
+
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   const modalOpen =
     rulesPanelOpen ||
@@ -1091,6 +1200,7 @@ function GameContent() {
     activeBattleZoneModal !== null ||
     shareOpen ||
     state.previewCard !== null ||
+    hasPendingBattleResolution ||
     activeBattleResolutionId !== null ||
     activeBuildUpgradeAnimation !== null;
   const sidebarPlayers = useMemo(
@@ -1165,19 +1275,13 @@ function GameContent() {
     } else if (phase === 'battle' && cb) {
       if (showSubmitResultPopover) {
         map['w'] = () => {
-          actions.battleSubmitResult(sp.name);
-          setIsChangingResult(false);
-          setShowSubmitResultPopover(false);
+          handleBattleResultSubmit(sp.name);
         };
         map['d'] = () => {
-          actions.battleSubmitResult("draw");
-          setIsChangingResult(false);
-          setShowSubmitResultPopover(false);
+          handleBattleResultSubmit("draw");
         };
         map['l'] = () => {
-          actions.battleSubmitResult(cb.opponent_name);
-          setIsChangingResult(false);
-          setShowSubmitResultPopover(false);
+          handleBattleResultSubmit(cb.opponent_name);
         };
         map['Enter'] = () => setShowSubmitResultPopover(false);
       } else {
@@ -1262,9 +1366,7 @@ function GameContent() {
         const needsUpgrade = isStageIncreasing && gameState.available_upgrades.length > 0;
         const canCont = !needsUpgrade || !!selectedUpgradeId;
         if (canCont) {
-          actions.rewardDone(selectedUpgradeId ?? undefined);
-          setSelectedUpgradeId(null);
-          setSelectedPoolCardId(null);
+          handleContinue();
         }
       };
     }
@@ -1331,7 +1433,8 @@ function GameContent() {
 
   const { self_player, current_battle } = gameState;
   const activeBattleResolution =
-    activeBattleResolutionId && gameState.battle_resolution?.resolution_id === activeBattleResolutionId
+    gameState.battle_resolution &&
+    (activeBattleResolutionId === battleResolutionId || hasPendingBattleResolution)
       ? gameState.battle_resolution
       : null;
   const displayBattleResolution = !!activeBattleResolution && !!cachedBattleForResolution;
@@ -1368,12 +1471,6 @@ function GameContent() {
       : hasPendingBuildUpgrades
         ? "apply"
         : "view";
-
-  const handleContinue = () => {
-    actions.rewardDone(selectedUpgradeId ?? undefined);
-    setSelectedUpgradeId(null);
-    setSelectedPoolCardId(null);
-  };
 
   const renderActionButtons = (): ReactNode => {
     if (isSpectator) {
@@ -1566,27 +1663,21 @@ function GameContent() {
                   {
                     label: "I Won",
                     onClick: () => {
-                      actions.battleSubmitResult(self_player.name);
-                      setIsChangingResult(false);
-                      setShowSubmitResultPopover(false);
+                      handleBattleResultSubmit(self_player.name);
                     },
                     className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
                   },
                   {
                     label: "Draw",
                     onClick: () => {
-                      actions.battleSubmitResult("draw");
-                      setIsChangingResult(false);
-                      setShowSubmitResultPopover(false);
+                      handleBattleResultSubmit("draw");
                     },
                     className: "btn btn-danger text-sm py-1.5",
                   },
                   {
                     label: "I Lost",
                     onClick: () => {
-                      actions.battleSubmitResult(opponent_name);
-                      setIsChangingResult(false);
-                      setShowSubmitResultPopover(false);
+                      handleBattleResultSubmit(opponent_name);
                     },
                     className: "btn btn-danger text-sm py-1.5",
                   },
@@ -1872,65 +1963,65 @@ function GameContent() {
               <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
               <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-                {sizes.isMobile && battleViewForDisplay && (
-                  <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight">
-                    <div className="flex items-center gap-1">
-                      <span className="text-gray-300 truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
-                      <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                        <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
-                        <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
-                        <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                  {sizes.isMobile && battleViewForDisplay && (
+                    <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight">
+                      <div className="flex items-center gap-1">
+                        <span className="text-gray-300 truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
+                        <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                          <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                        </div>
+                      </div>
+                      <div className="text-center leading-tight">
+                        {battleViewForDisplay.current_turn_name === self_player.name ? (
+                          <span className="text-green-400 font-medium">Your turn</span>
+                        ) : (
+                          <span className="text-amber-400 font-medium">Opp's turn</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                          <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                        </div>
+                        <span className="text-gray-300 truncate max-w-[60px] leading-tight">{self_player.name}</span>
                       </div>
                     </div>
-                    <div className="text-center leading-tight">
-                      {battleViewForDisplay.current_turn_name === self_player.name ? (
-                        <span className="text-green-400 font-medium">Your turn</span>
-                      ) : (
-                        <span className="text-amber-400 font-medium">Opp's turn</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                        <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
-                        <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
-                        <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
-                      </div>
-                      <span className="text-gray-300 truncate max-w-[60px] leading-tight">{self_player.name}</span>
-                    </div>
-                  </div>
-                )}
-                {sizes.isMobile && battleViewForDisplay && (
-                  <ZoneDivider
-                    orientation="horizontal"
-                    interactive={false}
-                    {...STATIC_DIVIDER_CALLBACKS}
-                  />
-                )}
-                  <BattlePhase
-                    gameState={gameState}
-                    battleOverride={displayBattleResolution ? battleViewForDisplay : undefined}
-                    actions={actions}
-                    isMobile={sizes.isMobile}
-                    selectedCard={battleSelectedCard}
-                    onSelectedCardChange={setBattleSelectedCard}
-                    onCardHover={handleCardHover}
-                    onOpponentCardHover={handleOpponentCardHover}
-                    onCardHoverEnd={handleCardHoverEnd}
-                    activeZoneModal={activeBattleZoneModal}
-                    onZoneModalToggle={toggleBattleZoneModal}
-                    onLayoutMetricsChange={setBattleSidebarLayout}
-                  />
-                  {displayBattleResolution && activeBattleResolution && (
-                    <BattleResolutionOverlay
-                      battle={battleViewForDisplay}
-                      resolution={activeBattleResolution}
-                      onComplete={() => {
-                        setActiveBattleResolutionId(null)
-                        setCachedBattleForResolution(null)
-                      }}
+                  )}
+                  {sizes.isMobile && battleViewForDisplay && (
+                    <ZoneDivider
+                      orientation="horizontal"
+                      interactive={false}
+                      {...STATIC_DIVIDER_CALLBACKS}
                     />
                   )}
-                </div>
+                    <BattlePhase
+                      gameState={gameState}
+                      battleOverride={displayBattleResolution ? battleViewForDisplay : undefined}
+                      actions={actions}
+                      isMobile={sizes.isMobile}
+                      selectedCard={battleSelectedCard}
+                      onSelectedCardChange={setBattleSelectedCard}
+                      onCardHover={handleCardHover}
+                      onOpponentCardHover={handleOpponentCardHover}
+                      onCardHoverEnd={handleCardHoverEnd}
+                      activeZoneModal={activeBattleZoneModal}
+                      onZoneModalOpenChange={setBattleZoneModalOpen}
+                      onLayoutMetricsChange={setBattleSidebarLayout}
+                    />
+                    {displayBattleResolution && activeBattleResolution && (
+                      <BattleResolutionOverlay
+                        battle={battleViewForDisplay}
+                        resolution={activeBattleResolution}
+                        onComplete={() => {
+                          setActiveBattleResolutionId(null)
+                          setCachedBattleForResolution(null)
+                        }}
+                      />
+                    )}
+                  </div>
               </main>
               {sizes.isMobile ? (
                 <>
@@ -2176,7 +2267,7 @@ function GameContent() {
         )}
         {/* Bottom Action Bar */}
         {!isSpectator && (
-          <div className={`shrink-0 relative frame-chrome ${displayBattleResolution ? 'z-[90] pointer-events-none' : 'z-40'}`}>
+          <div className="shrink-0 relative frame-chrome z-40">
             <div
               className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-main timeline-actions"
               data-guide-target="phase-action-bar"
@@ -2211,6 +2302,7 @@ function GameContent() {
             context={guideContext!}
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
+            guideCompletionTrigger={guideCompletionTrigger}
           />
         )}
         </GuideProvider>

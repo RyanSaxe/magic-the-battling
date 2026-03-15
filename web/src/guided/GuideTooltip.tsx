@@ -11,6 +11,9 @@ interface GuideTooltipProps {
   onPrimaryAction: () => void;
   onBack: () => void;
   onSkipAll: () => void;
+  interactive?: boolean;
+  ariaHidden?: boolean;
+  buttonsDisabled?: boolean;
 }
 
 export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
@@ -25,6 +28,9 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       onPrimaryAction,
       onBack,
       onSkipAll,
+      interactive = true,
+      ariaHidden = false,
+      buttonsDisabled = false,
     },
     ref,
   ) {
@@ -35,14 +41,17 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
     return (
       <div
         ref={ref}
-        className="absolute z-[82] pointer-events-auto w-[min(17.5rem,calc(100%-1rem))] sm:w-[min(22rem,calc(100%-2rem))] max-h-[calc(100%-1rem)] overflow-hidden rounded-xl border modal-chrome felt-raised-panel gold-border shadow-[0_18px_42px_rgba(0,0,0,0.58),0_6px_18px_rgba(0,0,0,0.3)]"
+        className={`guided-tooltip absolute z-[82] w-[min(17.5rem,calc(100%-1rem))] sm:w-[min(22rem,calc(100%-2rem))] max-h-[calc(100%-1rem)] overflow-hidden rounded-xl border modal-chrome felt-raised-panel gold-border shadow-[0_18px_42px_rgba(0,0,0,0.58),0_6px_18px_rgba(0,0,0,0.3)] ${
+          interactive ? "pointer-events-auto" : "pointer-events-none"
+        }`}
         style={{
           ...style,
           overscrollBehavior: "contain",
         }}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Guide"
+        role={ariaHidden ? undefined : "dialog"}
+        aria-modal={ariaHidden ? undefined : "true"}
+        aria-label={ariaHidden ? undefined : "Guide"}
+        aria-hidden={ariaHidden || undefined}
       >
         <div className="flex items-center justify-between gap-3 border-b gold-divider px-4 py-2.5">
           <span className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--color-gold)]">
@@ -50,16 +59,21 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
           </span>
           {totalSteps > 1 && (
             <div className="flex items-center gap-1.5">
-              {Array.from({ length: totalSteps }, (_, i) => (
-                <span
-                  key={i}
-                  className={`inline-block h-2 w-2 rounded-full ${
-                    i === stepIndex
-                      ? "bg-[var(--color-gold)]"
-                      : "bg-white/25"
-                  }`}
-                />
-              ))}
+              {Array.from({ length: totalSteps }, (_, i) => {
+                const isCurrent = i === stepIndex;
+                const isVisited = i < stepIndex;
+                const dotColor = isCurrent
+                  ? "bg-[var(--color-gold)]"
+                  : isVisited
+                    ? "bg-amber-400/40"
+                    : "bg-white/20";
+                return (
+                  <span
+                    key={i}
+                    className={`inline-block h-2 w-2 rounded-full ${dotColor}`}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
@@ -109,6 +123,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
               <button
                 type="button"
                 onClick={onBack}
+                disabled={buttonsDisabled}
                 className="btn btn-secondary shrink-0 whitespace-nowrap px-2 py-1 text-[11px] leading-none"
               >
                 Back
@@ -118,6 +133,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
               <button
                 type="button"
                 onClick={onSkipAll}
+                disabled={buttonsDisabled}
                 className="btn btn-danger shrink-0 whitespace-nowrap px-2 py-1 text-[11px] leading-none"
               >
                 Skip All Guides
@@ -128,6 +144,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
             <button
               type="button"
               onClick={onPrimaryAction}
+              disabled={buttonsDisabled}
               className="btn btn-primary shrink-0 whitespace-nowrap px-2.5 py-1 text-[11px] leading-none"
             >
               {primaryActionLabel}
