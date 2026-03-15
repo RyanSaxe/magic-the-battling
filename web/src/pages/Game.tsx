@@ -512,7 +512,7 @@ function GameGuideLayer({
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
 }) {
-  const GUIDE_HANDOFF_LINGER_MS = 520;
+  const GUIDE_HANDOFF_LINGER_MS = 450;
   const { state, setRevealedPlayerName } = useContextStrip();
   const { guideRequest, finishGuide, skipTutorial, updateGuideStep } = useGuideContext();
   const [activeStepState, setActiveStepState] = useState<{

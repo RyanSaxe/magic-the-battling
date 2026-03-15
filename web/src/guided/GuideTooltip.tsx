@@ -14,6 +14,7 @@ interface GuideTooltipProps {
   interactive?: boolean;
   ariaHidden?: boolean;
   buttonsDisabled?: boolean;
+  dotAnimating?: boolean;
 }
 
 export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
@@ -31,6 +32,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       interactive = true,
       ariaHidden = false,
       buttonsDisabled = false,
+      dotAnimating = false,
     },
     ref,
   ) {
@@ -59,16 +61,23 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
           </span>
           {totalSteps > 1 && (
             <div className="flex items-center gap-1.5">
-              {Array.from({ length: totalSteps }, (_, i) => (
-                <span
-                  key={i}
-                  className={`inline-block h-2 w-2 rounded-full ${
-                    i === stepIndex
-                      ? "bg-[var(--color-gold)]"
-                      : "bg-white/25"
-                  }`}
-                />
-              ))}
+              {Array.from({ length: totalSteps }, (_, i) => {
+                const isCurrent = i === stepIndex;
+                const isVisited = i < stepIndex;
+                const dotColor = isCurrent
+                  ? "bg-[var(--color-gold)]"
+                  : isVisited
+                    ? "bg-amber-400/40"
+                    : "bg-white/20";
+                const popClass = isCurrent && dotAnimating ? "animate-guide-dot-pop" : "";
+                return (
+                  <span
+                    key={i}
+                    className={`inline-block h-2 w-2 rounded-full ${dotColor} ${popClass}`}
+                    style={{ transition: "all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)" }}
+                  />
+                );
+              })}
             </div>
           )}
         </div>
