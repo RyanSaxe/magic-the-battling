@@ -7,6 +7,16 @@ export function makeZoneId(zone: ZoneName, owner: ZoneOwner = 'player', prefix?:
   return prefix ? `${prefix}:${base}` : base
 }
 
+export function makeDraggableId(
+  zone: ZoneName,
+  owner: ZoneOwner,
+  cardId: string,
+  instanceKey?: string,
+): string {
+  const base = `${makeZoneId(zone, owner)}-${cardId}`
+  return instanceKey ? `${instanceKey}:${base}` : base
+}
+
 export function parseZoneId(zoneId: string): { zone: ZoneName; owner: ZoneOwner } {
   const raw = zoneId.includes(':') ? zoneId.split(':')[1] : zoneId
   const [owner, ...zoneParts] = raw.split('-')

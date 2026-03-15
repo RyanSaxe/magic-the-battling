@@ -4,7 +4,7 @@ import type { ZoneOwner } from '../../dnd/types'
 import { DraggableCard, DroppableZone, useGameDnd } from '../../dnd'
 import { Card } from '../card'
 import { ZoneModal } from '../sidebar/DroppableZoneDisplay'
-import { makeZoneId } from '../../dnd/types'
+import { makeDraggableId } from '../../dnd/types'
 
 const CARD_ASPECT = 5 / 7
 const LABEL_HEIGHT = 18
@@ -56,10 +56,12 @@ export function CompactZoneDisplay({
   const showModal = isModalOpen ?? uncontrolledModalOpen
   const setShowModal = onModalOpenChange ?? setUncontrolledModalOpen
 
-  const { activeCard, activeFromZoneId } = useGameDnd()
-  const thisZoneId = makeZoneId(zone, zoneOwner)
+  const { activeDraggableId } = useGameDnd()
   const topCard = cards[cards.length - 1]
-  const isDraggingTopCard = activeCard?.id === topCard?.id && activeFromZoneId === thisZoneId
+  const topCardDraggableId = topCard
+    ? makeDraggableId(zone, zoneOwner, topCard.id, 'compact')
+    : null
+  const isDraggingTopCard = activeDraggableId !== null && activeDraggableId === topCardDraggableId
   const nextCard = isDraggingTopCard ? cards[cards.length - 2] : null
 
   const availW = width - 4
@@ -114,6 +116,7 @@ export function CompactZoneDisplay({
                 card={topCard}
                 zone={zone}
                 zoneOwner={zoneOwner}
+                dragInstanceKey="compact"
                 dimensions={{ width: cardW, height: cardH }}
                 disabled={!allowInteraction}
                 isOpponent={isOpponent}

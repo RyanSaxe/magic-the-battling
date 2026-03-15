@@ -79,6 +79,7 @@ export function ZoneModal({
               card={card}
               zone={zone}
               zoneOwner={zoneOwner}
+              dragInstanceKey="modal"
               dimensions={dims}
               isOpponent={isOpponent}
               onCardHover={onCardHover}
