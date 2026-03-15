@@ -805,6 +805,7 @@ function GameContent() {
   const [cachedBattleForResolution, setCachedBattleForResolution] = useState<BattleView | null>(null);
   const [activeBattleResolutionId, setActiveBattleResolutionId] = useState<string | null>(null);
   const [shownBattleResolutionIds, setShownBattleResolutionIds] = useState<Set<string>>(new Set());
+  const battleResolutionId = gameState?.battle_resolution?.resolution_id ?? null;
 
   useEffect(() => {
     if (gameState?.self_player.phase === "battle" && gameState.current_battle) {
@@ -947,33 +948,31 @@ function GameContent() {
   }, []);
 
   useEffect(() => {
-    const resolutionId = gameState?.battle_resolution?.resolution_id;
     const phase = gameState?.self_player.phase;
-    if (!resolutionId || !phase || phase === "battle" || !cachedBattleForResolution) {
+    if (!battleResolutionId || !phase || phase === "battle" || !cachedBattleForResolution) {
       return;
     }
-    if (shownBattleResolutionIds.has(resolutionId)) {
+    if (shownBattleResolutionIds.has(battleResolutionId)) {
       return;
     }
 
     queueMicrotask(() => {
+      closeGameplayOverlays();
+      setActiveBattleResolutionId(battleResolutionId);
       setShownBattleResolutionIds((current) => {
-        if (current.has(resolutionId)) {
+        if (current.has(battleResolutionId)) {
           return current;
         }
 
         const next = new Set(current);
-        next.add(resolutionId);
+        next.add(battleResolutionId);
         return next;
       });
-      closeGameplayOverlays();
-      setActiveBattleResolutionId(resolutionId);
     });
   }, [
+    battleResolutionId,
     cachedBattleForResolution,
     closeGameplayOverlays,
-    gameState?.battle_resolution,
-    gameState?.battle_resolution?.resolution_id,
     gameState?.self_player.phase,
     shownBattleResolutionIds,
   ]);
@@ -1088,6 +1087,12 @@ function GameContent() {
     setShareOpen(true);
   }, [closeGameplayOverlays]);
 
+  const hasPendingBattleResolution =
+    !!battleResolutionId &&
+    gameState?.self_player.phase !== "battle" &&
+    cachedBattleForResolution !== null &&
+    !shownBattleResolutionIds.has(battleResolutionId);
+
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   const modalOpen =
     rulesPanelOpen ||
@@ -1097,6 +1102,7 @@ function GameContent() {
     activeBattleZoneModal !== null ||
     shareOpen ||
     state.previewCard !== null ||
+    hasPendingBattleResolution ||
     activeBattleResolutionId !== null ||
     activeBuildUpgradeAnimation !== null;
   const sidebarPlayers = useMemo(
@@ -1337,7 +1343,8 @@ function GameContent() {
 
   const { self_player, current_battle } = gameState;
   const activeBattleResolution =
-    activeBattleResolutionId && gameState.battle_resolution?.resolution_id === activeBattleResolutionId
+    gameState.battle_resolution &&
+    (activeBattleResolutionId === battleResolutionId || hasPendingBattleResolution)
       ? gameState.battle_resolution
       : null;
   const displayBattleResolution = !!activeBattleResolution && !!cachedBattleForResolution;
