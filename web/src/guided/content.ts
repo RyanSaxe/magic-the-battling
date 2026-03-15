@@ -495,9 +495,6 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         title: "Scout A Likely Opponent",
         targetSelector: draftGuideOpponentSelector,
         targetId: "sidebar-opponent-list",
-        waitForLayoutTargetId: (ctx) => (
-          ctx.isMobile ? "sidebar-opponent-list" : undefined
-        ),
         placement: "left",
         cardPlacement: "middle-left",
         mobileCardPlacement: "bottom-center",
