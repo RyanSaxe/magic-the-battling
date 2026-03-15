@@ -177,7 +177,21 @@ export function GuidedWalkthrough({
   }, []);
 
   useEffect(() => {
-    if (!layout || !step) return;
+    if (!requestActive && displayState && animPhase !== "exiting") {
+      const exitId = requestAnimationFrame(() => {
+        clearPhaseTimer();
+        if (reducedMotion) {
+          finishGuide();
+        } else {
+          setAnimPhase("exiting");
+        }
+      });
+      return () => cancelAnimationFrame(exitId);
+    }
+  }, [animPhase, clearPhaseTimer, displayState, finishGuide, reducedMotion, requestActive]);
+
+  useEffect(() => {
+    if (!layout || !step || !requestActive) return;
 
     const nextState: DisplayState = {
       guideLabel: guide.label,
@@ -242,6 +256,7 @@ export function GuidedWalkthrough({
     guide.steps.length,
     layout,
     reducedMotion,
+    requestActive,
     step,
     stepIndex,
     stepKey,
@@ -428,8 +443,12 @@ export function GuidedWalkthrough({
   }, [animPhase, reducedMotion]);
 
   const showIdlePulse = animPhase === "idle";
-  const dotAnimating = animPhase === "enter-tooltip";
-  const buttonsDisabled = animPhase !== "idle" || !isCurrentStepDisplayed;
+  const buttonsDisabled =
+    animPhase === "exit-tooltip"
+    || animPhase === "morph-spot"
+    || animPhase === "enter-tooltip"
+    || animPhase === "exiting"
+    || (animPhase === "idle" && !isCurrentStepDisplayed);
 
   if (!step) return null;
 
@@ -500,7 +519,6 @@ export function GuidedWalkthrough({
           onSkipAll={onSkipAll}
           interactive={isCurrentStepDisplayed}
           buttonsDisabled={buttonsDisabled}
-          dotAnimating={dotAnimating}
           style={tooltipStyle}
         />
       )}

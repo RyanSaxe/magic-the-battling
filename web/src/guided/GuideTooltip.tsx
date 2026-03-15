@@ -14,7 +14,6 @@ interface GuideTooltipProps {
   interactive?: boolean;
   ariaHidden?: boolean;
   buttonsDisabled?: boolean;
-  dotAnimating?: boolean;
 }
 
 export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
@@ -32,7 +31,6 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       interactive = true,
       ariaHidden = false,
       buttonsDisabled = false,
-      dotAnimating = false,
     },
     ref,
   ) {
@@ -69,11 +67,10 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
                   : isVisited
                     ? "bg-amber-400/40"
                     : "bg-white/20";
-                const popClass = isCurrent && dotAnimating ? "animate-guide-dot-pop" : "";
                 return (
                   <span
                     key={i}
-                    className={`inline-block h-2 w-2 rounded-full ${dotColor} ${popClass}`}
+                    className={`inline-block h-2 w-2 rounded-full ${dotColor}`}
                   />
                 );
               })}

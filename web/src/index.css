@@ -1574,19 +1574,8 @@ body {
   to { opacity: 0; }
 }
 
-@keyframes guide-dot-pop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.4); }
-  100% { transform: scale(1); }
-}
-
-.animate-guide-dot-pop {
-  animation: guide-dot-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .animate-guide-spotlight-pulse,
-  .animate-guide-dot-pop {
+  .animate-guide-spotlight-pulse {
     animation: none;
   }
 }
