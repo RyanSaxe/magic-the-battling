@@ -371,6 +371,8 @@ export function GuidedWalkthrough({
     return {
       left, top,
       opacity: displayState ? 1 : 0,
+      transform: "scale(1) translateY(0)",
+      animation: "none",
       transition: "none",
     };
   }, [animPhase, displayState, reducedMotion]);

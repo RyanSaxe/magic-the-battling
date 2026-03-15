@@ -74,7 +74,6 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
                   <span
                     key={i}
                     className={`inline-block h-2 w-2 rounded-full ${dotColor} ${popClass}`}
-                    style={{ transition: "all 300ms cubic-bezier(0.34, 1.56, 0.64, 1)" }}
                   />
                 );
               })}
