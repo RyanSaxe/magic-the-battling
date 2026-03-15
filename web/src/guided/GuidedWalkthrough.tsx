@@ -28,6 +28,9 @@ export function GuidedWalkthrough({
 }: GuidedWalkthroughProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [transitionsEnabled, setTransitionsEnabled] = useState(false);
+  const [displayLayout, setDisplayLayout] = useState<ReturnType<typeof useGuidePositioning>>(null);
+  const latestLayoutRef = useRef<ReturnType<typeof useGuidePositioning>>(null);
+  const committedStepKeyRef = useRef<string | null>(null);
 
   const guide = useMemo(
     () => buildGuideDefinition(request.guideId, context),
@@ -106,51 +109,76 @@ export function GuidedWalkthrough({
   );
 
   useEffect(() => {
-    if (!layout || transitionsEnabled) return;
-    const id = requestAnimationFrame(() => setTransitionsEnabled(true));
+    latestLayoutRef.current = layout;
+  }, [layout]);
+
+  useEffect(() => {
+    if (!layout) return;
+
+    if (committedStepKeyRef.current !== stepKey) {
+      const id = requestAnimationFrame(() => {
+        const nextLayout = latestLayoutRef.current;
+        if (!nextLayout) return;
+        setTransitionsEnabled(true);
+        setDisplayLayout(nextLayout);
+        committedStepKeyRef.current = stepKey;
+      });
+      return () => cancelAnimationFrame(id);
+    }
+
+    const id = requestAnimationFrame(() => {
+      const nextLayout = latestLayoutRef.current;
+      if (!nextLayout) return;
+      if (displayLayout === null) {
+        committedStepKeyRef.current = stepKey;
+        setTransitionsEnabled(true);
+      }
+      setDisplayLayout(nextLayout);
+    });
+
     return () => cancelAnimationFrame(id);
-  }, [layout, transitionsEnabled]);
+  }, [displayLayout, layout, stepKey]);
 
   const tooltipStyle: CSSProperties = transitionsEnabled
     ? {
-        left: layout?.cardLeft ?? 16,
-        top: layout?.cardTop ?? 16,
+        left: displayLayout?.cardLeft ?? layout?.cardLeft ?? 16,
+        top: displayLayout?.cardTop ?? layout?.cardTop ?? 16,
         opacity: 1,
         transition:
           "left 280ms cubic-bezier(0.22,1,0.36,1), top 280ms cubic-bezier(0.22,1,0.36,1), opacity 200ms ease",
       }
     : {
-        left: layout?.cardLeft ?? 16,
-        top: layout?.cardTop ?? 16,
-        opacity: 0,
-        transition: "opacity 200ms ease",
+        left: displayLayout?.cardLeft ?? layout?.cardLeft ?? 16,
+        top: displayLayout?.cardTop ?? layout?.cardTop ?? 16,
+        opacity: (displayLayout ?? layout) ? 1 : 0,
+        transition: "none",
       };
 
   if (!step) return null;
 
   return (
     <div className="absolute inset-0 z-[80]" style={{ pointerEvents: "none" }} aria-live="polite">
-      <GuideOverlay clipPath={layout?.clipPath ?? "none"} allowInteraction={false} />
+      <GuideOverlay clipPath={displayLayout?.clipPath ?? layout?.clipPath ?? "none"} allowInteraction={false} />
 
-      {layout?.spotlight && (
+      {(displayLayout?.spotlight ?? layout?.spotlight) && (
         <>
           <div
             className="absolute pointer-events-none border border-amber-300/80 rounded-[clamp(14px,20%,24px)] shadow-[0_0_0_1px_rgba(0,0,0,0.25),0_0_24px_rgba(245,186,64,0.18)]"
             style={{
-              left: layout.spotlight.x,
-              top: layout.spotlight.y,
-              width: layout.spotlight.width,
-              height: layout.spotlight.height,
+              left: (displayLayout?.spotlight ?? layout?.spotlight)?.x,
+              top: (displayLayout?.spotlight ?? layout?.spotlight)?.y,
+              width: (displayLayout?.spotlight ?? layout?.spotlight)?.width,
+              height: (displayLayout?.spotlight ?? layout?.spotlight)?.height,
             }}
           />
           {!step.allowTargetInteraction && (
             <div
               className="absolute pointer-events-auto"
               style={{
-                left: layout.spotlight.x,
-                top: layout.spotlight.y,
-                width: layout.spotlight.width,
-                height: layout.spotlight.height,
+                left: (displayLayout?.spotlight ?? layout?.spotlight)?.x,
+                top: (displayLayout?.spotlight ?? layout?.spotlight)?.y,
+                width: (displayLayout?.spotlight ?? layout?.spotlight)?.width,
+                height: (displayLayout?.spotlight ?? layout?.spotlight)?.height,
               }}
             />
           )}

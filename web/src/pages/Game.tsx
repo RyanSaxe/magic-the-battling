@@ -2176,7 +2176,7 @@ function GameContent() {
         )}
         {/* Bottom Action Bar */}
         {!isSpectator && (
-          <div className={`shrink-0 relative frame-chrome ${displayBattleResolution ? 'z-[90] pointer-events-none' : 'z-40'}`}>
+          <div className="shrink-0 relative frame-chrome z-40">
             <div
               className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-main timeline-actions"
               data-guide-target="phase-action-bar"

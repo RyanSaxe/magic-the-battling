@@ -51,7 +51,8 @@ const BEAM_TRAVEL_MS = 260
 const BEAM_SETTLE_MS = 320
 const BEAM_PAUSE_MS = 260
 const GROUP_EXIT_MS = 220
-const NO_UPGRADE_WAIT_MS = 1000
+const COUNTER_SETTLE_MS = 800
+const COUNTER_SETTLE_PAUSE_MS = 200
 const CONTINUATION_MS = 1500
 const POISON_TO_LOSE = 10
 
@@ -212,6 +213,7 @@ export function BattleResolutionOverlay({
   const [incrementOwners, setIncrementOwners] = useState<OverlayOwner[]>([])
   const [lethalOwners, setLethalOwners] = useState<OverlayOwner[]>([])
   const [deadOwners, setDeadOwners] = useState<OverlayOwner[]>([])
+  const [settlingOwners, setSettlingOwners] = useState<OverlayOwner[]>([])
   const [activeSource, setActiveSource] = useState<ActiveSourceState | null>(null)
   const [activeBeam, setActiveBeam] = useState<{
     from: Point
@@ -351,13 +353,13 @@ export function BattleResolutionOverlay({
         setDeadOwners(deathTargets)
         await wait(DEATH_PHASE_MS)
         if (cancelled) return
-      } else if (groups.length === 0) {
-        await wait(NO_UPGRADE_WAIT_MS)
-        if (cancelled) return
-      } else {
-        await wait(420)
-        if (cancelled) return
       }
+
+      setSettlingOwners(damagedOwners)
+      await wait(COUNTER_SETTLE_MS)
+      if (cancelled) return
+      await wait(COUNTER_SETTLE_PAUSE_MS)
+      if (cancelled) return
 
       if (resolution.continue_sudden_death) {
         setShowContinuation(true)
@@ -386,7 +388,7 @@ export function BattleResolutionOverlay({
     <div className="fixed inset-0 z-[80] pointer-events-auto">
       <div className="battle-resolution-backdrop absolute inset-0" />
 
-      <svg className="pointer-events-none fixed inset-0 z-[82] h-full w-full overflow-visible">
+      <svg className="pointer-events-none fixed inset-0 z-[85] h-full w-full overflow-visible">
         {activeBeam && (
           <g>
             <line
@@ -425,6 +427,7 @@ export function BattleResolutionOverlay({
               isIncrementing && 'battle-resolution-counter-increment',
               isLethal && 'battle-resolution-counter-lethal',
               isDead && 'battle-resolution-counter-dead',
+              settlingOwners.includes(owner) && 'battle-resolution-counter-settling',
             ].filter(Boolean).join(' ')}
             style={{
               left: rect.left,
@@ -473,7 +476,7 @@ export function BattleResolutionOverlay({
       )}
 
       {showContinuation && (
-        <div className="fixed inset-0 z-[85] pointer-events-none flex items-center justify-center">
+        <div className="fixed inset-0 z-[86] pointer-events-none flex items-center justify-center">
           <div className="battle-resolution-continue-panel">
             Sudden Death
           </div>
