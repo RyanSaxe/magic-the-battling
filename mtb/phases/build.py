@@ -15,6 +15,9 @@ def move_card(player: Player, card: Card, source: BuildSource, destination: Buil
     if source == destination:
         return
 
+    if source == "sideboard" and destination == "hand" and len(player.hand) >= player.hand_size:
+        raise ValueError(f"Hand is full ({player.hand_size})")
+
     source_collection = _get_build_collection(player, source)
     if card not in source_collection:
         raise ValueError(f"Card not in player's {source}")

@@ -36,6 +36,20 @@ def test_move_card_not_in_source_raises(card_factory):
         build.move_card(player, card, "hand", "sideboard")
 
 
+def test_move_card_from_sideboard_to_hand_rejects_when_hand_is_full(card_factory):
+    game = create_game(["Alice"], num_players=1)
+    player = game.players[0]
+    player.hand.extend([card_factory(f"h{i}") for i in range(player.hand_size)])
+    sideboard_card = card_factory("sideboard_card")
+    player.sideboard.append(sideboard_card)
+
+    with pytest.raises(ValueError, match="Hand is full"):
+        build.move_card(player, sideboard_card, "sideboard", "hand")
+
+    assert len(player.hand) == player.hand_size
+    assert sideboard_card in player.sideboard
+
+
 def test_set_companion_copies_card_to_command_zone(card_factory):
     game = create_game(["Alice"], num_players=1)
     player = game.players[0]
