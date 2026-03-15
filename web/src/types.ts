@@ -10,6 +10,7 @@ export type BuildSource = 'hand' | 'sideboard'
 
 export interface Card {
   id: string
+  scryfall_id?: string
   name: string
   image_url: string
   flip_image_url: string | null
@@ -23,6 +24,7 @@ export interface Card {
   colors: string[]
   keywords?: string[]
   cmc: number
+  original_owner?: string | null
 }
 
 export interface Zones {
@@ -152,6 +154,142 @@ export interface GameState {
   use_upgrades: boolean
   cube_id: string
   play_mode: PlayMode
+}
+
+export interface CardCatalogEntry {
+  scryfall_id: string
+  name: string
+  image_url: string
+  flip_image_url: string | null
+  png_url: string | null
+  flip_png_url: string | null
+  type_line: string
+  oracle_text: string | null
+  colors: string[]
+  keywords: string[]
+  cmc: number
+  life_modifier: number | null
+  hand_modifier: number | null
+  token_scryfall_ids: string[]
+  is_upgrade: boolean
+  is_vanguard: boolean
+  is_companion: boolean
+}
+
+export interface CardRef {
+  id: string
+  scryfall_id: string
+  upgrade_target_id: string | null
+  original_owner: string | null
+}
+
+export interface CompactZones {
+  battlefield: CardRef[]
+  graveyard: CardRef[]
+  exile: CardRef[]
+  hand: CardRef[]
+  sideboard: CardRef[]
+  upgrades: CardRef[]
+  command_zone: CardRef[]
+  library: CardRef[]
+  treasures: number
+  submitted_cards: CardRef[]
+  original_hand_ids: string[]
+  tapped_card_ids: string[]
+  flipped_card_ids: string[]
+  face_down_card_ids: string[]
+  counters: Record<string, Record<string, number>>
+  attachments: Record<string, string[]>
+  spawned_tokens: CardRef[]
+  revealed_card_ids?: string[]
+}
+
+export interface CompactLastBattleResult {
+  opponent_name: string
+  winner_name: string | null
+  is_draw: boolean
+  poison_dealt: number
+  poison_taken: number
+  treasures_gained: number
+  card_gained: CardRef | null
+  vanquisher_gained: boolean
+  pre_battle_treasures: number
+}
+
+export interface CompactPlayerView {
+  name: string
+  treasures: number
+  poison: number
+  phase: Phase
+  round: number
+  stage: number
+  vanquishers: number
+  is_ghost: boolean
+  is_puppet: boolean
+  time_of_death: number | null
+  hand_count: number
+  sideboard_count: number
+  hand_size: number
+  is_stage_increasing: boolean
+  upgrades: CardRef[]
+  vanguard: CardRef | null
+  chosen_basics: string[]
+  most_recently_revealed_cards: CardRef[]
+  last_result: LastResult | null
+  pairing_probability: number | null
+  is_most_recent_ghost: boolean
+  full_sideboard: CardRef[]
+  command_zone: CardRef[]
+  placement: number
+  in_sudden_death: boolean
+  build_ready: boolean
+}
+
+export interface CompactSelfPlayerView extends CompactPlayerView {
+  hand: CardRef[]
+  sideboard: CardRef[]
+  command_zone: CardRef[]
+  current_pack: CardRef[] | null
+  last_battle_result: CompactLastBattleResult | null
+}
+
+export interface CompactBattleView {
+  opponent_name: string
+  coin_flip_name: string
+  on_the_play_name: string
+  current_turn_name: string
+  your_zones: CompactZones
+  opponent_zones: CompactZones
+  opponent_hand_count: number
+  result_submissions: Record<string, string>
+  your_poison: number
+  opponent_poison: number
+  opponent_hand_revealed: boolean
+  your_life: number
+  opponent_life: number
+  is_sudden_death: boolean
+  opponent_full_sideboard: CardRef[]
+  can_manipulate_opponent: boolean
+}
+
+export interface CompactGameState {
+  game_id: string
+  phase: string
+  starting_life: number
+  players: CompactPlayerView[]
+  self_player: CompactSelfPlayerView
+  available_upgrades: CardRef[]
+  current_battle: CompactBattleView | null
+  battle_resolution: BattleResolution | null
+  use_upgrades: boolean
+  cube_id: string
+  play_mode: PlayMode
+  catalog_delta: Record<string, CardCatalogEntry>
+}
+
+export interface GameBootstrap {
+  catalog: Record<string, CardCatalogEntry>
+  state: CompactGameState
 }
 
 export interface LobbyPlayer {

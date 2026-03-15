@@ -156,10 +156,11 @@ class TestGameWebSocket:
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             msg = ws_receive_json(ws)
 
-            assert msg["type"] == "game_state"
+            assert msg["type"] == "game_bootstrap"
             assert "payload" in msg
-            assert "phase" in msg["payload"]
-            assert "self_player" in msg["payload"]
+            assert "catalog" in msg["payload"]
+            assert "phase" in msg["payload"]["state"]
+            assert "self_player" in msg["payload"]["state"]
 
     def test_unknown_action_receives_error(self, client, game_with_players, ws_receive_json, ws_receive_json_until):
         game_id = game_with_players["game_id"]
@@ -258,7 +259,7 @@ class TestGameWebSocket:
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             msg = ws_receive_json(ws)
-            assert msg["type"] == "game_state"
+            assert msg["type"] == "game_bootstrap"
 
     def test_missing_runtime_mapping_rejects_invalid_session(self, client, game_with_players, ws_receive_json):
         game_id = game_with_players["game_id"]

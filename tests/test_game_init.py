@@ -61,9 +61,7 @@ def test_set_battler_deals_starting_pool(card_factory):
 
 def test_set_battler_populates_hand_empty(card_factory):
     game = create_game(["Alice"], num_players=1)
-    cards = [card_factory(f"c{i}") for i in range(7)]
-    for i, card in enumerate(cards):
-        card.elo = float(i * 10)
+    cards = [card_factory(f"c{i}", elo=float(i * 10)) for i in range(7)]
 
     battler = Battler(cards=cards.copy(), upgrades=[], vanguards=[])
     set_battler(game, battler)

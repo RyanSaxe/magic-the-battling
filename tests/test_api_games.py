@@ -172,12 +172,14 @@ class TestGetGameState:
 
         assert response.status_code == 200
         data = response.json()
-        assert "game_id" in data
-        assert "phase" in data
-        assert "players" in data
-        assert "self_player" in data
-        assert "available_upgrades" in data
-        assert isinstance(data["players"], list)
+        assert "catalog" in data
+        assert "state" in data
+        assert data["state"]["game_id"] == game_id
+        assert "phase" in data["state"]
+        assert "players" in data["state"]
+        assert "self_player" in data["state"]
+        assert "available_upgrades" in data["state"]
+        assert isinstance(data["state"]["players"], list)
 
     def test_nonexistent_game_returns_404(self, game_with_players, client):
         response = client.get(
