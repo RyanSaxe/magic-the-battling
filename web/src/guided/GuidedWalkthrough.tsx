@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import type { GuidedGuideId, GuideRequest, GuidedWalkthroughContext } from "./types";
+import type {
+  GuideStepDefinition,
+  GuidedGuideId,
+  GuideRequest,
+  GuidedWalkthroughContext,
+} from "./types";
 import { buildGuideDefinition } from "./content";
 import { useGuidePositioning } from "./useGuidePositioning";
 import { GuideOverlay } from "./GuideOverlay";
 import { GuideTooltip } from "./GuideTooltip";
+
+const GUIDE_MOVE_DURATION_MS = 420;
+const GUIDE_MOVE_EASING = "cubic-bezier(0.2, 0.9, 0.2, 1)";
 
 interface GuidedWalkthroughProps {
   rootRef: React.RefObject<HTMLElement | null>;
   request: GuideRequest;
   context: GuidedWalkthroughContext;
   stepIndex: number;
+  requestActive: boolean;
   onClose: (guideId: GuidedGuideId) => void;
   onSkipAll: () => void;
   onAdvanceStep: () => void;
@@ -21,16 +30,24 @@ export function GuidedWalkthrough({
   request,
   context,
   stepIndex,
+  requestActive,
   onClose,
   onSkipAll,
   onAdvanceStep,
   onBackStep,
 }: GuidedWalkthroughProps) {
-  const cardRef = useRef<HTMLDivElement>(null);
+  const measureCardRef = useRef<HTMLDivElement>(null);
   const [transitionsEnabled, setTransitionsEnabled] = useState(false);
-  const [displayLayout, setDisplayLayout] = useState<ReturnType<typeof useGuidePositioning>>(null);
-  const latestLayoutRef = useRef<ReturnType<typeof useGuidePositioning>>(null);
-  const committedStepKeyRef = useRef<string | null>(null);
+  const [displayState, setDisplayState] = useState<{
+    guideLabel: string;
+    layout: NonNullable<ReturnType<typeof useGuidePositioning>>;
+    showSkipAll: boolean;
+    step: GuideStepDefinition;
+    stepIndex: number;
+    stepKey: string;
+    totalSteps: number;
+  } | null>(null);
+  const hasCommittedInitialLayoutRef = useRef(false);
 
   const guide = useMemo(
     () => buildGuideDefinition(request.guideId, context),
@@ -57,10 +74,23 @@ export function GuidedWalkthrough({
       ? step.positionTargetSelector(context)
       : step.positionTargetSelector;
   }, [context, step]);
+  const resolvedWaitForLayoutTargetId = useMemo(() => {
+    if (!step?.waitForLayoutTargetId) return undefined;
+    return typeof step.waitForLayoutTargetId === "function"
+      ? step.waitForLayoutTargetId(context)
+      : step.waitForLayoutTargetId;
+  }, [context, step]);
+  const resolvedWaitForLayoutTargetSelector = useMemo(() => {
+    if (!step?.waitForLayoutTargetSelector) return undefined;
+    return typeof step.waitForLayoutTargetSelector === "function"
+      ? step.waitForLayoutTargetSelector(context)
+      : step.waitForLayoutTargetSelector;
+  }, [context, step]);
 
   const finishGuide = useCallback(() => {
     onClose(request.guideId);
   }, [onClose, request.guideId]);
+  const isCurrentStepDisplayed = requestActive && displayState?.stepKey === stepKey;
 
   useEffect(() => {
     if (guide.phase && context.currentPhase && context.currentPhase !== guide.phase) {
@@ -79,6 +109,10 @@ export function GuidedWalkthrough({
         return;
       }
 
+      if (!isCurrentStepDisplayed) {
+        return;
+      }
+
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
@@ -94,63 +128,69 @@ export function GuidedWalkthrough({
 
     window.addEventListener("keydown", handleKey, true);
     return () => window.removeEventListener("keydown", handleKey, true);
-  }, [finishGuide, onAdvanceStep, onBackStep, stepIndex]);
+  }, [finishGuide, isCurrentStepDisplayed, onAdvanceStep, onBackStep, stepIndex]);
 
   const layout = useGuidePositioning(
     rootRef,
-    cardRef,
+    measureCardRef,
     step?.targetId,
     resolvedTargetSelector,
     resolvedPositionTargetId,
     resolvedPositionTargetSelector,
+    resolvedWaitForLayoutTargetId,
+    resolvedWaitForLayoutTargetSelector,
     step?.placement ?? "bottom",
     step?.spotlightPadding,
     stepKey,
   );
 
   useEffect(() => {
-    latestLayoutRef.current = layout;
-  }, [layout]);
-
-  useEffect(() => {
-    if (!layout) return;
-
-    if (committedStepKeyRef.current !== stepKey) {
-      const id = requestAnimationFrame(() => {
-        const nextLayout = latestLayoutRef.current;
-        if (!nextLayout) return;
-        setTransitionsEnabled(true);
-        setDisplayLayout(nextLayout);
-        committedStepKeyRef.current = stepKey;
-      });
-      return () => cancelAnimationFrame(id);
+    if (!layout || !step) {
+      return;
     }
 
-    const id = requestAnimationFrame(() => {
-      const nextLayout = latestLayoutRef.current;
-      if (!nextLayout) return;
-      if (displayLayout === null) {
-        committedStepKeyRef.current = stepKey;
-        setTransitionsEnabled(true);
+    let enableTransitionsId: number | null = null;
+    const commitId = requestAnimationFrame(() => {
+      setDisplayState({
+        guideLabel: guide.label,
+        layout,
+        showSkipAll: guide.showSkipAll === true,
+        step,
+        stepIndex,
+        stepKey,
+        totalSteps: guide.steps.length,
+      });
+
+      if (hasCommittedInitialLayoutRef.current) {
+        return;
       }
-      setDisplayLayout(nextLayout);
+
+      hasCommittedInitialLayoutRef.current = true;
+      enableTransitionsId = requestAnimationFrame(() => {
+        setTransitionsEnabled(true);
+      });
     });
 
-    return () => cancelAnimationFrame(id);
-  }, [displayLayout, layout, stepKey]);
+    return () => {
+      cancelAnimationFrame(commitId);
+      if (enableTransitionsId !== null) {
+        cancelAnimationFrame(enableTransitionsId);
+      }
+    };
+  }, [guide.label, guide.showSkipAll, guide.steps.length, layout, step, stepIndex, stepKey]);
 
   const tooltipStyle: CSSProperties = transitionsEnabled
     ? {
-        left: displayLayout?.cardLeft ?? layout?.cardLeft ?? 16,
-        top: displayLayout?.cardTop ?? layout?.cardTop ?? 16,
+        left: displayState?.layout.cardLeft ?? 16,
+        top: displayState?.layout.cardTop ?? 16,
         opacity: 1,
         transition:
-          "left 280ms cubic-bezier(0.22,1,0.36,1), top 280ms cubic-bezier(0.22,1,0.36,1), opacity 200ms ease",
+          `left ${GUIDE_MOVE_DURATION_MS}ms ${GUIDE_MOVE_EASING}, top ${GUIDE_MOVE_DURATION_MS}ms ${GUIDE_MOVE_EASING}, opacity 220ms ease`,
       }
     : {
-        left: displayLayout?.cardLeft ?? layout?.cardLeft ?? 16,
-        top: displayLayout?.cardTop ?? layout?.cardTop ?? 16,
-        opacity: (displayLayout ?? layout) ? 1 : 0,
+        left: displayState?.layout.cardLeft ?? 16,
+        top: displayState?.layout.cardTop ?? 16,
+        opacity: displayState ? 1 : 0,
         transition: "none",
       };
 
@@ -158,35 +198,8 @@ export function GuidedWalkthrough({
 
   return (
     <div className="absolute inset-0 z-[80]" style={{ pointerEvents: "none" }} aria-live="polite">
-      <GuideOverlay clipPath={displayLayout?.clipPath ?? layout?.clipPath ?? "none"} allowInteraction={false} />
-
-      {(displayLayout?.spotlight ?? layout?.spotlight) && (
-        <>
-          <div
-            className="absolute pointer-events-none border border-amber-300/80 rounded-[clamp(14px,20%,24px)] shadow-[0_0_0_1px_rgba(0,0,0,0.25),0_0_24px_rgba(245,186,64,0.18)]"
-            style={{
-              left: (displayLayout?.spotlight ?? layout?.spotlight)?.x,
-              top: (displayLayout?.spotlight ?? layout?.spotlight)?.y,
-              width: (displayLayout?.spotlight ?? layout?.spotlight)?.width,
-              height: (displayLayout?.spotlight ?? layout?.spotlight)?.height,
-            }}
-          />
-          {!step.allowTargetInteraction && (
-            <div
-              className="absolute pointer-events-auto"
-              style={{
-                left: (displayLayout?.spotlight ?? layout?.spotlight)?.x,
-                top: (displayLayout?.spotlight ?? layout?.spotlight)?.y,
-                width: (displayLayout?.spotlight ?? layout?.spotlight)?.width,
-                height: (displayLayout?.spotlight ?? layout?.spotlight)?.height,
-              }}
-            />
-          )}
-        </>
-      )}
-
       <GuideTooltip
-        ref={cardRef}
+        ref={measureCardRef}
         step={step}
         guideLabel={guide.label}
         stepIndex={stepIndex}
@@ -195,8 +208,65 @@ export function GuidedWalkthrough({
         onPrimaryAction={onAdvanceStep}
         onBack={onBackStep}
         onSkipAll={onSkipAll}
-        style={tooltipStyle}
+        interactive={false}
+        ariaHidden
+        style={{
+          left: 0,
+          top: 0,
+          opacity: 0,
+          visibility: "hidden",
+          transition: "none",
+        }}
       />
+
+      <GuideOverlay clipPath={displayState?.layout.clipPath ?? "none"} allowInteraction={false} />
+
+      {displayState?.layout.spotlight && (
+        <>
+          <div
+            className="absolute pointer-events-none border border-amber-300/80 rounded-[clamp(14px,20%,24px)] shadow-[0_0_0_1px_rgba(0,0,0,0.25),0_0_24px_rgba(245,186,64,0.18)]"
+            style={{
+              left: displayState.layout.spotlight.x,
+              top: displayState.layout.spotlight.y,
+              width: displayState.layout.spotlight.width,
+              height: displayState.layout.spotlight.height,
+              transition: transitionsEnabled
+                ? `left ${GUIDE_MOVE_DURATION_MS}ms ${GUIDE_MOVE_EASING}, top ${GUIDE_MOVE_DURATION_MS}ms ${GUIDE_MOVE_EASING}, width ${GUIDE_MOVE_DURATION_MS}ms ${GUIDE_MOVE_EASING}, height ${GUIDE_MOVE_DURATION_MS}ms ${GUIDE_MOVE_EASING}`
+                : "none",
+            }}
+          />
+          {!displayState.step.allowTargetInteraction && (
+            <div
+              className="absolute pointer-events-auto"
+              style={{
+                left: displayState.layout.spotlight.x,
+                top: displayState.layout.spotlight.y,
+                width: displayState.layout.spotlight.width,
+                height: displayState.layout.spotlight.height,
+                transition: transitionsEnabled
+                  ? `left ${GUIDE_MOVE_DURATION_MS}ms ${GUIDE_MOVE_EASING}, top ${GUIDE_MOVE_DURATION_MS}ms ${GUIDE_MOVE_EASING}, width ${GUIDE_MOVE_DURATION_MS}ms ${GUIDE_MOVE_EASING}, height ${GUIDE_MOVE_DURATION_MS}ms ${GUIDE_MOVE_EASING}`
+                  : "none",
+              }}
+            />
+          )}
+        </>
+      )}
+
+      {displayState && (
+        <GuideTooltip
+          step={displayState.step}
+          guideLabel={displayState.guideLabel}
+          stepIndex={displayState.stepIndex}
+          totalSteps={displayState.totalSteps}
+          showSkipAll={displayState.showSkipAll}
+          onPrimaryAction={onAdvanceStep}
+          onBack={onBackStep}
+          onSkipAll={onSkipAll}
+          interactive={isCurrentStepDisplayed}
+          buttonsDisabled={!isCurrentStepDisplayed}
+          style={tooltipStyle}
+        />
+      )}
     </div>
   );
 }

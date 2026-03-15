@@ -44,6 +44,7 @@ import {
 } from "../utils/playerPlacement";
 import type { Phase } from "../constants/phases";
 import type {
+  GuideRequest,
   GuidedWalkthroughContext,
 } from "../guided/types";
 import {
@@ -511,6 +512,7 @@ function GameGuideLayer({
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
 }) {
+  const GUIDE_HANDOFF_LINGER_MS = 520;
   const { state, setRevealedPlayerName } = useContextStrip();
   const { guideRequest, finishGuide, skipTutorial, updateGuideStep } = useGuideContext();
   const [activeStepState, setActiveStepState] = useState<{
@@ -520,19 +522,37 @@ function GameGuideLayer({
     nonce: guideRequest?.nonce ?? null,
     stepIndex: guideRequest?.stepIndex ?? 0,
   });
+  const [renderRequest, setRenderRequest] = useState<GuideRequest | null>(guideRequest);
   const sidebarRestoreRef = useRef<{
     sidebarOpen: boolean;
     revealedPlayerName: string | null;
     revealedPlayerTab: "seen" | "overview";
   } | null>(null);
+  const activeRequest = guideRequest ?? renderRequest;
+  const requestActive = !!guideRequest && guideRequest.nonce === activeRequest?.nonce;
   const stepIndex =
-    guideRequest && activeStepState.nonce === guideRequest.nonce
+    activeRequest && activeStepState.nonce === activeRequest.nonce
       ? activeStepState.stepIndex
-      : (guideRequest?.stepIndex ?? 0);
+      : (activeRequest?.stepIndex ?? 0);
+
+  useEffect(() => {
+    if (guideRequest) {
+      queueMicrotask(() => {
+        setRenderRequest(guideRequest);
+      });
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setRenderRequest(null);
+    }, GUIDE_HANDOFF_LINGER_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [guideRequest]);
 
   const guide = useMemo(
-    () => (guideRequest ? buildGuideDefinition(guideRequest.guideId, context) : null),
-    [context, guideRequest],
+    () => (activeRequest ? buildGuideDefinition(activeRequest.guideId, context) : null),
+    [activeRequest, context],
   );
   const activeStep = guide?.steps[stepIndex] ?? null;
 
@@ -680,14 +700,14 @@ function GameGuideLayer({
     });
   }, [guideRequest, updateGuideStep]);
 
-  if (!guideRequest) return null;
+  if (!activeRequest) return null;
   return (
     <GuidedWalkthrough
-      key={guideRequest.nonce}
       rootRef={rootRef}
-      request={guideRequest}
+      request={activeRequest}
       context={context}
       stepIndex={stepIndex}
+      requestActive={requestActive}
       onClose={finishGuide}
       onSkipAll={skipTutorial}
       onAdvanceStep={handleAdvanceStep}
