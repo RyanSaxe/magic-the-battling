@@ -7,7 +7,26 @@ from pydantic import BaseModel
 from mtb.models.card_registry import export_registry, get_card_data
 from mtb.models.cards import Battler, Card
 from mtb.models.game import Game, LastBattleResult, Zones
-from server.schemas.api import CardCatalogEntry, CardRef, LastBattleResultView, ZonesView
+from mtb.phases.battle import BASIC_LAND_IMAGES, TREASURE_TOKEN_IMAGE
+from server.schemas.api import CardCatalogEntry, CardRef, GameStateResponse, LastBattleResultView, ZonesView
+
+_SYNTHETIC_CATALOG_ENTRIES = {
+    **{
+        f"basic-{name.lower()}": CardCatalogEntry(
+            scryfall_id=f"basic-{name.lower()}",
+            name=name,
+            image_url=image_url,
+            type_line="Basic Land",
+        )
+        for name, image_url in BASIC_LAND_IMAGES.items()
+    },
+    "treasure": CardCatalogEntry(
+        scryfall_id="treasure",
+        name="Treasure",
+        image_url=TREASURE_TOKEN_IMAGE,
+        type_line="Token Artifact — Treasure",
+    ),
+}
 
 
 def card_to_ref(card: Card | None) -> CardRef | None:
@@ -78,6 +97,10 @@ def catalog_entry_for_scryfall_id(scryfall_id: str) -> CardCatalogEntry:
             type_line="",
         )
 
+    synthetic = _SYNTHETIC_CATALOG_ENTRIES.get(scryfall_id)
+    if synthetic is not None:
+        return synthetic
+
     card_data = get_card_data(scryfall_id)
     oracle_text = card_data.oracle_text
     return CardCatalogEntry(
@@ -101,35 +124,118 @@ def catalog_entry_for_scryfall_id(scryfall_id: str) -> CardCatalogEntry:
     )
 
 
+def catalog_entry_for_card(card: Card) -> CardCatalogEntry:
+    try:
+        return catalog_entry_for_scryfall_id(card.scryfall_id)
+    except KeyError:
+        try:
+            token_scryfall_ids = [token.scryfall_id for token in card.tokens]
+        except KeyError:
+            token_scryfall_ids = []
+
+        return CardCatalogEntry(
+            scryfall_id=card.scryfall_id,
+            name=card.name,
+            image_url=card.image_url,
+            flip_image_url=card.flip_image_url,
+            png_url=card.png_url,
+            flip_png_url=card.flip_png_url,
+            type_line=card.type_line,
+            oracle_text=card.oracle_text,
+            colors=list(card.colors),
+            keywords=list(card.keywords),
+            cmc=card.cmc,
+            life_modifier=card.life_modifier,
+            hand_modifier=card.hand_modifier,
+            token_scryfall_ids=token_scryfall_ids,
+            is_upgrade=card.is_upgrade,
+            is_vanguard=card.is_vanguard,
+            is_companion=card.is_companion,
+        )
+
+
 def catalog_entries_for_cards(cards: list[Card]) -> list[CardCatalogEntry]:
-    return [catalog_entry_for_scryfall_id(card.scryfall_id) for card in cards]
+    return [catalog_entry_for_card(card) for card in cards]
 
 
 def build_catalog_from_battler(battler: Battler) -> dict[str, CardCatalogEntry]:
-    scryfall_ids = {
-        card.scryfall_id
-        for card in (battler.cards + battler.original_cards + battler.upgrades + battler.original_upgrades)
-    }
-    scryfall_ids.update(card.scryfall_id for card in battler.vanguards)
-    return build_catalog_from_scryfall_ids(scryfall_ids)
+    cards = battler.cards + battler.original_cards + battler.upgrades + battler.original_upgrades + battler.vanguards
+    cards_by_scryfall_id = {card.scryfall_id: card for card in cards if card.scryfall_id}
+    return build_catalog_from_cards(cards_by_scryfall_id)
 
 
 def build_catalog_from_game(game: Game) -> dict[str, CardCatalogEntry]:
-    scryfall_ids: set[str] = set()
-    _collect_scryfall_ids(game, scryfall_ids, set())
-    return build_catalog_from_scryfall_ids(scryfall_ids)
+    cards_by_scryfall_id: dict[str, Card] = {}
+    _collect_cards(game, cards_by_scryfall_id, set())
+    return build_catalog_from_cards(cards_by_scryfall_id)
 
 
 def build_catalog_from_scryfall_ids(scryfall_ids: set[str]) -> dict[str, CardCatalogEntry]:
     registry_data = export_registry(scryfall_ids)
-    return {scryfall_id: catalog_entry_for_scryfall_id(scryfall_id) for scryfall_id in registry_data}
+    catalog = {scryfall_id: catalog_entry_for_scryfall_id(scryfall_id) for scryfall_id in registry_data}
+    for scryfall_id in scryfall_ids:
+        if scryfall_id in catalog:
+            continue
+        synthetic = _SYNTHETIC_CATALOG_ENTRIES.get(scryfall_id)
+        if synthetic is not None:
+            catalog[scryfall_id] = synthetic
+    return catalog
 
 
-def _collect_scryfall_ids(obj: Any, scryfall_ids: set[str], seen: set[int]) -> None:
+def build_catalog_from_cards(cards_by_scryfall_id: dict[str, Card]) -> dict[str, CardCatalogEntry]:
+    catalog = build_catalog_from_scryfall_ids(set(cards_by_scryfall_id))
+    for scryfall_id, card in cards_by_scryfall_id.items():
+        if scryfall_id in catalog:
+            continue
+        catalog[scryfall_id] = catalog_entry_for_card(card)
+    return catalog
+
+
+def build_catalog_from_state_refs(state: GameStateResponse) -> dict[str, CardCatalogEntry]:
+    scryfall_ids: set[str] = set()
+    _collect_ref_scryfall_ids(state, scryfall_ids, set())
+    return build_catalog_from_scryfall_ids(scryfall_ids)
+
+
+def _collect_cards(obj: Any, cards_by_scryfall_id: dict[str, Card], seen: set[int]) -> None:
     if obj is None:
         return
 
     if isinstance(obj, Card):
+        if obj.scryfall_id:
+            cards_by_scryfall_id.setdefault(obj.scryfall_id, obj)
+        return
+
+    if isinstance(obj, str | int | float | bool):
+        return
+
+    obj_id = id(obj)
+    if obj_id in seen:
+        return
+    seen.add(obj_id)
+
+    if isinstance(obj, dict):
+        for value in obj.values():
+            _collect_cards(value, cards_by_scryfall_id, seen)
+        return
+
+    if isinstance(obj, list | tuple | set):
+        for item in obj:
+            _collect_cards(item, cards_by_scryfall_id, seen)
+        return
+
+    if isinstance(obj, BaseModel):
+        for field_name in type(obj).model_fields:
+            if field_name == "game_ref":
+                continue
+            _collect_cards(getattr(obj, field_name), cards_by_scryfall_id, seen)
+
+
+def _collect_ref_scryfall_ids(obj: Any, scryfall_ids: set[str], seen: set[int]) -> None:
+    if obj is None:
+        return
+
+    if isinstance(obj, CardRef):
         if obj.scryfall_id:
             scryfall_ids.add(obj.scryfall_id)
         return
@@ -144,16 +250,14 @@ def _collect_scryfall_ids(obj: Any, scryfall_ids: set[str], seen: set[int]) -> N
 
     if isinstance(obj, dict):
         for value in obj.values():
-            _collect_scryfall_ids(value, scryfall_ids, seen)
+            _collect_ref_scryfall_ids(value, scryfall_ids, seen)
         return
 
     if isinstance(obj, list | tuple | set):
         for item in obj:
-            _collect_scryfall_ids(item, scryfall_ids, seen)
+            _collect_ref_scryfall_ids(item, scryfall_ids, seen)
         return
 
     if isinstance(obj, BaseModel):
         for field_name in type(obj).model_fields:
-            if field_name == "game_ref":
-                continue
-            _collect_scryfall_ids(getattr(obj, field_name), scryfall_ids, seen)
+            _collect_ref_scryfall_ids(getattr(obj, field_name), scryfall_ids, seen)

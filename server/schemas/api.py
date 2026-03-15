@@ -184,6 +184,7 @@ class GameStateResponse(BaseModel):
     use_upgrades: bool = True
     cube_id: str = "auto"
     play_mode: PlayMode = "limited"
+    catalog_delta: dict[str, CardCatalogEntry] = Field(default_factory=dict)
 
 
 class GameBootstrapResponse(BaseModel):

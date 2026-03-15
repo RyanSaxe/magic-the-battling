@@ -75,6 +75,7 @@ class RunSummary:
     label: str
     games: int
     concurrency: int
+    idle_hot_games: int
     puppet_count: int
     timeout_per_game_sec: float
     wall_time_sec: float
@@ -94,12 +95,15 @@ class RunSummary:
     server_rss_mb: dict[str, float | int | None] | None = None
     server_rss_window_mb: dict[str, float | int | None] | None = None
     server_rss_per_game_mb: dict[str, float | int | None] | None = None
+    preload_server_status: dict[str, Any] | None = None
+    preload_rss_window_mb: dict[str, float | int | None] | None = None
 
 
 @dataclass
 class HarnessConfig:
     base_url: str
     sweep_games: list[int]
+    hot_game_counts: list[int]
     concurrency_override: int | None
     puppet_count: int
     cube_id: str
@@ -128,6 +132,10 @@ class HarnessConfig:
     @property
     def max_requested_games(self) -> int:
         return max(self.sweep_games)
+
+    @property
+    def max_requested_loaded_games(self) -> int:
+        return max(games + idle_hot_games for idle_hot_games in self.hot_game_counts for games in self.sweep_games)
 
     def concurrency_for(self, games: int) -> int:
         if self.concurrency_override is None:
@@ -165,7 +173,7 @@ class ManagedServer:
             env["DATABASE_PATH"] = str(temp_db)
 
         if self.config.disable_caps:
-            env.update(cap_overrides_for(self.config.max_requested_games))
+            env.update(cap_overrides_for(self.config.max_requested_loaded_games))
 
         env["MTB_COMPRESS_WS"] = "0" if self.config.disable_ws_gzip else "1"
         env["MTB_FAKE_CUBE_DATA"] = "1" if self.config.mock_cube_data else "0"
@@ -270,6 +278,14 @@ class PhaseContext:
     result: GameResult
     rng: random.Random
     ws_action_jitter_ms: float = 0.0
+
+
+@dataclass
+class IdleHotGame:
+    game_id: str
+    session_id: str
+    ws: Any
+    phase: str | None = None
 
 
 def resolve_db_source(explicit: str | None) -> Path:
@@ -562,6 +578,34 @@ def parse_sweep(raw: str | None, fallback_games: int) -> list[int]:
 
     if not values:
         msg = "--sweep did not contain any positive integers"
+        raise ValueError(msg)
+    return values
+
+
+def parse_hot_sweep(raw: str | None, fallback_hot_games: int) -> list[int]:
+    if raw is None:
+        return [fallback_hot_games]
+
+    values: list[int] = []
+    seen: set[int] = set()
+    for part in raw.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        try:
+            parsed = int(token)
+        except ValueError as exc:
+            msg = f"invalid hot sweep value: {token}"
+            raise ValueError(msg) from exc
+        if parsed < 0:
+            msg = f"hot sweep value must be non-negative: {parsed}"
+            raise ValueError(msg)
+        if parsed not in seen:
+            values.append(parsed)
+            seen.add(parsed)
+
+    if not values:
+        msg = "--hot-sweep did not contain any non-negative integers"
         raise ValueError(msg)
     return values
 
@@ -957,6 +1001,26 @@ async def enter_game_from_lobby(ctx: PhaseContext) -> dict[str, Any]:
             return state
 
 
+async def fetch_server_status(base_url: str, ops_token: str | None) -> dict[str, Any] | None:
+    if not ops_token:
+        return None
+
+    timeout = httpx.Timeout(10.0, connect=5.0, read=10.0, write=10.0, pool=10.0)
+    try:
+        async with httpx.AsyncClient(base_url=base_url, timeout=timeout) as client:
+            response = await client.get("/api/ops/capacity", headers={"x-ops-token": ops_token})
+            response.raise_for_status()
+            payload = response.json()
+    except Exception:
+        return None
+
+    if not isinstance(payload, dict):
+        return None
+
+    keys = ("loaded_games", "hot_games", "pending_games", "sessions", "game_starts_in_flight")
+    return {key: payload.get(key) for key in keys if key in payload}
+
+
 async def play_until_terminal(ctx: PhaseContext, state: dict[str, Any]) -> dict[str, Any]:
     current = state
     while True:
@@ -1164,16 +1228,124 @@ async def run_one_game(
     return result
 
 
+async def run_one_idle_hot_game(
+    client: httpx.AsyncClient,
+    cfg: HarnessConfig,
+    hot_index: int,
+    timeout_sec: float,
+) -> IdleHotGame:
+    deadline = time.monotonic() + timeout_sec
+    player_name = f"IdleHot-{hot_index:05d}-{cfg.seed}"
+    idempotency_key = f"idle-hot-{cfg.seed}-{hot_index}-{secrets.token_urlsafe(6)}"
+
+    game_id, session_id, _create_ms = await create_game_with_retry(
+        client,
+        cfg,
+        player_name=player_name,
+        deadline=deadline,
+        idempotency_key=idempotency_key,
+    )
+
+    ws_uri = ws_url_for(cfg.base_url, game_id, session_id)
+    ws, _ws_connect_ms = await connect_ws_with_retry(ws_uri=ws_uri, deadline=deadline)
+
+    result = GameResult(index=hot_index, game_id=game_id)
+    rng = random.Random((cfg.seed * 17) + hot_index)
+    ctx = PhaseContext(
+        ws=ws,
+        deadline=deadline,
+        result=result,
+        rng=rng,
+        ws_action_jitter_ms=cfg.ws_action_jitter_ms,
+    )
+
+    try:
+        state = await enter_game_from_lobby(ctx)
+    except Exception:
+        try:
+            await ws.close()
+        except Exception:
+            pass
+        raise
+
+    self_player = state.get("self_player") or {}
+    phase = str(self_player.get("phase") or "")
+    if phase in TERMINAL_PHASES:
+        try:
+            await ws.close()
+        except Exception:
+            pass
+        raise GameFlowError(f"idle hot game reached terminal phase immediately: {phase}")
+
+    return IdleHotGame(game_id=game_id, session_id=session_id, ws=ws, phase=phase or None)
+
+
+async def close_idle_hot_games(games: list[IdleHotGame]) -> None:
+    async def _close_one(game: IdleHotGame) -> None:
+        try:
+            await game.ws.close()
+        except Exception:
+            pass
+
+    if not games:
+        return
+    await asyncio.gather(*(_close_one(game) for game in games), return_exceptions=True)
+
+
+async def preload_idle_hot_games(
+    client: httpx.AsyncClient,
+    cfg: HarnessConfig,
+    idle_hot_games: int,
+    timeout_per_game_sec: float,
+    sampler: ProcessSampler | None,
+) -> tuple[list[IdleHotGame], dict[str, Any] | None, dict[str, float | int | None] | None]:
+    if idle_hot_games <= 0:
+        return [], None, None
+
+    preload_mark = sampler.mark() if sampler else 0
+    if sampler is not None:
+        await sampler.sample_now()
+
+    preload_concurrency = max(1, min(idle_hot_games, 50))
+    semaphore = asyncio.Semaphore(preload_concurrency)
+
+    async def _worker(idx: int) -> IdleHotGame:
+        async with semaphore:
+            return await run_one_idle_hot_game(client, cfg, idx, timeout_per_game_sec)
+
+    tasks = [asyncio.create_task(_worker(idx)) for idx in range(idle_hot_games)]
+    idle_games: list[IdleHotGame] = []
+    try:
+        idle_games.extend([await task for task in asyncio.as_completed(tasks)])
+    except Exception:
+        for task in tasks:
+            task.cancel()
+        await close_idle_hot_games(idle_games)
+        raise
+
+    if sampler is not None:
+        await sampler.sample_now()
+        preload_rss_window = sampler.slice_window(preload_mark)
+    else:
+        preload_rss_window = None
+
+    status = await fetch_server_status(cfg.base_url, cfg.ops_token)
+    return idle_games, status, preload_rss_window
+
+
 def summarize_run(
     label: str,
     cfg: HarnessConfig,
     games: int,
     concurrency: int,
+    idle_hot_games: int,
     timeout_per_game_sec: float,
     wall_time_sec: float,
     results: list[GameResult],
     server_rss_mb: dict[str, float | int | None] | None,
     server_rss_window_mb: dict[str, float | int | None] | None,
+    preload_server_status: dict[str, Any] | None,
+    preload_rss_window_mb: dict[str, float | int | None] | None,
 ) -> RunSummary:
     completed = len(results)
     succeeded = sum(1 for result in results if result.success)
@@ -1220,6 +1392,7 @@ def summarize_run(
         label=label,
         games=games,
         concurrency=concurrency,
+        idle_hot_games=idle_hot_games,
         puppet_count=cfg.puppet_count,
         timeout_per_game_sec=timeout_per_game_sec,
         wall_time_sec=wall_time_sec,
@@ -1239,6 +1412,8 @@ def summarize_run(
         server_rss_mb=server_rss_mb,
         server_rss_window_mb=server_rss_window_mb,
         server_rss_per_game_mb=rss_per_game,
+        preload_server_status=preload_server_status,
+        preload_rss_window_mb=preload_rss_window_mb,
     )
 
 
@@ -1247,6 +1422,7 @@ def print_summary(summary: RunSummary) -> None:
     print(f"=== {summary.label} ===")
     print(
         f"games={summary.games} concurrency={summary.concurrency} "
+        f"idle_hot_games={summary.idle_hot_games} "
         f"puppet_count={summary.puppet_count} timeout/game={summary.timeout_per_game_sec:.1f}s "
         f"wall={summary.wall_time_sec:.2f}s throughput={summary.throughput_games_per_sec:.2f} games/s"
     )
@@ -1264,6 +1440,20 @@ def print_summary(summary: RunSummary) -> None:
             f"{stage_round}:{count}" for stage_round, count in sorted(summary.terminal_stage_round_counts.items())
         )
         print(f"terminal stage-round: {pairs}")
+    if summary.preload_server_status:
+        pairs = ", ".join(
+            f"{key}={value}" for key, value in sorted(summary.preload_server_status.items()) if value is not None
+        )
+        print(f"idle hot preload status: {pairs}")
+    if summary.preload_rss_window_mb and int(summary.preload_rss_window_mb.get("count", 0) or 0) > 0:
+        print(
+            "idle hot preload rss window MB: "
+            f"start={_fmt_float(summary.preload_rss_window_mb.get('start'))} "
+            f"end={_fmt_float(summary.preload_rss_window_mb.get('end'))} "
+            f"peak={_fmt_float(summary.preload_rss_window_mb.get('peak'))} "
+            f"delta_end={_fmt_float(summary.preload_rss_window_mb.get('delta_end'))} "
+            f"delta_peak={_fmt_float(summary.preload_rss_window_mb.get('delta_peak'))}"
+        )
     if summary.server_rss_mb:
         print(f"managed server rss MB: {format_stats_line(summary.server_rss_mb)}")
     if summary.server_rss_window_mb and int(summary.server_rss_window_mb.get("count", 0) or 0) > 0:
@@ -1319,12 +1509,13 @@ def timeout_for_sweep(
     calibration_result: GameResult,
     timeout_per_game_sec: float,
     concurrency: int,
+    idle_hot_games: int = 0,
 ) -> float:
     if cfg.game_timeout_sec is not None:
         return timeout_per_game_sec
     return choose_timeout_seconds(
         single_game_seconds=calibration_result.duration_sec,
-        concurrency=concurrency,
+        concurrency=concurrency + max(0, idle_hot_games),
         multiplier=cfg.timeout_multiplier,
         min_timeout=cfg.timeout_min_sec,
         max_timeout=cfg.timeout_max_sec,
@@ -1343,6 +1534,7 @@ def build_report(
         "config": {
             "base_url": cfg.base_url,
             "sweep_games": cfg.sweep_games,
+            "hot_game_counts": cfg.hot_game_counts,
             "concurrency_override": cfg.concurrency_override,
             "puppet_count": cfg.puppet_count,
             "cube_id": cfg.cube_id,
@@ -1368,6 +1560,7 @@ async def run_sweep(
     cfg: HarnessConfig,
     games: int,
     concurrency: int,
+    idle_hot_games: int,
     timeout_per_game_sec: float,
     sampler: ProcessSampler | None,
 ) -> RunSummary:
@@ -1377,28 +1570,49 @@ async def run_sweep(
     )
     timeout = httpx.Timeout(30.0, connect=15.0, read=30.0, write=30.0, pool=30.0)
 
-    start_mark = sampler.mark() if sampler else 0
-    if sampler is not None:
-        await sampler.sample_now()
     started = time.perf_counter()
     results: list[GameResult] = []
+    preload_status = None
+    preload_rss_window = None
+    idle_games: list[IdleHotGame] = []
     semaphore = asyncio.Semaphore(concurrency)
     progress_every = max(1, games // 20)
 
     async with httpx.AsyncClient(base_url=cfg.base_url, timeout=timeout, limits=limits) as client:
+        if idle_hot_games > 0:
+            idle_games, preload_status, preload_rss_window = await preload_idle_hot_games(
+                client,
+                cfg,
+                idle_hot_games=idle_hot_games,
+                timeout_per_game_sec=timeout_per_game_sec,
+                sampler=sampler,
+            )
+            print(
+                "[harness] preloaded idle hot games: "
+                f"requested={idle_hot_games} connected={len(idle_games)} "
+                f"status={preload_status or {}}"
+            )
 
-        async def _worker(idx: int) -> GameResult:
-            async with semaphore:
-                return await run_one_game(client, cfg, idx, timeout_per_game_sec)
+        start_mark = sampler.mark() if sampler else 0
+        if sampler is not None:
+            await sampler.sample_now()
 
-        tasks = [asyncio.create_task(_worker(idx)) for idx in range(games)]
+        try:
 
-        for completed, task in enumerate(asyncio.as_completed(tasks), start=1):
-            result = await task
-            results.append(result)
-            if completed % progress_every == 0 or completed == games:
-                failures = sum(1 for item in results if not item.success)
-                print(f"[harness] progress {completed}/{games} completed (failures={failures})")
+            async def _worker(idx: int) -> GameResult:
+                async with semaphore:
+                    return await run_one_game(client, cfg, idx, timeout_per_game_sec)
+
+            tasks = [asyncio.create_task(_worker(idx)) for idx in range(games)]
+
+            for completed, task in enumerate(asyncio.as_completed(tasks), start=1):
+                result = await task
+                results.append(result)
+                if completed % progress_every == 0 or completed == games:
+                    failures = sum(1 for item in results if not item.success)
+                    print(f"[harness] progress {completed}/{games} completed (failures={failures})")
+        finally:
+            await close_idle_hot_games(idle_games)
 
     wall_time = time.perf_counter() - started
     rss_stats = None
@@ -1408,15 +1622,18 @@ async def run_sweep(
         rss_stats = sampler.slice_stats(start_mark)
         rss_window = sampler.slice_window(start_mark)
     summary = summarize_run(
-        label=f"load-games-{games}",
+        label=f"load-games-{games}" if idle_hot_games <= 0 else f"load-games-{games}-hot-{idle_hot_games}",
         cfg=cfg,
         games=games,
         concurrency=concurrency,
+        idle_hot_games=idle_hot_games,
         timeout_per_game_sec=timeout_per_game_sec,
         wall_time_sec=wall_time,
         results=results,
         server_rss_mb=rss_stats,
         server_rss_window_mb=rss_window,
+        preload_server_status=preload_status,
+        preload_rss_window_mb=preload_rss_window,
     )
     print_summary(summary)
     return summary
@@ -1449,12 +1666,62 @@ async def calibrate_timeout(cfg: HarnessConfig, concurrency: int) -> tuple[float
 
 
 def parse_args(argv: list[str] | None = None) -> HarnessConfig:
+    parser = _build_arg_parser()
+    args = parser.parse_args(argv)
+    _validate_args(args)
+
+    sweep = parse_sweep(args.sweep, args.games)
+    hot_sweep = parse_hot_sweep(args.hot_sweep, args.hot_games)
+    cfg = HarnessConfig(
+        base_url=args.base_url.rstrip("/"),
+        sweep_games=sweep,
+        hot_game_counts=hot_sweep,
+        concurrency_override=args.concurrency,
+        puppet_count=args.puppet_count,
+        cube_id=args.cube_id,
+        use_upgrades=args.use_upgrades,
+        seed=args.seed,
+        game_timeout_sec=args.game_timeout_sec,
+        timeout_multiplier=args.timeout_multiplier,
+        timeout_min_sec=args.timeout_min_sec,
+        timeout_max_sec=args.timeout_max_sec,
+        calibration_timeout_sec=args.calibration_timeout_sec,
+        disable_caps=args.disable_caps,
+        disable_ws_gzip=args.disable_ws_gzip,
+        mock_cube_data=args.mock_cube_data,
+        db_copy=args.db_copy,
+        db_source=args.db_source,
+        backend_port=args.backend_port,
+        startup_timeout_sec=args.startup_timeout_sec,
+        ops_token=args.ops_token,
+        reset_runtime_between_sweeps=args.reset_runtime_between_sweeps,
+        fresh_server_per_sweep=args.fresh_server_per_sweep,
+        rss_sample_interval_sec=args.rss_sample_interval_sec,
+        ws_action_jitter_ms=args.ws_action_jitter_ms,
+        json_output=args.json,
+        json_output_path=args.json_output,
+    )
+    return cfg
+
+
+def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run concurrent end-to-end goldfish load tests against real game engine flows.",
     )
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"Backend base URL (default: {DEFAULT_BASE_URL})")
     parser.add_argument("--games", type=int, default=10, help="Number of games to run for a single sweep")
     parser.add_argument("--sweep", default=None, help="Comma-separated game counts, e.g. 1,10,100,1000")
+    parser.add_argument(
+        "--hot-games",
+        type=int,
+        default=0,
+        help="Number of idle started games to keep hot in memory during each measured sweep (default: 0)",
+    )
+    parser.add_argument(
+        "--hot-sweep",
+        default=None,
+        help="Comma-separated idle hot-game counts, e.g. 0,50,100,200",
+    )
     parser.add_argument(
         "--concurrency",
         type=int,
@@ -1578,11 +1845,14 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
         default=True,
         help="Disable upgrades in created games",
     )
+    return parser
 
-    args = parser.parse_args(argv)
 
+def _validate_args(args: argparse.Namespace) -> None:
     if args.games <= 0:
         raise ValueError("--games must be positive")
+    if args.hot_games < 0:
+        raise ValueError("--hot-games must be non-negative")
     if args.concurrency is not None and args.concurrency <= 0:
         raise ValueError("--concurrency must be positive")
     if args.backend_port < 1 or args.backend_port > 65535:
@@ -1593,37 +1863,6 @@ def parse_args(argv: list[str] | None = None) -> HarnessConfig:
         raise ValueError("--ws-action-jitter-ms must be non-negative")
     if args.fresh_server_per_sweep and not args.db_copy:
         raise ValueError("--fresh-server-per-sweep requires --db-copy")
-
-    sweep = parse_sweep(args.sweep, args.games)
-    cfg = HarnessConfig(
-        base_url=args.base_url.rstrip("/"),
-        sweep_games=sweep,
-        concurrency_override=args.concurrency,
-        puppet_count=args.puppet_count,
-        cube_id=args.cube_id,
-        use_upgrades=args.use_upgrades,
-        seed=args.seed,
-        game_timeout_sec=args.game_timeout_sec,
-        timeout_multiplier=args.timeout_multiplier,
-        timeout_min_sec=args.timeout_min_sec,
-        timeout_max_sec=args.timeout_max_sec,
-        calibration_timeout_sec=args.calibration_timeout_sec,
-        disable_caps=args.disable_caps,
-        disable_ws_gzip=args.disable_ws_gzip,
-        mock_cube_data=args.mock_cube_data,
-        db_copy=args.db_copy,
-        db_source=args.db_source,
-        backend_port=args.backend_port,
-        startup_timeout_sec=args.startup_timeout_sec,
-        ops_token=args.ops_token,
-        reset_runtime_between_sweeps=args.reset_runtime_between_sweeps,
-        fresh_server_per_sweep=args.fresh_server_per_sweep,
-        rss_sample_interval_sec=args.rss_sample_interval_sec,
-        ws_action_jitter_ms=args.ws_action_jitter_ms,
-        json_output=args.json,
-        json_output_path=args.json_output,
-    )
-    return cfg
 
 
 async def run_harness(cfg: HarnessConfig) -> dict[str, Any]:
@@ -1654,6 +1893,7 @@ async def run_with_managed_server(cfg: HarnessConfig) -> dict[str, Any]:
 
     async with ManagedServer(cfg) as managed:
         cfg.base_url = managed.base_url
+        cfg.ops_token = managed.ops_token
         sampler = (
             ProcessSampler(managed.process.pid, interval_sec=cfg.rss_sample_interval_sec)
             if managed.process is not None
@@ -1676,34 +1916,47 @@ async def run_with_fresh_server_per_sweep(cfg: HarnessConfig) -> dict[str, Any]:
     first_concurrency = cfg.concurrency_for(cfg.sweep_games[0])
     async with ManagedServer(cfg) as managed:
         cfg.base_url = managed.base_url
-        timeout_per_game_sec, calibration_result = await calibrate_timeout(cfg, concurrency=first_concurrency)
+        cfg.ops_token = managed.ops_token
+        timeout_per_game_sec, calibration_result = await calibrate_timeout(
+            cfg,
+            concurrency=first_concurrency + cfg.hot_game_counts[0],
+        )
 
     sweeps: list[RunSummary] = []
-    for games in cfg.sweep_games:
-        concurrency = cfg.concurrency_for(games)
-        planned_timeout = timeout_for_sweep(cfg, calibration_result, timeout_per_game_sec, concurrency)
-
-        async with ManagedServer(cfg) as managed:
-            cfg.base_url = managed.base_url
-            sampler = (
-                ProcessSampler(managed.process.pid, interval_sec=cfg.rss_sample_interval_sec)
-                if managed.process is not None
-                else None
+    for idle_hot_games in cfg.hot_game_counts:
+        for games in cfg.sweep_games:
+            concurrency = cfg.concurrency_for(games)
+            planned_timeout = timeout_for_sweep(
+                cfg,
+                calibration_result,
+                timeout_per_game_sec,
+                concurrency,
+                idle_hot_games=idle_hot_games,
             )
-            if sampler is not None:
-                await sampler.start()
-            try:
-                sweep_summary = await run_sweep(
-                    cfg=cfg,
-                    games=games,
-                    concurrency=concurrency,
-                    timeout_per_game_sec=planned_timeout,
-                    sampler=sampler,
+
+            async with ManagedServer(cfg) as managed:
+                cfg.base_url = managed.base_url
+                cfg.ops_token = managed.ops_token
+                sampler = (
+                    ProcessSampler(managed.process.pid, interval_sec=cfg.rss_sample_interval_sec)
+                    if managed.process is not None
+                    else None
                 )
-            finally:
                 if sampler is not None:
-                    await sampler.stop()
-        sweeps.append(sweep_summary)
+                    await sampler.start()
+                try:
+                    sweep_summary = await run_sweep(
+                        cfg=cfg,
+                        games=games,
+                        concurrency=concurrency,
+                        idle_hot_games=idle_hot_games,
+                        timeout_per_game_sec=planned_timeout,
+                        sampler=sampler,
+                    )
+                finally:
+                    if sampler is not None:
+                        await sampler.stop()
+            sweeps.append(sweep_summary)
 
     return build_report(
         cfg,
@@ -1735,7 +1988,10 @@ async def execute_sweeps(
     ops_token: str | None,
 ) -> dict[str, Any]:
     first_concurrency = cfg.concurrency_for(cfg.sweep_games[0])
-    timeout_per_game_sec, calibration_result = await calibrate_timeout(cfg, concurrency=first_concurrency)
+    timeout_per_game_sec, calibration_result = await calibrate_timeout(
+        cfg,
+        concurrency=first_concurrency + cfg.hot_game_counts[0],
+    )
 
     sweeps: list[RunSummary] = []
     runtime_reset_results: list[dict[str, Any]] = []
@@ -1747,21 +2003,34 @@ async def execute_sweeps(
         else:
             print("[harness] note: skipping post-calibration runtime reset; ops token unavailable.")
 
-    for idx, games in enumerate(cfg.sweep_games):
+    sweep_pairs = [(idle_hot_games, games) for idle_hot_games in cfg.hot_game_counts for games in cfg.sweep_games]
+    for idx, (idle_hot_games, games) in enumerate(sweep_pairs):
         if idx > 0 and cfg.reset_runtime_between_sweeps:
             if ops_token:
                 reset = await clear_runtime_state(cfg.base_url, ops_token)
-                runtime_reset_results.append({"label": f"pre-sweep-{games}", "result": reset})
+                runtime_reset_results.append(
+                    {"label": f"pre-sweep-games-{games}-hot-{idle_hot_games}", "result": reset}
+                )
             else:
-                print(f"[harness] note: skipping runtime reset before sweep {games}; ops token unavailable.")
+                print(
+                    "[harness] note: skipping runtime reset before "
+                    f"sweep games={games} hot={idle_hot_games}; ops token unavailable."
+                )
 
         concurrency = cfg.concurrency_for(games)
-        planned_timeout = timeout_for_sweep(cfg, calibration_result, timeout_per_game_sec, concurrency)
+        planned_timeout = timeout_for_sweep(
+            cfg,
+            calibration_result,
+            timeout_per_game_sec,
+            concurrency,
+            idle_hot_games=idle_hot_games,
+        )
 
         sweep_summary = await run_sweep(
             cfg=cfg,
             games=games,
             concurrency=concurrency,
+            idle_hot_games=idle_hot_games,
             timeout_per_game_sec=planned_timeout,
             sampler=sampler,
         )

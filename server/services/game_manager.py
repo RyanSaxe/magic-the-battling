@@ -89,6 +89,7 @@ from server.schemas.api import (
 )
 from server.services.game_serialization import (
     build_catalog_from_game,
+    build_catalog_from_state_refs,
     card_to_ref,
     cards_to_refs,
     last_battle_result_to_view,
@@ -1932,7 +1933,7 @@ class GameManager:
             self._make_fake_player_view(fp, player, probabilities, most_recent_ghost_puppet_name) for fp in game.puppets
         )
 
-        return GameStateResponse(
+        state = GameStateResponse(
             game_id=game_id,
             phase=phase,
             starting_life=game.config.starting_life,
@@ -1972,6 +1973,8 @@ class GameManager:
             cube_id=game.config.cube_id,
             play_mode=game.config.play_mode,
         )
+        state.catalog_delta = build_catalog_from_state_refs(state)
+        return state
 
     def get_game_bootstrap(self, game_id: str, player_id: str) -> GameBootstrapResponse | None:
         game = self._active_games.get(game_id)

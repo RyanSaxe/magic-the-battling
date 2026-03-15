@@ -132,14 +132,17 @@ export function useWebSocket(
             }
             if (message.type === 'game_bootstrap') {
               const payload = message.payload as GameBootstrap
-              catalogRef.current = payload.catalog
+              catalogRef.current = { ...payload.catalog, ...(payload.state.catalog_delta ?? {}) }
               setState(s => ({
                 ...s,
-                gameState: hydrateGameState(payload.state, payload.catalog),
+                gameState: hydrateGameState(payload.state, catalogRef.current),
                 lobbyState: null,
               }))
             } else if (message.type === 'game_state') {
               const payload = message.payload as CompactGameState
+              if (payload.catalog_delta && Object.keys(payload.catalog_delta).length > 0) {
+                catalogRef.current = { ...catalogRef.current, ...payload.catalog_delta }
+              }
               const catalog = catalogRef.current
               setState(s => ({
                 ...s,

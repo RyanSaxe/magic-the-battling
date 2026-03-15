@@ -284,6 +284,7 @@ export interface CompactGameState {
   use_upgrades: boolean
   cube_id: string
   play_mode: PlayMode
+  catalog_delta: Record<string, CardCatalogEntry>
 }
 
 export interface GameBootstrap {
