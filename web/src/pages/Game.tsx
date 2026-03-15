@@ -45,6 +45,7 @@ import {
 import type { Phase } from "../constants/phases";
 import type {
   GuideRequest,
+  GuidedGuideId,
   GuidedWalkthroughContext,
 } from "../guided/types";
 import {
@@ -52,7 +53,10 @@ import {
   pickAutoReconnectPlayer,
   rememberPlayerForGame,
 } from "../utils/deviceIdentity";
-import { shouldBlockGuidesForBattleResolution } from "./gameGuideState";
+import {
+  matchesGuideCompletionTrigger,
+  shouldBlockGuidesForBattleResolution,
+} from "./gameGuideState";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -506,11 +510,17 @@ function GameGuideLayer({
   context,
   sidebarOpen,
   setSidebarOpen,
+  guideCompletionTrigger,
 }: {
   rootRef: React.RefObject<HTMLElement | null>;
   context: GuidedWalkthroughContext;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
+  guideCompletionTrigger: {
+    guideId: GuidedGuideId;
+    stepId: string;
+    nonce: number;
+  } | null;
 }) {
   const GUIDE_HANDOFF_LINGER_MS = 450;
   const { state, setRevealedPlayerName } = useContextStrip();
@@ -651,6 +661,22 @@ function GameGuideLayer({
   ]);
 
   useLayoutEffect(() => restoreSidebarState, [restoreSidebarState]);
+
+  useEffect(() => {
+    if (!guideRequest || !activeStep) {
+      return;
+    }
+
+    if (!matchesGuideCompletionTrigger({
+      activeGuideRequest: guideRequest,
+      activeStepId: activeStep.id,
+      trigger: guideCompletionTrigger,
+    })) {
+      return;
+    }
+
+    queueMicrotask(() => finishGuide(guideRequest.guideId));
+  }, [activeStep, finishGuide, guideCompletionTrigger, guideRequest]);
 
   const handleAdvanceStep = useCallback(() => {
     if (!guideRequest || !guide) {
@@ -821,6 +847,11 @@ function GameContent() {
   const [activeBattleZoneModal, setActiveBattleZoneModal] = useState<BattleZoneModal>(null);
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
+  const [guideCompletionTrigger, setGuideCompletionTrigger] = useState<{
+    guideId: GuidedGuideId;
+    stepId: string;
+    nonce: number;
+  } | null>(null);
   const [dismissedServerNoticeAt, setDismissedServerNoticeAt] = useState<string | null>(null);
   const [cachedBattleForResolution, setCachedBattleForResolution] = useState<BattleView | null>(null);
   const [activeBattleResolutionId, setActiveBattleResolutionId] = useState<string | null>(null);
@@ -892,6 +923,7 @@ function GameContent() {
 
   // Hover tracking for hotkeys
   const [hoveredCard, setHoveredCard] = useState<{ id: string; zone: ZoneName; owner: 'player' | 'opponent' } | null>(null);
+  const guideCompletionNonceRef = useRef(0);
   const handleCardHover = (cardId: string, zone: ZoneName) => {
     setHoveredCard({ id: cardId, zone, owner: 'player' });
   };
@@ -1009,6 +1041,15 @@ function GameContent() {
     setUpgradesModalOpenMode('auto');
   }, []);
 
+  const requestGuideCompletion = useCallback((guideId: GuidedGuideId, stepId: string) => {
+    guideCompletionNonceRef.current += 1;
+    setGuideCompletionTrigger({
+      guideId,
+      stepId,
+      nonce: guideCompletionNonceRef.current,
+    });
+  }, []);
+
   const openUpgradesModal = useCallback((
     targetCardId?: string,
     mode: UpgradesModalOpenMode = 'auto',
@@ -1027,13 +1068,14 @@ function GameContent() {
     }
     buildReadyPendingRef.current = true;
     setBuildReadyPending(true);
+    requestGuideCompletion("build_play_draw", "play-draw");
     closeGameplayOverlays();
     actions.buildReady(
       selectedBasics,
       playDrawPreference,
       handSlotsRef.current.filter((id): id is string => id !== null),
     );
-  }, [actions, closeGameplayOverlays, gameState, selectedBasics]);
+  }, [actions, closeGameplayOverlays, gameState, requestGuideCompletion, selectedBasics]);
 
   const openBuildSubmitPopover = useCallback(() => {
     if (showSubmitHandPopover || buildReadyPending) {
@@ -1106,6 +1148,20 @@ function GameContent() {
     closeGameplayOverlays("share");
     setShareOpen(true);
   }, [closeGameplayOverlays]);
+
+  const handleBattleResultSubmit = useCallback((result: string) => {
+    requestGuideCompletion("battle_result_submit", "result-submit");
+    actions.battleSubmitResult(result);
+    setIsChangingResult(false);
+    setShowSubmitResultPopover(false);
+  }, [actions, requestGuideCompletion]);
+
+  const handleContinue = useCallback(() => {
+    requestGuideCompletion("reward", "continue");
+    actions.rewardDone(selectedUpgradeId ?? undefined);
+    setSelectedUpgradeId(null);
+    setSelectedPoolCardId(null);
+  }, [actions, requestGuideCompletion, selectedUpgradeId]);
 
   const hasPendingBattleResolution =
     !!battleResolutionId &&
@@ -1197,19 +1253,13 @@ function GameContent() {
     } else if (phase === 'battle' && cb) {
       if (showSubmitResultPopover) {
         map['w'] = () => {
-          actions.battleSubmitResult(sp.name);
-          setIsChangingResult(false);
-          setShowSubmitResultPopover(false);
+          handleBattleResultSubmit(sp.name);
         };
         map['d'] = () => {
-          actions.battleSubmitResult("draw");
-          setIsChangingResult(false);
-          setShowSubmitResultPopover(false);
+          handleBattleResultSubmit("draw");
         };
         map['l'] = () => {
-          actions.battleSubmitResult(cb.opponent_name);
-          setIsChangingResult(false);
-          setShowSubmitResultPopover(false);
+          handleBattleResultSubmit(cb.opponent_name);
         };
         map['Enter'] = () => setShowSubmitResultPopover(false);
       } else {
@@ -1294,9 +1344,7 @@ function GameContent() {
         const needsUpgrade = isStageIncreasing && gameState.available_upgrades.length > 0;
         const canCont = !needsUpgrade || !!selectedUpgradeId;
         if (canCont) {
-          actions.rewardDone(selectedUpgradeId ?? undefined);
-          setSelectedUpgradeId(null);
-          setSelectedPoolCardId(null);
+          handleContinue();
         }
       };
     }
@@ -1401,12 +1449,6 @@ function GameContent() {
       : hasPendingBuildUpgrades
         ? "apply"
         : "view";
-
-  const handleContinue = () => {
-    actions.rewardDone(selectedUpgradeId ?? undefined);
-    setSelectedUpgradeId(null);
-    setSelectedPoolCardId(null);
-  };
 
   const renderActionButtons = (): ReactNode => {
     if (isSpectator) {
@@ -1599,27 +1641,21 @@ function GameContent() {
                   {
                     label: "I Won",
                     onClick: () => {
-                      actions.battleSubmitResult(self_player.name);
-                      setIsChangingResult(false);
-                      setShowSubmitResultPopover(false);
+                      handleBattleResultSubmit(self_player.name);
                     },
                     className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
                   },
                   {
                     label: "Draw",
                     onClick: () => {
-                      actions.battleSubmitResult("draw");
-                      setIsChangingResult(false);
-                      setShowSubmitResultPopover(false);
+                      handleBattleResultSubmit("draw");
                     },
                     className: "btn btn-danger text-sm py-1.5",
                   },
                   {
                     label: "I Lost",
                     onClick: () => {
-                      actions.battleSubmitResult(opponent_name);
-                      setIsChangingResult(false);
-                      setShowSubmitResultPopover(false);
+                      handleBattleResultSubmit(opponent_name);
                     },
                     className: "btn btn-danger text-sm py-1.5",
                   },
@@ -2244,6 +2280,7 @@ function GameContent() {
             context={guideContext!}
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
+            guideCompletionTrigger={guideCompletionTrigger}
           />
         )}
         </GuideProvider>
