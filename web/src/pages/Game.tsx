@@ -1062,15 +1062,21 @@ function GameContent() {
     setActiveDndPanel(panel);
   }, [activeDndPanel, closeGameplayOverlays]);
 
-  const toggleBattleZoneModal = useCallback((
+  const setBattleZoneModalOpen = useCallback((
     zone: BattleZoneModalState["zone"],
     owner: ZoneOwner,
+    open: boolean,
   ) => {
     const isSameModal =
       activeBattleZoneModal?.zone === zone &&
       activeBattleZoneModal.owner === owner;
+    if (!open) {
+      if (isSameModal) {
+        setActiveBattleZoneModal(null);
+      }
+      return;
+    }
     if (isSameModal) {
-      setActiveBattleZoneModal(null);
       return;
     }
     closeGameplayOverlays("battleZoneModal");
@@ -1917,7 +1923,7 @@ function GameContent() {
                     onOpponentCardHover={handleOpponentCardHover}
                     onCardHoverEnd={handleCardHoverEnd}
                     activeZoneModal={activeBattleZoneModal}
-                    onZoneModalToggle={toggleBattleZoneModal}
+                    onZoneModalOpenChange={setBattleZoneModalOpen}
                     onLayoutMetricsChange={setBattleSidebarLayout}
                   />
                   {displayBattleResolution && activeBattleResolution && (

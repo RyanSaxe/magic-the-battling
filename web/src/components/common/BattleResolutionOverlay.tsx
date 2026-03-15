@@ -35,6 +35,7 @@ interface ActiveSourceState {
   enterX: number
   enterY: number
   enterScale: number
+  isExiting: boolean
 }
 
 interface BeamGroup {
@@ -301,6 +302,7 @@ export function BattleResolutionOverlay({
           enterX,
           enterY,
           enterScale,
+          isExiting: false,
         })
 
         await wait(SOURCE_MOVE_MS)
@@ -335,6 +337,12 @@ export function BattleResolutionOverlay({
             if (cancelled) return
           }
         }
+
+        setActiveSource((current) => (
+          current && current.card.id === group.sourceCardId
+            ? { ...current, isExiting: true }
+            : current
+        ))
 
         await wait(GROUP_EXIT_MS)
         if (cancelled) return
@@ -452,7 +460,12 @@ export function BattleResolutionOverlay({
 
       {activeSource && (
         <div
-          className="fixed z-[84] battle-resolution-source-card"
+          className={[
+            'fixed z-[84] battle-resolution-source-card',
+            activeSource.isExiting
+              ? 'battle-resolution-source-card-exiting'
+              : 'battle-resolution-source-card-entering',
+          ].join(' ')}
           style={{
             left: activeSource.stageRect.left,
             top: activeSource.stageRect.top,

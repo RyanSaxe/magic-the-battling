@@ -1032,7 +1032,7 @@ body {
   }
 }
 
-@keyframes battle-resolution-source-stage {
+@keyframes battle-resolution-source-stage-enter {
   0% {
     opacity: 0;
     transform: translate(var(--battle-enter-x), var(--battle-enter-y)) scale(var(--battle-enter-scale));
@@ -1041,6 +1041,18 @@ body {
   100% {
     opacity: 1;
     transform: translate(0, 0) scale(1);
+  }
+}
+
+@keyframes battle-resolution-source-stage-exit {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(var(--battle-enter-x), var(--battle-enter-y)) scale(var(--battle-enter-scale));
   }
 }
 
@@ -1133,8 +1145,16 @@ body {
 }
 
 .battle-resolution-source-card {
-  animation: battle-resolution-source-stage 540ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   filter: drop-shadow(0 0 26px rgba(168, 85, 247, 0.45));
+  pointer-events: none;
+}
+
+.battle-resolution-source-card-entering {
+  animation: battle-resolution-source-stage-enter 540ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.battle-resolution-source-card-exiting {
+  animation: battle-resolution-source-stage-exit 220ms ease-in forwards;
 }
 
 .battle-resolution-beam-core {
