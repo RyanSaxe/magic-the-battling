@@ -2,6 +2,8 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, typ
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
+import { useVoiceChat } from "../hooks/useVoiceChat";
+import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import {
   rejoinGame,
   getGameStatus,
@@ -15,6 +17,7 @@ import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from 
 import { RewardPhase } from "./phases/Reward";
 import { Sidebar } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
+import { VoiceControls } from "../components/sidebar/VoiceControls";
 import { GameSummary } from "../components/GameSummary";
 import { ShareModal } from "../components/ShareModal";
 import { ActionMenu } from "../components/ActionMenu";
@@ -788,12 +791,27 @@ function GameContent() {
     addToast(message, "error");
   }, [addToast]);
 
-  const { gameState, isConnected, actions, pendingSpectateRequest, serverNotice, invalidSession } = useGame(
+  const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(null);
+  const handleVoiceSignal = useCallback((payload: VoiceSignalPayload) => {
+    voiceSignalRef.current?.(payload);
+  }, []);
+
+  const { gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, invalidSession } = useGame(
     gameId ?? null,
     isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
     handleServerError,
+    handleVoiceSignal,
   );
+
+  const battleOpponentName = (() => {
+    const sp = gameState?.self_player;
+    const cb = gameState?.current_battle;
+    if (sp?.phase === 'battle' && cb && !cb.can_manipulate_opponent) return cb.opponent_name;
+    return null;
+  })();
+  const voiceChat = useVoiceChat(send, battleOpponentName, gameState?.self_player.name ?? null, voiceSignalRef);
+
   const { state, setPreviewCard, setRevealedPlayerName } = useContextStrip();
 
   const isSpectator = !!spectatorConfig;
@@ -1792,6 +1810,7 @@ function GameContent() {
           onCreateOpponentTreasure={handleCreateOpponentTreasure}
           onUntapOpponentAll={handleUntapOpponentAll}
           onPassOpponentTurn={handlePassTurn}
+          voiceChat={!canManipulateOpponent ? voiceChat : undefined}
           handZoneHeight={battleSidebarLayout?.handHeight ?? null}
           middleLaneHeight={battleSidebarLayout?.middleLaneHeight ?? null}
         />
@@ -1973,11 +1992,16 @@ function GameContent() {
                           <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
                         </div>
                       </div>
-                      <div className="text-center leading-tight">
-                        {battleViewForDisplay.current_turn_name === self_player.name ? (
-                          <span className="text-green-400 font-medium">Your turn</span>
-                        ) : (
-                          <span className="text-amber-400 font-medium">Opp's turn</span>
+                      <div className="flex items-center gap-1.5 leading-tight">
+                        <div className="text-center">
+                          {battleViewForDisplay.current_turn_name === self_player.name ? (
+                            <span className="text-green-400 font-medium">Your turn</span>
+                          ) : (
+                            <span className="text-amber-400 font-medium">Opp's turn</span>
+                          )}
+                        </div>
+                        {!canManipulateOpponent && voiceChat.state.connectionState !== 'disconnected' && (
+                          <VoiceControls state={voiceChat.state} onToggleMute={voiceChat.toggleMute} />
                         )}
                       </div>
                       <div className="flex items-center gap-1">

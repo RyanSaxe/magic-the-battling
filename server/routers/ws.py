@@ -671,12 +671,43 @@ async def _handle_phase_error(
     return True
 
 
+async def _handle_voice_signal(game_id: str, player_id: str, payload: dict) -> None:
+    opponent_name = game_manager.get_battle_opponent_name(game_id, player_id)
+    if not opponent_name:
+        return
+    opponent_id = game_manager.get_player_id_by_name(game_id, opponent_name)
+    if not opponent_id:
+        return
+    sender_name = game_manager._player_id_to_name.get(player_id, "")
+    await connection_manager.send_to_player(
+        game_id,
+        opponent_id,
+        {
+            "type": "voice_signal",
+            "payload": {
+                "signal_type": payload.get("signal_type"),
+                "data": payload.get("data"),
+                "from_player": sender_name,
+            },
+        },
+    )
+
+
+async def _handle_passthrough_action(action: str, game_id: str, player_id: str, payload: dict) -> bool:
+    if action == "voice_signal":
+        await _handle_voice_signal(game_id, player_id, payload)
+        return True
+    if action == "spectate_response":
+        _handle_spectate_response(payload)
+        return True
+    return False
+
+
 async def handle_message(game_id: str, player_id: str, data: dict, websocket: WebSocket):
     action = data.get("action", "")
     payload = data.get("payload", {})
 
-    if action == "spectate_response":
-        _handle_spectate_response(payload)
+    if await _handle_passthrough_action(action, game_id, player_id, payload):
         return
 
     if ops_manager.is_maintenance():

@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import type { BattleView, Card as CardType } from "../../types";
+import type { VoiceChatState } from "../../hooks/useVoiceChat";
 import { UpgradeStack } from "./UpgradeStack";
+import { VoiceControls } from "./VoiceControls";
 
 interface BattleSidebarContentProps {
   currentBattle: BattleView;
@@ -19,6 +21,7 @@ interface BattleSidebarContentProps {
   onPassOpponentTurn?: () => void;
   handZoneHeight?: number | null;
   middleLaneHeight?: number | null;
+  voiceChat?: { state: VoiceChatState; toggleMute: () => void };
 }
 
 function LifeCounter({
@@ -172,6 +175,7 @@ export function BattleSidebarContent({
   onPassOpponentTurn,
   handZoneHeight = null,
   middleLaneHeight = null,
+  voiceChat,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
     currentBattle;
@@ -273,13 +277,16 @@ export function BattleSidebarContent({
               </div>
             </div>
 
-            <div className="relative z-10 flex items-center justify-center px-3 py-1 text-center text-xs">
+            <div className="relative z-10 flex flex-col items-center justify-center gap-1 px-3 py-1 text-center text-xs">
               {current_turn_name && (
                 isYourTurn ? (
                   <span className="text-green-400">It is your turn</span>
                 ) : (
                   <span className="text-amber-400">Opponent's turn</span>
                 )
+              )}
+              {voiceChat && (
+                <VoiceControls state={voiceChat.state} onToggleMute={voiceChat.toggleMute} />
               )}
             </div>
 
