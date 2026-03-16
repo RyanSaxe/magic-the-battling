@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useWebSocket } from './useWebSocket'
+import type { VoiceSignalPayload } from './useWebSocket'
 import type { CardDestination, BuildSource, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
 
@@ -12,7 +13,8 @@ export function useGame(
   gameId: string | null,
   sessionId: string | null,
   spectatorConfig?: SpectatorConfig | null,
-  onServerError?: (message: string) => void
+  onServerError?: (message: string) => void,
+  onVoiceSignal?: (payload: VoiceSignalPayload) => void,
 ) {
   const {
     isConnected,
@@ -25,7 +27,7 @@ export function useGame(
     kicked,
     invalidSession,
     gameNotFound,
-  } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError)
+  } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError, onVoiceSignal)
 
   const startGame = useCallback(() => {
     send('start_game')
@@ -150,6 +152,7 @@ export function useGame(
     kicked,
     invalidSession,
     gameNotFound,
+    send,
     actions: {
       startGame,
       setReady,

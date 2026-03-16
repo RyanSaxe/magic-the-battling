@@ -141,3 +141,6 @@ node_modules/
 web/.vite/
 
 backlog/
+
+# Local dev TLS certs
+web/certs/

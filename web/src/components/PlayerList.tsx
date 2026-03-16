@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { LastResult, PlayerView } from "../types";
 import {
   GhostIcon,
@@ -15,6 +16,7 @@ import { getPlayerPhaseStatusLabel } from "../utils/format";
 interface PlayerListProps {
   players: PlayerView[];
   currentPlayerName: string;
+  renderMicToggle?: (player: PlayerView) => ReactNode;
 }
 
 export const PLAYER_ROW_STACK_CLASS = "space-y-3";
@@ -126,6 +128,7 @@ export function PlayerRow({
   onClick,
   variant = "game",
   shareStatus,
+  micToggle,
 }: {
   player: PlayerView;
   players: PlayerView[];
@@ -134,6 +137,7 @@ export function PlayerRow({
   onClick: () => void;
   variant?: "game" | "share";
   shareStatus?: ShareResultStatus;
+  micToggle?: ReactNode;
 }) {
   const isSelf = player.name === currentPlayerName;
   const showPairingProbability =
@@ -154,6 +158,11 @@ export function PlayerRow({
         variant="corner"
         className="pointer-events-none absolute left-0 top-0 z-10"
       />
+      {micToggle && (
+        <div className="absolute right-1.5 top-1.5 z-10">
+          {micToggle}
+        </div>
+      )}
 
       <div className="min-w-0 self-end">
         <span className="block truncate text-sm font-medium text-amber-50">
@@ -206,6 +215,7 @@ export function PlayerRow({
 export function PlayerList({
   players,
   currentPlayerName,
+  renderMicToggle,
 }: PlayerListProps) {
   const { state, setRevealedPlayerName } = useContextStrip();
 
@@ -233,6 +243,7 @@ export function PlayerList({
             currentPlayerName={currentPlayerName}
             isSelected={state.revealedPlayerName === player.name}
             onClick={() => handlePlayerClick(player)}
+            micToggle={renderMicToggle?.(player)}
           />
         ))}
       </div>

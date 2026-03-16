@@ -2,6 +2,8 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, typ
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
+import { useVoiceChat, type VoicePeer } from "../hooks/useVoiceChat";
+import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import {
   rejoinGame,
   getGameStatus,
@@ -15,6 +17,7 @@ import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from 
 import { RewardPhase } from "./phases/Reward";
 import { Sidebar } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
+import { MicToggle } from "../components/sidebar/MicToggle";
 import { GameSummary } from "../components/GameSummary";
 import { ShareModal } from "../components/ShareModal";
 import { ActionMenu } from "../components/ActionMenu";
@@ -57,6 +60,17 @@ import {
   matchesGuideCompletionTrigger,
   shouldBlockGuidesForBattleResolution,
 } from "./gameGuideState";
+
+function getAggregateConnectionColor(peers: VoicePeer[]): string | null {
+  if (peers.length === 0) return null
+  const hasConnected = peers.some(p => p.connectionState === 'connected')
+  if (hasConnected) return 'bg-green-500'
+  const hasConnecting = peers.some(p => p.connectionState === 'connecting')
+  if (hasConnecting) return 'bg-yellow-500'
+  const allFailed = peers.every(p => p.connectionState === 'failed')
+  if (allFailed) return 'bg-red-500'
+  return null
+}
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -788,12 +802,55 @@ function GameContent() {
     addToast(message, "error");
   }, [addToast]);
 
-  const { gameState, isConnected, actions, pendingSpectateRequest, serverNotice, invalidSession } = useGame(
+  const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(null);
+  const handleVoiceSignal = useCallback((payload: VoiceSignalPayload) => {
+    voiceSignalRef.current?.(payload);
+  }, []);
+
+  const { gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, invalidSession } = useGame(
     gameId ?? null,
     isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
     handleServerError,
+    handleVoiceSignal,
   );
+
+  const peerNames = useMemo(() => {
+    if (!gameState) return []
+    const { self_player, current_battle } = gameState
+    if (self_player.phase === 'battle' && current_battle) {
+      return current_battle.can_manipulate_opponent ? [] : [current_battle.opponent_name]
+    }
+    return gameState.players
+      .filter(p => p.name !== self_player.name && !p.is_puppet)
+      .map(p => p.name)
+  }, [gameState])
+
+  const voiceChat = useVoiceChat(send, peerNames, gameState?.self_player.name ?? null, voiceSignalRef);
+
+  const renderMicToggle = useCallback((player: PlayerView) => {
+    if (player.is_puppet || player.is_ghost) return null
+    if (voiceChat.state.peers.length === 0 && !voiceChat.state.isAvailable) return null
+    const isSelf = player.name === gameState?.self_player.name
+    if (isSelf) {
+      return (
+        <MicToggle
+          muted={voiceChat.state.isMuted}
+          onClick={() => voiceChat.toggleSelfMute()}
+          connectionColor={getAggregateConnectionColor(voiceChat.state.peers)}
+        />
+      )
+    }
+    const peer = voiceChat.state.peers.find(p => p.name === player.name)
+    if (!peer) return null
+    return (
+      <MicToggle
+        muted={voiceChat.state.mutedPeers.has(player.name)}
+        onClick={() => voiceChat.togglePeerMute(player.name)}
+      />
+    )
+  }, [voiceChat, gameState?.self_player.name])
+
   const { state, setPreviewCard, setRevealedPlayerName } = useContextStrip();
 
   const isSpectator = !!spectatorConfig;
@@ -1792,6 +1849,11 @@ function GameContent() {
           onCreateOpponentTreasure={handleCreateOpponentTreasure}
           onUntapOpponentAll={handleUntapOpponentAll}
           onPassOpponentTurn={handlePassTurn}
+          voiceChat={!canManipulateOpponent ? {
+            state: voiceChat.state,
+            toggleSelfMute: voiceChat.toggleSelfMute,
+            togglePeerMute: voiceChat.togglePeerMute,
+          } : undefined}
           handZoneHeight={battleSidebarLayout?.handHeight ?? null}
           middleLaneHeight={battleSidebarLayout?.middleLaneHeight ?? null}
         />
@@ -1973,11 +2035,20 @@ function GameContent() {
                           <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
                         </div>
                       </div>
-                      <div className="text-center leading-tight">
-                        {battleViewForDisplay.current_turn_name === self_player.name ? (
-                          <span className="text-green-400 font-medium">Your turn</span>
-                        ) : (
-                          <span className="text-amber-400 font-medium">Opp's turn</span>
+                      <div className="flex items-center gap-1.5 leading-tight">
+                        <div className="text-center">
+                          {battleViewForDisplay.current_turn_name === self_player.name ? (
+                            <span className="text-green-400 font-medium">Your turn</span>
+                          ) : (
+                            <span className="text-amber-400 font-medium">Opp's turn</span>
+                          )}
+                        </div>
+                        {!canManipulateOpponent && voiceChat.state.peers.length > 0 && (
+                          <MicToggle
+                            muted={voiceChat.state.isMuted}
+                            onClick={() => voiceChat.toggleSelfMute()}
+                            connectionColor={getAggregateConnectionColor(voiceChat.state.peers)}
+                          />
                         )}
                       </div>
                       <div className="flex items-center gap-1">
@@ -2035,6 +2106,7 @@ function GameContent() {
                       phaseContent={renderPhaseContent()}
                       useUpgrades={gameState.use_upgrades}
                       isMobile
+                      renderMicToggle={renderMicToggle}
                     />
                   </div>
                 </>
@@ -2044,6 +2116,7 @@ function GameContent() {
                   currentPlayer={self_player}
                   phaseContent={renderPhaseContent()}
                   useUpgrades={gameState.use_upgrades}
+                  renderMicToggle={renderMicToggle}
                 />
               )}
               <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
@@ -2251,6 +2324,7 @@ function GameContent() {
                     phaseContent={renderPhaseContent()}
                     useUpgrades={gameState.use_upgrades}
                     isMobile
+                    renderMicToggle={renderMicToggle}
                   />
                 </div>
               </>
@@ -2260,6 +2334,7 @@ function GameContent() {
                 currentPlayer={self_player}
                 phaseContent={renderPhaseContent()}
                 useUpgrades={gameState.use_upgrades}
+                renderMicToggle={renderMicToggle}
               />
             )}
             <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
