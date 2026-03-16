@@ -54,6 +54,8 @@ Start the dev server and visit [`/docs`](http://localhost:8000/docs) for the aut
 
 Deployed to [Fly.io](https://fly.io) via Docker — see `fly.toml` and `Dockerfile`.
 
+On container startup, deploys now run `scripts/maintain_db.py --apply` against `/data/mtb.db` before booting the server. If pending DB maintenance exists, the script preserves the previous database as `/data/mtb.db.bak` and then applies the migration to the live DB path.
+
 ### PR Labels
 
 Labels on the merged PR control deploy behavior and release creation.

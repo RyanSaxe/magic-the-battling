@@ -14,11 +14,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  goldfish-load:
+  perf-matrix:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
-      LOAD_JSON_PATH: /tmp/mtb-pr-load.json
+      BURST_JSON_PATH: /tmp/mtb-pr-load-burst.json
+      HOT_JSON_PATH: /tmp/mtb-pr-load-hot.json
     steps:
       - uses: actions/checkout@v4
 
@@ -31,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Run goldfish load sweep
+      - name: Run burst sweep
         run: |
           uv run python -m server.perf.load_harness \
             --db-copy \
@@ -42,7 +43,22 @@ jobs:
             --fresh-server-per-sweep \
             --no-runtime-reset-between-sweeps \
             --game-timeout-sec 900 \
-            --json-output "${LOAD_JSON_PATH}"
+            --json-output "${BURST_JSON_PATH}"
+
+      - name: Run hot residency sweep
+        run: |
+          uv run python -m server.perf.load_harness \
+            --db-copy \
+            --mock-cube-data \
+            --games 50 \
+            --concurrency 50 \
+            --hot-sweep 0,100,250,500 \
+            --puppet-count 3 \
+            --disable-caps \
+            --fresh-server-per-sweep \
+            --no-runtime-reset-between-sweeps \
+            --game-timeout-sec 900 \
+            --json-output "${HOT_JSON_PATH}"
 
       - name: Validate completion is 100%
         id: validate
@@ -53,25 +69,39 @@ jobs:
           import pathlib
           import sys
 
-          path = pathlib.Path(os.environ["LOAD_JSON_PATH"])
-          report = json.loads(path.read_text())
-          sweeps = report.get("sweeps", [])
-          if not sweeps:
-            print("No sweeps found in load report.", file=sys.stderr)
-            sys.exit(1)
+          report_specs = [
+            ("burst", pathlib.Path(os.environ["BURST_JSON_PATH"])),
+            ("hot", pathlib.Path(os.environ["HOT_JSON_PATH"])),
+          ]
 
           lines = []
           failed = False
-          for sweep in sweeps:
-            games = int(sweep.get("games", 0))
-            completed = int(sweep.get("completed", 0))
-            failed_count = int(sweep.get("failed", 0))
-            pct = (completed / games * 100.0) if games else 0.0
-            lines.append(
-              f"- {games} games: completed={completed}, failed={failed_count}, completion={pct:.2f}%"
-            )
-            if completed != games or failed_count != 0:
-              failed = True
+          for label, path in report_specs:
+            if not path.exists():
+              print(f"Missing {label} report: {path}", file=sys.stderr)
+              sys.exit(1)
+
+            report = json.loads(path.read_text())
+            sweeps = report.get("sweeps", [])
+            if not sweeps:
+              print(f"No sweeps found in {label} report.", file=sys.stderr)
+              sys.exit(1)
+
+            lines.append(f"{label}:")
+            for sweep in sweeps:
+              games = int(sweep.get("games", 0))
+              completed = int(sweep.get("completed", 0))
+              failed_count = int(sweep.get("failed", 0))
+              idle_hot_games = int(sweep.get("idle_hot_games", 0))
+              pct = (completed / games * 100.0) if games else 0.0
+              descriptor = f"games={games}"
+              if idle_hot_games:
+                descriptor += f", idle_hot={idle_hot_games}"
+              lines.append(
+                f"- {descriptor}: completed={completed}, failed={failed_count}, completion={pct:.2f}%"
+              )
+              if completed != games or failed_count != 0:
+                failed = True
 
           summary = "\n".join(lines)
           pathlib.Path("/tmp/load-summary.txt").write_text(summary + "\n")
@@ -88,42 +118,76 @@ jobs:
           import os
           import pathlib
 
-          path = pathlib.Path(os.environ["LOAD_JSON_PATH"])
-          if not path.exists():
+          burst_path = pathlib.Path(os.environ["BURST_JSON_PATH"])
+          hot_path = pathlib.Path(os.environ["HOT_JSON_PATH"])
+          if not burst_path.exists() or not hot_path.exists():
             pathlib.Path("/tmp/pr-load-comment.md").write_text(
-              "## PR Load Test\n\nLoad harness did not produce a report file.\n"
+              "## PR Load Test\n\nLoad harness did not produce one or more report files.\n"
             )
             raise SystemExit
 
-          report = json.loads(path.read_text())
-          sweeps = report.get("sweeps", [])
-          fresh_server_per_sweep = bool((report.get("config") or {}).get("fresh_server_per_sweep"))
+          burst_report = json.loads(burst_path.read_text())
+          hot_report = json.loads(hot_path.read_text())
+          burst_sweeps = burst_report.get("sweeps", [])
+          hot_sweeps = hot_report.get("sweeps", [])
+          fresh_server_per_sweep = bool((burst_report.get("config") or {}).get("fresh_server_per_sweep"))
 
-          lines = ["## PR Load Test", "", "| Games | Completed | Failed | Wall Time (s) | Throughput (games/s) | Action p95 (ms) | RSS Start (MB) | RSS Peak (MB) | RSS End (MB) | RSS Delta End (MB) |", "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|"]
-          for s in sweeps:
-            games = s.get("games", 0)
-            completed = s.get("completed", 0)
-            failed = s.get("failed", 0)
-            wall = s.get("wall_time_sec", 0.0)
-            throughput = s.get("throughput_games_per_sec", 0.0)
-            action_p95 = (s.get("action_latency_stats_ms") or {}).get("p95", 0.0)
+          def fmt(value, decimals=1):
+            if value is None:
+              return "n/a"
+            return f"{value:.{decimals}f}"
+
+          lines = ["## PR Load Test", "", "### Burst Sweep", ""]
+          lines.extend([
+            "| Games | Completed | Failed | Wall Time (s) | Throughput (games/s) | Action p95 (ms) | Action p99 (ms) | RSS Peak (MB) | RSS Delta End (MB) |",
+            "|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+          ])
+          for s in burst_sweeps:
+            action = s.get("action_latency_stats_ms") or {}
             rss_window = s.get("server_rss_window_mb") or {}
-            rss_start = rss_window.get("start", 0.0)
-            rss_peak = rss_window.get("peak", 0.0)
-            rss_end = rss_window.get("end", 0.0)
-            rss_delta_end = rss_window.get("delta_end", 0.0)
             lines.append(
-              f"| {games} | {completed} | {failed} | {wall:.2f} | {throughput:.3f} | {action_p95:.1f} | {rss_start:.1f} | {rss_peak:.1f} | {rss_end:.1f} | {rss_delta_end:.1f} |"
+              f"| {s.get('games', 0)} | {s.get('completed', 0)} | {s.get('failed', 0)} | "
+              f"{fmt(s.get('wall_time_sec', 0.0), 2)} | {fmt(s.get('throughput_games_per_sec', 0.0), 3)} | "
+              f"{fmt(action.get('p95', 0.0), 1)} | {fmt(action.get('p99', 0.0), 1)} | "
+              f"{fmt(rss_window.get('peak', 0.0), 1)} | {fmt(rss_window.get('delta_end', 0.0), 1)} |"
+            )
+
+          lines.extend(["", "### Hot Residency Sweep", ""])
+          lines.extend([
+            "| Active Games | Idle Hot Games | Completed | Failed | Wall Time (s) | Throughput (games/s) | Action p95 (ms) | Preload RSS Delta (MB) | Active RSS Peak (MB) | Active RSS Delta (MB) |",
+            "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+          ])
+          for s in hot_sweeps:
+            action = s.get("action_latency_stats_ms") or {}
+            preload_rss = s.get("preload_rss_window_mb") or {}
+            active_rss = s.get("server_rss_window_mb") or {}
+            lines.append(
+              f"| {s.get('games', 0)} | {s.get('idle_hot_games', 0)} | {s.get('completed', 0)} | {s.get('failed', 0)} | "
+              f"{fmt(s.get('wall_time_sec', 0.0), 2)} | {fmt(s.get('throughput_games_per_sec', 0.0), 3)} | "
+              f"{fmt(action.get('p95', 0.0), 1)} | {fmt(preload_rss.get('delta_end', 0.0), 1)} | "
+              f"{fmt(active_rss.get('peak', 0.0), 1)} | {fmt(active_rss.get('delta_end', 0.0), 1)} |"
             )
 
           lines.append("")
-          lines.append("- Harness config: `--db-copy --mock-cube-data --sweep 10,50,100,200 --puppet-count 3 --disable-caps --fresh-server-per-sweep --no-runtime-reset-between-sweeps --game-timeout-sec 900`")
+          if burst_sweeps:
+            worst_burst = max((s.get("action_latency_stats_ms") or {}).get("p95", 0.0) for s in burst_sweeps)
+            burst_peak = max((s.get("server_rss_window_mb") or {}).get("peak", 0.0) for s in burst_sweeps)
+            lines.append(f"- Burst worst-case: `action p95={worst_burst:.1f} ms`, `rss peak={burst_peak:.1f} MB`.")
+          if hot_sweeps:
+            worst_hot = max((s.get("action_latency_stats_ms") or {}).get("p95", 0.0) for s in hot_sweeps)
+            hot_peak = max((s.get("server_rss_window_mb") or {}).get("peak", 0.0) for s in hot_sweeps)
+            hot_preload = max((s.get("preload_rss_window_mb") or {}).get("delta_end", 0.0) for s in hot_sweeps)
+            lines.append(
+              f"- Hot-residency worst-case: `action p95={worst_hot:.1f} ms`, `active rss peak={hot_peak:.1f} MB`, `preload rss delta={hot_preload:.1f} MB`."
+            )
+          lines.append("- Burst config: `--sweep 10,50,100,200 --puppet-count 3 --disable-caps --fresh-server-per-sweep --no-runtime-reset-between-sweeps --game-timeout-sec 900`")
+          lines.append("- Hot config: `--games 50 --concurrency 50 --hot-sweep 0,100,250,500 --puppet-count 3 --disable-caps --fresh-server-per-sweep --no-runtime-reset-between-sweeps --game-timeout-sec 900`")
           if fresh_server_per_sweep:
             lines.append("- Sweep isolation: each sweep ran on a fresh managed server process and fresh DB copy.")
           else:
-            reset_count = len(report.get("runtime_resets", []))
+            reset_count = len(burst_report.get("runtime_resets", [])) + len(hot_report.get("runtime_resets", []))
             lines.append(f"- Runtime resets executed: `{reset_count}` (post-calibration, between sweeps, post-sweeps).")
-          lines.append("- Guardrail: workflow fails if any sweep is not 100% completion.")
+          lines.append("- Guardrail: workflow fails if any sweep is not 100% completion with 0 failures.")
           lines.append("")
           lines.append("<sub>Automated comment from PR load-test workflow.</sub>")
           pathlib.Path("/tmp/pr-load-comment.md").write_text("\n".join(lines) + "\n")

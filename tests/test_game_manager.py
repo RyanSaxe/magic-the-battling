@@ -581,3 +581,31 @@ class TestRestoreRecovery:
         assert state is not None
         assert state.current_battle is not None
         assert state.current_battle.opponent_name == "Bot"
+
+    def test_get_game_state_includes_catalog_delta_for_runtime_battle_cards(self, game_manager):
+        game = create_game(["Alice"], num_players=1)
+        set_battler(game, self._make_battler())
+        alice = game.players[0]
+        alice.phase = "battle"
+        alice.chosen_basics = ["Swamp", "Forest", "Mountain"]
+        alice.treasures = 1
+
+        static_opponent = self._make_puppet_snapshot()
+        puppet = Puppet(name="Bot", player_history_id=1, snapshots={"3_1": static_opponent})
+        game.puppets.append(puppet)
+        bot_for_round = puppet.get_opponent_for_round(alice.stage, alice.round)
+        assert bot_for_round is not None
+        battle.start(game, alice, bot_for_round)
+
+        game_manager._active_games["g1"] = game
+        game_manager._player_to_game["pid_alice"] = "g1"
+        game_manager._player_id_to_name["pid_alice"] = "Alice"
+
+        state = game_manager.get_game_state("g1", "pid_alice")
+
+        assert state is not None
+        assert state.current_battle is not None
+        assert state.catalog_delta["basic-swamp"].name == "Swamp"
+        assert state.catalog_delta["basic-forest"].name == "Forest"
+        assert state.catalog_delta["basic-mountain"].name == "Mountain"
+        assert state.catalog_delta["treasure"].name == "Treasure"

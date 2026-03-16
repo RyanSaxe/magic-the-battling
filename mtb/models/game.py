@@ -1,9 +1,11 @@
+import json
 import random
 import weakref
 from typing import Any, Literal
 
-from pydantic import AliasChoices, BaseModel, Field, PrivateAttr, field_validator
+from pydantic import AliasChoices, BaseModel, Field, PrivateAttr, field_validator, model_serializer
 
+from mtb.models.card_registry import export_registry, import_registry
 from mtb.models.cards import Battler, Card
 from mtb.models.types import Phase, PlayMode, ZoneName, normalize_play_mode
 
@@ -200,6 +202,13 @@ class Player(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     game_ref: weakref.ref["Game"] | None = Field(default=None, exclude=True)
 
+    @model_serializer(mode="wrap")
+    def _serialize(self, handler: Any, info: Any) -> dict[str, Any]:
+        data = handler(self)
+        if info.context and info.context.get("exclude_shared_battler"):
+            data.pop("battler", None)
+        return data
+
     @property
     def game(self) -> "Game":
         if self.game_ref is None:
@@ -278,6 +287,15 @@ class Game(BaseModel):
         for player in self.players:
             player.game_ref = weakref.ref(self)
         self.normalize_player_battlers()
+
+    def snapshot_dump_json(self) -> str:
+        context: dict[str, Any] = {"slim_cards": True}
+        if self.battler is not None:
+            context["exclude_shared_battler"] = True
+        game_data = self.model_dump(context=context)
+        referenced = _collect_scryfall_ids(game_data)
+        registry_data = export_registry(referenced)
+        return json.dumps({"data": game_data, "card_registry": registry_data})
 
     def get_draft_state(self) -> DraftState:
         if self.draft_state is None:
@@ -420,3 +438,43 @@ def _deal_starting_pool(game: Game) -> None:
         player.battler.cards = player.battler.cards[pool_size:]
         player.sideboard.extend(player_cards)
         player.populate_hand()
+
+
+def _collect_scryfall_ids(data: Any) -> set[str]:
+    ids: set[str] = set()
+    stack: list[Any] = [data]
+
+    while stack:
+        obj = stack.pop()
+        if isinstance(obj, dict):
+            sid = obj.get("scryfall_id")
+            if isinstance(sid, str) and sid:
+                ids.add(sid)
+            stack.extend(obj.values())
+        elif isinstance(obj, list):
+            stack.extend(obj)
+
+    return ids
+
+
+def restore_game_from_snapshot(json_str: str) -> Game:
+    data = json.loads(json_str)
+    if "card_registry" in data:
+        import_registry(data["card_registry"])
+        return Game(**data["data"])
+    return Game(**data)
+
+
+def slim_snapshot_dump(snapshot_data: BattleSnapshotData) -> str:
+    slim_data = snapshot_data.model_dump(context={"slim_cards": True})
+    referenced = _collect_scryfall_ids(slim_data)
+    registry_data = export_registry(referenced)
+    return json.dumps({"data": slim_data, "card_registry": registry_data})
+
+
+def restore_snapshot_data(json_str: str) -> BattleSnapshotData:
+    data = json.loads(json_str)
+    if "card_registry" in data:
+        import_registry(data["card_registry"])
+        return BattleSnapshotData(**data["data"])
+    return BattleSnapshotData(**data)

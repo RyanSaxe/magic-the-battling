@@ -3,7 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 from mtb.models.cards import Card
-from mtb.models.game import BattleResolution, LastBattleResult, Zones
+from mtb.models.game import BattleResolution
 from mtb.models.types import BuildSource, CardDestination, Phase, PlayMode, ZoneName, normalize_play_mode
 
 LastResult = Literal["win", "loss", "draw"]
@@ -54,6 +54,66 @@ class StartGameResponse(BaseModel):
     success: bool
 
 
+class CardCatalogEntry(BaseModel):
+    scryfall_id: str
+    name: str
+    image_url: str
+    flip_image_url: str | None = None
+    png_url: str | None = None
+    flip_png_url: str | None = None
+    type_line: str
+    oracle_text: str | None = None
+    colors: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    cmc: float = 0.0
+    life_modifier: int | None = None
+    hand_modifier: int | None = None
+    token_scryfall_ids: list[str] = Field(default_factory=list)
+    is_upgrade: bool = False
+    is_vanguard: bool = False
+    is_companion: bool = False
+
+
+class CardRef(BaseModel):
+    id: str
+    scryfall_id: str
+    upgrade_target_id: str | None = None
+    original_owner: str | None = None
+
+
+class ZonesView(BaseModel):
+    battlefield: list[CardRef] = Field(default_factory=list)
+    graveyard: list[CardRef] = Field(default_factory=list)
+    exile: list[CardRef] = Field(default_factory=list)
+    hand: list[CardRef] = Field(default_factory=list)
+    sideboard: list[CardRef] = Field(default_factory=list)
+    upgrades: list[CardRef] = Field(default_factory=list)
+    command_zone: list[CardRef] = Field(default_factory=list)
+    library: list[CardRef] = Field(default_factory=list)
+    treasures: int = 0
+    submitted_cards: list[CardRef] = Field(default_factory=list)
+    original_hand_ids: list[str] = Field(default_factory=list)
+    tapped_card_ids: list[str] = Field(default_factory=list)
+    flipped_card_ids: list[str] = Field(default_factory=list)
+    face_down_card_ids: list[str] = Field(default_factory=list)
+    counters: dict[str, dict[str, int]] = Field(default_factory=dict)
+    attachments: dict[str, list[str]] = Field(default_factory=dict)
+    spawned_tokens: list[CardRef] = Field(default_factory=list)
+    revealed_card_ids: list[str] = Field(default_factory=list)
+
+
+class LastBattleResultView(BaseModel):
+    opponent_name: str
+    winner_name: str | None
+    is_draw: bool = False
+    poison_dealt: int = 0
+    poison_taken: int = 0
+    treasures_gained: int = 0
+    card_gained: CardRef | None = None
+    vanquisher_gained: bool = False
+    pre_battle_treasures: int = 0
+
+
 class PlayerView(BaseModel):
     name: str
     treasures: int
@@ -69,26 +129,26 @@ class PlayerView(BaseModel):
     sideboard_count: int
     hand_size: int
     is_stage_increasing: bool
-    upgrades: list[Card]
-    vanguard: Card | None
+    upgrades: list[CardRef]
+    vanguard: CardRef | None
     chosen_basics: list[str]
-    most_recently_revealed_cards: list[Card] = []
+    most_recently_revealed_cards: list[CardRef] = Field(default_factory=list)
     last_result: LastResult | None = None
     pairing_probability: float | None = None
     is_most_recent_ghost: bool = False
-    full_sideboard: list[Card] = []
-    command_zone: list[Card] = []
+    full_sideboard: list[CardRef] = Field(default_factory=list)
+    command_zone: list[CardRef] = Field(default_factory=list)
     placement: int = 0
     in_sudden_death: bool = False
     build_ready: bool = False
 
 
 class SelfPlayerView(PlayerView):
-    hand: list[Card]
-    sideboard: list[Card]
-    command_zone: list[Card] = []
-    current_pack: list[Card] | None = None
-    last_battle_result: LastBattleResult | None = None
+    hand: list[CardRef]
+    sideboard: list[CardRef]
+    command_zone: list[CardRef] = Field(default_factory=list)
+    current_pack: list[CardRef] | None = None
+    last_battle_result: LastBattleResultView | None = None
     build_ready: bool = False
     in_sudden_death: bool = False
 
@@ -98,8 +158,8 @@ class BattleView(BaseModel):
     coin_flip_name: str
     on_the_play_name: str
     current_turn_name: str
-    your_zones: Zones
-    opponent_zones: Zones
+    your_zones: ZonesView
+    opponent_zones: ZonesView
     opponent_hand_count: int
     result_submissions: dict[str, str]
     your_poison: int
@@ -108,7 +168,7 @@ class BattleView(BaseModel):
     your_life: int = 20
     opponent_life: int = 20
     is_sudden_death: bool = False
-    opponent_full_sideboard: list[Card] = []
+    opponent_full_sideboard: list[CardRef] = Field(default_factory=list)
     can_manipulate_opponent: bool = False
 
 
@@ -118,12 +178,18 @@ class GameStateResponse(BaseModel):
     starting_life: int
     players: list[PlayerView]
     self_player: SelfPlayerView
-    available_upgrades: list[Card]
+    available_upgrades: list[CardRef]
     current_battle: BattleView | None = None
     battle_resolution: BattleResolution | None = None
     use_upgrades: bool = True
     cube_id: str = "auto"
     play_mode: PlayMode = "limited"
+    catalog_delta: dict[str, CardCatalogEntry] = Field(default_factory=dict)
+
+
+class GameBootstrapResponse(BaseModel):
+    catalog: dict[str, CardCatalogEntry]
+    state: GameStateResponse
 
 
 class LobbyPlayer(BaseModel):
@@ -254,8 +320,8 @@ class SpectateRequestStatus(BaseModel):
 
 
 class GameCardsResponse(BaseModel):
-    cards: list[Card]
-    upgrades: list[Card]
+    cards: list[CardCatalogEntry]
+    upgrades: list[CardCatalogEntry]
 
 
 class SharePlayerSnapshot(BaseModel):

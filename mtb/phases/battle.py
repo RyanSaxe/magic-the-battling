@@ -1,3 +1,4 @@
+import hashlib
 import random
 from collections.abc import Callable
 from importlib import import_module
@@ -39,6 +40,7 @@ def _create_basic_land(name: str) -> Card:
         name=name,
         image_url=BASIC_LAND_IMAGES.get(name, f"basic/{name.lower()}.jpg"),
         id=f"basic-{name.lower()}-{uuid4().hex[:8]}",
+        scryfall_id=f"basic-{name.lower()}",
         type_line="Basic Land",
     )
 
@@ -48,6 +50,7 @@ def _create_treasure_token() -> Card:
         name="Treasure",
         image_url=TREASURE_TOKEN_IMAGE,
         id=f"treasure-{uuid4().hex[:8]}",
+        scryfall_id="treasure",
         type_line="Token Artifact — Treasure",
     )
 
@@ -688,10 +691,14 @@ def _handle_spawn(zones: Zones, _card_id: str, data: dict) -> bool:
     token_data = data.get("token")
     if not token_data:
         return False
+    name = token_data.get("name", "Token")
+    image_url = token_data.get("image_url", "")
+    sid = f"token-{hashlib.md5((name + image_url).encode()).hexdigest()[:12]}"
     token = Card(
         id=f"token-{uuid4().hex[:8]}",
-        name=token_data.get("name", "Token"),
-        image_url=token_data.get("image_url", ""),
+        scryfall_id=sid,
+        name=name,
+        image_url=image_url,
         type_line=token_data.get("type_line", "Token Creature"),
     )
     zones.spawned_tokens.append(token)

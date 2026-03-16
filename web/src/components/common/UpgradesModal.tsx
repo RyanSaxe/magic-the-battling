@@ -36,6 +36,8 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
         if (selectedTargetId) {
           setSelectedTargetId(null)
         } else if (selectedUpgradeId) {
@@ -44,6 +46,12 @@ export function UpgradesModal({ upgrades, mode, targets = [], onApply, onClose, 
           onClose()
         }
       } else if (e.key === 'Enter' && selectedUpgradeId && selectedTargetId && onApply) {
+        e.preventDefault()
+        e.stopPropagation()
+        const active = document.activeElement
+        if (active instanceof HTMLElement) {
+          active.blur()
+        }
         applyUpgrade(selectedUpgradeId, selectedTargetId)
       }
     }

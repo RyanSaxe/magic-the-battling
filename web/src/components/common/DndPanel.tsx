@@ -3,6 +3,7 @@ import { bestFit, type ZoneDims } from '../../hooks/cardSizeUtils'
 import { DroppableZone } from '../../dnd'
 import type { ZoneName } from '../../types'
 import type { ZoneOwner } from '../../dnd/types'
+import { resolveBattlePanelLayout } from './DndPanelLayout'
 
 interface DndPanelProps {
   title: string
@@ -16,11 +17,23 @@ interface DndPanelProps {
 }
 
 const DEFAULT_DIMS: ZoneDims = { width: 80, height: 112, rows: 1, columns: 1 }
+const PANEL_GAP = 6
+const PANEL_MAX_WIDTH = 200
+const PANEL_MIN_WIDTH = 40
+
+function contentBoxSize(node: HTMLElement) {
+  const cs = getComputedStyle(node)
+  return {
+    width: node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight),
+    height: node.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom),
+  }
+}
 
 export function DndPanel({ title, count, onClose, children, zone, zoneOwner, validFromZones, tone = 'default' }: DndPanelProps) {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_DIMS)
   const [mobileHeight, setMobileHeight] = useState<number | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
+  const isBattleTone = tone === 'battle'
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -54,30 +67,38 @@ export function DndPanel({ title, count, onClose, children, zone, zoneOwner, val
       if (!node) return
 
       const measure = (w: number, h: number) => {
-        const next = bestFit(count, w, h, 6, 200, 40)
+        const next = isBattleTone
+          ? resolveBattlePanelLayout(count, w, h)
+          : bestFit(count, w, h, PANEL_GAP, PANEL_MAX_WIDTH, PANEL_MIN_WIDTH)
         setDims((prev) =>
-          prev.width === next.width && prev.height === next.height ? prev : next
+          prev.width === next.width
+          && prev.height === next.height
+          && prev.rows === next.rows
+          && prev.columns === next.columns
+            ? prev
+            : next
         )
       }
 
-      const cs = getComputedStyle(node)
-      const w = node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
-      const h = node.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
-      measure(w, h)
+      const initial = contentBoxSize(node)
+      measure(initial.width, initial.height)
 
-      const observer = new ResizeObserver((entries) => {
-        const entry = entries[0]
-        if (!entry) return
-        measure(entry.contentRect.width, entry.contentRect.height)
+      const observer = new ResizeObserver(() => {
+        const next = contentBoxSize(node)
+        measure(next.width, next.height)
       })
 
       observer.observe(node)
       observerRef.current = observer
     },
-    [count],
+    [count, isBattleTone],
   )
 
-  const isBattleTone = tone === 'battle'
+  const panelChildren = children({ width: dims.width, height: dims.height })
+  const battleGridStyle = {
+    gridTemplateColumns: `repeat(${Math.max(1, dims.columns)}, ${dims.width}px)`,
+    gridAutoRows: `${dims.height}px`,
+  }
 
   return (
     <div
@@ -92,13 +113,31 @@ export function DndPanel({ title, count, onClose, children, zone, zoneOwner, val
       </div>
       <div ref={bodyRef} className="flex-1 min-h-0 p-2 flex items-center justify-center">
         {zone ? (
-          <DroppableZone zone={zone} zoneOwner={zoneOwner} validFromZones={validFromZones} idPrefix="panel" className="flex flex-wrap gap-1.5 justify-center content-center w-full h-full">
-            {children({ width: dims.width, height: dims.height })}
+          <DroppableZone
+            zone={zone}
+            zoneOwner={zoneOwner}
+            validFromZones={validFromZones}
+            idPrefix="panel"
+            className={isBattleTone ? 'w-full h-full overflow-auto' : 'flex flex-wrap gap-1.5 justify-center content-center w-full h-full'}
+          >
+            {isBattleTone ? (
+              <div className="grid gap-1.5 justify-center content-start min-h-full" style={battleGridStyle}>
+                {panelChildren}
+              </div>
+            ) : (
+              panelChildren
+            )}
           </DroppableZone>
         ) : (
-          <div className="flex flex-wrap gap-1.5 justify-center content-center">
-            {children({ width: dims.width, height: dims.height })}
-          </div>
+          isBattleTone ? (
+            <div className="grid gap-1.5 justify-center content-start w-full h-full overflow-auto" style={battleGridStyle}>
+              {panelChildren}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 justify-center content-center">
+              {panelChildren}
+            </div>
+          )
         )}
       </div>
     </div>

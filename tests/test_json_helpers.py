@@ -49,7 +49,7 @@ def json_helpers_module():
         module.stop_worker()
     except Exception:
         pass
-    module = importlib.reload(module)  # type: ignore[assignment]
+    module = importlib.reload(module)
     yield module
     try:
         module.stop_worker()

@@ -326,9 +326,9 @@ async def _handle_spectator_connection(
 
     await connection_manager.connect_spectator(game_id, target_player_id, websocket)
 
-    state = game_manager.get_game_state(game_id, target_player_id)
-    if state:
-        await send_ws(websocket, {"type": "game_state", "payload": state.model_dump()}, spectator=True)
+    bootstrap = game_manager.get_game_bootstrap(game_id, target_player_id)
+    if bootstrap:
+        await send_ws(websocket, {"type": "game_bootstrap", "payload": bootstrap.model_dump()}, spectator=True)
 
     try:
         while True:
@@ -389,13 +389,13 @@ async def _send_initial_player_state(
     if pending and not pending.is_started:
         await connection_manager.broadcast_lobby_state(game_id)
     elif game:
-        state = game_manager.get_game_state(game_id, player_id)
-        if state:
+        bootstrap = game_manager.get_game_bootstrap(game_id, player_id)
+        if bootstrap:
             await send_ws(
                 websocket,
                 {
-                    "type": "game_state",
-                    "payload": state.model_dump(),
+                    "type": "game_bootstrap",
+                    "payload": bootstrap.model_dump(),
                 },
             )
 

@@ -377,14 +377,9 @@ def test_full_draft_flow(card_factory):
     draft.swap(game, bob, bob_pack_card, bob_swap_card, "hand")
 
     # Add cards with ELO for hand population testing
-    high_elo = card_factory("high_elo")
-    high_elo.elo = 100.0
-    mid_elo = card_factory("mid_elo")
-    mid_elo.elo = 50.0
-    low_elo = card_factory("low_elo")
-    low_elo.elo = 10.0
-    alice_pack_card.elo = 80.0
-    alice_pack_card_2.elo = 5.0
+    high_elo = card_factory("high_elo", elo=100.0)
+    mid_elo = card_factory("mid_elo", elo=50.0)
+    low_elo = card_factory("low_elo", elo=10.0)
     alice.sideboard.extend([high_elo, mid_elo, low_elo])
 
     # End draft for both
@@ -409,9 +404,7 @@ def test_full_draft_flow(card_factory):
 
 def test_battler_elo_is_static(card_factory):
     """Battler.elo should be static and not change when cards are removed."""
-    cards = [card_factory(f"c{i}") for i in range(10)]
-    for i, card in enumerate(cards):
-        card.elo = float(i * 10)  # 0, 10, 20, ... 90
+    cards = [card_factory(f"c{i}", elo=float(i * 10)) for i in range(10)]
 
     expected_elo = sum(c.elo for c in cards) / len(cards)  # 45.0
     battler = Battler(cards=cards, upgrades=[], vanguards=[], elo=expected_elo)

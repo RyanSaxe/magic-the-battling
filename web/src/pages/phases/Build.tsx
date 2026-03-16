@@ -105,6 +105,8 @@ export function BuildPhase({
   const handZoneRef = useRef<HTMLDivElement | null>(null);
   const battlefieldZoneRef = useRef<HTMLDivElement | null>(null);
   const sideboardZoneRef = useRef<HTMLDivElement | null>(null);
+  const pendingHandAddsRef = useRef(0);
+  const pendingHandAddsTimeoutRef = useRef<number | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
     if (!(e.target as HTMLElement).closest(".card, .card-slot")) {
@@ -136,6 +138,43 @@ export function BuildPhase({
       return next;
     });
   }, []);
+
+  const clearPendingHandAdds = useCallback(() => {
+    pendingHandAddsRef.current = 0;
+    if (pendingHandAddsTimeoutRef.current !== null) {
+      window.clearTimeout(pendingHandAddsTimeoutRef.current);
+      pendingHandAddsTimeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    // Clear optimistic move guards once authoritative state updates arrive.
+    clearPendingHandAdds();
+  }, [self_player.hand.length, self_player.sideboard.length, clearPendingHandAdds]);
+
+  useEffect(
+    () => () => {
+      clearPendingHandAdds();
+    },
+    [clearPendingHandAdds],
+  );
+
+  const tryQueueSideboardToHandMove = useCallback(() => {
+    const availableSlots =
+      maxHandSize - self_player.hand.length - pendingHandAddsRef.current;
+    if (availableSlots <= 0) return false;
+
+    pendingHandAddsRef.current += 1;
+    if (pendingHandAddsTimeoutRef.current !== null) {
+      window.clearTimeout(pendingHandAddsTimeoutRef.current);
+    }
+    // Fallback so a dropped/failed response doesn't leave the guard stuck.
+    pendingHandAddsTimeoutRef.current = window.setTimeout(() => {
+      pendingHandAddsRef.current = 0;
+      pendingHandAddsTimeoutRef.current = null;
+    }, 2000);
+    return true;
+  }, [maxHandSize, self_player.hand.length]);
 
   useEffect(() => {
     if (
@@ -172,7 +211,15 @@ export function BuildPhase({
     if (locked) return;
     if (selection?.type === "card" && selection.zone === "sideboard") {
       const card = self_player.sideboard.find((c) => c.id === selection.cardId);
-      if (card) setSlotCard(slotIndex, card);
+      if (!card) {
+        setSelection(null);
+        return;
+      }
+      if (!tryQueueSideboardToHandMove()) {
+        setSelection(null);
+        return;
+      }
+      setSlotCard(slotIndex, card);
       actions.buildMove(selection.cardId, "sideboard", "hand");
       setSelection(null);
     } else if (
@@ -213,6 +260,10 @@ export function BuildPhase({
       actions.buildSwap(selection.cardId, "hand", card.id, "sideboard");
       setSelection(null);
     } else if (selection?.type === "empty") {
+      if (!tryQueueSideboardToHandMove()) {
+        setSelection(null);
+        return;
+      }
       setSlotCard(selection.slotIndex, card);
       actions.buildMove(card.id, "sideboard", "hand");
       setSelection(null);

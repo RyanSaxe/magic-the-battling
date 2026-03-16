@@ -20,6 +20,7 @@ import server.routers.ops as ops_module
 import server.routers.ws as ws_module
 import server.services.game_manager as gm_module
 import server.services.session_manager as sm_module
+from mtb.models.card_registry import clear_registry
 from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
 from mtb.models.game import Player
 from server.db.models import Base
@@ -199,8 +200,10 @@ def upgrade_factory(card_factory):
 def reset_singletons():
     """Install fresh runtime singletons everywhere the app imported them."""
     _reset_runtime_state()
+    clear_registry()
     yield
     _reset_runtime_state()
+    clear_registry()
 
 
 @pytest.fixture

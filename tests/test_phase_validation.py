@@ -98,10 +98,10 @@ class TestPhaseValidationIntegration:
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
-            assert state["type"] == "game_state"
-            assert state["payload"]["phase"] == "build"
+            assert state["type"] == "game_bootstrap"
+            assert state["payload"]["state"]["phase"] == "build"
 
-            card = state["payload"]["self_player"]["sideboard"][0]
+            card = state["payload"]["state"]["self_player"]["sideboard"][0]
             ws.send_json(
                 {
                     "action": "build_move",
@@ -116,6 +116,74 @@ class TestPhaseValidationIntegration:
             )
             assert msg["type"] == "game_state"
 
+    def test_build_move_rejects_second_rapid_move_when_one_slot_open(
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+    ):
+        game_id = game_with_players["game_id"]
+        session_id = game_with_players["alice"]["session_id"]
+        client.post(f"/api/games/{game_id}/start")
+
+        with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
+            bootstrap = ws_receive_json(ws)
+            assert bootstrap["type"] == "game_bootstrap"
+            state = bootstrap["payload"]["state"]
+            hand_size = state["self_player"]["hand_size"]
+
+            # Fill to one open hand slot.
+            for _ in range(hand_size - 1):
+                card = state["self_player"]["sideboard"][0]
+                ws.send_json(
+                    {
+                        "action": "build_move",
+                        "payload": {"card_id": card["id"], "source": "sideboard", "destination": "hand"},
+                    }
+                )
+                msg = ws_receive_json_until(
+                    ws,
+                    lambda message: message["type"] == "game_state",
+                    description="game_state after build_move",
+                )
+                state = msg["payload"]
+
+            sideboard = state["self_player"]["sideboard"]
+            assert len(sideboard) >= 2
+            first_card_id = sideboard[0]["id"]
+            second_card_id = sideboard[1]["id"]
+            baseline_sideboard_count = len(sideboard)
+
+            # Send two moves back-to-back with only one open slot remaining.
+            ws.send_json(
+                {
+                    "action": "build_move",
+                    "payload": {"card_id": first_card_id, "source": "sideboard", "destination": "hand"},
+                }
+            )
+            ws.send_json(
+                {
+                    "action": "build_move",
+                    "payload": {"card_id": second_card_id, "source": "sideboard", "destination": "hand"},
+                }
+            )
+
+            saw_game_state = None
+            saw_error = None
+            for _ in range(4):
+                message = ws_receive_json(ws)
+                if message["type"] == "game_state":
+                    saw_game_state = message
+                elif message["type"] == "error":
+                    saw_error = message
+                if saw_game_state and saw_error:
+                    break
+
+            assert saw_game_state is not None
+            assert saw_error is not None
+            assert "Hand is full" in saw_error["payload"]["message"]
+
+            final_self = saw_game_state["payload"]["self_player"]
+            assert len(final_self["hand"]) == hand_size
+            assert len(final_self["sideboard"]) == baseline_sideboard_count - 1
+
     def test_draft_action_during_build_phase_rejected(
         self, client, game_with_players, ws_receive_json, ws_receive_json_until
     ):
@@ -125,8 +193,8 @@ class TestPhaseValidationIntegration:
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
-            assert state["type"] == "game_state"
-            assert state["payload"]["phase"] == "build"
+            assert state["type"] == "game_bootstrap"
+            assert state["payload"]["state"]["phase"] == "build"
 
             ws.send_json(
                 {
@@ -157,7 +225,7 @@ class TestPhaseValidationIntegration:
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
-            assert state["payload"]["phase"] == "build"
+            assert state["payload"]["state"]["phase"] == "build"
 
             ws.send_json(
                 {
@@ -184,7 +252,7 @@ class TestPhaseValidationIntegration:
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
-            assert state["payload"]["phase"] == "build"
+            assert state["payload"]["state"]["phase"] == "build"
 
             ws.send_json(
                 {

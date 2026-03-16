@@ -38,8 +38,11 @@ from mtb.models.game import (
     StaticOpponent,
     Zones,
     create_game,
+    restore_game_from_snapshot,
+    restore_snapshot_data,
     set_battler,
     set_player_battlers,
+    slim_snapshot_dump,
 )
 from mtb.models.types import BuildSource, CardDestination, PlayMode, ZoneName, normalize_play_mode
 from mtb.phases import battle, build, draft, reward
@@ -76,12 +79,21 @@ from server.runtime_config import (
 from server.schemas.api import (
     BattleView,
     CubeLoadingStatus,
+    GameBootstrapResponse,
     GameStateResponse,
     LastResult,
     LobbyPlayer,
     LobbyStateResponse,
     PlayerView,
     SelfPlayerView,
+)
+from server.services.game_serialization import (
+    build_catalog_from_game,
+    build_catalog_from_state_refs,
+    card_to_ref,
+    cards_to_refs,
+    last_battle_result_to_view,
+    zones_to_view,
 )
 from server.services.session_manager import session_manager
 
@@ -102,7 +114,7 @@ def _scrub_face_down_cards(cards: list[Card], face_down_ids: set[str], id_map: d
         if card.id in face_down_ids:
             opaque_id = str(uuid4())
             id_map[opaque_id] = card.id
-            result.append(Card(id=opaque_id, name="", image_url="", type_line=""))
+            result.append(Card(id=opaque_id, scryfall_id="__scrubbed__", name="", image_url="", type_line=""))
         else:
             result.append(card)
     return result
@@ -337,7 +349,7 @@ class GameManager:
                     self._dirty_games.discard(game_id)
                     continue
 
-                state_json = game.model_dump_json()
+                state_json = game.snapshot_dump_json()
                 activity_at = self._last_human_activity.get(game_id, now)
                 stmt = sqlite_insert(ActiveGameSnapshot).values(
                     game_id=game_id,
@@ -509,7 +521,7 @@ class GameManager:
             row = session.get(ActiveGameSnapshot, game_id)
             if row is None:
                 return False
-            game = Game.model_validate_json(cast(str, row.state_json))
+            game = restore_game_from_snapshot(cast(str, row.state_json))
             self._active_games[game_id] = game
             if self._normalize_restored_game(game):
                 self.mark_game_dirty(game_id, human_activity=False)
@@ -536,7 +548,7 @@ class GameManager:
             for row in rows:
                 snapshot_game_id = cast(str, row.game_id)
                 try:
-                    game = Game.model_validate_json(cast(str, row.state_json))
+                    game = restore_game_from_snapshot(cast(str, row.state_json))
                 except Exception:
                     logger.exception("Invalid snapshot; deleting row for game_id=%s", snapshot_game_id)
                     session.delete(row)
@@ -1401,7 +1413,7 @@ class GameManager:
 
         for snapshot in history.snapshots:
             key = f"{snapshot.stage}_{snapshot.round}"
-            snapshot_data = BattleSnapshotData.model_validate_json(snapshot.full_state_json)
+            snapshot_data = restore_snapshot_data(snapshot.full_state_json)
             static_opp = StaticOpponent.from_snapshot(snapshot_data, bot_name, history_id)
             snapshots_dict[key] = static_opp
 
@@ -1469,14 +1481,16 @@ class GameManager:
             player_history_id=history.id,
             stage=stage,
             round=player.round,
-            hand_json=json.dumps([c.model_dump() for c in player.hand]),
-            vanguard_json=player.vanguard.model_dump_json() if player.vanguard else None,
+            hand_json=json.dumps([ref.model_dump() for ref in cards_to_refs(player.hand)]),
+            vanguard_json=(ref.model_dump_json() if (ref := card_to_ref(player.vanguard)) is not None else None),
             basic_lands_json=json.dumps(player.chosen_basics),
-            applied_upgrades_json=json.dumps([u.model_dump() for u in player.upgrades if u.upgrade_target]),
+            applied_upgrades_json=json.dumps(
+                [ref.model_dump() for ref in cards_to_refs([u for u in player.upgrades if u.upgrade_target])]
+            ),
             treasures=player.treasures,
             poison=player.poison,
             play_draw_preference=player.play_draw_preference,
-            full_state_json=snapshot_data.model_dump_json(),
+            full_state_json=slim_snapshot_dump(snapshot_data),
         )
         db.add(snapshot)
         db.commit()
@@ -1919,7 +1933,7 @@ class GameManager:
             self._make_fake_player_view(fp, player, probabilities, most_recent_ghost_puppet_name) for fp in game.puppets
         )
 
-        return GameStateResponse(
+        state = GameStateResponse(
             game_id=game_id,
             phase=phase,
             starting_life=game.config.starting_life,
@@ -1939,25 +1953,41 @@ class GameManager:
                 sideboard_count=len(player.sideboard),
                 hand_size=player.hand_size,
                 is_stage_increasing=reward.is_stage_increasing(player),
-                upgrades=player.upgrades,
-                vanguard=player.vanguard,
+                upgrades=cards_to_refs(player.upgrades),
+                vanguard=card_to_ref(player.vanguard),
                 chosen_basics=player.chosen_basics,
-                most_recently_revealed_cards=player.most_recently_revealed_cards,
+                most_recently_revealed_cards=cards_to_refs(player.most_recently_revealed_cards),
                 last_result=self._get_last_result(player),
-                hand=player.hand,
-                sideboard=player.sideboard,
-                command_zone=player.command_zone,
-                current_pack=current_pack,
-                last_battle_result=player.last_battle_result,
+                hand=cards_to_refs(player.hand),
+                sideboard=cards_to_refs(player.sideboard),
+                command_zone=cards_to_refs(player.command_zone),
+                current_pack=cards_to_refs(current_pack) if current_pack is not None else None,
+                last_battle_result=last_battle_result_to_view(player.last_battle_result),
                 build_ready=player.build_ready,
                 in_sudden_death=player.in_sudden_death,
                 placement=player.placement,
             ),
-            available_upgrades=game.available_upgrades,
+            available_upgrades=cards_to_refs(game.available_upgrades),
             current_battle=current_battle,
             battle_resolution=player.battle_resolution,
             cube_id=game.config.cube_id,
             play_mode=game.config.play_mode,
+        )
+        state.catalog_delta = build_catalog_from_state_refs(state)
+        return state
+
+    def get_game_bootstrap(self, game_id: str, player_id: str) -> GameBootstrapResponse | None:
+        game = self._active_games.get(game_id)
+        if game is None:
+            return None
+
+        state = self.get_game_state(game_id, player_id)
+        if state is None:
+            return None
+
+        return GameBootstrapResponse(
+            catalog=build_catalog_from_game(game),
+            state=state,
         )
 
     def _determine_game_phase(self, game: Game) -> str:
@@ -2032,15 +2062,15 @@ class GameManager:
             sideboard_count=len(player.sideboard),
             hand_size=player.hand_size,
             is_stage_increasing=reward.is_stage_increasing(player),
-            upgrades=player.upgrades,
-            vanguard=player.vanguard,
+            upgrades=cards_to_refs(player.upgrades),
+            vanguard=card_to_ref(player.vanguard),
             chosen_basics=player.chosen_basics,
-            most_recently_revealed_cards=player.most_recently_revealed_cards,
+            most_recently_revealed_cards=cards_to_refs(player.most_recently_revealed_cards),
             last_result=self._get_last_result(player),
             pairing_probability=probabilities.get(player.name, 0.0),
             is_most_recent_ghost=player.name == most_recent_ghost_name,
-            full_sideboard=player.sideboard if is_eliminated else [],
-            command_zone=player.command_zone,
+            full_sideboard=cards_to_refs(player.sideboard) if is_eliminated else [],
+            command_zone=cards_to_refs(player.command_zone),
             placement=player.placement,
             in_sudden_death=player.in_sudden_death,
             build_ready=player.build_ready,
@@ -2091,15 +2121,15 @@ class GameManager:
                 sideboard_count=len(snapshot.sideboard),
                 hand_size=len(snapshot.hand),
                 is_stage_increasing=False,
-                upgrades=prior_upgrades,
-                vanguard=snapshot.vanguard,
+                upgrades=cards_to_refs(prior_upgrades),
+                vanguard=card_to_ref(snapshot.vanguard),
                 chosen_basics=snapshot.chosen_basics,
-                most_recently_revealed_cards=revealed_cards,
+                most_recently_revealed_cards=cards_to_refs(revealed_cards),
                 last_result=last_result,
                 pairing_probability=probabilities.get(fake.name, 0.0),
                 is_most_recent_ghost=fake.name == most_recent_ghost_puppet_name,
-                full_sideboard=snapshot.sideboard,
-                command_zone=snapshot.command_zone,
+                full_sideboard=cards_to_refs(snapshot.sideboard),
+                command_zone=cards_to_refs(snapshot.command_zone),
                 placement=fake.placement,
                 in_sudden_death=fake.in_sudden_death,
             )
@@ -2397,8 +2427,8 @@ class GameManager:
             coin_flip_name=b.coin_flip_name,
             on_the_play_name=b.on_the_play_name,
             current_turn_name=b.current_turn_name,
-            your_zones=your_zones,
-            opponent_zones=hidden_opponent,
+            your_zones=zones_to_view(your_zones),
+            opponent_zones=zones_to_view(hidden_opponent),
             opponent_hand_count=len(opponent_zones.hand),
             result_submissions=b.result_submissions,
             your_poison=your_poison,
@@ -2407,7 +2437,7 @@ class GameManager:
             your_life=your_life,
             opponent_life=opponent_life,
             is_sudden_death=b.is_sudden_death,
-            opponent_full_sideboard=full_sideboard,
+            opponent_full_sideboard=cards_to_refs(full_sideboard),
             can_manipulate_opponent=isinstance(opponent_obj, StaticOpponent),
         )
 
@@ -2445,14 +2475,19 @@ class GameManager:
         draft.end_for_player(game, player)
         return True
 
-    def handle_build_move(self, player: Player, card_id: str, source: BuildSource, destination: BuildSource) -> bool:
+    def handle_build_move(
+        self, player: Player, card_id: str, source: BuildSource, destination: BuildSource
+    ) -> bool | str:
         source_list = player.hand if source == "hand" else player.sideboard
         card = next((c for c in source_list if c.id == card_id), None)
         if not card:
-            return False
+            return f"Card not found in {source}"
 
-        build.move_card(player, card, source, destination)
-        return True
+        try:
+            build.move_card(player, card, source, destination)
+            return True
+        except ValueError as e:
+            return str(e)
 
     def handle_build_swap(
         self,
