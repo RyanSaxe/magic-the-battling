@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -11,6 +13,16 @@ function parsePort(raw: string | undefined, fallback: number): number {
   return parsed
 }
 
+function loadLocalCerts(): { key: Buffer; cert: Buffer } | undefined {
+  const certDir = path.resolve(__dirname, 'certs')
+  const certPath = path.join(certDir, 'dev.pem')
+  const keyPath = path.join(certDir, 'dev-key.pem')
+  if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+    return { key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }
+  }
+  return undefined
+}
+
 const backendPort = parsePort(process.env.VITE_BACKEND_PORT, 8000)
 const frontendPort = parsePort(process.env.VITE_FRONTEND_PORT, 3000)
 const backendHttpTarget = `http://localhost:${backendPort}`
@@ -21,6 +33,7 @@ export default defineConfig({
   server: {
     port: frontendPort,
     host: '0.0.0.0',
+    https: loadLocalCerts(),
     proxy: {
       '/api': backendHttpTarget,
       '/ws': {
