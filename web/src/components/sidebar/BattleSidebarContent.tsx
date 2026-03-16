@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import type { BattleView, Card as CardType } from "../../types";
 import type { VoiceChatState } from "../../hooks/useVoiceChat";
 import { UpgradeStack } from "./UpgradeStack";
-import { VoiceControls } from "./VoiceControls";
+import { MicToggle } from "./MicToggle";
 
 interface BattleSidebarContentProps {
   currentBattle: BattleView;
@@ -21,7 +21,11 @@ interface BattleSidebarContentProps {
   onPassOpponentTurn?: () => void;
   handZoneHeight?: number | null;
   middleLaneHeight?: number | null;
-  voiceChat?: { state: VoiceChatState; toggleMute: () => void };
+  voiceChat?: {
+    state: VoiceChatState;
+    toggleSelfMute: () => void;
+    togglePeerMute: (peerName: string) => void;
+  };
 }
 
 function LifeCounter({
@@ -265,8 +269,16 @@ export function BattleSidebarContent({
               )}
 
               <div className="text-center">
-                <div className="text-xs text-gray-400 uppercase mb-1 truncate">
-                  {opponent_name}
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <span className="text-xs text-gray-400 uppercase truncate">
+                    {opponent_name}
+                  </span>
+                  {voiceChat && voiceChat.state.peers.some(p => p.name === opponent_name) && (
+                    <MicToggle
+                      muted={voiceChat.state.mutedPeers.has(opponent_name)}
+                      onClick={() => voiceChat.togglePeerMute(opponent_name)}
+                    />
+                  )}
                 </div>
                 <div className="flex justify-center">
                   <LifeCounter
@@ -285,9 +297,6 @@ export function BattleSidebarContent({
                   <span className="text-amber-400">Opponent's turn</span>
                 )
               )}
-              {voiceChat && (
-                <VoiceControls state={voiceChat.state} onToggleMute={voiceChat.toggleMute} />
-              )}
             </div>
 
             <div className="relative z-10 flex min-h-0 flex-col justify-between gap-3 p-3 pt-2">
@@ -295,8 +304,23 @@ export function BattleSidebarContent({
                 <div className="flex justify-center">
                   <LifeCounter life={yourLife} onChange={onYourLifeChange} />
                 </div>
-                <div className="text-xs text-gray-400 uppercase mt-1 truncate">
-                  {playerName}
+                <div className="flex items-center justify-center gap-1.5 mt-1">
+                  <span className="text-xs text-gray-400 uppercase truncate">
+                    {playerName}
+                  </span>
+                  {voiceChat && voiceChat.state.peers.length > 0 && (
+                    <MicToggle
+                      muted={voiceChat.state.isMuted}
+                      onClick={() => voiceChat.toggleSelfMute()}
+                      connectionColor={(() => {
+                        const { peers } = voiceChat.state
+                        if (peers.some(p => p.connectionState === 'connected')) return 'bg-green-500'
+                        if (peers.some(p => p.connectionState === 'connecting')) return 'bg-yellow-500'
+                        if (peers.every(p => p.connectionState === 'failed')) return 'bg-red-500'
+                        return null
+                      })()}
+                    />
+                  )}
                 </div>
               </div>
 

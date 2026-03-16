@@ -672,16 +672,16 @@ async def _handle_phase_error(
 
 
 async def _handle_voice_signal(game_id: str, player_id: str, payload: dict) -> None:
-    opponent_name = game_manager.get_battle_opponent_name(game_id, player_id)
-    if not opponent_name:
+    target_name = payload.get("target_player")
+    if not target_name:
         return
-    opponent_id = game_manager.get_player_id_by_name(game_id, opponent_name)
-    if not opponent_id:
+    target_id = game_manager.get_player_id_by_name(game_id, target_name)
+    if not target_id:
         return
     sender_name = game_manager._player_id_to_name.get(player_id, "")
     await connection_manager.send_to_player(
         game_id,
-        opponent_id,
+        target_id,
         {
             "type": "voice_signal",
             "payload": {

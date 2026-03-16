@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { FaDiscord } from "react-icons/fa6";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
+import { useVoiceChat } from "../hooks/useVoiceChat";
+import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { InfoIcon } from "../components/icons/InfoIcon";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
+import { MicToggle } from "../components/sidebar/MicToggle";
 import { useToast } from "../contexts";
 import { HintsBanner } from "../components/common/HintsBanner";
 import { CubeCobraPrimerLink } from "../components/common/CubeCobraPrimerLink";
@@ -159,6 +162,12 @@ export function Lobby() {
   const navigate = useNavigate();
   const { session, clearSession } = useSession();
   const { addToast } = useToast();
+
+  const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(null);
+  const handleVoiceSignal = useCallback((payload: VoiceSignalPayload) => {
+    voiceSignalRef.current?.(payload);
+  }, []);
+
   const {
     lobbyState,
     gameState,
@@ -167,12 +176,25 @@ export function Lobby() {
     invalidSession,
     gameNotFound,
     actions,
+    send,
   } = useGame(
     gameId ?? null,
     session?.sessionId ?? null,
     null,
     addToast,
+    handleVoiceSignal,
   );
+
+  const peerNames = useMemo(() => {
+    if (!lobbyState || !session) return []
+    return lobbyState.players
+      .filter(p => p.player_id !== session.playerId)
+      .map(p => p.name)
+  }, [lobbyState, session])
+
+  const selfName = lobbyState?.players.find(p => p.player_id === session?.playerId)?.name ?? null
+
+  const voiceChat = useVoiceChat(send, peerNames, selfName, voiceSignalRef);
 
   const [copied, setCopied] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
@@ -875,20 +897,39 @@ export function Lobby() {
                                 player.is_ready ? "bg-green-500" : "bg-gray-500"
                               }`}
                             />
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <div className="text-white text-sm truncate">
                                 {player.name}
                               </div>
                             </div>
+                            {player.player_id === session?.playerId && voiceChat.state.peers.length > 0 && (
+                              <MicToggle
+                                muted={voiceChat.state.isMuted}
+                                onClick={() => voiceChat.toggleSelfMute()}
+                                connectionColor={(() => {
+                                  const { peers } = voiceChat.state
+                                  if (peers.some(p => p.connectionState === 'connected')) return 'bg-green-500'
+                                  if (peers.some(p => p.connectionState === 'connecting')) return 'bg-yellow-500'
+                                  if (peers.every(p => p.connectionState === 'failed')) return 'bg-red-500'
+                                  return null
+                                })()}
+                              />
+                            )}
+                            {player.player_id !== session?.playerId && voiceChat.state.peers.some(p => p.name === player.name) && (
+                              <MicToggle
+                                muted={voiceChat.state.mutedPeers.has(player.name)}
+                                onClick={() => voiceChat.togglePeerMute(player.name)}
+                              />
+                            )}
                             {player.is_host && (
-                              <span className="text-amber-400 text-xs shrink-0 ml-auto">
+                              <span className="text-amber-400 text-xs shrink-0">
                                 Host
                               </span>
                             )}
                             {isHost && !player.is_host && (
                               <button
                                 onClick={() => actions.kickPlayer(player.player_id)}
-                                className="text-gray-500 hover:text-red-400 transition-colors shrink-0 ml-auto text-xs"
+                                className="text-gray-500 hover:text-red-400 transition-colors shrink-0 text-xs"
                                 title="Remove player"
                               >
                                 &times;

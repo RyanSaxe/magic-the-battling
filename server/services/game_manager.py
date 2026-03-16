@@ -1735,20 +1735,6 @@ class GameManager:
                 return player_id
         return None
 
-    def get_battle_opponent_name(self, game_id: str, player_id: str) -> str | None:
-        game = self.get_game(game_id)
-        if not game:
-            return None
-        player_name = self._player_id_to_name.get(player_id)
-        if not player_name:
-            return None
-        for b in game.active_battles:
-            if b.player.name == player_name:
-                return b.opponent.name if isinstance(b.opponent, Player) else None
-            if b.opponent.name == player_name and isinstance(b.opponent, Player):
-                return b.player.name
-        return None
-
     def create_spectate_request(self, game_id: str, target_player_name: str, spectator_name: str) -> str:
         self.cleanup_expired_spectate_requests()
         if len(self._spectate_requests) >= MAX_SPECTATE_REQUESTS_TOTAL:

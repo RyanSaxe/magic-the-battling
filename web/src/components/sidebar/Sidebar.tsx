@@ -10,6 +10,7 @@ interface SidebarProps {
   phaseContent?: ReactNode;
   useUpgrades?: boolean;
   isMobile?: boolean;
+  renderMicToggle?: (player: PlayerView) => ReactNode;
 }
 
 export function Sidebar({
@@ -18,6 +19,7 @@ export function Sidebar({
   phaseContent,
   useUpgrades = true,
   isMobile = false,
+  renderMicToggle,
 }: SidebarProps) {
   const { state, setRevealedPlayerName } = useContextStrip();
   const revealedPlayer = state.revealedPlayerName
@@ -99,6 +101,7 @@ export function Sidebar({
           <PlayerList
             players={players}
             currentPlayerName={currentPlayer.name}
+            renderMicToggle={renderMicToggle}
           />
         </div>
       )}

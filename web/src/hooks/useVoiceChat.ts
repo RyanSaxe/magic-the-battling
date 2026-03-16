@@ -5,10 +5,16 @@ const ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun1.l.google.com:19302' },
 ]
 
+export interface VoicePeer {
+  name: string
+  connectionState: 'connecting' | 'connected' | 'failed' | 'disconnected'
+}
+
 export interface VoiceChatState {
   isAvailable: boolean
-  connectionState: 'disconnected' | 'connecting' | 'connected' | 'failed'
   isMuted: boolean
+  peers: VoicePeer[]
+  mutedPeers: Set<string>
 }
 
 interface VoiceSignalPayload {
@@ -17,10 +23,18 @@ interface VoiceSignalPayload {
   from_player: string
 }
 
+interface PeerState {
+  pc: RTCPeerConnection
+  audioEl: HTMLAudioElement
+  iceBuffer: RTCIceCandidateInit[]
+  hasRemoteDesc: boolean
+}
+
 const INITIAL_STATE: VoiceChatState = {
   isAvailable: true,
-  connectionState: 'disconnected',
   isMuted: false,
+  peers: [],
+  mutedPeers: new Set(),
 }
 
 function browserSupportsVoice(): boolean {
@@ -29,55 +43,129 @@ function browserSupportsVoice(): boolean {
 
 export function useVoiceChat(
   send: (action: string, payload: Record<string, unknown>) => void,
-  battleOpponentName: string | null,
+  peerNames: string[],
   selfPlayerName: string | null,
   voiceSignalRef: MutableRefObject<((payload: VoiceSignalPayload) => void) | null>,
-): { state: VoiceChatState; toggleMute: () => void } {
+): {
+  state: VoiceChatState
+  toggleSelfMute: () => void
+  togglePeerMute: (peerName: string) => void
+} {
   const [state, setState] = useState<VoiceChatState>(INITIAL_STATE)
 
-  const pcRef = useRef<RTCPeerConnection | null>(null)
+  const peersRef = useRef<Map<string, PeerState>>(new Map())
   const localStreamRef = useRef<MediaStream | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const iceBufferRef = useRef<RTCIceCandidateInit[]>([])
-  const hasRemoteDescRef = useRef(false)
+  const mutedPeersRef = useRef<Set<string>>(new Set())
 
-  const sendSignal = useCallback((signalType: string, data: unknown) => {
-    send('voice_signal', { signal_type: signalType, data })
+  const sendSignalTo = useCallback((peerName: string, signalType: string, data: unknown) => {
+    send('voice_signal', { signal_type: signalType, data, target_player: peerName })
   }, [send])
 
+  const updatePeerStates = useCallback(() => {
+    const peers: VoicePeer[] = []
+    for (const [name, ps] of peersRef.current) {
+      let connectionState: VoicePeer['connectionState'] = 'connecting'
+      switch (ps.pc.connectionState) {
+        case 'connected':
+          connectionState = 'connected'
+          break
+        case 'failed':
+          connectionState = 'failed'
+          break
+        case 'disconnected':
+        case 'closed':
+          connectionState = 'disconnected'
+          break
+      }
+      peers.push({ name, connectionState })
+    }
+    setState(s => ({ ...s, peers }))
+  }, [])
+
+  const createPeerConnection = useCallback((peerName: string, stream: MediaStream, isOfferer: boolean) => {
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+    const audioEl = document.createElement('audio')
+    audioEl.autoplay = true
+    if (mutedPeersRef.current.has(peerName)) {
+      audioEl.muted = true
+    }
+
+    const peerState: PeerState = { pc, audioEl, iceBuffer: [], hasRemoteDesc: false }
+    peersRef.current.set(peerName, peerState)
+
+    for (const track of stream.getTracks()) {
+      pc.addTrack(track, stream)
+    }
+
+    pc.onicecandidate = (ev) => {
+      if (ev.candidate) {
+        sendSignalTo(peerName, 'ice', ev.candidate.toJSON())
+      }
+    }
+
+    pc.ontrack = (ev) => {
+      audioEl.srcObject = ev.streams[0] ?? new MediaStream([ev.track])
+    }
+
+    pc.onconnectionstatechange = () => {
+      updatePeerStates()
+    }
+
+    if (isOfferer) {
+      pc.createOffer().then(offer => {
+        return pc.setLocalDescription(offer).then(() => {
+          sendSignalTo(peerName, 'offer', offer)
+        })
+      }).catch(err => console.error('Voice offer error:', err))
+    }
+
+    updatePeerStates()
+  }, [sendSignalTo, updatePeerStates])
+
+  const destroyPeer = useCallback((peerName: string) => {
+    const ps = peersRef.current.get(peerName)
+    if (!ps) return
+    ps.pc.close()
+    ps.audioEl.srcObject = null
+    ps.audioEl.remove()
+    peersRef.current.delete(peerName)
+    updatePeerStates()
+  }, [updatePeerStates])
+
   const handleSignal = useCallback(async (payload: VoiceSignalPayload) => {
-    const pc = pcRef.current
-    if (!pc) return
+    const fromPeer = payload.from_player
+    const ps = peersRef.current.get(fromPeer)
+    if (!ps) return
 
     try {
       if (payload.signal_type === 'offer') {
-        await pc.setRemoteDescription(new RTCSessionDescription(payload.data as RTCSessionDescriptionInit))
-        hasRemoteDescRef.current = true
-        for (const candidate of iceBufferRef.current) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate))
+        await ps.pc.setRemoteDescription(new RTCSessionDescription(payload.data as RTCSessionDescriptionInit))
+        ps.hasRemoteDesc = true
+        for (const candidate of ps.iceBuffer) {
+          await ps.pc.addIceCandidate(new RTCIceCandidate(candidate))
         }
-        iceBufferRef.current = []
-        const answer = await pc.createAnswer()
-        await pc.setLocalDescription(answer)
-        sendSignal('answer', answer)
+        ps.iceBuffer = []
+        const answer = await ps.pc.createAnswer()
+        await ps.pc.setLocalDescription(answer)
+        sendSignalTo(fromPeer, 'answer', answer)
       } else if (payload.signal_type === 'answer') {
-        await pc.setRemoteDescription(new RTCSessionDescription(payload.data as RTCSessionDescriptionInit))
-        hasRemoteDescRef.current = true
-        for (const candidate of iceBufferRef.current) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate))
+        await ps.pc.setRemoteDescription(new RTCSessionDescription(payload.data as RTCSessionDescriptionInit))
+        ps.hasRemoteDesc = true
+        for (const candidate of ps.iceBuffer) {
+          await ps.pc.addIceCandidate(new RTCIceCandidate(candidate))
         }
-        iceBufferRef.current = []
+        ps.iceBuffer = []
       } else if (payload.signal_type === 'ice') {
-        if (hasRemoteDescRef.current) {
-          await pc.addIceCandidate(new RTCIceCandidate(payload.data as RTCIceCandidateInit))
+        if (ps.hasRemoteDesc) {
+          await ps.pc.addIceCandidate(new RTCIceCandidate(payload.data as RTCIceCandidateInit))
         } else {
-          iceBufferRef.current.push(payload.data as RTCIceCandidateInit)
+          ps.iceBuffer.push(payload.data as RTCIceCandidateInit)
         }
       }
     } catch (err) {
       console.error('Voice signal handling error:', err)
     }
-  }, [sendSignal])
+  }, [sendSignalTo])
 
   useEffect(() => {
     voiceSignalRef.current = handleSignal
@@ -85,108 +173,86 @@ export function useVoiceChat(
   }, [handleSignal, voiceSignalRef])
 
   useEffect(() => {
-    function cleanup() {
+    if (peerNames.length === 0 || !selfPlayerName) {
+      for (const name of peersRef.current.keys()) {
+        destroyPeer(name)
+      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(t => t.stop())
         localStreamRef.current = null
       }
-      if (pcRef.current) {
-        pcRef.current.close()
-        pcRef.current = null
-      }
-      if (audioRef.current) {
-        audioRef.current.srcObject = null
-        audioRef.current.remove()
-        audioRef.current = null
-      }
-      iceBufferRef.current = []
-      hasRemoteDescRef.current = false
-    }
-
-    if (!battleOpponentName || !selfPlayerName) {
-      cleanup()
-      return () => { setState(INITIAL_STATE) }
+      setState(s => ({ ...s, peers: [], isMuted: false }))
+      return
     }
 
     if (!browserSupportsVoice()) {
-      return () => { setState(s => ({ ...s, isAvailable: false })) }
+      setState(s => ({ ...s, isAvailable: false }))
+      return
     }
 
     let cancelled = false
 
-    async function setup() {
-      let stream: MediaStream
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true },
-          video: false,
-        })
-      } catch {
-        if (!cancelled) setState(s => ({ ...s, isAvailable: false }))
-        return
-      }
-      if (cancelled) {
-        stream.getTracks().forEach(t => t.stop())
-        return
-      }
-
-      localStreamRef.current = stream
-      setState(s => ({ ...s, connectionState: 'connecting' }))
-
-      const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS })
-      pcRef.current = pc
-
-      for (const track of stream.getTracks()) {
-        pc.addTrack(track, stream)
+    async function reconcile() {
+      if (!localStreamRef.current) {
+        let stream: MediaStream
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true },
+            video: false,
+          })
+        } catch {
+          if (!cancelled) setState(s => ({ ...s, isAvailable: false }))
+          return
+        }
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop())
+          return
+        }
+        localStreamRef.current = stream
       }
 
-      pc.onicecandidate = (ev) => {
-        if (ev.candidate) {
-          sendSignal('ice', ev.candidate.toJSON())
+      const stream = localStreamRef.current!
+      const currentNames = new Set(peersRef.current.keys())
+      const desiredNames = new Set(peerNames)
+
+      for (const name of currentNames) {
+        if (!desiredNames.has(name)) {
+          destroyPeer(name)
         }
       }
 
-      pc.ontrack = (ev) => {
-        if (!audioRef.current) {
-          audioRef.current = document.createElement('audio')
-          audioRef.current.autoplay = true
+      for (const name of desiredNames) {
+        if (!currentNames.has(name)) {
+          const isOfferer = selfPlayerName! < name
+          createPeerConnection(name, stream, isOfferer)
         }
-        audioRef.current.srcObject = ev.streams[0] ?? new MediaStream([ev.track])
-      }
-
-      pc.onconnectionstatechange = () => {
-        if (cancelled) return
-        switch (pc.connectionState) {
-          case 'connected':
-            setState(s => ({ ...s, connectionState: 'connected' }))
-            break
-          case 'failed':
-            setState(s => ({ ...s, connectionState: 'failed' }))
-            break
-          case 'disconnected':
-          case 'closed':
-            setState(s => ({ ...s, connectionState: 'disconnected' }))
-            break
-        }
-      }
-
-      const isOfferer = selfPlayerName! < battleOpponentName!
-      if (isOfferer) {
-        const offer = await pc.createOffer()
-        await pc.setLocalDescription(offer)
-        sendSignal('offer', offer)
       }
     }
 
-    setup()
+    reconcile()
 
+    return () => { cancelled = true }
+  }, [peerNames, selfPlayerName, createPeerConnection, destroyPeer])
+
+  useEffect(() => {
     return () => {
-      cancelled = true
-      cleanup()
+      for (const name of peersRef.current.keys()) {
+        const ps = peersRef.current.get(name)
+        if (ps) {
+          ps.pc.close()
+          ps.audioEl.srcObject = null
+          ps.audioEl.remove()
+        }
+      }
+      peersRef.current.clear()
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(t => t.stop())
+        localStreamRef.current = null
+      }
     }
-  }, [battleOpponentName, selfPlayerName, sendSignal])
+  }, [])
 
-  const toggleMute = useCallback(() => {
+  const toggleSelfMute = useCallback(() => {
     const stream = localStreamRef.current
     if (!stream) return
     const track = stream.getAudioTracks()[0]
@@ -195,5 +261,19 @@ export function useVoiceChat(
     setState(s => ({ ...s, isMuted: !track.enabled }))
   }, [])
 
-  return { state, toggleMute }
+  const togglePeerMute = useCallback((peerName: string) => {
+    const ps = peersRef.current.get(peerName)
+    const next = new Set(mutedPeersRef.current)
+    if (next.has(peerName)) {
+      next.delete(peerName)
+      if (ps) ps.audioEl.muted = false
+    } else {
+      next.add(peerName)
+      if (ps) ps.audioEl.muted = true
+    }
+    mutedPeersRef.current = next
+    setState(s => ({ ...s, mutedPeers: next }))
+  }, [])
+
+  return { state, toggleSelfMute, togglePeerMute }
 }
