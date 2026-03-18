@@ -208,11 +208,7 @@ export function BattleSidebarContent({
       {/* Controls panel */}
       <div
         className={`${middleLaneHeight != null ? "box-border shrink-0" : "flex-1"} min-h-0`}
-        style={
-          middleLaneHeight != null
-            ? { height: middleLaneHeight }
-            : undefined
-        }
+        style={middleLaneHeight != null ? { height: middleLaneHeight } : undefined}
       >
         <div
           className="relative grid h-full min-h-0 w-full grid-rows-[1fr_auto_1fr] overflow-hidden"

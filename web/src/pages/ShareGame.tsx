@@ -100,8 +100,8 @@ export function ShareGame() {
   const [previewCard, setPreviewCardState] = useState<CardType | null>(null)
   const [previewUpgrades, setPreviewUpgrades] = useState<CardType[]>([])
   const [deckConstraintsByView, setDeckConstraintsByView] = useState<Record<string, ZoneConstraints>>({})
-  const [headerRef, headerHeight] = useElementHeight()
-  const [bottomBarRef, bottomBarHeight] = useElementHeight()
+  const [headerRef] = useElementHeight()
+  const [bottomBarRef] = useElementHeight()
   const usesOverlaySidebar = shellMode !== 'big'
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen
   const isSmallShell = shellMode === 'small'
@@ -112,9 +112,6 @@ export function ShareGame() {
       : 'shrink-0 py-3 frame-chrome bar-pad-both'
   const bottomBarPaddingClass =
     shellMode === 'small' ? 'bar-pad-both' : 'bar-pad-main'
-  const overlaySidebarPaddingStyle = usesOverlaySidebar
-    ? { paddingTop: headerHeight, paddingBottom: bottomBarHeight }
-    : undefined
   const setPreviewCard = useCallback((card: CardType | null, appliedUpgrades?: CardType[]) => {
     setPreviewCardState(card)
     setPreviewUpgrades(appliedUpgrades ?? [])
@@ -358,10 +355,7 @@ export function ShareGame() {
                 overlaySidebarOpen ? 'translate-x-0' : 'translate-x-full'
               }`}
             >
-              <aside
-                className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden"
-                style={overlaySidebarPaddingStyle}
-              >
+              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
                 <div className="px-3 py-2 text-sm font-medium text-gray-400">
                   Players
                 </div>

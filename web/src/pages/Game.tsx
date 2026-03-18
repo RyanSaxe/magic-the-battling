@@ -1572,13 +1572,11 @@ function GameContent() {
   const actionBarPhase = displayBattleResolution ? "battle" : currentPhase;
   const actionBarBattle = battleViewForDisplay;
   const canManipulateOpponent = battleViewForDisplay?.can_manipulate_opponent ?? false;
-  const overlaySidebarPadding = usesOverlaySidebar
+  const overlaySidebarPadding = usesOverlaySidebar && (currentPhase === "battle" || displayBattleResolution) && battleViewForDisplay
     ? {
         top:
           phaseTimelineHeight +
-          ((currentPhase === "battle" || displayBattleResolution) && battleViewForDisplay
-            ? battleLifeRailHeight + 2
-            : 0),
+          battleLifeRailHeight + 2,
         bottom: actionBarHeight,
       }
     : undefined;
