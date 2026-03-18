@@ -4,7 +4,7 @@ import type { RevealedPlayerTab } from "../../contexts/contextStripState";
 import { useContextStrip } from "../../contexts";
 import {
   CARD_ASPECT_RATIO,
-  bestFit,
+  bestFitNoClip,
   type ZoneDims,
 } from "../../hooks/cardSizeUtils";
 import { Card } from "../card";
@@ -222,7 +222,7 @@ function AdaptiveCardSection({
     width: number,
     height: number,
   ) => {
-    const next = bestFit(cards.length, width, height, 8, maxWidth, minWidth);
+    const next = bestFitNoClip(cards.length, width, height, 8, maxWidth, minWidth);
 
     if (cards.length < minColumns || next.columns >= minColumns) {
       return next;

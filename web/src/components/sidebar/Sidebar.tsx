@@ -78,6 +78,8 @@ export function Sidebar({
     <aside
       className={`relative w-[var(--sidebar-width)] h-full frame-chrome flex flex-col ${
         isMobile ? "overflow-hidden" : "overflow-visible"
+      } ${
+        shouldRenderDesktopDrawer ? "z-[45]" : ""
       }`}
       style={overlayPadding ? {
         paddingTop: overlayPadding.top,
