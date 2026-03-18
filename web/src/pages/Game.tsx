@@ -953,6 +953,7 @@ function GameContent() {
   const [upgradesModalOpenMode, setUpgradesModalOpenMode] =
     useState<UpgradesModalOpenMode>('auto');
   const [upgradeInitialTargetId, setUpgradeInitialTargetId] = useState<string | undefined>(undefined);
+  const [upgradeInitialId, setUpgradeInitialId] = useState<string | undefined>(undefined);
   const [upgradeInitialRevealIds, setUpgradeInitialRevealIds] = useState<string[]>([]);
   const handSlotsRef = useRef<(string | null)[]>([]);
   const [pendingBuildUpgradeAnimation, setPendingBuildUpgradeAnimation] =
@@ -1110,6 +1111,7 @@ function GameContent() {
     if (except !== "upgrades") {
       setShowUpgradesModal(false);
       setUpgradeInitialTargetId(undefined);
+      setUpgradeInitialId(undefined);
       setUpgradeInitialRevealIds([]);
       setUpgradesModalOpenMode("auto");
     }
@@ -1173,6 +1175,7 @@ function GameContent() {
   const closeUpgradesModal = useCallback(() => {
     setShowUpgradesModal(false);
     setUpgradeInitialTargetId(undefined);
+    setUpgradeInitialId(undefined);
     setUpgradeInitialRevealIds([]);
     setUpgradesModalOpenMode('auto');
   }, []);
@@ -1193,8 +1196,21 @@ function GameContent() {
   ) => {
     closeGameplayOverlays("upgrades");
     setUpgradeInitialTargetId(targetCardId);
+    setUpgradeInitialId(undefined);
     setUpgradeInitialRevealIds(initialRevealIds);
     setUpgradesModalOpenMode(mode);
+    setShowUpgradesModal(true);
+  }, [closeGameplayOverlays]);
+
+  const openBuildApplyUpgradeModal = useCallback((options: {
+    targetCardId?: string;
+    upgradeId?: string;
+  } = {}) => {
+    closeGameplayOverlays("upgrades");
+    setUpgradeInitialTargetId(options.targetCardId);
+    setUpgradeInitialId(options.upgradeId);
+    setUpgradeInitialRevealIds([]);
+    setUpgradesModalOpenMode("auto");
     setShowUpgradesModal(true);
   }, [closeGameplayOverlays]);
 
@@ -2397,7 +2413,12 @@ function GameContent() {
             )}
             <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
               {currentPhase === "draft" && (
-                <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
+                <DraftPhase
+                  gameState={gameState}
+                  actions={actions}
+                  isMobile={sizes.isMobile}
+                  showDesktopUpgradeRail={shellMode === "big"}
+                />
               )}
               {currentPhase === "build" && (
                 <BuildPhase
@@ -2408,8 +2429,14 @@ function GameContent() {
                   onHandSlotsChange={(slots) => { handSlotsRef.current = slots; }}
                   onCardHover={handleCardHover}
                   onCardHoverEnd={handleCardHoverEnd}
-                  onQuickUpgrade={openUpgradesModal}
+                  onQuickUpgrade={(targetCardId) =>
+                    openBuildApplyUpgradeModal({ targetCardId })
+                  }
+                  onQuickApplyUpgrade={(upgradeId) =>
+                    openBuildApplyUpgradeModal({ upgradeId })
+                  }
                   isMobile={sizes.isMobile}
+                  showDesktopUpgradeRail={shellMode === "big"}
                 />
               )}
               {currentPhase === "reward" && (
@@ -2598,6 +2625,7 @@ function GameContent() {
           }}
           onClose={closeUpgradesModal}
           initialTargetId={upgradeInitialTargetId}
+          initialUpgradeId={upgradeInitialId}
           initialRevealUpgradeIds={upgradeInitialRevealIds}
         />
       )}

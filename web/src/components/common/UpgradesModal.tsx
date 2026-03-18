@@ -16,6 +16,7 @@ interface UpgradesModalProps {
   onReveal?: (upgradeIds: string[]) => void
   onClose: () => void
   initialTargetId?: string
+  initialUpgradeId?: string
   initialRevealUpgradeIds?: string[]
 }
 
@@ -27,6 +28,7 @@ export function UpgradesModal({
   onReveal,
   onClose,
   initialTargetId,
+  initialUpgradeId,
   initialRevealUpgradeIds = [],
 }: UpgradesModalProps) {
   const applied = getAppliedUpgrades(upgrades)
@@ -34,7 +36,15 @@ export function UpgradesModal({
   const hiddenApplied = getUnrevealedAppliedUpgrades(upgrades)
   const revealedApplied = applied.filter((upgrade) => upgrade.is_revealed !== false)
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(() => (
-    mode === 'apply' && unapplied.length === 1 ? unapplied[0].id : null
+    mode === 'apply'
+      ? (
+          unapplied.some((upgrade) => upgrade.id === initialUpgradeId)
+            ? initialUpgradeId ?? null
+            : unapplied.length === 1
+              ? unapplied[0].id
+              : null
+        )
+      : null
   ))
   const [selectedRevealUpgradeIds, setSelectedRevealUpgradeIds] = useState<string[]>(() => {
     if (mode !== 'reveal') return []

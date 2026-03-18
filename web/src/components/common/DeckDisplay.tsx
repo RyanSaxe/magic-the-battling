@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo, useRef } from 'react'
 import type { Card as CardType } from '../../types'
 import type { ZoneConstraints } from '../../hooks/computeConstrainedLayout'
 import { Card } from '../card'
-import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { useCardLayout, ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
 import { useZoneDividers } from '../../hooks/useZoneDividers'
 import { BasicLandCard } from './BasicLandCard'
@@ -11,6 +10,7 @@ import { LayoutResetControl } from './LayoutResetControl'
 import { TreasureCard } from './TreasureCard'
 import { PoisonCard } from './PoisonCard'
 import { ZoneLayout } from './ZoneLayout'
+import { UpgradeGrid } from './UpgradeGrid'
 import { buildAppliedUpgradeMap, type UpgradeDisplayScope } from '../../utils/upgrades'
 
 export interface DeckDisplayResizeState {
@@ -279,11 +279,11 @@ export function DeckDisplay({
       }
       upgradesLabel="Upgrades"
       upgradesContent={
-        <CardGrid columns={dims.commandZone.columns} cardWidth={czDims.width}>
-          {upgrades.map((upgrade) => (
-            <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={czDims} />
-          ))}
-        </CardGrid>
+        <UpgradeGrid
+          upgrades={upgrades}
+          fallbackDims={czDims}
+          frame={zoneFrames?.commandZone}
+        />
       }
     />
   )

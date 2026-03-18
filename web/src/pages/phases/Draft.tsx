@@ -4,6 +4,7 @@ import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { useCardLayout } from '../../hooks/useCardLayout'
 import { ZoneDivider } from '../../components/common/ZoneDivider'
 import { LayoutResetControl } from '../../components/common/LayoutResetControl'
+import { UpgradeGrid } from '../../components/common/UpgradeGrid'
 import { ZoneLabel } from '../../components/common/ZoneLabel'
 import { usePersistedConstraints } from '../../hooks/usePersistedConstraints'
 import { useZoneDividers } from '../../hooks/useZoneDividers'
@@ -17,6 +18,7 @@ interface DraftPhaseProps {
     draftDone: () => void
   }
   isMobile?: boolean
+  showDesktopUpgradeRail?: boolean
 }
 
 type SelectionZone = 'pack' | 'pool'
@@ -28,14 +30,16 @@ interface CardWithIndex {
   isInHand: boolean
 }
 
-export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
+export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRail = false }: DraftPhaseProps) {
   const [selectedCard, setSelectedCard] = useState<CardWithIndex | null>(null)
   const packZoneRef = useRef<HTMLDivElement | null>(null)
   const poolZoneRef = useRef<HTMLDivElement | null>(null)
+  const upgradesZoneRef = useRef<HTMLDivElement | null>(null)
 
   const { self_player } = gameState
   const currentPack = self_player.current_pack ?? []
   const pool = [...self_player.hand, ...self_player.sideboard]
+  const hasDesktopUpgradeRail = showDesktopUpgradeRail && self_player.upgrades.length > 0
 
   const {
     constraints,
@@ -52,8 +56,13 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
     zones: {
       pool: { count: pool.length, maxCardWidth: 300 },
       pack: { count: currentPack.length, maxCardWidth: 400 },
+      upgrades: { count: hasDesktopUpgradeRail ? self_player.upgrades.length : 0, maxCardWidth: 200 },
     },
-    layout: { top: ['pack'], bottomLeft: ['pool'] },
+    layout: {
+      top: ['pack'],
+      bottomLeft: ['pool'],
+      bottomRight: hasDesktopUpgradeRail ? ['upgrades'] : [],
+    },
     fixedHeight: 65,
     padding: 24,
   }
@@ -71,10 +80,13 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
     ? draftConstrainedLayoutConfig
     : draftDefaultLayoutConfig
 
-  const [containerRef, { pool: poolDims, pack: packDims }, containerSize, zoneFrames] = useCardLayout({
+  const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
     ...activeLayoutConfig,
     constraints,
   })
+  const packDims = dims.pack
+  const poolDims = dims.pool
+  const upgradesDims = dims.upgrades
 
   const packStyle = zoneFrames?.pack
     ? { height: zoneFrames.pack.outerHeight, flex: '0 0 auto' as const }
@@ -82,25 +94,45 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
   const poolStyle = zoneFrames?.pool
     ? { minHeight: zoneFrames.pool.outerHeight, flex: '1 1 auto' as const }
     : undefined
+  const upgradesStyle = zoneFrames?.upgrades
+    ? {
+        alignSelf: 'stretch' as const,
+        minHeight: 0,
+        boxShadow: 'inset 0 2px 6px rgba(0, 0, 0, 0.3)',
+      }
+    : undefined
 
   const dividerCallbacks = useZoneDividers({
     containerHeight: containerSize.height,
     containerWidth: containerSize.width,
-    currentLayout: { pool: poolDims, pack: packDims },
+    currentLayout: dims,
     layoutConfig: activeLayoutConfig,
     allowHorizontalResize: !isMobile,
     measureInitialConstraints: () => {
       const packOuter = packZoneRef.current?.getBoundingClientRect().height ?? 0
-      const poolOuter = poolZoneRef.current?.getBoundingClientRect().height ?? 0
-      const usableH = packOuter + poolOuter
+      const poolRect = poolZoneRef.current?.getBoundingClientRect()
+      const upgradesRect = upgradesZoneRef.current?.getBoundingClientRect()
+      const poolOuter = poolRect?.height ?? 0
+      const upgradesOuter = upgradesRect?.height ?? 0
+      const poolOuterWidth = poolRect?.width ?? 0
+      const upgradesOuterWidth = upgradesRect?.width ?? 0
+      const sectionGap = 2
+      const bottomOuter = Math.max(poolOuter, upgradesOuter)
+      const usableH = packOuter + bottomOuter
+      const totalBottomWidth =
+        poolOuterWidth + (hasDesktopUpgradeRail ? upgradesOuterWidth + sectionGap : 0)
+      const leftFraction =
+        hasDesktopUpgradeRail && totalBottomWidth > sectionGap
+          ? poolOuterWidth / (totalBottomWidth - sectionGap)
+          : 0.7
 
       return usableH > 0
         ? {
             topFraction: packOuter / usableH,
-            leftFraction: 0.7,
+            leftFraction,
             bottomLeftSplit: 0.5,
             usableHeight: usableH,
-            usableWidth: containerSize.width,
+            usableWidth: totalBottomWidth > 0 ? totalBottomWidth : containerSize.width,
           }
         : null
     },
@@ -236,48 +268,85 @@ export function DraftPhase({ gameState, actions, isMobile }: DraftPhaseProps) {
         )}
 
         {/* Pool */}
-        <div
-          ref={poolZoneRef}
-          className={`zone-sideboard w-full px-3 pt-5 pb-3 relative flex flex-col min-h-0 ${zoneFrames ? '' : 'flex-1'}`}
-          style={poolStyle}
-          data-guide-target="draft-pool"
-        >
-          <ZoneLabel dragCallbacks={dividerCallbacks.topDivider}>
-            Pool
-          </ZoneLabel>
-          <div className="flex-1 min-h-0 overflow-auto">
-            {pool.length === 0 ? (
-              <div className="flex items-center justify-center">
-                <div className="text-gray-500 text-sm text-center">
-                  Swap cards from the pack to build your pool
+        <div className={`flex min-h-0 w-full ${zoneFrames ? '' : 'flex-1'}`} style={{ gap: 0, ...(zoneFrames ? { flex: '1 1 auto', minHeight: 0 } : {}) }}>
+          <div
+            ref={poolZoneRef}
+            className={`zone-sideboard w-full px-3 pt-5 pb-3 relative flex flex-col min-h-0 ${zoneFrames ? '' : 'flex-1'}`}
+            style={poolStyle}
+            data-guide-target="draft-pool"
+          >
+            <ZoneLabel dragCallbacks={dividerCallbacks.topDivider}>
+              Pool
+            </ZoneLabel>
+            <div className="flex-1 min-h-0 overflow-auto">
+              {pool.length === 0 ? (
+                <div className="flex items-center justify-center">
+                  <div className="text-gray-500 text-sm text-center">
+                    Swap cards from the pack to build your pool
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${poolDims.columns}, ${poolDims.width}px)`,
-                gap: '6px',
-                justifyContent: 'center',
-                maxWidth: '100%',
-                overflow: 'hidden',
-              }}>
-                {pool.map((card, index) => {
-                  const isInHand = self_player.hand.some((c) => c.id === card.id)
-                  return (
-                    <Card
-                      key={card.id}
-                      card={card}
-                      onClick={() => handleCardClick(card, index, 'pool', isInHand)}
-                      selected={selectedCard?.card.id === card.id}
-                      dimensions={poolDims}
-                      upgraded={upgradedCardIds.has(card.id)}
-                      appliedUpgrades={getAppliedUpgrades(card.id)}
-                    />
-                  )
-                })}
-              </div>
-            )}
+              ) : (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${poolDims.columns}, ${poolDims.width}px)`,
+                  gap: '6px',
+                  justifyContent: 'center',
+                  maxWidth: '100%',
+                  overflow: 'hidden',
+                }}>
+                  {pool.map((card, index) => {
+                    const isInHand = self_player.hand.some((c) => c.id === card.id)
+                    return (
+                      <Card
+                        key={card.id}
+                        card={card}
+                        onClick={() => handleCardClick(card, index, 'pool', isInHand)}
+                        selected={selectedCard?.card.id === card.id}
+                        dimensions={poolDims}
+                        upgraded={upgradedCardIds.has(card.id)}
+                        appliedUpgrades={getAppliedUpgrades(card.id)}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
+          {hasDesktopUpgradeRail && dividerCallbacks.leftDivider && (
+            <ZoneDivider
+              orientation="vertical"
+              interactive={!isMobile}
+              {...dividerCallbacks.leftDivider}
+            />
+          )}
+          {hasDesktopUpgradeRail && (
+            <div
+              ref={upgradesZoneRef}
+              className="zone-upgrades min-w-0 overflow-visible px-3 pt-5 pb-3 relative flex items-center justify-center"
+              style={upgradesStyle}
+            >
+              <ZoneLabel
+                className="justify-center"
+                wrapClassName="max-w-[calc(100%-0.25rem)]"
+                constrainToParent
+                dragCallbacks={dividerCallbacks.topDivider}
+              >
+                Upgrades
+              </ZoneLabel>
+              <div className="overflow-hidden">
+                <UpgradeGrid
+                  upgrades={self_player.upgrades}
+                  fallbackDims={{
+                    width: upgradesDims.width,
+                    height: upgradesDims.height,
+                    rows: upgradesDims.rows,
+                    columns: upgradesDims.columns,
+                  }}
+                  frame={zoneFrames?.upgrades}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
