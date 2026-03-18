@@ -1990,6 +1990,7 @@ function GameContent() {
           } : undefined}
           handZoneHeight={battleSidebarLayout?.handHeight ?? null}
           middleLaneHeight={battleSidebarLayout?.middleLaneHeight ?? null}
+          overlayTopInset={overlaySidebarPadding?.top ?? 0}
         />
       );
     }
@@ -2248,7 +2249,6 @@ function GameContent() {
                       useUpgrades={gameState.use_upgrades}
                       isMobile
                       renderMicToggle={renderMicToggle}
-                      overlayPadding={overlaySidebarPadding}
                     />
                   </div>
                 </>
@@ -2505,7 +2505,6 @@ function GameContent() {
                     useUpgrades={gameState.use_upgrades}
                     isMobile
                     renderMicToggle={renderMicToggle}
-                    overlayPadding={overlaySidebarPadding}
                   />
                 </div>
               </>
