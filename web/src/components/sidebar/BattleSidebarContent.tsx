@@ -21,7 +21,7 @@ interface BattleSidebarContentProps {
   onCreateOpponentTreasure?: () => void;
   onUntapOpponentAll?: () => void;
   onPassOpponentTurn?: () => void;
-  handZoneHeight?: number | null;
+  topSectionHeight?: number | null;
   middleLaneHeight?: number | null;
   overlayTopInset?: number;
   voiceChat?: {
@@ -102,7 +102,7 @@ function LifeCounter({
 
 const GAP = 8
 const MIN_DIMS = { width: 50, height: 70 }
-const CENTER_GAP = 12
+const SECTION_GUTTER = 12
 
 function resolveUpgradeDims(
   count: number,
@@ -117,13 +117,9 @@ function resolveUpgradeDims(
 function PlayerSection({
   upgrades,
   isReversed = false,
-  viewportInsetTop = 0,
-  viewportInsetBottom = 0,
 }: {
   upgrades: CardType[];
   isReversed?: boolean;
-  viewportInsetTop?: number;
-  viewportInsetBottom?: number;
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerDims, setContainerDims] = useState<{ width: number; height: number } | null>(null)
@@ -145,32 +141,76 @@ function PlayerSection({
   const dims = resolveUpgradeDims(appliedUpgrades.length, containerDims)
 
   return (
-    <div className="relative h-full overflow-hidden">
+    <div
+      ref={containerRef}
+      className={`h-full overflow-hidden`}
+    >
       <div
-        ref={containerRef}
-        className="absolute inset-x-3"
+        className={`grid h-full justify-center gap-2 ${isReversed ? "content-end" : "content-start"}`}
         style={{
-          top: viewportInsetTop,
-          bottom: viewportInsetBottom,
+          gridTemplateColumns: `repeat(${Math.max(1, dims.columns)}, ${dims.width}px)`,
         }}
       >
-        <div
-          className={`grid h-full justify-center gap-2 ${isReversed ? "content-end" : "content-start"}`}
-          style={{
-            gridTemplateColumns: `repeat(${Math.max(1, dims.columns)}, ${dims.width}px)`,
-          }}
-        >
-          {appliedUpgrades.map((upgrade) => (
-            <UpgradeStack
-              key={upgrade.id}
-              upgrade={upgrade}
-              dimensions={{ width: dims.width, height: dims.height }}
-            />
-          ))}
-        </div>
+        {appliedUpgrades.map((upgrade) => (
+          <UpgradeStack
+            key={upgrade.id}
+            upgrade={upgrade}
+            dimensions={{ width: dims.width, height: dims.height }}
+          />
+        ))}
       </div>
     </div>
   );
+}
+
+function ActionButtonsRow({
+  onCreateTreasure,
+  onUntapAll,
+  onPassTurn,
+  passDisabled,
+}: {
+  onCreateTreasure?: () => void;
+  onUntapAll?: () => void;
+  onPassTurn?: () => void;
+  passDisabled: boolean;
+}) {
+  if (!onCreateTreasure && !onUntapAll && !onPassTurn) {
+    return null
+  }
+
+  return (
+    <div className="flex gap-2">
+      {onCreateTreasure && (
+        <button
+          onClick={onCreateTreasure}
+          className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+        >
+          Treasure
+        </button>
+      )}
+      {onUntapAll && (
+        <button
+          onClick={onUntapAll}
+          className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+        >
+          Untap
+        </button>
+      )}
+      {onPassTurn && (
+        <button
+          onClick={onPassTurn}
+          disabled={passDisabled}
+          className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
+            !passDisabled
+              ? "bg-indigo-600 hover:bg-indigo-500"
+              : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
+          }`}
+        >
+          Pass
+        </button>
+      )}
+    </div>
+  )
 }
 
 function ControlsPanel({
@@ -180,15 +220,8 @@ function ControlsPanel({
   yourLife,
   onOpponentLifeChange,
   onYourLifeChange,
-  canManipulateOpponent,
-  onCreateOpponentTreasure,
-  onUntapOpponentAll,
-  onPassOpponentTurn,
   isYourTurn,
   currentTurnName,
-  onCreateTreasure,
-  onUntapAll,
-  onPassTurn,
   voiceChat,
   showTopDivider,
 }: {
@@ -198,15 +231,8 @@ function ControlsPanel({
   yourLife: number;
   onOpponentLifeChange: (life: number) => void;
   onYourLifeChange: (life: number) => void;
-  canManipulateOpponent?: boolean;
-  onCreateOpponentTreasure?: () => void;
-  onUntapOpponentAll?: () => void;
-  onPassOpponentTurn?: () => void;
   isYourTurn: boolean;
   currentTurnName: string | null;
-  onCreateTreasure?: () => void;
-  onUntapAll?: () => void;
-  onPassTurn?: () => void;
   voiceChat?: BattleSidebarContentProps["voiceChat"];
   showTopDivider: boolean;
 }) {
@@ -229,41 +255,7 @@ function ControlsPanel({
           className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
         />
       )}
-      <div className="relative z-10 flex min-h-0 flex-col justify-between gap-3 p-3 pb-2">
-        {canManipulateOpponent && (onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn) && (
-          <div className="flex gap-2">
-            {onCreateOpponentTreasure && (
-              <button
-                onClick={onCreateOpponentTreasure}
-                className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-              >
-                Treasure
-              </button>
-            )}
-            {onUntapOpponentAll && (
-              <button
-                onClick={onUntapOpponentAll}
-                className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-              >
-                Untap
-              </button>
-            )}
-            {onPassOpponentTurn && (
-              <button
-                onClick={onPassOpponentTurn}
-                disabled={isYourTurn}
-                className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
-                  !isYourTurn
-                    ? "bg-indigo-600 hover:bg-indigo-500"
-                    : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
-                }`}
-              >
-                Pass
-              </button>
-            )}
-          </div>
-        )}
-
+      <div className="relative z-10 flex min-h-0 flex-col items-center justify-center gap-2 px-3 py-2">
         <div className="text-center">
           <div className="flex items-center justify-center gap-1.5 mb-1">
             <span className="text-xs text-gray-400 uppercase truncate">
@@ -295,7 +287,7 @@ function ControlsPanel({
         )}
       </div>
 
-      <div className="relative z-10 flex min-h-0 flex-col justify-between gap-3 p-3 pt-2">
+      <div className="relative z-10 flex min-h-0 flex-col items-center justify-center gap-2 px-3 py-2">
         <div className="text-center">
           <div className="flex justify-center">
             <LifeCounter life={yourLife} onChange={onYourLifeChange} />
@@ -319,40 +311,6 @@ function ControlsPanel({
             )}
           </div>
         </div>
-
-        {(onCreateTreasure || onUntapAll || onPassTurn) && (
-          <div className="flex gap-2">
-            {onCreateTreasure && (
-              <button
-                onClick={onCreateTreasure}
-                className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-              >
-                Treasure
-              </button>
-            )}
-            {onUntapAll && (
-              <button
-                onClick={onUntapAll}
-                className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-              >
-                Untap
-              </button>
-            )}
-            {onPassTurn && (
-              <button
-                onClick={onPassTurn}
-                disabled={!isYourTurn}
-                className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
-                  isYourTurn
-                    ? "bg-indigo-600 hover:bg-indigo-500"
-                    : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
-                }`}
-              >
-                Pass
-              </button>
-            )}
-          </div>
-        )}
       </div>
     </div>
   )
@@ -373,7 +331,7 @@ export function BattleSidebarContent({
   onCreateOpponentTreasure,
   onUntapOpponentAll,
   onPassOpponentTurn,
-  handZoneHeight = null,
+  topSectionHeight = null,
   middleLaneHeight = null,
   overlayTopInset = 0,
   voiceChat,
@@ -383,25 +341,43 @@ export function BattleSidebarContent({
 
   const isYourTurn = current_turn_name === playerName;
   const hasMeasuredMiddleLane = middleLaneHeight != null;
-  const hasMeasuredLayout = handZoneHeight != null && middleLaneHeight != null;
+  const hasMeasuredLayout = topSectionHeight != null && middleLaneHeight != null;
+  const hasOpponentActions = !!canManipulateOpponent && !!(onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn)
+  const hasPlayerActions = !!(onCreateTreasure || onUntapAll || onPassTurn)
 
   if (hasMeasuredLayout) {
-    const topSectionHeight = handZoneHeight + overlayTopInset
-    const controlsTop = topSectionHeight
+    const totalTopSectionHeight = topSectionHeight + overlayTopInset
+    const controlsTop = totalTopSectionHeight
     const controlsBottom = controlsTop + middleLaneHeight
 
     return (
       <div className="relative h-full">
         <div
           className="absolute inset-x-0 top-0 overflow-hidden"
-          style={{ height: topSectionHeight }}
+          style={{ height: totalTopSectionHeight }}
         >
-          <PlayerSection
-            upgrades={opponent_zones.upgrades}
-            isReversed
-            viewportInsetTop={0}
-            viewportInsetBottom={CENTER_GAP}
-          />
+          <div
+            className="grid h-full min-h-0 px-3 pt-3 pb-3"
+            style={{
+              gap: SECTION_GUTTER,
+              gridTemplateRows: hasOpponentActions ? "minmax(0,1fr) auto" : "minmax(0,1fr)",
+            }}
+          >
+            <div className="min-h-0">
+              <PlayerSection
+                upgrades={opponent_zones.upgrades}
+                isReversed
+              />
+            </div>
+            {hasOpponentActions && (
+              <ActionButtonsRow
+                onCreateTreasure={onCreateOpponentTreasure}
+                onUntapAll={onUntapOpponentAll}
+                onPassTurn={onPassOpponentTurn}
+                passDisabled={isYourTurn}
+              />
+            )}
+          </div>
         </div>
 
         <div
@@ -415,15 +391,8 @@ export function BattleSidebarContent({
             yourLife={yourLife}
             onOpponentLifeChange={onOpponentLifeChange}
             onYourLifeChange={onYourLifeChange}
-            canManipulateOpponent={canManipulateOpponent}
-            onCreateOpponentTreasure={onCreateOpponentTreasure}
-            onUntapOpponentAll={onUntapOpponentAll}
-            onPassOpponentTurn={onPassOpponentTurn}
             isYourTurn={isYourTurn}
             currentTurnName={current_turn_name}
-            onCreateTreasure={onCreateTreasure}
-            onUntapAll={onUntapAll}
-            onPassTurn={onPassTurn}
             voiceChat={voiceChat}
             showTopDivider
           />
@@ -437,11 +406,27 @@ export function BattleSidebarContent({
             aria-hidden="true"
             className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
           />
-          <PlayerSection
-            upgrades={selfUpgrades}
-            viewportInsetTop={CENTER_GAP}
-            viewportInsetBottom={0}
-          />
+          <div
+            className="grid h-full min-h-0 px-3 pt-3 pb-3"
+            style={{
+              gap: SECTION_GUTTER,
+              gridTemplateRows: hasPlayerActions ? "auto minmax(0,1fr)" : "minmax(0,1fr)",
+            }}
+          >
+            {hasPlayerActions && (
+              <ActionButtonsRow
+                onCreateTreasure={onCreateTreasure}
+                onUntapAll={onUntapAll}
+                onPassTurn={onPassTurn}
+                passDisabled={!isYourTurn}
+              />
+            )}
+            <div className="min-h-0">
+              <PlayerSection
+                upgrades={selfUpgrades}
+              />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -451,17 +436,35 @@ export function BattleSidebarContent({
     <div className="flex flex-col h-full">
       {/* Opponent section - top */}
       <div
-        className={`${handZoneHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden ${
+        className={`${topSectionHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden ${
           hasMeasuredMiddleLane
             ? ""
             : "border-b border-[var(--gold-border-opaque)]"
         }`}
-        style={handZoneHeight != null ? { height: handZoneHeight } : undefined}
+        style={topSectionHeight != null ? { height: topSectionHeight } : undefined}
       >
-        <PlayerSection
-          upgrades={opponent_zones.upgrades}
-          isReversed
-        />
+        <div
+          className="grid h-full min-h-0 px-3 pt-3 pb-3"
+          style={{
+            gap: SECTION_GUTTER,
+            gridTemplateRows: hasOpponentActions ? "minmax(0,1fr) auto" : "minmax(0,1fr)",
+          }}
+        >
+          <div className="min-h-0">
+            <PlayerSection
+              upgrades={opponent_zones.upgrades}
+              isReversed
+            />
+          </div>
+          {hasOpponentActions && (
+            <ActionButtonsRow
+              onCreateTreasure={onCreateOpponentTreasure}
+              onUntapAll={onUntapOpponentAll}
+              onPassTurn={onPassOpponentTurn}
+              passDisabled={isYourTurn}
+            />
+          )}
+        </div>
       </div>
 
       {/* Controls panel */}
@@ -476,15 +479,8 @@ export function BattleSidebarContent({
           yourLife={yourLife}
           onOpponentLifeChange={onOpponentLifeChange}
           onYourLifeChange={onYourLifeChange}
-          canManipulateOpponent={canManipulateOpponent}
-          onCreateOpponentTreasure={onCreateOpponentTreasure}
-          onUntapOpponentAll={onUntapOpponentAll}
-          onPassOpponentTurn={onPassOpponentTurn}
           isYourTurn={isYourTurn}
           currentTurnName={current_turn_name}
-          onCreateTreasure={onCreateTreasure}
-          onUntapAll={onUntapAll}
-          onPassTurn={onPassTurn}
           voiceChat={voiceChat}
           showTopDivider={middleLaneHeight != null}
         />
@@ -504,10 +500,27 @@ export function BattleSidebarContent({
             className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
           />
         )}
-        <PlayerSection
-          upgrades={selfUpgrades}
-          viewportInsetTop={CENTER_GAP}
-        />
+        <div
+          className="grid h-full min-h-0 px-3 pt-3 pb-3"
+          style={{
+            gap: SECTION_GUTTER,
+            gridTemplateRows: hasPlayerActions ? "auto minmax(0,1fr)" : "minmax(0,1fr)",
+          }}
+        >
+          {hasPlayerActions && (
+            <ActionButtonsRow
+              onCreateTreasure={onCreateTreasure}
+              onUntapAll={onUntapAll}
+              onPassTurn={onPassTurn}
+              passDisabled={!isYourTurn}
+            />
+          )}
+          <div className="min-h-0">
+            <PlayerSection
+              upgrades={selfUpgrades}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

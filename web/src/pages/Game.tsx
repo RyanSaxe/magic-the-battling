@@ -100,7 +100,7 @@ const STATIC_DIVIDER_CALLBACKS = {
 type ActiveDndPanel = "sideboard" | "opponentSideboard" | "graveyard" | "exile" | null;
 type BattleZoneModal = BattleZoneModalState | null;
 type BattleSidebarLayout = {
-  handHeight: number;
+  topSectionHeight: number;
   middleLaneHeight: number;
 } | null;
 type PendingBuildUpgradeAnimation = {
@@ -1988,7 +1988,7 @@ function GameContent() {
             toggleSelfMute: voiceChat.toggleSelfMute,
             togglePeerMute: voiceChat.togglePeerMute,
           } : undefined}
-          handZoneHeight={battleSidebarLayout?.handHeight ?? null}
+          topSectionHeight={battleSidebarLayout?.topSectionHeight ?? null}
           middleLaneHeight={battleSidebarLayout?.middleLaneHeight ?? null}
           overlayTopInset={overlaySidebarPadding?.top ?? 0}
         />

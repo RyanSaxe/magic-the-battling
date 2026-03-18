@@ -53,7 +53,7 @@ interface BattlePhaseProps {
     open: boolean,
   ) => void
   onLayoutMetricsChange?: (metrics: {
-    handHeight: number
+    topSectionHeight: number
     middleLaneHeight: number
   }) => void
 }
@@ -220,14 +220,16 @@ export function BattlePhase({
 
   useLayoutEffect(() => {
     onLayoutMetricsChange?.({
-      handHeight,
-      middleLaneHeight: (2 * bfHeight) + MID_DIVIDER_HEIGHT,
+      topSectionHeight: handHeight + opponentMidZoneHeight,
+      middleLaneHeight: opponentBottomZoneHeight + MID_DIVIDER_HEIGHT + playerTopZoneHeight,
     })
   }, [
-    bfHeight,
     handHeight,
     onLayoutMetricsChange,
     MID_DIVIDER_HEIGHT,
+    opponentBottomZoneHeight,
+    opponentMidZoneHeight,
+    playerTopZoneHeight,
   ])
 
   if (!battle) {
