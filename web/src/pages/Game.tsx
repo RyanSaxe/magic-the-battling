@@ -60,6 +60,7 @@ import {
   matchesGuideCompletionTrigger,
   shouldBlockGuidesForBattleResolution,
 } from "./gameGuideState";
+import { getVoicePeerNames } from "../utils/voiceChat";
 
 function getAggregateConnectionColor(peers: VoicePeer[]): string | null {
   if (peers.length === 0) return null
@@ -815,20 +816,14 @@ function GameContent() {
     handleVoiceSignal,
   );
 
-  const peerNames = useMemo(() => {
-    if (!gameState) return []
-    const { self_player, current_battle } = gameState
-    if (self_player.phase === 'battle' && current_battle) {
-      return current_battle.can_manipulate_opponent ? [] : [current_battle.opponent_name]
-    }
-    return gameState.players
-      .filter(p => p.name !== self_player.name && !p.is_puppet)
-      .map(p => p.name)
-  }, [gameState])
+  const peerNames = useMemo(() => getVoicePeerNames(gameState), [gameState]);
+  const voiceTargetNames = useMemo(() => new Set(peerNames), [peerNames]);
+  const voiceTargetsAvailable = peerNames.length > 0;
 
   const voiceChat = useVoiceChat(send, peerNames, gameState?.self_player.name ?? null, voiceSignalRef);
 
   const renderMicToggle = useCallback((player: PlayerView) => {
+    if (!voiceTargetsAvailable) return null
     if (player.is_puppet || player.is_ghost) return null
     if (voiceChat.state.peers.length === 0 && !voiceChat.state.isAvailable) return null
     const isSelf = player.name === gameState?.self_player.name
@@ -841,6 +836,7 @@ function GameContent() {
         />
       )
     }
+    if (!voiceTargetNames.has(player.name)) return null
     const peer = voiceChat.state.peers.find(p => p.name === player.name)
     if (!peer) return null
     return (
@@ -849,7 +845,7 @@ function GameContent() {
         onClick={() => voiceChat.togglePeerMute(player.name)}
       />
     )
-  }, [voiceChat, gameState?.self_player.name])
+  }, [gameState?.self_player.name, voiceChat, voiceTargetNames, voiceTargetsAvailable])
 
   const { state, setPreviewCard, setRevealedPlayerName } = useContextStrip();
 
@@ -1865,7 +1861,7 @@ function GameContent() {
           onCreateOpponentTreasure={handleCreateOpponentTreasure}
           onUntapOpponentAll={handleUntapOpponentAll}
           onPassOpponentTurn={handlePassTurn}
-          voiceChat={!canManipulateOpponent ? {
+          voiceChat={!canManipulateOpponent && voiceTargetsAvailable ? {
             state: voiceChat.state,
             toggleSelfMute: voiceChat.toggleSelfMute,
             togglePeerMute: voiceChat.togglePeerMute,
@@ -2038,7 +2034,9 @@ function GameContent() {
             validDropZones={getValidDropZones}
           >
             <div className="flex-1 flex min-h-0 game-surface">
-              <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
+              {sizes.isMobile && (
+                <div className="w-[4px] shrink-0 frame-chrome" />
+              )}
               <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
                   {sizes.isMobile && battleViewForDisplay && (
@@ -2059,7 +2057,7 @@ function GameContent() {
                             <span className="text-amber-400 font-medium">Opp's turn</span>
                           )}
                         </div>
-                        {!canManipulateOpponent && voiceChat.state.peers.length > 0 && (
+                        {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
                           <MicToggle
                             muted={voiceChat.state.isMuted}
                             onClick={() => voiceChat.toggleSelfMute()}
@@ -2135,7 +2133,9 @@ function GameContent() {
                   renderMicToggle={renderMicToggle}
                 />
               )}
-              <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
+              {sizes.isMobile && (
+                <div className="w-[4px] shrink-0 frame-chrome" />
+              )}
             </div>
             {activeDndPanel === 'sideboard' && current_battle && (
               <div onClick={(e) => handlePanelClickToMove(e, 'sideboard', 'player')}>
@@ -2255,7 +2255,9 @@ function GameContent() {
           </FaceDownProvider>
         ) : (
           <div className="flex-1 flex min-h-0 game-surface">
-            <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
+            {sizes.isMobile && (
+              <div className="w-[4px] shrink-0 frame-chrome" />
+            )}
             <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
               {currentPhase === "draft" && (
                 <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
@@ -2353,7 +2355,9 @@ function GameContent() {
                 renderMicToggle={renderMicToggle}
               />
             )}
-            <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
+            {sizes.isMobile && (
+              <div className="w-[4px] shrink-0 frame-chrome" />
+            )}
           </div>
         )}
         {/* Bottom Action Bar */}

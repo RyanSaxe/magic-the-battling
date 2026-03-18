@@ -97,7 +97,7 @@ export function Sidebar({
           onClose={() => setRevealedPlayerName(null)}
         />
       ) : (
-        <div className="relative z-50 px-3 py-3 sm:py-0 overflow-auto flex-1 flex flex-col">
+        <div className={`relative z-50 px-3 overflow-auto flex-1 flex flex-col ${isMobile ? "py-3" : "py-0"}`}>
           <PlayerList
             players={players}
             currentPlayerName={currentPlayer.name}

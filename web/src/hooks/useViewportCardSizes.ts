@@ -5,6 +5,8 @@ export interface CardDimensions {
   height: number
 }
 
+export const GAME_MOBILE_BREAKPOINT_PX = 1120
+
 interface ViewportCardSizes {
   hand: CardDimensions
   battlefield: CardDimensions
@@ -20,8 +22,8 @@ function clampDims(vh: number, fraction: number, min: number, max: number): Card
   return { width, height }
 }
 
-function computeSizes(width: number, height: number): ViewportCardSizes {
-  const isMobile = width < 640
+export function computeViewportCardSizes(width: number, height: number): ViewportCardSizes {
+  const isMobile = width < GAME_MOBILE_BREAKPOINT_PX
   const scale = isMobile ? 0.6 : 1
 
   return {
@@ -36,12 +38,12 @@ function computeSizes(width: number, height: number): ViewportCardSizes {
 
 export function useViewportCardSizes(): ViewportCardSizes {
   const [sizes, setSizes] = useState(() =>
-    computeSizes(window.innerWidth, window.innerHeight)
+    computeViewportCardSizes(window.innerWidth, window.innerHeight)
   )
 
   useEffect(() => {
     const handleResize = () => {
-      setSizes(computeSizes(window.innerWidth, window.innerHeight))
+      setSizes(computeViewportCardSizes(window.innerWidth, window.innerHeight))
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)

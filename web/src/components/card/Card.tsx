@@ -50,6 +50,9 @@ const isBasicLandOrTreasureToken = (card: CardType) =>
   (card.type_line.toLowerCase().includes('treasure') &&
     !card.type_line.toLowerCase().includes('land'))
 
+const isCopiedToken = (card: CardType) =>
+  card.scryfall_id?.startsWith('token-copy-') ?? false
+
 export function Card({
   card,
   onClick,
@@ -82,6 +85,7 @@ export function Card({
   const previewContext = useContext(CardPreviewContext)
 
   const showZoom = !isBasicLandOrTreasureToken(card)
+  const showCopyBadge = isCopiedToken(card)
 
   useEffect(() => {
     if (!isHovered || !previewContext || !showZoom) return
@@ -148,6 +152,14 @@ export function Card({
           <span className="text-gray-400 text-xs text-center px-2">{card.name}</span>
         </div>
       )}
+      {showCopyBadge && (
+        <div
+          className="absolute left-1 top-1 rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200"
+          data-copy-token-badge
+        >
+          Copy
+        </div>
+      )}
       <img
         src={imageUrl}
         alt={card.name}
@@ -169,7 +181,7 @@ export function Card({
       )}
       {previewContext && showZoom && (!effectiveFaceDown || canPeekFaceDown) && (isHovered || selected) && (
         <button
-          className="absolute top-1 left-1 bg-black/60 rounded p-1 text-white hover:bg-black/80 transition-colors"
+          className={`absolute ${showCopyBadge ? 'top-8' : 'top-1'} left-1 bg-black/60 rounded p-1 text-white hover:bg-black/80 transition-colors`}
           onClick={(e) => {
             e.stopPropagation()
             if (card.upgrade_target) {

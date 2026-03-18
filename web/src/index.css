@@ -218,17 +218,6 @@ body {
   .dnd-panel-header-battle {
     position: relative;
   }
-
-  .dnd-panel-header-battle::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -3px;
-    height: 2px;
-    background: var(--gold-border);
-    pointer-events: none;
-  }
 }
 
 /* Zone-specific backgrounds */

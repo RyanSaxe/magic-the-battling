@@ -559,14 +559,13 @@ export function PlayerDetailPanel({
       ref={panelRef}
       data-guide-target="sidebar-detail-drawer"
       aria-hidden={!isOpen}
-      className={`absolute inset-y-0 z-[60] overflow-hidden border-l-2 border-r-0 border-t-0 border-b-0 border-[var(--gold-border-opaque)] frame-chrome ${
+      className={`absolute inset-y-0 z-[30] overflow-hidden border-l-2 border-r-0 border-t-0 border-b-0 border-[var(--gold-border-opaque)] frame-chrome ${
         isOpen ? "pointer-events-auto" : "pointer-events-none"
       }`}
       style={{
         right: "calc(100% - 8px)",
         width: "var(--sidebar-width)",
-        boxShadow:
-          "-10px 16px 28px rgba(0, 0, 0, 0.34)",
+        boxShadow: "-14px 0 22px -12px rgba(0, 0, 0, 0.42)",
         transform: renderOpen ? "translateX(0)" : "translateX(calc(100% - 8px))",
         transition: "transform 220ms ease-out",
       }}

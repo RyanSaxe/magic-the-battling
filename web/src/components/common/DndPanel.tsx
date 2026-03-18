@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { bestFit, type ZoneDims } from '../../hooks/cardSizeUtils'
+import { GAME_MOBILE_BREAKPOINT_PX } from '../../hooks/useViewportCardSizes'
 import { DroppableZone } from '../../dnd'
 import type { ZoneName } from '../../types'
 import type { ZoneOwner } from '../../dnd/types'
@@ -45,6 +46,9 @@ export function DndPanel({
 }: DndPanelProps) {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_DIMS)
   const [mobileHeight, setMobileHeight] = useState<number | null>(null)
+  const [isMobileLayout, setIsMobileLayout] = useState(
+    () => window.innerWidth < GAME_MOBILE_BREAKPOINT_PX,
+  )
   const observerRef = useRef<ResizeObserver | null>(null)
   const isBattleTone = tone === 'battle'
 
@@ -55,6 +59,15 @@ export function DndPanel({
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobileLayout(window.innerWidth < GAME_MOBILE_BREAKPOINT_PX)
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     const el = document.getElementById('opponent-hand')
@@ -112,13 +125,25 @@ export function DndPanel({
     gridTemplateColumns: `repeat(${Math.max(1, dims.columns)}, ${dims.width}px)`,
     gridAutoRows: `${dims.height}px`,
   }
+  const panelShellClassName = isBattleTone
+    ? [
+        'battle-panel-chrome',
+        isMobileLayout ? '' : 'left-auto !max-h-none !h-full w-[calc(16rem-1px)]',
+      ].filter(Boolean).join(' ')
+    : [
+        'modal-chrome gold-border',
+        isMobileLayout ? 'border-b' : 'left-auto !max-h-none !h-full w-64 border-l-2',
+      ].filter(Boolean).join(' ')
+  const headerClassName = isBattleTone
+    ? 'dnd-panel-header-battle'
+    : `gold-border ${isMobileLayout ? 'border-b' : 'border-b-2'}`
 
   return (
     <div
-      className={`fixed top-0 left-0 right-0 sm:left-auto sm:!max-h-none sm:!h-full ${isBattleTone ? 'sm:w-[calc(16rem-1px)] battle-panel-chrome' : 'sm:w-64 modal-chrome border-b sm:border-b-0 sm:border-l-2 gold-border'} z-50 flex flex-col${mobileHeight == null ? ' max-h-[50vh]' : ''}`}
+      className={`fixed top-0 left-0 right-0 ${panelShellClassName} z-50 flex flex-col${mobileHeight == null ? ' max-h-[50vh]' : ''}`}
       style={mobileHeight != null ? { height: mobileHeight } : undefined}
     >
-      <div className={`px-2 py-1.5 sm:px-3 sm:py-[10px] flex justify-between items-center shrink-0 ${isBattleTone ? 'dnd-panel-header-battle' : 'border-b sm:border-b-2 gold-border'}`}>
+      <div className={`px-2 py-1.5 ${isMobileLayout ? '' : 'px-3 py-[10px]'} flex justify-between items-center shrink-0 ${headerClassName}`}>
         {hideTitle ? <div /> : <h3 className="text-white font-medium text-sm">{title}</h3>}
         <div className="flex items-center gap-2">
           {headerActions}
