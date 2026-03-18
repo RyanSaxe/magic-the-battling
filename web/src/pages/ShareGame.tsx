@@ -6,6 +6,7 @@ import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
 import { buildSharePlayerViews, getSharePlayerRowBadge } from '../utils/share'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
 import { useGameShellMode } from '../hooks/useGameShellMode'
+import { useElementHeight } from '../hooks/useElementHeight'
 import type { ZoneConstraints } from '../hooks/computeConstrainedLayout'
 import { CardPreviewContext, CardPreviewModal } from '../components/card'
 import { PLAYER_ROW_STACK_CLASS, PlayerRow } from '../components/PlayerList'
@@ -99,6 +100,8 @@ export function ShareGame() {
   const [previewCard, setPreviewCardState] = useState<CardType | null>(null)
   const [previewUpgrades, setPreviewUpgrades] = useState<CardType[]>([])
   const [deckConstraintsByView, setDeckConstraintsByView] = useState<Record<string, ZoneConstraints>>({})
+  const [headerRef, headerHeight] = useElementHeight()
+  const [bottomBarRef, bottomBarHeight] = useElementHeight()
   const usesOverlaySidebar = shellMode !== 'big'
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen
   const isSmallShell = shellMode === 'small'
@@ -109,6 +112,9 @@ export function ShareGame() {
       : 'shrink-0 py-3 frame-chrome bar-pad-both'
   const bottomBarPaddingClass =
     shellMode === 'small' ? 'bar-pad-both' : 'bar-pad-main'
+  const overlaySidebarPaddingStyle = usesOverlaySidebar
+    ? { paddingTop: headerHeight, paddingBottom: bottomBarHeight }
+    : undefined
   const setPreviewCard = useCallback((card: CardType | null, appliedUpgrades?: CardType[]) => {
     setPreviewCardState(card)
     setPreviewUpgrades(appliedUpgrades ?? [])
@@ -244,7 +250,7 @@ export function ShareGame() {
   }
 
   const renderSidebarContent = () => (
-    <div className="px-3 py-3 sm:py-0">
+    <div className="px-3 py-0">
       <div className={PLAYER_ROW_STACK_CLASS}>
         {sortedPlayerViews.map((pv) => {
           const sharePlayer = sharePlayersByName.get(pv.name)
@@ -276,7 +282,7 @@ export function ShareGame() {
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
     <div className="h-dvh flex flex-col bg-gray-900 text-white overflow-hidden">
       {/* Header */}
-      <header className={headerChromeClassName}>
+      <header ref={headerRef} className={headerChromeClassName}>
         {!usesCompactHeader ? (
         <div className="flex items-center justify-between">
           <div>
@@ -352,7 +358,10 @@ export function ShareGame() {
                 overlaySidebarOpen ? 'translate-x-0' : 'translate-x-full'
               }`}
             >
-              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
+              <aside
+                className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden"
+                style={overlaySidebarPaddingStyle}
+              >
                 <div className="px-3 py-2 text-sm font-medium text-gray-400">
                   Players
                 </div>
@@ -378,7 +387,7 @@ export function ShareGame() {
       </div>
 
       {/* Bottom Bar */}
-      <div className="shrink-0 frame-chrome">
+      <div ref={bottomBarRef} className="shrink-0 frame-chrome">
         <div className={`flex items-center justify-between py-1.5 sm:py-2 ${bottomBarPaddingClass} timeline-actions`}>
           <div className="relative">
             <button

@@ -547,6 +547,10 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         placement: "top",
         cardPlacement: "top-center",
         primaryActionLabel: "Next",
+        sidebarState: {
+          openOnMobile: false,
+          playerName: null,
+        },
         content: {
           summary: "Rolling spends 1 treasure to exile the current pack and replace it with a new pack of 5 cards.",
           detail: "Treasures matter across phases, so rolling is a real resource decision, not a free redraw.",

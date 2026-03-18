@@ -34,6 +34,7 @@ import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard, type ZoneOwner } from "../dnd";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { useGameShellMode } from "../hooks/useGameShellMode";
+import { useElementHeight } from "../hooks/useElementHeight";
 import { BattleResolutionOverlay } from "../components/common/BattleResolutionOverlay";
 import { BuildUpgradeOverlay } from "../components/common/BuildUpgradeOverlay";
 import { UpgradesModal } from "../components/common/UpgradesModal";
@@ -676,8 +677,13 @@ function GameGuideLayer({
       };
     }
 
-    if (context.isMobile && resolvedSidebarState.openOnMobile && !sidebarOpen) {
-      setSidebarOpen(true);
+    if (context.isMobile) {
+      if (resolvedSidebarState.openOnMobile === true && !sidebarOpen) {
+        setSidebarOpen(true);
+      }
+      if (resolvedSidebarState.openOnMobile === false && sidebarOpen) {
+        setSidebarOpen(false);
+      }
     }
     if (
       resolvedSidebarState.playerName !== undefined
@@ -815,6 +821,8 @@ function GameContent() {
   const shellMode = useGameShellMode();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [battleSidebarLayout, setBattleSidebarLayout] = useState<BattleSidebarLayout>(null);
+  const [phaseTimelineRef, phaseTimelineHeight] = useElementHeight();
+  const [actionBarRef, actionBarHeight] = useElementHeight();
   const usesOverlaySidebar = shellMode !== "big";
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
   const isSmallShell = shellMode === "small";
@@ -824,6 +832,9 @@ function GameContent() {
     shellMode === "small" ? "" : "sm:-translate-x-2";
   const actionBarPaddingClass =
     shellMode === "small" ? "bar-pad-both" : "bar-pad-main";
+  const overlaySidebarPadding = usesOverlaySidebar
+    ? { top: phaseTimelineHeight, bottom: actionBarHeight }
+    : undefined;
 
   const isSpectateMode = searchParams.get("spectate") === "true";
   const { addToast } = useToast();
@@ -2088,7 +2099,7 @@ function GameContent() {
           closeGameplayOverlays={closeGameplayOverlays}
         >
         {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
-        <div className="relative">
+        <div ref={phaseTimelineRef} className="relative">
           <PhaseTimeline
             currentPhase={currentPhase}
             stage={self_player.stage}
@@ -2212,6 +2223,7 @@ function GameContent() {
                       useUpgrades={gameState.use_upgrades}
                       isMobile
                       renderMicToggle={renderMicToggle}
+                      overlayPadding={overlaySidebarPadding}
                     />
                   </div>
                 </>
@@ -2457,6 +2469,7 @@ function GameContent() {
                     useUpgrades={gameState.use_upgrades}
                     isMobile
                     renderMicToggle={renderMicToggle}
+                    overlayPadding={overlaySidebarPadding}
                   />
                 </div>
               </>
@@ -2479,7 +2492,7 @@ function GameContent() {
         )}
         {/* Bottom Action Bar */}
         {!isSpectator && (
-          <div className="shrink-0 relative frame-chrome z-40">
+          <div ref={actionBarRef} className="shrink-0 relative frame-chrome z-40">
             <div
               className={`flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 ${actionBarPaddingClass} timeline-actions`}
               data-guide-target="phase-action-bar"
