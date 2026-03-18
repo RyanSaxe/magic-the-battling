@@ -397,6 +397,8 @@ export function BuildPhase({
   const upgradeDims = {
     width: dims.commandZone.width,
     height: dims.commandZone.height,
+    rows: dims.commandZone.rows,
+    columns: dims.commandZone.columns,
   };
 
   const emptySlotLabel = isMobile

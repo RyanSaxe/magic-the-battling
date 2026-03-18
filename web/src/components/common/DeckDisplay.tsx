@@ -187,7 +187,12 @@ export function DeckDisplay({
   const handDims = { width: dims.hand.width, height: dims.hand.height }
   const sideboardDims = { width: dims.sideboard.width, height: dims.sideboard.height }
   const bfDims = { width: dims.battlefield.width, height: dims.battlefield.height }
-  const czDims = { width: dims.commandZone.width, height: dims.commandZone.height }
+  const czDims = {
+    width: dims.commandZone.width,
+    height: dims.commandZone.height,
+    rows: dims.commandZone.rows,
+    columns: dims.commandZone.columns,
+  }
 
   return (
     <ZoneLayout
