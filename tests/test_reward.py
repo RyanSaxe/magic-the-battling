@@ -109,6 +109,24 @@ def test_apply_upgrade_to_card(card_factory, upgrade_factory):
     reward.apply_upgrade_to_card(player, upgrade, target)
 
     assert upgrade.upgrade_target is target
+    assert upgrade.is_revealed is False
+
+
+def test_hidden_applied_upgrades_do_not_count_until_revealed(card_factory, upgrade_factory):
+    game = create_game(["Alice"], num_players=1)
+    player = game.players[0]
+    upgrade = upgrade_factory("power")
+    target = card_factory("creature")
+    player.hand = [target]
+    player.upgrades = [upgrade]
+
+    reward.apply_upgrade_to_card(player, upgrade, target)
+
+    assert reward.count_applied_upgrades(player) == 0
+
+    reward.reveal_upgrade(player, upgrade)
+
+    assert reward.count_applied_upgrades(player) == 1
 
 
 def test_apply_upgrade_to_card_already_applied_raises(card_factory, upgrade_factory):

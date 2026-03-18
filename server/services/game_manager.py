@@ -1468,8 +1468,13 @@ class GameManager:
             hand=[c.model_copy() for c in player.hand],
             vanguard=player.vanguard.model_copy() if player.vanguard else None,
             basic_lands=player.chosen_basics.copy(),
-            applied_upgrades=[u.model_copy() for u in player.upgrades if u.upgrade_target is not None],
-            upgrades=[u.model_copy() for u in player.upgrades],
+            applied_upgrades=[
+                u.model_copy(update={"is_revealed": True}) for u in player.upgrades if reward.is_applied_upgrade(u)
+            ],
+            upgrades=[
+                u.model_copy(update={"is_revealed": True}) if reward.is_applied_upgrade(u) else u.model_copy()
+                for u in player.upgrades
+            ],
             treasures=player.treasures,
             sideboard=[c.model_copy() for c in player.sideboard],
             command_zone=[c.model_copy() for c in player.command_zone],
@@ -1485,7 +1490,16 @@ class GameManager:
             vanguard_json=(ref.model_dump_json() if (ref := card_to_ref(player.vanguard)) is not None else None),
             basic_lands_json=json.dumps(player.chosen_basics),
             applied_upgrades_json=json.dumps(
-                [ref.model_dump() for ref in cards_to_refs([u for u in player.upgrades if u.upgrade_target])]
+                [
+                    ref.model_dump()
+                    for ref in cards_to_refs(
+                        [
+                            u.model_copy(update={"is_revealed": True})
+                            for u in player.upgrades
+                            if reward.is_applied_upgrade(u)
+                        ]
+                    )
+                ]
             ),
             treasures=player.treasures,
             poison=player.poison,
@@ -2059,6 +2073,9 @@ class GameManager:
             return "loss"
         return "win"
 
+    def _public_visible_upgrades(self, upgrades: list[Card]) -> list[Card]:
+        return [upgrade for upgrade in upgrades if reward.is_revealed_applied_upgrade(upgrade)]
+
     def _make_player_view(
         self,
         player: Player,
@@ -2067,6 +2084,9 @@ class GameManager:
         most_recent_ghost_name: str | None = None,
     ) -> PlayerView:
         is_eliminated = player.phase == "eliminated"
+        visible_upgrades = (
+            player.upgrades if player.name == viewer.name else self._public_visible_upgrades(player.upgrades)
+        )
         return PlayerView(
             name=player.name,
             treasures=player.treasures,
@@ -2082,7 +2102,7 @@ class GameManager:
             sideboard_count=len(player.sideboard),
             hand_size=player.hand_size,
             is_stage_increasing=reward.is_stage_increasing(player),
-            upgrades=cards_to_refs(player.upgrades),
+            upgrades=cards_to_refs(visible_upgrades),
             vanguard=card_to_ref(player.vanguard),
             chosen_basics=player.chosen_basics,
             most_recently_revealed_cards=cards_to_refs(player.most_recently_revealed_cards),
@@ -2428,7 +2448,7 @@ class GameManager:
             exile=scrubbed_exile,
             hand=opponent_zones.hand if hand_revealed else [],
             sideboard=[],
-            upgrades=opponent_zones.upgrades,
+            upgrades=self._public_visible_upgrades(opponent_zones.upgrades),
             command_zone=scrubbed_cz,
             library=scrubbed_library,
             treasures=opponent_zones.treasures,
@@ -2784,6 +2804,25 @@ class GameManager:
             if player.name in (b.player.name, b.opponent.name):
                 card_id = b._face_down_id_map.get(card_id, card_id)
                 return battle.update_card_state(b, player, action_type, card_id, data)
+        return False
+
+    def handle_battle_reveal_upgrade(self, game: Game, player: Player, upgrade_id: str) -> bool:
+        for b in game.active_battles:
+            if player.name not in (b.player.name, b.opponent.name):
+                continue
+
+            own_zones = self._get_zones_for_owner(b, player, "player")
+            zone_upgrade = next((upgrade for upgrade in own_zones.upgrades if upgrade.id == upgrade_id), None)
+            player_upgrade = next((upgrade for upgrade in player.upgrades if upgrade.id == upgrade_id), None)
+            target_upgrade = player_upgrade or zone_upgrade
+            if target_upgrade is None or not reward.is_applied_upgrade(target_upgrade) or target_upgrade.is_revealed:
+                return False
+
+            if player_upgrade is not None:
+                reward.reveal_upgrade(player, player_upgrade)
+            if zone_upgrade is not None:
+                zone_upgrade.is_revealed = True
+            return True
         return False
 
     def handle_battle_pass_turn(self, game: Game, player: Player) -> bool | str:

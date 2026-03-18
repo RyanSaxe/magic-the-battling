@@ -46,6 +46,10 @@ import {
   comparePlayersForSidebar,
   getSidebarPlayerOrder,
 } from "../utils/playerPlacement";
+import {
+  getRevealedAppliedUpgrades,
+  getUnrevealedAppliedUpgrades,
+} from "../utils/upgrades";
 import type { Phase } from "../constants/phases";
 import type {
   GuideRequest,
@@ -922,7 +926,7 @@ function GameContent() {
   ]);
 
   // Lifted state from Build phase
-  type UpgradesModalOpenMode = 'auto' | 'view';
+  type UpgradesModalOpenMode = 'auto' | 'view' | 'reveal';
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
   const [showUpgradesModal, setShowUpgradesModal] = useState(false);
   const [upgradesModalOpenMode, setUpgradesModalOpenMode] =
@@ -1486,6 +1490,8 @@ function GameContent() {
       hasRewardUpgradeChoice: needsUpgrade,
       showBuildSubmitPopover: showSubmitHandPopover,
       showBattleSubmitPopover: showSubmitResultPopover,
+      hasBattleRevealUpgrade:
+        currentPhase === "battle" && getUnrevealedAppliedUpgrades(self_player.upgrades).length > 0,
       availableRewardUpgrades: gameState.available_upgrades,
       draftGuideOpponentName: dgo.name,
       draftGuideOpponentRevealedCount: dgo.revealedCount,
@@ -1557,12 +1563,16 @@ function GameContent() {
   const canContinue = !needsUpgrade || !!selectedUpgradeId;
   const hasPendingBuildUpgrades =
     currentPhase === "build" && self_player.upgrades.some((u) => !u.upgrade_target);
-  const upgradesModalMode: "view" | "apply" =
+  const hasUnrevealedBattleUpgrades =
+    actionBarPhase === "battle" && getUnrevealedAppliedUpgrades(self_player.upgrades).length > 0;
+  const upgradesModalMode: "view" | "apply" | "reveal" =
     upgradesModalOpenMode === "view"
       ? "view"
-      : hasPendingBuildUpgrades
-        ? "apply"
-        : "view";
+      : upgradesModalOpenMode === "reveal"
+        ? "reveal"
+        : hasPendingBuildUpgrades
+          ? "apply"
+          : "view";
 
   const renderActionButtons = (): ReactNode => {
     if (isSpectator) {
@@ -1705,13 +1715,27 @@ function GameContent() {
       const opponentSubmission = result_submissions[opponent_name];
 
       left = (
-        <button
-          onClick={openActionMenu}
-          className="btn btn-secondary"
-          data-guide-target="battle-actions"
-        >
-          Actions
-        </button>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {hasUnrevealedBattleUpgrades && (
+            <button
+              onClick={() => {
+                requestGuideCompletion("hint_battle_unrevealed_upgrade", "reveal-upgrade");
+                openUpgradesModal(undefined, 'reveal');
+              }}
+              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              data-guide-target="battle-reveal-upgrade"
+            >
+              Reveal Upgrade
+            </button>
+          )}
+          <button
+            onClick={openActionMenu}
+            className="btn btn-secondary"
+            data-guide-target="battle-actions"
+          >
+            Actions
+          </button>
+        </div>
       );
 
       if (mySubmission && !isChangingResult) {
@@ -1889,7 +1913,7 @@ function GameContent() {
       return (
         <BattleSidebarContent
           currentBattle={battleViewForDisplay}
-          selfUpgrades={self_player.upgrades}
+          selfUpgrades={getRevealedAppliedUpgrades(self_player.upgrades)}
           yourLife={battleViewForDisplay.your_life}
           opponentLife={battleViewForDisplay.opponent_life}
           onYourLifeChange={handleYourLifeChange}
@@ -2497,6 +2521,9 @@ function GameContent() {
           onApply={(upgradeId, targetId) => {
             setPendingBuildUpgradeAnimation({ upgradeId, targetId });
             actions.buildApplyUpgrade(upgradeId, targetId);
+          }}
+          onReveal={(upgradeId) => {
+            actions.battleRevealUpgrade(upgradeId);
           }}
           onClose={closeUpgradesModal}
           initialTargetId={upgradeInitialTargetId}

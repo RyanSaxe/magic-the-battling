@@ -3,6 +3,7 @@ import type { BattleView, Card as CardType } from "../../types";
 import type { VoiceChatState } from "../../hooks/useVoiceChat";
 import { UpgradeStack } from "./UpgradeStack";
 import { MicToggle } from "./MicToggle";
+import { getRevealedAppliedUpgrades } from "../../utils/upgrades";
 
 interface BattleSidebarContentProps {
   currentBattle: BattleView;
@@ -142,7 +143,7 @@ function PlayerSection({
     return () => obs.disconnect()
   }, [])
 
-  const appliedUpgrades = upgrades.filter((u) => u.upgrade_target);
+  const appliedUpgrades = getRevealedAppliedUpgrades(upgrades);
 
   if (appliedUpgrades.length === 0) return null;
 

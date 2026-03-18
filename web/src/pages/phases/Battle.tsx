@@ -6,6 +6,7 @@ import { CompactZoneDisplay } from '../../components/zones/CompactZoneDisplay'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
 import { ZoneDivider } from '../../components/common/ZoneDivider'
 import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
+import { getAppliedUpgrades, getRevealedAppliedUpgrades } from '../../utils/upgrades'
 
 interface ContextMenuState {
   card: CardType
@@ -251,8 +252,8 @@ export function BattlePhase({
   const opponentFlippedIds = new Set(opponent_zones.flipped_card_ids || [])
   const opponentCounters = opponent_zones.counters || {}
 
-  const playerAppliedUpgrades = your_zones.upgrades.filter((u) => u.upgrade_target)
-  const opponentAppliedUpgrades = opponent_zones.upgrades.filter((u) => u.upgrade_target)
+  const playerAppliedUpgrades = getAppliedUpgrades(your_zones.upgrades)
+  const opponentAppliedUpgrades = getRevealedAppliedUpgrades(opponent_zones.upgrades)
 
   const upgradedCardIds = new Set(playerAppliedUpgrades.map((u) => u.upgrade_target!.id))
   const opponentUpgradedCardIds = new Set(opponentAppliedUpgrades.map((u) => u.upgrade_target!.id))

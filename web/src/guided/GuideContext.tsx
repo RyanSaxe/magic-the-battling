@@ -22,7 +22,11 @@ import {
 import { resolveNewPlayerPreferenceForGame } from "../utils/deviceIdentity";
 import type { Phase } from "../constants/phases";
 import { GuideStateContext } from "./guideState";
-import { getEligibleConditionalGuides, isConditionalGuideEligible } from "./content";
+import {
+  getEligibleConditionalGuides,
+  isAlwaysOnConditionalGuide,
+  isConditionalGuideEligible,
+} from "./content";
 
 function isTimelinePhase(phase: string | undefined): phase is Phase {
   return phase === "draft" || phase === "build" || phase === "battle" || phase === "reward";
@@ -178,14 +182,16 @@ export function GuideProvider({
   );
 
   useEffect(() => {
-    if (!gameId || !progressHydrated || !isGuidedMode || isSpectator || skippedAll) {
+    if (!gameId || !progressHydrated || isSpectator) {
       return;
     }
 
     const activeGuideId = guideRequest?.guideId ?? null;
     const pending = eligibleConditionalGuides.filter(
       (guideId) =>
-        !seenGuides.has(guideId)
+        (isGuidedMode || isAlwaysOnConditionalGuide(guideId))
+        && (!skippedAll || isAlwaysOnConditionalGuide(guideId))
+        && !seenGuides.has(guideId)
         && activeGuideId !== guideId
         && !guideQueue.includes(guideId),
     );
@@ -222,9 +228,7 @@ export function GuideProvider({
       !gameId ||
       !selfPhase ||
       !progressHydrated ||
-      !isGuidedMode ||
       isSpectator ||
-      skippedAll ||
       guideRequest !== null ||
       hasOverlayOpen
     ) {
@@ -233,7 +237,9 @@ export function GuideProvider({
 
     const nextQueue = guideQueue.filter(
       (guideId) =>
-        !seenGuides.has(guideId)
+        (isGuidedMode || isAlwaysOnConditionalGuide(guideId))
+        && (!skippedAll || isAlwaysOnConditionalGuide(guideId))
+        && !seenGuides.has(guideId)
         && isConditionalGuideEligible(guideId, guideContext),
     );
 
@@ -241,6 +247,17 @@ export function GuideProvider({
       queueMicrotask(() => {
         setGuideQueue(nextQueue);
       });
+    }
+
+    if (nextQueue.length > 0) {
+      queueMicrotask(() => {
+        requestGuide(nextQueue[0]);
+      });
+      return;
+    }
+
+    if (!isGuidedMode || skippedAll) {
+      return;
     }
 
     if (!seenGuides.has("welcome")) {

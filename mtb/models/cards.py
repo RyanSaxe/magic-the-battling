@@ -26,6 +26,7 @@ class Card(BaseModel):
     id: str
     scryfall_id: str = ""
     upgrade_target: "Card | None" = None
+    is_revealed: bool = True
     original_owner: str | None = None
 
     _card_data: CardData | None = PrivateAttr(default=None)
@@ -167,6 +168,7 @@ class Card(BaseModel):
                 "upgrade_target": (
                     self.upgrade_target.model_dump(context=info.context) if self.upgrade_target is not None else None
                 ),
+                "is_revealed": self.is_revealed,
                 "original_owner": self.original_owner,
             }
         return handler(self)

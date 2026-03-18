@@ -13,6 +13,7 @@ const baseContext: GuidedWalkthroughContext = {
   hasRewardUpgradeChoice: false,
   showBuildSubmitPopover: false,
   showBattleSubmitPopover: false,
+  hasBattleRevealUpgrade: false,
   availableRewardUpgrades: [],
   draftGuideOpponentName: "Rival",
   draftGuideOpponentRevealedCount: 3,
@@ -44,6 +45,18 @@ describe("buildGuideDefinition", () => {
     const step = guide.steps.find((candidate) => candidate.id === "continue");
 
     expect(step?.targetId).toBe("reward-continue");
+    expect(step?.allowTargetInteraction).toBe(true);
+  });
+
+  it("targets the battle reveal-upgrade button for the reveal hint", () => {
+    const guide = buildGuideDefinition("hint_battle_unrevealed_upgrade", {
+      ...baseContext,
+      currentPhase: "battle",
+      hasBattleRevealUpgrade: true,
+    });
+    const step = guide.steps.find((candidate) => candidate.id === "reveal-upgrade");
+
+    expect(step?.targetId).toBe("battle-reveal-upgrade");
     expect(step?.allowTargetInteraction).toBe(true);
   });
 });

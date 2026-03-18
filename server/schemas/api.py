@@ -78,6 +78,7 @@ class CardRef(BaseModel):
     id: str
     scryfall_id: str
     upgrade_target_id: str | None = None
+    is_revealed: bool = True
     original_owner: str | None = None
 
 

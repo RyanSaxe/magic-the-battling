@@ -32,6 +32,7 @@ export interface Card {
   tokens: Card[]
   elo: number | null
   upgrade_target: Card | null
+  is_revealed?: boolean
   oracle_text: string | null
   colors: string[]
   keywords?: string[]
@@ -192,6 +193,7 @@ export interface CardRef {
   id: string
   scryfall_id: string
   upgrade_target_id: string | null
+  is_revealed?: boolean
   original_owner: string | null
 }
 
