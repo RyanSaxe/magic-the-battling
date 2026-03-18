@@ -437,7 +437,8 @@ body {
 }
 
 .card.dragging {
-  opacity: 0.5;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .card.upgraded::after,

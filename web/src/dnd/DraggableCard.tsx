@@ -93,7 +93,11 @@ export function DraggableCard({
             }
           },
         }}
-        interactiveStyle={transform ? { transform: CSS.Translate.toString(transform) } : undefined}
+        interactiveStyle={
+          transform && !isDragging
+            ? { transform: CSS.Translate.toString(transform) }
+            : undefined
+        }
         selected={selected}
         size={size}
         dimensions={dimensions}
