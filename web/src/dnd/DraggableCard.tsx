@@ -116,7 +116,6 @@ export function DraggableCard({
         }}
         onHoverStart={onCardHover ? () => onCardHover(card.id, zone) : undefined}
         onHoverEnd={onCardHoverEnd}
-        suppressHoverEnlarge={isDragging}
       />
     </div>
   )

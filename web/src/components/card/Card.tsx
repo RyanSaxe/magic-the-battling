@@ -1,12 +1,8 @@
-import { useState, useContext, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useContext, useEffect, useRef, useMemo } from 'react'
 import type { Card as CardType } from '../../types'
 import { CardPreviewContext } from './CardPreviewContext'
 import { useFaceDown } from '../../contexts/faceDownState'
 import { CARD_BACK_IMAGE, BASIC_LANDS } from '../../constants/assets'
-
-const HOVER_ENLARGE_SCALE = 1.24
-const HOVER_ENLARGE_Z_INDEX = 56
-const VIEWPORT_PADDING = 8
 
 interface CardProps {
   card: CardType
@@ -34,7 +30,6 @@ interface CardProps {
   canPeekFaceDown?: boolean
   style?: React.CSSProperties
   trackDomId?: boolean
-  suppressHoverEnlarge?: boolean
   interactiveRef?: React.Ref<HTMLDivElement>
   interactiveStyle?: React.CSSProperties
   interactiveProps?: React.HTMLAttributes<HTMLDivElement>
@@ -105,7 +100,6 @@ export function Card({
   canPeekFaceDown = true,
   style: externalStyle,
   trackDomId = true,
-  suppressHoverEnlarge = false,
   interactiveRef,
   interactiveStyle,
   interactiveProps,
@@ -113,7 +107,6 @@ export function Card({
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
-  const [hoverRect, setHoverRect] = useState<DOMRect | null>(null)
   const anchorRef = useRef<HTMLDivElement | null>(null)
 
   const contextFaceDown = useFaceDown(card.id)
@@ -154,57 +147,6 @@ export function Card({
   const imageUrl = isHovered && pngUrl ? pngUrl : normalUrl
 
   const dims = dimensions ?? sizeStyles[size]
-  const canPromote = canHover && !dragging && !suppressHoverEnlarge
-  const shouldPromote = canPromote && isHovered && hoverRect !== null
-
-  const updateHoverRect = useCallback(() => {
-    if (!anchorRef.current) return
-    setHoverRect(anchorRef.current.getBoundingClientRect())
-  }, [])
-
-  useEffect(() => {
-    if (!shouldPromote) return
-
-    updateHoverRect()
-    const observer = new ResizeObserver(() => updateHoverRect())
-    if (anchorRef.current) {
-      observer.observe(anchorRef.current)
-    }
-
-    const handleViewportChange = () => updateHoverRect()
-    window.addEventListener('resize', handleViewportChange)
-    window.addEventListener('scroll', handleViewportChange, true)
-
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', handleViewportChange)
-      window.removeEventListener('scroll', handleViewportChange, true)
-    }
-  }, [shouldPromote, updateHoverRect])
-
-  const promotionStyle = useMemo(() => {
-    if (!shouldPromote || !hoverRect) return null
-
-    const scaledWidth = dims.width * HOVER_ENLARGE_SCALE
-    const scaledHeight = dims.height * HOVER_ENLARGE_SCALE
-    const clampedLeft = Math.min(
-      Math.max(hoverRect.left - (scaledWidth - dims.width) / 2, VIEWPORT_PADDING),
-      Math.max(VIEWPORT_PADDING, window.innerWidth - scaledWidth - VIEWPORT_PADDING),
-    )
-    const clampedTop = Math.min(
-      Math.max(hoverRect.top - (scaledHeight - dims.height) / 2, VIEWPORT_PADDING),
-      Math.max(VIEWPORT_PADDING, window.innerHeight - scaledHeight - VIEWPORT_PADDING),
-    )
-
-    return {
-      position: 'fixed' as const,
-      top: hoverRect.top,
-      left: hoverRect.left,
-      zIndex: HOVER_ENLARGE_Z_INDEX,
-      transform: `translate(${clampedLeft - hoverRect.left}px, ${clampedTop - hoverRect.top}px) scale(${HOVER_ENLARGE_SCALE})`,
-      transformOrigin: 'center center',
-    }
-  }, [dims.height, dims.width, hoverRect, shouldPromote])
 
   const baseClasses = [
     'card',
@@ -222,7 +164,6 @@ export function Card({
   const boxShadow = glowShadow || (dragging ? '0 20px 40px rgba(0, 0, 0, 0.5)' : undefined)
   const interactiveTransform = [
     interactiveStyle?.transform,
-    promotionStyle?.transform,
     dragging ? 'scale(1.05)' : '',
     tapped ? 'rotate(90deg)' : '',
   ].filter(Boolean).join(' ') || undefined
@@ -257,7 +198,6 @@ export function Card({
         style={{
           ...interactiveExternalStyle,
           ...interactiveStyle,
-          ...promotionStyle,
           width: dims.width,
           height: dims.height,
           boxShadow,
@@ -271,14 +211,12 @@ export function Card({
         }}
         onMouseEnter={canHover ? (e) => {
           interactiveOnMouseEnter?.(e)
-          updateHoverRect()
           setIsHovered(true)
           onHoverStart?.()
         } : interactiveOnMouseEnter}
         onMouseLeave={canHover ? (e) => {
           interactiveOnMouseLeave?.(e)
           setIsHovered(false)
-          setHoverRect(null)
           onHoverEnd?.()
         } : interactiveOnMouseLeave}
         {...restInteractiveProps}
