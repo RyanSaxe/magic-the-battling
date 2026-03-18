@@ -27,6 +27,8 @@ interface DraggableCardProps {
   isCompanion?: boolean
   upgraded?: boolean
   appliedUpgrades?: CardType[]
+  hiddenUpgradeCount?: number
+  onRevealHiddenUpgrades?: () => void
   canPeekFaceDown?: boolean
   style?: React.CSSProperties
   dragInstanceKey?: string
@@ -54,6 +56,8 @@ export function DraggableCard({
   isCompanion = false,
   upgraded = false,
   appliedUpgrades,
+  hiddenUpgradeCount = 0,
+  onRevealHiddenUpgrades,
   canPeekFaceDown,
   style: externalStyle,
   dragInstanceKey,
@@ -109,6 +113,8 @@ export function DraggableCard({
         isCompanion={isCompanion}
         upgraded={upgraded}
         appliedUpgrades={appliedUpgrades}
+        hiddenUpgradeCount={hiddenUpgradeCount}
+        onRevealHiddenUpgrades={onRevealHiddenUpgrades}
         canPeekFaceDown={canPeekFaceDown}
       />
     </div>

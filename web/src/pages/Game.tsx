@@ -47,6 +47,8 @@ import {
   getSidebarPlayerOrder,
 } from "../utils/playerPlacement";
 import {
+  buildAppliedUpgradeMap,
+  buildHiddenAppliedUpgradeMap,
   getRevealedAppliedUpgrades,
   getUnrevealedAppliedUpgrades,
 } from "../utils/upgrades";
@@ -932,6 +934,7 @@ function GameContent() {
   const [upgradesModalOpenMode, setUpgradesModalOpenMode] =
     useState<UpgradesModalOpenMode>('auto');
   const [upgradeInitialTargetId, setUpgradeInitialTargetId] = useState<string | undefined>(undefined);
+  const [upgradeInitialRevealIds, setUpgradeInitialRevealIds] = useState<string[]>([]);
   const handSlotsRef = useRef<(string | null)[]>([]);
   const [pendingBuildUpgradeAnimation, setPendingBuildUpgradeAnimation] =
     useState<PendingBuildUpgradeAnimation | null>(null);
@@ -1088,6 +1091,7 @@ function GameContent() {
     if (except !== "upgrades") {
       setShowUpgradesModal(false);
       setUpgradeInitialTargetId(undefined);
+      setUpgradeInitialRevealIds([]);
       setUpgradesModalOpenMode("auto");
     }
     if (except !== "actionMenu") {
@@ -1150,6 +1154,7 @@ function GameContent() {
   const closeUpgradesModal = useCallback(() => {
     setShowUpgradesModal(false);
     setUpgradeInitialTargetId(undefined);
+    setUpgradeInitialRevealIds([]);
     setUpgradesModalOpenMode('auto');
   }, []);
 
@@ -1165,9 +1170,11 @@ function GameContent() {
   const openUpgradesModal = useCallback((
     targetCardId?: string,
     mode: UpgradesModalOpenMode = 'auto',
+    initialRevealIds: string[] = [],
   ) => {
     closeGameplayOverlays("upgrades");
     setUpgradeInitialTargetId(targetCardId);
+    setUpgradeInitialRevealIds(initialRevealIds);
     setUpgradesModalOpenMode(mode);
     setShowUpgradesModal(true);
   }, [closeGameplayOverlays]);
@@ -1565,6 +1572,21 @@ function GameContent() {
     currentPhase === "build" && self_player.upgrades.some((u) => !u.upgrade_target);
   const hasUnrevealedBattleUpgrades =
     actionBarPhase === "battle" && getUnrevealedAppliedUpgrades(self_player.upgrades).length > 0;
+  const {
+    upgradedCardIds: battleUpgradedCardIds,
+    appliedUpgradesByCardId: battleUpgradesByCardId,
+  } = current_battle
+    ? buildAppliedUpgradeMap(current_battle.your_zones.upgrades, "revealed_applied")
+    : { upgradedCardIds: new Set<string>(), appliedUpgradesByCardId: new Map<string, CardType[]>() };
+  const battleHiddenUpgradesByCardId = current_battle
+    ? buildHiddenAppliedUpgradeMap(current_battle.your_zones.upgrades)
+    : new Map<string, CardType[]>();
+  const {
+    upgradedCardIds: opponentBattleUpgradedCardIds,
+    appliedUpgradesByCardId: opponentBattleUpgradesByCardId,
+  } = current_battle
+    ? buildAppliedUpgradeMap(current_battle.opponent_zones.upgrades, "revealed_applied")
+    : { upgradedCardIds: new Set<string>(), appliedUpgradesByCardId: new Map<string, CardType[]>() };
   const upgradesModalMode: "view" | "apply" | "reveal" =
     upgradesModalOpenMode === "view"
       ? "view"
@@ -1573,6 +1595,11 @@ function GameContent() {
         : hasPendingBuildUpgrades
           ? "apply"
           : "view";
+
+  const openBattleRevealUpgradesModal = (initialRevealIds: string[] = []) => {
+    requestGuideCompletion("hint_battle_unrevealed_upgrade", "reveal-upgrade");
+    openUpgradesModal(undefined, "reveal", initialRevealIds);
+  };
 
   const renderActionButtons = (): ReactNode => {
     if (isSpectator) {
@@ -1718,10 +1745,7 @@ function GameContent() {
         <div className="flex items-center gap-1.5 sm:gap-2">
           {hasUnrevealedBattleUpgrades && (
             <button
-              onClick={() => {
-                requestGuideCompletion("hint_battle_unrevealed_upgrade", "reveal-upgrade");
-                openUpgradesModal(undefined, 'reveal');
-              }}
+              onClick={() => openBattleRevealUpgradesModal()}
               className="btn bg-purple-600 hover:bg-purple-500 text-white"
               data-guide-target="battle-reveal-upgrade"
             >
@@ -2152,6 +2176,7 @@ function GameContent() {
                       gameState={gameState}
                       battleOverride={displayBattleResolution ? battleViewForDisplay : undefined}
                       actions={actions}
+                      onRevealHiddenUpgrades={openBattleRevealUpgradesModal}
                       isMobile={sizes.isMobile}
                       selectedCard={battleSelectedCard}
                       onSelectedCardChange={setBattleSelectedCard}
@@ -2228,6 +2253,12 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'player' })}
+                        upgraded={battleUpgradedCardIds.has(card.id)}
+                        appliedUpgrades={battleUpgradesByCardId.get(card.id)}
+                        hiddenUpgradeCount={(battleHiddenUpgradesByCardId.get(card.id) ?? []).length}
+                        onRevealHiddenUpgrades={() => openBattleRevealUpgradesModal(
+                          (battleHiddenUpgradesByCardId.get(card.id) ?? []).map((upgrade) => upgrade.id),
+                        )}
                       />
                     ))
                   }
@@ -2258,6 +2289,8 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'opponent' })}
+                        upgraded={opponentBattleUpgradedCardIds.has(card.id)}
+                        appliedUpgrades={opponentBattleUpgradesByCardId.get(card.id)}
                       />
                     ))
                   }
@@ -2286,6 +2319,12 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'graveyard', owner: 'player' })}
+                        upgraded={battleUpgradedCardIds.has(card.id)}
+                        appliedUpgrades={battleUpgradesByCardId.get(card.id)}
+                        hiddenUpgradeCount={(battleHiddenUpgradesByCardId.get(card.id) ?? []).length}
+                        onRevealHiddenUpgrades={() => openBattleRevealUpgradesModal(
+                          (battleHiddenUpgradesByCardId.get(card.id) ?? []).map((upgrade) => upgrade.id),
+                        )}
                       />
                     ))
                   }
@@ -2314,6 +2353,12 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'exile', owner: 'player' })}
+                        upgraded={battleUpgradedCardIds.has(card.id)}
+                        appliedUpgrades={battleUpgradesByCardId.get(card.id)}
+                        hiddenUpgradeCount={(battleHiddenUpgradesByCardId.get(card.id) ?? []).length}
+                        onRevealHiddenUpgrades={() => openBattleRevealUpgradesModal(
+                          (battleHiddenUpgradesByCardId.get(card.id) ?? []).map((upgrade) => upgrade.id),
+                        )}
                       />
                     ))
                   }
@@ -2522,11 +2567,14 @@ function GameContent() {
             setPendingBuildUpgradeAnimation({ upgradeId, targetId });
             actions.buildApplyUpgrade(upgradeId, targetId);
           }}
-          onReveal={(upgradeId) => {
-            actions.battleRevealUpgrade(upgradeId);
+          onReveal={(upgradeIds) => {
+            upgradeIds.forEach((upgradeId) => {
+              actions.battleRevealUpgrade(upgradeId);
+            });
           }}
           onClose={closeUpgradesModal}
           initialTargetId={upgradeInitialTargetId}
+          initialRevealUpgradeIds={upgradeInitialRevealIds}
         />
       )}
       {activeBuildUpgradeAnimation && (

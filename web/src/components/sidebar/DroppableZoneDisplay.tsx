@@ -23,6 +23,8 @@ interface DroppableZoneDisplayProps {
   titleClassName?: string
   hideCount?: boolean
   size?: CardSize
+  upgradedCardIds?: Set<string>
+  appliedUpgradesByCardId?: Map<string, CardType[]>
 }
 
 const VALID_FROM_ZONES: ZoneName[] = ['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']
@@ -42,6 +44,10 @@ export function ZoneModal({
   tone = 'default',
   hideTitle = false,
   headerActions,
+  upgradedCardIds,
+  appliedUpgradesByCardId,
+  hiddenUpgradesByCardId,
+  onRevealHiddenUpgrades,
 }: {
   title: string
   zone: ZoneName
@@ -57,6 +63,10 @@ export function ZoneModal({
   tone?: 'default' | 'battle'
   hideTitle?: boolean
   headerActions?: React.ReactNode
+  upgradedCardIds?: Set<string>
+  appliedUpgradesByCardId?: Map<string, CardType[]>
+  hiddenUpgradesByCardId?: Map<string, CardType[]>
+  onRevealHiddenUpgrades?: (cardId: string) => void
 }) {
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
@@ -94,6 +104,10 @@ export function ZoneModal({
               onClick={onCardClick ? () => onCardClick(card, zone, zoneOwner) : undefined}
               faceDown={forceFaceDown}
               canPeekFaceDown={!forceFaceDown}
+              upgraded={upgradedCardIds?.has(card.id)}
+              appliedUpgrades={appliedUpgradesByCardId?.get(card.id)}
+              hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
+              onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(card.id) : undefined}
             />
           ))
         }
@@ -127,7 +141,16 @@ export function ZoneModal({
         ) : (
           <div className="flex flex-wrap gap-2">
             {cards.map((card) => (
-              <Card key={card.id} card={card} size="sm" faceDown={forceFaceDown} />
+              <Card
+                key={card.id}
+                card={card}
+                size="sm"
+                faceDown={forceFaceDown}
+                upgraded={upgradedCardIds?.has(card.id)}
+                appliedUpgrades={appliedUpgradesByCardId?.get(card.id)}
+                hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
+                onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(card.id) : undefined}
+              />
             ))}
           </div>
         )}
@@ -147,6 +170,8 @@ export function DroppableZoneDisplay({
   titleClassName = 'text-gray-400',
   hideCount = false,
   size = 'xs',
+  upgradedCardIds,
+  appliedUpgradesByCardId,
 }: DroppableZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -187,9 +212,24 @@ export function DroppableZoneDisplay({
               <div className="flex gap-0.5">
                 {displayedCards.map((card) =>
                   allowInteraction ? (
-                    <DraggableCard key={card.id} card={card} zone={zone} zoneOwner={zoneOwner} size={size} isOpponent={isOpponent} />
+                    <DraggableCard
+                      key={card.id}
+                      card={card}
+                      zone={zone}
+                      zoneOwner={zoneOwner}
+                      size={size}
+                      isOpponent={isOpponent}
+                      upgraded={upgradedCardIds?.has(card.id)}
+                      appliedUpgrades={appliedUpgradesByCardId?.get(card.id)}
+                    />
                   ) : (
-                    <Card key={card.id} card={card} size={size} />
+                    <Card
+                      key={card.id}
+                      card={card}
+                      size={size}
+                      upgraded={upgradedCardIds?.has(card.id)}
+                      appliedUpgrades={appliedUpgradesByCardId?.get(card.id)}
+                    />
                   )
                 )}
               </div>
@@ -209,6 +249,8 @@ export function DroppableZoneDisplay({
           allowInteraction={allowInteraction}
           isOpponent={isOpponent}
           onClose={() => setShowModal(false)}
+          upgradedCardIds={upgradedCardIds}
+          appliedUpgradesByCardId={appliedUpgradesByCardId}
         />
       )}
     </>

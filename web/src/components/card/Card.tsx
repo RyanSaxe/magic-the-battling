@@ -22,6 +22,8 @@ interface CardProps {
   isCompanion?: boolean
   upgraded?: boolean
   appliedUpgrades?: CardType[]
+  hiddenUpgradeCount?: number
+  onRevealHiddenUpgrades?: () => void
   canPeekFaceDown?: boolean
   style?: React.CSSProperties
   trackDomId?: boolean
@@ -71,6 +73,8 @@ export function Card({
   isCompanion = false,
   upgraded = false,
   appliedUpgrades,
+  hiddenUpgradeCount = 0,
+  onRevealHiddenUpgrades,
   canPeekFaceDown = true,
   style: externalStyle,
   trackDomId = true,
@@ -86,6 +90,8 @@ export function Card({
 
   const showZoom = !isBasicLandOrTreasureToken(card)
   const showCopyBadge = isCopiedToken(card)
+  const showRevealHiddenUpgradeButton =
+    hiddenUpgradeCount > 0 && !effectiveFaceDown && !!onRevealHiddenUpgrades && (isHovered || selected)
 
   useEffect(() => {
     if (!isHovered || !previewContext || !showZoom) return
@@ -207,8 +213,19 @@ export function Card({
           </svg>
         </button>
       )}
+      {showRevealHiddenUpgradeButton && (
+        <button
+          className="absolute bottom-1 left-1 bg-purple-600/90 rounded px-2 py-0.5 text-white text-xs hover:bg-purple-500 transition-colors"
+          onClick={(e) => {
+            e.stopPropagation()
+            onRevealHiddenUpgrades?.()
+          }}
+        >
+          {hiddenUpgradeCount > 1 ? 'Reveal Upgrades' : 'Reveal Upgrade'}
+        </button>
+      )}
       {counters && Object.keys(counters).length > 0 && (
-        <div className="absolute bottom-1 left-1 flex gap-1">
+        <div className={`absolute left-1 flex gap-1 ${showRevealHiddenUpgradeButton ? 'bottom-8' : 'bottom-1'}`}>
           {Object.entries(counters).map(([type, count]) => (
             <div
               key={type}

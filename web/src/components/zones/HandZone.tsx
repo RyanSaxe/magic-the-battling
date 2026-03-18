@@ -14,6 +14,8 @@ interface HandZoneProps {
   zone?: ZoneName;
   upgradedCardIds?: Set<string>;
   upgradesByCardId?: Map<string, CardType[]>;
+  hiddenUpgradesByCardId?: Map<string, CardType[]>;
+  onRevealHiddenUpgrades?: (cardId: string) => void;
   cardDimensions?: CardDimensions;
   gap?: number;
 }
@@ -38,6 +40,8 @@ export function HandZone({
   zone = "hand",
   upgradedCardIds = new Set(),
   upgradesByCardId,
+  hiddenUpgradesByCardId,
+  onRevealHiddenUpgrades,
   cardDimensions,
   gap,
 }: HandZoneProps) {
@@ -67,6 +71,8 @@ export function HandZone({
             disabled={!draggable}
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={upgradesByCardId?.get(card.id)}
+            hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
+            onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(card.id) : undefined}
             onCardHover={onCardHover}
             onCardHoverEnd={onCardHoverEnd}
             style={{ ...(isOverlapping && i > 0 ? { marginLeft: gap } : undefined), ...(zIndex !== undefined ? { zIndex } : undefined) }}

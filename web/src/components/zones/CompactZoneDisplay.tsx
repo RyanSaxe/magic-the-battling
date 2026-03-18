@@ -30,6 +30,10 @@ interface CompactZoneDisplayProps {
   onModalOpenChange?: (open: boolean) => void
   onContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void
   modalHeaderActions?: React.ReactNode
+  upgradedCardIds?: Set<string>
+  upgradesByCardId?: Map<string, CardType[]>
+  hiddenUpgradesByCardId?: Map<string, CardType[]>
+  onRevealHiddenUpgrades?: (cardId: string) => void
 }
 
 export function CompactZoneDisplay({
@@ -53,6 +57,10 @@ export function CompactZoneDisplay({
   onModalOpenChange,
   onContextMenu,
   modalHeaderActions,
+  upgradedCardIds,
+  upgradesByCardId,
+  hiddenUpgradesByCardId,
+  onRevealHiddenUpgrades,
 }: CompactZoneDisplayProps) {
   const [uncontrolledModalOpen, setUncontrolledModalOpen] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -113,6 +121,10 @@ export function CompactZoneDisplay({
                   card={nextCard}
                   dimensions={{ width: cardW, height: cardH }}
                   faceDown={forceFaceDown}
+                  upgraded={upgradedCardIds?.has(nextCard.id)}
+                  appliedUpgrades={upgradesByCardId?.get(nextCard.id)}
+                  hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(nextCard.id) ?? []).length}
+                  onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(nextCard.id) : undefined}
                 />
               </div>
             )}
@@ -129,6 +141,10 @@ export function CompactZoneDisplay({
                 onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
                 faceDown={forceFaceDown}
                 canPeekFaceDown={forceFaceDown ? false : canPeekFaceDown}
+                upgraded={upgradedCardIds?.has(topCard.id)}
+                appliedUpgrades={upgradesByCardId?.get(topCard.id)}
+                hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(topCard.id) ?? []).length}
+                onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(topCard.id) : undefined}
               />
             )}
           </div>
@@ -151,6 +167,10 @@ export function CompactZoneDisplay({
           onCardClick={onCardClick}
           selectedCardId={selectedCardId}
           forceFaceDown={forceFaceDown}
+          upgradedCardIds={upgradedCardIds}
+          appliedUpgradesByCardId={upgradesByCardId}
+          hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+          onRevealHiddenUpgrades={onRevealHiddenUpgrades}
         />
       )}
     </>

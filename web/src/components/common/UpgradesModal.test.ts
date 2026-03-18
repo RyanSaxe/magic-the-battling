@@ -52,12 +52,12 @@ describe("applyUpgradeWithModalClose", () => {
     });
 
     revealUpgradeWithModalClose({
-      upgradeId: "upgrade-1",
+      upgradeIds: ["upgrade-1", "upgrade-2"],
       onClose: () => {
         events.push("close");
       },
-      onReveal: (upgradeId) => {
-        events.push(`reveal:${upgradeId}`);
+      onReveal: (upgradeIds) => {
+        events.push(`reveal:${upgradeIds.join(",")}`);
       },
       flush,
     });
@@ -66,7 +66,7 @@ describe("applyUpgradeWithModalClose", () => {
     expect(events).toEqual([
       "flush",
       "close",
-      "reveal:upgrade-1",
+      "reveal:upgrade-1,upgrade-2",
     ]);
   });
 });

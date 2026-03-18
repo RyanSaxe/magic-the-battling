@@ -6,7 +6,7 @@ import { CompactZoneDisplay } from '../../components/zones/CompactZoneDisplay'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
 import { ZoneDivider } from '../../components/common/ZoneDivider'
 import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
-import { getAppliedUpgrades, getRevealedAppliedUpgrades } from '../../utils/upgrades'
+import { buildAppliedUpgradeMap, buildHiddenAppliedUpgradeMap } from '../../utils/upgrades'
 
 interface ContextMenuState {
   card: CardType
@@ -39,6 +39,7 @@ interface BattlePhaseProps {
     battleSubmitResult: (result: string) => void
     battleUpdateCardState: (actionType: CardStateAction, cardId: string, data?: Record<string, unknown>) => void
   }
+  onRevealHiddenUpgrades?: (upgradeIds: string[]) => void
   isMobile?: boolean
   selectedCard: BattleSelectedCard | null
   onSelectedCardChange: (card: BattleSelectedCard | null) => void
@@ -129,6 +130,7 @@ export function BattlePhase({
   gameState,
   battleOverride,
   actions,
+  onRevealHiddenUpgrades,
   isMobile = false,
   selectedCard,
   onSelectedCardChange,
@@ -252,25 +254,20 @@ export function BattlePhase({
   const opponentFlippedIds = new Set(opponent_zones.flipped_card_ids || [])
   const opponentCounters = opponent_zones.counters || {}
 
-  const playerAppliedUpgrades = getAppliedUpgrades(your_zones.upgrades)
-  const opponentAppliedUpgrades = getRevealedAppliedUpgrades(opponent_zones.upgrades)
+  const { upgradedCardIds, appliedUpgradesByCardId: upgradesByCardId } = buildAppliedUpgradeMap(
+    your_zones.upgrades,
+    'revealed_applied',
+  )
+  const {
+    upgradedCardIds: opponentUpgradedCardIds,
+    appliedUpgradesByCardId: opponentUpgradesByCardId,
+  } = buildAppliedUpgradeMap(opponent_zones.upgrades, 'revealed_applied')
+  const hiddenUpgradesByCardId = buildHiddenAppliedUpgradeMap(your_zones.upgrades)
 
-  const upgradedCardIds = new Set(playerAppliedUpgrades.map((u) => u.upgrade_target!.id))
-  const opponentUpgradedCardIds = new Set(opponentAppliedUpgrades.map((u) => u.upgrade_target!.id))
-
-  const upgradesByCardId = new Map<string, CardType[]>()
-  for (const u of playerAppliedUpgrades) {
-    const id = u.upgrade_target!.id
-    const existing = upgradesByCardId.get(id) ?? []
-    existing.push(u)
-    upgradesByCardId.set(id, existing)
-  }
-  const opponentUpgradesByCardId = new Map<string, CardType[]>()
-  for (const u of opponentAppliedUpgrades) {
-    const id = u.upgrade_target!.id
-    const existing = opponentUpgradesByCardId.get(id) ?? []
-    existing.push(u)
-    opponentUpgradesByCardId.set(id, existing)
+  const openRevealModalForCard = (cardId: string) => {
+    const hiddenUpgrades = hiddenUpgradesByCardId.get(cardId) ?? []
+    if (hiddenUpgrades.length === 0) return
+    onRevealHiddenUpgrades?.(hiddenUpgrades.map((upgrade) => upgrade.id))
   }
 
   const handleCardClick = (card: CardType, zone: ZoneName, owner: ZoneOwner = 'player') => {
@@ -474,6 +471,8 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('library', 'opponent')}
               onCardClick={handleCardClick}
+              upgradedCardIds={opponentUpgradedCardIds}
+              upgradesByCardId={opponentUpgradesByCardId}
               containerClassName="battle-side-cell"
               onContextMenu={(e) => handleLibraryContextMenu(e, 'opponent', opponent_zones.library.length, canManipulateOpponent)}
               modalHeaderActions={canManipulateOpponent && opponent_zones.library.length > 0 ? (
@@ -512,6 +511,8 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('graveyard', 'opponent')}
               onCardClick={handleCardClick}
+              upgradedCardIds={opponentUpgradedCardIds}
+              upgradesByCardId={opponentUpgradesByCardId}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('graveyard', 'opponent')}
               onModalOpenChange={(open) => onZoneModalOpenChange('graveyard', 'opponent', open)}
@@ -531,6 +532,8 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('exile', 'opponent')}
               onCardClick={handleCardClick}
+              upgradedCardIds={opponentUpgradedCardIds}
+              upgradesByCardId={opponentUpgradesByCardId}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('exile', 'opponent')}
               onModalOpenChange={(open) => onZoneModalOpenChange('exile', 'opponent', open)}
@@ -567,6 +570,8 @@ export function BattlePhase({
                 separateLands
                 upgradedCardIds={upgradedCardIds}
                 upgradesByCardId={upgradesByCardId}
+                hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+                onRevealHiddenUpgrades={openRevealModalForCard}
                 poisonCount={yourPoison}
                 cardDimensions={sizes.playerNonlands}
                 rowHeight={rowHeight}
@@ -589,6 +594,8 @@ export function BattlePhase({
                 onCardHoverEnd={onCardHoverEnd}
                 upgradedCardIds={upgradedCardIds}
                 upgradesByCardId={upgradesByCardId}
+                hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+                onRevealHiddenUpgrades={openRevealModalForCard}
                 cardDimensions={sizes.playerHand}
                 gap={sizes.playerHandGap}
               />
@@ -608,6 +615,10 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('exile', 'player')}
               onCardClick={handleCardClick}
+              upgradedCardIds={upgradedCardIds}
+              upgradesByCardId={upgradesByCardId}
+              hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+              onRevealHiddenUpgrades={openRevealModalForCard}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('exile', 'player')}
               onModalOpenChange={(open) => onZoneModalOpenChange('exile', 'player', open)}
@@ -624,6 +635,10 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('graveyard', 'player')}
               onCardClick={handleCardClick}
+              upgradedCardIds={upgradedCardIds}
+              upgradesByCardId={upgradesByCardId}
+              hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+              onRevealHiddenUpgrades={openRevealModalForCard}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('graveyard', 'player')}
               onModalOpenChange={(open) => onZoneModalOpenChange('graveyard', 'player', open)}
@@ -641,6 +656,10 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('library', 'player')}
               onCardClick={handleCardClick}
+              upgradedCardIds={upgradedCardIds}
+              upgradesByCardId={upgradesByCardId}
+              hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+              onRevealHiddenUpgrades={openRevealModalForCard}
               containerClassName="battle-side-cell"
               onContextMenu={(e) => handleLibraryContextMenu(e, 'player', your_zones.library.length, true)}
               modalHeaderActions={your_zones.library.length > 0 ? (

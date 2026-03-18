@@ -10,6 +10,8 @@ interface ZoneDisplayProps {
   maxThumbnails?: number;
   showUpgradeTargets?: boolean;
   companionIds?: Set<string>;
+  upgradedCardIds?: Set<string>;
+  appliedUpgradesByCardId?: Map<string, CardType[]>;
 }
 
 const DEFAULT_MODAL_DIMS: ZoneDims = {
@@ -24,12 +26,16 @@ export function ZoneModal({
   cards,
   showUpgradeTargets,
   companionIds,
+  upgradedCardIds,
+  appliedUpgradesByCardId,
   onClose,
 }: {
   title: string;
   cards: CardType[];
   showUpgradeTargets?: boolean;
   companionIds?: Set<string>;
+  upgradedCardIds?: Set<string>;
+  appliedUpgradesByCardId?: Map<string, CardType[]>;
   onClose: () => void;
 }) {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_MODAL_DIMS);
@@ -138,6 +144,8 @@ export function ZoneModal({
                     card={card}
                     dimensions={{ width: dims.width, height: dims.height }}
                     isCompanion={companionIds?.has(card.id)}
+                    upgraded={upgradedCardIds?.has(card.id)}
+                    appliedUpgrades={appliedUpgradesByCardId?.get(card.id)}
                   />
                 ),
               )}
@@ -155,6 +163,8 @@ export function ZoneDisplay({
   maxThumbnails = 6,
   showUpgradeTargets = false,
   companionIds,
+  upgradedCardIds,
+  appliedUpgradesByCardId,
 }: ZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false);
 
@@ -188,6 +198,8 @@ export function ZoneDisplay({
                     card={card}
                     size="sm"
                     isCompanion={companionIds?.has(card.id)}
+                    upgraded={upgradedCardIds?.has(card.id)}
+                    appliedUpgrades={appliedUpgradesByCardId?.get(card.id)}
                   />
                 ),
               )}
@@ -207,6 +219,8 @@ export function ZoneDisplay({
           cards={cards}
           showUpgradeTargets={showUpgradeTargets}
           companionIds={companionIds}
+          upgradedCardIds={upgradedCardIds}
+          appliedUpgradesByCardId={appliedUpgradesByCardId}
           onClose={() => setShowModal(false)}
         />
       )}

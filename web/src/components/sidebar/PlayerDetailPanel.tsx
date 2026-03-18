@@ -14,6 +14,7 @@ import {
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
 import { getPlayerPhaseStatusLabel } from "../../utils/format";
+import { buildAppliedUpgradeMap, getAppliedUpgrades, getUpgradeDisplayScope, getUnappliedUpgrades } from "../../utils/upgrades";
 
 interface PlayerDetailPanelProps {
   player: PlayerView;
@@ -77,28 +78,6 @@ function OverviewToken({
       </span>
     </div>
   );
-}
-
-function buildAppliedUpgradeMap(
-  upgrades: CardType[],
-): {
-  upgradedCardIds: Set<string>;
-  appliedUpgradesByCardId: Map<string, CardType[]>;
-} {
-  const upgradedCardIds = new Set<string>();
-  const appliedUpgradesByCardId = new Map<string, CardType[]>();
-
-  upgrades.forEach((upgrade) => {
-    if (!upgrade.upgrade_target) return;
-
-    const targetId = upgrade.upgrade_target.id;
-    upgradedCardIds.add(targetId);
-    const existing = appliedUpgradesByCardId.get(targetId) ?? [];
-    existing.push(upgrade);
-    appliedUpgradesByCardId.set(targetId, existing);
-  });
-
-  return { upgradedCardIds, appliedUpgradesByCardId };
 }
 
 function OverviewTokenRow({
@@ -413,17 +392,15 @@ export function PlayerDetailPanel({
   const [renderOpen, setRenderOpen] = useState(false);
 
   const isViewingSelf = player.name === currentPlayer.name;
-  const appliedUpgrades = player.upgrades.filter(
-    (upgrade) => upgrade.upgrade_target !== null,
-  );
-  const pendingUpgrades = currentPlayer.upgrades.filter(
-    (upgrade) => upgrade.upgrade_target === null,
-  );
+  const upgradeDisplayScope = getUpgradeDisplayScope(isViewingSelf, currentPlayer.phase);
+  const appliedUpgrades = getAppliedUpgrades(player.upgrades);
+  const pendingUpgrades = getUnappliedUpgrades(currentPlayer.upgrades);
   const allUpgrades = isViewingSelf
     ? [...appliedUpgrades, ...pendingUpgrades]
     : appliedUpgrades;
   const { upgradedCardIds, appliedUpgradesByCardId } = buildAppliedUpgradeMap(
-    appliedUpgrades,
+    player.upgrades,
+    upgradeDisplayScope,
   );
   const companionIds = new Set(player.command_zone.map((card) => card.id));
   const lastResultLabel = getLastResultLabel(player.last_result, player.in_sudden_death);

@@ -13,9 +13,10 @@ interface UpgradesModalProps {
   mode: 'view' | 'apply' | 'reveal'
   targets?: CardType[]
   onApply?: (upgradeId: string, targetId: string) => void
-  onReveal?: (upgradeId: string) => void
+  onReveal?: (upgradeIds: string[]) => void
   onClose: () => void
   initialTargetId?: string
+  initialRevealUpgradeIds?: string[]
 }
 
 export function UpgradesModal({
@@ -26,17 +27,22 @@ export function UpgradesModal({
   onReveal,
   onClose,
   initialTargetId,
+  initialRevealUpgradeIds = [],
 }: UpgradesModalProps) {
-  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(() => {
-    if (mode === 'apply') {
-      const unapplied = getUnappliedUpgrades(upgrades)
-      return unapplied.length === 1 ? unapplied[0].id : null
-    }
-    if (mode === 'reveal') {
-      const hiddenApplied = getUnrevealedAppliedUpgrades(upgrades)
-      return hiddenApplied.length === 1 ? hiddenApplied[0].id : null
-    }
-    return null
+  const applied = getAppliedUpgrades(upgrades)
+  const unapplied = getUnappliedUpgrades(upgrades)
+  const hiddenApplied = getUnrevealedAppliedUpgrades(upgrades)
+  const revealedApplied = applied.filter((upgrade) => upgrade.is_revealed !== false)
+  const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(() => (
+    mode === 'apply' && unapplied.length === 1 ? unapplied[0].id : null
+  ))
+  const [selectedRevealUpgradeIds, setSelectedRevealUpgradeIds] = useState<string[]>(() => {
+    if (mode !== 'reveal') return []
+
+    const hiddenUpgradeIds = new Set(hiddenApplied.map((upgrade) => upgrade.id))
+    const initialSelection = initialRevealUpgradeIds.filter((upgradeId) => hiddenUpgradeIds.has(upgradeId))
+    if (initialSelection.length > 0) return initialSelection
+    return hiddenApplied.length === 1 ? [hiddenApplied[0].id] : []
   })
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(initialTargetId ?? null)
 
@@ -49,9 +55,9 @@ export function UpgradesModal({
     })
   }, [onApply, onClose])
 
-  const revealUpgrade = useCallback((upgradeId: string) => {
+  const revealUpgrade = useCallback((upgradeIds: string[]) => {
     revealUpgradeWithModalClose({
-      upgradeId,
+      upgradeIds,
       onReveal,
       onClose,
     })
@@ -64,6 +70,8 @@ export function UpgradesModal({
         e.stopPropagation()
         if (mode === 'apply' && selectedTargetId) {
           setSelectedTargetId(null)
+        } else if (mode === 'reveal' && selectedRevealUpgradeIds.length > 0) {
+          setSelectedRevealUpgradeIds([])
         } else if (selectedUpgradeId) {
           setSelectedUpgradeId(null)
         } else {
@@ -77,30 +85,36 @@ export function UpgradesModal({
           active.blur()
         }
         applyUpgrade(selectedUpgradeId, selectedTargetId)
-      } else if (e.key === 'Enter' && mode === 'reveal' && selectedUpgradeId && onReveal) {
+      } else if (e.key === 'Enter' && mode === 'reveal' && selectedRevealUpgradeIds.length > 0 && onReveal) {
         e.preventDefault()
         e.stopPropagation()
         const active = document.activeElement
         if (active instanceof HTMLElement) {
           active.blur()
         }
-        revealUpgrade(selectedUpgradeId)
+        revealUpgrade(selectedRevealUpgradeIds)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [applyUpgrade, mode, onClose, onApply, onReveal, revealUpgrade, selectedUpgradeId, selectedTargetId])
+  }, [
+    applyUpgrade,
+    mode,
+    onClose,
+    onApply,
+    onReveal,
+    revealUpgrade,
+    selectedRevealUpgradeIds,
+    selectedTargetId,
+    selectedUpgradeId,
+  ])
 
-  const applied = getAppliedUpgrades(upgrades)
-  const unapplied = getUnappliedUpgrades(upgrades)
-  const hiddenApplied = getUnrevealedAppliedUpgrades(upgrades)
-  const revealedApplied = applied.filter((upgrade) => upgrade.is_revealed !== false)
-  const selectedUpgrade = (mode === 'reveal' ? hiddenApplied : unapplied).find((u) => u.id === selectedUpgradeId) ?? null
+  const selectedUpgrade = unapplied.find((u) => u.id === selectedUpgradeId) ?? null
   const selectedTarget = targets.find((t) => t.id === selectedTargetId) ?? null
   const readyToConfirm = mode === 'apply'
     ? !!(selectedUpgrade && selectedTarget)
     : mode === 'reveal'
-      ? !!selectedUpgrade
+      ? selectedRevealUpgradeIds.length > 0
       : false
 
   const isApplyMode = mode === 'apply'
@@ -133,18 +147,26 @@ export function UpgradesModal({
   const targetDims = { width: applyDims.targets.width, height: applyDims.targets.height }
 
   const handleConfirm = () => {
-    if (!selectedUpgrade) return
     if (isApplyMode) {
+      if (!selectedUpgrade) return
       if (!selectedTarget || !onApply) return
       applyUpgrade(selectedUpgrade.id, selectedTarget.id)
       return
     }
     if (!isRevealMode || !onReveal) return
-    revealUpgrade(selectedUpgrade.id)
+    revealUpgrade(selectedRevealUpgradeIds)
   }
 
   const handleTargetClick = (target: CardType) => {
     setSelectedTargetId(selectedTargetId === target.id ? null : target.id)
+  }
+
+  const handleRevealUpgradeClick = (upgradeId: string) => {
+    setSelectedRevealUpgradeIds((current) =>
+      current.includes(upgradeId)
+        ? current.filter((id) => id !== upgradeId)
+        : [...current, upgradeId],
+    )
   }
 
   return (
@@ -236,14 +258,8 @@ export function UpgradesModal({
                       key={upgrade.id}
                       upgrade={upgrade}
                       dimensions={upgradeDims}
-                      onClick={() => {
-                        if (selectedUpgradeId === upgrade.id) {
-                          setSelectedUpgradeId(null)
-                        } else {
-                          setSelectedUpgradeId(upgrade.id)
-                        }
-                      }}
-                      selected={selectedUpgradeId === upgrade.id}
+                      onClick={() => handleRevealUpgradeClick(upgrade.id)}
+                      selected={selectedRevealUpgradeIds.includes(upgrade.id)}
                     />
                   ))}
                 </CardGrid>

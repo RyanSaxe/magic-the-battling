@@ -30,15 +30,16 @@ export function applyUpgradeWithModalClose(options: {
 }
 
 export function revealUpgradeWithModalClose(options: {
-  upgradeId: string;
-  onReveal?: (upgradeId: string) => void;
+  upgradeIds: string[];
+  onReveal?: (upgradeIds: string[]) => void;
   onClose: () => void;
   flush?: (callback: () => void) => void;
 }) {
-  const { upgradeId, onReveal, onClose, flush = flushSync } = options;
+  const { upgradeIds, onReveal, onClose, flush = flushSync } = options;
+  if (upgradeIds.length === 0) return;
   runModalActionWithClose({
     onClose,
     flush,
-    onRun: onReveal ? () => onReveal(upgradeId) : undefined,
+    onRun: onReveal ? () => onReveal(upgradeIds) : undefined,
   });
 }

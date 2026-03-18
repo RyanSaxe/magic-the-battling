@@ -11,6 +11,7 @@ import { LayoutResetControl } from './LayoutResetControl'
 import { TreasureCard } from './TreasureCard'
 import { PoisonCard } from './PoisonCard'
 import { ZoneLayout } from './ZoneLayout'
+import { buildAppliedUpgradeMap, type UpgradeDisplayScope } from '../../utils/upgrades'
 
 export interface DeckDisplayResizeState {
   constraints: ZoneConstraints | null
@@ -39,6 +40,7 @@ interface DeckDisplayProps {
   layoutStateKey?: string
   resizeState?: DeckDisplayResizeState
   resetControl?: DeckDisplayResetControl
+  upgradeDisplayScope?: UpgradeDisplayScope
 }
 
 export function DeckDisplay({
@@ -55,6 +57,7 @@ export function DeckDisplay({
   layoutStateKey,
   resizeState,
   resetControl,
+  upgradeDisplayScope = 'all_applied',
 }: DeckDisplayProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const localLayoutStateKey = layoutStateKey ?? '__default__'
@@ -81,6 +84,10 @@ export function DeckDisplay({
 
   const battlefieldCount = basics.length + 2
   const commandZoneCount = upgrades.length
+  const { upgradedCardIds, appliedUpgradesByCardId } = useMemo(
+    () => buildAppliedUpgradeMap(upgrades, upgradeDisplayScope),
+    [upgradeDisplayScope, upgrades],
+  )
 
   const hasHand = hand.length > 0
   const hasSideboard = sideboard.length > 0
@@ -230,7 +237,16 @@ export function DeckDisplay({
       handContent={
         <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
           {hand.map((card) => (
-            <Card key={card.id} card={card} dimensions={handDims} isCompanion={companionIds.has(card.id)} onClick={() => handleCardClick(card.id)} selected={selectedCardId === card.id} />
+            <Card
+              key={card.id}
+              card={card}
+              dimensions={handDims}
+              isCompanion={companionIds.has(card.id)}
+              onClick={() => handleCardClick(card.id)}
+              selected={selectedCardId === card.id}
+              upgraded={upgradedCardIds.has(card.id)}
+              appliedUpgrades={appliedUpgradesByCardId.get(card.id)}
+            />
           ))}
         </CardGrid>
       }
@@ -248,7 +264,16 @@ export function DeckDisplay({
       sideboardContent={
         <CardGrid columns={dims.sideboard.columns} cardWidth={sideboardDims.width}>
           {sideboard.map((card) => (
-            <Card key={card.id} card={card} dimensions={sideboardDims} isCompanion={companionIds.has(card.id)} onClick={() => handleCardClick(card.id)} selected={selectedCardId === card.id} />
+            <Card
+              key={card.id}
+              card={card}
+              dimensions={sideboardDims}
+              isCompanion={companionIds.has(card.id)}
+              onClick={() => handleCardClick(card.id)}
+              selected={selectedCardId === card.id}
+              upgraded={upgradedCardIds.has(card.id)}
+              appliedUpgrades={appliedUpgradesByCardId.get(card.id)}
+            />
           ))}
         </CardGrid>
       }
