@@ -5,7 +5,7 @@ export interface CardDimensions {
   height: number
 }
 
-export const GAME_MOBILE_BREAKPOINT_PX = 1120
+export const MOBILE_BREAKPOINT_PX = 640
 
 interface ViewportCardSizes {
   hand: CardDimensions
@@ -23,7 +23,7 @@ function clampDims(vh: number, fraction: number, min: number, max: number): Card
 }
 
 export function computeViewportCardSizes(width: number, height: number): ViewportCardSizes {
-  const isMobile = width < GAME_MOBILE_BREAKPOINT_PX
+  const isMobile = width < MOBILE_BREAKPOINT_PX
   const scale = isMobile ? 0.6 : 1
 
   return {

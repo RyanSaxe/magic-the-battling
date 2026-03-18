@@ -46,6 +46,7 @@ interface PhaseTimelineProps {
   hamburger?: React.ReactNode;
   title?: React.ReactNode;
   headerClassName?: string;
+  rightActionsClassName?: string;
 }
 
 function isGamePhase(phase: string): phase is Phase {
@@ -92,6 +93,7 @@ export function PhaseTimeline({
   hamburger,
   title,
   headerClassName,
+  rightActionsClassName,
 }: PhaseTimelineProps) {
   const guideState = useContext(GuideStateContext);
   const welcomeGuideActive = guideState?.guideRequest?.guideId === "welcome";
@@ -237,6 +239,7 @@ export function PhaseTimeline({
   }, [closePopoverImmediately, onOpenRules, popoverPhase]);
 
   const headerCls = headerClassName ?? "py-1.5 pl-4 pr-1.5";
+  const resolvedRightActionsClassName = rightActionsClassName ?? "sm:-translate-x-2";
 
   if (!isGamePhase(currentPhase)) {
     return (
@@ -249,7 +252,7 @@ export function PhaseTimeline({
               {END_STATE_LABELS[currentPhase]}
             </span>
           )}
-          <div className="flex items-center gap-1.5 timeline-actions sm:-translate-x-2">
+          <div className={`flex items-center gap-1.5 timeline-actions ${resolvedRightActionsClassName}`}>
             {onOpenRules && <RulesButton onClick={() => onOpenRules()} />}
             <HomeButton />
             {hamburger && <div className="shrink-0">{hamburger}</div>}
@@ -318,7 +321,7 @@ export function PhaseTimeline({
           })}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 timeline-actions sm:-translate-x-2">
+        <div className={`flex items-center gap-1.5 shrink-0 timeline-actions ${resolvedRightActionsClassName}`}>
           {onOpenRules && <RulesButton onClick={() => onOpenRules()} />}
           <div className="hidden sm:block">
             <HomeButton />

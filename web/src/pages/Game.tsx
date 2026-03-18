@@ -33,6 +33,7 @@ import { FaceDownProvider } from "../contexts/FaceDownContext";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard, type ZoneOwner } from "../dnd";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
+import { useGameShellMode } from "../hooks/useGameShellMode";
 import { BattleResolutionOverlay } from "../components/common/BattleResolutionOverlay";
 import { BuildUpgradeOverlay } from "../components/common/BuildUpgradeOverlay";
 import { UpgradesModal } from "../components/common/UpgradesModal";
@@ -788,8 +789,18 @@ function GameContent() {
   const [spectatingPlayer, setSpectatingPlayer] = useState<string | null>(null);
 
   const sizes = useViewportCardSizes();
+  const shellMode = useGameShellMode();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [battleSidebarLayout, setBattleSidebarLayout] = useState<BattleSidebarLayout>(null);
+  const usesOverlaySidebar = shellMode !== "big";
+  const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
+  const isSmallShell = shellMode === "small";
+  const phaseTimelineHeaderClassName =
+    shellMode === "small" ? "py-1.5 bar-pad-both" : "py-1.5 bar-pad-left";
+  const phaseTimelineRightActionsClassName =
+    shellMode === "small" ? "sm:-translate-x-4" : "sm:-translate-x-2";
+  const actionBarPaddingClass =
+    shellMode === "small" ? "bar-pad-both" : "bar-pad-main";
 
   const isSpectateMode = searchParams.get("spectate") === "true";
   const { addToast } = useToast();
@@ -1276,7 +1287,7 @@ function GameContent() {
     const { self_player: sp, current_battle: cb } = gameState;
     const phase = sp.phase;
 
-    if (!sizes.isMobile && phase !== "battle") {
+    if (!usesOverlaySidebar && phase !== "battle") {
       sidebarPlayers.slice(0, 8).forEach((player, index) => {
         map[String(index + 1)] = () => {
           setRevealedPlayerName(player.name, "seen");
@@ -1440,7 +1451,7 @@ function GameContent() {
       currentPhase: isTimelinePhase(currentPhase) ? currentPhase : null,
       selfPlayer: self_player,
       currentBattle: current_battle,
-      isMobile: sizes.isMobile,
+      isMobile: usesOverlaySidebar,
       sidebarOpen,
       revealedPlayerName: state.revealedPlayerName,
       useUpgrades: gameState.use_upgrades,
@@ -1453,7 +1464,7 @@ function GameContent() {
       isStageEnd: self_player.is_stage_increasing,
     };
   }, [
-    gameState, sizes.isMobile, sidebarOpen,
+    gameState, usesOverlaySidebar, sidebarOpen,
     state.revealedPlayerName,
     showSubmitHandPopover, showSubmitResultPopover,
   ]);
@@ -2007,9 +2018,10 @@ function GameContent() {
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
             useUpgrades={gameState.use_upgrades}
-            headerClassName="py-1.5 bar-pad-left"
+            headerClassName={phaseTimelineHeaderClassName}
+            rightActionsClassName={phaseTimelineRightActionsClassName}
             onOpenRules={openRulesPanel}
-            hamburger={sizes.isMobile ? (
+            hamburger={usesOverlaySidebar ? (
               <button
                 onClick={() => setSidebarOpen((o) => !o)}
                 className="btn btn-secondary text-xs sm:text-sm"
@@ -2034,7 +2046,7 @@ function GameContent() {
             validDropZones={getValidDropZones}
           >
             <div className="flex-1 flex min-h-0 game-surface">
-              {sizes.isMobile && (
+              {shellMode === "mobile" && (
                 <div className="w-[4px] shrink-0 frame-chrome" />
               )}
               <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
@@ -2108,12 +2120,12 @@ function GameContent() {
                     )}
                   </div>
               </main>
-              {sizes.isMobile ? (
+              {usesOverlaySidebar ? (
                 <>
-                  {sidebarOpen && (
+                  {overlaySidebarOpen && (
                     <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
                   )}
-                  <div className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                  <div className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${overlaySidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <Sidebar
                       players={gameState.players}
                       currentPlayer={self_player}
@@ -2133,8 +2145,11 @@ function GameContent() {
                   renderMicToggle={renderMicToggle}
                 />
               )}
-              {sizes.isMobile && (
+              {shellMode === "mobile" && (
                 <div className="w-[4px] shrink-0 frame-chrome" />
+              )}
+              {isSmallShell && (
+                <div className="w-10 shrink-0 frame-chrome" />
               )}
             </div>
             {activeDndPanel === 'sideboard' && current_battle && (
@@ -2255,7 +2270,7 @@ function GameContent() {
           </FaceDownProvider>
         ) : (
           <div className="flex-1 flex min-h-0 game-surface">
-            {sizes.isMobile && (
+            {shellMode === "mobile" && (
               <div className="w-[4px] shrink-0 frame-chrome" />
             )}
             <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
@@ -2330,12 +2345,12 @@ function GameContent() {
                 />
               )}
             </main>
-            {sizes.isMobile ? (
+            {usesOverlaySidebar ? (
               <>
-                {sidebarOpen && (
+                {overlaySidebarOpen && (
                   <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
                 )}
-                <div className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${overlaySidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                   <Sidebar
                     players={gameState.players}
                     currentPlayer={self_player}
@@ -2355,8 +2370,11 @@ function GameContent() {
                 renderMicToggle={renderMicToggle}
               />
             )}
-            {sizes.isMobile && (
+            {shellMode === "mobile" && (
               <div className="w-[4px] shrink-0 frame-chrome" />
+            )}
+            {isSmallShell && (
+              <div className="w-10 shrink-0 frame-chrome" />
             )}
           </div>
         )}
@@ -2364,7 +2382,7 @@ function GameContent() {
         {!isSpectator && (
           <div className="shrink-0 relative frame-chrome z-40">
             <div
-              className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-main timeline-actions"
+              className={`flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 ${actionBarPaddingClass} timeline-actions`}
               data-guide-target="phase-action-bar"
             >
               {isEndPhase && gameId ? (
