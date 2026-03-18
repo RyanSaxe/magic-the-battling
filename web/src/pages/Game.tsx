@@ -822,6 +822,7 @@ function GameContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [battleSidebarLayout, setBattleSidebarLayout] = useState<BattleSidebarLayout>(null);
   const [phaseTimelineRef, phaseTimelineHeight] = useElementHeight();
+  const [battleLifeRailRef, battleLifeRailHeight] = useElementHeight();
   const [actionBarRef, actionBarHeight] = useElementHeight();
   const usesOverlaySidebar = shellMode !== "big";
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
@@ -833,7 +834,14 @@ function GameContent() {
   const actionBarPaddingClass =
     shellMode === "small" ? "bar-pad-both" : "bar-pad-main";
   const overlaySidebarPadding = usesOverlaySidebar
-    ? { top: phaseTimelineHeight, bottom: actionBarHeight }
+    ? {
+        top:
+          phaseTimelineHeight +
+          ((currentPhase === "battle" || displayBattleResolution) && battleViewForDisplay
+            ? battleLifeRailHeight
+            : 0),
+        bottom: actionBarHeight,
+      }
     : undefined;
 
   const isSpectateMode = searchParams.get("spectate") === "true";
@@ -2141,7 +2149,10 @@ function GameContent() {
               <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
                   {usesOverlaySidebar && battleViewForDisplay && (
-                    <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight">
+                    <div
+                      ref={battleLifeRailRef}
+                      className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight"
+                    >
                       <div className="flex items-center gap-1">
                         <span className="text-gray-300 truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
