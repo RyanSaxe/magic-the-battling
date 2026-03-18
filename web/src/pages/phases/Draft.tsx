@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
-import { useCardLayout } from '../../hooks/useCardLayout'
+import { useCardLayout, ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
 import { ZoneDivider } from '../../components/common/ZoneDivider'
 import { LayoutResetControl } from '../../components/common/LayoutResetControl'
 import { UpgradeGrid } from '../../components/common/UpgradeGrid'
@@ -52,7 +52,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     round: self_player.round,
   })
 
-  const draftDefaultLayoutConfig = {
+  const layoutConfig = {
     zones: {
       pool: { count: pool.length, maxCardWidth: 300 },
       pack: { count: currentPack.length, maxCardWidth: 400 },
@@ -65,23 +65,11 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     },
     fixedHeight: 65,
     padding: 24,
+    ...ZONE_LAYOUT_PADDING,
   }
-
-  const draftConstrainedLayoutConfig = {
-    zones: draftDefaultLayoutConfig.zones,
-    layout: draftDefaultLayoutConfig.layout,
-    sectionPadH: 12,
-    sectionPadTop: 20,
-    sectionPadBottom: 12,
-    sectionGap: 2,
-  }
-
-  const activeLayoutConfig = constraints
-    ? draftConstrainedLayoutConfig
-    : draftDefaultLayoutConfig
 
   const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
-    ...activeLayoutConfig,
+    ...layoutConfig,
     constraints,
   })
   const packDims = dims.pack
@@ -96,6 +84,8 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     : undefined
   const upgradesStyle = zoneFrames?.upgrades
     ? {
+        width: zoneFrames.upgrades.outerWidth,
+        flex: '0 0 auto' as const,
         alignSelf: 'stretch' as const,
         minHeight: 0,
         boxShadow: 'inset 0 2px 6px rgba(0, 0, 0, 0.3)',
@@ -106,7 +96,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     containerHeight: containerSize.height,
     containerWidth: containerSize.width,
     currentLayout: dims,
-    layoutConfig: activeLayoutConfig,
+    layoutConfig,
     allowHorizontalResize: !isMobile,
     measureInitialConstraints: () => {
       const packOuter = packZoneRef.current?.getBoundingClientRect().height ?? 0
@@ -116,7 +106,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
       const upgradesOuter = upgradesRect?.height ?? 0
       const poolOuterWidth = poolRect?.width ?? 0
       const upgradesOuterWidth = upgradesRect?.width ?? 0
-      const sectionGap = 2
+      const sectionGap = ZONE_LAYOUT_PADDING.sectionGap
       const bottomOuter = Math.max(poolOuter, upgradesOuter)
       const usableH = packOuter + bottomOuter
       const totalBottomWidth =
