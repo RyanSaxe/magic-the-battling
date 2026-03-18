@@ -58,8 +58,11 @@ import {
   rememberPlayerForGame,
 } from "../utils/deviceIdentity";
 import {
+  isSubmitPopoverGuideStepActive,
   matchesGuideCompletionTrigger,
+  shouldDisableGameplayHotkeys,
   shouldBlockGuidesForBattleResolution,
+  type VisibleGuideStep,
 } from "./gameGuideState";
 import { getVoicePeerNames } from "../utils/voiceChat";
 
@@ -527,6 +530,7 @@ function GameGuideLayer({
   sidebarOpen,
   setSidebarOpen,
   guideCompletionTrigger,
+  onVisibleGuideStepChange,
 }: {
   rootRef: React.RefObject<HTMLElement | null>;
   context: GuidedWalkthroughContext;
@@ -537,6 +541,7 @@ function GameGuideLayer({
     stepId: string;
     nonce: number;
   } | null;
+  onVisibleGuideStepChange: (step: VisibleGuideStep | null) => void;
 }) {
   const GUIDE_HANDOFF_LINGER_MS = 450;
   const { state, setRevealedPlayerName } = useContextStrip();
@@ -764,6 +769,18 @@ function GameGuideLayer({
     });
   }, [guideRequest, updateGuideStep]);
 
+  useEffect(() => {
+    onVisibleGuideStepChange(
+      activeRequest && activeStep
+        ? { guideId: activeRequest.guideId, stepId: activeStep.id }
+        : null,
+    );
+  }, [activeRequest, activeStep, onVisibleGuideStepChange]);
+
+  useEffect(() => () => {
+    onVisibleGuideStepChange(null);
+  }, [onVisibleGuideStepChange]);
+
   if (!activeRequest) return null;
   return (
     <GuidedWalkthrough
@@ -933,6 +950,7 @@ function GameContent() {
   const [activeBattleZoneModal, setActiveBattleZoneModal] = useState<BattleZoneModal>(null);
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
+  const [visibleGuideStep, setVisibleGuideStep] = useState<VisibleGuideStep | null>(null);
   const [guideCompletionTrigger, setGuideCompletionTrigger] = useState<{
     guideId: GuidedGuideId;
     stepId: string;
@@ -1017,6 +1035,10 @@ function GameContent() {
     setHoveredCard({ id: cardId, zone, owner: 'opponent' });
   };
   const handleCardHoverEnd = () => setHoveredCard(null);
+
+  useEffect(() => {
+    queueMicrotask(() => setHoveredCard(null));
+  }, [selfPhase]);
 
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
@@ -1254,6 +1276,8 @@ function GameContent() {
     gameState?.self_player.phase !== "battle" &&
     cachedBattleForResolution !== null &&
     !shownBattleResolutionIds.has(battleResolutionId);
+  const buildSubmitGuideActive = isSubmitPopoverGuideStepActive(visibleGuideStep, "build");
+  const battleSubmitGuideActive = isSubmitPopoverGuideStepActive(visibleGuideStep, "battle");
 
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   const modalOpen =
@@ -1267,6 +1291,10 @@ function GameContent() {
     hasPendingBattleResolution ||
     activeBattleResolutionId !== null ||
     activeBuildUpgradeAnimation !== null;
+  const gameplayHotkeysDisabled = shouldDisableGameplayHotkeys({
+    modalOpen,
+    visibleGuideStep,
+  });
   const sidebarPlayers = useMemo(
     () => (gameState ? getSidebarPlayerOrder(gameState.players) : []),
     [gameState],
@@ -1282,7 +1310,7 @@ function GameContent() {
         );
       },
     };
-    if (!gameState || isSpectator || modalOpen) return map;
+    if (!gameState || isSpectator || gameplayHotkeysDisabled) return map;
 
     const { self_player: sp, current_battle: cb } = gameState;
     const phase = sp.phase;
@@ -1438,7 +1466,7 @@ function GameContent() {
     return map;
   })();
 
-  useHotkeys(hotkeyMap, !modalOpen);
+  useHotkeys(hotkeyMap, !gameplayHotkeysDisabled);
 
   const guideContext = useMemo<GuidedWalkthroughContext | null>(() => {
     if (!gameState) return null;
@@ -1663,7 +1691,8 @@ function GameContent() {
                 ]}
                 onClose={() => setShowSubmitHandPopover(false)}
                 guideTarget="build-submit-popover"
-                closeOnOutsideClick={false}
+                closeOnOutsideClick
+                ignoreOutsideClickSelector={buildSubmitGuideActive ? "[data-guided-tooltip='true']" : undefined}
               />
             )}
           </div>
@@ -1748,7 +1777,8 @@ function GameContent() {
                 ]}
                 onClose={() => setShowSubmitResultPopover(false)}
                 guideTarget="battle-submit-popover"
-                closeOnOutsideClick={false}
+                closeOnOutsideClick
+                ignoreOutsideClickSelector={battleSubmitGuideActive ? "[data-guided-tooltip='true']" : undefined}
               />
             )}
           </div>
@@ -2416,6 +2446,7 @@ function GameContent() {
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             guideCompletionTrigger={guideCompletionTrigger}
+            onVisibleGuideStepChange={setVisibleGuideStep}
           />
         )}
         </GuideProvider>
