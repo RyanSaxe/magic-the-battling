@@ -1091,6 +1091,38 @@ def test_copy_token_preserves_only_flip_and_face_down_state(card_factory):
     assert copied.id not in b.player_zones.counters
 
 
+def test_draw_and_shuffle_opponent_library_for_static_opponent(card_factory, monkeypatch):
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice)
+
+    static_opp = StaticOpponent(
+        name="Bot",
+        hand=[],
+        chosen_basics=["Plains", "Island", "Mountain"],
+    )
+    b = battle.start(game, alice, static_opp)
+    top = card_factory("TopCard")
+    bottom = card_factory("BottomCard")
+    b.opponent_zones.library = [bottom, top]
+
+    draw_result = battle.update_card_state(b, alice, "draw_library", "", data={"for_opponent": True})
+    assert draw_result
+    assert b.opponent_zones.library == [bottom]
+    assert b.opponent_zones.hand[-1] is top
+
+    extra = card_factory("ExtraCard")
+    b.opponent_zones.library.append(extra)
+
+    def reverse_shuffle(items):
+        items[:] = list(reversed(items))
+
+    monkeypatch.setattr("mtb.phases.battle.random.shuffle", reverse_shuffle)
+    shuffle_result = battle.update_card_state(b, alice, "shuffle_library", "", data={"for_opponent": True})
+    assert shuffle_result
+    assert b.opponent_zones.library == [extra, bottom]
+
+
 def _spawn_token(b, player, name="Zombie"):
     battle.update_card_state(
         b,

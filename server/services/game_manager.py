@@ -2392,6 +2392,11 @@ class GameManager:
             scrubbed_gy = _scrub_face_down_cards(opponent_zones.graveyard, face_down_ids, id_map)
             scrubbed_exile = _scrub_face_down_cards(opponent_zones.exile, face_down_ids, id_map)
             scrubbed_cz = _scrub_face_down_cards(opponent_zones.command_zone, face_down_ids, id_map)
+            scrubbed_library = _scrub_face_down_cards(
+                opponent_zones.library,
+                {card.id for card in opponent_zones.library},
+                id_map,
+            )
             scrubbed_tokens = _scrub_face_down_cards(opponent_zones.spawned_tokens, face_down_ids, id_map)
             reverse_map = {real: opaque for opaque, real in id_map.items()}
             scrubbed_face_down_ids = _remap_id_list(opponent_zones.face_down_card_ids, reverse_map)
@@ -2408,6 +2413,7 @@ class GameManager:
             scrubbed_gy = opponent_zones.graveyard
             scrubbed_exile = opponent_zones.exile
             scrubbed_cz = opponent_zones.command_zone
+            scrubbed_library = opponent_zones.library
             scrubbed_tokens = opponent_zones.spawned_tokens
             scrubbed_face_down_ids = opponent_zones.face_down_card_ids
             scrubbed_tapped_ids = opponent_zones.tapped_card_ids
@@ -2424,7 +2430,7 @@ class GameManager:
             sideboard=[],
             upgrades=opponent_zones.upgrades,
             command_zone=scrubbed_cz,
-            library=[],
+            library=scrubbed_library,
             treasures=opponent_zones.treasures,
             submitted_cards=[],
             tapped_card_ids=scrubbed_tapped_ids,

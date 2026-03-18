@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
+from conftest import setup_battle_ready
 
 from mtb.models.cards import Battler, Card
 from mtb.models.game import Game, Puppet, StaticOpponent, create_game, set_battler
@@ -372,6 +373,23 @@ class TestConstructedLobbyRules:
         assert error is None
         assert lobby is not None
         assert lobby.target_player_count == 6
+
+    def test_static_opponent_library_is_in_battle_view(self, game_manager, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[],
+            chosen_basics=["Plains", "Island", "Mountain"],
+        )
+        battle_state = battle.start(game, alice, static_opp)
+        battle_state.opponent_zones.library = [card_factory("LibCard")]
+
+        battle_view = game_manager._make_battle_view(battle_state, alice, game)
+
+        assert len(battle_view.opponent_zones.library) == 1
 
     def test_clear_player_battler_resets_state_and_unreadies(self, game_manager, card_factory):
         pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")

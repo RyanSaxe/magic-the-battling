@@ -1785,6 +1785,22 @@ function GameContent() {
     actions.battleUpdateCardState("create_treasure", "", { for_opponent: true });
   };
 
+  const handleDrawLibrary = () => {
+    actions.battleUpdateCardState("draw_library", "", {});
+  };
+
+  const handleShuffleLibrary = () => {
+    actions.battleUpdateCardState("shuffle_library", "", {});
+  };
+
+  const handleDrawOpponentLibrary = () => {
+    actions.battleUpdateCardState("draw_library", "", { for_opponent: true });
+  };
+
+  const handleShuffleOpponentLibrary = () => {
+    actions.battleUpdateCardState("shuffle_library", "", { for_opponent: true });
+  };
+
   const handlePassTurn = () => {
     actions.battlePassTurn();
   };
@@ -2404,6 +2420,10 @@ function GameContent() {
           onShowSideboard={() => toggleBattlePanel('sideboard')}
           onShowOpponentSideboard={() => toggleBattlePanel('opponentSideboard')}
           onCreateTreasure={handleCreateTreasure}
+          onDrawLibrary={handleDrawLibrary}
+          onShuffleLibrary={handleShuffleLibrary}
+          onDrawOpponentLibrary={handleDrawOpponentLibrary}
+          onShuffleOpponentLibrary={handleShuffleOpponentLibrary}
           onPassTurn={handlePassTurn}
           onRollDie={handleRollDie}
           onClose={() => setActionMenuOpen(false)}
