@@ -833,16 +833,6 @@ function GameContent() {
     shellMode === "small" ? "" : "sm:-translate-x-2";
   const actionBarPaddingClass =
     shellMode === "small" ? "bar-pad-both" : "bar-pad-main";
-  const overlaySidebarPadding = usesOverlaySidebar
-    ? {
-        top:
-          phaseTimelineHeight +
-          ((currentPhase === "battle" || displayBattleResolution) && battleViewForDisplay
-            ? battleLifeRailHeight
-            : 0),
-        bottom: actionBarHeight,
-      }
-    : undefined;
 
   const isSpectateMode = searchParams.get("spectate") === "true";
   const { addToast } = useToast();
@@ -1582,6 +1572,16 @@ function GameContent() {
   const actionBarPhase = displayBattleResolution ? "battle" : currentPhase;
   const actionBarBattle = battleViewForDisplay;
   const canManipulateOpponent = battleViewForDisplay?.can_manipulate_opponent ?? false;
+  const overlaySidebarPadding = usesOverlaySidebar
+    ? {
+        top:
+          phaseTimelineHeight +
+          ((currentPhase === "battle" || displayBattleResolution) && battleViewForDisplay
+            ? battleLifeRailHeight + 2
+            : 0),
+        bottom: actionBarHeight,
+      }
+    : undefined;
 
   const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
