@@ -1,13 +1,20 @@
-import { useState, useContext, useEffect } from 'react'
+import { useState, useContext, useEffect, useRef, useMemo, useCallback } from 'react'
 import type { Card as CardType } from '../../types'
 import { CardPreviewContext } from './CardPreviewContext'
 import { useFaceDown } from '../../contexts/faceDownState'
 import { CARD_BACK_IMAGE, BASIC_LANDS } from '../../constants/assets'
 
+const HOVER_ENLARGE_SCALE = 1.24
+const HOVER_ENLARGE_Z_INDEX = 56
+const VIEWPORT_PADDING = 8
+
 interface CardProps {
   card: CardType
   onClick?: () => void
   onDoubleClick?: () => void
+  onContextMenu?: (e: React.MouseEvent<HTMLDivElement>) => void
+  onHoverStart?: () => void
+  onHoverEnd?: () => void
   selected?: boolean
   size?: 'xs' | 'sm' | 'md' | 'lg'
   dimensions?: { width: number; height: number }
@@ -27,6 +34,10 @@ interface CardProps {
   canPeekFaceDown?: boolean
   style?: React.CSSProperties
   trackDomId?: boolean
+  suppressHoverEnlarge?: boolean
+  interactiveRef?: React.Ref<HTMLDivElement>
+  interactiveStyle?: React.CSSProperties
+  interactiveProps?: React.HTMLAttributes<HTMLDivElement>
 }
 
 const sizeStyles = {
@@ -55,10 +66,26 @@ const isBasicLandOrTreasureToken = (card: CardType) =>
 const isCopiedToken = (card: CardType) =>
   card.scryfall_id?.startsWith('token-copy-') ?? false
 
+function mergeRefs<T>(...refs: Array<React.Ref<T> | undefined>) {
+  return (value: T | null) => {
+    refs.forEach((ref) => {
+      if (!ref) return
+      if (typeof ref === 'function') {
+        ref(value)
+      } else {
+        ;(ref as React.MutableRefObject<T | null>).current = value
+      }
+    })
+  }
+}
+
 export function Card({
   card,
   onClick,
   onDoubleClick,
+  onContextMenu,
+  onHoverStart,
+  onHoverEnd,
   selected,
   size = 'md',
   dimensions,
@@ -78,10 +105,16 @@ export function Card({
   canPeekFaceDown = true,
   style: externalStyle,
   trackDomId = true,
+  suppressHoverEnlarge = false,
+  interactiveRef,
+  interactiveStyle,
+  interactiveProps,
 }: CardProps) {
   const [showFlip, setShowFlip] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
+  const [hoverRect, setHoverRect] = useState<DOMRect | null>(null)
+  const anchorRef = useRef<HTMLDivElement | null>(null)
 
   const contextFaceDown = useFaceDown(card.id)
   const effectiveFaceDown = faceDown || contextFaceDown
@@ -121,6 +154,57 @@ export function Card({
   const imageUrl = isHovered && pngUrl ? pngUrl : normalUrl
 
   const dims = dimensions ?? sizeStyles[size]
+  const canPromote = canHover && !dragging && !suppressHoverEnlarge
+  const shouldPromote = canPromote && isHovered && hoverRect !== null
+
+  const updateHoverRect = useCallback(() => {
+    if (!anchorRef.current) return
+    setHoverRect(anchorRef.current.getBoundingClientRect())
+  }, [])
+
+  useEffect(() => {
+    if (!shouldPromote) return
+
+    updateHoverRect()
+    const observer = new ResizeObserver(() => updateHoverRect())
+    if (anchorRef.current) {
+      observer.observe(anchorRef.current)
+    }
+
+    const handleViewportChange = () => updateHoverRect()
+    window.addEventListener('resize', handleViewportChange)
+    window.addEventListener('scroll', handleViewportChange, true)
+
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', handleViewportChange)
+      window.removeEventListener('scroll', handleViewportChange, true)
+    }
+  }, [shouldPromote, updateHoverRect])
+
+  const promotionStyle = useMemo(() => {
+    if (!shouldPromote || !hoverRect) return null
+
+    const scaledWidth = dims.width * HOVER_ENLARGE_SCALE
+    const scaledHeight = dims.height * HOVER_ENLARGE_SCALE
+    const clampedLeft = Math.min(
+      Math.max(hoverRect.left - (scaledWidth - dims.width) / 2, VIEWPORT_PADDING),
+      Math.max(VIEWPORT_PADDING, window.innerWidth - scaledWidth - VIEWPORT_PADDING),
+    )
+    const clampedTop = Math.min(
+      Math.max(hoverRect.top - (scaledHeight - dims.height) / 2, VIEWPORT_PADDING),
+      Math.max(VIEWPORT_PADDING, window.innerHeight - scaledHeight - VIEWPORT_PADDING),
+    )
+
+    return {
+      position: 'fixed' as const,
+      top: hoverRect.top,
+      left: hoverRect.left,
+      zIndex: HOVER_ENLARGE_Z_INDEX,
+      transform: `translate(${clampedLeft - hoverRect.left}px, ${clampedTop - hoverRect.top}px) scale(${HOVER_ENLARGE_SCALE})`,
+      transformOrigin: 'center center',
+    }
+  }, [dims.height, dims.width, hoverRect, shouldPromote])
 
   const baseClasses = [
     'card',
@@ -136,106 +220,153 @@ export function Card({
 
   const glowShadow = glow !== 'none' ? glowColors[glow] : undefined
   const boxShadow = glowShadow || (dragging ? '0 20px 40px rgba(0, 0, 0, 0.5)' : undefined)
+  const interactiveTransform = [
+    interactiveStyle?.transform,
+    promotionStyle?.transform,
+    dragging ? 'scale(1.05)' : '',
+    tapped ? 'rotate(90deg)' : '',
+  ].filter(Boolean).join(' ') || undefined
+
+  const mergedInteractiveRef = useMemo(
+    () => mergeRefs<HTMLDivElement>(interactiveRef),
+    [interactiveRef],
+  )
+  const {
+    onMouseEnter: interactiveOnMouseEnter,
+    onMouseLeave: interactiveOnMouseLeave,
+    onContextMenu: interactiveOnContextMenu,
+    style: interactiveExternalStyle,
+    ...restInteractiveProps
+  } = interactiveProps ?? {}
 
   return (
     <div
-      className={baseClasses}
-      data-guide-card-id={card.id}
-      data-card-id={trackDomId ? card.id : undefined}
+      ref={anchorRef}
       style={{
         ...externalStyle,
         width: dims.width,
         height: dims.height,
-        boxShadow,
+        position: 'relative',
       }}
-      onClick={disabled ? undefined : onClick}
-      onDoubleClick={disabled ? undefined : onDoubleClick}
-      onMouseEnter={canHover ? () => setIsHovered(true) : undefined}
-      onMouseLeave={canHover ? () => setIsHovered(false) : undefined}
     >
-      {isLoading && (
-        <div className="skeleton absolute inset-0 flex items-center justify-center bg-gray-800">
-          <span className="text-gray-400 text-xs text-center px-2">{card.name}</span>
-        </div>
-      )}
-      {showCopyBadge && (
-        <div
-          className="absolute left-1 top-1 rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200"
-          data-copy-token-badge
-        >
-          Copy
-        </div>
-      )}
-      <img
-        src={imageUrl}
-        alt={card.name}
-        className={`w-full h-full object-cover ${isLoading ? 'invisible' : ''}`}
-        onLoad={() => setIsLoading(false)}
-        onError={() => setIsLoading(false)}
-        draggable={false}
-      />
-      {card.flip_image_url && !effectiveFaceDown && (isHovered || selected) && (
-        <button
-          className="absolute top-1 right-1 bg-black/60 rounded px-2 py-0.5 text-white text-xs hover:bg-black/80 transition-colors"
-          onClick={(e) => {
-            e.stopPropagation()
-            setShowFlip(!showFlip)
-          }}
-        >
-          Flip
-        </button>
-      )}
-      {previewContext && showZoom && (!effectiveFaceDown || canPeekFaceDown) && (isHovered || selected) && (
-        <button
-          className={`absolute ${showCopyBadge ? 'top-8' : 'top-1'} left-1 bg-black/60 rounded p-1 text-white hover:bg-black/80 transition-colors`}
-          onClick={(e) => {
-            e.stopPropagation()
-            if (card.upgrade_target) {
-              previewContext.setPreviewCard(card.upgrade_target, [card])
-            } else {
-              previewContext.setPreviewCard(card, appliedUpgrades)
-            }
-          }}
-          title="Preview card"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+      <div
+        ref={mergedInteractiveRef}
+        className={baseClasses}
+        data-guide-card-id={card.id}
+        data-card-id={trackDomId ? card.id : undefined}
+        style={{
+          ...interactiveExternalStyle,
+          ...interactiveStyle,
+          ...promotionStyle,
+          width: dims.width,
+          height: dims.height,
+          boxShadow,
+          transform: interactiveTransform,
+        }}
+        onClick={disabled ? undefined : onClick}
+        onDoubleClick={disabled ? undefined : onDoubleClick}
+        onContextMenu={(e) => {
+          interactiveOnContextMenu?.(e)
+          onContextMenu?.(e)
+        }}
+        onMouseEnter={canHover ? (e) => {
+          interactiveOnMouseEnter?.(e)
+          updateHoverRect()
+          setIsHovered(true)
+          onHoverStart?.()
+        } : interactiveOnMouseEnter}
+        onMouseLeave={canHover ? (e) => {
+          interactiveOnMouseLeave?.(e)
+          setIsHovered(false)
+          setHoverRect(null)
+          onHoverEnd?.()
+        } : interactiveOnMouseLeave}
+        {...restInteractiveProps}
+      >
+        {isLoading && (
+          <div className="skeleton absolute inset-0 flex items-center justify-center bg-gray-800">
+            <span className="text-gray-400 text-xs text-center px-2">{card.name}</span>
+          </div>
+        )}
+        {showCopyBadge && (
+          <div
+            className="absolute left-1 top-1 rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200"
+            data-copy-token-badge
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
-            />
-          </svg>
-        </button>
-      )}
-      {showRevealHiddenUpgradeButton && (
-        <button
-          className="absolute bottom-1 left-1 bg-purple-600/90 rounded px-2 py-0.5 text-white text-xs hover:bg-purple-500 transition-colors"
-          onClick={(e) => {
-            e.stopPropagation()
-            onRevealHiddenUpgrades?.()
-          }}
-        >
-          {hiddenUpgradeCount > 1 ? 'Reveal Upgrades' : 'Reveal Upgrade'}
-        </button>
-      )}
-      {counters && Object.keys(counters).length > 0 && (
-        <div className={`absolute left-1 flex gap-1 ${showRevealHiddenUpgradeButton ? 'bottom-8' : 'bottom-1'}`}>
-          {Object.entries(counters).map(([type, count]) => (
-            <div
-              key={type}
-              className="bg-black/80 text-white text-xs px-1.5 py-0.5 rounded border border-amber-500"
+            Copy
+          </div>
+        )}
+        <img
+          src={imageUrl}
+          alt={card.name}
+          className={`w-full h-full object-cover ${isLoading ? 'invisible' : ''}`}
+          onLoad={() => setIsLoading(false)}
+          onError={() => setIsLoading(false)}
+          draggable={false}
+        />
+        {card.flip_image_url && !effectiveFaceDown && (isHovered || selected) && (
+          <button
+            className="absolute top-1 right-1 bg-black/60 rounded px-2 py-0.5 text-white text-xs hover:bg-black/80 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation()
+              setShowFlip(!showFlip)
+            }}
+          >
+            Flip
+          </button>
+        )}
+        {previewContext && showZoom && (!effectiveFaceDown || canPeekFaceDown) && (isHovered || selected) && (
+          <button
+            className={`absolute ${showCopyBadge ? 'top-8' : 'top-1'} left-1 bg-black/60 rounded p-1 text-white hover:bg-black/80 transition-colors`}
+            onClick={(e) => {
+              e.stopPropagation()
+              if (card.upgrade_target) {
+                previewContext.setPreviewCard(card.upgrade_target, [card])
+              } else {
+                previewContext.setPreviewCard(card, appliedUpgrades)
+              }
+            }}
+            title="Preview card"
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              {type === '+1/+1' ? `+${count}/+${count}` : `${count} ${type}`}
-            </div>
-          ))}
-        </div>
-      )}
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
+              />
+            </svg>
+          </button>
+        )}
+        {showRevealHiddenUpgradeButton && (
+          <button
+            className="absolute bottom-1 left-1 bg-purple-600/90 rounded px-2 py-0.5 text-white text-xs hover:bg-purple-500 transition-colors"
+            onClick={(e) => {
+              e.stopPropagation()
+              onRevealHiddenUpgrades?.()
+            }}
+          >
+            {hiddenUpgradeCount > 1 ? 'Reveal Upgrades' : 'Reveal Upgrade'}
+          </button>
+        )}
+        {counters && Object.keys(counters).length > 0 && (
+          <div className={`absolute left-1 flex gap-1 ${showRevealHiddenUpgradeButton ? 'bottom-8' : 'bottom-1'}`}>
+            {Object.entries(counters).map(([type, count]) => (
+              <div
+                key={type}
+                className="bg-black/80 text-white text-xs px-1.5 py-0.5 rounded border border-amber-500"
+              >
+                {type === '+1/+1' ? `+${count}/+${count}` : `${count} ${type}`}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

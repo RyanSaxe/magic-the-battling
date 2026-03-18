@@ -428,7 +428,6 @@ body {
 }
 
 .card.tapped {
-  transform: rotate(90deg);
   transition: transform var(--transition-spring);
 }
 
@@ -439,7 +438,6 @@ body {
 
 .card.dragging {
   opacity: 0.5;
-  transform: scale(1.05);
 }
 
 .card.upgraded::after,

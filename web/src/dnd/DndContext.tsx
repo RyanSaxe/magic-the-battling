@@ -131,6 +131,7 @@ export function GameDndProvider({
               size="md"
               className="drag-overlay"
               faceDown={activeFaceDown}
+              suppressHoverEnlarge
             />
           )}
         </DragOverlay>
