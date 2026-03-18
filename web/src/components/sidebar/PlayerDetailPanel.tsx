@@ -559,7 +559,7 @@ export function PlayerDetailPanel({
       ref={panelRef}
       data-guide-target="sidebar-detail-drawer"
       aria-hidden={!isOpen}
-      className={`absolute inset-y-0 z-30 overflow-hidden border-l-2 border-r-0 border-t-0 border-b-0 border-[var(--gold-border-opaque)] frame-chrome ${
+      className={`absolute inset-y-0 z-[60] overflow-hidden border-l-2 border-r-0 border-t-0 border-b-0 border-[var(--gold-border-opaque)] frame-chrome ${
         isOpen ? "pointer-events-auto" : "pointer-events-none"
       }`}
       style={{

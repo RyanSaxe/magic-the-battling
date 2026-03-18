@@ -562,6 +562,18 @@ async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
             await connection_manager.send_error(websocket, "Cannot kick player")
         return True
 
+    if action == "set_target_player_count":
+        success, error = game_manager.set_target_player_count(
+            game_id,
+            player_id,
+            int(payload.get("target_player_count", 0)),
+        )
+        if success:
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, error or "Cannot change player cap")
+        return True
+
     return False
 
 

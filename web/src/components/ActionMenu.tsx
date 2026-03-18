@@ -142,6 +142,7 @@ export function ActionMenu({
                 {zone !== 'battlefield' && <MenuItem label="Battlefield" onClick={() => handleMove('battlefield')} />}
                 {zone !== 'graveyard' && <MenuItem label="Graveyard" onClick={() => handleMove('graveyard')} />}
                 {zone !== 'exile' && <MenuItem label="Exile" onClick={() => handleMove('exile')} />}
+                {zone !== 'library' && <MenuItem label="Library" onClick={() => handleMove('library')} />}
               </Submenu>
             )}
 
@@ -221,6 +222,13 @@ export function ActionMenu({
                   </Submenu>
                 )}
               </>
+            )}
+
+            {!isScrubbed && (
+              <MenuItem
+                label="Make Copy Token"
+                onClick={() => handleAction('copy_token')}
+              />
             )}
 
             {onBattlefield && attachableCards.length > 0 && (

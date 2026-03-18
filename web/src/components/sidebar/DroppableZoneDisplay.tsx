@@ -25,7 +25,7 @@ interface DroppableZoneDisplayProps {
   size?: CardSize
 }
 
-const VALID_FROM_ZONES: ZoneName[] = ['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']
+const VALID_FROM_ZONES: ZoneName[] = ['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']
 
 export function ZoneModal({
   title,
@@ -40,6 +40,8 @@ export function ZoneModal({
   selectedCardId,
   forceFaceDown = false,
   tone = 'default',
+  hideTitle = false,
+  headerActions,
 }: {
   title: string
   zone: ZoneName
@@ -53,6 +55,8 @@ export function ZoneModal({
   selectedCardId?: string
   forceFaceDown?: boolean
   tone?: 'default' | 'battle'
+  hideTitle?: boolean
+  headerActions?: React.ReactNode
 }) {
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
@@ -68,6 +72,8 @@ export function ZoneModal({
         count={cards.length}
         onClose={handleClose}
         tone={tone}
+        hideTitle={hideTitle}
+        headerActions={headerActions}
         zone={zone}
         zoneOwner={zoneOwner}
         validFromZones={VALID_FROM_ZONES}
@@ -105,13 +111,16 @@ export function ZoneModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-white font-medium">{title}</h3>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-white"
-          >
-            ✕
-          </button>
+          {hideTitle ? <div /> : <h3 className="text-white font-medium">{title}</h3>}
+          <div className="flex items-center gap-2">
+            {headerActions}
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
         </div>
         {cards.length === 0 ? (
           <div className="text-gray-500 text-center py-4">No cards</div>

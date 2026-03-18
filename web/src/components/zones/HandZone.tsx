@@ -30,6 +30,7 @@ export function HandZone({
     "battlefield",
     "graveyard",
     "exile",
+    "library",
     "sideboard",
     "command_zone",
   ],

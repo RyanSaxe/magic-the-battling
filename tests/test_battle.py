@@ -354,8 +354,8 @@ def test_sideboard_to_battlefield_syncs_player_model(card_factory):
     assert wish_target in b.player_zones.battlefield
 
 
-def test_command_zone_to_battlefield_preserves_companion_selection(card_factory):
-    """Casting companion should preserve selection state for next build phase."""
+def test_companion_starts_battle_in_exile_and_preserves_selection(card_factory):
+    """Build command-zone cards should appear in battle exile without losing selection state."""
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
@@ -366,14 +366,8 @@ def test_command_zone_to_battlefield_preserves_companion_selection(card_factory)
 
     b = battle.start(game, alice, bob)
 
-    manager = GameManager()
-    manager.handle_battle_move(game, alice, companion.id, "command_zone", "battlefield")
-
-    # Companion should remain in player.command_zone (selection state persists)
     assert companion in alice.command_zone
-    # But should be on battlefield in battle zones
-    assert companion in b.player_zones.battlefield
-    # And removed from battle's command_zone
+    assert companion in b.player_zones.exile
     assert companion not in b.player_zones.command_zone
 
 
@@ -880,7 +874,7 @@ class TestOpponentZoneManipulation:
 
 
 def test_companion_filtered_from_sideboard_in_battle(card_factory):
-    """Companion should only appear in command_zone during battle, not sideboard."""
+    """Companion should only appear in exile during battle, not sideboard."""
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
     setup_battle_ready(alice)
@@ -893,14 +887,14 @@ def test_companion_filtered_from_sideboard_in_battle(card_factory):
 
     b = battle.start(game, alice, bob)
 
-    assert companion in b.player_zones.command_zone
+    assert companion in b.player_zones.exile
     assert companion not in b.player_zones.sideboard
     assert other_sideboard in b.player_zones.sideboard
     assert len(b.player_zones.sideboard) == 1
 
 
 def test_companion_filtered_from_sideboard_vs_static_opponent(card_factory):
-    """Companion should be filtered from sideboard for static opponents too."""
+    """Companion should move to exile and be filtered from sideboard for static opponents too."""
     game = create_game(["Alice"], num_players=1)
     alice = game.players[0]
     setup_battle_ready(alice)
@@ -921,7 +915,7 @@ def test_companion_filtered_from_sideboard_vs_static_opponent(card_factory):
 
     b = battle.start(game, alice, static_opp)
 
-    assert companion in b.opponent_zones.command_zone
+    assert companion in b.opponent_zones.exile
     assert companion not in b.opponent_zones.sideboard
     assert other_sideboard in b.opponent_zones.sideboard
     assert len(b.opponent_zones.sideboard) == 1
@@ -1021,6 +1015,80 @@ def test_spawn_token_for_player(card_factory):
     assert len(b.opponent_zones.battlefield) == initial_opponent_battlefield
     zombie = b.player_zones.battlefield[-1]
     assert zombie.name == "Zombie"
+
+
+def test_draw_library_moves_top_card_to_hand(card_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice)
+    setup_battle_ready(bob)
+
+    top = card_factory("TopCard")
+    bottom = card_factory("BottomCard")
+    b = battle.start(game, alice, bob)
+    b.player_zones.library = [bottom, top]
+
+    result = battle.update_card_state(b, alice, "draw_library", "")
+
+    assert result
+    assert b.player_zones.library == [bottom]
+    assert b.player_zones.hand[-1] is top
+
+
+def test_shuffle_library_randomizes_player_library(card_factory, monkeypatch):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice)
+    setup_battle_ready(bob)
+
+    cards = [card_factory(f"Card{i}") for i in range(3)]
+    b = battle.start(game, alice, bob)
+    b.player_zones.library = cards.copy()
+
+    def reverse_shuffle(items):
+        items[:] = list(reversed(items))
+
+    monkeypatch.setattr("mtb.phases.battle.random.shuffle", reverse_shuffle)
+
+    result = battle.update_card_state(b, alice, "shuffle_library", "")
+
+    assert result
+    assert b.player_zones.library == list(reversed(cards))
+
+
+def test_copy_token_preserves_only_flip_and_face_down_state(card_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice)
+    setup_battle_ready(bob)
+
+    card = card_factory(
+        "CloneSource",
+        oracle_text="Some rules text",
+        flip_image_url="flip-image",
+        png_url="png",
+        flip_png_url="flip-png",
+        colors=["U"],
+        cmc=3,
+    )
+    b = battle.start(game, alice, bob)
+    b.player_zones.battlefield.append(card)
+    b.player_zones.flipped_card_ids.append(card.id)
+    b.player_zones.face_down_card_ids.append(card.id)
+    b.player_zones.tapped_card_ids.append(card.id)
+    b.player_zones.counters[card.id] = {"+1/+1": 2}
+
+    result = battle.update_card_state(b, alice, "copy_token", card.id)
+
+    assert result
+    copied = b.player_zones.battlefield[-1]
+    assert copied.id != card.id
+    assert copied.name == card.name
+    assert copied.image_url == card.image_url
+    assert copied.id in b.player_zones.flipped_card_ids
+    assert copied.id in b.player_zones.face_down_card_ids
+    assert copied.id not in b.player_zones.tapped_card_ids
+    assert copied.id not in b.player_zones.counters
 
 
 def _spawn_token(b, player, name="Zombie"):

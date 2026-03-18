@@ -52,7 +52,7 @@ export function BattlefieldZone({
   flippedCardIds = new Set(),
   counters = {},
   attachments = {},
-  validFromZones = ["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone"],
+  validFromZones = ["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone", "library"],
   draggable = true,
   isOpponent = false,
   canManipulateOpponent = false,

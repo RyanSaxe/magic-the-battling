@@ -28,6 +28,8 @@ interface CompactZoneDisplayProps {
   forceFaceDown?: boolean
   isModalOpen?: boolean
   onModalOpenChange?: (open: boolean) => void
+  onContextMenu?: (event: React.MouseEvent<HTMLDivElement>) => void
+  modalHeaderActions?: React.ReactNode
 }
 
 export function CompactZoneDisplay({
@@ -49,6 +51,8 @@ export function CompactZoneDisplay({
   forceFaceDown = false,
   isModalOpen,
   onModalOpenChange,
+  onContextMenu,
+  modalHeaderActions,
 }: CompactZoneDisplayProps) {
   const [uncontrolledModalOpen, setUncontrolledModalOpen] = useState(false)
   const allowInteraction = !isOpponent || canManipulateOpponent
@@ -86,6 +90,7 @@ export function CompactZoneDisplay({
         style={{ width, height }}
       >
         <div
+          onContextMenu={onContextMenu}
           onClick={(e) => {
             if (selectedCardId && onZoneClick) {
               e.stopPropagation()
@@ -138,6 +143,8 @@ export function CompactZoneDisplay({
           allowInteraction={allowInteraction}
           isOpponent={isOpponent}
           tone="battle"
+          hideTitle
+          headerActions={modalHeaderActions}
           onClose={() => setShowModal(false)}
           onCardHover={onCardHover}
           onCardHoverEnd={onCardHoverEnd}

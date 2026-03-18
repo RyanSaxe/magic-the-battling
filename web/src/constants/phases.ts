@@ -30,9 +30,9 @@ const PHASE_SUMMARY_ROWS: Record<Phase, PhaseSummaryRow[]> = {
     { text: 'Double tap on any card to tap/untap it.' },
   ],
   reward: [
-    { text: 'After every battle, collect +1 treasure and your end-of-round loot.' },
-    { text: 'On rounds 1 and 2, you also get +1 random card from the Battler.' },
-    { text: 'At stage end, you gain The Vanquisher, grow your hand size, and advance.' },
+    { text: 'Collect your post-battle rewards, then advance to the next round.' },
+    { text: 'Rounds 1 and 2 add +1 random card from the Battler.' },
+    { text: 'Stage end grants The Vanquisher, +1 hand size, and the next stage.' },
     { text: 'If upgrades are on, stage end also includes an upgrade choice.', requiresUpgrades: true },
   ],
 }
@@ -41,7 +41,7 @@ const PHASE_TIPS: Record<Phase, string> = {
   draft: "Some cards are bad for 3-card hands, but good for 5-card hands. Decide if they're worth holding onto.",
   build: "Treasures are persistent across phases. If you can create them early, that can snowball into a lategame advantage.",
   battle: "Treasures are persistent across phases. Using them to win means you have less later, so spend them carefully.",
-  reward: "After battles, the cards other players cast can be seen in the sidebar. This can help you draft and build better hands.",
+  reward: "Use the scouting sidebar after rewards to adjust future drafts and builds around what other players have shown.",
 }
 
 export function getPhaseTip(phase: Phase): string {

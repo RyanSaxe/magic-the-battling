@@ -342,6 +342,36 @@ class TestConstructedLobbyRules:
         assert lobby.play_mode == "constructed"
         assert lobby.players[0].battler_id == "alice_deck"
         assert lobby.players[0].battler_status == "ready"
+        assert lobby.target_player_count == 4
+
+    def test_join_game_respects_target_player_cap(self, game_manager):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", target_player_count=2)
+
+        joined = game_manager.join_game(pending.join_code, "Bob", "bob_pid")
+        blocked = game_manager.join_game(pending.join_code, "Charlie", "charlie_pid")
+
+        assert joined is not None
+        assert blocked is None
+
+    def test_set_target_player_count_rejects_below_occupied_slots(self, game_manager):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", target_player_count=4)
+        game_manager.join_game(pending.join_code, "Bob", "bob_pid")
+
+        success, error = game_manager.set_target_player_count(pending.game_id, "alice_pid", 1)
+
+        assert success is False
+        assert error is not None
+
+    def test_set_target_player_count_updates_lobby_state(self, game_manager):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", target_player_count=4)
+
+        success, error = game_manager.set_target_player_count(pending.game_id, "alice_pid", 6)
+        lobby = game_manager.get_lobby_state(pending.game_id)
+
+        assert success is True
+        assert error is None
+        assert lobby is not None
+        assert lobby.target_player_count == 6
 
     def test_clear_player_battler_resets_state_and_unreadies(self, game_manager, card_factory):
         pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")

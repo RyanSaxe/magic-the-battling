@@ -682,12 +682,13 @@ export function Lobby() {
                   const isHost = currentPlayer?.is_host ?? false;
                   const isReady = currentPlayer?.is_ready ?? false;
                   const puppetCount = lobbyState.puppet_count;
-                  const total = lobbyState.target_player_count;
+                  const playerCap = lobbyState.target_player_count;
+                  const occupiedSlots = lobbyState.players.length + puppetCount;
                   const availablePuppets = lobbyState.available_puppet_count;
                   const canAddPuppet =
                     availablePuppets !== null &&
                     puppetCount < availablePuppets &&
-                    total < 8;
+                    occupiedSlots < playerCap;
                   const summaryBattlerId =
                     lobbyState.play_mode === "limited"
                       ? lobbyState.cube_id
@@ -703,9 +704,9 @@ export function Lobby() {
 
                   const startMessage = (() => {
                     if (startingGame) return null;
-                    if (total < 2) return "Need at least 2 players";
-                    if (total % 2 !== 0)
-                      return `Odd player count (${total})`;
+                    if (occupiedSlots < 2) return "Need at least 2 players";
+                    if (occupiedSlots % 2 !== 0)
+                      return `Odd player count (${occupiedSlots})`;
                     if (!lobbyState.players.every((p) => p.is_ready))
                       return "Waiting for all players to ready";
                     if (
@@ -731,7 +732,7 @@ export function Lobby() {
                   const playerSlots = [
                     ...filledSlots,
                     ...Array.from({
-                      length: Math.max(0, 8 - filledSlots.length),
+                      length: Math.max(0, playerCap - filledSlots.length),
                     }).map((_, i) => ({
                       kind: "open" as const,
                       key: `open-${i}`,
@@ -847,6 +848,24 @@ export function Lobby() {
                     <h2 className="text-white font-medium text-sm">Players</h2>
                     {isHost ? (
                       <div className="flex items-center gap-1.5">
+                        <label className="flex items-center gap-1 text-xs text-gray-400">
+                          <span>Cap</span>
+                          <select
+                            value={playerCap}
+                            onChange={(event) => actions.setTargetPlayerCount(Number(event.target.value))}
+                            className="h-7 rounded border border-black/40 bg-black/40 px-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          >
+                            {Array.from({ length: 7 }, (_, index) => index + 2).map((value) => (
+                              <option
+                                key={value}
+                                value={value}
+                                disabled={value < occupiedSlots}
+                              >
+                                {value}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
                         <button
                           onClick={() => actions.addPuppet()}
                           disabled={!canAddPuppet}
@@ -868,20 +887,26 @@ export function Lobby() {
                         </button>
                       </div>
                     ) : (
-                      puppetCount > 0 && (
-                        <button
-                          onClick={() =>
-                            openGuide({
-                              docId: "faq",
-                              tab: "why-are-my-opponents-cards-face-up",
-                            })
-                          }
-                          className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
-                        >
-                          What are Puppets?
-                        </button>
-                      )
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-gray-500">Cap {playerCap}</span>
+                        {puppetCount > 0 && (
+                          <button
+                            onClick={() =>
+                              openGuide({
+                                docId: "faq",
+                                tab: "why-are-my-opponents-cards-face-up",
+                              })
+                            }
+                            className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
+                          >
+                            What are Puppets?
+                          </button>
+                        )}
+                      </div>
                     )}
+                  </div>
+                  <div className="mb-2 text-[11px] text-gray-500">
+                    {occupiedSlots} / {playerCap} slots filled
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {playerSlots.map((slot) => {

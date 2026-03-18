@@ -742,6 +742,8 @@ class GameManager:
             return None
 
         total = len(pending.player_names) + pending.puppet_count
+        if total >= pending.target_player_count:
+            return None
         if total >= 8:
             return None
 
@@ -855,7 +857,6 @@ class GameManager:
             return None
 
         pending.is_started = True
-        pending.target_player_count = total
 
         config = Config(
             use_upgrades=pending.use_upgrades,
@@ -962,7 +963,6 @@ class GameManager:
                         return None
 
                 pending.is_started = True
-                pending.target_player_count = total
 
                 config = Config(
                     use_upgrades=pending.use_upgrades,
@@ -1689,6 +1689,8 @@ class GameManager:
         if player_id != pending.host_player_id:
             return False
         total = len(pending.player_names) + pending.puppet_count
+        if total >= pending.target_player_count:
+            return False
         if total >= 8:
             return False
         available = self._count_available_bots(pending)
@@ -1696,6 +1698,24 @@ class GameManager:
             return False
         pending.puppet_count += 1
         return True
+
+    def set_target_player_count(
+        self, game_id: str, player_id: str, target_player_count: int
+    ) -> tuple[bool, str | None]:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.is_started:
+            return False, "Game not found"
+        if player_id != pending.host_player_id:
+            return False, "Only the host can change the player cap"
+        if target_player_count < 2 or target_player_count > 8:
+            return False, "Player cap must be between 2 and 8"
+
+        occupied_slots = len(pending.player_names) + pending.puppet_count
+        if target_player_count < occupied_slots:
+            return False, "Player cap cannot be lower than occupied slots"
+
+        pending.target_player_count = target_player_count
+        return True, None
 
     def remove_puppet(self, game_id: str, player_id: str) -> bool:
         pending = self._pending_games.get(game_id)
@@ -1885,7 +1905,7 @@ class GameManager:
             players=players,
             can_start=can_start,
             is_started=pending.is_started,
-            target_player_count=total,
+            target_player_count=pending.target_player_count,
             puppet_count=pending.puppet_count,
             cube_loading_status=self._get_cube_loading_status(pending),
             cube_loading_error=loading_error,

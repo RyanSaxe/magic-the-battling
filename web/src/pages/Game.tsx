@@ -1365,7 +1365,7 @@ function GameContent() {
               }
             }
           };
-          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile', l: 'command_zone' } as const;
+          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile', l: 'library' } as const;
           for (const [key, toZone] of Object.entries(moveZones)) {
             map[key] = () => {
               if (toZone !== hoveredCard.zone) {
@@ -2130,7 +2130,7 @@ function GameContent() {
                   tone="battle"
                   zone="sideboard"
                   zoneOwner="player"
-                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
                 >
                   {(dims) =>
                     current_battle.your_zones.sideboard.map((card) => (
@@ -2158,7 +2158,7 @@ function GameContent() {
                   tone="battle"
                   zone="sideboard"
                   zoneOwner="opponent"
-                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
                 >
                   {(dims) =>
                     current_battle.opponent_full_sideboard!.map((card) => (
@@ -2188,7 +2188,7 @@ function GameContent() {
                   tone="battle"
                   zone="graveyard"
                   zoneOwner="player"
-                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
                 >
                   {(dims) =>
                     current_battle.your_zones.graveyard.map((card) => (
@@ -2216,7 +2216,7 @@ function GameContent() {
                   tone="battle"
                   zone="exile"
                   zoneOwner="player"
-                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
                 >
                   {(dims) =>
                     current_battle.your_zones.exile.map((card) => (
