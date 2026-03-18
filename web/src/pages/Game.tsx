@@ -798,7 +798,7 @@ function GameContent() {
   const phaseTimelineHeaderClassName =
     shellMode === "small" ? "py-1.5 bar-pad-both" : "py-1.5 bar-pad-left";
   const phaseTimelineRightActionsClassName =
-    shellMode === "small" ? "sm:-translate-x-4" : "sm:-translate-x-2";
+    shellMode === "small" ? "" : "sm:-translate-x-2";
   const actionBarPaddingClass =
     shellMode === "small" ? "bar-pad-both" : "bar-pad-main";
 
