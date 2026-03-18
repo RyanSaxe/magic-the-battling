@@ -30,10 +30,9 @@ const PHASE_SUMMARY_ROWS: Record<Phase, PhaseSummaryRow[]> = {
     { text: 'Double tap on any card to tap/untap it.' },
   ],
   reward: [
-    { text: 'Collect your post-battle rewards, then advance to the next round.' },
-    { text: 'Rounds 1 and 2 add +1 random card from the Battler.' },
-    { text: 'Stage end grants The Vanquisher, +1 hand size, and the next stage.' },
-    { text: 'If upgrades are on, stage end also includes an upgrade choice.', requiresUpgrades: true },
+    { text: 'You always get 1 Treasure.' },
+    { text: 'Rounds 1 and 2 give you a random card.' },
+    { text: 'Round 3 grants you a special surprise.' },
   ],
 }
 
