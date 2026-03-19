@@ -1723,6 +1723,8 @@ class GameManager:
             return False, "Only the host can change the player cap"
         if target_player_count < 2 or target_player_count > 8:
             return False, "Player cap must be between 2 and 8"
+        if target_player_count % 2 != 0:
+            return False, "Player cap must be an even number"
 
         occupied_slots = len(pending.player_names) + pending.puppet_count
         if target_player_count < occupied_slots:

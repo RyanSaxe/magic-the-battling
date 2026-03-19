@@ -22,6 +22,7 @@ import {
 
 const DESKTOP_SUBTITLE = "An MtG format inspired by autobattlers";
 const MOBILE_SUBTITLE = "An MtG format inspired by autobattlers";
+const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 
 function cubeCobraUrl(battlerId: string) {
   return `https://cubecobra.com/cube/overview/${encodeURIComponent(battlerId)}`;
@@ -849,13 +850,13 @@ export function Lobby() {
                     {isHost ? (
                       <div className="flex items-center gap-1.5">
                         <label className="flex items-center gap-1 text-xs text-gray-400">
-                          <span>Cap</span>
+                          <span>Max</span>
                           <select
                             value={playerCap}
                             onChange={(event) => actions.setTargetPlayerCount(Number(event.target.value))}
                             className="h-7 rounded border border-black/40 bg-black/40 px-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
                           >
-                            {Array.from({ length: 7 }, (_, index) => index + 2).map((value) => (
+                            {EVEN_PLAYER_CAP_OPTIONS.map((value) => (
                               <option
                                 key={value}
                                 value={value}
