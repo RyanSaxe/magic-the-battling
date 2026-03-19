@@ -1,11 +1,10 @@
 import { useState, useCallback, useRef } from 'react'
 import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
-import { useCardLayout, ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
-import { ZoneDivider } from '../../components/common/ZoneDivider'
+import { useCardLayout } from '../../hooks/useCardLayout'
 import { LayoutResetControl } from '../../components/common/LayoutResetControl'
 import { UpgradeGrid } from '../../components/common/UpgradeGrid'
-import { ZoneLabel } from '../../components/common/ZoneLabel'
+import { ZoneLayout } from '../../components/common/ZoneLayout'
 import { usePersistedConstraints } from '../../hooks/usePersistedConstraints'
 import { useZoneDividers } from '../../hooks/useZoneDividers'
 import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
@@ -52,7 +51,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     round: self_player.round,
   })
 
-  const layoutConfig = {
+  const draftDefaultLayoutConfig = {
     zones: {
       pool: { count: pool.length, maxCardWidth: 300 },
       pack: { count: currentPack.length, maxCardWidth: 400 },
@@ -65,38 +64,34 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     },
     fixedHeight: 65,
     padding: 24,
-    ...ZONE_LAYOUT_PADDING,
   }
 
+  const draftConstrainedLayoutConfig = {
+    zones: draftDefaultLayoutConfig.zones,
+    layout: draftDefaultLayoutConfig.layout,
+    sectionPadH: 12,
+    sectionPadTop: 20,
+    sectionPadBottom: 12,
+    sectionGap: 2,
+  }
+
+  const activeLayoutConfig = constraints
+    ? draftConstrainedLayoutConfig
+    : draftDefaultLayoutConfig
+
   const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
-    ...layoutConfig,
+    ...activeLayoutConfig,
     constraints,
   })
   const packDims = dims.pack
   const poolDims = dims.pool
   const upgradesDims = dims.upgrades
 
-  const packStyle = zoneFrames?.pack
-    ? { height: zoneFrames.pack.outerHeight, flex: '0 0 auto' as const }
-    : undefined
-  const poolStyle = zoneFrames?.pool
-    ? { minHeight: zoneFrames.pool.outerHeight, flex: '1 1 auto' as const }
-    : undefined
-  const upgradesStyle = zoneFrames?.upgrades
-    ? {
-        width: zoneFrames.upgrades.outerWidth,
-        flex: '0 0 auto' as const,
-        alignSelf: 'stretch' as const,
-        minHeight: 0,
-        boxShadow: 'inset 0 2px 6px rgba(0, 0, 0, 0.3)',
-      }
-    : undefined
-
   const dividerCallbacks = useZoneDividers({
     containerHeight: containerSize.height,
     containerWidth: containerSize.width,
     currentLayout: dims,
-    layoutConfig,
+    layoutConfig: activeLayoutConfig,
     allowHorizontalResize: !isMobile,
     measureInitialConstraints: () => {
       const packOuter = packZoneRef.current?.getBoundingClientRect().height ?? 0
@@ -106,7 +101,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
       const upgradesOuter = upgradesRect?.height ?? 0
       const poolOuterWidth = poolRect?.width ?? 0
       const upgradesOuterWidth = upgradesRect?.width ?? 0
-      const sectionGap = ZONE_LAYOUT_PADDING.sectionGap
+      const sectionGap = 2
       const bottomOuter = Math.max(poolOuter, upgradesOuter)
       const usableH = packOuter + bottomOuter
       const totalBottomWidth =
@@ -169,176 +164,171 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     [selectedCard, actions]
   )
 
-  return (
-    <div ref={containerRef} className="relative zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col h-full" onClick={handleBackgroundClick}>
-      {persistedLayout.canReset && (
-        <LayoutResetControl
-          phaseLabel="Draft"
-          currentStage={self_player.stage}
-          currentRound={self_player.round}
-          originStage={persistedLayout.originStage}
-          originRound={persistedLayout.originRound}
-          isInherited={persistedLayout.source === 'inherited'}
-          onConfirm={clearConstraints}
-          position={isMobile ? 'bottom-right' : 'top-right'}
-        />
-      )}
-      <div className="flex flex-col flex-1 min-h-0" style={{ gap: dividerCallbacks.topDivider ? 0 : 2 }}>
-        {/* Pack */}
+  const packContent = (
+    <>
+      <div className="absolute top-0 left-0 pointer-events-none z-10">
         <div
-          ref={packZoneRef}
-          className="zone-pack w-full px-3 pt-5 pb-3 relative flex flex-col min-h-0"
-          style={packStyle}
-          data-guide-target="draft-pack"
+          className="relative draft-token-frame draft-token-frame--treasure"
+          data-guide-target="draft-mobile-treasure"
         >
-          <div className="absolute top-0 left-0 pointer-events-none z-10">
-            <div
-              className="relative draft-token-frame draft-token-frame--treasure"
-              data-guide-target="draft-mobile-treasure"
-            >
-              <img
-                src={TREASURE_TOKEN_IMAGE}
-                alt="Treasure"
-                className="h-[56px] sm:h-[84px] block shadow-lg"
-                style={{ borderRadius: 'var(--card-border-radius)' }}
-              />
-              <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-amber-400 text-xs sm:text-sm font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none">
-                {self_player.treasures}
-              </span>
-            </div>
-          </div>
-          <div className="absolute top-0 right-0 pointer-events-none z-10">
-            <div className="relative draft-token-frame draft-token-frame--poison">
-              <img
-                src={POISON_COUNTER_IMAGE}
-                alt="Poison"
-                className="h-[56px] sm:h-[84px] block shadow-lg"
-                style={{ borderRadius: 'var(--card-border-radius)' }}
-              />
-              <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-purple-400 text-xs sm:text-sm font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none">
-                {self_player.poison}
-              </span>
-            </div>
-          </div>
-          <ZoneLabel>Pack</ZoneLabel>
-          <div className="flex-1 min-h-0 overflow-auto">
-            {currentPack.length === 0 ? (
-              <div className="text-center">
-                <div className="text-gray-400 text-sm">No pack available</div>
-              </div>
-            ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${packDims.columns}, ${packDims.width}px)`,
-                gap: '6px',
-                justifyContent: 'center',
-                maxWidth: '100%',
-                overflow: 'hidden',
-              }}>
-                {currentPack.map((card, index) => (
-                  <Card
-                    key={card.id}
-                    card={card}
-                    onClick={() => handleCardClick(card, index, 'pack', false)}
-                    selected={selectedCard?.card.id === card.id}
-                    dimensions={packDims}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {dividerCallbacks.topDivider && (
-          <ZoneDivider
-            orientation="horizontal"
-            interactive={!isMobile}
-            {...dividerCallbacks.topDivider}
+          <img
+            src={TREASURE_TOKEN_IMAGE}
+            alt="Treasure"
+            className="h-[56px] sm:h-[84px] block shadow-lg"
+            style={{ borderRadius: 'var(--card-border-radius)' }}
           />
-        )}
-
-        {/* Pool */}
-        <div className={`flex min-h-0 w-full ${zoneFrames ? '' : 'flex-1'}`} style={{ gap: 0, ...(zoneFrames ? { flex: '1 1 auto', minHeight: 0 } : {}) }}>
-          <div
-            ref={poolZoneRef}
-            className={`zone-sideboard w-full px-3 pt-5 pb-3 relative flex flex-col min-h-0 ${zoneFrames ? '' : 'flex-1'}`}
-            style={poolStyle}
-            data-guide-target="draft-pool"
-          >
-            <ZoneLabel dragCallbacks={dividerCallbacks.topDivider}>
-              Pool
-            </ZoneLabel>
-            <div className="flex-1 min-h-0 overflow-auto">
-              {pool.length === 0 ? (
-                <div className="flex items-center justify-center">
-                  <div className="text-gray-500 text-sm text-center">
-                    Swap cards from the pack to build your pool
-                  </div>
-                </div>
-              ) : (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${poolDims.columns}, ${poolDims.width}px)`,
-                  gap: '6px',
-                  justifyContent: 'center',
-                  maxWidth: '100%',
-                  overflow: 'hidden',
-                }}>
-                  {pool.map((card, index) => {
-                    const isInHand = self_player.hand.some((c) => c.id === card.id)
-                    return (
-                      <Card
-                        key={card.id}
-                        card={card}
-                        onClick={() => handleCardClick(card, index, 'pool', isInHand)}
-                        selected={selectedCard?.card.id === card.id}
-                        dimensions={poolDims}
-                        upgraded={upgradedCardIds.has(card.id)}
-                        appliedUpgrades={getAppliedUpgrades(card.id)}
-                      />
-                    )
-                  })}
-                </div>
-              )}
+          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-amber-400 text-xs sm:text-sm font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none">
+            {self_player.treasures}
+          </span>
+        </div>
+      </div>
+      <div className="absolute top-0 right-0 pointer-events-none z-10">
+        <div className="relative draft-token-frame draft-token-frame--poison">
+          <img
+            src={POISON_COUNTER_IMAGE}
+            alt="Poison"
+            className="h-[56px] sm:h-[84px] block shadow-lg"
+            style={{ borderRadius: 'var(--card-border-radius)' }}
+          />
+          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-purple-400 text-xs sm:text-sm font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none">
+            {self_player.poison}
+          </span>
+        </div>
+      </div>
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex-1 min-h-0 overflow-auto">
+          {currentPack.length === 0 ? (
+            <div className="text-center">
+              <div className="text-gray-400 text-sm">No pack available</div>
             </div>
-          </div>
-          {hasDesktopUpgradeRail && dividerCallbacks.leftDivider && (
-            <ZoneDivider
-              orientation="vertical"
-              interactive={!isMobile}
-              {...dividerCallbacks.leftDivider}
-            />
-          )}
-          {hasDesktopUpgradeRail && (
-            <div
-              ref={upgradesZoneRef}
-              className="zone-upgrades min-w-0 overflow-visible px-3 pt-5 pb-3 relative flex items-center justify-center"
-              style={upgradesStyle}
-            >
-              <ZoneLabel
-                className="justify-center"
-                wrapClassName="max-w-[calc(100%-0.25rem)]"
-                constrainToParent
-                dragCallbacks={dividerCallbacks.topDivider}
-              >
-                Upgrades
-              </ZoneLabel>
-              <div className="overflow-hidden">
-                <UpgradeGrid
-                  upgrades={self_player.upgrades}
-                  fallbackDims={{
-                    width: upgradesDims.width,
-                    height: upgradesDims.height,
-                    rows: upgradesDims.rows,
-                    columns: upgradesDims.columns,
-                  }}
-                  frame={zoneFrames?.upgrades}
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${packDims.columns}, ${packDims.width}px)`,
+              gap: '6px',
+              justifyContent: 'center',
+              maxWidth: '100%',
+              overflow: 'hidden',
+            }}>
+              {currentPack.map((card, index) => (
+                <Card
+                  key={card.id}
+                  card={card}
+                  onClick={() => handleCardClick(card, index, 'pack', false)}
+                  selected={selectedCard?.card.id === card.id}
+                  dimensions={packDims}
                 />
-              </div>
+              ))}
             </div>
           )}
         </div>
       </div>
+    </>
+  )
+
+  const poolContent = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex-1 min-h-0 overflow-auto">
+        {pool.length === 0 ? (
+          <div className="flex items-center justify-center">
+            <div className="text-gray-500 text-sm text-center">
+              Swap cards from the pack to build your pool
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${poolDims.columns}, ${poolDims.width}px)`,
+            gap: '6px',
+            justifyContent: 'center',
+            maxWidth: '100%',
+            overflow: 'hidden',
+          }}>
+            {pool.map((card, index) => {
+              const isInHand = self_player.hand.some((c) => c.id === card.id)
+              return (
+                <Card
+                  key={card.id}
+                  card={card}
+                  onClick={() => handleCardClick(card, index, 'pool', isInHand)}
+                  selected={selectedCard?.card.id === card.id}
+                  dimensions={poolDims}
+                  upgraded={upgradedCardIds.has(card.id)}
+                  appliedUpgrades={getAppliedUpgrades(card.id)}
+                />
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
+  )
+
+  return (
+    <ZoneLayout
+      containerRef={containerRef}
+      onClick={handleBackgroundClick}
+      isMobile={isMobile}
+      zoneHeights={zoneFrames ? {
+        hand: zoneFrames.pack.outerHeight,
+        sideboard: zoneFrames.pool.outerHeight,
+        upgrades: hasDesktopUpgradeRail ? zoneFrames.upgrades.outerHeight : undefined,
+      } : null}
+      zoneRefs={{
+        hand: (node) => {
+          packZoneRef.current = node
+        },
+        sideboard: (node) => {
+          poolZoneRef.current = node
+        },
+        upgrades: (node) => {
+          upgradesZoneRef.current = node
+        },
+      }}
+      overlay={
+        persistedLayout.canReset ? (
+          <LayoutResetControl
+            phaseLabel="Draft"
+            currentStage={self_player.stage}
+            currentRound={self_player.round}
+            originStage={persistedLayout.originStage}
+            originRound={persistedLayout.originRound}
+            isInherited={persistedLayout.source === 'inherited'}
+            onConfirm={clearConstraints}
+            position={isMobile ? 'bottom-right' : 'top-right'}
+          />
+        ) : null
+      }
+      hasHand={true}
+      hasBattlefield={false}
+      hasSideboard={true}
+      hasUpgrades={hasDesktopUpgradeRail}
+      dividerCallbacks={dividerCallbacks}
+      zoneTargetIds={{
+        hand: 'draft-pack',
+        sideboard: 'draft-pool',
+      }}
+      handLabel="Pack"
+      handContent={packContent}
+      battlefieldLabel={null}
+      battlefieldContent={null}
+      sideboardLabel="Pool"
+      sideboardContent={poolContent}
+      upgradesLabel="Upgrades"
+      upgradesContent={
+        hasDesktopUpgradeRail ? (
+          <UpgradeGrid
+            upgrades={self_player.upgrades}
+            fallbackDims={{
+              width: upgradesDims.width,
+              height: upgradesDims.height,
+              rows: upgradesDims.rows,
+              columns: upgradesDims.columns,
+            }}
+            frame={zoneFrames?.upgrades}
+          />
+        ) : null
+      }
+    />
   )
 }
