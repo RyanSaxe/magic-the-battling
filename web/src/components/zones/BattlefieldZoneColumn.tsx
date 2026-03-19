@@ -3,7 +3,7 @@ import type { ZoneOwner } from '../../dnd/types'
 import { CompactZoneDisplay } from './CompactZoneDisplay'
 
 const VALID_FROM_ZONES: ZoneName[] = [
-  'hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone',
+  'hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library',
 ]
 
 interface BattlefieldZoneColumnProps {

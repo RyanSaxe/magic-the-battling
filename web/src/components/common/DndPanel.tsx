@@ -14,6 +14,8 @@ interface DndPanelProps {
   zoneOwner?: ZoneOwner
   validFromZones?: ZoneName[]
   tone?: 'default' | 'battle'
+  hideTitle?: boolean
+  headerActions?: React.ReactNode
 }
 
 const DEFAULT_DIMS: ZoneDims = { width: 80, height: 112, rows: 1, columns: 1 }
@@ -29,7 +31,18 @@ function contentBoxSize(node: HTMLElement) {
   }
 }
 
-export function DndPanel({ title, count, onClose, children, zone, zoneOwner, validFromZones, tone = 'default' }: DndPanelProps) {
+export function DndPanel({
+  title,
+  count,
+  onClose,
+  children,
+  zone,
+  zoneOwner,
+  validFromZones,
+  tone = 'default',
+  hideTitle = false,
+  headerActions,
+}: DndPanelProps) {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_DIMS)
   const [mobileHeight, setMobileHeight] = useState<number | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
@@ -106,10 +119,13 @@ export function DndPanel({ title, count, onClose, children, zone, zoneOwner, val
       style={mobileHeight != null ? { height: mobileHeight } : undefined}
     >
       <div className={`px-2 py-1.5 sm:px-3 sm:py-[10px] flex justify-between items-center shrink-0 ${isBattleTone ? 'dnd-panel-header-battle' : 'border-b sm:border-b-2 gold-border'}`}>
-        <h3 className="text-white font-medium text-sm">{title}</h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">
-          &times;
-        </button>
+        {hideTitle ? <div /> : <h3 className="text-white font-medium text-sm">{title}</h3>}
+        <div className="flex items-center gap-2">
+          {headerActions}
+          <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">
+            &times;
+          </button>
+        </div>
       </div>
       <div ref={bodyRef} className="flex-1 min-h-0 p-2 flex items-center justify-center">
         {zone ? (

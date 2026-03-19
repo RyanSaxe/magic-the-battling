@@ -29,12 +29,18 @@ class StaticOpponent(BaseModel):
 
     @classmethod
     def from_player(cls, player: "Player", hand_revealed: bool = False) -> "StaticOpponent":
+        upgrades = []
+        for upgrade in player.upgrades:
+            copy = upgrade.model_copy()
+            if copy.upgrade_target is not None:
+                copy.is_revealed = True
+            upgrades.append(copy)
         return cls(
             name=player.name,
             hand=player.hand.copy(),
             sideboard=player.sideboard.copy(),
             command_zone=player.command_zone.copy(),
-            upgrades=player.upgrades.copy(),
+            upgrades=upgrades,
             vanguard=player.vanguard,
             chosen_basics=player.chosen_basics.copy(),
             treasures=player.treasures,
@@ -45,12 +51,17 @@ class StaticOpponent(BaseModel):
 
     @classmethod
     def from_snapshot(cls, snapshot: "BattleSnapshotData", player_name: str, history_id: int) -> "StaticOpponent":
+        applied_upgrades = []
+        for upgrade in snapshot.applied_upgrades:
+            copy = upgrade.model_copy()
+            copy.is_revealed = True
+            applied_upgrades.append(copy)
         return cls(
             name=player_name,
             hand=snapshot.hand,
             sideboard=snapshot.sideboard,
             command_zone=snapshot.command_zone,
-            upgrades=snapshot.applied_upgrades,
+            upgrades=applied_upgrades,
             vanguard=snapshot.vanguard,
             chosen_basics=snapshot.basic_lands,
             treasures=snapshot.treasures,

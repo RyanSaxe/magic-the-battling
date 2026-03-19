@@ -218,17 +218,6 @@ body {
   .dnd-panel-header-battle {
     position: relative;
   }
-
-  .dnd-panel-header-battle::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -3px;
-    height: 2px;
-    background: var(--gold-border);
-    pointer-events: none;
-  }
 }
 
 /* Zone-specific backgrounds */
@@ -439,7 +428,6 @@ body {
 }
 
 .card.tapped {
-  transform: rotate(90deg);
   transition: transform var(--transition-spring);
 }
 
@@ -449,8 +437,8 @@ body {
 }
 
 .card.dragging {
-  opacity: 0.5;
-  transform: scale(1.05);
+  opacity: 0;
+  pointer-events: none;
 }
 
 .card.upgraded::after,

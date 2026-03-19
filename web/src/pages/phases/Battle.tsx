@@ -6,12 +6,18 @@ import { CompactZoneDisplay } from '../../components/zones/CompactZoneDisplay'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
 import { ZoneDivider } from '../../components/common/ZoneDivider'
 import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
+import { buildAppliedUpgradeMap, buildHiddenAppliedUpgradeMap } from '../../utils/upgrades'
 
 interface ContextMenuState {
   card: CardType
   zone: ZoneName
   position: { x: number; y: number }
   isOpponent?: boolean
+}
+
+interface ZoneContextMenuState {
+  owner: ZoneOwner
+  position: { x: number; y: number }
 }
 
 export interface BattleSelectedCard {
@@ -21,7 +27,7 @@ export interface BattleSelectedCard {
 }
 
 export interface BattleZoneModalState {
-  zone: "graveyard" | "exile" | "command_zone"
+  zone: "graveyard" | "exile" | "library"
   owner: ZoneOwner
 }
 
@@ -33,6 +39,7 @@ interface BattlePhaseProps {
     battleSubmitResult: (result: string) => void
     battleUpdateCardState: (actionType: CardStateAction, cardId: string, data?: Record<string, unknown>) => void
   }
+  onRevealHiddenUpgrades?: (upgradeIds: string[]) => void
   isMobile?: boolean
   selectedCard: BattleSelectedCard | null
   onSelectedCardChange: (card: BattleSelectedCard | null) => void
@@ -46,7 +53,7 @@ interface BattlePhaseProps {
     open: boolean,
   ) => void
   onLayoutMetricsChange?: (metrics: {
-    handHeight: number
+    topSectionHeight: number
     middleLaneHeight: number
   }) => void
 }
@@ -61,21 +68,69 @@ const STATIC_DIVIDER_CALLBACKS = {
   onDragEnd: () => {},
 }
 
-type CommandZoneRole = 'library' | 'companion'
-
-function deriveCommandZoneRole(commandZoneCards: CardType[] | undefined): CommandZoneRole {
-  return (commandZoneCards?.length ?? 0) > 0 ? 'companion' : 'library'
-}
-
 function countTopLevel(cards: CardType[], attachments: Record<string, string[]>, predicate: (c: CardType) => boolean): number {
   const attachedIds = new Set(Object.values(attachments).flat())
   return cards.filter((c) => !attachedIds.has(c.id) && predicate(c)).length
+}
+
+function ZoneActionMenu({
+  position,
+  onDraw,
+  onShuffle,
+  onClose,
+}: {
+  position: { x: number; y: number }
+  onDraw: () => void
+  onShuffle: () => void
+  onClose: () => void
+}) {
+  const menuRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return
+    const rect = node.getBoundingClientRect()
+    const padding = 8
+    const x = Math.max(padding, Math.min(position.x, window.innerWidth - rect.width - padding))
+    const y = Math.max(padding, Math.min(position.y, window.innerHeight - rect.height - padding))
+    node.style.left = `${x}px`
+    node.style.top = `${y}px`
+  }, [position])
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50" onClick={onClose} />
+      <div
+        ref={menuRef}
+        className="fixed modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[160px] z-[51]"
+      >
+        <button
+          type="button"
+          onClick={() => {
+            onDraw()
+            onClose()
+          }}
+          className="w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10 transition-colors"
+        >
+          Draw
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onShuffle()
+            onClose()
+          }}
+          className="w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10 transition-colors"
+        >
+          Shuffle
+        </button>
+      </div>
+    </>
+  )
 }
 
 export function BattlePhase({
   gameState,
   battleOverride,
   actions,
+  onRevealHiddenUpgrades,
   isMobile = false,
   selectedCard,
   onSelectedCardChange,
@@ -87,15 +142,6 @@ export function BattlePhase({
   onLayoutMetricsChange,
 }: BattlePhaseProps) {
   const setSelectedCard = onSelectedCardChange
-
-  const [commandZoneRoles, setCommandZoneRoles] = useState<{
-    player: CommandZoneRole
-    opponent: CommandZoneRole
-  }>({
-    player: 'library',
-    opponent: 'library',
-  })
-  const [commandZoneRolesBattleIdentity, setCommandZoneRolesBattleIdentity] = useState<string | null>(null)
 
   const selectedCardRef = useRef(selectedCard)
   const actionsRef = useRef(actions)
@@ -123,48 +169,13 @@ export function BattlePhase({
     }
   }, [setSelectedCard])
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [zoneContextMenu, setZoneContextMenu] = useState<ZoneContextMenuState | null>(null)
 
   const { current_battle } = gameState
 
   const battle = battleOverride ?? current_battle
   const yourZones = battle?.your_zones
   const oppZones = battle?.opponent_zones
-
-  const battleIdentity = battle
-    ? `${battle.opponent_name}|${battle.coin_flip_name}|${battle.on_the_play_name}|${battle.is_sudden_death ? 'sd' : 'normal'}`
-    : null
-
-  useEffect(() => {
-    if (!battle || !battleIdentity) {
-      return
-    }
-    if (commandZoneRolesBattleIdentity === battleIdentity) {
-      return
-    }
-
-    const nextRoles = {
-      player: deriveCommandZoneRole(battle.your_zones.command_zone),
-      opponent: deriveCommandZoneRole(battle.opponent_zones.command_zone),
-    }
-
-    queueMicrotask(() => {
-      setCommandZoneRoles(nextRoles)
-      setCommandZoneRolesBattleIdentity(battleIdentity)
-    })
-  }, [battle, battleIdentity, commandZoneRolesBattleIdentity])
-
-  const effectiveCommandZoneRoles =
-    battle && battleIdentity && commandZoneRolesBattleIdentity !== battleIdentity
-      ? {
-          player: deriveCommandZoneRole(battle.your_zones.command_zone),
-          opponent: deriveCommandZoneRole(battle.opponent_zones.command_zone),
-        }
-      : commandZoneRoles
-
-  const playerCommandZoneTitle = effectiveCommandZoneRoles.player === 'companion' ? 'Companion' : 'Library'
-  const opponentCommandZoneTitle = effectiveCommandZoneRoles.opponent === 'companion' ? 'Companion' : 'Library'
-  const forcePlayerCommandZoneFaceDown = effectiveCommandZoneRoles.player === 'library'
-  const forceOpponentCommandZoneFaceDown = effectiveCommandZoneRoles.opponent === 'library'
 
   const playerHandCount = yourZones?.hand.length ?? 0
   const opponentHandCount = battle?.opponent_hand_count ?? 0
@@ -209,14 +220,16 @@ export function BattlePhase({
 
   useLayoutEffect(() => {
     onLayoutMetricsChange?.({
-      handHeight,
-      middleLaneHeight: (2 * bfHeight) + MID_DIVIDER_HEIGHT,
+      topSectionHeight: handHeight + opponentMidZoneHeight,
+      middleLaneHeight: opponentBottomZoneHeight + MID_DIVIDER_HEIGHT + playerTopZoneHeight,
     })
   }, [
-    bfHeight,
     handHeight,
     onLayoutMetricsChange,
     MID_DIVIDER_HEIGHT,
+    opponentBottomZoneHeight,
+    opponentMidZoneHeight,
+    playerTopZoneHeight,
   ])
 
   if (!battle) {
@@ -232,7 +245,7 @@ export function BattlePhase({
 
   const { your_zones, opponent_zones, opponent_hand_count: oppHandCount, opponent_hand_revealed } = battle
 
-  const canManipulateOpponent = true
+  const canManipulateOpponent = battle.can_manipulate_opponent
 
   const tappedCardIds = new Set(your_zones.tapped_card_ids || [])
   const flippedCardIds = new Set(your_zones.flipped_card_ids || [])
@@ -243,25 +256,20 @@ export function BattlePhase({
   const opponentFlippedIds = new Set(opponent_zones.flipped_card_ids || [])
   const opponentCounters = opponent_zones.counters || {}
 
-  const playerAppliedUpgrades = your_zones.upgrades.filter((u) => u.upgrade_target)
-  const opponentAppliedUpgrades = opponent_zones.upgrades.filter((u) => u.upgrade_target)
+  const { upgradedCardIds, appliedUpgradesByCardId: upgradesByCardId } = buildAppliedUpgradeMap(
+    your_zones.upgrades,
+    'revealed_applied',
+  )
+  const {
+    upgradedCardIds: opponentUpgradedCardIds,
+    appliedUpgradesByCardId: opponentUpgradesByCardId,
+  } = buildAppliedUpgradeMap(opponent_zones.upgrades, 'revealed_applied')
+  const hiddenUpgradesByCardId = buildHiddenAppliedUpgradeMap(your_zones.upgrades)
 
-  const upgradedCardIds = new Set(playerAppliedUpgrades.map((u) => u.upgrade_target!.id))
-  const opponentUpgradedCardIds = new Set(opponentAppliedUpgrades.map((u) => u.upgrade_target!.id))
-
-  const upgradesByCardId = new Map<string, CardType[]>()
-  for (const u of playerAppliedUpgrades) {
-    const id = u.upgrade_target!.id
-    const existing = upgradesByCardId.get(id) ?? []
-    existing.push(u)
-    upgradesByCardId.set(id, existing)
-  }
-  const opponentUpgradesByCardId = new Map<string, CardType[]>()
-  for (const u of opponentAppliedUpgrades) {
-    const id = u.upgrade_target!.id
-    const existing = opponentUpgradesByCardId.get(id) ?? []
-    existing.push(u)
-    opponentUpgradesByCardId.set(id, existing)
+  const openRevealModalForCard = (cardId: string) => {
+    const hiddenUpgrades = hiddenUpgradesByCardId.get(cardId) ?? []
+    if (hiddenUpgrades.length === 0) return
+    onRevealHiddenUpgrades?.(hiddenUpgrades.map((upgrade) => upgrade.id))
   }
 
   const handleCardClick = (card: CardType, zone: ZoneName, owner: ZoneOwner = 'player') => {
@@ -278,6 +286,10 @@ export function BattlePhase({
       actions.battleMove(selectedCard.card.id, selectedCard.zone, toZone, selectedCard.owner, toOwner)
     }
     setSelectedCard(null)
+  }
+
+  const handleLibraryAction = (action: 'draw_library' | 'shuffle_library', owner: ZoneOwner) => {
+    actions.battleUpdateCardState(action, '', owner === 'opponent' ? { for_opponent: true } : undefined)
   }
 
   const handleCardDoubleClick = (card: CardType) => {
@@ -317,6 +329,20 @@ export function BattlePhase({
   const handleOpponentContextMenu = (e: React.MouseEvent, card: CardType, zone: ZoneName) => {
     e.preventDefault()
     setContextMenu({ card, zone, position: { x: e.clientX, y: e.clientY }, isOpponent: true })
+  }
+
+  const handleLibraryContextMenu = (
+    e: React.MouseEvent<HTMLDivElement>,
+    owner: ZoneOwner,
+    count: number,
+    canOpen: boolean,
+  ) => {
+    if (!canOpen || count <= 0) return
+    e.preventDefault()
+    setZoneContextMenu({
+      owner,
+      position: { x: e.clientX, y: e.clientY },
+    })
   }
 
   const isCardAttached = (cardId: string): boolean => {
@@ -370,7 +396,7 @@ export function BattlePhase({
                 <DroppableZone
                   zone="hand"
                   zoneOwner="opponent"
-                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
                   className="hand-zone flex items-center justify-center flex-nowrap w-full h-full"
                   style={{ gap: Math.max(0, sizes.opponentHandGap) }}
                 >
@@ -433,24 +459,44 @@ export function BattlePhase({
           {/* Opponent side zones: Library, Graveyard, Exile (top→bottom, mirrored) */}
           <div className="flex flex-col shrink-0 battle-side-column battle-side-column-opponent" style={{ width: zoneColumnWidth }}>
             <CompactZoneDisplay
-              title={opponentCommandZoneTitle}
-              zone="command_zone"
-              cards={opponent_zones.command_zone}
+              title="Library"
+              zone="library"
+              cards={opponent_zones.library}
               height={opponentTopZoneHeight}
               width={zoneColumnWidth}
               isOpponent
               canManipulateOpponent={canManipulateOpponent}
-              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
               onCardHover={onOpponentCardHover}
               onCardHoverEnd={onCardHoverEnd}
-              canPeekFaceDown={opponent_hand_revealed}
-              forceFaceDown={forceOpponentCommandZoneFaceDown}
+              forceFaceDown
               selectedCardId={selectedCard?.card.id}
-              onZoneClick={() => handleZoneClick('command_zone', 'opponent')}
+              onZoneClick={() => handleZoneClick('library', 'opponent')}
               onCardClick={handleCardClick}
+              upgradedCardIds={opponentUpgradedCardIds}
+              upgradesByCardId={opponentUpgradesByCardId}
               containerClassName="battle-side-cell"
-              isModalOpen={isZoneModalOpen('command_zone', 'opponent')}
-              onModalOpenChange={(open) => onZoneModalOpenChange('command_zone', 'opponent', open)}
+              onContextMenu={(e) => handleLibraryContextMenu(e, 'opponent', opponent_zones.library.length, canManipulateOpponent)}
+              modalHeaderActions={canManipulateOpponent && opponent_zones.library.length > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleLibraryAction('draw_library', 'opponent')}
+                    className="btn btn-secondary text-xs py-1 px-2"
+                  >
+                    Draw
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLibraryAction('shuffle_library', 'opponent')}
+                    className="btn btn-secondary text-xs py-1 px-2"
+                  >
+                    Shuffle
+                  </button>
+                </>
+              ) : undefined}
+              isModalOpen={isZoneModalOpen('library', 'opponent')}
+              onModalOpenChange={(open) => onZoneModalOpenChange('library', 'opponent', open)}
             />
             <CompactZoneDisplay
               title="Graveyard"
@@ -460,13 +506,15 @@ export function BattlePhase({
               width={zoneColumnWidth}
               isOpponent
               canManipulateOpponent={canManipulateOpponent}
-              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
               onCardHover={onOpponentCardHover}
               onCardHoverEnd={onCardHoverEnd}
               canPeekFaceDown={opponent_hand_revealed}
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('graveyard', 'opponent')}
               onCardClick={handleCardClick}
+              upgradedCardIds={opponentUpgradedCardIds}
+              upgradesByCardId={opponentUpgradesByCardId}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('graveyard', 'opponent')}
               onModalOpenChange={(open) => onZoneModalOpenChange('graveyard', 'opponent', open)}
@@ -479,13 +527,15 @@ export function BattlePhase({
               width={zoneColumnWidth}
               isOpponent
               canManipulateOpponent={canManipulateOpponent}
-              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
               onCardHover={onOpponentCardHover}
               onCardHoverEnd={onCardHoverEnd}
               canPeekFaceDown={opponent_hand_revealed}
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('exile', 'opponent')}
               onCardClick={handleCardClick}
+              upgradedCardIds={opponentUpgradedCardIds}
+              upgradesByCardId={opponentUpgradesByCardId}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('exile', 'opponent')}
               onModalOpenChange={(open) => onZoneModalOpenChange('exile', 'opponent', open)}
@@ -522,6 +572,8 @@ export function BattlePhase({
                 separateLands
                 upgradedCardIds={upgradedCardIds}
                 upgradesByCardId={upgradesByCardId}
+                hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+                onRevealHiddenUpgrades={openRevealModalForCard}
                 poisonCount={yourPoison}
                 cardDimensions={sizes.playerNonlands}
                 rowHeight={rowHeight}
@@ -544,6 +596,8 @@ export function BattlePhase({
                 onCardHoverEnd={onCardHoverEnd}
                 upgradedCardIds={upgradedCardIds}
                 upgradesByCardId={upgradesByCardId}
+                hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+                onRevealHiddenUpgrades={openRevealModalForCard}
                 cardDimensions={sizes.playerHand}
                 gap={sizes.playerHandGap}
               />
@@ -557,12 +611,16 @@ export function BattlePhase({
               cards={your_zones.exile}
               height={playerTopZoneHeight}
               width={zoneColumnWidth}
-              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
               onCardHover={onCardHover}
               onCardHoverEnd={onCardHoverEnd}
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('exile', 'player')}
               onCardClick={handleCardClick}
+              upgradedCardIds={upgradedCardIds}
+              upgradesByCardId={upgradesByCardId}
+              hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+              onRevealHiddenUpgrades={openRevealModalForCard}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('exile', 'player')}
               onModalOpenChange={(open) => onZoneModalOpenChange('exile', 'player', open)}
@@ -573,32 +631,59 @@ export function BattlePhase({
               cards={your_zones.graveyard}
               height={playerMidZoneHeight}
               width={zoneColumnWidth}
-              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
               onCardHover={onCardHover}
               onCardHoverEnd={onCardHoverEnd}
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('graveyard', 'player')}
               onCardClick={handleCardClick}
+              upgradedCardIds={upgradedCardIds}
+              upgradesByCardId={upgradesByCardId}
+              hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+              onRevealHiddenUpgrades={openRevealModalForCard}
               containerClassName="battle-side-cell"
               isModalOpen={isZoneModalOpen('graveyard', 'player')}
               onModalOpenChange={(open) => onZoneModalOpenChange('graveyard', 'player', open)}
             />
             <CompactZoneDisplay
-              title={playerCommandZoneTitle}
-              zone="command_zone"
-              cards={your_zones.command_zone}
+              title="Library"
+              zone="library"
+              cards={your_zones.library}
               height={playerBottomZoneHeight}
               width={zoneColumnWidth}
-              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+              validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
               onCardHover={onCardHover}
               onCardHoverEnd={onCardHoverEnd}
-              forceFaceDown={forcePlayerCommandZoneFaceDown}
+              forceFaceDown
               selectedCardId={selectedCard?.card.id}
-              onZoneClick={() => handleZoneClick('command_zone', 'player')}
+              onZoneClick={() => handleZoneClick('library', 'player')}
               onCardClick={handleCardClick}
+              upgradedCardIds={upgradedCardIds}
+              upgradesByCardId={upgradesByCardId}
+              hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+              onRevealHiddenUpgrades={openRevealModalForCard}
               containerClassName="battle-side-cell"
-              isModalOpen={isZoneModalOpen('command_zone', 'player')}
-              onModalOpenChange={(open) => onZoneModalOpenChange('command_zone', 'player', open)}
+              onContextMenu={(e) => handleLibraryContextMenu(e, 'player', your_zones.library.length, true)}
+              modalHeaderActions={your_zones.library.length > 0 ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleLibraryAction('draw_library', 'player')}
+                    className="btn btn-secondary text-xs py-1 px-2"
+                  >
+                    Draw
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLibraryAction('shuffle_library', 'player')}
+                    className="btn btn-secondary text-xs py-1 px-2"
+                  >
+                    Shuffle
+                  </button>
+                </>
+              ) : undefined}
+              isModalOpen={isZoneModalOpen('library', 'player')}
+              onModalOpenChange={(open) => onZoneModalOpenChange('library', 'player', open)}
             />
           </div>
         </div>
@@ -619,6 +704,14 @@ export function BattlePhase({
             onAction={handleContextMenuAction}
             onMove={handleContextMenuMove}
             onClose={() => setContextMenu(null)}
+          />
+        )}
+        {zoneContextMenu && (
+          <ZoneActionMenu
+            position={zoneContextMenu.position}
+            onDraw={() => handleLibraryAction('draw_library', zoneContextMenu.owner)}
+            onShuffle={() => handleLibraryAction('shuffle_library', zoneContextMenu.owner)}
+            onClose={() => setZoneContextMenu(null)}
           />
         )}
       </div>

@@ -9,6 +9,7 @@ interface ActionMenuProps {
   battle: {
     your_zones: {
       battlefield: CardType[]
+      library: CardType[]
       tapped_card_ids: string[]
       face_down_card_ids: string[]
       counters: Record<string, Record<string, number>>
@@ -16,9 +17,11 @@ interface ActionMenuProps {
     }
     opponent_zones: {
       battlefield: CardType[]
+      library: CardType[]
       tapped_card_ids: string[]
     }
     current_turn_name: string | null
+    can_manipulate_opponent: boolean
   }
   playerName: string
   sideboardCount: number
@@ -30,6 +33,10 @@ interface ActionMenuProps {
   onShowSideboard: () => void
   onShowOpponentSideboard: () => void
   onCreateTreasure: () => void
+  onDrawLibrary: () => void
+  onShuffleLibrary: () => void
+  onDrawOpponentLibrary: () => void
+  onShuffleOpponentLibrary: () => void
   onPassTurn: () => void
   onRollDie: (sides: number) => void
   onClose: () => void
@@ -53,6 +60,10 @@ export function ActionMenu({
   onShowSideboard,
   onShowOpponentSideboard,
   onCreateTreasure,
+  onDrawLibrary,
+  onShuffleLibrary,
+  onDrawOpponentLibrary,
+  onShuffleOpponentLibrary,
   onPassTurn,
   onRollDie,
   onClose,
@@ -94,6 +105,8 @@ export function ActionMenu({
   const hasCounters = Object.keys(counters).length > 0
   const isAttached = card ? Object.values(attachments).some(children => children.includes(card.id)) : false
   const attachableCards = onBattlefield ? battle.your_zones.battlefield.filter(c => c.id !== card?.id) : []
+  const yourLibraryCount = battle.your_zones.library.length
+  const opponentLibraryCount = battle.opponent_zones.library.length
 
   return (
     <>
@@ -142,6 +155,7 @@ export function ActionMenu({
                 {zone !== 'battlefield' && <MenuItem label="Battlefield" onClick={() => handleMove('battlefield')} />}
                 {zone !== 'graveyard' && <MenuItem label="Graveyard" onClick={() => handleMove('graveyard')} />}
                 {zone !== 'exile' && <MenuItem label="Exile" onClick={() => handleMove('exile')} />}
+                {zone !== 'library' && <MenuItem label="Library" onClick={() => handleMove('library')} />}
               </Submenu>
             )}
 
@@ -223,6 +237,13 @@ export function ActionMenu({
               </>
             )}
 
+            {!isScrubbed && (
+              <MenuItem
+                label="Make Copy Token"
+                onClick={() => handleAction('copy_token')}
+              />
+            )}
+
             {onBattlefield && attachableCards.length > 0 && (
               <>
                 <MenuItem
@@ -263,6 +284,18 @@ export function ActionMenu({
         )}
         {opponentSideboardCount > 0 && (
           <MenuItem label={`View Opp. Sideboard (${opponentSideboardCount})`} onClick={() => handleGeneralAction(onShowOpponentSideboard)} />
+        )}
+        {yourLibraryCount > 0 && (
+          <>
+            <MenuItem label={`Draw from Library (${yourLibraryCount})`} onClick={() => handleGeneralAction(onDrawLibrary)} />
+            <MenuItem label={`Shuffle Library (${yourLibraryCount})`} onClick={() => handleGeneralAction(onShuffleLibrary)} />
+          </>
+        )}
+        {battle.can_manipulate_opponent && opponentLibraryCount > 0 && (
+          <>
+            <MenuItem label={`Draw Opp. Library (${opponentLibraryCount})`} onClick={() => handleGeneralAction(onDrawOpponentLibrary)} />
+            <MenuItem label={`Shuffle Opp. Library (${opponentLibraryCount})`} onClick={() => handleGeneralAction(onShuffleOpponentLibrary)} />
+          </>
         )}
 
         <MenuDivider />

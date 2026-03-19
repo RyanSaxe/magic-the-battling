@@ -3,6 +3,8 @@ import type { BattleView, Card as CardType } from "../../types";
 import type { VoiceChatState } from "../../hooks/useVoiceChat";
 import { UpgradeStack } from "./UpgradeStack";
 import { MicToggle } from "./MicToggle";
+import { getRevealedAppliedUpgrades } from "../../utils/upgrades";
+import { bestFit, type ZoneDims } from "../../hooks/cardSizeUtils";
 
 interface BattleSidebarContentProps {
   currentBattle: BattleView;
@@ -19,8 +21,9 @@ interface BattleSidebarContentProps {
   onCreateOpponentTreasure?: () => void;
   onUntapOpponentAll?: () => void;
   onPassOpponentTurn?: () => void;
-  handZoneHeight?: number | null;
+  topSectionHeight?: number | null;
   middleLaneHeight?: number | null;
+  overlayTopInset?: number;
   voiceChat?: {
     state: VoiceChatState;
     toggleSelfMute: () => void;
@@ -97,29 +100,18 @@ function LifeCounter({
   );
 }
 
-const ASPECT_RATIO = 7 / 5
 const GAP = 8
-const PADDING = 12
 const MIN_DIMS = { width: 50, height: 70 }
-const MAX_DIMS = { width: 130, height: 182 }
+const SECTION_GUTTER = 12
 
-function computeUpgradeDims(
+function resolveUpgradeDims(
   count: number,
   container: { width: number; height: number } | null,
-): { width: number; height: number } {
-  if (!container || count === 0) return MIN_DIMS
-  const availW = container.width - PADDING * 2
-  const availH = container.height - PADDING
-  let w = Math.floor((availW - GAP * (count - 1)) / count)
-  let h = Math.round(w * ASPECT_RATIO)
-  if (h > availH) {
-    h = availH
-    w = Math.round(h / ASPECT_RATIO)
-  }
-  return {
-    width: Math.max(MIN_DIMS.width, Math.min(MAX_DIMS.width, w)),
-    height: Math.max(MIN_DIMS.height, Math.min(MAX_DIMS.height, Math.round(w * ASPECT_RATIO))),
-  }
+): ZoneDims {
+  if (!container || count === 0) return { ...MIN_DIMS, rows: 1, columns: 1 }
+  const availWidth = Math.max(1, container.width)
+  const availHeight = Math.max(1, container.height)
+  return bestFit(count, availWidth, availHeight, GAP, availWidth, 1)
 }
 
 function PlayerSection({
@@ -142,24 +134,186 @@ function PlayerSection({
     return () => obs.disconnect()
   }, [])
 
-  const appliedUpgrades = upgrades.filter((u) => u.upgrade_target);
+  const appliedUpgrades = getRevealedAppliedUpgrades(upgrades);
 
   if (appliedUpgrades.length === 0) return null;
 
-  const dims = computeUpgradeDims(appliedUpgrades.length, containerDims)
+  const dims = resolveUpgradeDims(appliedUpgrades.length, containerDims)
 
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col ${isReversed ? 'justify-end' : 'justify-start'} h-full`}
+      className={`h-full overflow-hidden`}
     >
-      <div className="flex gap-2 flex-wrap justify-center">
+      <div
+        className={`grid h-full justify-center gap-2 ${isReversed ? "content-end" : "content-start"}`}
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(1, dims.columns)}, ${dims.width}px)`,
+        }}
+      >
         {appliedUpgrades.map((upgrade) => (
-          <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={dims} />
+          <UpgradeStack
+            key={upgrade.id}
+            upgrade={upgrade}
+            dimensions={{ width: dims.width, height: dims.height }}
+          />
         ))}
       </div>
     </div>
   );
+}
+
+function ActionButtonsRow({
+  onCreateTreasure,
+  onUntapAll,
+  onPassTurn,
+  passDisabled,
+}: {
+  onCreateTreasure?: () => void;
+  onUntapAll?: () => void;
+  onPassTurn?: () => void;
+  passDisabled: boolean;
+}) {
+  if (!onCreateTreasure && !onUntapAll && !onPassTurn) {
+    return null
+  }
+
+  return (
+    <div className="flex gap-2">
+      {onCreateTreasure && (
+        <button
+          onClick={onCreateTreasure}
+          className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+        >
+          Treasure
+        </button>
+      )}
+      {onUntapAll && (
+        <button
+          onClick={onUntapAll}
+          className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+        >
+          Untap
+        </button>
+      )}
+      {onPassTurn && (
+        <button
+          onClick={onPassTurn}
+          disabled={passDisabled}
+          className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
+            !passDisabled
+              ? "bg-indigo-600 hover:bg-indigo-500"
+              : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
+          }`}
+        >
+          Pass
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ControlsPanel({
+  opponentName,
+  playerName,
+  opponentLife,
+  yourLife,
+  onOpponentLifeChange,
+  onYourLifeChange,
+  isYourTurn,
+  currentTurnName,
+  voiceChat,
+  showTopDivider,
+}: {
+  opponentName: string;
+  playerName: string;
+  opponentLife: number;
+  yourLife: number;
+  onOpponentLifeChange: (life: number) => void;
+  onYourLifeChange: (life: number) => void;
+  isYourTurn: boolean;
+  currentTurnName: string | null;
+  voiceChat?: BattleSidebarContentProps["voiceChat"];
+  showTopDivider: boolean;
+}) {
+  return (
+    <div
+      className="relative grid h-full min-h-0 w-full grid-rows-[1fr_auto_1fr] overflow-hidden"
+      style={{ background: 'var(--chrome-modal)' }}
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-[2px]"
+        style={{
+          boxShadow:
+            'inset 0 10px 18px -14px rgba(255, 236, 181, 0.18), inset 0 0 24px rgba(0, 0, 0, 0.22)',
+        }}
+      />
+      {showTopDivider && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
+        />
+      )}
+      <div className="relative z-10 flex min-h-0 flex-col items-center justify-center gap-2 px-3 py-2">
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-1.5 mb-1">
+            <span className="text-xs text-gray-400 uppercase truncate">
+              {opponentName}
+            </span>
+            {voiceChat && voiceChat.state.peers.some((p) => p.name === opponentName) && (
+              <MicToggle
+                muted={voiceChat.state.mutedPeers.has(opponentName)}
+                onClick={() => voiceChat.togglePeerMute(opponentName)}
+              />
+            )}
+          </div>
+          <div className="flex justify-center">
+            <LifeCounter
+              life={opponentLife}
+              onChange={onOpponentLifeChange}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="relative z-10 flex flex-col items-center justify-center gap-1 px-3 py-1 text-center text-xs">
+        {currentTurnName && (
+          isYourTurn ? (
+            <span className="text-green-400">It is your turn</span>
+          ) : (
+            <span className="text-amber-400">Opponent's turn</span>
+          )
+        )}
+      </div>
+
+      <div className="relative z-10 flex min-h-0 flex-col items-center justify-center gap-2 px-3 py-2">
+        <div className="text-center">
+          <div className="flex justify-center">
+            <LifeCounter life={yourLife} onChange={onYourLifeChange} />
+          </div>
+          <div className="flex items-center justify-center gap-1.5 mt-1">
+            <span className="text-xs text-gray-400 uppercase truncate">
+              {playerName}
+            </span>
+            {voiceChat && voiceChat.state.peers.length > 0 && (
+              <MicToggle
+                muted={voiceChat.state.isMuted}
+                onClick={() => voiceChat.toggleSelfMute()}
+                connectionColor={(() => {
+                  const { peers } = voiceChat.state
+                  if (peers.some((p) => p.connectionState === 'connected')) return 'bg-green-500'
+                  if (peers.some((p) => p.connectionState === 'connecting')) return 'bg-yellow-500'
+                  if (peers.every((p) => p.connectionState === 'failed')) return 'bg-red-500'
+                  return null
+                })()}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function BattleSidebarContent({
@@ -177,8 +331,9 @@ export function BattleSidebarContent({
   onCreateOpponentTreasure,
   onUntapOpponentAll,
   onPassOpponentTurn,
-  handZoneHeight = null,
+  topSectionHeight = null,
   middleLaneHeight = null,
+  overlayTopInset = 0,
   voiceChat,
 }: BattleSidebarContentProps) {
   const { opponent_name, current_turn_name, opponent_zones } =
@@ -186,184 +341,154 @@ export function BattleSidebarContent({
 
   const isYourTurn = current_turn_name === playerName;
   const hasMeasuredMiddleLane = middleLaneHeight != null;
+  const hasMeasuredLayout = topSectionHeight != null && middleLaneHeight != null;
+  const hasOpponentActions = !!canManipulateOpponent && !!(onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn)
+  const hasPlayerActions = !!(onCreateTreasure || onUntapAll || onPassTurn)
+
+  if (hasMeasuredLayout) {
+    const totalTopSectionHeight = topSectionHeight + overlayTopInset
+    const controlsTop = totalTopSectionHeight
+    const controlsBottom = controlsTop + middleLaneHeight
+
+    return (
+      <div className="relative h-full">
+        <div
+          className="absolute inset-x-0 top-0 overflow-hidden"
+          style={{ height: totalTopSectionHeight }}
+        >
+          <div
+            className="grid h-full min-h-0 px-3 pt-3 pb-3"
+            style={{
+              gap: SECTION_GUTTER,
+              gridTemplateRows: hasOpponentActions ? "minmax(0,1fr) auto" : "minmax(0,1fr)",
+            }}
+          >
+            <div className="min-h-0">
+              <PlayerSection
+                upgrades={opponent_zones.upgrades}
+                isReversed
+              />
+            </div>
+            {hasOpponentActions && (
+              <ActionButtonsRow
+                onCreateTreasure={onCreateOpponentTreasure}
+                onUntapAll={onUntapOpponentAll}
+                onPassTurn={onPassOpponentTurn}
+                passDisabled={isYourTurn}
+              />
+            )}
+          </div>
+        </div>
+
+        <div
+          className="absolute inset-x-0 min-h-0"
+          style={{ top: controlsTop, height: middleLaneHeight }}
+        >
+          <ControlsPanel
+            opponentName={opponent_name}
+            playerName={playerName}
+            opponentLife={opponentLife}
+            yourLife={yourLife}
+            onOpponentLifeChange={onOpponentLifeChange}
+            onYourLifeChange={onYourLifeChange}
+            isYourTurn={isYourTurn}
+            currentTurnName={current_turn_name}
+            voiceChat={voiceChat}
+            showTopDivider
+          />
+        </div>
+
+        <div
+          className="absolute inset-x-0 bottom-0 min-h-0 overflow-hidden"
+          style={{ top: controlsBottom }}
+        >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
+          />
+          <div
+            className="grid h-full min-h-0 px-3 pt-3 pb-3"
+            style={{
+              gap: SECTION_GUTTER,
+              gridTemplateRows: hasPlayerActions ? "auto minmax(0,1fr)" : "minmax(0,1fr)",
+            }}
+          >
+            {hasPlayerActions && (
+              <ActionButtonsRow
+                onCreateTreasure={onCreateTreasure}
+                onUntapAll={onUntapAll}
+                onPassTurn={onPassTurn}
+                passDisabled={!isYourTurn}
+              />
+            )}
+            <div className="min-h-0">
+              <PlayerSection
+                upgrades={selfUpgrades}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full">
       {/* Opponent section - top */}
       <div
-        className={`${handZoneHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden pb-3 pl-3 pr-3 ${
+        className={`${topSectionHeight != null ? "box-border shrink-0" : "flex-1"} overflow-hidden ${
           hasMeasuredMiddleLane
             ? ""
             : "border-b border-[var(--gold-border-opaque)]"
         }`}
-        style={handZoneHeight != null ? { height: handZoneHeight } : undefined}
+        style={topSectionHeight != null ? { height: topSectionHeight } : undefined}
       >
-        <PlayerSection
-          upgrades={opponent_zones.upgrades}
-          isReversed
-        />
+        <div
+          className="grid h-full min-h-0 px-3 pt-3 pb-3"
+          style={{
+            gap: SECTION_GUTTER,
+            gridTemplateRows: hasOpponentActions ? "minmax(0,1fr) auto" : "minmax(0,1fr)",
+          }}
+        >
+          <div className="min-h-0">
+            <PlayerSection
+              upgrades={opponent_zones.upgrades}
+              isReversed
+            />
+          </div>
+          {hasOpponentActions && (
+            <ActionButtonsRow
+              onCreateTreasure={onCreateOpponentTreasure}
+              onUntapAll={onUntapOpponentAll}
+              onPassTurn={onPassOpponentTurn}
+              passDisabled={isYourTurn}
+            />
+          )}
+        </div>
       </div>
 
       {/* Controls panel */}
       <div
         className={`${middleLaneHeight != null ? "box-border shrink-0" : "flex-1"} min-h-0`}
-        style={
-          middleLaneHeight != null
-            ? { height: middleLaneHeight }
-            : undefined
-        }
+        style={middleLaneHeight != null ? { height: middleLaneHeight } : undefined}
       >
-        <div
-          className="relative grid h-full min-h-0 w-full grid-rows-[1fr_auto_1fr] overflow-hidden"
-          style={{ background: 'var(--chrome-modal)' }}
-        >
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-[2px]"
-            style={{
-              boxShadow:
-                'inset 0 10px 18px -14px rgba(255, 236, 181, 0.18), inset 0 0 24px rgba(0, 0, 0, 0.22)',
-            }}
-          />
-          {middleLaneHeight != null && (
-            <>
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
-              />
-            </>
-          )}
-            <div className="relative z-10 flex min-h-0 flex-col justify-between gap-3 p-3 pb-2">
-              {canManipulateOpponent && (onCreateOpponentTreasure || onUntapOpponentAll || onPassOpponentTurn) && (
-                <div className="flex gap-2">
-                  {onCreateOpponentTreasure && (
-                    <button
-                      onClick={onCreateOpponentTreasure}
-                      className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-                    >
-                      Treasure
-                    </button>
-                  )}
-                  {onUntapOpponentAll && (
-                    <button
-                      onClick={onUntapOpponentAll}
-                      className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-                    >
-                      Untap
-                    </button>
-                  )}
-                  {onPassOpponentTurn && (
-                    <button
-                      onClick={onPassOpponentTurn}
-                      disabled={isYourTurn}
-                      className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
-                        !isYourTurn
-                          ? "bg-indigo-600 hover:bg-indigo-500"
-                          : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
-                      }`}
-                    >
-                      Pass
-                    </button>
-                  )}
-                </div>
-              )}
-
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1.5 mb-1">
-                  <span className="text-xs text-gray-400 uppercase truncate">
-                    {opponent_name}
-                  </span>
-                  {voiceChat && voiceChat.state.peers.some(p => p.name === opponent_name) && (
-                    <MicToggle
-                      muted={voiceChat.state.mutedPeers.has(opponent_name)}
-                      onClick={() => voiceChat.togglePeerMute(opponent_name)}
-                    />
-                  )}
-                </div>
-                <div className="flex justify-center">
-                  <LifeCounter
-                    life={opponentLife}
-                    onChange={onOpponentLifeChange}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="relative z-10 flex flex-col items-center justify-center gap-1 px-3 py-1 text-center text-xs">
-              {current_turn_name && (
-                isYourTurn ? (
-                  <span className="text-green-400">It is your turn</span>
-                ) : (
-                  <span className="text-amber-400">Opponent's turn</span>
-                )
-              )}
-            </div>
-
-            <div className="relative z-10 flex min-h-0 flex-col justify-between gap-3 p-3 pt-2">
-              <div className="text-center">
-                <div className="flex justify-center">
-                  <LifeCounter life={yourLife} onChange={onYourLifeChange} />
-                </div>
-                <div className="flex items-center justify-center gap-1.5 mt-1">
-                  <span className="text-xs text-gray-400 uppercase truncate">
-                    {playerName}
-                  </span>
-                  {voiceChat && voiceChat.state.peers.length > 0 && (
-                    <MicToggle
-                      muted={voiceChat.state.isMuted}
-                      onClick={() => voiceChat.toggleSelfMute()}
-                      connectionColor={(() => {
-                        const { peers } = voiceChat.state
-                        if (peers.some(p => p.connectionState === 'connected')) return 'bg-green-500'
-                        if (peers.some(p => p.connectionState === 'connecting')) return 'bg-yellow-500'
-                        if (peers.every(p => p.connectionState === 'failed')) return 'bg-red-500'
-                        return null
-                      })()}
-                    />
-                  )}
-                </div>
-              </div>
-
-              {(onCreateTreasure || onUntapAll || onPassTurn) && (
-                <div className="flex gap-2">
-                  {onCreateTreasure && (
-                    <button
-                      onClick={onCreateTreasure}
-                      className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-                    >
-                      Treasure
-                    </button>
-                  )}
-                  {onUntapAll && (
-                    <button
-                      onClick={onUntapAll}
-                      className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-                    >
-                      Untap
-                    </button>
-                  )}
-                  {onPassTurn && (
-                    <button
-                      onClick={onPassTurn}
-                      disabled={!isYourTurn}
-                      className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
-                        isYourTurn
-                          ? "bg-indigo-600 hover:bg-indigo-500"
-                          : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
-                      }`}
-                    >
-                      Pass
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-        </div>
+        <ControlsPanel
+          opponentName={opponent_name}
+          playerName={playerName}
+          opponentLife={opponentLife}
+          yourLife={yourLife}
+          onOpponentLifeChange={onOpponentLifeChange}
+          onYourLifeChange={onYourLifeChange}
+          isYourTurn={isYourTurn}
+          currentTurnName={current_turn_name}
+          voiceChat={voiceChat}
+          showTopDivider={middleLaneHeight != null}
+        />
       </div>
 
       {/* Your section - bottom */}
       <div
-        className={`relative min-h-0 flex-1 overflow-hidden p-3 ${
+        className={`relative min-h-0 flex-1 overflow-hidden ${
           hasMeasuredMiddleLane
             ? ""
             : "border-t border-[var(--gold-border-opaque)]"
@@ -375,9 +500,27 @@ export function BattleSidebarContent({
             className="pointer-events-none absolute inset-x-0 top-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
           />
         )}
-        <PlayerSection
-          upgrades={selfUpgrades}
-        />
+        <div
+          className="grid h-full min-h-0 px-3 pt-3 pb-3"
+          style={{
+            gap: SECTION_GUTTER,
+            gridTemplateRows: hasPlayerActions ? "auto minmax(0,1fr)" : "minmax(0,1fr)",
+          }}
+        >
+          {hasPlayerActions && (
+            <ActionButtonsRow
+              onCreateTreasure={onCreateTreasure}
+              onUntapAll={onUntapAll}
+              onPassTurn={onPassTurn}
+              passDisabled={!isYourTurn}
+            />
+          )}
+          <div className="min-h-0">
+            <PlayerSection
+              upgrades={selfUpgrades}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );

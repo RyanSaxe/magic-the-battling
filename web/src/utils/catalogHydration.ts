@@ -30,6 +30,7 @@ function makeFallbackCard(ref: CardRef): Card {
     tokens: [],
     elo: null,
     upgrade_target: null,
+    is_revealed: ref.is_revealed !== false,
     oracle_text: null,
     colors: [],
     keywords: [],
@@ -72,6 +73,7 @@ function hydrateCatalogCard(
     tokens,
     elo: null,
     upgrade_target: null,
+    is_revealed: true,
     oracle_text: def.oracle_text,
     colors: def.colors,
     keywords: def.keywords,
@@ -122,6 +124,7 @@ function hydrateCard(
   return {
     ...base,
     original_owner: ref.original_owner,
+    is_revealed: ref.is_revealed !== false,
     upgrade_target: ref.upgrade_target_id ? hydrateOptionalCard(refsById.get(ref.upgrade_target_id) ?? null, catalog, refsById, nextStack) : null,
   }
 }

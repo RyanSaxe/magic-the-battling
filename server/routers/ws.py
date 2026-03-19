@@ -33,6 +33,7 @@ ACTION_REQUIRED_PHASES: dict[str, str] = {
     "build_set_companion": "build",
     "build_remove_companion": "build",
     "battle_move": "battle",
+    "battle_reveal_upgrade": "battle",
     "battle_submit_result": "battle",
     "battle_update_card_state": "battle",
     "battle_update_life": "battle",
@@ -562,6 +563,18 @@ async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
             await connection_manager.send_error(websocket, "Cannot kick player")
         return True
 
+    if action == "set_target_player_count":
+        success, error = game_manager.set_target_player_count(
+            game_id,
+            player_id,
+            int(payload.get("target_player_count", 0)),
+        )
+        if success:
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, error or "Cannot change player cap")
+        return True
+
     return False
 
 
@@ -617,6 +630,8 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
                 payload.get("from_owner", "player"),
                 payload.get("to_owner", "player"),
             )
+        case "battle_reveal_upgrade":
+            return game_manager.handle_battle_reveal_upgrade(game, player, payload["upgrade_id"])
         case "battle_submit_result":
             db_session = db.SessionLocal()
             try:

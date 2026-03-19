@@ -3,10 +3,11 @@ from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
+from conftest import setup_battle_ready
 
 from mtb.models.cards import Battler, Card
 from mtb.models.game import Game, Puppet, StaticOpponent, create_game, set_battler
-from mtb.phases import battle
+from mtb.phases import battle, reward
 from server.db.models import PlayerGameHistory
 from server.routers.ws import ConnectionManager
 from server.runtime_config import MAX_GAME_START_QUEUE
@@ -75,6 +76,47 @@ def test_find_historical_players_randomizes_within_elo_range(game_manager, mock_
 
     unique_orderings = len(set(results_sets))
     assert unique_orderings > 1, "Expected varied results across multiple calls"
+
+
+def test_battle_reveal_upgrade_updates_public_visibility(game_manager, card_factory, upgrade_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    target = card_factory("alice-card")
+    upgrade = upgrade_factory("hidden-upgrade")
+    alice.hand = [target]
+    alice.upgrades = [upgrade]
+    reward.apply_upgrade_to_card(alice, upgrade, target)
+    battle.start(game, alice, bob)
+
+    game_manager._active_games["g1"] = game
+    game_manager._player_to_game["pid_alice"] = "g1"
+    game_manager._player_to_game["pid_bob"] = "g1"
+    game_manager._player_id_to_name["pid_alice"] = "Alice"
+    game_manager._player_id_to_name["pid_bob"] = "Bob"
+
+    alice_state_before = game_manager.get_game_state("g1", "pid_alice")
+    bob_state_before = game_manager.get_game_state("g1", "pid_bob")
+
+    assert alice_state_before is not None
+    assert bob_state_before is not None
+    assert alice_state_before.self_player.upgrades[0].is_revealed is False
+    assert alice_state_before.current_battle is not None
+    assert bob_state_before.current_battle is not None
+    assert alice_state_before.current_battle.your_zones.upgrades[0].is_revealed is False
+    assert bob_state_before.current_battle.opponent_zones.upgrades == []
+    assert next(player for player in bob_state_before.players if player.name == "Alice").upgrades == []
+
+    assert game_manager.handle_battle_reveal_upgrade(game, alice, upgrade.id) is True
+
+    bob_state_after = game_manager.get_game_state("g1", "pid_bob")
+    assert bob_state_after is not None
+    assert bob_state_after.current_battle is not None
+    assert len(bob_state_after.current_battle.opponent_zones.upgrades) == 1
+    assert bob_state_after.current_battle.opponent_zones.upgrades[0].is_revealed is True
+    assert len(next(player for player in bob_state_after.players if player.name == "Alice").upgrades) == 1
 
 
 def test_find_historical_players_filters_by_elo_range(game_manager, mock_db_session):
@@ -342,6 +384,53 @@ class TestConstructedLobbyRules:
         assert lobby.play_mode == "constructed"
         assert lobby.players[0].battler_id == "alice_deck"
         assert lobby.players[0].battler_status == "ready"
+        assert lobby.target_player_count == 4
+
+    def test_join_game_respects_target_player_cap(self, game_manager):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", target_player_count=2)
+
+        joined = game_manager.join_game(pending.join_code, "Bob", "bob_pid")
+        blocked = game_manager.join_game(pending.join_code, "Charlie", "charlie_pid")
+
+        assert joined is not None
+        assert blocked is None
+
+    def test_set_target_player_count_rejects_below_occupied_slots(self, game_manager):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", target_player_count=4)
+        game_manager.join_game(pending.join_code, "Bob", "bob_pid")
+
+        success, error = game_manager.set_target_player_count(pending.game_id, "alice_pid", 1)
+
+        assert success is False
+        assert error is not None
+
+    def test_set_target_player_count_updates_lobby_state(self, game_manager):
+        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", target_player_count=4)
+
+        success, error = game_manager.set_target_player_count(pending.game_id, "alice_pid", 6)
+        lobby = game_manager.get_lobby_state(pending.game_id)
+
+        assert success is True
+        assert error is None
+        assert lobby is not None
+        assert lobby.target_player_count == 6
+
+    def test_static_opponent_library_is_in_battle_view(self, game_manager, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        alice = game.players[0]
+        setup_battle_ready(alice)
+
+        static_opp = StaticOpponent(
+            name="Bot",
+            hand=[],
+            chosen_basics=["Plains", "Island", "Mountain"],
+        )
+        battle_state = battle.start(game, alice, static_opp)
+        battle_state.opponent_zones.library = [card_factory("LibCard")]
+
+        battle_view = game_manager._make_battle_view(battle_state, alice, game)
+
+        assert len(battle_view.opponent_zones.library) == 1
 
     def test_clear_player_battler_resets_state_and_unreadies(self, game_manager, card_factory):
         pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")

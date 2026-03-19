@@ -66,8 +66,6 @@ def _create_zones(player: Player | StaticOpponent) -> Zones:
     treasures = [_create_treasure_token() for _ in range(player.treasures)]
     command_zone_ids = {c.id for c in player.command_zone}
     sideboard_display = [c for c in player.sideboard if c.id not in command_zone_ids]
-    # TODO(v1.0): Split companion and library storage; command_zone currently doubles
-    # as the battle "library" rendering source to avoid historical data regressions.
     submitted = player.hand + player.sideboard
     revealed_card_ids = [c.id for c in player.command_zone]
 
@@ -77,9 +75,9 @@ def _create_zones(player: Player | StaticOpponent) -> Zones:
 
     return Zones(
         battlefield=basics + treasures,
+        exile=player.command_zone.copy(),
         hand=player.hand.copy(),
         sideboard=sideboard_display,
-        command_zone=player.command_zone.copy(),
         upgrades=player.upgrades.copy(),
         treasures=player.treasures,
         submitted_cards=submitted,
@@ -713,6 +711,60 @@ def _handle_create_treasure(zones: Zones, _card_id: str, _data: dict) -> bool:
     return True
 
 
+def _handle_draw_library(zones: Zones, _card_id: str, _data: dict) -> bool:
+    if not zones.library:
+        return False
+    zones.hand.append(zones.library.pop())
+    return True
+
+
+def _handle_shuffle_library(zones: Zones, _card_id: str, _data: dict) -> bool:
+    if not zones.library:
+        return False
+    random.shuffle(zones.library)
+    return True
+
+
+def _find_card_in_zones(zones: Zones, card_id: str) -> Card | None:
+    for zone_name in _SEARCHABLE_ZONES:
+        for card in zones.get_zone(zone_name):
+            if card.id == card_id:
+                return card
+    for card in zones.spawned_tokens:
+        if card.id == card_id:
+            return card
+    return None
+
+
+def _handle_copy_token(zones: Zones, card_id: str, _data: dict) -> bool:
+    source = _find_card_in_zones(zones, card_id)
+    if source is None or not source.name:
+        return False
+
+    sid_seed = source.scryfall_id or source.name or source.id
+    token = Card(
+        id=f"token-{uuid4().hex[:8]}",
+        scryfall_id=f"token-copy-{hashlib.md5(sid_seed.encode()).hexdigest()[:12]}",
+        name=source.name,
+        image_url=source.image_url,
+        flip_image_url=source.flip_image_url,
+        png_url=source.png_url,
+        flip_png_url=source.flip_png_url,
+        type_line=source.type_line,
+        oracle_text=source.oracle_text,
+        colors=source.colors.copy(),
+        cmc=source.cmc,
+        original_owner=source.original_owner,
+    )
+    zones.spawned_tokens.append(token)
+    zones.battlefield.append(token)
+    if card_id in zones.flipped_card_ids:
+        zones.flipped_card_ids.append(token.id)
+    if card_id in zones.face_down_card_ids:
+        zones.face_down_card_ids.append(token.id)
+    return True
+
+
 CardStateHandler = Callable[[Zones, str, dict], bool]
 
 _CARD_STATE_HANDLERS: dict[str, CardStateHandler] = {
@@ -725,10 +777,21 @@ _CARD_STATE_HANDLERS: dict[str, CardStateHandler] = {
     "detach": _handle_detach,
     "spawn": _handle_spawn,
     "create_treasure": _handle_create_treasure,
+    "draw_library": _handle_draw_library,
+    "shuffle_library": _handle_shuffle_library,
+    "copy_token": _handle_copy_token,
 }
 
 
-_SEARCHABLE_ZONES: list[ZoneName] = ["battlefield", "hand", "graveyard", "exile", "sideboard", "command_zone"]
+_SEARCHABLE_ZONES: list[ZoneName] = [
+    "battlefield",
+    "hand",
+    "graveyard",
+    "exile",
+    "sideboard",
+    "command_zone",
+    "library",
+]
 
 
 def get_zones_for_card(battle: Battle, player: Player, card_id: str) -> tuple[Zones, bool]:
@@ -757,7 +820,7 @@ def get_zones_for_card(battle: Battle, player: Player, card_id: str) -> tuple[Zo
     raise ValueError(f"Card {card_id} not found")
 
 
-_ACTIONS_WITHOUT_CARD = {"spawn", "create_treasure"}
+_ACTIONS_WITHOUT_CARD = {"spawn", "create_treasure", "draw_library", "shuffle_library"}
 
 
 def update_card_state(

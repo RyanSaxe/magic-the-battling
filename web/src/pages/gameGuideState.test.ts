@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { matchesGuideCompletionTrigger, shouldBlockGuidesForBattleResolution } from "./gameGuideState";
+import {
+  isSubmitPopoverGuideStepActive,
+  matchesGuideCompletionTrigger,
+  shouldBlockGuidesForBattleResolution,
+  shouldDisableGameplayHotkeys,
+} from "./gameGuideState";
 
 describe("shouldBlockGuidesForBattleResolution", () => {
   it("blocks guides while a new resolution is queued but not yet shown", () => {
@@ -86,6 +91,55 @@ describe("matchesGuideCompletionTrigger", () => {
         guideId: "reward",
         stepId: "continue",
       },
+    })).toBe(false);
+  });
+});
+
+describe("isSubmitPopoverGuideStepActive", () => {
+  it("matches the build play/draw guide step", () => {
+    expect(isSubmitPopoverGuideStepActive({
+      guideId: "build_play_draw",
+      stepId: "play-draw",
+    }, "build")).toBe(true);
+  });
+
+  it("matches the battle submit-result guide step", () => {
+    expect(isSubmitPopoverGuideStepActive({
+      guideId: "battle_result_submit",
+      stepId: "result-submit",
+    }, "battle")).toBe(true);
+  });
+
+  it("does not match unrelated guide steps", () => {
+    expect(isSubmitPopoverGuideStepActive({
+      guideId: "reward",
+      stepId: "continue",
+    }, "build")).toBe(false);
+  });
+});
+
+describe("shouldDisableGameplayHotkeys", () => {
+  it("disables hotkeys when a gameplay modal is already open", () => {
+    expect(shouldDisableGameplayHotkeys({
+      modalOpen: true,
+      visibleGuideStep: null,
+    })).toBe(true);
+  });
+
+  it("disables hotkeys while a guide is visible", () => {
+    expect(shouldDisableGameplayHotkeys({
+      modalOpen: false,
+      visibleGuideStep: {
+        guideId: "battle_result_submit",
+        stepId: "result-submit",
+      },
+    })).toBe(true);
+  });
+
+  it("leaves hotkeys enabled when neither a modal nor guide is visible", () => {
+    expect(shouldDisableGameplayHotkeys({
+      modalOpen: false,
+      visibleGuideStep: null,
     })).toBe(false);
   });
 });

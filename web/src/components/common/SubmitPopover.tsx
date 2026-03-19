@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { shouldCloseSubmitPopoverOnOutsideClick } from "./submitPopoverState";
 
 interface SubmitPopoverOption {
   label: string;
@@ -11,6 +12,7 @@ interface SubmitPopoverProps {
   onClose: () => void;
   guideTarget?: string;
   closeOnOutsideClick?: boolean;
+  ignoreOutsideClickSelector?: string;
 }
 
 export function SubmitPopover({
@@ -18,12 +20,28 @@ export function SubmitPopover({
   onClose,
   guideTarget,
   closeOnOutsideClick = true,
+  ignoreOutsideClickSelector,
 }: SubmitPopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
-      if (closeOnOutsideClick && ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as Node | null;
+      if (!ref.current || !target) {
+        return;
+      }
+
+      const clickedIgnoredElement = !!(
+        ignoreOutsideClickSelector
+        && target instanceof Element
+        && target.closest(ignoreOutsideClickSelector)
+      );
+
+      if (shouldCloseSubmitPopoverOnOutsideClick({
+        closeOnOutsideClick,
+        clickedInsidePopover: ref.current.contains(target),
+        clickedIgnoredElement,
+      })) {
         onClose();
       }
     };
@@ -36,7 +54,7 @@ export function SubmitPopover({
       document.removeEventListener("mousedown", handleClick);
       document.removeEventListener("keydown", handleKey);
     };
-  }, [closeOnOutsideClick, onClose]);
+  }, [closeOnOutsideClick, ignoreOutsideClickSelector, onClose]);
 
   return (
     <div

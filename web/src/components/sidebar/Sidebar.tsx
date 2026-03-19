@@ -11,6 +11,10 @@ interface SidebarProps {
   useUpgrades?: boolean;
   isMobile?: boolean;
   renderMicToggle?: (player: PlayerView) => ReactNode;
+  overlayPadding?: {
+    top: number;
+    bottom: number;
+  };
 }
 
 export function Sidebar({
@@ -20,6 +24,7 @@ export function Sidebar({
   useUpgrades = true,
   isMobile = false,
   renderMicToggle,
+  overlayPadding,
 }: SidebarProps) {
   const { state, setRevealedPlayerName } = useContextStrip();
   const revealedPlayer = state.revealedPlayerName
@@ -66,12 +71,20 @@ export function Sidebar({
   const desktopDrawerPlayer = desktopDrawer.playerName
     ? players.find((player) => player.name === desktopDrawer.playerName) ?? null
     : null;
+  const hasOverlayPadding =
+    (overlayPadding?.top ?? 0) > 0 || (overlayPadding?.bottom ?? 0) > 0;
 
   return (
     <aside
       className={`relative w-[var(--sidebar-width)] h-full frame-chrome flex flex-col ${
         isMobile ? "overflow-hidden" : "overflow-visible"
+      } ${
+        shouldRenderDesktopDrawer ? "z-[45]" : ""
       }`}
+      style={overlayPadding ? {
+        paddingTop: overlayPadding.top,
+        paddingBottom: overlayPadding.bottom,
+      } : undefined}
       data-guide-target="sidebar-panel"
     >
       {shouldRenderDesktopDrawer && (
@@ -97,7 +110,11 @@ export function Sidebar({
           onClose={() => setRevealedPlayerName(null)}
         />
       ) : (
-        <div className="relative z-50 px-3 py-3 sm:py-0 overflow-auto flex-1 flex flex-col">
+        <div
+          className={`relative z-50 px-3 overflow-auto flex-1 flex flex-col ${
+            isMobile && !hasOverlayPadding ? "py-3" : "py-0"
+          }`}
+        >
           <PlayerList
             players={players}
             currentPlayerName={currentPlayer.name}

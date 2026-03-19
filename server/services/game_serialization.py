@@ -36,6 +36,7 @@ def card_to_ref(card: Card | None) -> CardRef | None:
         id=card.id,
         scryfall_id=card.scryfall_id,
         upgrade_target_id=card.upgrade_target.id if card.upgrade_target is not None else None,
+        is_revealed=card.is_revealed,
         original_owner=card.original_owner,
     )
 

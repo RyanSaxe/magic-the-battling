@@ -54,3 +54,81 @@ export function bestFit(
 
   return { width: minWidth, height: Math.round(minWidth * CARD_ASPECT_RATIO), rows: 1, columns: count }
 }
+
+function fitsWithinBounds(
+  dims: ZoneDims,
+  availWidth: number,
+  availHeight: number,
+  gap: number,
+): boolean {
+  const totalWidth = dims.columns * dims.width + gap * Math.max(0, dims.columns - 1)
+  const totalHeight = dims.rows * dims.height + gap * Math.max(0, dims.rows - 1)
+
+  return totalWidth <= availWidth && totalHeight <= availHeight
+}
+
+export function bestFitNoClip(
+  count: number,
+  availWidth: number,
+  availHeight: number,
+  gap: number,
+  maxWidth: number,
+  preferredMinWidth: number,
+): ZoneDims {
+  const preferred = bestFit(count, availWidth, availHeight, gap, maxWidth, preferredMinWidth)
+  if (fitsWithinBounds(preferred, availWidth, availHeight, gap)) {
+    return preferred
+  }
+
+  let bestScore = -1
+  let bestResult: ZoneDims | null = null
+
+  for (let rows = 1; rows <= count; rows++) {
+    const columns = Math.ceil(count / rows)
+    const widthByColumns = Math.floor((availWidth - gap * Math.max(0, columns - 1)) / columns)
+    const widthByRows = Math.floor(
+      (availHeight - gap * Math.max(0, rows - 1)) / (rows * CARD_ASPECT_RATIO),
+    )
+    const cardWidth = Math.floor(Math.min(maxWidth, widthByColumns, widthByRows))
+    if (cardWidth < 1) continue
+
+    const candidate = {
+      width: cardWidth,
+      height: Math.round(cardWidth * CARD_ASPECT_RATIO),
+      rows,
+      columns,
+    }
+
+    if (!fitsWithinBounds(candidate, availWidth, availHeight, gap)) continue
+
+    const totalHeight = rows * candidate.height + gap * Math.max(0, rows - 1)
+    const fill = availHeight > 0 ? Math.min(1, totalHeight / availHeight) : 0
+    const minWidthPenalty = candidate.width < preferredMinWidth ? 0.96 : 1
+    const score = candidate.width * Math.sqrt(fill) * Math.pow(0.90, rows - 1) * minWidthPenalty
+
+    if (score > bestScore) {
+      bestScore = score
+      bestResult = candidate
+    }
+  }
+
+  if (bestResult) return bestResult
+
+  const safeWidth = Math.max(
+    1,
+    Math.floor(
+      Math.min(
+        maxWidth,
+        availWidth,
+        availHeight / CARD_ASPECT_RATIO,
+      ),
+    ),
+  )
+
+  return {
+    width: safeWidth,
+    height: Math.max(1, Math.round(safeWidth * CARD_ASPECT_RATIO)),
+    rows: count,
+    columns: 1,
+  }
+}

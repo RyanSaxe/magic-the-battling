@@ -94,6 +94,10 @@ export function useGame(
     send('battle_move', { card_id: cardId, from_zone: fromZone, to_zone: toZone, from_owner: fromOwner, to_owner: toOwner })
   }, [send])
 
+  const battleRevealUpgrade = useCallback((upgradeId: string) => {
+    send('battle_reveal_upgrade', { upgrade_id: upgradeId })
+  }, [send])
+
   const battleSubmitResult = useCallback((result: string) => {
     send('battle_submit_result', { result })
   }, [send])
@@ -134,6 +138,10 @@ export function useGame(
     send('remove_puppet')
   }, [send])
 
+  const setTargetPlayerCount = useCallback((targetPlayerCount: number) => {
+    send('set_target_player_count', { target_player_count: targetPlayerCount })
+  }, [send])
+
   const kickPlayer = useCallback((targetPlayerId: string) => {
     send('kick_player', { target_player_id: targetPlayerId })
   }, [send])
@@ -160,6 +168,7 @@ export function useGame(
       clearBattler,
       addPuppet,
       removePuppet,
+      setTargetPlayerCount,
       kickPlayer,
       draftSwap,
       draftRoll,
@@ -172,6 +181,7 @@ export function useGame(
       buildSetCompanion,
       buildRemoveCompanion,
       battleMove,
+      battleRevealUpgrade,
       battleSubmitResult,
       battleUpdateCardState,
       battleUpdateLife,

@@ -7,6 +7,7 @@ const SANDBOX_ZONES: Set<ZoneName> = new Set([
   'battlefield',
   'graveyard',
   'exile',
+  'library',
   'command_zone',
   'sideboard',
 ])
@@ -25,14 +26,14 @@ interface UseDndActionsOptions {
 }
 
 const BATTLE_VALID_ZONES: Record<ZoneName, ZoneName[]> = {
-  hand: ['battlefield', 'graveyard', 'exile', 'command_zone'],
-  battlefield: ['hand', 'graveyard', 'exile', 'command_zone'],
-  graveyard: ['hand', 'battlefield', 'exile', 'command_zone'],
-  exile: ['hand', 'battlefield', 'graveyard', 'command_zone'],
-  sideboard: ['hand', 'battlefield', 'graveyard', 'exile', 'command_zone'],
+  hand: ['battlefield', 'graveyard', 'exile', 'library', 'command_zone'],
+  battlefield: ['hand', 'graveyard', 'exile', 'library', 'command_zone'],
+  graveyard: ['hand', 'battlefield', 'exile', 'library', 'command_zone'],
+  exile: ['hand', 'battlefield', 'graveyard', 'library', 'command_zone'],
+  sideboard: ['hand', 'battlefield', 'graveyard', 'exile', 'library', 'command_zone'],
   upgrades: [],
-  command_zone: ['hand', 'battlefield', 'graveyard', 'exile'],
-  library: [],
+  command_zone: ['hand', 'battlefield', 'graveyard', 'exile', 'library'],
+  library: ['hand', 'battlefield', 'graveyard', 'exile', 'command_zone'],
 }
 
 const BUILD_VALID_ZONES: Record<ZoneName, ZoneName[]> = {

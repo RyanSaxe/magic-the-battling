@@ -314,6 +314,8 @@ def join_game_by_code(request: JoinGameRequest):
 
     if request.player_name in pending.player_names:
         raise HTTPException(status_code=409, detail="Player name already taken")
+    if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
+        raise HTTPException(status_code=400, detail="Lobby is full")
 
     session = session_manager.create_session(pending.game_id)
     result = game_manager.join_game(
@@ -349,6 +351,8 @@ def join_game(game_id: str, request: JoinGameRequest):
 
     if request.player_name in pending.player_names:
         raise HTTPException(status_code=409, detail="Player name already taken")
+    if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
+        raise HTTPException(status_code=400, detail="Lobby is full")
 
     session = session_manager.create_session(game_id)
     result = game_manager.join_game(

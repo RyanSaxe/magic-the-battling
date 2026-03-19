@@ -12,6 +12,7 @@ import { TreasureCard } from "../../components/common/TreasureCard";
 import { PoisonCard } from "../../components/common/PoisonCard";
 import { CardGrid } from "../../components/common/CardGrid";
 import { LayoutResetControl } from "../../components/common/LayoutResetControl";
+import { UpgradeGrid } from "../../components/common/UpgradeGrid";
 import { ZoneLayout } from "../../components/common/ZoneLayout";
 import { useCardLayout, ZONE_LAYOUT_PADDING } from "../../hooks/useCardLayout";
 import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
@@ -52,7 +53,9 @@ interface BuildPhaseProps {
   onCardHover?: (cardId: string, zone: ZoneName) => void;
   onCardHoverEnd?: () => void;
   onQuickUpgrade?: (targetCardId: string) => void;
+  onQuickApplyUpgrade?: (upgradeId: string) => void;
   isMobile?: boolean;
+  showDesktopUpgradeRail?: boolean;
 }
 
 function syncHandSlots(
@@ -93,7 +96,9 @@ export function BuildPhase({
   onCardHover,
   onCardHoverEnd,
   onQuickUpgrade,
+  onQuickApplyUpgrade,
   isMobile = false,
+  showDesktopUpgradeRail = false,
 }: BuildPhaseProps) {
   const { self_player } = gameState;
   const maxHandSize = self_player.hand_size;
@@ -105,6 +110,7 @@ export function BuildPhase({
   const handZoneRef = useRef<HTMLDivElement | null>(null);
   const battlefieldZoneRef = useRef<HTMLDivElement | null>(null);
   const sideboardZoneRef = useRef<HTMLDivElement | null>(null);
+  const upgradesZoneRef = useRef<HTMLDivElement | null>(null);
   const pendingHandAddsRef = useRef(0);
   const pendingHandAddsTimeoutRef = useRef<number | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
@@ -202,6 +208,8 @@ export function BuildPhase({
     appliedUpgrades.filter((u) => u.upgrade_target!.id === cardId);
   const hasUnappliedUpgrade = self_player.upgrades.some((u) => !u.upgrade_target);
   const canQuickUpgrade = !locked && hasUnappliedUpgrade && !!onQuickUpgrade;
+  const hasDesktopUpgradeRail =
+    showDesktopUpgradeRail && self_player.upgrades.length > 0;
 
   const isCompanion = (card: CardType) =>
     card.oracle_text?.includes("Companion —") ?? false;
@@ -294,8 +302,13 @@ export function BuildPhase({
       hand: { count: maxHandSize },
       battlefield: { count: battlefieldCount, priority: "fill", maxRows: 1 },
       sideboard: { count: stableSBCount },
+      commandZone: { count: hasDesktopUpgradeRail ? self_player.upgrades.length : 0 },
     },
-    layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
+    layout: {
+      top: ["hand"],
+      bottomLeft: ["battlefield", "sideboard"],
+      bottomRight: hasDesktopUpgradeRail ? ["commandZone"] : [],
+    },
     ...ZONE_LAYOUT_PADDING,
     constraints,
   });
@@ -305,8 +318,13 @@ export function BuildPhase({
       hand: { count: maxHandSize },
       battlefield: { count: battlefieldCount, priority: "fill" as const, maxRows: 1 },
       sideboard: { count: stableSBCount },
+      commandZone: { count: hasDesktopUpgradeRail ? self_player.upgrades.length : 0 },
     },
-    layout: { top: ["hand"], bottomLeft: ["battlefield", "sideboard"] },
+    layout: {
+      top: ["hand"],
+      bottomLeft: ["battlefield", "sideboard"],
+      bottomRight: hasDesktopUpgradeRail ? ["commandZone"] : [],
+    },
     ...ZONE_LAYOUT_PADDING,
   };
 
@@ -317,17 +335,29 @@ export function BuildPhase({
     layoutConfig,
     measureInitialConstraints: () => {
       const handOuter = handZoneRef.current?.getBoundingClientRect().height ?? 0;
-      const battlefieldOuter =
-        battlefieldZoneRef.current?.getBoundingClientRect().height ?? 0;
+      const battlefieldRect = battlefieldZoneRef.current?.getBoundingClientRect();
       const sideboardOuter =
         sideboardZoneRef.current?.getBoundingClientRect().height ?? 0;
+      const upgradesRect = upgradesZoneRef.current?.getBoundingClientRect();
+      const battlefieldOuter = battlefieldRect?.height ?? 0;
+      const upgradesOuter = upgradesRect?.height ?? 0;
+      const battlefieldOuterWidth = battlefieldRect?.width ?? 0;
+      const upgradesOuterWidth = upgradesRect?.width ?? 0;
       const sectionGap = ZONE_LAYOUT_PADDING.sectionGap;
       const sectionPadV =
         ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom;
 
       const lowerOuter =
         battlefieldOuter + (hasSideboard ? sideboardOuter + sectionGap : 0);
-      const usableH = handOuter + lowerOuter;
+      const bottomOuter = Math.max(lowerOuter, upgradesOuter);
+      const usableH = handOuter + bottomOuter;
+      const totalBottomWidth =
+        battlefieldOuterWidth
+        + (hasDesktopUpgradeRail ? upgradesOuterWidth + sectionGap : 0);
+      const leftFraction =
+        hasDesktopUpgradeRail && totalBottomWidth > sectionGap
+          ? battlefieldOuterWidth / (totalBottomWidth - sectionGap)
+          : 0.7;
 
       let bottomLeftSplit = 0.5;
       if (hasSideboard) {
@@ -342,14 +372,14 @@ export function BuildPhase({
       return usableH > 0
         ? {
             topFraction: handOuter / usableH,
-            leftFraction: 0.7,
+            leftFraction,
             bottomLeftSplit,
             usableHeight: usableH,
             bottomInnerHeight: Math.max(
               0,
               lowerOuter - (hasSideboard ? sectionGap : 0) - (hasSideboard ? 2 * sectionPadV : sectionPadV),
             ),
-            usableWidth: containerSize.width,
+            usableWidth: totalBottomWidth > 0 ? totalBottomWidth : containerSize.width,
           }
         : null;
     },
@@ -364,6 +394,12 @@ export function BuildPhase({
     height: dims.battlefield.height,
   };
   const sbDims = { width: dims.sideboard.width, height: dims.sideboard.height };
+  const upgradeDims = {
+    width: dims.commandZone.width,
+    height: dims.commandZone.height,
+    rows: dims.commandZone.rows,
+    columns: dims.commandZone.columns,
+  };
 
   const emptySlotLabel = isMobile
     ? "Tap here and a card below to add that card to your hand"
@@ -391,6 +427,25 @@ export function BuildPhase({
         title="Upgrade (U)"
       >
         Upgrade
+      </button>
+    );
+  };
+
+  const renderUpgradeApplyButton = (upgrade: CardType) => {
+    if (locked || upgrade.upgrade_target || !onQuickApplyUpgrade) return null;
+
+    return (
+      <button
+        type="button"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-600 text-white shadow-md ring-1 ring-black/40 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-purple-500 transition-opacity duration-150"
+        onClick={(e) => {
+          e.stopPropagation();
+          onQuickApplyUpgrade(upgrade.id);
+        }}
+        aria-label={`Apply ${upgrade.name}`}
+        title="Apply"
+      >
+        Apply
       </button>
     );
   };
@@ -473,6 +528,7 @@ export function BuildPhase({
           hand: zoneFrames.hand.outerHeight,
           battlefield: zoneFrames.battlefield.outerHeight,
           sideboard: zoneFrames.sideboard.outerHeight,
+          upgrades: hasDesktopUpgradeRail ? zoneFrames.commandZone.outerHeight : undefined,
         } : null}
         zoneRefs={{
           hand: (node) => {
@@ -483,6 +539,9 @@ export function BuildPhase({
           },
           sideboard: (node) => {
             sideboardZoneRef.current = node;
+          },
+          upgrades: (node) => {
+            upgradesZoneRef.current = node;
           },
         }}
         overlay={
@@ -502,7 +561,7 @@ export function BuildPhase({
         hasHand={true}
         hasBattlefield={true}
         hasSideboard={hasSideboard}
-        hasUpgrades={false}
+        hasUpgrades={hasDesktopUpgradeRail}
         containerTargetId="build-workspace"
         dividerCallbacks={locked ? null : dividerCallbacks}
         zoneTargetIds={{
@@ -576,8 +635,17 @@ export function BuildPhase({
             })}
           </CardGrid>
         }
-        upgradesLabel={null}
-        upgradesContent={null}
+        upgradesLabel="Upgrades"
+        upgradesContent={
+          hasDesktopUpgradeRail ? (
+            <UpgradeGrid
+              upgrades={self_player.upgrades}
+              fallbackDims={upgradeDims}
+              frame={zoneFrames?.commandZone}
+              renderOverlay={renderUpgradeApplyButton}
+            />
+          ) : null
+        }
       />
     </>
   );

@@ -14,11 +14,20 @@ def _submitted_damage_cards(player: Player | StaticOpponent) -> list[Card]:
     return [*player.hand, *player.command_zone]
 
 
+def is_applied_upgrade(upgrade: Card) -> bool:
+    return upgrade.upgrade_target is not None
+
+
+def is_revealed_applied_upgrade(upgrade: Card) -> bool:
+    return is_applied_upgrade(upgrade) and upgrade.is_revealed
+
+
 def get_submitted_upgrade_source_ids(player: Player | StaticOpponent) -> list[str]:
     source_ids: list[str] = []
+    revealed_applied_upgrades = [upgrade for upgrade in player.upgrades if is_revealed_applied_upgrade(upgrade)]
     upgrade_targets = {
         upgrade.upgrade_target.id: upgrade.upgrade_target
-        for upgrade in player.upgrades
+        for upgrade in revealed_applied_upgrades
         if upgrade.upgrade_target is not None
     }
 
@@ -28,7 +37,7 @@ def get_submitted_upgrade_source_ids(player: Player | StaticOpponent) -> list[st
             continue
         source_ids.extend(
             upgrade.upgrade_target.id
-            for upgrade in player.upgrades
+            for upgrade in revealed_applied_upgrades
             if upgrade.upgrade_target is not None and upgrade.upgrade_target.id == target.id
         )
 
@@ -102,13 +111,22 @@ def apply_upgrade_to_card(player: Player, upgrade: Card, target: Card) -> None:
     if upgrade not in player.upgrades:
         raise ValueError("Player does not have this upgrade")
 
-    if upgrade.upgrade_target is not None:
+    if is_applied_upgrade(upgrade):
         raise ValueError("Upgrade has already been applied")
 
     if target not in player.hand and target not in player.sideboard:
         raise ValueError("Target card not in player's hand or sideboard")
 
     upgrade.upgrade_target = target
+    upgrade.is_revealed = False
+
+
+def reveal_upgrade(player: Player, upgrade: Card) -> None:
+    if upgrade not in player.upgrades:
+        raise ValueError("Player does not have this upgrade")
+    if not is_applied_upgrade(upgrade):
+        raise ValueError("Upgrade has not been applied")
+    upgrade.is_revealed = True
 
 
 def _award_rewards(
