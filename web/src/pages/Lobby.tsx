@@ -906,9 +906,6 @@ export function Lobby() {
                       </div>
                     )}
                   </div>
-                  <div className="mb-2 text-[11px] text-gray-500">
-                    {occupiedSlots} / {playerCap} slots filled
-                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     {playerSlots.map((slot) => {
                       if (slot.kind === "player") {
