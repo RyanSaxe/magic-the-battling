@@ -206,6 +206,9 @@ export function DeckDisplay({
         sideboard: zoneFrames.sideboard.outerHeight,
         upgrades: zoneFrames.commandZone.outerHeight,
       } : null}
+      zoneWidths={enableResize && zoneFrames && hasUpgrades ? {
+        upgrades: zoneFrames.commandZone.outerWidth,
+      } : null}
       zoneRefs={enableResize ? {
         hand: (node) => {
           handZoneRef.current = node

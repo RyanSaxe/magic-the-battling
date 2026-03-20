@@ -530,6 +530,9 @@ export function BuildPhase({
           sideboard: zoneFrames.sideboard.outerHeight,
           upgrades: hasDesktopUpgradeRail ? zoneFrames.commandZone.outerHeight : undefined,
         } : null}
+        zoneWidths={zoneFrames && hasDesktopUpgradeRail ? {
+          upgrades: zoneFrames.commandZone.outerWidth,
+        } : null}
         zoneRefs={{
           hand: (node) => {
             handZoneRef.current = node;

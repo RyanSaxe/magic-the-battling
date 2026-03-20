@@ -274,6 +274,9 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
         sideboard: zoneFrames.pool.outerHeight,
         upgrades: hasDesktopUpgradeRail ? zoneFrames.upgrades.outerHeight : undefined,
       } : null}
+      zoneWidths={zoneFrames && hasDesktopUpgradeRail ? {
+        upgrades: zoneFrames.upgrades.outerWidth,
+      } : null}
       zoneRefs={{
         hand: (node) => {
           packZoneRef.current = node
