@@ -521,7 +521,7 @@ export function PlayerDetailPanel({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 px-4 pb-4">
+      <div className="flex flex-col flex-1 min-h-0 px-4 pb-4">
         {activeTab === "overview" ? overviewContent : seenContent}
       </div>
     </div>
@@ -542,9 +542,10 @@ export function PlayerDetailPanel({
       style={{
         right: "calc(100% - 8px)",
         width: "var(--sidebar-width)",
-        boxShadow: "-14px 0 22px -12px rgba(0, 0, 0, 0.42)",
+        boxShadow: renderOpen ? "-6px 0 12px -2px rgba(0, 0, 0, 0.3)" : "none",
+        clipPath: "inset(0 0 0 -20px)",
         transform: renderOpen ? "translateX(0)" : "translateX(calc(100% - 8px))",
-        transition: "transform 220ms ease-out",
+        transition: "transform 220ms ease-out, box-shadow 220ms ease-out",
       }}
     >
       {shell}
