@@ -685,6 +685,22 @@ export function Lobby() {
                   const puppetCount = lobbyState.puppet_count;
                   const playerCap = lobbyState.target_player_count;
                   const occupiedSlots = lobbyState.players.length + puppetCount;
+                  const playerCapIndex = EVEN_PLAYER_CAP_OPTIONS.findIndex(
+                    (value) => value === playerCap,
+                  );
+                  const previousPlayerCap =
+                    playerCapIndex > 0
+                      ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex - 1]
+                      : null;
+                  const nextPlayerCap =
+                    playerCapIndex >= 0 &&
+                    playerCapIndex < EVEN_PLAYER_CAP_OPTIONS.length - 1
+                      ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex + 1]
+                      : null;
+                  const canDecreasePlayerCap =
+                    previousPlayerCap !== null &&
+                    previousPlayerCap >= occupiedSlots;
+                  const canIncreasePlayerCap = nextPlayerCap !== null;
                   const availablePuppets = lobbyState.available_puppet_count;
                   const canAddPuppet =
                     availablePuppets !== null &&
@@ -849,24 +865,45 @@ export function Lobby() {
                     <h2 className="text-white font-medium text-sm">Players</h2>
                     {isHost ? (
                       <div className="flex items-center gap-1.5">
-                        <label className="flex items-center gap-1 text-xs text-gray-400">
-                          <span>Max</span>
-                          <select
-                            value={playerCap}
-                            onChange={(event) => actions.setTargetPlayerCount(Number(event.target.value))}
-                            className="h-7 rounded border border-black/40 bg-black/40 px-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                        <div className="flex items-center gap-1.5 rounded-md border border-black/40 bg-black/30 px-1.5 py-1">
+                          <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                            Max
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (previousPlayerCap !== null) {
+                                actions.setTargetPlayerCount(previousPlayerCap);
+                              }
+                            }}
+                            disabled={!canDecreasePlayerCap}
+                            aria-label="Decrease max players"
+                            className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
                           >
-                            {EVEN_PLAYER_CAP_OPTIONS.map((value) => (
-                              <option
-                                key={value}
-                                value={value}
-                                disabled={value < occupiedSlots}
-                              >
-                                {value}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                            -
+                          </button>
+                          <div className="min-w-[4.5rem] text-center">
+                            <div className="text-sm font-semibold text-white">
+                              {playerCap}
+                            </div>
+                            <div className="text-[9px] uppercase tracking-[0.12em] text-gray-500">
+                              players
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (nextPlayerCap !== null) {
+                                actions.setTargetPlayerCount(nextPlayerCap);
+                              }
+                            }}
+                            disabled={!canIncreasePlayerCap}
+                            aria-label="Increase max players"
+                            className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
+                          >
+                            +
+                          </button>
+                        </div>
                         <button
                           onClick={() => actions.addPuppet()}
                           disabled={!canAddPuppet}
