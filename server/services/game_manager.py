@@ -819,11 +819,8 @@ class GameManager:
             return False, "Only the host can start the game"
 
         total = len(pending.player_names) + pending.puppet_count
-        if total < 2:
-            return False, "Need at least 2 players"
-
-        if total % 2 != 0:
-            return False, "Need an even number of players"
+        if total != pending.target_player_count:
+            return False, f"Need exactly {pending.target_player_count} players"
 
         all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
         if not all_ready:
@@ -1903,7 +1900,7 @@ class GameManager:
         total = len(pending.player_names) + pending.puppet_count
         available = self._count_available_bots(pending)
         has_enough_bots = pending.puppet_count == 0 or (available is not None and available >= pending.puppet_count)
-        can_start = total >= 2 and total % 2 == 0 and all_ready and has_enough_bots
+        can_start = total == pending.target_player_count and all_ready and has_enough_bots
         loading_error = pending.battler_error
         if pending.play_mode == "constructed":
             loading_error = next(

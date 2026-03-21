@@ -677,7 +677,7 @@ export function Lobby() {
         <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col sm:items-center sm:justify-center px-4 py-4 overflow-auto">
-            <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md flex-1 min-h-0 overflow-visible sm:flex-none felt-raised-panel">
+            <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md overflow-visible sm:flex-none felt-raised-panel">
               {lobbyState &&
                 (() => {
                   const isHost = currentPlayer?.is_host ?? false;
@@ -753,7 +753,6 @@ export function Lobby() {
                     }).map((_, i) => ({
                       kind: "open" as const,
                       key: `open-${i}`,
-                      openIndex: i,
                     })),
                   ];
 
@@ -862,13 +861,9 @@ export function Lobby() {
 
                 <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
                   <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-white font-medium text-sm">Players</h2>
                     {isHost ? (
                       <div className="flex items-center gap-1.5">
-                        <div className="flex items-center gap-1.5 rounded-md border border-black/40 bg-black/30 px-1.5 py-1">
-                          <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-                            Max
-                          </span>
+                        <div className="flex items-center gap-1 rounded-md border border-black/40 bg-black/30 px-1.5 py-1">
                           <button
                             type="button"
                             onClick={() => {
@@ -877,19 +872,14 @@ export function Lobby() {
                               }
                             }}
                             disabled={!canDecreasePlayerCap}
-                            aria-label="Decrease max players"
+                            aria-label="Decrease player count"
                             className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
                           >
                             -
                           </button>
-                          <div className="min-w-[4.5rem] text-center">
-                            <div className="text-sm font-semibold text-white">
-                              {playerCap}
-                            </div>
-                            <div className="text-[9px] uppercase tracking-[0.12em] text-gray-500">
-                              players
-                            </div>
-                          </div>
+                          <span className="min-w-[3.5rem] text-center text-sm font-semibold text-white">
+                            {playerCap} players
+                          </span>
                           <button
                             type="button"
                             onClick={() => {
@@ -898,7 +888,7 @@ export function Lobby() {
                               }
                             }}
                             disabled={!canIncreasePlayerCap}
-                            aria-label="Increase max players"
+                            aria-label="Increase player count"
                             className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
                           >
                             +
@@ -926,7 +916,7 @@ export function Lobby() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-gray-500">Cap {playerCap}</span>
+                        <span className="text-sm font-medium text-white">{playerCap} players</span>
                         {puppetCount > 0 && (
                           <button
                             onClick={() =>
@@ -1064,9 +1054,7 @@ export function Lobby() {
                         >
                           <span className="w-2 h-2 rounded-full shrink-0 bg-black/40" />
                           <span className="text-gray-500 text-sm italic">
-                            {filledSlots.length === 1 && slot.openIndex === 0
-                              ? "required"
-                              : "optional"}
+                            required
                           </span>
                         </div>
                       );
