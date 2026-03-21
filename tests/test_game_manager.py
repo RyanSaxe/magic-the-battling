@@ -322,6 +322,7 @@ class TestGameStartQueueGuards:
 
     def test_can_start_game_rejects_when_start_queue_full(self, game_manager):
         pending = game_manager.create_game(player_name="Host", player_id="host_pid")
+        pending.target_player_count = 2
         joined = game_manager.join_game(pending.join_code, "Guest", "guest_pid")
         assert joined is not None
         pending.player_ready["host_pid"] = True
@@ -347,6 +348,7 @@ class TestConstructedLobbyRules:
 
     def test_can_start_constructed_game_once_all_battlers_are_loaded(self, game_manager, card_factory):
         pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
+        pending.target_player_count = 2
         game_manager.join_game(pending.join_code, "Bob", "bob_pid")
 
         pending.player_battlers["alice_pid"].battler = Battler(
