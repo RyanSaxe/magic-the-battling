@@ -862,7 +862,7 @@ export function Lobby() {
                   <div className="flex items-center justify-between mb-2">
                     {isHost ? (
                       <>
-                        <div className="flex items-center gap-1 rounded-md border border-black/40 bg-black/30 px-1.5 py-1">
+                        <div className="flex items-center justify-center gap-1 rounded-md border border-black/40 bg-black/30 px-1.5 py-1 w-[calc(50%-0.25rem)]">
                           <button
                             type="button"
                             onClick={() => {
