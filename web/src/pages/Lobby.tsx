@@ -861,7 +861,7 @@ export function Lobby() {
                 <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
                   <div className="flex items-center justify-between mb-2">
                     {isHost ? (
-                      <div className="flex items-center gap-1.5">
+                      <>
                         <div className="flex items-center gap-1 rounded-md border border-black/40 bg-black/30 px-1.5 py-1">
                           <button
                             type="button"
@@ -893,26 +893,28 @@ export function Lobby() {
                             +
                           </button>
                         </div>
-                        <button
-                          onClick={() => actions.addPuppet()}
-                          disabled={!canAddPuppet}
-                          className="ml-auto text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
-                        >
-                          + Add Puppet
-                        </button>
-                        <button
-                          onClick={() =>
-                            openGuide({
-                              docId: "faq",
-                              tab: "why-are-my-opponents-cards-face-up",
-                            })
-                          }
-                          className="w-5 h-5 rounded-full bg-black/30 border border-black/40 text-gray-400 hover:bg-black/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
-                          title="What are Puppets?"
-                        >
-                          ?
-                        </button>
-                      </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => actions.addPuppet()}
+                            disabled={!canAddPuppet}
+                            className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                          >
+                            + Add Puppet
+                          </button>
+                          <button
+                            onClick={() =>
+                              openGuide({
+                                docId: "faq",
+                                tab: "why-are-my-opponents-cards-face-up",
+                              })
+                            }
+                            className="w-5 h-5 rounded-full bg-black/30 border border-black/40 text-gray-400 hover:bg-black/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
+                            title="What are Puppets?"
+                          >
+                            ?
+                          </button>
+                        </div>
+                      </>
                     ) : (
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-medium text-white">{playerCap} players</span>
