@@ -897,7 +897,7 @@ export function Lobby() {
                         <button
                           onClick={() => actions.addPuppet()}
                           disabled={!canAddPuppet}
-                          className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                          className="ml-auto text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
                         >
                           + Add Puppet
                         </button>
