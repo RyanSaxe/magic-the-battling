@@ -721,9 +721,8 @@ export function Lobby() {
 
                   const startMessage = (() => {
                     if (startingGame) return null;
-                    if (occupiedSlots < 2) return "Need at least 2 players";
-                    if (occupiedSlots % 2 !== 0)
-                      return `Odd player count (${occupiedSlots})`;
+                    if (occupiedSlots !== playerCap)
+                      return `Need ${playerCap - occupiedSlots} more player${playerCap - occupiedSlots === 1 ? "" : "s"}`;
                     if (!lobbyState.players.every((p) => p.is_ready))
                       return "Waiting for all players to ready";
                     if (
