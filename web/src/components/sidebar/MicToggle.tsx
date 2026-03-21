@@ -1,9 +1,12 @@
 interface MicToggleProps {
   muted: boolean
   onClick: (e: React.MouseEvent) => void
+  variant?: 'default' | 'player-row'
 }
 
-export function MicToggle({ muted, onClick }: MicToggleProps) {
+export function MicToggle({ muted, onClick, variant = 'default' }: MicToggleProps) {
+  const isPlayerRow = variant === 'player-row'
+
   return (
     <button
       type="button"
@@ -11,7 +14,11 @@ export function MicToggle({ muted, onClick }: MicToggleProps) {
         e.stopPropagation()
         onClick(e)
       }}
-      className={`relative inline-flex items-center justify-center w-6 h-6 rounded transition-colors ${
+      className={`relative inline-flex items-center rounded transition-colors ${
+        isPlayerRow
+          ? 'h-6 w-4 shrink-0 justify-start'
+          : 'h-6 w-6 justify-center'
+      } ${
         muted
           ? 'text-red-400 hover:text-red-300'
           : 'text-indigo-300 hover:text-indigo-200'

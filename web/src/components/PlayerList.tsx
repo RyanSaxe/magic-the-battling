@@ -142,6 +142,7 @@ export function PlayerRow({
   const isSelf = player.name === currentPlayerName;
   const showPairingProbability =
     variant !== "share" && !isSelf && (!player.is_ghost || player.is_most_recent_ghost);
+  const showLeadingMicToggle = variant === "game" && !!micToggle;
 
   return (
     <button
@@ -160,10 +161,11 @@ export function PlayerRow({
       />
       <div className="min-w-0 self-end">
         <div className="flex items-center gap-1.5">
+          {showLeadingMicToggle ? micToggle : null}
           <span className="block truncate text-sm font-medium text-amber-50">
             {player.name}
           </span>
-          {micToggle}
+          {!showLeadingMicToggle ? micToggle : null}
         </div>
       </div>
 

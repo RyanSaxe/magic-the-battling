@@ -865,6 +865,7 @@ function GameContent() {
       return (
         <MicToggle
           muted={voiceChat.state.isMuted}
+          variant="player-row"
           onClick={() => voiceChat.toggleSelfMute()}
         />
       )
@@ -875,6 +876,7 @@ function GameContent() {
     return (
       <MicToggle
         muted={voiceChat.state.mutedPeers.has(player.name)}
+        variant="player-row"
         onClick={() => voiceChat.togglePeerMute(player.name)}
       />
     )
