@@ -469,6 +469,26 @@ body {
   box-shadow: none;
 }
 
+.card.unrevealed-upgrade::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 11;
+  border: 2px dashed #fbbf24;
+  animation: unrevealed-upgrade-pulse 2s ease-in-out infinite;
+}
+
+.card.selected.unrevealed-upgrade::before {
+  border: none;
+}
+
+@keyframes unrevealed-upgrade-pulse {
+  0%, 100% { border-color: rgba(251, 191, 36, 0.3); }
+  50% { border-color: rgba(251, 191, 36, 0.9); }
+}
+
 /* Card on table has shadow for depth */
 .card-on-table {
   box-shadow:

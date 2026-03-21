@@ -1,10 +1,12 @@
 interface MicToggleProps {
   muted: boolean
   onClick: (e: React.MouseEvent) => void
-  connectionColor?: string | null
+  variant?: 'default' | 'player-row'
 }
 
-export function MicToggle({ muted, onClick, connectionColor }: MicToggleProps) {
+export function MicToggle({ muted, onClick, variant = 'default' }: MicToggleProps) {
+  const isPlayerRow = variant === 'player-row'
+
   return (
     <button
       type="button"
@@ -12,7 +14,11 @@ export function MicToggle({ muted, onClick, connectionColor }: MicToggleProps) {
         e.stopPropagation()
         onClick(e)
       }}
-      className={`relative inline-flex items-center justify-center w-6 h-6 rounded transition-colors ${
+      className={`relative inline-flex items-center rounded transition-colors ${
+        isPlayerRow
+          ? 'h-6 w-4 shrink-0 justify-start'
+          : 'h-6 w-6 justify-center'
+      } ${
         muted
           ? 'text-red-400 hover:text-red-300'
           : 'text-indigo-300 hover:text-indigo-200'
@@ -20,9 +26,6 @@ export function MicToggle({ muted, onClick, connectionColor }: MicToggleProps) {
       title={muted ? 'Unmute' : 'Mute'}
     >
       {muted ? <MicOffIcon className="w-3.5 h-3.5" /> : <MicIcon className="w-3.5 h-3.5" />}
-      {connectionColor && (
-        <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${connectionColor}`} />
-      )}
     </button>
   )
 }

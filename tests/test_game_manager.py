@@ -119,6 +119,115 @@ def test_battle_reveal_upgrade_updates_public_visibility(game_manager, card_fact
     assert len(next(player for player in bob_state_after.players if player.name == "Alice").upgrades) == 1
 
 
+def test_battle_reveal_upgrade_broadcasts_animation_to_both_players(game_manager, card_factory, upgrade_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    target = card_factory("alice-card")
+    upgrade = upgrade_factory("hidden-upgrade")
+    alice.hand = [target]
+    alice.upgrades = [upgrade]
+    reward.apply_upgrade_to_card(alice, upgrade, target)
+    battle.start(game, alice, bob)
+
+    game_manager._active_games["g1"] = game
+    game_manager._player_to_game["pid_alice"] = "g1"
+    game_manager._player_to_game["pid_bob"] = "g1"
+    game_manager._player_id_to_name["pid_alice"] = "Alice"
+    game_manager._player_id_to_name["pid_bob"] = "Bob"
+
+    assert game_manager.handle_battle_reveal_upgrade(game, alice, upgrade.id) is True
+
+    alice_state = game_manager.get_game_state("g1", "pid_alice")
+    bob_state = game_manager.get_game_state("g1", "pid_bob")
+    assert alice_state is not None
+    assert alice_state.current_battle is not None
+    assert bob_state is not None
+    assert bob_state.current_battle is not None
+
+    alice_anims = alice_state.current_battle.pending_reveal_animations
+    bob_anims = bob_state.current_battle.pending_reveal_animations
+    assert len(alice_anims) == 1
+    assert len(bob_anims) == 1
+    assert alice_anims[0].animation_id == bob_anims[0].animation_id
+    assert alice_anims[0].player_name == "Alice"
+    assert alice_anims[0].upgrade.id == upgrade.id
+    assert alice_anims[0].target.id == target.id
+
+
+def test_revealed_upgrade_visible_to_opponent_after_battle_ends(game_manager, card_factory, upgrade_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    target = card_factory("alice-card")
+    upgrade = upgrade_factory("hidden-upgrade")
+    alice.hand = [target]
+    alice.upgrades = [upgrade]
+    reward.apply_upgrade_to_card(alice, upgrade, target)
+    b = battle.start(game, alice, bob)
+
+    game_manager._active_games["g1"] = game
+    game_manager._player_to_game["pid_alice"] = "g1"
+    game_manager._player_to_game["pid_bob"] = "g1"
+    game_manager._player_id_to_name["pid_alice"] = "Alice"
+    game_manager._player_id_to_name["pid_bob"] = "Bob"
+
+    assert game_manager.handle_battle_reveal_upgrade(game, alice, upgrade.id) is True
+
+    battle.submit_result(b, alice, alice.name)
+    battle.submit_result(b, bob, alice.name)
+    assert battle.results_agreed(b)
+    battle.end(game, b)
+
+    bob_state = game_manager.get_game_state("g1", "pid_bob")
+    assert bob_state is not None
+    alice_in_bob_view = next(p for p in bob_state.players if p.name == "Alice")
+    assert len(alice_in_bob_view.upgrades) == 1
+    assert alice_in_bob_view.upgrades[0].is_revealed is True
+
+
+def test_revealed_upgrade_resolution_events_match_for_both_players(game_manager, card_factory, upgrade_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    setup_battle_ready(alice, ["Plains", "Plains", "Plains"])
+    setup_battle_ready(bob, ["Island", "Island", "Island"])
+
+    target = card_factory("alice-card")
+    upgrade = upgrade_factory("hidden-upgrade")
+    alice.hand = [target]
+    alice.upgrades = [upgrade]
+    reward.apply_upgrade_to_card(alice, upgrade, target)
+    battle.start(game, alice, bob)
+
+    game_manager._active_games["g1"] = game
+    game_manager._player_to_game["pid_alice"] = "g1"
+    game_manager._player_to_game["pid_bob"] = "g1"
+    game_manager._player_id_to_name["pid_alice"] = "Alice"
+    game_manager._player_id_to_name["pid_bob"] = "Bob"
+
+    assert game_manager.handle_battle_reveal_upgrade(game, alice, upgrade.id) is True
+    game_manager.handle_battle_submit_result(game, alice, alice.name, "g1")
+    game_manager.handle_battle_submit_result(game, bob, alice.name, "g1")
+
+    alice_state = game_manager.get_game_state("g1", "pid_alice")
+    bob_state = game_manager.get_game_state("g1", "pid_bob")
+    assert alice_state is not None
+    assert bob_state is not None
+    assert alice_state.battle_resolution is not None
+    assert bob_state.battle_resolution is not None
+
+    alice_opp_events = alice_state.battle_resolution.opponent_side.events
+    bob_your_events = bob_state.battle_resolution.your_side.events
+    upgrade_beams_alice = [e for e in alice_opp_events if e.event_type == "upgrade_beam"]
+    upgrade_beams_bob = [e for e in bob_your_events if e.event_type == "upgrade_beam"]
+    assert len(upgrade_beams_alice) == 1
+    assert len(upgrade_beams_bob) == 1
+
+
 def test_find_historical_players_filters_by_elo_range(game_manager, mock_db_session):
     """_find_historical_players should exclude candidates outside ELO range."""
     target_elo = 1200.0
@@ -322,6 +431,7 @@ class TestGameStartQueueGuards:
 
     def test_can_start_game_rejects_when_start_queue_full(self, game_manager):
         pending = game_manager.create_game(player_name="Host", player_id="host_pid")
+        pending.target_player_count = 2
         joined = game_manager.join_game(pending.join_code, "Guest", "guest_pid")
         assert joined is not None
         pending.player_ready["host_pid"] = True
@@ -347,6 +457,7 @@ class TestConstructedLobbyRules:
 
     def test_can_start_constructed_game_once_all_battlers_are_loaded(self, game_manager, card_factory):
         pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
+        pending.target_player_count = 2
         game_manager.join_game(pending.join_code, "Bob", "bob_pid")
 
         pending.player_battlers["alice_pid"].battler = Battler(

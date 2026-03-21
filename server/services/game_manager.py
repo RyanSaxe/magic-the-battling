@@ -33,6 +33,7 @@ from mtb.models.game import (
     Config,
     Game,
     LastBattleResult,
+    PendingRevealAnimation,
     Player,
     Puppet,
     StaticOpponent,
@@ -85,6 +86,7 @@ from server.schemas.api import (
     LobbyPlayer,
     LobbyStateResponse,
     PlayerView,
+    RevealAnimationView,
     SelfPlayerView,
 )
 from server.services.game_serialization import (
@@ -819,11 +821,8 @@ class GameManager:
             return False, "Only the host can start the game"
 
         total = len(pending.player_names) + pending.puppet_count
-        if total < 2:
-            return False, "Need at least 2 players"
-
-        if total % 2 != 0:
-            return False, "Need an even number of players"
+        if total != pending.target_player_count:
+            return False, f"Need exactly {pending.target_player_count} players"
 
         all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
         if not all_ready:
@@ -1723,6 +1722,8 @@ class GameManager:
             return False, "Only the host can change the player cap"
         if target_player_count < 2 or target_player_count > 8:
             return False, "Player cap must be between 2 and 8"
+        if target_player_count % 2 != 0:
+            return False, "Player cap must be an even number"
 
         occupied_slots = len(pending.player_names) + pending.puppet_count
         if target_player_count < occupied_slots:
@@ -1901,7 +1902,7 @@ class GameManager:
         total = len(pending.player_names) + pending.puppet_count
         available = self._count_available_bots(pending)
         has_enough_bots = pending.puppet_count == 0 or (available is not None and available >= pending.puppet_count)
-        can_start = total >= 2 and total % 2 == 0 and all_ready and has_enough_bots
+        can_start = total == pending.target_player_count and all_ready and has_enough_bots
         loading_error = pending.battler_error
         if pending.play_mode == "constructed":
             loading_error = next(
@@ -2485,6 +2486,15 @@ class GameManager:
             is_sudden_death=b.is_sudden_death,
             opponent_full_sideboard=cards_to_refs(full_sideboard),
             can_manipulate_opponent=isinstance(opponent_obj, StaticOpponent),
+            pending_reveal_animations=[
+                RevealAnimationView(
+                    animation_id=anim.animation_id,
+                    upgrade=cards_to_refs([anim.upgrade])[0],
+                    target=cards_to_refs([anim.target])[0],
+                    player_name=anim.player_name,
+                )
+                for anim in b.pending_reveal_animations
+            ],
         )
 
     def handle_draft_swap(
@@ -2822,6 +2832,16 @@ class GameManager:
                 reward.reveal_upgrade(player, player_upgrade)
             if zone_upgrade is not None:
                 zone_upgrade.is_revealed = True
+
+            assert target_upgrade.upgrade_target is not None
+            b.pending_reveal_animations.append(
+                PendingRevealAnimation(
+                    animation_id=uuid4().hex[:8],
+                    upgrade=target_upgrade,
+                    target=target_upgrade.upgrade_target,
+                    player_name=player.name,
+                )
+            )
             return True
         return False
 

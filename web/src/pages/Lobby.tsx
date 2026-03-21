@@ -22,6 +22,7 @@ import {
 
 const DESKTOP_SUBTITLE = "An MtG format inspired by autobattlers";
 const MOBILE_SUBTITLE = "An MtG format inspired by autobattlers";
+const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 
 function cubeCobraUrl(battlerId: string) {
   return `https://cubecobra.com/cube/overview/${encodeURIComponent(battlerId)}`;
@@ -676,7 +677,7 @@ export function Lobby() {
         <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col sm:items-center sm:justify-center px-4 py-4 overflow-auto">
-            <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md flex-1 min-h-0 overflow-visible sm:flex-none felt-raised-panel">
+            <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md overflow-visible sm:flex-none felt-raised-panel">
               {lobbyState &&
                 (() => {
                   const isHost = currentPlayer?.is_host ?? false;
@@ -684,6 +685,22 @@ export function Lobby() {
                   const puppetCount = lobbyState.puppet_count;
                   const playerCap = lobbyState.target_player_count;
                   const occupiedSlots = lobbyState.players.length + puppetCount;
+                  const playerCapIndex = EVEN_PLAYER_CAP_OPTIONS.findIndex(
+                    (value) => value === playerCap,
+                  );
+                  const previousPlayerCap =
+                    playerCapIndex > 0
+                      ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex - 1]
+                      : null;
+                  const nextPlayerCap =
+                    playerCapIndex >= 0 &&
+                    playerCapIndex < EVEN_PLAYER_CAP_OPTIONS.length - 1
+                      ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex + 1]
+                      : null;
+                  const canDecreasePlayerCap =
+                    previousPlayerCap !== null &&
+                    previousPlayerCap >= occupiedSlots;
+                  const canIncreasePlayerCap = nextPlayerCap !== null;
                   const availablePuppets = lobbyState.available_puppet_count;
                   const canAddPuppet =
                     availablePuppets !== null &&
@@ -704,9 +721,8 @@ export function Lobby() {
 
                   const startMessage = (() => {
                     if (startingGame) return null;
-                    if (occupiedSlots < 2) return "Need at least 2 players";
-                    if (occupiedSlots % 2 !== 0)
-                      return `Odd player count (${occupiedSlots})`;
+                    if (occupiedSlots !== playerCap)
+                      return `Need ${playerCap - occupiedSlots} more player${playerCap - occupiedSlots === 1 ? "" : "s"}`;
                     if (!lobbyState.players.every((p) => p.is_ready))
                       return "Waiting for all players to ready";
                     if (
@@ -736,7 +752,6 @@ export function Lobby() {
                     }).map((_, i) => ({
                       kind: "open" as const,
                       key: `open-${i}`,
-                      openIndex: i,
                     })),
                   ];
 
@@ -845,50 +860,64 @@ export function Lobby() {
 
                 <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
                   <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-white font-medium text-sm">Players</h2>
                     {isHost ? (
-                      <div className="flex items-center gap-1.5">
-                        <label className="flex items-center gap-1 text-xs text-gray-400">
-                          <span>Cap</span>
-                          <select
-                            value={playerCap}
-                            onChange={(event) => actions.setTargetPlayerCount(Number(event.target.value))}
-                            className="h-7 rounded border border-black/40 bg-black/40 px-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      <>
+                        <div className="flex items-center justify-center gap-1 rounded-md border border-black/40 bg-black/30 px-1.5 py-1 w-[calc(50%-0.25rem)]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (previousPlayerCap !== null) {
+                                actions.setTargetPlayerCount(previousPlayerCap);
+                              }
+                            }}
+                            disabled={!canDecreasePlayerCap}
+                            aria-label="Decrease player count"
+                            className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
                           >
-                            {Array.from({ length: 7 }, (_, index) => index + 2).map((value) => (
-                              <option
-                                key={value}
-                                value={value}
-                                disabled={value < occupiedSlots}
-                              >
-                                {value}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <button
-                          onClick={() => actions.addPuppet()}
-                          disabled={!canAddPuppet}
-                          className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
-                        >
-                          + Add Puppet
-                        </button>
-                        <button
-                          onClick={() =>
-                            openGuide({
-                              docId: "faq",
-                              tab: "why-are-my-opponents-cards-face-up",
-                            })
-                          }
-                          className="w-5 h-5 rounded-full bg-black/30 border border-black/40 text-gray-400 hover:bg-black/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
-                          title="What are Puppets?"
-                        >
-                          ?
-                        </button>
-                      </div>
+                            -
+                          </button>
+                          <span className="min-w-[3.5rem] text-center text-sm font-semibold text-white">
+                            {playerCap} players
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (nextPlayerCap !== null) {
+                                actions.setTargetPlayerCount(nextPlayerCap);
+                              }
+                            }}
+                            disabled={!canIncreasePlayerCap}
+                            aria-label="Increase player count"
+                            className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => actions.addPuppet()}
+                            disabled={!canAddPuppet}
+                            className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                          >
+                            + Add Puppet
+                          </button>
+                          <button
+                            onClick={() =>
+                              openGuide({
+                                docId: "faq",
+                                tab: "why-are-my-opponents-cards-face-up",
+                              })
+                            }
+                            className="w-5 h-5 rounded-full bg-black/30 border border-black/40 text-gray-400 hover:bg-black/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
+                            title="What are Puppets?"
+                          >
+                            ?
+                          </button>
+                        </div>
+                      </>
                     ) : (
                       <div className="flex items-center gap-3">
-                        <span className="text-xs text-gray-500">Cap {playerCap}</span>
+                        <span className="text-sm font-medium text-white">{playerCap} players</span>
                         {puppetCount > 0 && (
                           <button
                             onClick={() =>
@@ -904,9 +933,6 @@ export function Lobby() {
                         )}
                       </div>
                     )}
-                  </div>
-                  <div className="mb-2 text-[11px] text-gray-500">
-                    {occupiedSlots} / {playerCap} slots filled
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {playerSlots.map((slot) => {
@@ -931,13 +957,6 @@ export function Lobby() {
                               <MicToggle
                                 muted={voiceChat.state.isMuted}
                                 onClick={() => voiceChat.toggleSelfMute()}
-                                connectionColor={(() => {
-                                  const { peers } = voiceChat.state
-                                  if (peers.some(p => p.connectionState === 'connected')) return 'bg-green-500'
-                                  if (peers.some(p => p.connectionState === 'connecting')) return 'bg-yellow-500'
-                                  if (peers.every(p => p.connectionState === 'failed')) return 'bg-red-500'
-                                  return null
-                                })()}
                               />
                             )}
                             {player.player_id !== session?.playerId && voiceChat.state.peers.some(p => p.name === player.name) && (
@@ -1029,9 +1048,7 @@ export function Lobby() {
                         >
                           <span className="w-2 h-2 rounded-full shrink-0 bg-black/40" />
                           <span className="text-gray-500 text-sm italic">
-                            {filledSlots.length === 1 && slot.openIndex === 0
-                              ? "required"
-                              : "optional"}
+                            required
                           </span>
                         </div>
                       );

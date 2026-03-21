@@ -136,6 +136,13 @@ export interface SelfPlayerView extends PlayerView {
   in_sudden_death: boolean
 }
 
+export interface RevealAnimation {
+  animation_id: string
+  upgrade: Card
+  target: Card
+  player_name: string
+}
+
 export interface BattleView {
   opponent_name: string
   coin_flip_name: string
@@ -153,6 +160,7 @@ export interface BattleView {
   is_sudden_death: boolean
   opponent_full_sideboard: Card[]
   can_manipulate_opponent: boolean
+  pending_reveal_animations: RevealAnimation[]
 }
 
 export interface GameState {
@@ -193,6 +201,7 @@ export interface CardRef {
   id: string
   scryfall_id: string
   upgrade_target_id: string | null
+  upgrade_target_ref?: CardRef | null
   is_revealed?: boolean
   original_owner: string | null
 }
@@ -267,6 +276,13 @@ export interface CompactSelfPlayerView extends CompactPlayerView {
   last_battle_result: CompactLastBattleResult | null
 }
 
+export interface CompactRevealAnimation {
+  animation_id: string
+  upgrade: CardRef
+  target: CardRef
+  player_name: string
+}
+
 export interface CompactBattleView {
   opponent_name: string
   coin_flip_name: string
@@ -284,6 +300,7 @@ export interface CompactBattleView {
   is_sudden_death: boolean
   opponent_full_sideboard: CardRef[]
   can_manipulate_opponent: boolean
+  pending_reveal_animations: CompactRevealAnimation[]
 }
 
 export interface CompactGameState {

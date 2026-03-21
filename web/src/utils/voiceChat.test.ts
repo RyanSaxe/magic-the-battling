@@ -149,6 +149,7 @@ describe("getVoicePeerNames", () => {
         is_sudden_death: false,
         opponent_full_sideboard: [],
         can_manipulate_opponent: false,
+        pending_reveal_animations: [],
       },
     });
 

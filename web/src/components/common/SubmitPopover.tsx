@@ -25,7 +25,7 @@ export function SubmitPopover({
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
+    const handlePointerDown = (e: PointerEvent) => {
       const target = e.target as Node | null;
       if (!ref.current || !target) {
         return;
@@ -48,10 +48,10 @@ export function SubmitPopover({
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKey);
     return () => {
-      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKey);
     };
   }, [closeOnOutsideClick, ignoreOutsideClickSelector, onClose]);

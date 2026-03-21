@@ -78,6 +78,7 @@ class CardRef(BaseModel):
     id: str
     scryfall_id: str
     upgrade_target_id: str | None = None
+    upgrade_target_ref: "CardRef | None" = None
     is_revealed: bool = True
     original_owner: str | None = None
 
@@ -154,6 +155,13 @@ class SelfPlayerView(PlayerView):
     in_sudden_death: bool = False
 
 
+class RevealAnimationView(BaseModel):
+    animation_id: str
+    upgrade: CardRef
+    target: CardRef
+    player_name: str
+
+
 class BattleView(BaseModel):
     opponent_name: str
     coin_flip_name: str
@@ -171,6 +179,7 @@ class BattleView(BaseModel):
     is_sudden_death: bool = False
     opponent_full_sideboard: list[CardRef] = Field(default_factory=list)
     can_manipulate_opponent: bool = False
+    pending_reveal_animations: list[RevealAnimationView] = Field(default_factory=list)
 
 
 class GameStateResponse(BaseModel):
