@@ -157,6 +157,7 @@ export function Card({
     dragging && 'dragging',
     isCompanion && 'companion',
     upgraded && 'upgraded',
+    hiddenUpgradeCount > 0 && 'unrevealed-upgrade',
     className,
   ].filter(Boolean).join(' ')
 

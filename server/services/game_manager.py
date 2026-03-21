@@ -33,6 +33,7 @@ from mtb.models.game import (
     Config,
     Game,
     LastBattleResult,
+    PendingRevealAnimation,
     Player,
     Puppet,
     StaticOpponent,
@@ -85,6 +86,7 @@ from server.schemas.api import (
     LobbyPlayer,
     LobbyStateResponse,
     PlayerView,
+    RevealAnimationView,
     SelfPlayerView,
 )
 from server.services.game_serialization import (
@@ -2484,6 +2486,15 @@ class GameManager:
             is_sudden_death=b.is_sudden_death,
             opponent_full_sideboard=cards_to_refs(full_sideboard),
             can_manipulate_opponent=isinstance(opponent_obj, StaticOpponent),
+            pending_reveal_animations=[
+                RevealAnimationView(
+                    animation_id=anim.animation_id,
+                    upgrade=cards_to_refs([anim.upgrade])[0],
+                    target=cards_to_refs([anim.target])[0],
+                    player_name=anim.player_name,
+                )
+                for anim in b.pending_reveal_animations
+            ],
         )
 
     def handle_draft_swap(
@@ -2821,6 +2832,16 @@ class GameManager:
                 reward.reveal_upgrade(player, player_upgrade)
             if zone_upgrade is not None:
                 zone_upgrade.is_revealed = True
+
+            assert target_upgrade.upgrade_target is not None
+            b.pending_reveal_animations.append(
+                PendingRevealAnimation(
+                    animation_id=uuid4().hex[:8],
+                    upgrade=target_upgrade,
+                    target=target_upgrade.upgrade_target,
+                    player_name=player.name,
+                )
+            )
             return True
         return False
 

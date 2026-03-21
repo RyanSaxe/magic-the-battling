@@ -219,6 +219,12 @@ function hydrateBattleView(
     your_zones: hydrateZones(battle.your_zones, catalog, refsById),
     opponent_zones: hydrateZones(battle.opponent_zones, catalog, refsById),
     opponent_full_sideboard: hydrateCards(battle.opponent_full_sideboard, catalog, refsById),
+    pending_reveal_animations: (battle.pending_reveal_animations ?? []).map((anim) => ({
+      animation_id: anim.animation_id,
+      upgrade: hydrateCard(anim.upgrade, catalog, refsById),
+      target: hydrateCard(anim.target, catalog, refsById),
+      player_name: anim.player_name,
+    })),
   }
 }
 

@@ -10,7 +10,7 @@ import {
   createSpectateRequest,
   getSpectateRequestStatus,
 } from "../api/client";
-import type { BattleView, Card as CardType, GameStatusResponse, PlayerView, ZoneName } from "../types";
+import type { BattleView, Card as CardType, GameStatusResponse, PlayerView, RevealAnimation, ZoneName } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
 import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
@@ -36,7 +36,9 @@ import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
 import { useGameShellMode } from "../hooks/useGameShellMode";
 import { useElementHeight } from "../hooks/useElementHeight";
 import { BattleResolutionOverlay } from "../components/common/BattleResolutionOverlay";
+import { BattleRevealOverlay } from "../components/common/BattleRevealOverlay";
 import { BuildUpgradeOverlay } from "../components/common/BuildUpgradeOverlay";
+import { RevealBeforeSubmitModal } from "../components/common/RevealBeforeSubmitModal";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
@@ -967,6 +969,7 @@ function GameContent() {
   const [activeBattleZoneModal, setActiveBattleZoneModal] = useState<BattleZoneModal>(null);
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
+  const [pendingBattleResult, setPendingBattleResult] = useState<string | null>(null);
   const [visibleGuideStep, setVisibleGuideStep] = useState<VisibleGuideStep | null>(null);
   const [guideCompletionTrigger, setGuideCompletionTrigger] = useState<{
     guideId: GuidedGuideId;
@@ -977,6 +980,8 @@ function GameContent() {
   const [cachedBattleForResolution, setCachedBattleForResolution] = useState<BattleView | null>(null);
   const [activeBattleResolutionId, setActiveBattleResolutionId] = useState<string | null>(null);
   const [shownBattleResolutionIds, setShownBattleResolutionIds] = useState<Set<string>>(new Set());
+  const [shownRevealAnimationIds, setShownRevealAnimationIds] = useState<Set<string>>(new Set());
+  const [activeRevealAnimation, setActiveRevealAnimation] = useState<RevealAnimation | null>(null);
   const battleResolutionId = gameState?.battle_resolution?.resolution_id ?? null;
 
   useEffect(() => {
@@ -1010,6 +1015,25 @@ function GameContent() {
       setPendingBuildUpgradeAnimation(null);
     });
   }, [gameState?.self_player, pendingBuildUpgradeAnimation]);
+
+  useEffect(() => {
+    const battle = gameState?.current_battle;
+    if (!battle || activeRevealAnimation || pendingBattleResult) return;
+    if (gameState?.self_player.phase !== "battle") return;
+
+    const pending = battle.pending_reveal_animations ?? [];
+    const next = pending.find((a) => !shownRevealAnimationIds.has(a.animation_id));
+    if (!next) return;
+
+    queueMicrotask(() => {
+      setActiveRevealAnimation(next);
+      setShownRevealAnimationIds((prev) => {
+        const s = new Set(prev);
+        s.add(next.animation_id);
+        return s;
+      });
+    });
+  }, [gameState?.current_battle, gameState?.self_player.phase, activeRevealAnimation, shownRevealAnimationIds, pendingBattleResult]);
 
   const prevPhaseRef = useRef(gameState?.self_player.phase);
   if (gameState?.self_player.phase !== prevPhaseRef.current) {
@@ -1295,10 +1319,36 @@ function GameContent() {
 
   const handleBattleResultSubmit = useCallback((result: string) => {
     requestGuideCompletion("battle_result_submit", "result-submit");
-    actions.battleSubmitResult(result);
     setIsChangingResult(false);
     setShowSubmitResultPopover(false);
-  }, [actions, requestGuideCompletion]);
+
+    const isLoss = result !== gameState?.self_player.name && result !== "draw";
+    const unrevealed = gameState
+      ? getUnrevealedAppliedUpgrades(gameState.self_player.upgrades)
+      : [];
+
+    if (!isLoss && unrevealed.length > 0) {
+      setPendingBattleResult(result);
+      return;
+    }
+
+    actions.battleSubmitResult(result);
+  }, [actions, gameState, requestGuideCompletion]);
+
+  const handleRevealAndSubmit = useCallback((upgradeIds: string[]) => {
+    upgradeIds.forEach((id) => actions.battleRevealUpgrade(id));
+    if (pendingBattleResult) {
+      actions.battleSubmitResult(pendingBattleResult);
+    }
+    setPendingBattleResult(null);
+  }, [actions, pendingBattleResult]);
+
+  const handleSkipAndSubmit = useCallback(() => {
+    if (pendingBattleResult) {
+      actions.battleSubmitResult(pendingBattleResult);
+    }
+    setPendingBattleResult(null);
+  }, [actions, pendingBattleResult]);
 
   const handleContinue = useCallback(() => {
     requestGuideCompletion("reward", "continue");
@@ -1326,7 +1376,9 @@ function GameContent() {
     state.previewCard !== null ||
     hasPendingBattleResolution ||
     activeBattleResolutionId !== null ||
-    activeBuildUpgradeAnimation !== null;
+    activeBuildUpgradeAnimation !== null ||
+    pendingBattleResult !== null ||
+    activeRevealAnimation !== null;
   const gameplayHotkeysDisabled = shouldDisableGameplayHotkeys({
     modalOpen,
     visibleGuideStep,
@@ -2626,11 +2678,28 @@ function GameContent() {
           initialRevealUpgradeIds={upgradeInitialRevealIds}
         />
       )}
+      {pendingBattleResult && (
+        <RevealBeforeSubmitModal
+          upgrades={getUnrevealedAppliedUpgrades(self_player.upgrades)}
+          onRevealAndSubmit={handleRevealAndSubmit}
+          onSkip={handleSkipAndSubmit}
+          onClose={() => setPendingBattleResult(null)}
+        />
+      )}
       {activeBuildUpgradeAnimation && (
         <BuildUpgradeOverlay
           upgrade={activeBuildUpgradeAnimation.upgrade}
           target={activeBuildUpgradeAnimation.target}
           onComplete={() => setActiveBuildUpgradeAnimation(null)}
+        />
+      )}
+      {activeRevealAnimation && (
+        <BattleRevealOverlay
+          upgrade={activeRevealAnimation.upgrade}
+          target={activeRevealAnimation.target}
+          playerName={activeRevealAnimation.player_name}
+          selfName={self_player.name}
+          onComplete={() => setActiveRevealAnimation(null)}
         />
       )}
       {shareOpen && (

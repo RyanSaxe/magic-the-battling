@@ -381,6 +381,13 @@ class Zones(BaseModel):
                 return self.library
 
 
+class PendingRevealAnimation(BaseModel):
+    animation_id: str
+    upgrade: Card
+    target: Card
+    player_name: str
+
+
 class Battle(BaseModel):
     player: Player
     opponent: Player | StaticOpponent
@@ -393,6 +400,7 @@ class Battle(BaseModel):
     player_life: int = 20
     opponent_life: int = 20
     is_sudden_death: bool = False
+    pending_reveal_animations: list[PendingRevealAnimation] = Field(default_factory=list)
     _face_down_id_map: dict[str, str] = PrivateAttr(default_factory=dict)
 
 
