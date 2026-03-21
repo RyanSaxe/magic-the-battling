@@ -201,6 +201,7 @@ export interface CardRef {
   id: string
   scryfall_id: string
   upgrade_target_id: string | null
+  upgrade_target_ref?: CardRef | null
   is_revealed?: boolean
   original_owner: string | null
 }

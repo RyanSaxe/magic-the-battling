@@ -1,10 +1,9 @@
 interface MicToggleProps {
   muted: boolean
   onClick: (e: React.MouseEvent) => void
-  connectionColor?: string | null
 }
 
-export function MicToggle({ muted, onClick, connectionColor }: MicToggleProps) {
+export function MicToggle({ muted, onClick }: MicToggleProps) {
   return (
     <button
       type="button"
@@ -20,9 +19,6 @@ export function MicToggle({ muted, onClick, connectionColor }: MicToggleProps) {
       title={muted ? 'Unmute' : 'Mute'}
     >
       {muted ? <MicOffIcon className="w-3.5 h-3.5" /> : <MicIcon className="w-3.5 h-3.5" />}
-      {connectionColor && (
-        <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${connectionColor}`} />
-      )}
     </button>
   )
 }

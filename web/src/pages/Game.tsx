@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, typ
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
-import { useVoiceChat, type VoicePeer } from "../hooks/useVoiceChat";
+import { useVoiceChat } from "../hooks/useVoiceChat";
 import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import {
   rejoinGame,
@@ -74,17 +74,6 @@ import {
   type VisibleGuideStep,
 } from "./gameGuideState";
 import { getVoicePeerNames } from "../utils/voiceChat";
-
-function getAggregateConnectionColor(peers: VoicePeer[]): string | null {
-  if (peers.length === 0) return null
-  const hasConnected = peers.some(p => p.connectionState === 'connected')
-  if (hasConnected) return 'bg-green-500'
-  const hasConnecting = peers.some(p => p.connectionState === 'connecting')
-  if (hasConnecting) return 'bg-yellow-500'
-  const allFailed = peers.every(p => p.connectionState === 'failed')
-  if (allFailed) return 'bg-red-500'
-  return null
-}
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -877,7 +866,6 @@ function GameContent() {
         <MicToggle
           muted={voiceChat.state.isMuted}
           onClick={() => voiceChat.toggleSelfMute()}
-          connectionColor={getAggregateConnectionColor(voiceChat.state.peers)}
         />
       )
     }
@@ -970,6 +958,7 @@ function GameContent() {
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
   const [pendingBattleResult, setPendingBattleResult] = useState<string | null>(null);
+  const [pendingPostRevealSubmit, setPendingPostRevealSubmit] = useState<string | null>(null);
   const [visibleGuideStep, setVisibleGuideStep] = useState<VisibleGuideStep | null>(null);
   const [guideCompletionTrigger, setGuideCompletionTrigger] = useState<{
     guideId: GuidedGuideId;
@@ -1337,9 +1326,7 @@ function GameContent() {
 
   const handleRevealAndSubmit = useCallback((upgradeIds: string[]) => {
     upgradeIds.forEach((id) => actions.battleRevealUpgrade(id));
-    if (pendingBattleResult) {
-      actions.battleSubmitResult(pendingBattleResult);
-    }
+    setPendingPostRevealSubmit(pendingBattleResult);
     setPendingBattleResult(null);
   }, [actions, pendingBattleResult]);
 
@@ -1378,7 +1365,8 @@ function GameContent() {
     activeBattleResolutionId !== null ||
     activeBuildUpgradeAnimation !== null ||
     pendingBattleResult !== null ||
-    activeRevealAnimation !== null;
+    activeRevealAnimation !== null ||
+    pendingPostRevealSubmit !== null;
   const gameplayHotkeysDisabled = shouldDisableGameplayHotkeys({
     modalOpen,
     visibleGuideStep,
@@ -2240,7 +2228,6 @@ function GameContent() {
                           <MicToggle
                             muted={voiceChat.state.isMuted}
                             onClick={() => voiceChat.toggleSelfMute()}
-                            connectionColor={getAggregateConnectionColor(voiceChat.state.peers)}
                           />
                         )}
                       </div>
@@ -2699,7 +2686,13 @@ function GameContent() {
           target={activeRevealAnimation.target}
           playerName={activeRevealAnimation.player_name}
           selfName={self_player.name}
-          onComplete={() => setActiveRevealAnimation(null)}
+          onComplete={() => {
+            setActiveRevealAnimation(null);
+            if (pendingPostRevealSubmit) {
+              actions.battleSubmitResult(pendingPostRevealSubmit);
+              setPendingPostRevealSubmit(null);
+            }
+          }}
         />
       )}
       {shareOpen && (

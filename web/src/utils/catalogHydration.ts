@@ -99,6 +99,9 @@ function indexCardRefs(obj: unknown, refs: Map<string, CardRef>): void {
   if ('id' in obj && 'scryfall_id' in obj) {
     const ref = obj as CardRef
     refs.set(ref.id, ref)
+    if (ref.upgrade_target_ref) {
+      refs.set(ref.upgrade_target_ref.id, ref.upgrade_target_ref)
+    }
     return
   }
 

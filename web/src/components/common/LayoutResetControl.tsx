@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useGameShellMode, type GameShellMode } from "../../hooks/useGameShellMode";
 
 interface LayoutResetControlProps {
   phaseLabel: string;
@@ -12,7 +13,7 @@ interface LayoutResetControlProps {
   message?: string;
 }
 
-function positionClasses(position: "top-right" | "bottom-right") {
+function positionClasses(position: "top-right" | "bottom-right", shellMode: GameShellMode) {
   if (position === "bottom-right") {
     return {
       wrapper: "absolute right-2 bottom-2 z-40 pointer-events-auto",
@@ -20,8 +21,12 @@ function positionClasses(position: "top-right" | "bottom-right") {
     };
   }
 
+  const wrapper = shellMode === "big"
+    ? "absolute right-0 top-0 -translate-y-[calc(100%+0.5rem)] z-40 pointer-events-auto"
+    : "absolute right-2 top-2 z-40 pointer-events-auto";
+
   return {
-    wrapper: "absolute right-2 top-2 z-40 pointer-events-auto sm:right-0 sm:top-0 sm:-translate-y-[calc(100%+0.5rem)]",
+    wrapper,
     popover: "absolute right-0 top-full mt-2",
   };
 }
@@ -38,7 +43,8 @@ export function LayoutResetControl({
   message,
 }: LayoutResetControlProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const { wrapper, popover } = positionClasses(position);
+  const shellMode = useGameShellMode();
+  const { wrapper, popover } = positionClasses(position, shellMode);
 
   return (
     <div className={wrapper} onClick={(e) => e.stopPropagation()}>

@@ -158,16 +158,13 @@ export function PlayerRow({
         variant="corner"
         className="pointer-events-none absolute left-0 top-0 z-10"
       />
-      {micToggle && (
-        <div className="absolute right-1.5 top-1.5 z-10">
+      <div className="min-w-0 self-end">
+        <div className="flex items-center gap-1.5">
+          <span className="block truncate text-sm font-medium text-amber-50">
+            {player.name}
+          </span>
           {micToggle}
         </div>
-      )}
-
-      <div className="min-w-0 self-end">
-        <span className="block truncate text-sm font-medium text-amber-50">
-          {player.name}
-        </span>
       </div>
 
       <div className="justify-self-end self-end max-w-[8.5rem] text-xs text-gray-400">

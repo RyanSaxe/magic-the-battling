@@ -957,13 +957,6 @@ export function Lobby() {
                               <MicToggle
                                 muted={voiceChat.state.isMuted}
                                 onClick={() => voiceChat.toggleSelfMute()}
-                                connectionColor={(() => {
-                                  const { peers } = voiceChat.state
-                                  if (peers.some(p => p.connectionState === 'connected')) return 'bg-green-500'
-                                  if (peers.some(p => p.connectionState === 'connecting')) return 'bg-yellow-500'
-                                  if (peers.every(p => p.connectionState === 'failed')) return 'bg-red-500'
-                                  return null
-                                })()}
                               />
                             )}
                             {player.player_id !== session?.playerId && voiceChat.state.peers.some(p => p.name === player.name) && (
