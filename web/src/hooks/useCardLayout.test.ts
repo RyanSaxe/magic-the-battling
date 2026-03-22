@@ -214,6 +214,20 @@ describe('computeLayout', () => {
       })
       expect(result.commandZone.columns).toBe(1)
     })
+
+    it('respects minColumns on command zone', () => {
+      const result = computeLayout(1000, 700, {
+        zones: {
+          hand: { count: 7 },
+          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          sideboard: { count: 12 },
+          commandZone: { count: 5, minColumns: 2 },
+        },
+        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        ...ZONE_LAYOUT_PADDING,
+      })
+      expect(result.commandZone.columns).toBe(2)
+    })
   })
 
   describe('overflow fallback', () => {

@@ -165,6 +165,7 @@ class PendingGame:
     target_player_count: int = 4
     auto_approve_spectators: bool = False
     guided_mode_default: bool = False
+    voice_chat_enabled: bool = True
     play_mode: PlayMode = "limited"
     player_ready: dict[str, bool] = field(default_factory=dict)
     player_battlers: dict[str, PendingPlayerBattler] = field(default_factory=dict)
@@ -861,6 +862,7 @@ class GameManager:
             use_upgrades=pending.use_upgrades,
             use_vanguards=pending.use_vanguards,
             auto_approve_spectators=pending.auto_approve_spectators,
+            voice_chat_enabled=pending.voice_chat_enabled,
             cube_id=pending.cube_id,
             play_mode=pending.play_mode,
         )
@@ -967,6 +969,7 @@ class GameManager:
                     use_upgrades=pending.use_upgrades,
                     use_vanguards=pending.use_vanguards,
                     auto_approve_spectators=pending.auto_approve_spectators,
+                    voice_chat_enabled=pending.voice_chat_enabled,
                     cube_id=pending.cube_id,
                     play_mode=pending.play_mode,
                 )
@@ -1732,6 +1735,15 @@ class GameManager:
         pending.target_player_count = target_player_count
         return True, None
 
+    def set_voice_chat_enabled(self, game_id: str, player_id: str, enabled: bool) -> tuple[bool, str | None]:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.is_started:
+            return False, "Game not found"
+        if player_id != pending.host_player_id:
+            return False, "Only the host can toggle voice chat"
+        pending.voice_chat_enabled = enabled
+        return True, None
+
     def remove_puppet(self, game_id: str, player_id: str) -> bool:
         pending = self._pending_games.get(game_id)
         if not pending or pending.is_started:
@@ -1928,6 +1940,7 @@ class GameManager:
             cube_id=pending.cube_id,
             use_upgrades=pending.use_upgrades,
             guided_mode_default=pending.guided_mode_default,
+            voice_chat_enabled=pending.voice_chat_enabled,
             play_mode=pending.play_mode,
         )
 
@@ -1973,6 +1986,7 @@ class GameManager:
             phase=phase,
             starting_life=game.config.starting_life,
             use_upgrades=game.config.use_upgrades,
+            voice_chat_enabled=game.config.voice_chat_enabled,
             players=all_players,
             self_player=SelfPlayerView(
                 name=player.name,

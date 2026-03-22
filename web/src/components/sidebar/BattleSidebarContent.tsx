@@ -264,6 +264,9 @@ function ControlsPanel({
             {voiceChat && voiceChat.state.peers.some((p) => p.name === opponentName) && (
               <MicToggle
                 muted={voiceChat.state.mutedPeers.has(opponentName)}
+                connectionState={voiceChat.state.peers.find(p => p.name === opponentName)?.connectionState}
+                audioLevelKey={opponentName}
+                remoteMuted={voiceChat.state.remoteMutedPeers.has(opponentName)}
                 onClick={() => voiceChat.togglePeerMute(opponentName)}
               />
             )}
@@ -299,6 +302,7 @@ function ControlsPanel({
             {voiceChat && voiceChat.state.peers.length > 0 && (
               <MicToggle
                 muted={voiceChat.state.isMuted}
+                audioLevelKey="__self__"
                 onClick={() => voiceChat.toggleSelfMute()}
               />
             )}

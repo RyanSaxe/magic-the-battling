@@ -898,6 +898,40 @@ body {
   animation: gentle-glow 3s ease-in-out infinite;
 }
 
+.mic-level-bar {
+  width: 2px;
+  align-self: stretch;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+
+.mic-level-bar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: var(--mic-level, 0%);
+  background: rgb(74, 222, 128);
+  border-radius: 1px;
+  transition: height 50ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mic-level-bar::after { transition: none; }
+}
+
+@keyframes mic-connecting {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+.animate-mic-connecting {
+  animation: mic-connecting 1.5s ease-in-out infinite;
+}
+
 /* Carousel crossfade */
 .carousel-fade-in {
   opacity: 1;

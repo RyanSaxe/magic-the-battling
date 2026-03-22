@@ -173,6 +173,7 @@ export interface GameState {
   current_battle: BattleView | null
   battle_resolution: BattleResolution | null
   use_upgrades: boolean
+  voice_chat_enabled: boolean
   cube_id: string
   play_mode: PlayMode
 }
@@ -313,6 +314,7 @@ export interface CompactGameState {
   current_battle: CompactBattleView | null
   battle_resolution: BattleResolution | null
   use_upgrades: boolean
+  voice_chat_enabled: boolean
   cube_id: string
   play_mode: PlayMode
   catalog_delta: Record<string, CardCatalogEntry>
@@ -347,6 +349,7 @@ export interface LobbyState {
   available_puppet_count: number | null
   use_upgrades: boolean
   guided_mode_default: boolean
+  voice_chat_enabled: boolean
   play_mode: PlayMode
 }
 
