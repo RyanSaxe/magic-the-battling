@@ -854,7 +854,11 @@ function GameContent() {
   const voiceTargetNames = useMemo(() => new Set(peerNames), [peerNames]);
   const voiceTargetsAvailable = peerNames.length > 0;
 
-  const voiceChat = useVoiceChat(send, peerNames, gameState?.self_player.name ?? null, voiceSignalRef);
+  const handleMicDenied = useCallback(() => {
+    addToast("Microphone access was denied. Voice chat is unavailable.", "warning")
+  }, [addToast])
+
+  const voiceChat = useVoiceChat(send, peerNames, gameState?.self_player.name ?? null, voiceSignalRef, handleMicDenied);
 
   const renderMicToggle = useCallback((player: PlayerView) => {
     if (!voiceTargetsAvailable) return null

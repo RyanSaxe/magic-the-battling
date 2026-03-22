@@ -50,6 +50,7 @@ export function useVoiceChat(
   peerNames: string[],
   selfPlayerName: string | null,
   voiceSignalRef: MutableRefObject<((payload: VoiceSignalPayload) => void) | null>,
+  onPermissionDenied?: () => void,
 ): {
   state: VoiceChatState
   toggleSelfMute: () => void
@@ -256,7 +257,10 @@ export function useVoiceChat(
             video: false,
           })
         } catch {
-          if (!cancelled) setState(s => ({ ...s, isAvailable: false }))
+          if (!cancelled) {
+            setState(s => ({ ...s, isAvailable: false }))
+            onPermissionDenied?.()
+          }
           return
         }
         if (cancelled) {

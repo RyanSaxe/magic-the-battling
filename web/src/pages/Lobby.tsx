@@ -195,7 +195,11 @@ export function Lobby() {
 
   const selfName = lobbyState?.players.find(p => p.player_id === session?.playerId)?.name ?? null
 
-  const voiceChat = useVoiceChat(send, peerNames, selfName, voiceSignalRef);
+  const handleMicDenied = useCallback(() => {
+    addToast("Microphone access was denied. Voice chat is unavailable.", "warning")
+  }, [addToast])
+
+  const voiceChat = useVoiceChat(send, peerNames, selfName, voiceSignalRef, handleMicDenied);
 
   const [copied, setCopied] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
