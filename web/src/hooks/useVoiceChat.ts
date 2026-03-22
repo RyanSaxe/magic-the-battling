@@ -16,6 +16,7 @@ export interface VoiceChatState {
   isSpeaking: boolean
   peers: VoicePeer[]
   mutedPeers: Set<string>
+  speakingPeers: Set<string>
 }
 
 interface VoiceSignalPayload {
@@ -37,6 +38,7 @@ const INITIAL_STATE: VoiceChatState = {
   isSpeaking: false,
   peers: [],
   mutedPeers: new Set(),
+  speakingPeers: new Set(),
 }
 
 const SPEAKING_THRESHOLD = 15
@@ -46,6 +48,42 @@ const DISCONNECTED_GRACE = 4000
 
 function browserSupportsVoice(): boolean {
   return typeof navigator.mediaDevices?.getUserMedia === 'function' && typeof RTCPeerConnection !== 'undefined'
+}
+
+function createAudioLevelDetector(
+  stream: MediaStream,
+  onSpeakingChange: (speaking: boolean) => void,
+): { stop: () => void } {
+  const ctx = new AudioContext()
+  const source = ctx.createMediaStreamSource(stream)
+  const analyser = ctx.createAnalyser()
+  analyser.fftSize = 256
+  analyser.smoothingTimeConstant = 0.3
+  source.connect(analyser)
+
+  const data = new Uint8Array(analyser.frequencyBinCount)
+  let wasSpeaking = false
+  let rafId = 0
+
+  const tick = () => {
+    rafId = requestAnimationFrame(tick)
+    analyser.getByteFrequencyData(data)
+    let sum = 0
+    for (let i = 0; i < data.length; i++) sum += data[i]
+    const speaking = sum / data.length > SPEAKING_THRESHOLD
+    if (speaking !== wasSpeaking) {
+      wasSpeaking = speaking
+      onSpeakingChange(speaking)
+    }
+  }
+  rafId = requestAnimationFrame(tick)
+
+  return {
+    stop() {
+      cancelAnimationFrame(rafId)
+      ctx.close()
+    },
+  }
 }
 
 export function useVoiceChat(
@@ -74,54 +112,24 @@ export function useVoiceChat(
   const onRetriesExhaustedRef = useRef(onRetriesExhausted)
   const onPermissionDeniedRef = useRef(onPermissionDenied)
 
-  const audioContextRef = useRef<AudioContext | null>(null)
-  const analyserRef = useRef<AnalyserNode | null>(null)
-  const rafIdRef = useRef(0)
-  const isSpeakingRef = useRef(false)
+  const selfDetectorRef = useRef<{ stop: () => void } | null>(null)
+  const peerDetectorsRef = useRef<Map<string, { stop: () => void }>>(new Map())
 
   const startSpeakingDetection = useCallback((stream: MediaStream) => {
-    const ctx = new AudioContext()
-    const source = ctx.createMediaStreamSource(stream)
-    const analyser = ctx.createAnalyser()
-    analyser.fftSize = 256
-    analyser.smoothingTimeConstant = 0.3
-    source.connect(analyser)
-    audioContextRef.current = ctx
-    analyserRef.current = analyser
-
-    const data = new Uint8Array(analyser.frequencyBinCount)
-    const tick = () => {
-      rafIdRef.current = requestAnimationFrame(tick)
+    selfDetectorRef.current?.stop()
+    selfDetectorRef.current = createAudioLevelDetector(stream, (speaking) => {
       const track = localStreamRef.current?.getAudioTracks()[0]
       if (!track?.enabled) {
-        if (isSpeakingRef.current) {
-          isSpeakingRef.current = false
-          setState(s => ({ ...s, isSpeaking: false }))
-        }
+        setState(s => s.isSpeaking ? { ...s, isSpeaking: false } : s)
         return
       }
-      analyser.getByteFrequencyData(data)
-      let sum = 0
-      for (let i = 0; i < data.length; i++) sum += data[i]
-      const avg = sum / data.length
-      const speaking = avg > SPEAKING_THRESHOLD
-      if (speaking !== isSpeakingRef.current) {
-        isSpeakingRef.current = speaking
-        setState(s => ({ ...s, isSpeaking: speaking }))
-      }
-    }
-    rafIdRef.current = requestAnimationFrame(tick)
+      setState(s => s.isSpeaking !== speaking ? { ...s, isSpeaking: speaking } : s)
+    })
   }, [])
 
   const stopSpeakingDetection = useCallback(() => {
-    cancelAnimationFrame(rafIdRef.current)
-    rafIdRef.current = 0
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
-    }
-    analyserRef.current = null
-    isSpeakingRef.current = false
+    selfDetectorRef.current?.stop()
+    selfDetectorRef.current = null
   }, [])
 
   const sendSignalTo = useCallback((peerName: string, signalType: string, data: unknown) => {
@@ -171,7 +179,19 @@ export function useVoiceChat(
     }
 
     pc.ontrack = (ev) => {
-      audioEl.srcObject = ev.streams[0] ?? new MediaStream([ev.track])
+      const remoteStream = ev.streams[0] ?? new MediaStream([ev.track])
+      audioEl.srcObject = remoteStream
+      peerDetectorsRef.current.get(peerName)?.stop()
+      const detector = createAudioLevelDetector(remoteStream, (speaking) => {
+        setState(s => {
+          const has = s.speakingPeers.has(peerName)
+          if (speaking === has) return s
+          const next = new Set(s.speakingPeers)
+          if (speaking) { next.add(peerName) } else { next.delete(peerName) }
+          return { ...s, speakingPeers: next }
+        })
+      })
+      peerDetectorsRef.current.set(peerName, detector)
     }
 
     pc.onconnectionstatechange = () => {
@@ -222,6 +242,8 @@ export function useVoiceChat(
     const timer = retryTimerRef.current.get(peerName)
     if (timer) { clearTimeout(timer); retryTimerRef.current.delete(peerName) }
     retryCountRef.current.delete(peerName)
+    peerDetectorsRef.current.get(peerName)?.stop()
+    peerDetectorsRef.current.delete(peerName)
     const ps = peersRef.current.get(peerName)
     if (!ps) return
     ps.pc.close()
@@ -229,6 +251,12 @@ export function useVoiceChat(
     ps.audioEl.remove()
     peersRef.current.delete(peerName)
     updatePeerStates()
+    setState(s => {
+      if (!s.speakingPeers.has(peerName)) return s
+      const next = new Set(s.speakingPeers)
+      next.delete(peerName)
+      return { ...s, speakingPeers: next }
+    })
   }, [updatePeerStates])
 
   useEffect(() => { selfPlayerNameRef.current = selfPlayerName }, [selfPlayerName])
@@ -348,10 +376,13 @@ export function useVoiceChat(
     const timers = retryTimerRef.current
     const retryCounts = retryCountRef.current
     const peers = peersRef.current
+    const detectors = peerDetectorsRef.current
     return () => {
       for (const timer of timers.values()) clearTimeout(timer)
       timers.clear()
       retryCounts.clear()
+      for (const d of detectors.values()) d.stop()
+      detectors.clear()
       for (const name of peers.keys()) {
         const ps = peers.get(name)
         if (ps) {

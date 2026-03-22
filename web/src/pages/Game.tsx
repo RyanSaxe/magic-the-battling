@@ -886,6 +886,7 @@ function GameContent() {
       <MicToggle
         muted={voiceChat.state.mutedPeers.has(player.name)}
         connectionState={peer.connectionState}
+        speaking={voiceChat.state.speakingPeers.has(player.name)}
         variant="player-row"
         onClick={() => voiceChat.togglePeerMute(player.name)}
       />
@@ -2228,6 +2229,7 @@ function GameContent() {
                             <MicToggle
                               muted={voiceChat.state.mutedPeers.has(battleViewForDisplay.opponent_name)}
                               connectionState={oppPeer.connectionState}
+                              speaking={voiceChat.state.speakingPeers.has(battleViewForDisplay.opponent_name)}
                               onClick={() => voiceChat.togglePeerMute(battleViewForDisplay.opponent_name)}
                             />
                           ) : null

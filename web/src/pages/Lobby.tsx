@@ -976,6 +976,7 @@ export function Lobby() {
                                 <MicToggle
                                   muted={voiceChat.state.mutedPeers.has(player.name)}
                                   connectionState={peer.connectionState}
+                                  speaking={voiceChat.state.speakingPeers.has(player.name)}
                                   onClick={() => voiceChat.togglePeerMute(player.name)}
                                 />
                               ) : null
