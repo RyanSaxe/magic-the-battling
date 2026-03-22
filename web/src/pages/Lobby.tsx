@@ -89,7 +89,7 @@ function GuidedModeSwitch({
   }, [showGuidedModeHelp]);
 
   return (
-    <div className="flex items-center gap-1.5 shrink-0 rounded-md border border-black/40 bg-black/40 px-2 py-1">
+    <div className="flex items-center gap-1.5">
       <label className="flex items-center gap-1.5 cursor-pointer">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
           Guided
@@ -152,7 +152,7 @@ function VoiceChatSwitch({
 }) {
   return (
     <div
-      className={`flex items-center gap-1.5 shrink-0 rounded-md border border-black/40 bg-black/40 px-2 py-1${
+      className={`flex items-center gap-1.5${
         !isHost ? ' opacity-50' : ''
       }`}
     >
@@ -1098,11 +1098,12 @@ export function Lobby() {
                 </div>
 
                 <div className="space-y-3 mb-3">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between rounded-md border border-black/40 bg-black/40 px-2 py-1">
                     <GuidedModeSwitch
                       enabled={isGuidedMode}
                       setEnabled={handleGuidedModeToggle}
                     />
+                    <div className="h-4 w-px bg-white/10" />
                     <VoiceChatSwitch
                       enabled={lobbyState.voice_chat_enabled}
                       setEnabled={(v) => send('set_voice_chat', { enabled: v })}
