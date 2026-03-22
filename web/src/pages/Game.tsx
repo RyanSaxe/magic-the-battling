@@ -865,6 +865,7 @@ function GameContent() {
       return (
         <MicToggle
           muted={voiceChat.state.isMuted}
+          speaking={voiceChat.state.isSpeaking}
           variant="player-row"
           onClick={() => voiceChat.toggleSelfMute()}
         />
@@ -2229,6 +2230,7 @@ function GameContent() {
                         {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
                           <MicToggle
                             muted={voiceChat.state.isMuted}
+                            speaking={voiceChat.state.isSpeaking}
                             onClick={() => voiceChat.toggleSelfMute()}
                           />
                         )}

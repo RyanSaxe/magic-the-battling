@@ -2,10 +2,12 @@ interface MicToggleProps {
   muted: boolean
   onClick: (e: React.MouseEvent) => void
   variant?: 'default' | 'player-row'
+  speaking?: boolean
 }
 
-export function MicToggle({ muted, onClick, variant = 'default' }: MicToggleProps) {
+export function MicToggle({ muted, onClick, variant = 'default', speaking }: MicToggleProps) {
   const isPlayerRow = variant === 'player-row'
+  const showGlow = speaking && !muted
 
   return (
     <button
@@ -22,7 +24,7 @@ export function MicToggle({ muted, onClick, variant = 'default' }: MicToggleProp
         muted
           ? 'text-red-400 hover:text-red-300'
           : 'text-indigo-300 hover:text-indigo-200'
-      }`}
+      }${showGlow ? ' animate-mic-speaking' : ''}`}
       title={muted ? 'Unmute' : 'Mute'}
     >
       {muted ? <MicOffIcon className="w-3.5 h-3.5" /> : <MicIcon className="w-3.5 h-3.5" />}

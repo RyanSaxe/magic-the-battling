@@ -299,6 +299,7 @@ function ControlsPanel({
             {voiceChat && voiceChat.state.peers.length > 0 && (
               <MicToggle
                 muted={voiceChat.state.isMuted}
+                speaking={voiceChat.state.isSpeaking}
                 onClick={() => voiceChat.toggleSelfMute()}
               />
             )}

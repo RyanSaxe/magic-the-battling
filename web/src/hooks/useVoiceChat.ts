@@ -13,6 +13,7 @@ export interface VoicePeer {
 export interface VoiceChatState {
   isAvailable: boolean
   isMuted: boolean
+  isSpeaking: boolean
   peers: VoicePeer[]
   mutedPeers: Set<string>
 }
@@ -33,9 +34,12 @@ interface PeerState {
 const INITIAL_STATE: VoiceChatState = {
   isAvailable: true,
   isMuted: false,
+  isSpeaking: false,
   peers: [],
   mutedPeers: new Set(),
 }
+
+const SPEAKING_THRESHOLD = 15
 
 function browserSupportsVoice(): boolean {
   return typeof navigator.mediaDevices?.getUserMedia === 'function' && typeof RTCPeerConnection !== 'undefined'
@@ -56,6 +60,56 @@ export function useVoiceChat(
   const peersRef = useRef<Map<string, PeerState>>(new Map())
   const localStreamRef = useRef<MediaStream | null>(null)
   const mutedPeersRef = useRef<Set<string>>(new Set())
+
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const analyserRef = useRef<AnalyserNode | null>(null)
+  const rafIdRef = useRef(0)
+  const isSpeakingRef = useRef(false)
+
+  const startSpeakingDetection = useCallback((stream: MediaStream) => {
+    const ctx = new AudioContext()
+    const source = ctx.createMediaStreamSource(stream)
+    const analyser = ctx.createAnalyser()
+    analyser.fftSize = 256
+    analyser.smoothingTimeConstant = 0.3
+    source.connect(analyser)
+    audioContextRef.current = ctx
+    analyserRef.current = analyser
+
+    const data = new Uint8Array(analyser.frequencyBinCount)
+    const tick = () => {
+      rafIdRef.current = requestAnimationFrame(tick)
+      const track = localStreamRef.current?.getAudioTracks()[0]
+      if (!track?.enabled) {
+        if (isSpeakingRef.current) {
+          isSpeakingRef.current = false
+          setState(s => ({ ...s, isSpeaking: false }))
+        }
+        return
+      }
+      analyser.getByteFrequencyData(data)
+      let sum = 0
+      for (let i = 0; i < data.length; i++) sum += data[i]
+      const avg = sum / data.length
+      const speaking = avg > SPEAKING_THRESHOLD
+      if (speaking !== isSpeakingRef.current) {
+        isSpeakingRef.current = speaking
+        setState(s => ({ ...s, isSpeaking: speaking }))
+      }
+    }
+    rafIdRef.current = requestAnimationFrame(tick)
+  }, [])
+
+  const stopSpeakingDetection = useCallback(() => {
+    cancelAnimationFrame(rafIdRef.current)
+    rafIdRef.current = 0
+    if (audioContextRef.current) {
+      audioContextRef.current.close()
+      audioContextRef.current = null
+    }
+    analyserRef.current = null
+    isSpeakingRef.current = false
+  }, [])
 
   const sendSignalTo = useCallback((peerName: string, signalType: string, data: unknown) => {
     send('voice_signal', { signal_type: signalType, data, target_player: peerName })
@@ -181,7 +235,8 @@ export function useVoiceChat(
         localStreamRef.current.getTracks().forEach(t => t.stop())
         localStreamRef.current = null
       }
-      setState(s => ({ ...s, peers: [], isMuted: false }))
+      stopSpeakingDetection()
+      setState(s => ({ ...s, peers: [], isMuted: false, isSpeaking: false }))
       return
     }
 
@@ -209,6 +264,7 @@ export function useVoiceChat(
           return
         }
         localStreamRef.current = stream
+        startSpeakingDetection(stream)
       }
 
       const stream = localStreamRef.current!
@@ -232,7 +288,7 @@ export function useVoiceChat(
     reconcile()
 
     return () => { cancelled = true }
-  }, [peerNames, selfPlayerName, createPeerConnection, destroyPeer])
+  }, [peerNames, selfPlayerName, createPeerConnection, destroyPeer, startSpeakingDetection, stopSpeakingDetection])
 
   useEffect(() => {
     return () => {
@@ -249,8 +305,9 @@ export function useVoiceChat(
         localStreamRef.current.getTracks().forEach(t => t.stop())
         localStreamRef.current = null
       }
+      stopSpeakingDetection()
     }
-  }, [])
+  }, [stopSpeakingDetection])
 
   const toggleSelfMute = useCallback(() => {
     const stream = localStreamRef.current
@@ -258,7 +315,8 @@ export function useVoiceChat(
     const track = stream.getAudioTracks()[0]
     if (!track) return
     track.enabled = !track.enabled
-    setState(s => ({ ...s, isMuted: !track.enabled }))
+    const muted = !track.enabled
+    setState(s => ({ ...s, isMuted: muted, ...(muted && { isSpeaking: false }) }))
   }, [])
 
   const togglePeerMute = useCallback((peerName: string) => {

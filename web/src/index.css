@@ -898,6 +898,16 @@ body {
   animation: gentle-glow 3s ease-in-out infinite;
 }
 
+@keyframes mic-speaking {
+  0%, 100% { box-shadow: 0 0 4px rgba(74, 222, 128, 0.4); }
+  50% { box-shadow: 0 0 10px rgba(74, 222, 128, 0.6), 0 0 20px rgba(74, 222, 128, 0.2); }
+}
+
+.animate-mic-speaking {
+  animation: mic-speaking 1.2s ease-in-out infinite;
+  border-radius: 4px;
+}
+
 /* Carousel crossfade */
 .carousel-fade-in {
   opacity: 1;
