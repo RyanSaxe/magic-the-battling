@@ -17,6 +17,7 @@ export interface VoiceChatState {
   peers: VoicePeer[]
   mutedPeers: Set<string>
   speakingPeers: Set<string>
+  remoteMutedPeers: Set<string>
 }
 
 interface VoiceSignalPayload {
@@ -39,6 +40,7 @@ const INITIAL_STATE: VoiceChatState = {
   peers: [],
   mutedPeers: new Set(),
   speakingPeers: new Set(),
+  remoteMutedPeers: new Set(),
 }
 
 const SPEAKING_THRESHOLD = 15
@@ -200,6 +202,10 @@ export function useVoiceChat(
         retryCountRef.current.delete(peerName)
         const timer = retryTimerRef.current.get(peerName)
         if (timer) { clearTimeout(timer); retryTimerRef.current.delete(peerName) }
+        const track = localStreamRef.current?.getAudioTracks()[0]
+        if (track && !track.enabled) {
+          sendSignalTo(peerName, 'mute_state', { muted: true })
+        }
       } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
         const delay = pc.connectionState === 'disconnected'
           ? DISCONNECTED_GRACE
@@ -252,10 +258,14 @@ export function useVoiceChat(
     peersRef.current.delete(peerName)
     updatePeerStates()
     setState(s => {
-      if (!s.speakingPeers.has(peerName)) return s
-      const next = new Set(s.speakingPeers)
-      next.delete(peerName)
-      return { ...s, speakingPeers: next }
+      const hasSpeaking = s.speakingPeers.has(peerName)
+      const hasRemoteMuted = s.remoteMutedPeers.has(peerName)
+      if (!hasSpeaking && !hasRemoteMuted) return s
+      const nextSpeaking = hasSpeaking ? new Set(s.speakingPeers) : s.speakingPeers
+      const nextRemoteMuted = hasRemoteMuted ? new Set(s.remoteMutedPeers) : s.remoteMutedPeers
+      if (hasSpeaking) nextSpeaking.delete(peerName)
+      if (hasRemoteMuted) nextRemoteMuted.delete(peerName)
+      return { ...s, speakingPeers: nextSpeaking, remoteMutedPeers: nextRemoteMuted }
     })
   }, [updatePeerStates])
 
@@ -294,6 +304,13 @@ export function useVoiceChat(
         } else {
           ps.iceBuffer.push(payload.data as RTCIceCandidateInit)
         }
+      } else if (payload.signal_type === 'mute_state') {
+        const { muted } = payload.data as { muted: boolean }
+        setState(s => {
+          const next = new Set(s.remoteMutedPeers)
+          if (muted) { next.add(fromPeer) } else { next.delete(fromPeer) }
+          return { ...s, remoteMutedPeers: next }
+        })
       }
     } catch (err) {
       console.error('Voice signal handling error:', err)
@@ -408,7 +425,10 @@ export function useVoiceChat(
     track.enabled = !track.enabled
     const muted = !track.enabled
     setState(s => ({ ...s, isMuted: muted, ...(muted && { isSpeaking: false }) }))
-  }, [])
+    for (const peerName of peersRef.current.keys()) {
+      sendSignalTo(peerName, 'mute_state', { muted })
+    }
+  }, [sendSignalTo])
 
   const togglePeerMute = useCallback((peerName: string) => {
     const ps = peersRef.current.get(peerName)

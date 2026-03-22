@@ -266,6 +266,7 @@ function ControlsPanel({
                 muted={voiceChat.state.mutedPeers.has(opponentName)}
                 connectionState={voiceChat.state.peers.find(p => p.name === opponentName)?.connectionState}
                 speaking={voiceChat.state.speakingPeers.has(opponentName)}
+                remoteMuted={voiceChat.state.remoteMutedPeers.has(opponentName)}
                 onClick={() => voiceChat.togglePeerMute(opponentName)}
               />
             )}

@@ -6,10 +6,11 @@ interface MicToggleProps {
   variant?: 'default' | 'player-row'
   speaking?: boolean
   connectionState?: VoicePeer['connectionState']
+  remoteMuted?: boolean
 }
 
-function getMicVisual(props: Pick<MicToggleProps, 'muted' | 'connectionState'>) {
-  const { muted, connectionState } = props
+function getMicVisual(props: Pick<MicToggleProps, 'muted' | 'connectionState' | 'remoteMuted'>) {
+  const { muted, connectionState, remoteMuted } = props
 
   if (connectionState === 'connecting') {
     return { icon: 'mic', color: 'text-gray-400', animation: 'animate-mic-connecting', title: 'Connecting...' }
@@ -23,12 +24,15 @@ function getMicVisual(props: Pick<MicToggleProps, 'muted' | 'connectionState'>) 
   if (muted) {
     return { icon: 'off', color: 'text-red-400 hover:text-red-300', animation: '', title: 'Unmute' }
   }
+  if (remoteMuted) {
+    return { icon: 'off', color: 'text-gray-400', animation: '', title: 'Player muted' }
+  }
   return { icon: 'mic', color: 'text-indigo-300 hover:text-indigo-200', animation: '', title: 'Mute' }
 }
 
-export function MicToggle({ muted, onClick, variant = 'default', speaking, connectionState }: MicToggleProps) {
+export function MicToggle({ muted, onClick, variant = 'default', speaking, connectionState, remoteMuted }: MicToggleProps) {
   const isPlayerRow = variant === 'player-row'
-  const visual = getMicVisual({ muted, connectionState })
+  const visual = getMicVisual({ muted, connectionState, remoteMuted })
   const showGlow = speaking && !muted && visual.icon === 'mic'
 
   const iconEl = visual.icon === 'warning'
