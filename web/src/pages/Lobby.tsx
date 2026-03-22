@@ -1103,7 +1103,6 @@ export function Lobby() {
                       enabled={isGuidedMode}
                       setEnabled={handleGuidedModeToggle}
                     />
-                    <div className="h-4 w-px bg-white/10" />
                     <VoiceChatSwitch
                       enabled={lobbyState.voice_chat_enabled}
                       setEnabled={(v) => send('set_voice_chat', { enabled: v })}
