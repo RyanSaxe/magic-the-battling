@@ -199,7 +199,11 @@ export function Lobby() {
     addToast("Microphone access was denied. Voice chat is unavailable.", "warning")
   }, [addToast])
 
-  const voiceChat = useVoiceChat(send, peerNames, selfName, voiceSignalRef, handleMicDenied);
+  const handleRetriesExhausted = useCallback((peerName: string) => {
+    addToast(`Voice connection to ${peerName} failed.`, "warning")
+  }, [addToast])
+
+  const voiceChat = useVoiceChat(send, peerNames, selfName, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
 
   const [copied, setCopied] = useState(false);
   const [startingGame, setStartingGame] = useState(false);

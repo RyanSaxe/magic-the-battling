@@ -40,6 +40,9 @@ const INITIAL_STATE: VoiceChatState = {
 }
 
 const SPEAKING_THRESHOLD = 15
+const MAX_RETRIES = 3
+const BASE_RETRY_DELAY = 1000
+const DISCONNECTED_GRACE = 4000
 
 function browserSupportsVoice(): boolean {
   return typeof navigator.mediaDevices?.getUserMedia === 'function' && typeof RTCPeerConnection !== 'undefined'
@@ -51,6 +54,7 @@ export function useVoiceChat(
   selfPlayerName: string | null,
   voiceSignalRef: MutableRefObject<((payload: VoiceSignalPayload) => void) | null>,
   onPermissionDenied?: () => void,
+  onRetriesExhausted?: (peerName: string) => void,
 ): {
   state: VoiceChatState
   toggleSelfMute: () => void
@@ -61,6 +65,14 @@ export function useVoiceChat(
   const peersRef = useRef<Map<string, PeerState>>(new Map())
   const localStreamRef = useRef<MediaStream | null>(null)
   const mutedPeersRef = useRef<Set<string>>(new Set())
+
+  const retryCountRef = useRef<Map<string, number>>(new Map())
+  const retryTimerRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const selfPlayerNameRef = useRef(selfPlayerName)
+  const createPeerConnectionRef = useRef<((peerName: string, stream: MediaStream, isOfferer: boolean) => void) | null>(null)
+  const destroyPeerRef = useRef<((peerName: string) => void) | null>(null)
+  const onRetriesExhaustedRef = useRef(onRetriesExhausted)
+  const onPermissionDeniedRef = useRef(onPermissionDenied)
 
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
@@ -164,6 +176,35 @@ export function useVoiceChat(
 
     pc.onconnectionstatechange = () => {
       updatePeerStates()
+      if (pc.connectionState === 'connected') {
+        retryCountRef.current.delete(peerName)
+        const timer = retryTimerRef.current.get(peerName)
+        if (timer) { clearTimeout(timer); retryTimerRef.current.delete(peerName) }
+      } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+        const delay = pc.connectionState === 'disconnected'
+          ? DISCONNECTED_GRACE
+          : BASE_RETRY_DELAY * Math.pow(2, retryCountRef.current.get(peerName) ?? 0)
+        const existingTimer = retryTimerRef.current.get(peerName)
+        if (existingTimer) clearTimeout(existingTimer)
+
+        const timerId = setTimeout(() => {
+          retryTimerRef.current.delete(peerName)
+          if (!peersRef.current.has(peerName)) return
+          const currentPc = peersRef.current.get(peerName)?.pc
+          if (currentPc && currentPc.connectionState === 'connected') return
+          const retryCount = retryCountRef.current.get(peerName) ?? 0
+          if (retryCount >= MAX_RETRIES) {
+            onRetriesExhaustedRef.current?.(peerName)
+            return
+          }
+          retryCountRef.current.set(peerName, retryCount + 1)
+          destroyPeerRef.current?.(peerName)
+          const s = localStreamRef.current
+          if (!s) return
+          createPeerConnectionRef.current?.(peerName, s, selfPlayerNameRef.current! < peerName)
+        }, delay)
+        retryTimerRef.current.set(peerName, timerId)
+      }
     }
 
     if (isOfferer) {
@@ -178,6 +219,9 @@ export function useVoiceChat(
   }, [sendSignalTo, updatePeerStates])
 
   const destroyPeer = useCallback((peerName: string) => {
+    const timer = retryTimerRef.current.get(peerName)
+    if (timer) { clearTimeout(timer); retryTimerRef.current.delete(peerName) }
+    retryCountRef.current.delete(peerName)
     const ps = peersRef.current.get(peerName)
     if (!ps) return
     ps.pc.close()
@@ -186,6 +230,12 @@ export function useVoiceChat(
     peersRef.current.delete(peerName)
     updatePeerStates()
   }, [updatePeerStates])
+
+  useEffect(() => { selfPlayerNameRef.current = selfPlayerName }, [selfPlayerName])
+  useEffect(() => { createPeerConnectionRef.current = createPeerConnection }, [createPeerConnection])
+  useEffect(() => { destroyPeerRef.current = destroyPeer }, [destroyPeer])
+  useEffect(() => { onRetriesExhaustedRef.current = onRetriesExhausted }, [onRetriesExhausted])
+  useEffect(() => { onPermissionDeniedRef.current = onPermissionDenied }, [onPermissionDenied])
 
   const handleSignal = useCallback(async (payload: VoiceSignalPayload) => {
     const fromPeer = payload.from_player
@@ -259,7 +309,7 @@ export function useVoiceChat(
         } catch {
           if (!cancelled) {
             setState(s => ({ ...s, isAvailable: false }))
-            onPermissionDenied?.()
+            onPermissionDeniedRef.current?.()
           }
           return
         }
@@ -295,16 +345,22 @@ export function useVoiceChat(
   }, [peerNames, selfPlayerName, createPeerConnection, destroyPeer, startSpeakingDetection, stopSpeakingDetection])
 
   useEffect(() => {
+    const timers = retryTimerRef.current
+    const retryCounts = retryCountRef.current
+    const peers = peersRef.current
     return () => {
-      for (const name of peersRef.current.keys()) {
-        const ps = peersRef.current.get(name)
+      for (const timer of timers.values()) clearTimeout(timer)
+      timers.clear()
+      retryCounts.clear()
+      for (const name of peers.keys()) {
+        const ps = peers.get(name)
         if (ps) {
           ps.pc.close()
           ps.audioEl.srcObject = null
           ps.audioEl.remove()
         }
       }
-      peersRef.current.clear()
+      peers.clear()
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(t => t.stop())
         localStreamRef.current = null
