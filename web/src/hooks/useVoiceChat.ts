@@ -44,9 +44,38 @@ const INITIAL_STATE: VoiceChatState = {
 }
 
 const SPEAKING_THRESHOLD = 15
+const ATTACK_ALPHA = 0.4
+const DECAY_ALPHA = 0.15
 const MAX_RETRIES = 3
 const BASE_RETRY_DELAY = 1000
 const DISCONNECTED_GRACE = 4000
+
+let sharedAudioContext: AudioContext | null = null
+let sharedAudioContextRefCount = 0
+
+function getSharedAudioContext(): AudioContext {
+  if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
+    sharedAudioContext = new AudioContext()
+    sharedAudioContextRefCount = 0
+  }
+  sharedAudioContextRefCount++
+  return sharedAudioContext
+}
+
+function releaseSharedAudioContext() {
+  sharedAudioContextRefCount--
+  if (sharedAudioContextRefCount <= 0) {
+    sharedAudioContext?.close()
+    sharedAudioContext = null
+    sharedAudioContextRefCount = 0
+  }
+}
+
+const audioLevels: Record<string, number> = {}
+
+export function getAudioLevel(key: string): number {
+  return audioLevels[key] ?? 0
+}
 
 function browserSupportsVoice(): boolean {
   return typeof navigator.mediaDevices?.getUserMedia === 'function' && typeof RTCPeerConnection !== 'undefined'
@@ -54,9 +83,9 @@ function browserSupportsVoice(): boolean {
 
 function createAudioLevelDetector(
   stream: MediaStream,
-  onSpeakingChange: (speaking: boolean) => void,
+  onLevel: (level: number, speaking: boolean) => void,
 ): { stop: () => void } {
-  const ctx = new AudioContext()
+  const ctx = getSharedAudioContext()
   const source = ctx.createMediaStreamSource(stream)
   const analyser = ctx.createAnalyser()
   analyser.fftSize = 256
@@ -64,7 +93,7 @@ function createAudioLevelDetector(
   source.connect(analyser)
 
   const data = new Uint8Array(analyser.frequencyBinCount)
-  let wasSpeaking = false
+  let smoothed = 0
   let rafId = 0
 
   const tick = () => {
@@ -72,18 +101,20 @@ function createAudioLevelDetector(
     analyser.getByteFrequencyData(data)
     let sum = 0
     for (let i = 0; i < data.length; i++) sum += data[i]
-    const speaking = sum / data.length > SPEAKING_THRESHOLD
-    if (speaking !== wasSpeaking) {
-      wasSpeaking = speaking
-      onSpeakingChange(speaking)
-    }
+    const avg = sum / data.length
+    const raw = avg > SPEAKING_THRESHOLD ? avg / 255 : 0
+    const alpha = raw > smoothed ? ATTACK_ALPHA : DECAY_ALPHA
+    smoothed += alpha * (raw - smoothed)
+    if (smoothed < 0.01) smoothed = 0
+    onLevel(smoothed, smoothed > 0)
   }
   rafId = requestAnimationFrame(tick)
 
   return {
     stop() {
       cancelAnimationFrame(rafId)
-      ctx.close()
+      source.disconnect()
+      releaseSharedAudioContext()
     },
   }
 }
@@ -119,12 +150,14 @@ export function useVoiceChat(
 
   const startSpeakingDetection = useCallback((stream: MediaStream) => {
     selfDetectorRef.current?.stop()
-    selfDetectorRef.current = createAudioLevelDetector(stream, (speaking) => {
+    selfDetectorRef.current = createAudioLevelDetector(stream, (level, speaking) => {
       const track = localStreamRef.current?.getAudioTracks()[0]
       if (!track?.enabled) {
+        audioLevels['__self__'] = 0
         setState(s => s.isSpeaking ? { ...s, isSpeaking: false } : s)
         return
       }
+      audioLevels['__self__'] = level
       setState(s => s.isSpeaking !== speaking ? { ...s, isSpeaking: speaking } : s)
     })
   }, [])
@@ -184,7 +217,8 @@ export function useVoiceChat(
       const remoteStream = ev.streams[0] ?? new MediaStream([ev.track])
       audioEl.srcObject = remoteStream
       peerDetectorsRef.current.get(peerName)?.stop()
-      const detector = createAudioLevelDetector(remoteStream, (speaking) => {
+      const detector = createAudioLevelDetector(remoteStream, (level, speaking) => {
+        audioLevels[peerName] = level
         setState(s => {
           const has = s.speakingPeers.has(peerName)
           if (speaking === has) return s
@@ -250,6 +284,7 @@ export function useVoiceChat(
     retryCountRef.current.delete(peerName)
     peerDetectorsRef.current.get(peerName)?.stop()
     peerDetectorsRef.current.delete(peerName)
+    delete audioLevels[peerName]
     const ps = peersRef.current.get(peerName)
     if (!ps) return
     ps.pc.close()
@@ -332,6 +367,7 @@ export function useVoiceChat(
         localStreamRef.current = null
       }
       stopSpeakingDetection()
+      audioLevels['__self__'] = 0
       setState(s => ({ ...s, peers: [], isMuted: false, isSpeaking: false }))
       return
     }
@@ -424,6 +460,7 @@ export function useVoiceChat(
     if (!track) return
     track.enabled = !track.enabled
     const muted = !track.enabled
+    if (muted) audioLevels['__self__'] = 0
     setState(s => ({ ...s, isMuted: muted, ...(muted && { isSpeaking: false }) }))
     for (const peerName of peersRef.current.keys()) {
       sendSignalTo(peerName, 'mute_state', { muted })
