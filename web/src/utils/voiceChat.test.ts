@@ -58,6 +58,7 @@ function makeGameState(overrides: Partial<GameState>): GameState {
     current_battle: null,
     battle_resolution: null,
     use_upgrades: true,
+    voice_chat_enabled: true,
     cube_id: "cube-1",
     play_mode: "limited",
     ...overrides,

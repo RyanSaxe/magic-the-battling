@@ -314,6 +314,7 @@ export interface CompactGameState {
   current_battle: CompactBattleView | null
   battle_resolution: BattleResolution | null
   use_upgrades: boolean
+  voice_chat_enabled: boolean
   cube_id: string
   play_mode: PlayMode
   catalog_delta: Record<string, CardCatalogEntry>
