@@ -12,6 +12,7 @@ import { PoisonCard } from './PoisonCard'
 import { ZoneLayout } from './ZoneLayout'
 import { UpgradeGrid } from './UpgradeGrid'
 import { buildAppliedUpgradeMap, type UpgradeDisplayScope } from '../../utils/upgrades'
+import { getUpgradeGridColumns } from '../../utils/upgradeGrid'
 
 export interface DeckDisplayResizeState {
   constraints: ZoneConstraints | null
@@ -112,7 +113,7 @@ export function DeckDisplay({
       hand: { count: hasHand ? hand.length : 0 },
       battlefield: { count: battlefieldCount, priority: 'fill' as const, maxRows: 1 },
       sideboard: { count: sideboard.length },
-      commandZone: { count: commandZoneCount },
+      commandZone: { count: commandZoneCount, minColumns: getUpgradeGridColumns(commandZoneCount) },
     },
     layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
     ...ZONE_LAYOUT_PADDING,
