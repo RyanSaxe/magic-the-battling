@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useWebSocket } from './useWebSocket'
+import type { VoiceSignalPayload } from './useWebSocket'
 import type { CardDestination, BuildSource, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
 
@@ -12,7 +13,8 @@ export function useGame(
   gameId: string | null,
   sessionId: string | null,
   spectatorConfig?: SpectatorConfig | null,
-  onServerError?: (message: string) => void
+  onServerError?: (message: string) => void,
+  onVoiceSignal?: (payload: VoiceSignalPayload) => void,
 ) {
   const {
     isConnected,
@@ -25,7 +27,7 @@ export function useGame(
     kicked,
     invalidSession,
     gameNotFound,
-  } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError)
+  } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError, onVoiceSignal)
 
   const startGame = useCallback(() => {
     send('start_game')
@@ -92,6 +94,10 @@ export function useGame(
     send('battle_move', { card_id: cardId, from_zone: fromZone, to_zone: toZone, from_owner: fromOwner, to_owner: toOwner })
   }, [send])
 
+  const battleRevealUpgrade = useCallback((upgradeId: string) => {
+    send('battle_reveal_upgrade', { upgrade_id: upgradeId })
+  }, [send])
+
   const battleSubmitResult = useCallback((result: string) => {
     send('battle_submit_result', { result })
   }, [send])
@@ -132,6 +138,10 @@ export function useGame(
     send('remove_puppet')
   }, [send])
 
+  const setTargetPlayerCount = useCallback((targetPlayerCount: number) => {
+    send('set_target_player_count', { target_player_count: targetPlayerCount })
+  }, [send])
+
   const kickPlayer = useCallback((targetPlayerId: string) => {
     send('kick_player', { target_player_id: targetPlayerId })
   }, [send])
@@ -150,6 +160,7 @@ export function useGame(
     kicked,
     invalidSession,
     gameNotFound,
+    send,
     actions: {
       startGame,
       setReady,
@@ -157,6 +168,7 @@ export function useGame(
       clearBattler,
       addPuppet,
       removePuppet,
+      setTargetPlayerCount,
       kickPlayer,
       draftSwap,
       draftRoll,
@@ -169,6 +181,7 @@ export function useGame(
       buildSetCompanion,
       buildRemoveCompanion,
       battleMove,
+      battleRevealUpgrade,
       battleSubmitResult,
       battleUpdateCardState,
       battleUpdateLife,

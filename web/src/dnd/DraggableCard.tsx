@@ -27,6 +27,8 @@ interface DraggableCardProps {
   isCompanion?: boolean
   upgraded?: boolean
   appliedUpgrades?: CardType[]
+  hiddenUpgradeCount?: number
+  onRevealHiddenUpgrades?: () => void
   canPeekFaceDown?: boolean
   style?: React.CSSProperties
   dragInstanceKey?: string
@@ -54,6 +56,8 @@ export function DraggableCard({
   isCompanion = false,
   upgraded = false,
   appliedUpgrades,
+  hiddenUpgradeCount = 0,
+  onRevealHiddenUpgrades,
   canPeekFaceDown,
   style: externalStyle,
   dragInstanceKey,
@@ -73,30 +77,27 @@ export function DraggableCard({
 
   const style = {
     ...externalStyle,
-    ...(transform ? { transform: CSS.Translate.toString(transform) } : undefined),
   }
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...listeners}
-      {...attributes}
-      onClick={(e) => {
-        if (!(e.target as HTMLElement).closest('button')) {
-          onClick?.()
-        }
-      }}
-      onDoubleClick={onDoubleClick}
-      onMouseEnter={onCardHover ? () => onCardHover(card.id, zone) : undefined}
-      onMouseLeave={onCardHoverEnd}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        onContextMenu?.(e)
-      }}
-    >
+    <div style={style}>
       <Card
         card={card}
+        interactiveRef={setNodeRef}
+        interactiveProps={{
+          ...listeners,
+          ...attributes,
+          onClick: (e) => {
+            if (!(e.target as HTMLElement).closest('button')) {
+              onClick?.()
+            }
+          },
+        }}
+        interactiveStyle={
+          transform && !isDragging
+            ? { transform: CSS.Translate.toString(transform) }
+            : undefined
+        }
         selected={selected}
         size={size}
         dimensions={dimensions}
@@ -109,7 +110,16 @@ export function DraggableCard({
         isCompanion={isCompanion}
         upgraded={upgraded}
         appliedUpgrades={appliedUpgrades}
+        hiddenUpgradeCount={hiddenUpgradeCount}
+        onRevealHiddenUpgrades={onRevealHiddenUpgrades}
         canPeekFaceDown={canPeekFaceDown}
+        onDoubleClick={onDoubleClick}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          onContextMenu?.(e)
+        }}
+        onHoverStart={onCardHover ? () => onCardHover(card.id, zone) : undefined}
+        onHoverEnd={onCardHoverEnd}
       />
     </div>
   )

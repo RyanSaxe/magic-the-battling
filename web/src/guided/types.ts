@@ -5,7 +5,8 @@ import type { RevealedPlayerTab } from "../contexts/contextStripState";
 export type ConditionalGuideId =
   | "hint_treasure_producer"
   | "hint_treasure_cap"
-  | "hint_build_unapplied_upgrade";
+  | "hint_build_unapplied_upgrade"
+  | "hint_battle_unrevealed_upgrade";
 
 export type GuidedGuideId =
   | "welcome"
@@ -38,6 +39,7 @@ export type GuideTargetId =
   | "battle-hand"
   | "battle-battlefield"
   | "battle-opponent-hand"
+  | "battle-reveal-upgrade"
   | "battle-actions"
   | "battle-submit"
   | "battle-submit-popover"
@@ -92,6 +94,7 @@ export interface GuidedWalkthroughContext {
   hasRewardUpgradeChoice: boolean;
   showBuildSubmitPopover: boolean;
   showBattleSubmitPopover: boolean;
+  hasBattleRevealUpgrade: boolean;
   availableRewardUpgrades: GameCard[];
   draftGuideOpponentName: string | null;
   draftGuideOpponentRevealedCount: number;

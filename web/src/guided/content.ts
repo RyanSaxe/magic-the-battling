@@ -9,8 +9,14 @@ import type {
 const CONDITIONAL_GUIDE_PRIORITY: ConditionalGuideId[] = [
   "hint_treasure_producer",
   "hint_build_unapplied_upgrade",
+  "hint_battle_unrevealed_upgrade",
   "hint_treasure_cap",
 ];
+
+const ALWAYS_ON_CONDITIONAL_GUIDES = new Set<ConditionalGuideId>([
+  "hint_battle_unrevealed_upgrade",
+  "hint_treasure_cap",
+]);
 
 const TREASURE_EXCEPTION_NAMES = new Set(["An Offer You Can't Refuse"]);
 
@@ -541,6 +547,10 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         placement: "top",
         cardPlacement: "top-center",
         primaryActionLabel: "Next",
+        sidebarState: {
+          openOnMobile: false,
+          playerName: null,
+        },
         content: {
           summary: "Rolling spends 1 treasure to exile the current pack and replace it with a new pack of 5 cards.",
           detail: "Treasures matter across phases, so rolling is a real resource decision, not a free redraw.",
@@ -670,6 +680,37 @@ function buildUnappliedUpgradeHint(): GuideDefinition {
   };
 }
 
+function buildBattleRevealUpgradeHint(): GuideDefinition {
+  return {
+    id: "hint_battle_unrevealed_upgrade",
+    label: "Battle Tip",
+    phase: "battle",
+    steps: [
+      {
+        id: "reveal-upgrade",
+        title: "Reveal Your Hidden Upgrade",
+        targetId: "battle-reveal-upgrade",
+        positionTargetId: "battle-battlefield",
+        placement: "top",
+        cardPlacement: "top-center",
+        mobileCardPlacement: "top-center",
+        primaryActionLabel: "Got it",
+        allowTargetInteraction: true,
+        content: {
+          summary: "This card has an upgrade applied, but that upgrade stays hidden until you choose to reveal it.",
+          detail: "Revealing it makes the upgrade public for the rest of the game, including damage scaling, card zoom, borders, and scouting details.",
+        },
+      },
+    ],
+  };
+}
+
+export function isAlwaysOnConditionalGuide(
+  guideId: ConditionalGuideId,
+): boolean {
+  return ALWAYS_ON_CONDITIONAL_GUIDES.has(guideId);
+}
+
 export function isConditionalGuideId(
   guideId: GuidedGuideId,
 ): guideId is ConditionalGuideId {
@@ -686,6 +727,8 @@ export function isConditionalGuideEligible(
     case "hint_build_unapplied_upgrade":
       return ctx.currentPhase === "build"
         && !!ctx.selfPlayer?.upgrades.some((upgrade) => !upgrade.upgrade_target);
+    case "hint_battle_unrevealed_upgrade":
+      return ctx.currentPhase === "battle" && ctx.hasBattleRevealUpgrade;
     case "hint_treasure_cap":
       return ctx.currentPhase === "draft" && (ctx.selfPlayer?.treasures ?? 0) >= 6;
   }
@@ -724,6 +767,8 @@ export function buildGuideDefinition(
       return buildTreasureProducerHint(ctx);
     case "hint_build_unapplied_upgrade":
       return buildUnappliedUpgradeHint();
+    case "hint_battle_unrevealed_upgrade":
+      return buildBattleRevealUpgradeHint();
     case "hint_treasure_cap":
       return buildTreasureCapHint(ctx);
   }

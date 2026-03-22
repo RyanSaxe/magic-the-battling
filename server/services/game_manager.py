@@ -33,6 +33,7 @@ from mtb.models.game import (
     Config,
     Game,
     LastBattleResult,
+    PendingRevealAnimation,
     Player,
     Puppet,
     StaticOpponent,
@@ -85,6 +86,7 @@ from server.schemas.api import (
     LobbyPlayer,
     LobbyStateResponse,
     PlayerView,
+    RevealAnimationView,
     SelfPlayerView,
 )
 from server.services.game_serialization import (
@@ -163,6 +165,7 @@ class PendingGame:
     target_player_count: int = 4
     auto_approve_spectators: bool = False
     guided_mode_default: bool = False
+    voice_chat_enabled: bool = True
     play_mode: PlayMode = "limited"
     player_ready: dict[str, bool] = field(default_factory=dict)
     player_battlers: dict[str, PendingPlayerBattler] = field(default_factory=dict)
@@ -742,6 +745,8 @@ class GameManager:
             return None
 
         total = len(pending.player_names) + pending.puppet_count
+        if total >= pending.target_player_count:
+            return None
         if total >= 8:
             return None
 
@@ -817,11 +822,8 @@ class GameManager:
             return False, "Only the host can start the game"
 
         total = len(pending.player_names) + pending.puppet_count
-        if total < 2:
-            return False, "Need at least 2 players"
-
-        if total % 2 != 0:
-            return False, "Need an even number of players"
+        if total != pending.target_player_count:
+            return False, f"Need exactly {pending.target_player_count} players"
 
         all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
         if not all_ready:
@@ -855,12 +857,12 @@ class GameManager:
             return None
 
         pending.is_started = True
-        pending.target_player_count = total
 
         config = Config(
             use_upgrades=pending.use_upgrades,
             use_vanguards=pending.use_vanguards,
             auto_approve_spectators=pending.auto_approve_spectators,
+            voice_chat_enabled=pending.voice_chat_enabled,
             cube_id=pending.cube_id,
             play_mode=pending.play_mode,
         )
@@ -962,12 +964,12 @@ class GameManager:
                         return None
 
                 pending.is_started = True
-                pending.target_player_count = total
 
                 config = Config(
                     use_upgrades=pending.use_upgrades,
                     use_vanguards=pending.use_vanguards,
                     auto_approve_spectators=pending.auto_approve_spectators,
+                    voice_chat_enabled=pending.voice_chat_enabled,
                     cube_id=pending.cube_id,
                     play_mode=pending.play_mode,
                 )
@@ -1468,8 +1470,13 @@ class GameManager:
             hand=[c.model_copy() for c in player.hand],
             vanguard=player.vanguard.model_copy() if player.vanguard else None,
             basic_lands=player.chosen_basics.copy(),
-            applied_upgrades=[u.model_copy() for u in player.upgrades if u.upgrade_target is not None],
-            upgrades=[u.model_copy() for u in player.upgrades],
+            applied_upgrades=[
+                u.model_copy(update={"is_revealed": True}) for u in player.upgrades if reward.is_applied_upgrade(u)
+            ],
+            upgrades=[
+                u.model_copy(update={"is_revealed": True}) if reward.is_applied_upgrade(u) else u.model_copy()
+                for u in player.upgrades
+            ],
             treasures=player.treasures,
             sideboard=[c.model_copy() for c in player.sideboard],
             command_zone=[c.model_copy() for c in player.command_zone],
@@ -1485,7 +1492,16 @@ class GameManager:
             vanguard_json=(ref.model_dump_json() if (ref := card_to_ref(player.vanguard)) is not None else None),
             basic_lands_json=json.dumps(player.chosen_basics),
             applied_upgrades_json=json.dumps(
-                [ref.model_dump() for ref in cards_to_refs([u for u in player.upgrades if u.upgrade_target])]
+                [
+                    ref.model_dump()
+                    for ref in cards_to_refs(
+                        [
+                            u.model_copy(update={"is_revealed": True})
+                            for u in player.upgrades
+                            if reward.is_applied_upgrade(u)
+                        ]
+                    )
+                ]
             ),
             treasures=player.treasures,
             poison=player.poison,
@@ -1689,6 +1705,8 @@ class GameManager:
         if player_id != pending.host_player_id:
             return False
         total = len(pending.player_names) + pending.puppet_count
+        if total >= pending.target_player_count:
+            return False
         if total >= 8:
             return False
         available = self._count_available_bots(pending)
@@ -1696,6 +1714,35 @@ class GameManager:
             return False
         pending.puppet_count += 1
         return True
+
+    def set_target_player_count(
+        self, game_id: str, player_id: str, target_player_count: int
+    ) -> tuple[bool, str | None]:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.is_started:
+            return False, "Game not found"
+        if player_id != pending.host_player_id:
+            return False, "Only the host can change the player cap"
+        if target_player_count < 2 or target_player_count > 8:
+            return False, "Player cap must be between 2 and 8"
+        if target_player_count % 2 != 0:
+            return False, "Player cap must be an even number"
+
+        occupied_slots = len(pending.player_names) + pending.puppet_count
+        if target_player_count < occupied_slots:
+            return False, "Player cap cannot be lower than occupied slots"
+
+        pending.target_player_count = target_player_count
+        return True, None
+
+    def set_voice_chat_enabled(self, game_id: str, player_id: str, enabled: bool) -> tuple[bool, str | None]:
+        pending = self._pending_games.get(game_id)
+        if not pending or pending.is_started:
+            return False, "Game not found"
+        if player_id != pending.host_player_id:
+            return False, "Only the host can toggle voice chat"
+        pending.voice_chat_enabled = enabled
+        return True, None
 
     def remove_puppet(self, game_id: str, player_id: str) -> bool:
         pending = self._pending_games.get(game_id)
@@ -1867,7 +1914,7 @@ class GameManager:
         total = len(pending.player_names) + pending.puppet_count
         available = self._count_available_bots(pending)
         has_enough_bots = pending.puppet_count == 0 or (available is not None and available >= pending.puppet_count)
-        can_start = total >= 2 and total % 2 == 0 and all_ready and has_enough_bots
+        can_start = total == pending.target_player_count and all_ready and has_enough_bots
         loading_error = pending.battler_error
         if pending.play_mode == "constructed":
             loading_error = next(
@@ -1885,7 +1932,7 @@ class GameManager:
             players=players,
             can_start=can_start,
             is_started=pending.is_started,
-            target_player_count=total,
+            target_player_count=pending.target_player_count,
             puppet_count=pending.puppet_count,
             cube_loading_status=self._get_cube_loading_status(pending),
             cube_loading_error=loading_error,
@@ -1893,6 +1940,7 @@ class GameManager:
             cube_id=pending.cube_id,
             use_upgrades=pending.use_upgrades,
             guided_mode_default=pending.guided_mode_default,
+            voice_chat_enabled=pending.voice_chat_enabled,
             play_mode=pending.play_mode,
         )
 
@@ -1938,6 +1986,7 @@ class GameManager:
             phase=phase,
             starting_life=game.config.starting_life,
             use_upgrades=game.config.use_upgrades,
+            voice_chat_enabled=game.config.voice_chat_enabled,
             players=all_players,
             self_player=SelfPlayerView(
                 name=player.name,
@@ -2039,6 +2088,9 @@ class GameManager:
             return "loss"
         return "win"
 
+    def _public_visible_upgrades(self, upgrades: list[Card]) -> list[Card]:
+        return [upgrade for upgrade in upgrades if reward.is_revealed_applied_upgrade(upgrade)]
+
     def _make_player_view(
         self,
         player: Player,
@@ -2047,6 +2099,9 @@ class GameManager:
         most_recent_ghost_name: str | None = None,
     ) -> PlayerView:
         is_eliminated = player.phase == "eliminated"
+        visible_upgrades = (
+            player.upgrades if player.name == viewer.name else self._public_visible_upgrades(player.upgrades)
+        )
         return PlayerView(
             name=player.name,
             treasures=player.treasures,
@@ -2062,7 +2117,7 @@ class GameManager:
             sideboard_count=len(player.sideboard),
             hand_size=player.hand_size,
             is_stage_increasing=reward.is_stage_increasing(player),
-            upgrades=cards_to_refs(player.upgrades),
+            upgrades=cards_to_refs(visible_upgrades),
             vanguard=card_to_ref(player.vanguard),
             chosen_basics=player.chosen_basics,
             most_recently_revealed_cards=cards_to_refs(player.most_recently_revealed_cards),
@@ -2372,6 +2427,11 @@ class GameManager:
             scrubbed_gy = _scrub_face_down_cards(opponent_zones.graveyard, face_down_ids, id_map)
             scrubbed_exile = _scrub_face_down_cards(opponent_zones.exile, face_down_ids, id_map)
             scrubbed_cz = _scrub_face_down_cards(opponent_zones.command_zone, face_down_ids, id_map)
+            scrubbed_library = _scrub_face_down_cards(
+                opponent_zones.library,
+                {card.id for card in opponent_zones.library},
+                id_map,
+            )
             scrubbed_tokens = _scrub_face_down_cards(opponent_zones.spawned_tokens, face_down_ids, id_map)
             reverse_map = {real: opaque for opaque, real in id_map.items()}
             scrubbed_face_down_ids = _remap_id_list(opponent_zones.face_down_card_ids, reverse_map)
@@ -2388,6 +2448,7 @@ class GameManager:
             scrubbed_gy = opponent_zones.graveyard
             scrubbed_exile = opponent_zones.exile
             scrubbed_cz = opponent_zones.command_zone
+            scrubbed_library = opponent_zones.library
             scrubbed_tokens = opponent_zones.spawned_tokens
             scrubbed_face_down_ids = opponent_zones.face_down_card_ids
             scrubbed_tapped_ids = opponent_zones.tapped_card_ids
@@ -2402,9 +2463,9 @@ class GameManager:
             exile=scrubbed_exile,
             hand=opponent_zones.hand if hand_revealed else [],
             sideboard=[],
-            upgrades=opponent_zones.upgrades,
+            upgrades=self._public_visible_upgrades(opponent_zones.upgrades),
             command_zone=scrubbed_cz,
-            library=[],
+            library=scrubbed_library,
             treasures=opponent_zones.treasures,
             submitted_cards=[],
             tapped_card_ids=scrubbed_tapped_ids,
@@ -2439,6 +2500,15 @@ class GameManager:
             is_sudden_death=b.is_sudden_death,
             opponent_full_sideboard=cards_to_refs(full_sideboard),
             can_manipulate_opponent=isinstance(opponent_obj, StaticOpponent),
+            pending_reveal_animations=[
+                RevealAnimationView(
+                    animation_id=anim.animation_id,
+                    upgrade=cards_to_refs([anim.upgrade])[0],
+                    target=cards_to_refs([anim.target])[0],
+                    player_name=anim.player_name,
+                )
+                for anim in b.pending_reveal_animations
+            ],
         )
 
     def handle_draft_swap(
@@ -2758,6 +2828,35 @@ class GameManager:
             if player.name in (b.player.name, b.opponent.name):
                 card_id = b._face_down_id_map.get(card_id, card_id)
                 return battle.update_card_state(b, player, action_type, card_id, data)
+        return False
+
+    def handle_battle_reveal_upgrade(self, game: Game, player: Player, upgrade_id: str) -> bool:
+        for b in game.active_battles:
+            if player.name not in (b.player.name, b.opponent.name):
+                continue
+
+            own_zones = self._get_zones_for_owner(b, player, "player")
+            zone_upgrade = next((upgrade for upgrade in own_zones.upgrades if upgrade.id == upgrade_id), None)
+            player_upgrade = next((upgrade for upgrade in player.upgrades if upgrade.id == upgrade_id), None)
+            target_upgrade = player_upgrade or zone_upgrade
+            if target_upgrade is None or not reward.is_applied_upgrade(target_upgrade) or target_upgrade.is_revealed:
+                return False
+
+            if player_upgrade is not None:
+                reward.reveal_upgrade(player, player_upgrade)
+            if zone_upgrade is not None:
+                zone_upgrade.is_revealed = True
+
+            assert target_upgrade.upgrade_target is not None
+            b.pending_reveal_animations.append(
+                PendingRevealAnimation(
+                    animation_id=uuid4().hex[:8],
+                    upgrade=target_upgrade,
+                    target=target_upgrade.upgrade_target,
+                    player_name=player.name,
+                )
+            )
+            return True
         return False
 
     def handle_battle_pass_turn(self, game: Game, player: Player) -> bool | str:

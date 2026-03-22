@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo, useRef } from 'react'
 import type { Card as CardType } from '../../types'
 import type { ZoneConstraints } from '../../hooks/computeConstrainedLayout'
 import { Card } from '../card'
-import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { useCardLayout, ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
 import { useZoneDividers } from '../../hooks/useZoneDividers'
 import { BasicLandCard } from './BasicLandCard'
@@ -11,6 +10,9 @@ import { LayoutResetControl } from './LayoutResetControl'
 import { TreasureCard } from './TreasureCard'
 import { PoisonCard } from './PoisonCard'
 import { ZoneLayout } from './ZoneLayout'
+import { UpgradeGrid } from './UpgradeGrid'
+import { buildAppliedUpgradeMap, type UpgradeDisplayScope } from '../../utils/upgrades'
+import { getUpgradeGridColumns } from '../../utils/upgradeGrid'
 
 export interface DeckDisplayResizeState {
   constraints: ZoneConstraints | null
@@ -39,6 +41,7 @@ interface DeckDisplayProps {
   layoutStateKey?: string
   resizeState?: DeckDisplayResizeState
   resetControl?: DeckDisplayResetControl
+  upgradeDisplayScope?: UpgradeDisplayScope
 }
 
 export function DeckDisplay({
@@ -55,6 +58,7 @@ export function DeckDisplay({
   layoutStateKey,
   resizeState,
   resetControl,
+  upgradeDisplayScope = 'all_applied',
 }: DeckDisplayProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const localLayoutStateKey = layoutStateKey ?? '__default__'
@@ -81,6 +85,10 @@ export function DeckDisplay({
 
   const battlefieldCount = basics.length + 2
   const commandZoneCount = upgrades.length
+  const { upgradedCardIds, appliedUpgradesByCardId } = useMemo(
+    () => buildAppliedUpgradeMap(upgrades, upgradeDisplayScope),
+    [upgradeDisplayScope, upgrades],
+  )
 
   const hasHand = hand.length > 0
   const hasSideboard = sideboard.length > 0
@@ -105,7 +113,7 @@ export function DeckDisplay({
       hand: { count: hasHand ? hand.length : 0 },
       battlefield: { count: battlefieldCount, priority: 'fill' as const, maxRows: 1 },
       sideboard: { count: sideboard.length },
-      commandZone: { count: commandZoneCount },
+      commandZone: { count: commandZoneCount, minColumns: getUpgradeGridColumns(commandZoneCount) },
     },
     layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
     ...ZONE_LAYOUT_PADDING,
@@ -180,7 +188,12 @@ export function DeckDisplay({
   const handDims = { width: dims.hand.width, height: dims.hand.height }
   const sideboardDims = { width: dims.sideboard.width, height: dims.sideboard.height }
   const bfDims = { width: dims.battlefield.width, height: dims.battlefield.height }
-  const czDims = { width: dims.commandZone.width, height: dims.commandZone.height }
+  const czDims = {
+    width: dims.commandZone.width,
+    height: dims.commandZone.height,
+    rows: dims.commandZone.rows,
+    columns: dims.commandZone.columns,
+  }
 
   return (
     <ZoneLayout
@@ -193,6 +206,9 @@ export function DeckDisplay({
         battlefield: zoneFrames.battlefield.outerHeight,
         sideboard: zoneFrames.sideboard.outerHeight,
         upgrades: zoneFrames.commandZone.outerHeight,
+      } : null}
+      zoneWidths={enableResize && zoneFrames && hasUpgrades ? {
+        upgrades: zoneFrames.commandZone.outerWidth,
       } : null}
       zoneRefs={enableResize ? {
         hand: (node) => {
@@ -230,7 +246,16 @@ export function DeckDisplay({
       handContent={
         <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
           {hand.map((card) => (
-            <Card key={card.id} card={card} dimensions={handDims} isCompanion={companionIds.has(card.id)} onClick={() => handleCardClick(card.id)} selected={selectedCardId === card.id} />
+            <Card
+              key={card.id}
+              card={card}
+              dimensions={handDims}
+              isCompanion={companionIds.has(card.id)}
+              onClick={() => handleCardClick(card.id)}
+              selected={selectedCardId === card.id}
+              upgraded={upgradedCardIds.has(card.id)}
+              appliedUpgrades={appliedUpgradesByCardId.get(card.id)}
+            />
           ))}
         </CardGrid>
       }
@@ -248,17 +273,26 @@ export function DeckDisplay({
       sideboardContent={
         <CardGrid columns={dims.sideboard.columns} cardWidth={sideboardDims.width}>
           {sideboard.map((card) => (
-            <Card key={card.id} card={card} dimensions={sideboardDims} isCompanion={companionIds.has(card.id)} onClick={() => handleCardClick(card.id)} selected={selectedCardId === card.id} />
+            <Card
+              key={card.id}
+              card={card}
+              dimensions={sideboardDims}
+              isCompanion={companionIds.has(card.id)}
+              onClick={() => handleCardClick(card.id)}
+              selected={selectedCardId === card.id}
+              upgraded={upgradedCardIds.has(card.id)}
+              appliedUpgrades={appliedUpgradesByCardId.get(card.id)}
+            />
           ))}
         </CardGrid>
       }
       upgradesLabel="Upgrades"
       upgradesContent={
-        <CardGrid columns={dims.commandZone.columns} cardWidth={czDims.width}>
-          {upgrades.map((upgrade) => (
-            <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={czDims} />
-          ))}
-        </CardGrid>
+        <UpgradeGrid
+          upgrades={upgrades}
+          fallbackDims={czDims}
+          frame={zoneFrames?.commandZone}
+        />
       }
     />
   )

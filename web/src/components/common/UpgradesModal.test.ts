@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { applyUpgradeWithModalClose } from "./upgradeModalFlow";
+import { applyUpgradeWithModalClose, revealUpgradeWithModalClose } from "./upgradeModalFlow";
 
 describe("applyUpgradeWithModalClose", () => {
   it("closes the modal before applying the upgrade", () => {
@@ -42,5 +42,31 @@ describe("applyUpgradeWithModalClose", () => {
 
     expect(flush).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("closes the modal before revealing the upgrade", () => {
+    const events: string[] = [];
+    const flush = vi.fn((callback: () => void) => {
+      events.push("flush");
+      callback();
+    });
+
+    revealUpgradeWithModalClose({
+      upgradeIds: ["upgrade-1", "upgrade-2"],
+      onClose: () => {
+        events.push("close");
+      },
+      onReveal: (upgradeIds) => {
+        events.push(`reveal:${upgradeIds.join(",")}`);
+      },
+      flush,
+    });
+
+    expect(flush).toHaveBeenCalledTimes(1);
+    expect(events).toEqual([
+      "flush",
+      "close",
+      "reveal:upgrade-1,upgrade-2",
+    ]);
   });
 });

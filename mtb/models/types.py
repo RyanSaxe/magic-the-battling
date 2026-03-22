@@ -5,7 +5,20 @@ PlayMode = Literal["limited", "constructed"]
 ZoneName = Literal["battlefield", "graveyard", "exile", "hand", "sideboard", "upgrades", "command_zone", "library"]
 CardDestination = Literal["hand", "sideboard", "upgrades"]
 BuildSource = Literal["hand", "sideboard"]
-CardStateAction = Literal["tap", "untap", "flip", "face_down", "counter", "attach", "detach", "spawn"]
+CardStateAction = Literal[
+    "tap",
+    "untap",
+    "flip",
+    "face_down",
+    "counter",
+    "attach",
+    "detach",
+    "spawn",
+    "create_treasure",
+    "draw_library",
+    "shuffle_library",
+    "copy_token",
+]
 
 VANGUARD_TYPE = "vanguard"
 UPGRADE_TYPE = "conspiracy"

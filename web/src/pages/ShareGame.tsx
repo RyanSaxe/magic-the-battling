@@ -5,6 +5,8 @@ import type { ShareGameResponse, SharePlayerSnapshot, Card as CardType } from '.
 import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
 import { buildSharePlayerViews, getSharePlayerRowBadge } from '../utils/share'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
+import { useGameShellMode } from '../hooks/useGameShellMode'
+import { useElementHeight } from '../hooks/useElementHeight'
 import type { ZoneConstraints } from '../hooks/computeConstrainedLayout'
 import { CardPreviewContext, CardPreviewModal } from '../components/card'
 import { PLAYER_ROW_STACK_CLASS, PlayerRow } from '../components/PlayerList'
@@ -87,6 +89,7 @@ export function ShareGame() {
   const { gameId, playerName } = useParams<{ gameId: string; playerName: string }>()
   const navigate = useNavigate()
   const sizes = useViewportCardSizes()
+  const shellMode = useGameShellMode()
   const [data, setData] = useState<ShareGameResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -97,6 +100,18 @@ export function ShareGame() {
   const [previewCard, setPreviewCardState] = useState<CardType | null>(null)
   const [previewUpgrades, setPreviewUpgrades] = useState<CardType[]>([])
   const [deckConstraintsByView, setDeckConstraintsByView] = useState<Record<string, ZoneConstraints>>({})
+  const [headerRef] = useElementHeight()
+  const [bottomBarRef] = useElementHeight()
+  const usesOverlaySidebar = shellMode !== 'big'
+  const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen
+  const isSmallShell = shellMode === 'small'
+  const usesCompactHeader = shellMode === 'mobile'
+  const headerChromeClassName =
+    shellMode === 'big'
+      ? 'shrink-0 py-3 frame-chrome bar-pad-left'
+      : 'shrink-0 py-3 frame-chrome bar-pad-both'
+  const bottomBarPaddingClass =
+    shellMode === 'small' ? 'bar-pad-both' : 'bar-pad-main'
   const setPreviewCard = useCallback((card: CardType | null, appliedUpgrades?: CardType[]) => {
     setPreviewCardState(card)
     setPreviewUpgrades(appliedUpgrades ?? [])
@@ -137,7 +152,7 @@ export function ShareGame() {
   const playerViews = buildSharePlayerViews(data, effectiveSelectedRound)
   const sortedPlayerViews = getSidebarPlayerOrder(playerViews)
   const shareHotkeys: Record<string, () => void> = {}
-  if (!sizes.isMobile && !previewCard && !roundPopoverOpen) {
+  if (shellMode === 'big' && !previewCard && !roundPopoverOpen) {
     sortedPlayerViews.slice(0, 8).forEach((player, index) => {
       shareHotkeys[String(index + 1)] = () => {
         setSelectedPlayer(player.name)
@@ -232,7 +247,7 @@ export function ShareGame() {
   }
 
   const renderSidebarContent = () => (
-    <div className="px-3 py-3 sm:py-0">
+    <div className="px-3 py-0">
       <div className={PLAYER_ROW_STACK_CLASS}>
         {sortedPlayerViews.map((pv) => {
           const sharePlayer = sharePlayersByName.get(pv.name)
@@ -251,7 +266,7 @@ export function ShareGame() {
               shareStatus={shareStatus}
               onClick={() => {
                 setSelectedPlayer(pv.name)
-                if (sizes.isMobile) setSidebarOpen(false)
+                if (usesOverlaySidebar) setSidebarOpen(false)
               }}
             />
           )
@@ -264,8 +279,9 @@ export function ShareGame() {
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
     <div className="h-dvh flex flex-col bg-gray-900 text-white overflow-hidden">
       {/* Header */}
-      <header className="shrink-0 py-3 frame-chrome px-3 sm:pl-[var(--frame-rail-edge)] sm:pr-3">
-        <div className="hidden sm:flex items-center justify-between">
+      <header ref={headerRef} className={headerChromeClassName}>
+        {!usesCompactHeader ? (
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
               Magic: The Battling
@@ -289,7 +305,7 @@ export function ShareGame() {
             </button>
           </div>
         </div>
-        <div className="sm:hidden">
+        ) : (
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
@@ -314,19 +330,21 @@ export function ShareGame() {
               </button>
             </div>
           </div>
-        </div>
+        )}
       </header>
 
       {/* Main + Sidebar */}
       <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
+        {shellMode === 'mobile' && (
+          <div className="w-[4px] shrink-0 frame-chrome" />
+        )}
         <main className="flex-1 flex flex-col min-h-0 min-w-0">
           {renderContent()}
         </main>
 
-        {sizes.isMobile ? (
+        {usesOverlaySidebar ? (
           <>
-            {sidebarOpen && (
+            {overlaySidebarOpen && (
               <div
                 className="fixed inset-0 bg-black/50 z-40"
                 onClick={() => setSidebarOpen(false)}
@@ -334,7 +352,7 @@ export function ShareGame() {
             )}
             <div
               className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${
-                sidebarOpen ? 'translate-x-0' : 'translate-x-full'
+                overlaySidebarOpen ? 'translate-x-0' : 'translate-x-full'
               }`}
             >
               <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
@@ -354,12 +372,17 @@ export function ShareGame() {
             </div>
           </aside>
         )}
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
+        {shellMode === 'mobile' && (
+          <div className="w-[4px] shrink-0 frame-chrome" />
+        )}
+        {isSmallShell && (
+          <div className="w-10 shrink-0 frame-chrome" />
+        )}
       </div>
 
       {/* Bottom Bar */}
-      <div className="shrink-0 frame-chrome">
-        <div className="flex items-center justify-between py-1.5 sm:py-2 bar-pad-main timeline-actions">
+      <div ref={bottomBarRef} className="shrink-0 frame-chrome">
+        <div className={`flex items-center justify-between py-1.5 sm:py-2 ${bottomBarPaddingClass} timeline-actions`}>
           <div className="relative">
             <button
               className="btn btn-secondary text-sm py-1.5 px-3"
@@ -392,7 +415,7 @@ export function ShareGame() {
             >
               Next
             </button>
-            {sizes.isMobile && (
+            {usesOverlaySidebar && (
               <button
                 onClick={() => setSidebarOpen((o) => !o)}
                 className="btn btn-secondary py-1.5 px-2 text-sm"

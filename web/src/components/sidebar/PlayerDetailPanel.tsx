@@ -4,7 +4,7 @@ import type { RevealedPlayerTab } from "../../contexts/contextStripState";
 import { useContextStrip } from "../../contexts";
 import {
   CARD_ASPECT_RATIO,
-  bestFit,
+  bestFitNoClip,
   type ZoneDims,
 } from "../../hooks/cardSizeUtils";
 import { Card } from "../card";
@@ -14,6 +14,7 @@ import {
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
 import { getPlayerPhaseStatusLabel } from "../../utils/format";
+import { buildAppliedUpgradeMap, getAppliedUpgrades, getUpgradeDisplayScope, getUnappliedUpgrades } from "../../utils/upgrades";
 
 interface PlayerDetailPanelProps {
   player: PlayerView;
@@ -77,28 +78,6 @@ function OverviewToken({
       </span>
     </div>
   );
-}
-
-function buildAppliedUpgradeMap(
-  upgrades: CardType[],
-): {
-  upgradedCardIds: Set<string>;
-  appliedUpgradesByCardId: Map<string, CardType[]>;
-} {
-  const upgradedCardIds = new Set<string>();
-  const appliedUpgradesByCardId = new Map<string, CardType[]>();
-
-  upgrades.forEach((upgrade) => {
-    if (!upgrade.upgrade_target) return;
-
-    const targetId = upgrade.upgrade_target.id;
-    upgradedCardIds.add(targetId);
-    const existing = appliedUpgradesByCardId.get(targetId) ?? [];
-    existing.push(upgrade);
-    appliedUpgradesByCardId.set(targetId, existing);
-  });
-
-  return { upgradedCardIds, appliedUpgradesByCardId };
 }
 
 function OverviewTokenRow({
@@ -243,7 +222,7 @@ function AdaptiveCardSection({
     width: number,
     height: number,
   ) => {
-    const next = bestFit(cards.length, width, height, 8, maxWidth, minWidth);
+    const next = bestFitNoClip(cards.length, width, height, 8, maxWidth, minWidth);
 
     if (cards.length < minColumns || next.columns >= minColumns) {
       return next;
@@ -413,17 +392,15 @@ export function PlayerDetailPanel({
   const [renderOpen, setRenderOpen] = useState(false);
 
   const isViewingSelf = player.name === currentPlayer.name;
-  const appliedUpgrades = player.upgrades.filter(
-    (upgrade) => upgrade.upgrade_target !== null,
-  );
-  const pendingUpgrades = currentPlayer.upgrades.filter(
-    (upgrade) => upgrade.upgrade_target === null,
-  );
+  const upgradeDisplayScope = getUpgradeDisplayScope(isViewingSelf, currentPlayer.phase);
+  const appliedUpgrades = getAppliedUpgrades(player.upgrades);
+  const pendingUpgrades = getUnappliedUpgrades(currentPlayer.upgrades);
   const allUpgrades = isViewingSelf
     ? [...appliedUpgrades, ...pendingUpgrades]
     : appliedUpgrades;
   const { upgradedCardIds, appliedUpgradesByCardId } = buildAppliedUpgradeMap(
-    appliedUpgrades,
+    player.upgrades,
+    upgradeDisplayScope,
   );
   const companionIds = new Set(player.command_zone.map((card) => card.id));
   const lastResultLabel = getLastResultLabel(player.last_result, player.in_sudden_death);
@@ -544,7 +521,7 @@ export function PlayerDetailPanel({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 px-4 pb-4">
+      <div className="flex flex-col flex-1 min-h-0 px-4 pb-4">
         {activeTab === "overview" ? overviewContent : seenContent}
       </div>
     </div>
@@ -559,16 +536,16 @@ export function PlayerDetailPanel({
       ref={panelRef}
       data-guide-target="sidebar-detail-drawer"
       aria-hidden={!isOpen}
-      className={`absolute inset-y-0 z-30 overflow-hidden border-l-2 border-r-0 border-t-0 border-b-0 border-[var(--gold-border-opaque)] frame-chrome ${
+      className={`absolute inset-y-0 z-[30] overflow-hidden border-l-2 border-r-0 border-t-0 border-b-0 border-[var(--gold-border-opaque)] frame-chrome ${
         isOpen ? "pointer-events-auto" : "pointer-events-none"
       }`}
       style={{
         right: "calc(100% - 8px)",
         width: "var(--sidebar-width)",
-        boxShadow:
-          "-10px 16px 28px rgba(0, 0, 0, 0.34)",
+        boxShadow: renderOpen ? "-6px 0 12px -2px rgba(0, 0, 0, 0.3)" : "none",
+        clipPath: "inset(0 0 0 -20px)",
         transform: renderOpen ? "translateX(0)" : "translateX(calc(100% - 8px))",
-        transition: "transform 220ms ease-out",
+        transition: "transform 220ms ease-out, box-shadow 220ms ease-out",
       }}
     >
       {shell}

@@ -33,6 +33,7 @@ ACTION_REQUIRED_PHASES: dict[str, str] = {
     "build_set_companion": "build",
     "build_remove_companion": "build",
     "battle_move": "battle",
+    "battle_reveal_upgrade": "battle",
     "battle_submit_result": "battle",
     "battle_update_card_state": "battle",
     "battle_update_life": "battle",
@@ -562,6 +563,27 @@ async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
             await connection_manager.send_error(websocket, "Cannot kick player")
         return True
 
+    if action == "set_target_player_count":
+        success, error = game_manager.set_target_player_count(
+            game_id,
+            player_id,
+            int(payload.get("target_player_count", 0)),
+        )
+        if success:
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, error or "Cannot change player cap")
+        return True
+
+    if action == "set_voice_chat":
+        enabled = payload.get("enabled", True)
+        success, error = game_manager.set_voice_chat_enabled(game_id, player_id, enabled)
+        if success:
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, error or "Cannot toggle voice chat")
+        return True
+
     return False
 
 
@@ -617,6 +639,8 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
                 payload.get("from_owner", "player"),
                 payload.get("to_owner", "player"),
             )
+        case "battle_reveal_upgrade":
+            return game_manager.handle_battle_reveal_upgrade(game, player, payload["upgrade_id"])
         case "battle_submit_result":
             db_session = db.SessionLocal()
             try:
@@ -671,12 +695,43 @@ async def _handle_phase_error(
     return True
 
 
+async def _handle_voice_signal(game_id: str, player_id: str, payload: dict) -> None:
+    target_name = payload.get("target_player")
+    if not target_name:
+        return
+    target_id = game_manager.get_player_id_by_name(game_id, target_name)
+    if not target_id:
+        return
+    sender_name = game_manager._player_id_to_name.get(player_id, "")
+    await connection_manager.send_to_player(
+        game_id,
+        target_id,
+        {
+            "type": "voice_signal",
+            "payload": {
+                "signal_type": payload.get("signal_type"),
+                "data": payload.get("data"),
+                "from_player": sender_name,
+            },
+        },
+    )
+
+
+async def _handle_passthrough_action(action: str, game_id: str, player_id: str, payload: dict) -> bool:
+    if action == "voice_signal":
+        await _handle_voice_signal(game_id, player_id, payload)
+        return True
+    if action == "spectate_response":
+        _handle_spectate_response(payload)
+        return True
+    return False
+
+
 async def handle_message(game_id: str, player_id: str, data: dict, websocket: WebSocket):
     action = data.get("action", "")
     payload = data.get("payload", {})
 
-    if action == "spectate_response":
-        _handle_spectate_response(payload)
+    if await _handle_passthrough_action(action, game_id, player_id, payload):
         return
 
     if ops_manager.is_maintenance():

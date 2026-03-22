@@ -29,12 +29,18 @@ class StaticOpponent(BaseModel):
 
     @classmethod
     def from_player(cls, player: "Player", hand_revealed: bool = False) -> "StaticOpponent":
+        upgrades = []
+        for upgrade in player.upgrades:
+            copy = upgrade.model_copy()
+            if copy.upgrade_target is not None:
+                copy.is_revealed = True
+            upgrades.append(copy)
         return cls(
             name=player.name,
             hand=player.hand.copy(),
             sideboard=player.sideboard.copy(),
             command_zone=player.command_zone.copy(),
-            upgrades=player.upgrades.copy(),
+            upgrades=upgrades,
             vanguard=player.vanguard,
             chosen_basics=player.chosen_basics.copy(),
             treasures=player.treasures,
@@ -45,12 +51,17 @@ class StaticOpponent(BaseModel):
 
     @classmethod
     def from_snapshot(cls, snapshot: "BattleSnapshotData", player_name: str, history_id: int) -> "StaticOpponent":
+        applied_upgrades = []
+        for upgrade in snapshot.applied_upgrades:
+            copy = upgrade.model_copy()
+            copy.is_revealed = True
+            applied_upgrades.append(copy)
         return cls(
             name=player_name,
             hand=snapshot.hand,
             sideboard=snapshot.sideboard,
             command_zone=snapshot.command_zone,
-            upgrades=snapshot.applied_upgrades,
+            upgrades=applied_upgrades,
             vanguard=snapshot.vanguard,
             chosen_basics=snapshot.basic_lands,
             treasures=snapshot.treasures,
@@ -253,6 +264,7 @@ class Config(BaseModel):
     use_upgrades: bool = True
     use_vanguards: bool = False
     auto_approve_spectators: bool = False
+    voice_chat_enabled: bool = True
     cube_id: str = "auto"
     play_mode: PlayMode = "limited"
 
@@ -370,6 +382,13 @@ class Zones(BaseModel):
                 return self.library
 
 
+class PendingRevealAnimation(BaseModel):
+    animation_id: str
+    upgrade: Card
+    target: Card
+    player_name: str
+
+
 class Battle(BaseModel):
     player: Player
     opponent: Player | StaticOpponent
@@ -382,6 +401,7 @@ class Battle(BaseModel):
     player_life: int = 20
     opponent_life: int = 20
     is_sudden_death: bool = False
+    pending_reveal_animations: list[PendingRevealAnimation] = Field(default_factory=list)
     _face_down_id_map: dict[str, str] = PrivateAttr(default_factory=dict)
 
 

@@ -2,19 +2,22 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, typ
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
+import { useVoiceChat } from "../hooks/useVoiceChat";
+import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import {
   rejoinGame,
   getGameStatus,
   createSpectateRequest,
   getSpectateRequestStatus,
 } from "../api/client";
-import type { BattleView, Card as CardType, GameStatusResponse, PlayerView, ZoneName } from "../types";
+import type { BattleView, Card as CardType, GameStatusResponse, PlayerView, RevealAnimation, ZoneName } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
 import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
 import { RewardPhase } from "./phases/Reward";
 import { Sidebar } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
+import { MicToggle } from "../components/sidebar/MicToggle";
 import { GameSummary } from "../components/GameSummary";
 import { ShareModal } from "../components/ShareModal";
 import { ActionMenu } from "../components/ActionMenu";
@@ -30,8 +33,12 @@ import { FaceDownProvider } from "../contexts/FaceDownContext";
 import { CardPreviewContext, CardPreviewModal } from "../components/card";
 import { GameDndProvider, useDndActions, DraggableCard, type ZoneOwner } from "../dnd";
 import { useViewportCardSizes } from "../hooks/useViewportCardSizes";
+import { useGameShellMode } from "../hooks/useGameShellMode";
+import { useElementHeight } from "../hooks/useElementHeight";
 import { BattleResolutionOverlay } from "../components/common/BattleResolutionOverlay";
+import { BattleRevealOverlay } from "../components/common/BattleRevealOverlay";
 import { BuildUpgradeOverlay } from "../components/common/BuildUpgradeOverlay";
+import { RevealBeforeSubmitModal } from "../components/common/RevealBeforeSubmitModal";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
@@ -42,6 +49,12 @@ import {
   comparePlayersForSidebar,
   getSidebarPlayerOrder,
 } from "../utils/playerPlacement";
+import {
+  buildAppliedUpgradeMap,
+  buildHiddenAppliedUpgradeMap,
+  getRevealedAppliedUpgrades,
+  getUnrevealedAppliedUpgrades,
+} from "../utils/upgrades";
 import type { Phase } from "../constants/phases";
 import type {
   GuideRequest,
@@ -54,9 +67,13 @@ import {
   rememberPlayerForGame,
 } from "../utils/deviceIdentity";
 import {
+  isSubmitPopoverGuideStepActive,
   matchesGuideCompletionTrigger,
+  shouldDisableGameplayHotkeys,
   shouldBlockGuidesForBattleResolution,
+  type VisibleGuideStep,
 } from "./gameGuideState";
+import { getVoicePeerNames } from "../utils/voiceChat";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -74,7 +91,7 @@ const STATIC_DIVIDER_CALLBACKS = {
 type ActiveDndPanel = "sideboard" | "opponentSideboard" | "graveyard" | "exile" | null;
 type BattleZoneModal = BattleZoneModalState | null;
 type BattleSidebarLayout = {
-  handHeight: number;
+  topSectionHeight: number;
   middleLaneHeight: number;
 } | null;
 type PendingBuildUpgradeAnimation = {
@@ -511,6 +528,7 @@ function GameGuideLayer({
   sidebarOpen,
   setSidebarOpen,
   guideCompletionTrigger,
+  onVisibleGuideStepChange,
 }: {
   rootRef: React.RefObject<HTMLElement | null>;
   context: GuidedWalkthroughContext;
@@ -521,6 +539,7 @@ function GameGuideLayer({
     stepId: string;
     nonce: number;
   } | null;
+  onVisibleGuideStepChange: (step: VisibleGuideStep | null) => void;
 }) {
   const GUIDE_HANDOFF_LINGER_MS = 450;
   const { state, setRevealedPlayerName } = useContextStrip();
@@ -649,8 +668,13 @@ function GameGuideLayer({
       };
     }
 
-    if (context.isMobile && resolvedSidebarState.openOnMobile && !sidebarOpen) {
-      setSidebarOpen(true);
+    if (context.isMobile) {
+      if (resolvedSidebarState.openOnMobile === true && !sidebarOpen) {
+        setSidebarOpen(true);
+      }
+      if (resolvedSidebarState.openOnMobile === false && sidebarOpen) {
+        setSidebarOpen(false);
+      }
     }
     if (
       resolvedSidebarState.playerName !== undefined
@@ -748,6 +772,18 @@ function GameGuideLayer({
     });
   }, [guideRequest, updateGuideStep]);
 
+  useEffect(() => {
+    onVisibleGuideStepChange(
+      activeRequest && activeStep
+        ? { guideId: activeRequest.guideId, stepId: activeStep.id }
+        : null,
+    );
+  }, [activeRequest, activeStep, onVisibleGuideStepChange]);
+
+  useEffect(() => () => {
+    onVisibleGuideStepChange(null);
+  }, [onVisibleGuideStepChange]);
+
   if (!activeRequest) return null;
   return (
     <GuidedWalkthrough
@@ -773,8 +809,21 @@ function GameContent() {
   const [spectatingPlayer, setSpectatingPlayer] = useState<string | null>(null);
 
   const sizes = useViewportCardSizes();
+  const shellMode = useGameShellMode();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [battleSidebarLayout, setBattleSidebarLayout] = useState<BattleSidebarLayout>(null);
+  const [phaseTimelineRef, phaseTimelineHeight] = useElementHeight();
+  const [battleLifeRailRef, battleLifeRailHeight] = useElementHeight();
+  const [actionBarRef, actionBarHeight] = useElementHeight();
+  const usesOverlaySidebar = shellMode !== "big";
+  const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
+  const isSmallShell = shellMode === "small";
+  const phaseTimelineHeaderClassName =
+    shellMode === "small" ? "py-1.5 bar-pad-both" : "py-1.5 bar-pad-left";
+  const phaseTimelineRightActionsClassName =
+    shellMode === "small" ? "" : "sm:-translate-x-2";
+  const actionBarPaddingClass =
+    shellMode === "small" ? "bar-pad-both" : "bar-pad-main";
 
   const isSpectateMode = searchParams.get("spectate") === "true";
   const { addToast } = useToast();
@@ -788,12 +837,66 @@ function GameContent() {
     addToast(message, "error");
   }, [addToast]);
 
-  const { gameState, isConnected, actions, pendingSpectateRequest, serverNotice, invalidSession } = useGame(
+  const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(null);
+  const handleVoiceSignal = useCallback((payload: VoiceSignalPayload) => {
+    voiceSignalRef.current?.(payload);
+  }, []);
+
+  const { gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, invalidSession } = useGame(
     gameId ?? null,
     isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
     handleServerError,
+    handleVoiceSignal,
   );
+
+  const peerNames = useMemo(() => {
+    if (!gameState?.voice_chat_enabled) return []
+    return getVoicePeerNames(gameState)
+  }, [gameState]);
+  const voiceTargetNames = useMemo(() => new Set(peerNames), [peerNames]);
+  const voiceTargetsAvailable = peerNames.length > 0;
+
+  const handleMicDenied = useCallback(() => {
+    addToast("Microphone access was denied. Voice chat is unavailable.", "warning")
+  }, [addToast])
+
+  const handleRetriesExhausted = useCallback((peerName: string) => {
+    addToast(`Voice connection to ${peerName} failed.`, "warning")
+  }, [addToast])
+
+  const voiceChat = useVoiceChat(send, peerNames, gameState?.self_player.name ?? null, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
+
+  const renderMicToggle = useCallback((player: PlayerView) => {
+    if (!voiceTargetsAvailable) return null
+    if (player.is_puppet || player.is_ghost) return null
+    if (voiceChat.state.peers.length === 0 && !voiceChat.state.isAvailable) return null
+    const isSelf = player.name === gameState?.self_player.name
+    if (isSelf) {
+      return (
+        <MicToggle
+          muted={voiceChat.state.isMuted}
+          audioLevelKey="__self__"
+          variant="player-row"
+          onClick={() => voiceChat.toggleSelfMute()}
+        />
+      )
+    }
+    if (!voiceTargetNames.has(player.name)) return null
+    const peer = voiceChat.state.peers.find(p => p.name === player.name)
+    if (!peer) return null
+    return (
+      <MicToggle
+        muted={voiceChat.state.mutedPeers.has(player.name)}
+        connectionState={peer.connectionState}
+        audioLevelKey={player.name}
+        remoteMuted={voiceChat.state.remoteMutedPeers.has(player.name)}
+        variant="player-row"
+        onClick={() => voiceChat.togglePeerMute(player.name)}
+      />
+    )
+  }, [gameState?.self_player.name, voiceChat, voiceTargetNames, voiceTargetsAvailable])
+
   const { state, setPreviewCard, setRevealedPlayerName } = useContextStrip();
 
   const isSpectator = !!spectatorConfig;
@@ -841,12 +944,14 @@ function GameContent() {
   ]);
 
   // Lifted state from Build phase
-  type UpgradesModalOpenMode = 'auto' | 'view';
+  type UpgradesModalOpenMode = 'auto' | 'view' | 'reveal';
   const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
   const [showUpgradesModal, setShowUpgradesModal] = useState(false);
   const [upgradesModalOpenMode, setUpgradesModalOpenMode] =
     useState<UpgradesModalOpenMode>('auto');
   const [upgradeInitialTargetId, setUpgradeInitialTargetId] = useState<string | undefined>(undefined);
+  const [upgradeInitialId, setUpgradeInitialId] = useState<string | undefined>(undefined);
+  const [upgradeInitialRevealIds, setUpgradeInitialRevealIds] = useState<string[]>([]);
   const handSlotsRef = useRef<(string | null)[]>([]);
   const [pendingBuildUpgradeAnimation, setPendingBuildUpgradeAnimation] =
     useState<PendingBuildUpgradeAnimation | null>(null);
@@ -869,6 +974,9 @@ function GameContent() {
   const [activeBattleZoneModal, setActiveBattleZoneModal] = useState<BattleZoneModal>(null);
   const [showSubmitHandPopover, setShowSubmitHandPopover] = useState(false);
   const [showSubmitResultPopover, setShowSubmitResultPopover] = useState(false);
+  const [pendingBattleResult, setPendingBattleResult] = useState<string | null>(null);
+  const [pendingPostRevealSubmit, setPendingPostRevealSubmit] = useState<string | null>(null);
+  const [visibleGuideStep, setVisibleGuideStep] = useState<VisibleGuideStep | null>(null);
   const [guideCompletionTrigger, setGuideCompletionTrigger] = useState<{
     guideId: GuidedGuideId;
     stepId: string;
@@ -878,6 +986,8 @@ function GameContent() {
   const [cachedBattleForResolution, setCachedBattleForResolution] = useState<BattleView | null>(null);
   const [activeBattleResolutionId, setActiveBattleResolutionId] = useState<string | null>(null);
   const [shownBattleResolutionIds, setShownBattleResolutionIds] = useState<Set<string>>(new Set());
+  const [shownRevealAnimationIds, setShownRevealAnimationIds] = useState<Set<string>>(new Set());
+  const [activeRevealAnimation, setActiveRevealAnimation] = useState<RevealAnimation | null>(null);
   const battleResolutionId = gameState?.battle_resolution?.resolution_id ?? null;
 
   useEffect(() => {
@@ -911,6 +1021,25 @@ function GameContent() {
       setPendingBuildUpgradeAnimation(null);
     });
   }, [gameState?.self_player, pendingBuildUpgradeAnimation]);
+
+  useEffect(() => {
+    const battle = gameState?.current_battle;
+    if (!battle || activeRevealAnimation || pendingBattleResult) return;
+    if (gameState?.self_player.phase !== "battle") return;
+
+    const pending = battle.pending_reveal_animations ?? [];
+    const next = pending.find((a) => !shownRevealAnimationIds.has(a.animation_id));
+    if (!next) return;
+
+    queueMicrotask(() => {
+      setActiveRevealAnimation(next);
+      setShownRevealAnimationIds((prev) => {
+        const s = new Set(prev);
+        s.add(next.animation_id);
+        return s;
+      });
+    });
+  }, [gameState?.current_battle, gameState?.self_player.phase, activeRevealAnimation, shownRevealAnimationIds, pendingBattleResult]);
 
   const prevPhaseRef = useRef(gameState?.self_player.phase);
   if (gameState?.self_player.phase !== prevPhaseRef.current) {
@@ -953,6 +1082,10 @@ function GameContent() {
     setHoveredCard({ id: cardId, zone, owner: 'opponent' });
   };
   const handleCardHoverEnd = () => setHoveredCard(null);
+
+  useEffect(() => {
+    queueMicrotask(() => setHoveredCard(null));
+  }, [selfPhase]);
 
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
@@ -998,6 +1131,8 @@ function GameContent() {
     if (except !== "upgrades") {
       setShowUpgradesModal(false);
       setUpgradeInitialTargetId(undefined);
+      setUpgradeInitialId(undefined);
+      setUpgradeInitialRevealIds([]);
       setUpgradesModalOpenMode("auto");
     }
     if (except !== "actionMenu") {
@@ -1060,6 +1195,8 @@ function GameContent() {
   const closeUpgradesModal = useCallback(() => {
     setShowUpgradesModal(false);
     setUpgradeInitialTargetId(undefined);
+    setUpgradeInitialId(undefined);
+    setUpgradeInitialRevealIds([]);
     setUpgradesModalOpenMode('auto');
   }, []);
 
@@ -1075,10 +1212,25 @@ function GameContent() {
   const openUpgradesModal = useCallback((
     targetCardId?: string,
     mode: UpgradesModalOpenMode = 'auto',
+    initialRevealIds: string[] = [],
   ) => {
     closeGameplayOverlays("upgrades");
     setUpgradeInitialTargetId(targetCardId);
+    setUpgradeInitialId(undefined);
+    setUpgradeInitialRevealIds(initialRevealIds);
     setUpgradesModalOpenMode(mode);
+    setShowUpgradesModal(true);
+  }, [closeGameplayOverlays]);
+
+  const openBuildApplyUpgradeModal = useCallback((options: {
+    targetCardId?: string;
+    upgradeId?: string;
+  } = {}) => {
+    closeGameplayOverlays("upgrades");
+    setUpgradeInitialTargetId(options.targetCardId);
+    setUpgradeInitialId(options.upgradeId);
+    setUpgradeInitialRevealIds([]);
+    setUpgradesModalOpenMode("auto");
     setShowUpgradesModal(true);
   }, [closeGameplayOverlays]);
 
@@ -1173,10 +1325,34 @@ function GameContent() {
 
   const handleBattleResultSubmit = useCallback((result: string) => {
     requestGuideCompletion("battle_result_submit", "result-submit");
-    actions.battleSubmitResult(result);
     setIsChangingResult(false);
     setShowSubmitResultPopover(false);
-  }, [actions, requestGuideCompletion]);
+
+    const isLoss = result !== gameState?.self_player.name && result !== "draw";
+    const unrevealed = gameState
+      ? getUnrevealedAppliedUpgrades(gameState.self_player.upgrades)
+      : [];
+
+    if (!isLoss && unrevealed.length > 0) {
+      setPendingBattleResult(result);
+      return;
+    }
+
+    actions.battleSubmitResult(result);
+  }, [actions, gameState, requestGuideCompletion]);
+
+  const handleRevealAndSubmit = useCallback((upgradeIds: string[]) => {
+    upgradeIds.forEach((id) => actions.battleRevealUpgrade(id));
+    setPendingPostRevealSubmit(pendingBattleResult);
+    setPendingBattleResult(null);
+  }, [actions, pendingBattleResult]);
+
+  const handleSkipAndSubmit = useCallback(() => {
+    if (pendingBattleResult) {
+      actions.battleSubmitResult(pendingBattleResult);
+    }
+    setPendingBattleResult(null);
+  }, [actions, pendingBattleResult]);
 
   const handleContinue = useCallback(() => {
     requestGuideCompletion("reward", "continue");
@@ -1190,6 +1366,8 @@ function GameContent() {
     gameState?.self_player.phase !== "battle" &&
     cachedBattleForResolution !== null &&
     !shownBattleResolutionIds.has(battleResolutionId);
+  const buildSubmitGuideActive = isSubmitPopoverGuideStepActive(visibleGuideStep, "build");
+  const battleSubmitGuideActive = isSubmitPopoverGuideStepActive(visibleGuideStep, "battle");
 
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   const modalOpen =
@@ -1202,7 +1380,14 @@ function GameContent() {
     state.previewCard !== null ||
     hasPendingBattleResolution ||
     activeBattleResolutionId !== null ||
-    activeBuildUpgradeAnimation !== null;
+    activeBuildUpgradeAnimation !== null ||
+    pendingBattleResult !== null ||
+    activeRevealAnimation !== null ||
+    pendingPostRevealSubmit !== null;
+  const gameplayHotkeysDisabled = shouldDisableGameplayHotkeys({
+    modalOpen,
+    visibleGuideStep,
+  });
   const sidebarPlayers = useMemo(
     () => (gameState ? getSidebarPlayerOrder(gameState.players) : []),
     [gameState],
@@ -1218,12 +1403,12 @@ function GameContent() {
         );
       },
     };
-    if (!gameState || isSpectator || modalOpen) return map;
+    if (!gameState || isSpectator || gameplayHotkeysDisabled) return map;
 
     const { self_player: sp, current_battle: cb } = gameState;
     const phase = sp.phase;
 
-    if (!sizes.isMobile && phase !== "battle") {
+    if (!usesOverlaySidebar && phase !== "battle") {
       sidebarPlayers.slice(0, 8).forEach((player, index) => {
         map[String(index + 1)] = () => {
           setRevealedPlayerName(player.name, "seen");
@@ -1308,7 +1493,7 @@ function GameContent() {
               }
             }
           };
-          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile', l: 'command_zone' } as const;
+          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile', l: 'library' } as const;
           for (const [key, toZone] of Object.entries(moveZones)) {
             map[key] = () => {
               if (toZone !== hoveredCard.zone) {
@@ -1374,7 +1559,7 @@ function GameContent() {
     return map;
   })();
 
-  useHotkeys(hotkeyMap, !modalOpen);
+  useHotkeys(hotkeyMap, !gameplayHotkeysDisabled);
 
   const guideContext = useMemo<GuidedWalkthroughContext | null>(() => {
     if (!gameState) return null;
@@ -1387,20 +1572,22 @@ function GameContent() {
       currentPhase: isTimelinePhase(currentPhase) ? currentPhase : null,
       selfPlayer: self_player,
       currentBattle: current_battle,
-      isMobile: sizes.isMobile,
+      isMobile: usesOverlaySidebar,
       sidebarOpen,
       revealedPlayerName: state.revealedPlayerName,
       useUpgrades: gameState.use_upgrades,
       hasRewardUpgradeChoice: needsUpgrade,
       showBuildSubmitPopover: showSubmitHandPopover,
       showBattleSubmitPopover: showSubmitResultPopover,
+      hasBattleRevealUpgrade:
+        currentPhase === "battle" && getUnrevealedAppliedUpgrades(self_player.upgrades).length > 0,
       availableRewardUpgrades: gameState.available_upgrades,
       draftGuideOpponentName: dgo.name,
       draftGuideOpponentRevealedCount: dgo.revealedCount,
       isStageEnd: self_player.is_stage_increasing,
     };
   }, [
-    gameState, sizes.isMobile, sidebarOpen,
+    gameState, usesOverlaySidebar, sidebarOpen,
     state.revealedPlayerName,
     showSubmitHandPopover, showSubmitResultPopover,
   ]);
@@ -1442,6 +1629,14 @@ function GameContent() {
   const actionBarPhase = displayBattleResolution ? "battle" : currentPhase;
   const actionBarBattle = battleViewForDisplay;
   const canManipulateOpponent = battleViewForDisplay?.can_manipulate_opponent ?? false;
+  const overlaySidebarPadding = usesOverlaySidebar && (currentPhase === "battle" || displayBattleResolution) && battleViewForDisplay
+    ? {
+        top:
+          phaseTimelineHeight +
+          battleLifeRailHeight + 2,
+        bottom: actionBarHeight,
+      }
+    : undefined;
 
   const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
@@ -1465,12 +1660,36 @@ function GameContent() {
   const canContinue = !needsUpgrade || !!selectedUpgradeId;
   const hasPendingBuildUpgrades =
     currentPhase === "build" && self_player.upgrades.some((u) => !u.upgrade_target);
-  const upgradesModalMode: "view" | "apply" =
+  const hasUnrevealedBattleUpgrades =
+    actionBarPhase === "battle" && getUnrevealedAppliedUpgrades(self_player.upgrades).length > 0;
+  const {
+    upgradedCardIds: battleUpgradedCardIds,
+    appliedUpgradesByCardId: battleUpgradesByCardId,
+  } = current_battle
+    ? buildAppliedUpgradeMap(current_battle.your_zones.upgrades, "revealed_applied")
+    : { upgradedCardIds: new Set<string>(), appliedUpgradesByCardId: new Map<string, CardType[]>() };
+  const battleHiddenUpgradesByCardId = current_battle
+    ? buildHiddenAppliedUpgradeMap(current_battle.your_zones.upgrades)
+    : new Map<string, CardType[]>();
+  const {
+    upgradedCardIds: opponentBattleUpgradedCardIds,
+    appliedUpgradesByCardId: opponentBattleUpgradesByCardId,
+  } = current_battle
+    ? buildAppliedUpgradeMap(current_battle.opponent_zones.upgrades, "revealed_applied")
+    : { upgradedCardIds: new Set<string>(), appliedUpgradesByCardId: new Map<string, CardType[]>() };
+  const upgradesModalMode: "view" | "apply" | "reveal" =
     upgradesModalOpenMode === "view"
       ? "view"
-      : hasPendingBuildUpgrades
-        ? "apply"
-        : "view";
+      : upgradesModalOpenMode === "reveal"
+        ? "reveal"
+        : hasPendingBuildUpgrades
+          ? "apply"
+          : "view";
+
+  const openBattleRevealUpgradesModal = (initialRevealIds: string[] = []) => {
+    requestGuideCompletion("hint_battle_unrevealed_upgrade", "reveal-upgrade");
+    openUpgradesModal(undefined, "reveal", initialRevealIds);
+  };
 
   const renderActionButtons = (): ReactNode => {
     if (isSpectator) {
@@ -1599,7 +1818,8 @@ function GameContent() {
                 ]}
                 onClose={() => setShowSubmitHandPopover(false)}
                 guideTarget="build-submit-popover"
-                closeOnOutsideClick={false}
+                closeOnOutsideClick
+                ignoreOutsideClickSelector={buildSubmitGuideActive ? "[data-guided-tooltip='true']" : undefined}
               />
             )}
           </div>
@@ -1612,13 +1832,24 @@ function GameContent() {
       const opponentSubmission = result_submissions[opponent_name];
 
       left = (
-        <button
-          onClick={openActionMenu}
-          className="btn btn-secondary"
-          data-guide-target="battle-actions"
-        >
-          Actions
-        </button>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {hasUnrevealedBattleUpgrades && (
+            <button
+              onClick={() => openBattleRevealUpgradesModal()}
+              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              data-guide-target="battle-reveal-upgrade"
+            >
+              Reveal Upgrade
+            </button>
+          )}
+          <button
+            onClick={openActionMenu}
+            className="btn btn-secondary"
+            data-guide-target="battle-actions"
+          >
+            Actions
+          </button>
+        </div>
       );
 
       if (mySubmission && !isChangingResult) {
@@ -1684,7 +1915,8 @@ function GameContent() {
                 ]}
                 onClose={() => setShowSubmitResultPopover(false)}
                 guideTarget="battle-submit-popover"
-                closeOnOutsideClick={false}
+                closeOnOutsideClick
+                ignoreOutsideClickSelector={battleSubmitGuideActive ? "[data-guided-tooltip='true']" : undefined}
               />
             )}
           </div>
@@ -1726,6 +1958,22 @@ function GameContent() {
 
   const handleCreateOpponentTreasure = () => {
     actions.battleUpdateCardState("create_treasure", "", { for_opponent: true });
+  };
+
+  const handleDrawLibrary = () => {
+    actions.battleUpdateCardState("draw_library", "", {});
+  };
+
+  const handleShuffleLibrary = () => {
+    actions.battleUpdateCardState("shuffle_library", "", {});
+  };
+
+  const handleDrawOpponentLibrary = () => {
+    actions.battleUpdateCardState("draw_library", "", { for_opponent: true });
+  };
+
+  const handleShuffleOpponentLibrary = () => {
+    actions.battleUpdateCardState("shuffle_library", "", { for_opponent: true });
   };
 
   const handlePassTurn = () => {
@@ -1779,7 +2027,7 @@ function GameContent() {
       return (
         <BattleSidebarContent
           currentBattle={battleViewForDisplay}
-          selfUpgrades={self_player.upgrades}
+          selfUpgrades={getRevealedAppliedUpgrades(self_player.upgrades)}
           yourLife={battleViewForDisplay.your_life}
           opponentLife={battleViewForDisplay.opponent_life}
           onYourLifeChange={handleYourLifeChange}
@@ -1792,8 +2040,14 @@ function GameContent() {
           onCreateOpponentTreasure={handleCreateOpponentTreasure}
           onUntapOpponentAll={handleUntapOpponentAll}
           onPassOpponentTurn={handlePassTurn}
-          handZoneHeight={battleSidebarLayout?.handHeight ?? null}
+          voiceChat={!canManipulateOpponent && voiceTargetsAvailable ? {
+            state: voiceChat.state,
+            toggleSelfMute: voiceChat.toggleSelfMute,
+            togglePeerMute: voiceChat.togglePeerMute,
+          } : undefined}
+          topSectionHeight={battleSidebarLayout?.topSectionHeight ?? null}
           middleLaneHeight={battleSidebarLayout?.middleLaneHeight ?? null}
+          overlayTopInset={overlaySidebarPadding?.top ?? 0}
         />
       );
     }
@@ -1925,7 +2179,7 @@ function GameContent() {
           closeGameplayOverlays={closeGameplayOverlays}
         >
         {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
-        <div className="relative">
+        <div ref={phaseTimelineRef} className="relative">
           <PhaseTimeline
             currentPhase={currentPhase}
             stage={self_player.stage}
@@ -1933,9 +2187,10 @@ function GameContent() {
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
             useUpgrades={gameState.use_upgrades}
-            headerClassName="py-1.5 bar-pad-left"
+            headerClassName={phaseTimelineHeaderClassName}
+            rightActionsClassName={phaseTimelineRightActionsClassName}
             onOpenRules={openRulesPanel}
-            hamburger={sizes.isMobile ? (
+            hamburger={usesOverlaySidebar ? (
               <button
                 onClick={() => setSidebarOpen((o) => !o)}
                 className="btn btn-secondary text-xs sm:text-sm"
@@ -1960,25 +2215,44 @@ function GameContent() {
             validDropZones={getValidDropZones}
           >
             <div className="flex-1 flex min-h-0 game-surface">
-              <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
+              {shellMode === "mobile" && (
+                <div className="w-[4px] shrink-0 frame-chrome" />
+              )}
               <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-                  {sizes.isMobile && battleViewForDisplay && (
-                    <div className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight">
+                  {usesOverlaySidebar && battleViewForDisplay && (
+                    <div
+                      ref={battleLifeRailRef}
+                      className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight"
+                    >
                       <div className="flex items-center gap-1">
                         <span className="text-gray-300 truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
+                        {!canManipulateOpponent && voiceTargetsAvailable && (() => {
+                          const oppPeer = voiceChat.state.peers.find(p => p.name === battleViewForDisplay.opponent_name)
+                          return oppPeer ? (
+                            <MicToggle
+                              muted={voiceChat.state.mutedPeers.has(battleViewForDisplay.opponent_name)}
+                              connectionState={oppPeer.connectionState}
+                              audioLevelKey={battleViewForDisplay.opponent_name}
+                              remoteMuted={voiceChat.state.remoteMutedPeers.has(battleViewForDisplay.opponent_name)}
+                              onClick={() => voiceChat.togglePeerMute(battleViewForDisplay.opponent_name)}
+                            />
+                          ) : null
+                        })()}
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
                           <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
                           <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
                           <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
                         </div>
                       </div>
-                      <div className="text-center leading-tight">
-                        {battleViewForDisplay.current_turn_name === self_player.name ? (
-                          <span className="text-green-400 font-medium">Your turn</span>
-                        ) : (
-                          <span className="text-amber-400 font-medium">Opp's turn</span>
-                        )}
+                      <div className="flex items-center gap-1.5 leading-tight">
+                        <div className="text-center">
+                          {battleViewForDisplay.current_turn_name === self_player.name ? (
+                            <span className="text-green-400 font-medium">Your turn</span>
+                          ) : (
+                            <span className="text-amber-400 font-medium">Opp's turn</span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
@@ -1986,11 +2260,18 @@ function GameContent() {
                           <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
                           <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
                         </div>
+                        {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
+                          <MicToggle
+                            muted={voiceChat.state.isMuted}
+                            audioLevelKey="__self__"
+                            onClick={() => voiceChat.toggleSelfMute()}
+                          />
+                        )}
                         <span className="text-gray-300 truncate max-w-[60px] leading-tight">{self_player.name}</span>
                       </div>
                     </div>
                   )}
-                  {sizes.isMobile && battleViewForDisplay && (
+                  {usesOverlaySidebar && battleViewForDisplay && (
                     <ZoneDivider
                       orientation="horizontal"
                       interactive={false}
@@ -2001,6 +2282,7 @@ function GameContent() {
                       gameState={gameState}
                       battleOverride={displayBattleResolution ? battleViewForDisplay : undefined}
                       actions={actions}
+                      onRevealHiddenUpgrades={openBattleRevealUpgradesModal}
                       isMobile={sizes.isMobile}
                       selectedCard={battleSelectedCard}
                       onSelectedCardChange={setBattleSelectedCard}
@@ -2023,18 +2305,19 @@ function GameContent() {
                     )}
                   </div>
               </main>
-              {sizes.isMobile ? (
+              {usesOverlaySidebar ? (
                 <>
-                  {sidebarOpen && (
+                  {overlaySidebarOpen && (
                     <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
                   )}
-                  <div className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                  <div className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${overlaySidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                     <Sidebar
                       players={gameState.players}
                       currentPlayer={self_player}
                       phaseContent={renderPhaseContent()}
                       useUpgrades={gameState.use_upgrades}
                       isMobile
+                      renderMicToggle={renderMicToggle}
                     />
                   </div>
                 </>
@@ -2044,9 +2327,15 @@ function GameContent() {
                   currentPlayer={self_player}
                   phaseContent={renderPhaseContent()}
                   useUpgrades={gameState.use_upgrades}
+                  renderMicToggle={renderMicToggle}
                 />
               )}
-              <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
+              {shellMode === "mobile" && (
+                <div className="w-[4px] shrink-0 frame-chrome" />
+              )}
+              {isSmallShell && (
+                <div className="w-10 shrink-0 frame-chrome" />
+              )}
             </div>
             {activeDndPanel === 'sideboard' && current_battle && (
               <div onClick={(e) => handlePanelClickToMove(e, 'sideboard', 'player')}>
@@ -2057,7 +2346,7 @@ function GameContent() {
                   tone="battle"
                   zone="sideboard"
                   zoneOwner="player"
-                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
                 >
                   {(dims) =>
                     current_battle.your_zones.sideboard.map((card) => (
@@ -2070,6 +2359,12 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'player' })}
+                        upgraded={battleUpgradedCardIds.has(card.id)}
+                        appliedUpgrades={battleUpgradesByCardId.get(card.id)}
+                        hiddenUpgradeCount={(battleHiddenUpgradesByCardId.get(card.id) ?? []).length}
+                        onRevealHiddenUpgrades={() => openBattleRevealUpgradesModal(
+                          (battleHiddenUpgradesByCardId.get(card.id) ?? []).map((upgrade) => upgrade.id),
+                        )}
                       />
                     ))
                   }
@@ -2085,7 +2380,7 @@ function GameContent() {
                   tone="battle"
                   zone="sideboard"
                   zoneOwner="opponent"
-                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
                 >
                   {(dims) =>
                     current_battle.opponent_full_sideboard!.map((card) => (
@@ -2100,6 +2395,8 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'opponent' })}
+                        upgraded={opponentBattleUpgradedCardIds.has(card.id)}
+                        appliedUpgrades={opponentBattleUpgradesByCardId.get(card.id)}
                       />
                     ))
                   }
@@ -2115,7 +2412,7 @@ function GameContent() {
                   tone="battle"
                   zone="graveyard"
                   zoneOwner="player"
-                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
                 >
                   {(dims) =>
                     current_battle.your_zones.graveyard.map((card) => (
@@ -2128,6 +2425,12 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'graveyard', owner: 'player' })}
+                        upgraded={battleUpgradedCardIds.has(card.id)}
+                        appliedUpgrades={battleUpgradesByCardId.get(card.id)}
+                        hiddenUpgradeCount={(battleHiddenUpgradesByCardId.get(card.id) ?? []).length}
+                        onRevealHiddenUpgrades={() => openBattleRevealUpgradesModal(
+                          (battleHiddenUpgradesByCardId.get(card.id) ?? []).map((upgrade) => upgrade.id),
+                        )}
                       />
                     ))
                   }
@@ -2143,7 +2446,7 @@ function GameContent() {
                   tone="battle"
                   zone="exile"
                   zoneOwner="player"
-                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']}
+                  validFromZones={['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']}
                 >
                   {(dims) =>
                     current_battle.your_zones.exile.map((card) => (
@@ -2156,6 +2459,12 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'exile', owner: 'player' })}
+                        upgraded={battleUpgradedCardIds.has(card.id)}
+                        appliedUpgrades={battleUpgradesByCardId.get(card.id)}
+                        hiddenUpgradeCount={(battleHiddenUpgradesByCardId.get(card.id) ?? []).length}
+                        onRevealHiddenUpgrades={() => openBattleRevealUpgradesModal(
+                          (battleHiddenUpgradesByCardId.get(card.id) ?? []).map((upgrade) => upgrade.id),
+                        )}
                       />
                     ))
                   }
@@ -2166,10 +2475,17 @@ function GameContent() {
           </FaceDownProvider>
         ) : (
           <div className="flex-1 flex min-h-0 game-surface">
-            <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
+            {shellMode === "mobile" && (
+              <div className="w-[4px] shrink-0 frame-chrome" />
+            )}
             <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
               {currentPhase === "draft" && (
-                <DraftPhase gameState={gameState} actions={actions} isMobile={sizes.isMobile} />
+                <DraftPhase
+                  gameState={gameState}
+                  actions={actions}
+                  isMobile={sizes.isMobile}
+                  showDesktopUpgradeRail={shellMode === "big"}
+                />
               )}
               {currentPhase === "build" && (
                 <BuildPhase
@@ -2180,8 +2496,14 @@ function GameContent() {
                   onHandSlotsChange={(slots) => { handSlotsRef.current = slots; }}
                   onCardHover={handleCardHover}
                   onCardHoverEnd={handleCardHoverEnd}
-                  onQuickUpgrade={openUpgradesModal}
+                  onQuickUpgrade={(targetCardId) =>
+                    openBuildApplyUpgradeModal({ targetCardId })
+                  }
+                  onQuickApplyUpgrade={(upgradeId) =>
+                    openBuildApplyUpgradeModal({ upgradeId })
+                  }
                   isMobile={sizes.isMobile}
+                  showDesktopUpgradeRail={shellMode === "big"}
                 />
               )}
               {currentPhase === "reward" && (
@@ -2239,18 +2561,19 @@ function GameContent() {
                 />
               )}
             </main>
-            {sizes.isMobile ? (
+            {usesOverlaySidebar ? (
               <>
-                {sidebarOpen && (
+                {overlaySidebarOpen && (
                   <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setSidebarOpen(false)} />
                 )}
-                <div className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${overlaySidebarOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                   <Sidebar
                     players={gameState.players}
                     currentPlayer={self_player}
                     phaseContent={renderPhaseContent()}
                     useUpgrades={gameState.use_upgrades}
                     isMobile
+                    renderMicToggle={renderMicToggle}
                   />
                 </div>
               </>
@@ -2260,16 +2583,22 @@ function GameContent() {
                 currentPlayer={self_player}
                 phaseContent={renderPhaseContent()}
                 useUpgrades={gameState.use_upgrades}
+                renderMicToggle={renderMicToggle}
               />
             )}
-            <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
+            {shellMode === "mobile" && (
+              <div className="w-[4px] shrink-0 frame-chrome" />
+            )}
+            {isSmallShell && (
+              <div className="w-10 shrink-0 frame-chrome" />
+            )}
           </div>
         )}
         {/* Bottom Action Bar */}
         {!isSpectator && (
-          <div className="shrink-0 relative frame-chrome z-40">
+          <div ref={actionBarRef} className="shrink-0 relative frame-chrome z-40">
             <div
-              className="flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 bar-pad-main timeline-actions"
+              className={`flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 ${actionBarPaddingClass} timeline-actions`}
               data-guide-target="phase-action-bar"
             >
               {isEndPhase && gameId ? (
@@ -2303,6 +2632,7 @@ function GameContent() {
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
             guideCompletionTrigger={guideCompletionTrigger}
+            onVisibleGuideStepChange={setVisibleGuideStep}
           />
         )}
         </GuideProvider>
@@ -2329,6 +2659,10 @@ function GameContent() {
           onShowSideboard={() => toggleBattlePanel('sideboard')}
           onShowOpponentSideboard={() => toggleBattlePanel('opponentSideboard')}
           onCreateTreasure={handleCreateTreasure}
+          onDrawLibrary={handleDrawLibrary}
+          onShuffleLibrary={handleShuffleLibrary}
+          onDrawOpponentLibrary={handleDrawOpponentLibrary}
+          onShuffleOpponentLibrary={handleShuffleOpponentLibrary}
           onPassTurn={handlePassTurn}
           onRollDie={handleRollDie}
           onClose={() => setActionMenuOpen(false)}
@@ -2350,8 +2684,23 @@ function GameContent() {
             setPendingBuildUpgradeAnimation({ upgradeId, targetId });
             actions.buildApplyUpgrade(upgradeId, targetId);
           }}
+          onReveal={(upgradeIds) => {
+            upgradeIds.forEach((upgradeId) => {
+              actions.battleRevealUpgrade(upgradeId);
+            });
+          }}
           onClose={closeUpgradesModal}
           initialTargetId={upgradeInitialTargetId}
+          initialUpgradeId={upgradeInitialId}
+          initialRevealUpgradeIds={upgradeInitialRevealIds}
+        />
+      )}
+      {pendingBattleResult && (
+        <RevealBeforeSubmitModal
+          upgrades={getUnrevealedAppliedUpgrades(self_player.upgrades)}
+          onRevealAndSubmit={handleRevealAndSubmit}
+          onSkip={handleSkipAndSubmit}
+          onClose={() => setPendingBattleResult(null)}
         />
       )}
       {activeBuildUpgradeAnimation && (
@@ -2359,6 +2708,21 @@ function GameContent() {
           upgrade={activeBuildUpgradeAnimation.upgrade}
           target={activeBuildUpgradeAnimation.target}
           onComplete={() => setActiveBuildUpgradeAnimation(null)}
+        />
+      )}
+      {activeRevealAnimation && (
+        <BattleRevealOverlay
+          upgrade={activeRevealAnimation.upgrade}
+          target={activeRevealAnimation.target}
+          playerName={activeRevealAnimation.player_name}
+          selfName={self_player.name}
+          onComplete={() => {
+            setActiveRevealAnimation(null);
+            if (pendingPostRevealSubmit) {
+              actions.battleSubmitResult(pendingPostRevealSubmit);
+              setPendingPostRevealSubmit(null);
+            }
+          }}
         />
       )}
       {shareOpen && (

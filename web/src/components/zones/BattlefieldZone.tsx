@@ -33,6 +33,8 @@ interface BattlefieldZoneProps {
   cardDimensions?: CardDimensions;
   upgradedCardIds?: Set<string>;
   upgradesByCardId?: Map<string, CardType[]>;
+  hiddenUpgradesByCardId?: Map<string, CardType[]>;
+  onRevealHiddenUpgrades?: (cardId: string) => void;
   poisonCount?: number;
   rowHeight?: number;
   landCardDimensions?: CardDimensions;
@@ -52,7 +54,7 @@ export function BattlefieldZone({
   flippedCardIds = new Set(),
   counters = {},
   attachments = {},
-  validFromZones = ["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone"],
+  validFromZones = ["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone", "library"],
   draggable = true,
   isOpponent = false,
   canManipulateOpponent = false,
@@ -61,6 +63,8 @@ export function BattlefieldZone({
   cardDimensions,
   upgradedCardIds = new Set(),
   upgradesByCardId,
+  hiddenUpgradesByCardId,
+  onRevealHiddenUpgrades,
   poisonCount = 0,
   rowHeight,
   landCardDimensions,
@@ -104,6 +108,8 @@ export function BattlefieldZone({
           onCardContextMenu={onCardContextMenu}
           upgradedCardIds={upgradedCardIds}
           upgradesByCardId={upgradesByCardId}
+          hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+          onRevealHiddenUpgrades={onRevealHiddenUpgrades}
         />
       );
     }
@@ -135,6 +141,8 @@ export function BattlefieldZone({
           isOpponent={isOpponent}
           upgraded={upgradedCardIds.has(card.id)}
           appliedUpgrades={upgradesByCardId?.get(card.id)}
+          hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
+          onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(card.id) : undefined}
           canPeekFaceDown={canPeekFaceDown}
           onCardHover={allowInteraction ? onCardHover : undefined}
           onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}

@@ -35,11 +35,18 @@ function computeReconnectDelayMs(attempt: number): number {
   return Math.floor(Math.random() * capped)
 }
 
+export interface VoiceSignalPayload {
+  signal_type: string
+  data: unknown
+  from_player: string
+}
+
 export function useWebSocket(
   gameId: string | null,
   sessionId: string | null,
   spectatorConfig?: SpectatorConfig | null,
-  onServerError?: (message: string) => void
+  onServerError?: (message: string) => void,
+  onVoiceSignal?: (payload: VoiceSignalPayload) => void,
 ) {
   const [state, setState] = useState<WebSocketState>({
     isConnected: false,
@@ -62,6 +69,10 @@ export function useWebSocket(
   useEffect(() => {
     onServerErrorRef.current = onServerError
   }, [onServerError])
+  const onVoiceSignalRef = useRef(onVoiceSignal)
+  useEffect(() => {
+    onVoiceSignalRef.current = onVoiceSignal
+  }, [onVoiceSignal])
 
   useEffect(() => {
     if (!gameId || !sessionId) {
@@ -160,6 +171,8 @@ export function useWebSocket(
             } else if (message.type === 'kicked') {
               isClosingRef.current = true
               setState(s => ({ ...s, kicked: true }))
+            } else if (message.type === 'voice_signal') {
+              onVoiceSignalRef.current?.(message.payload)
             }
           } catch (err) {
             console.error('Failed to process WebSocket message:', err)

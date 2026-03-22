@@ -4,7 +4,19 @@ export type LastResult = 'win' | 'loss' | 'draw'
 export type CubeLoadingStatus = 'loading' | 'ready' | 'error'
 export type BattlerLoadingStatus = 'missing' | 'loading' | 'ready' | 'error'
 export type ZoneName = 'battlefield' | 'graveyard' | 'exile' | 'hand' | 'sideboard' | 'upgrades' | 'command_zone' | 'library'
-export type CardStateAction = 'tap' | 'untap' | 'flip' | 'face_down' | 'counter' | 'attach' | 'detach' | 'spawn' | 'create_treasure'
+export type CardStateAction =
+  | 'tap'
+  | 'untap'
+  | 'flip'
+  | 'face_down'
+  | 'counter'
+  | 'attach'
+  | 'detach'
+  | 'spawn'
+  | 'create_treasure'
+  | 'draw_library'
+  | 'shuffle_library'
+  | 'copy_token'
 export type CardDestination = 'hand' | 'sideboard' | 'upgrades'
 export type BuildSource = 'hand' | 'sideboard'
 
@@ -20,6 +32,7 @@ export interface Card {
   tokens: Card[]
   elo: number | null
   upgrade_target: Card | null
+  is_revealed?: boolean
   oracle_text: string | null
   colors: string[]
   keywords?: string[]
@@ -123,6 +136,13 @@ export interface SelfPlayerView extends PlayerView {
   in_sudden_death: boolean
 }
 
+export interface RevealAnimation {
+  animation_id: string
+  upgrade: Card
+  target: Card
+  player_name: string
+}
+
 export interface BattleView {
   opponent_name: string
   coin_flip_name: string
@@ -140,6 +160,7 @@ export interface BattleView {
   is_sudden_death: boolean
   opponent_full_sideboard: Card[]
   can_manipulate_opponent: boolean
+  pending_reveal_animations: RevealAnimation[]
 }
 
 export interface GameState {
@@ -152,6 +173,7 @@ export interface GameState {
   current_battle: BattleView | null
   battle_resolution: BattleResolution | null
   use_upgrades: boolean
+  voice_chat_enabled: boolean
   cube_id: string
   play_mode: PlayMode
 }
@@ -180,6 +202,8 @@ export interface CardRef {
   id: string
   scryfall_id: string
   upgrade_target_id: string | null
+  upgrade_target_ref?: CardRef | null
+  is_revealed?: boolean
   original_owner: string | null
 }
 
@@ -253,6 +277,13 @@ export interface CompactSelfPlayerView extends CompactPlayerView {
   last_battle_result: CompactLastBattleResult | null
 }
 
+export interface CompactRevealAnimation {
+  animation_id: string
+  upgrade: CardRef
+  target: CardRef
+  player_name: string
+}
+
 export interface CompactBattleView {
   opponent_name: string
   coin_flip_name: string
@@ -270,6 +301,7 @@ export interface CompactBattleView {
   is_sudden_death: boolean
   opponent_full_sideboard: CardRef[]
   can_manipulate_opponent: boolean
+  pending_reveal_animations: CompactRevealAnimation[]
 }
 
 export interface CompactGameState {
@@ -282,6 +314,7 @@ export interface CompactGameState {
   current_battle: CompactBattleView | null
   battle_resolution: BattleResolution | null
   use_upgrades: boolean
+  voice_chat_enabled: boolean
   cube_id: string
   play_mode: PlayMode
   catalog_delta: Record<string, CardCatalogEntry>
@@ -316,6 +349,7 @@ export interface LobbyState {
   available_puppet_count: number | null
   use_upgrades: boolean
   guided_mode_default: boolean
+  voice_chat_enabled: boolean
   play_mode: PlayMode
 }
 

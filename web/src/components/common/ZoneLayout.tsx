@@ -10,6 +10,10 @@ interface ZoneSectionHeights {
   upgrades?: number
 }
 
+interface ZoneSectionWidths {
+  upgrades?: number
+}
+
 interface ZoneRefs {
   hand?: RefCallback<HTMLDivElement>
   battlefield?: RefCallback<HTMLDivElement>
@@ -44,6 +48,7 @@ interface ZoneLayoutProps {
   dividerCallbacks?: DividerCallbacks | null
   isMobile?: boolean
   zoneHeights?: ZoneSectionHeights | null
+  zoneWidths?: ZoneSectionWidths | null
   zoneRefs?: ZoneRefs
   zoneTargetIds?: ZoneTargetIds
   overlay?: ReactNode
@@ -75,6 +80,7 @@ export function ZoneLayout({
   dividerCallbacks,
   isMobile = false,
   zoneHeights = null,
+  zoneWidths = null,
   zoneRefs,
   zoneTargetIds,
   overlay,
@@ -117,6 +123,9 @@ export function ZoneLayout({
           // doubling the lower edge chrome during manual resize.
           boxShadow: 'inset 0 2px 6px rgba(0, 0, 0, 0.3)',
         }
+      : {}),
+    ...(zoneWidths?.upgrades != null
+      ? { width: zoneWidths.upgrades, flex: '0 0 auto' as const }
       : {}),
   }
   const rootClassName = [

@@ -32,10 +32,19 @@ _SYNTHETIC_CATALOG_ENTRIES = {
 def card_to_ref(card: Card | None) -> CardRef | None:
     if card is None:
         return None
+    target = card.upgrade_target
     return CardRef(
         id=card.id,
         scryfall_id=card.scryfall_id,
-        upgrade_target_id=card.upgrade_target.id if card.upgrade_target is not None else None,
+        upgrade_target_id=target.id if target is not None else None,
+        upgrade_target_ref=CardRef(
+            id=target.id,
+            scryfall_id=target.scryfall_id,
+            original_owner=target.original_owner,
+        )
+        if target is not None
+        else None,
+        is_revealed=card.is_revealed,
         original_owner=card.original_owner,
     )
 

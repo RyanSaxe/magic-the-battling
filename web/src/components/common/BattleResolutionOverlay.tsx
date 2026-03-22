@@ -76,6 +76,11 @@ function buildCardLookup(battle: BattleView): Map<string, CardLookupEntry> {
     addCards(zones.command_zone, owner)
     addCards(zones.submitted_cards, owner)
     addCards(zones.upgrades, owner)
+    for (const upgrade of zones.upgrades) {
+      if (upgrade.upgrade_target) {
+        lookup.set(upgrade.upgrade_target.id, { card: upgrade.upgrade_target, owner })
+      }
+    }
   }
 
   addZones('player', battle.your_zones)

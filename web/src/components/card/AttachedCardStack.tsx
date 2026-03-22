@@ -16,6 +16,8 @@ interface AttachedCardStackProps {
   onCardContextMenu?: (e: React.MouseEvent, card: CardType) => void
   upgradedCardIds?: Set<string>
   upgradesByCardId?: Map<string, CardType[]>
+  hiddenUpgradesByCardId?: Map<string, CardType[]>
+  onRevealHiddenUpgrades?: (cardId: string) => void
 }
 
 const PEEK_FRACTION = 0.15
@@ -43,6 +45,8 @@ export function AttachedCardStack({
   onCardContextMenu,
   upgradedCardIds = new Set(),
   upgradesByCardId,
+  hiddenUpgradesByCardId,
+  onRevealHiddenUpgrades,
 }: AttachedCardStackProps) {
   const baseDims = dimensions ?? SIZE_DIMENSIONS[size]
   const n = attachedCards.length
@@ -83,6 +87,8 @@ export function AttachedCardStack({
             onDoubleClick={() => onCardDoubleClick?.(card)}
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={upgradesByCardId?.get(card.id)}
+            hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
+            onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(card.id) : undefined}
           />
         </div>
       ))}
@@ -109,6 +115,8 @@ export function AttachedCardStack({
           onDoubleClick={() => onCardDoubleClick?.(parentCard)}
           upgraded={upgradedCardIds.has(parentCard.id)}
           appliedUpgrades={upgradesByCardId?.get(parentCard.id)}
+          hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(parentCard.id) ?? []).length}
+          onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(parentCard.id) : undefined}
         />
       </div>
     </div>

@@ -5,6 +5,7 @@ import {
   MouseSensor,
   TouchSensor,
   KeyboardSensor,
+  KeyboardCode,
   useSensor,
   useSensors,
   type DragStartEvent,
@@ -61,7 +62,13 @@ export function GameDndProvider({
     },
   });
 
-  const keyboardSensor = useSensor(KeyboardSensor);
+  const keyboardSensor = useSensor(KeyboardSensor, {
+    keyboardCodes: {
+      start: [KeyboardCode.Space],
+      cancel: [KeyboardCode.Esc],
+      end: [KeyboardCode.Space, KeyboardCode.Tab],
+    },
+  });
 
   const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
 

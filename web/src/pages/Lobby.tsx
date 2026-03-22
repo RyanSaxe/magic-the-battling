@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { FaDiscord } from "react-icons/fa6";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
+import { useVoiceChat } from "../hooks/useVoiceChat";
+import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { InfoIcon } from "../components/icons/InfoIcon";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
+import { MicToggle } from "../components/sidebar/MicToggle";
 import { useToast } from "../contexts";
 import { HintsBanner } from "../components/common/HintsBanner";
 import { CubeCobraPrimerLink } from "../components/common/CubeCobraPrimerLink";
@@ -19,6 +22,7 @@ import {
 
 const DESKTOP_SUBTITLE = "An MtG format inspired by autobattlers";
 const MOBILE_SUBTITLE = "An MtG format inspired by autobattlers";
+const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 
 function cubeCobraUrl(battlerId: string) {
   return `https://cubecobra.com/cube/overview/${encodeURIComponent(battlerId)}`;
@@ -85,7 +89,7 @@ function GuidedModeSwitch({
   }, [showGuidedModeHelp]);
 
   return (
-    <div className="flex items-center gap-1.5 shrink-0 rounded-md border border-black/40 bg-black/40 px-2 py-1">
+    <div className="flex items-center gap-1.5">
       <label className="flex items-center gap-1.5 cursor-pointer">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
           Guided
@@ -137,6 +141,44 @@ function GuidedModeSwitch({
   );
 }
 
+function VoiceChatSwitch({
+  enabled,
+  setEnabled,
+  isHost,
+}: {
+  enabled: boolean;
+  setEnabled: (v: boolean) => void;
+  isHost: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-1.5${
+        !isHost ? ' opacity-50' : ''
+      }`}
+    >
+      <label className={`flex items-center gap-1.5${isHost ? ' cursor-pointer' : ' cursor-default'}`}>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
+          Voice
+        </span>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => isHost && setEnabled(e.target.checked)}
+          disabled={!isHost}
+          className="sr-only peer"
+        />
+        <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              enabled ? 'translate-x-5' : 'translate-x-1'
+            }`}
+          />
+        </span>
+      </label>
+    </div>
+  );
+}
+
 function LobbyFooterLinks() {
   return (
     <div className="flex items-center justify-between">
@@ -159,6 +201,12 @@ export function Lobby() {
   const navigate = useNavigate();
   const { session, clearSession } = useSession();
   const { addToast } = useToast();
+
+  const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(null);
+  const handleVoiceSignal = useCallback((payload: VoiceSignalPayload) => {
+    voiceSignalRef.current?.(payload);
+  }, []);
+
   const {
     lobbyState,
     gameState,
@@ -167,12 +215,33 @@ export function Lobby() {
     invalidSession,
     gameNotFound,
     actions,
+    send,
   } = useGame(
     gameId ?? null,
     session?.sessionId ?? null,
     null,
     addToast,
+    handleVoiceSignal,
   );
+
+  const peerNames = useMemo(() => {
+    if (!lobbyState?.voice_chat_enabled || !session) return []
+    return lobbyState.players
+      .filter(p => p.player_id !== session.playerId)
+      .map(p => p.name)
+  }, [lobbyState, session])
+
+  const selfName = lobbyState?.players.find(p => p.player_id === session?.playerId)?.name ?? null
+
+  const handleMicDenied = useCallback(() => {
+    addToast("Microphone access was denied. Voice chat is unavailable.", "warning")
+  }, [addToast])
+
+  const handleRetriesExhausted = useCallback((peerName: string) => {
+    addToast(`Voice connection to ${peerName} failed.`, "warning")
+  }, [addToast])
+
+  const voiceChat = useVoiceChat(send, peerNames, selfName, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
 
   const [copied, setCopied] = useState(false);
   const [startingGame, setStartingGame] = useState(false);
@@ -654,18 +723,35 @@ export function Lobby() {
         <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col sm:items-center sm:justify-center px-4 py-4 overflow-auto">
-            <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md flex-1 min-h-0 overflow-visible sm:flex-none felt-raised-panel">
+            <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md overflow-visible sm:flex-none felt-raised-panel">
               {lobbyState &&
                 (() => {
                   const isHost = currentPlayer?.is_host ?? false;
                   const isReady = currentPlayer?.is_ready ?? false;
                   const puppetCount = lobbyState.puppet_count;
-                  const total = lobbyState.target_player_count;
+                  const playerCap = lobbyState.target_player_count;
+                  const occupiedSlots = lobbyState.players.length + puppetCount;
+                  const playerCapIndex = EVEN_PLAYER_CAP_OPTIONS.findIndex(
+                    (value) => value === playerCap,
+                  );
+                  const previousPlayerCap =
+                    playerCapIndex > 0
+                      ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex - 1]
+                      : null;
+                  const nextPlayerCap =
+                    playerCapIndex >= 0 &&
+                    playerCapIndex < EVEN_PLAYER_CAP_OPTIONS.length - 1
+                      ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex + 1]
+                      : null;
+                  const canDecreasePlayerCap =
+                    previousPlayerCap !== null &&
+                    previousPlayerCap >= occupiedSlots;
+                  const canIncreasePlayerCap = nextPlayerCap !== null;
                   const availablePuppets = lobbyState.available_puppet_count;
                   const canAddPuppet =
                     availablePuppets !== null &&
                     puppetCount < availablePuppets &&
-                    total < 8;
+                    occupiedSlots < playerCap;
                   const summaryBattlerId =
                     lobbyState.play_mode === "limited"
                       ? lobbyState.cube_id
@@ -679,21 +765,6 @@ export function Lobby() {
                     setShowRulesPanel(true);
                   };
 
-                  const startMessage = (() => {
-                    if (startingGame) return null;
-                    if (total < 2) return "Need at least 2 players";
-                    if (total % 2 !== 0)
-                      return `Odd player count (${total})`;
-                    if (!lobbyState.players.every((p) => p.is_ready))
-                      return "Waiting for all players to ready";
-                    if (
-                      puppetCount > 0 &&
-                      availablePuppets !== null &&
-                      availablePuppets < puppetCount
-                    )
-                      return "Not enough puppets available";
-                    return null;
-                  })();
                   const filledSlots = [
                     ...lobbyState.players.map((player) => ({
                       kind: "player" as const,
@@ -709,11 +780,10 @@ export function Lobby() {
                   const playerSlots = [
                     ...filledSlots,
                     ...Array.from({
-                      length: Math.max(0, 8 - filledSlots.length),
+                      length: Math.max(0, playerCap - filledSlots.length),
                     }).map((_, i) => ({
                       kind: "open" as const,
                       key: `open-${i}`,
-                      openIndex: i,
                     })),
                   ];
 
@@ -822,43 +892,78 @@ export function Lobby() {
 
                 <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
                   <div className="flex items-center justify-between mb-2">
-                    <h2 className="text-white font-medium text-sm">Players</h2>
                     {isHost ? (
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          onClick={() => actions.addPuppet()}
-                          disabled={!canAddPuppet}
-                          className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
-                        >
-                          + Add Puppet
-                        </button>
-                        <button
-                          onClick={() =>
-                            openGuide({
-                              docId: "faq",
-                              tab: "why-are-my-opponents-cards-face-up",
-                            })
-                          }
-                          className="w-5 h-5 rounded-full bg-black/30 border border-black/40 text-gray-400 hover:bg-black/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
-                          title="What are Puppets?"
-                        >
-                          ?
-                        </button>
-                      </div>
+                      <>
+                        <div className="flex items-center justify-center gap-1 rounded-md border border-black/40 bg-black/30 px-1.5 py-1 w-[calc(50%-0.25rem)]">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (previousPlayerCap !== null) {
+                                actions.setTargetPlayerCount(previousPlayerCap);
+                              }
+                            }}
+                            disabled={!canDecreasePlayerCap}
+                            aria-label="Decrease player count"
+                            className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
+                          >
+                            -
+                          </button>
+                          <span className="min-w-[3.5rem] text-center text-sm font-semibold text-white">
+                            {playerCap} players
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (nextPlayerCap !== null) {
+                                actions.setTargetPlayerCount(nextPlayerCap);
+                              }
+                            }}
+                            disabled={!canIncreasePlayerCap}
+                            aria-label="Increase player count"
+                            className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => actions.addPuppet()}
+                            disabled={!canAddPuppet}
+                            className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                          >
+                            + Add Puppet
+                          </button>
+                          <button
+                            onClick={() =>
+                              openGuide({
+                                docId: "faq",
+                                tab: "why-are-my-opponents-cards-face-up",
+                              })
+                            }
+                            className="w-5 h-5 rounded-full bg-black/30 border border-black/40 text-gray-400 hover:bg-black/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
+                            title="What are Puppets?"
+                          >
+                            ?
+                          </button>
+                        </div>
+                      </>
                     ) : (
-                      puppetCount > 0 && (
-                        <button
-                          onClick={() =>
-                            openGuide({
-                              docId: "faq",
-                              tab: "why-are-my-opponents-cards-face-up",
-                            })
-                          }
-                          className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
-                        >
-                          What are Puppets?
-                        </button>
-                      )
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-white">{playerCap} players</span>
+                        {puppetCount > 0 && (
+                          <button
+                            onClick={() =>
+                              openGuide({
+                                docId: "faq",
+                                tab: "why-are-my-opponents-cards-face-up",
+                              })
+                            }
+                            className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
+                          >
+                            What are Puppets?
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -875,20 +980,41 @@ export function Lobby() {
                                 player.is_ready ? "bg-green-500" : "bg-gray-500"
                               }`}
                             />
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <div className="text-white text-sm truncate">
                                 {player.name}
                               </div>
                             </div>
+                            {player.player_id === session?.playerId && voiceChat.state.peers.length > 0 && (
+                              <MicToggle
+                                muted={voiceChat.state.isMuted}
+                                audioLevelKey="__self__"
+                                onClick={() => voiceChat.toggleSelfMute()}
+                              />
+                            )}
+                            {(() => {
+                              const peer = player.player_id !== session?.playerId
+                                ? voiceChat.state.peers.find(p => p.name === player.name)
+                                : null
+                              return peer ? (
+                                <MicToggle
+                                  muted={voiceChat.state.mutedPeers.has(player.name)}
+                                  connectionState={peer.connectionState}
+                                  audioLevelKey={player.name}
+                                  remoteMuted={voiceChat.state.remoteMutedPeers.has(player.name)}
+                                  onClick={() => voiceChat.togglePeerMute(player.name)}
+                                />
+                              ) : null
+                            })()}
                             {player.is_host && (
-                              <span className="text-amber-400 text-xs shrink-0 ml-auto">
+                              <span className="text-amber-400 text-xs shrink-0">
                                 Host
                               </span>
                             )}
                             {isHost && !player.is_host && (
                               <button
                                 onClick={() => actions.kickPlayer(player.player_id)}
-                                className="text-gray-500 hover:text-red-400 transition-colors shrink-0 ml-auto text-xs"
+                                className="text-gray-500 hover:text-red-400 transition-colors shrink-0 text-xs"
                                 title="Remove player"
                               >
                                 &times;
@@ -963,9 +1089,7 @@ export function Lobby() {
                         >
                           <span className="w-2 h-2 rounded-full shrink-0 bg-black/40" />
                           <span className="text-gray-500 text-sm italic">
-                            {filledSlots.length === 1 && slot.openIndex === 0
-                              ? "required"
-                              : "optional"}
+                            required
                           </span>
                         </div>
                       );
@@ -974,18 +1098,16 @@ export function Lobby() {
                 </div>
 
                 <div className="space-y-3 mb-3">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between rounded-md border border-black/40 bg-black/40 px-2 py-1">
                     <GuidedModeSwitch
                       enabled={isGuidedMode}
                       setEnabled={handleGuidedModeToggle}
                     />
-                    {startMessage ? (
-                      <p className="text-gray-500 text-xs text-right leading-snug max-w-[58%]">
-                        {startMessage}
-                      </p>
-                    ) : (
-                      <span />
-                    )}
+                    <VoiceChatSwitch
+                      enabled={lobbyState.voice_chat_enabled}
+                      setEnabled={(v) => send('set_voice_chat', { enabled: v })}
+                      isHost={isHost}
+                    />
                   </div>
 
                   <div className={isHost ? "grid grid-cols-2 gap-2" : ""}>

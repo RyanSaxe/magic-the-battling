@@ -29,7 +29,7 @@ export function PileZone({
   const allowInteraction = !isOpponent || canManipulateOpponent
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
-  const defaultValidZones = ['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone']
+  const defaultValidZones = ['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']
 
   const label = zone === 'graveyard' ? 'GY' : 'Exile'
   const bgColor = zone === 'graveyard'

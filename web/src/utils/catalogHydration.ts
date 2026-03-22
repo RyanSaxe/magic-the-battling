@@ -30,6 +30,7 @@ function makeFallbackCard(ref: CardRef): Card {
     tokens: [],
     elo: null,
     upgrade_target: null,
+    is_revealed: ref.is_revealed !== false,
     oracle_text: null,
     colors: [],
     keywords: [],
@@ -72,6 +73,7 @@ function hydrateCatalogCard(
     tokens,
     elo: null,
     upgrade_target: null,
+    is_revealed: true,
     oracle_text: def.oracle_text,
     colors: def.colors,
     keywords: def.keywords,
@@ -97,6 +99,9 @@ function indexCardRefs(obj: unknown, refs: Map<string, CardRef>): void {
   if ('id' in obj && 'scryfall_id' in obj) {
     const ref = obj as CardRef
     refs.set(ref.id, ref)
+    if (ref.upgrade_target_ref) {
+      refs.set(ref.upgrade_target_ref.id, ref.upgrade_target_ref)
+    }
     return
   }
 
@@ -122,6 +127,7 @@ function hydrateCard(
   return {
     ...base,
     original_owner: ref.original_owner,
+    is_revealed: ref.is_revealed !== false,
     upgrade_target: ref.upgrade_target_id ? hydrateOptionalCard(refsById.get(ref.upgrade_target_id) ?? null, catalog, refsById, nextStack) : null,
   }
 }
@@ -216,6 +222,12 @@ function hydrateBattleView(
     your_zones: hydrateZones(battle.your_zones, catalog, refsById),
     opponent_zones: hydrateZones(battle.opponent_zones, catalog, refsById),
     opponent_full_sideboard: hydrateCards(battle.opponent_full_sideboard, catalog, refsById),
+    pending_reveal_animations: (battle.pending_reveal_animations ?? []).map((anim) => ({
+      animation_id: anim.animation_id,
+      upgrade: hydrateCard(anim.upgrade, catalog, refsById),
+      target: hydrateCard(anim.target, catalog, refsById),
+      player_name: anim.player_name,
+    })),
   }
 }
 
