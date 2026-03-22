@@ -141,6 +141,44 @@ function GuidedModeSwitch({
   );
 }
 
+function VoiceChatSwitch({
+  enabled,
+  setEnabled,
+  isHost,
+}: {
+  enabled: boolean;
+  setEnabled: (v: boolean) => void;
+  isHost: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-1.5 shrink-0 rounded-md border border-black/40 bg-black/40 px-2 py-1${
+        !isHost ? ' opacity-50' : ''
+      }`}
+    >
+      <label className={`flex items-center gap-1.5${isHost ? ' cursor-pointer' : ' cursor-default'}`}>
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
+          Voice
+        </span>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(e) => isHost && setEnabled(e.target.checked)}
+          disabled={!isHost}
+          className="sr-only peer"
+        />
+        <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+              enabled ? 'translate-x-5' : 'translate-x-1'
+            }`}
+          />
+        </span>
+      </label>
+    </div>
+  );
+}
+
 function LobbyFooterLinks() {
   return (
     <div className="flex items-center justify-between">
@@ -187,7 +225,7 @@ export function Lobby() {
   );
 
   const peerNames = useMemo(() => {
-    if (!lobbyState || !session) return []
+    if (!lobbyState?.voice_chat_enabled || !session) return []
     return lobbyState.players
       .filter(p => p.player_id !== session.playerId)
       .map(p => p.name)
@@ -727,20 +765,6 @@ export function Lobby() {
                     setShowRulesPanel(true);
                   };
 
-                  const startMessage = (() => {
-                    if (startingGame) return null;
-                    if (occupiedSlots !== playerCap)
-                      return `Need ${playerCap - occupiedSlots} more player${playerCap - occupiedSlots === 1 ? "" : "s"}`;
-                    if (!lobbyState.players.every((p) => p.is_ready))
-                      return "Waiting for all players to ready";
-                    if (
-                      puppetCount > 0 &&
-                      availablePuppets !== null &&
-                      availablePuppets < puppetCount
-                    )
-                      return "Not enough puppets available";
-                    return null;
-                  })();
                   const filledSlots = [
                     ...lobbyState.players.map((player) => ({
                       kind: "player" as const,
@@ -977,6 +1001,7 @@ export function Lobby() {
                                   muted={voiceChat.state.mutedPeers.has(player.name)}
                                   connectionState={peer.connectionState}
                                   speaking={voiceChat.state.speakingPeers.has(player.name)}
+                                  remoteMuted={voiceChat.state.remoteMutedPeers.has(player.name)}
                                   onClick={() => voiceChat.togglePeerMute(player.name)}
                                 />
                               ) : null
@@ -1078,13 +1103,11 @@ export function Lobby() {
                       enabled={isGuidedMode}
                       setEnabled={handleGuidedModeToggle}
                     />
-                    {startMessage ? (
-                      <p className="text-gray-500 text-xs text-right leading-snug max-w-[58%]">
-                        {startMessage}
-                      </p>
-                    ) : (
-                      <span />
-                    )}
+                    <VoiceChatSwitch
+                      enabled={lobbyState.voice_chat_enabled}
+                      setEnabled={(v) => send('set_voice_chat', { enabled: v })}
+                      isHost={isHost}
+                    />
                   </div>
 
                   <div className={isHost ? "grid grid-cols-2 gap-2" : ""}>

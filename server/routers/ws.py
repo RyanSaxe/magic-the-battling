@@ -575,6 +575,15 @@ async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
             await connection_manager.send_error(websocket, error or "Cannot change player cap")
         return True
 
+    if action == "set_voice_chat":
+        enabled = payload.get("enabled", True)
+        success, error = game_manager.set_voice_chat_enabled(game_id, player_id, enabled)
+        if success:
+            await connection_manager.broadcast_lobby_state(game_id)
+        else:
+            await connection_manager.send_error(websocket, error or "Cannot toggle voice chat")
+        return True
+
     return False
 
 

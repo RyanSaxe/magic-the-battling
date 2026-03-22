@@ -850,7 +850,10 @@ function GameContent() {
     handleVoiceSignal,
   );
 
-  const peerNames = useMemo(() => getVoicePeerNames(gameState), [gameState]);
+  const peerNames = useMemo(() => {
+    if (!gameState?.voice_chat_enabled) return []
+    return getVoicePeerNames(gameState)
+  }, [gameState]);
   const voiceTargetNames = useMemo(() => new Set(peerNames), [peerNames]);
   const voiceTargetsAvailable = peerNames.length > 0;
 
@@ -887,6 +890,7 @@ function GameContent() {
         muted={voiceChat.state.mutedPeers.has(player.name)}
         connectionState={peer.connectionState}
         speaking={voiceChat.state.speakingPeers.has(player.name)}
+        remoteMuted={voiceChat.state.remoteMutedPeers.has(player.name)}
         variant="player-row"
         onClick={() => voiceChat.togglePeerMute(player.name)}
       />
@@ -2230,6 +2234,7 @@ function GameContent() {
                               muted={voiceChat.state.mutedPeers.has(battleViewForDisplay.opponent_name)}
                               connectionState={oppPeer.connectionState}
                               speaking={voiceChat.state.speakingPeers.has(battleViewForDisplay.opponent_name)}
+                              remoteMuted={voiceChat.state.remoteMutedPeers.has(battleViewForDisplay.opponent_name)}
                               onClick={() => voiceChat.togglePeerMute(battleViewForDisplay.opponent_name)}
                             />
                           ) : null
