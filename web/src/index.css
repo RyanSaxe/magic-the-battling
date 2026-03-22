@@ -908,6 +908,15 @@ body {
   border-radius: 4px;
 }
 
+@keyframes mic-connecting {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+.animate-mic-connecting {
+  animation: mic-connecting 1.5s ease-in-out infinite;
+}
+
 /* Carousel crossfade */
 .carousel-fade-in {
   opacity: 1;

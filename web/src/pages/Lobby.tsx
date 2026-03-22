@@ -960,12 +960,18 @@ export function Lobby() {
                                 onClick={() => voiceChat.toggleSelfMute()}
                               />
                             )}
-                            {player.player_id !== session?.playerId && voiceChat.state.peers.some(p => p.name === player.name) && (
-                              <MicToggle
-                                muted={voiceChat.state.mutedPeers.has(player.name)}
-                                onClick={() => voiceChat.togglePeerMute(player.name)}
-                              />
-                            )}
+                            {(() => {
+                              const peer = player.player_id !== session?.playerId
+                                ? voiceChat.state.peers.find(p => p.name === player.name)
+                                : null
+                              return peer ? (
+                                <MicToggle
+                                  muted={voiceChat.state.mutedPeers.has(player.name)}
+                                  connectionState={peer.connectionState}
+                                  onClick={() => voiceChat.togglePeerMute(player.name)}
+                                />
+                              ) : null
+                            })()}
                             {player.is_host && (
                               <span className="text-amber-400 text-xs shrink-0">
                                 Host

@@ -264,6 +264,7 @@ function ControlsPanel({
             {voiceChat && voiceChat.state.peers.some((p) => p.name === opponentName) && (
               <MicToggle
                 muted={voiceChat.state.mutedPeers.has(opponentName)}
+                connectionState={voiceChat.state.peers.find(p => p.name === opponentName)?.connectionState}
                 onClick={() => voiceChat.togglePeerMute(opponentName)}
               />
             )}

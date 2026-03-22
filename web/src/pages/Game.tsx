@@ -877,6 +877,7 @@ function GameContent() {
     return (
       <MicToggle
         muted={voiceChat.state.mutedPeers.has(player.name)}
+        connectionState={peer.connectionState}
         variant="player-row"
         onClick={() => voiceChat.togglePeerMute(player.name)}
       />
@@ -2213,6 +2214,16 @@ function GameContent() {
                     >
                       <div className="flex items-center gap-1">
                         <span className="text-gray-300 truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
+                        {!canManipulateOpponent && voiceTargetsAvailable && (() => {
+                          const oppPeer = voiceChat.state.peers.find(p => p.name === battleViewForDisplay.opponent_name)
+                          return oppPeer ? (
+                            <MicToggle
+                              muted={voiceChat.state.mutedPeers.has(battleViewForDisplay.opponent_name)}
+                              connectionState={oppPeer.connectionState}
+                              onClick={() => voiceChat.togglePeerMute(battleViewForDisplay.opponent_name)}
+                            />
+                          ) : null
+                        })()}
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
                           <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
                           <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
@@ -2227,13 +2238,6 @@ function GameContent() {
                             <span className="text-amber-400 font-medium">Opp's turn</span>
                           )}
                         </div>
-                        {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
-                          <MicToggle
-                            muted={voiceChat.state.isMuted}
-                            speaking={voiceChat.state.isSpeaking}
-                            onClick={() => voiceChat.toggleSelfMute()}
-                          />
-                        )}
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
@@ -2241,6 +2245,13 @@ function GameContent() {
                           <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
                           <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
                         </div>
+                        {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
+                          <MicToggle
+                            muted={voiceChat.state.isMuted}
+                            speaking={voiceChat.state.isSpeaking}
+                            onClick={() => voiceChat.toggleSelfMute()}
+                          />
+                        )}
                         <span className="text-gray-300 truncate max-w-[60px] leading-tight">{self_player.name}</span>
                       </div>
                     </div>
