@@ -1,10 +1,11 @@
-import type { VoicePeer } from '../../hooks/useVoiceChat'
+import { useEffect, useRef } from 'react'
+import { type VoicePeer, getAudioLevel } from '../../hooks/useVoiceChat'
 
 interface MicToggleProps {
   muted: boolean
   onClick: (e: React.MouseEvent) => void
   variant?: 'default' | 'player-row'
-  speaking?: boolean
+  audioLevelKey?: string
   connectionState?: VoicePeer['connectionState']
   remoteMuted?: boolean
 }
@@ -30,10 +31,23 @@ function getMicVisual(props: Pick<MicToggleProps, 'muted' | 'connectionState' | 
   return { icon: 'mic', color: 'text-indigo-300 hover:text-indigo-200', animation: '', title: 'Mute' }
 }
 
-export function MicToggle({ muted, onClick, variant = 'default', speaking, connectionState, remoteMuted }: MicToggleProps) {
+export function MicToggle({ muted, onClick, variant = 'default', audioLevelKey, connectionState, remoteMuted }: MicToggleProps) {
   const isPlayerRow = variant === 'player-row'
   const visual = getMicVisual({ muted, connectionState, remoteMuted })
-  const showGlow = speaking && !muted && visual.icon === 'mic'
+  const barRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!audioLevelKey) return
+    let rafId = 0
+    const tick = () => {
+      rafId = requestAnimationFrame(tick)
+      const el = barRef.current
+      if (!el) return
+      el.style.setProperty('--mic-level', `${(getAudioLevel(audioLevelKey) * 100).toFixed(1)}%`)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [audioLevelKey])
 
   const iconEl = visual.icon === 'warning'
     ? <MicWarningIcon className="w-3.5 h-3.5" />
@@ -50,11 +64,12 @@ export function MicToggle({ muted, onClick, variant = 'default', speaking, conne
       }}
       className={`relative inline-flex items-center rounded transition-colors ${
         isPlayerRow
-          ? 'h-6 w-4 shrink-0 justify-start'
-          : 'h-6 w-6 justify-center'
-      } ${visual.color}${visual.animation ? ` ${visual.animation}` : ''}${showGlow ? ' animate-mic-speaking' : ''}`}
+          ? `h-6 shrink-0 justify-start ${audioLevelKey ? 'w-5 gap-0.5' : 'w-4'}`
+          : `h-6 justify-center ${audioLevelKey ? 'w-7 gap-0.5' : 'w-6'}`
+      } ${visual.color}${visual.animation ? ` ${visual.animation}` : ''}`}
       title={visual.title}
     >
+      {audioLevelKey && <span ref={barRef} className="mic-level-bar" />}
       {iconEl}
     </button>
   )

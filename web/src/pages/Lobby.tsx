@@ -988,7 +988,7 @@ export function Lobby() {
                             {player.player_id === session?.playerId && voiceChat.state.peers.length > 0 && (
                               <MicToggle
                                 muted={voiceChat.state.isMuted}
-                                speaking={voiceChat.state.isSpeaking}
+                                audioLevelKey="__self__"
                                 onClick={() => voiceChat.toggleSelfMute()}
                               />
                             )}
@@ -1000,7 +1000,7 @@ export function Lobby() {
                                 <MicToggle
                                   muted={voiceChat.state.mutedPeers.has(player.name)}
                                   connectionState={peer.connectionState}
-                                  speaking={voiceChat.state.speakingPeers.has(player.name)}
+                                  audioLevelKey={player.name}
                                   remoteMuted={voiceChat.state.remoteMutedPeers.has(player.name)}
                                   onClick={() => voiceChat.togglePeerMute(player.name)}
                                 />
