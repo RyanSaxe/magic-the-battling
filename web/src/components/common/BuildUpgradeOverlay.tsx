@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Card } from '../card'
 import type { Card as CardType } from '../../types'
 
@@ -22,6 +22,8 @@ export function BuildUpgradeOverlay({
   onComplete,
 }: BuildUpgradeOverlayProps) {
   const [phase, setPhase] = useState<'show' | 'glow' | 'fade'>('show')
+  const onCompleteRef = useRef(onComplete)
+  useEffect(() => { onCompleteRef.current = onComplete })
 
   useEffect(() => {
     let cancelled = false
@@ -35,14 +37,14 @@ export function BuildUpgradeOverlay({
       setPhase('fade')
       await wait(760)
       if (cancelled) return
-      onComplete()
+      onCompleteRef.current()
     }
 
     void run()
     return () => {
       cancelled = true
     }
-  }, [onComplete])
+  }, [])
 
   const dims = useMemo(() => {
     const viewportWidth = window.innerWidth
