@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Card } from '../card'
 import { PoisonCard } from './PoisonCard'
 import type { BattleResolution, BattleView, Card as CardType } from '../../types'
@@ -227,6 +227,9 @@ export function BattleResolutionOverlay({
   } | null>(null)
   const [showContinuation, setShowContinuation] = useState(false)
 
+  const onCompleteRef = useRef(onComplete)
+  useEffect(() => { onCompleteRef.current = onComplete })
+
   const cardLookup = useMemo(() => buildCardLookup(battle), [battle])
   const resolutionSides = useMemo(
     () => ({
@@ -259,7 +262,7 @@ export function BattleResolutionOverlay({
 
       if (damagedOwners.length === 0) {
         await wait(220)
-        if (!cancelled) onComplete()
+        if (!cancelled) onCompleteRef.current()
         return
       }
 
@@ -380,7 +383,7 @@ export function BattleResolutionOverlay({
         if (cancelled) return
       }
 
-      onComplete()
+      onCompleteRef.current()
     }
 
     void run()
@@ -388,7 +391,8 @@ export function BattleResolutionOverlay({
     return () => {
       cancelled = true
     }
-  }, [battle, cardLookup, onComplete, resolution, resolutionSides])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const poisonRects = {
     player: rectForSelector('[data-poison-owner="player"]'),

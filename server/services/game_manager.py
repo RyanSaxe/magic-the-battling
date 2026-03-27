@@ -165,7 +165,7 @@ class PendingGame:
     target_player_count: int = 4
     auto_approve_spectators: bool = False
     guided_mode_default: bool = False
-    voice_chat_enabled: bool = True
+    voice_chat_enabled: bool = False
     play_mode: PlayMode = "limited"
     player_ready: dict[str, bool] = field(default_factory=dict)
     player_battlers: dict[str, PendingPlayerBattler] = field(default_factory=dict)
