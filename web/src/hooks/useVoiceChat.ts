@@ -49,6 +49,28 @@ const DECAY_ALPHA = 0.15
 const MAX_RETRIES = 3
 const BASE_RETRY_DELAY = 1000
 const DISCONNECTED_GRACE = 4000
+const MAX_PENDING_SIGNALS = 50
+
+const MUTE_STORAGE_KEY = 'mtb_voice_muted'
+const MUTED_PEERS_STORAGE_KEY = 'mtb_voice_muted_peers'
+
+function getPersistedMute(): boolean {
+  return sessionStorage.getItem(MUTE_STORAGE_KEY) === 'true'
+}
+
+function setPersistedMute(muted: boolean) {
+  sessionStorage.setItem(MUTE_STORAGE_KEY, muted ? 'true' : 'false')
+}
+
+function getPersistedMutedPeers(): Set<string> {
+  const raw = sessionStorage.getItem(MUTED_PEERS_STORAGE_KEY)
+  if (!raw) return new Set()
+  try { return new Set(JSON.parse(raw) as string[]) } catch { return new Set() }
+}
+
+function setPersistedMutedPeers(peers: Set<string>) {
+  sessionStorage.setItem(MUTED_PEERS_STORAGE_KEY, JSON.stringify([...peers]))
+}
 
 let sharedAudioContext: AudioContext | null = null
 let sharedAudioContextRefCount = 0
@@ -131,17 +153,23 @@ export function useVoiceChat(
   toggleSelfMute: () => void
   togglePeerMute: (peerName: string) => void
 } {
-  const [state, setState] = useState<VoiceChatState>(INITIAL_STATE)
+  const [state, setState] = useState<VoiceChatState>(() => ({
+    ...INITIAL_STATE,
+    isMuted: getPersistedMute(),
+    mutedPeers: getPersistedMutedPeers(),
+  }))
 
   const peersRef = useRef<Map<string, PeerState>>(new Map())
   const localStreamRef = useRef<MediaStream | null>(null)
-  const mutedPeersRef = useRef<Set<string>>(new Set())
+  const mutedPeersRef = useRef<Set<string>>(getPersistedMutedPeers())
 
   const retryCountRef = useRef<Map<string, number>>(new Map())
   const retryTimerRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const pendingSignalsRef = useRef<Map<string, VoiceSignalPayload[]>>(new Map())
   const selfPlayerNameRef = useRef(selfPlayerName)
   const createPeerConnectionRef = useRef<((peerName: string, stream: MediaStream, isOfferer: boolean) => void) | null>(null)
   const destroyPeerRef = useRef<((peerName: string) => void) | null>(null)
+  const handleSignalRef = useRef<((payload: VoiceSignalPayload) => Promise<void>) | null>(null)
   const onRetriesExhaustedRef = useRef(onRetriesExhausted)
   const onPermissionDeniedRef = useRef(onPermissionDenied)
 
@@ -276,12 +304,23 @@ export function useVoiceChat(
     }
 
     updatePeerStates()
+
+    const buffered = pendingSignalsRef.current.get(peerName)
+    if (buffered) {
+      pendingSignalsRef.current.delete(peerName)
+      ;(async () => {
+        for (const sig of buffered) {
+          await handleSignalRef.current?.(sig)
+        }
+      })()
+    }
   }, [sendSignalTo, updatePeerStates])
 
   const destroyPeer = useCallback((peerName: string) => {
     const timer = retryTimerRef.current.get(peerName)
     if (timer) { clearTimeout(timer); retryTimerRef.current.delete(peerName) }
     retryCountRef.current.delete(peerName)
+    pendingSignalsRef.current.delete(peerName)
     peerDetectorsRef.current.get(peerName)?.stop()
     peerDetectorsRef.current.delete(peerName)
     delete audioLevels[peerName]
@@ -313,7 +352,14 @@ export function useVoiceChat(
   const handleSignal = useCallback(async (payload: VoiceSignalPayload) => {
     const fromPeer = payload.from_player
     const ps = peersRef.current.get(fromPeer)
-    if (!ps) return
+    if (!ps) {
+      const buf = pendingSignalsRef.current.get(fromPeer) ?? []
+      if (buf.length < MAX_PENDING_SIGNALS) {
+        buf.push(payload)
+        pendingSignalsRef.current.set(fromPeer, buf)
+      }
+      return
+    }
 
     try {
       if (payload.signal_type === 'offer') {
@@ -352,6 +398,8 @@ export function useVoiceChat(
     }
   }, [sendSignalTo])
 
+  useEffect(() => { handleSignalRef.current = handleSignal }, [handleSignal])
+
   useEffect(() => {
     voiceSignalRef.current = handleSignal
     return () => { voiceSignalRef.current = null }
@@ -368,7 +416,8 @@ export function useVoiceChat(
       }
       stopSpeakingDetection()
       audioLevels['__self__'] = 0
-      setState(s => ({ ...s, peers: [], isMuted: false, isSpeaking: false }))
+      pendingSignalsRef.current.clear()
+      setState(s => ({ ...s, peers: [], isSpeaking: false }))
       return
     }
 
@@ -399,6 +448,10 @@ export function useVoiceChat(
           return
         }
         localStreamRef.current = stream
+        if (getPersistedMute()) {
+          const track = stream.getAudioTracks()[0]
+          if (track) track.enabled = false
+        }
         startSpeakingDetection(stream)
       }
 
@@ -430,10 +483,12 @@ export function useVoiceChat(
     const retryCounts = retryCountRef.current
     const peers = peersRef.current
     const detectors = peerDetectorsRef.current
+    const pending = pendingSignalsRef.current
     return () => {
       for (const timer of timers.values()) clearTimeout(timer)
       timers.clear()
       retryCounts.clear()
+      pending.clear()
       for (const d of detectors.values()) d.stop()
       detectors.clear()
       for (const name of peers.keys()) {
@@ -460,6 +515,7 @@ export function useVoiceChat(
     if (!track) return
     track.enabled = !track.enabled
     const muted = !track.enabled
+    setPersistedMute(muted)
     if (muted) audioLevels['__self__'] = 0
     setState(s => ({ ...s, isMuted: muted, ...(muted && { isSpeaking: false }) }))
     for (const peerName of peersRef.current.keys()) {
@@ -478,6 +534,7 @@ export function useVoiceChat(
       if (ps) ps.audioEl.muted = true
     }
     mutedPeersRef.current = next
+    setPersistedMutedPeers(next)
     setState(s => ({ ...s, mutedPeers: next }))
   }, [])
 
