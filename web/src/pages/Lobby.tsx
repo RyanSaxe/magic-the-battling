@@ -150,6 +150,59 @@ function VoiceChatSwitch({
   setEnabled: (v: boolean) => void;
   isHost: boolean;
 }) {
+  const voiceHelpText =
+    "Voice chat may not work for all players. If it doesn't connect, use Discord instead.";
+  const [showVoiceHelp, setShowVoiceHelp] = useState(false);
+  const voiceHelpRef = useRef<HTMLDivElement>(null);
+  const [popupAnchorX, setPopupAnchorX] = useState<"right" | "left" | "center">("right");
+  const [popupAnchorY, setPopupAnchorY] = useState<"top" | "bottom">("top");
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!voiceHelpRef.current?.contains(target)) {
+        setShowVoiceHelp(false);
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+
+  useEffect(() => {
+    if (!showVoiceHelp) return;
+
+    const repositionPopup = () => {
+      const anchor = voiceHelpRef.current;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const viewportPadding = 8;
+      const popupWidth = Math.min(256, window.innerWidth - viewportPadding * 2);
+      const canAlignRight = rect.right - popupWidth >= viewportPadding;
+      const canAlignLeft = rect.left + popupWidth <= window.innerWidth - viewportPadding;
+
+      if (canAlignRight) {
+        setPopupAnchorX("right");
+      } else if (canAlignLeft) {
+        setPopupAnchorX("left");
+      } else {
+        setPopupAnchorX("center");
+      }
+
+      const estimatedPopupHeight = 96;
+      setPopupAnchorY(
+        rect.top - estimatedPopupHeight >= viewportPadding ? "top" : "bottom",
+      );
+    };
+
+    repositionPopup();
+    window.addEventListener("resize", repositionPopup);
+    window.addEventListener("scroll", repositionPopup, true);
+    return () => {
+      window.removeEventListener("resize", repositionPopup);
+      window.removeEventListener("scroll", repositionPopup, true);
+    };
+  }, [showVoiceHelp]);
+
   return (
     <div
       className={`flex items-center gap-1.5${
@@ -159,6 +212,9 @@ function VoiceChatSwitch({
       <label className={`flex items-center gap-1.5${isHost ? ' cursor-pointer' : ' cursor-default'}`}>
         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
           Voice
+        </span>
+        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400">
+          Beta
         </span>
         <input
           type="checkbox"
@@ -175,6 +231,35 @@ function VoiceChatSwitch({
           />
         </span>
       </label>
+      <div ref={voiceHelpRef} className="relative group shrink-0">
+        <button
+          type="button"
+          className="text-gray-400 hover:text-gray-200"
+          aria-label="Voice chat info"
+          aria-expanded={showVoiceHelp}
+          onClick={() => setShowVoiceHelp((v) => !v)}
+        >
+          <InfoIcon size="sm" />
+        </button>
+        <span
+          className={`absolute w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-[60] ${
+            popupAnchorX === "right"
+              ? "right-0"
+              : popupAnchorX === "left"
+                ? "left-0"
+                : "left-1/2 -translate-x-1/2"
+          } ${
+            popupAnchorY === "top" ? "bottom-full mb-2" : "top-full mt-2"
+          } ${
+            showVoiceHelp
+              ? "opacity-100"
+              : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
+          }`}
+          style={{ maxWidth: "calc(100vw - 1rem)" }}
+        >
+          {voiceHelpText}
+        </span>
+      </div>
     </div>
   );
 }

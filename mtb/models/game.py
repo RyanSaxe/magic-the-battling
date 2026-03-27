@@ -264,7 +264,7 @@ class Config(BaseModel):
     use_upgrades: bool = True
     use_vanguards: bool = False
     auto_approve_spectators: bool = False
-    voice_chat_enabled: bool = True
+    voice_chat_enabled: bool = False
     cube_id: str = "auto"
     play_mode: PlayMode = "limited"
 

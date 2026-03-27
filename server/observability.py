@@ -32,8 +32,12 @@ def _resolve_log_directory() -> Path:
     return Path(__file__).resolve().parent.parent / "data" / "logs"
 
 
+_logging_configured = False
+
+
 def configure_logging() -> None:
-    if getattr(configure_logging, "_configured", False):
+    global _logging_configured
+    if _logging_configured:
         return
 
     root = logging.getLogger()
@@ -56,7 +60,7 @@ def configure_logging() -> None:
     file_handler.setFormatter(JsonLineFormatter())
     root.addHandler(file_handler)
 
-    configure_logging._configured = True  # type: ignore[attr-defined]
+    _logging_configured = True
     logging.getLogger(OBSERVABILITY_LOGGER_NAME).info(
         "Configured logging with persistent JSON logs at %s", log_dir / "server.jsonl"
     )
