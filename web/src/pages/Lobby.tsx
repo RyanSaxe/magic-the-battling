@@ -213,6 +213,9 @@ function VoiceChatSwitch({
         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
           Voice
         </span>
+        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400">
+          Beta
+        </span>
         <input
           type="checkbox"
           checked={enabled}
