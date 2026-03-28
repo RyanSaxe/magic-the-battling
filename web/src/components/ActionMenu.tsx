@@ -3,6 +3,7 @@ import type { Card as CardType, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
 import { useFaceDown } from '../contexts/faceDownState'
 import type { BattleSelectedCard } from '../pages/phases/Battle'
+import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../utils/battleInteraction'
 
 interface ActionMenuProps {
   selectedCard: BattleSelectedCard | null
@@ -19,6 +20,9 @@ interface ActionMenuProps {
       battlefield: CardType[]
       library: CardType[]
       tapped_card_ids: string[]
+      face_down_card_ids: string[]
+      counters: Record<string, Record<string, number>>
+      attachments: Record<string, string[]>
     }
     current_turn_name: string | null
     can_manipulate_opponent: boolean
@@ -80,7 +84,7 @@ export function ActionMenu({
 
   const handleMove = (toZone: ZoneName) => {
     if (!selectedCard) return
-    onMove(selectedCard.card.id, selectedCard.zone, toZone, 'player', 'player')
+    onMove(selectedCard.card.id, selectedCard.zone, toZone, selectedCard.owner, selectedCard.owner)
     onClose()
   }
 
@@ -91,20 +95,24 @@ export function ActionMenu({
 
   const card = selectedCard?.card
   const zone = selectedCard?.zone
+  const selectedOwner = selectedCard?.owner ?? 'player'
+  const ownerZones = selectedOwner === 'player' ? battle.your_zones : battle.opponent_zones
   const onBattlefield = zone === 'battlefield'
   const isFaceDown = useFaceDown(card?.id ?? '')
   const isScrubbed = !card?.name
 
-  const tappedCardIds = new Set(battle.your_zones.tapped_card_ids || [])
-  const counters = card ? (battle.your_zones.counters?.[card.id] || {}) : {}
-  const attachments = battle.your_zones.attachments || {}
+  const tappedCardIds = new Set(ownerZones.tapped_card_ids || [])
+  const counters = card ? (ownerZones.counters?.[card.id] || {}) : {}
+  const attachments = ownerZones.attachments || {}
 
   const isTapped = card ? tappedCardIds.has(card.id) : false
   const hasFlip = !!card?.flip_image_url
+  const canFaceDown = canUseBattleFaceDownAction(selectedOwner, battle.can_manipulate_opponent)
+  const canFlip = canUseBattleFlipAction(selectedOwner, isFaceDown, battle.can_manipulate_opponent)
   const hasTokens = (card?.tokens?.length ?? 0) > 0
   const hasCounters = Object.keys(counters).length > 0
   const isAttached = card ? Object.values(attachments).some(children => children.includes(card.id)) : false
-  const attachableCards = onBattlefield ? battle.your_zones.battlefield.filter(c => c.id !== card?.id) : []
+  const attachableCards = onBattlefield ? ownerZones.battlefield.filter(c => c.id !== card?.id) : []
   const yourLibraryCount = battle.your_zones.library.length
   const opponentLibraryCount = battle.opponent_zones.library.length
 
@@ -128,14 +136,14 @@ export function ActionMenu({
               />
             )}
 
-            {hasFlip && !isScrubbed && (
+            {hasFlip && !isScrubbed && canFlip && (
               <MenuItem
                 label="Flip"
                 onClick={() => handleAction('flip')}
               />
             )}
 
-            {!isScrubbed && (
+            {!isScrubbed && canFaceDown && (
               <MenuItem
                 label={isFaceDown ? 'Turn Face Up' : 'Turn Face Down'}
                 onClick={() => handleAction('face_down')}

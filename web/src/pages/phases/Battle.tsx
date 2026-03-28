@@ -7,6 +7,7 @@ import { Card, CardBack, CardActionMenu } from '../../components/card'
 import { ZoneDivider } from '../../components/common/ZoneDivider'
 import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
 import { buildAppliedUpgradeMap, buildHiddenAppliedUpgradeMap } from '../../utils/upgrades'
+import { canInteractWithBattleZone } from '../../utils/battleInteraction'
 
 interface ContextMenuState {
   card: CardType
@@ -246,14 +247,21 @@ export function BattlePhase({
   const { your_zones, opponent_zones, opponent_hand_count: oppHandCount, opponent_hand_revealed } = battle
 
   const canManipulateOpponent = battle.can_manipulate_opponent
+  const allowOpponentHandInteraction = canInteractWithBattleZone({
+    owner: 'opponent',
+    zone: 'hand',
+    canManipulateOpponent,
+  })
 
   const tappedCardIds = new Set(your_zones.tapped_card_ids || [])
   const flippedCardIds = new Set(your_zones.flipped_card_ids || [])
+  const faceDownCardIds = new Set(your_zones.face_down_card_ids || [])
   const counters = your_zones.counters || {}
   const attachments = your_zones.attachments || {}
 
   const opponentTappedIds = new Set(opponent_zones.tapped_card_ids || [])
   const opponentFlippedIds = new Set(opponent_zones.flipped_card_ids || [])
+  const opponentFaceDownIds = new Set(opponent_zones.face_down_card_ids || [])
   const opponentCounters = opponent_zones.counters || {}
 
   const { upgradedCardIds, appliedUpgradesByCardId: upgradesByCardId } = buildAppliedUpgradeMap(
@@ -392,7 +400,7 @@ export function BattlePhase({
               style={{ height: handHeight }}
               data-guide-target="battle-opponent-hand"
             >
-              {canManipulateOpponent ? (
+              {allowOpponentHandInteraction ? (
                 <DroppableZone
                   zone="hand"
                   zoneOwner="opponent"
@@ -434,12 +442,13 @@ export function BattlePhase({
                 cards={opponent_zones.battlefield}
                 selectedCardId={selectedCard?.card.id}
                 onCardClick={(card) => handleCardClick(card, 'battlefield', 'opponent')}
-                onCardDoubleClick={canManipulateOpponent ? handleOpponentCardDoubleClick : undefined}
-                onCardContextMenu={canManipulateOpponent ? (e, card) => handleOpponentContextMenu(e, card, 'battlefield') : undefined}
+                onCardDoubleClick={handleOpponentCardDoubleClick}
+                onCardContextMenu={(e, card) => handleOpponentContextMenu(e, card, 'battlefield')}
                 onCardHover={onOpponentCardHover}
                 onCardHoverEnd={onCardHoverEnd}
                 tappedCardIds={opponentTappedIds}
                 flippedCardIds={opponentFlippedIds}
+                faceDownCardIds={opponentFaceDownIds}
                 counters={opponentCounters}
                 attachments={opponent_zones.attachments || {}}
                 separateLands
@@ -567,6 +576,7 @@ export function BattlePhase({
                 onCardHoverEnd={onCardHoverEnd}
                 tappedCardIds={tappedCardIds}
                 flippedCardIds={flippedCardIds}
+                faceDownCardIds={faceDownCardIds}
                 counters={counters}
                 attachments={attachments}
                 separateLands

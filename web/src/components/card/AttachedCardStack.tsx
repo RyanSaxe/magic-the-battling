@@ -14,6 +14,7 @@ interface AttachedCardStackProps {
   onCardClick?: (card: CardType) => void
   onCardDoubleClick?: (card: CardType) => void
   onCardContextMenu?: (e: React.MouseEvent, card: CardType) => void
+  allowCardInteraction?: (card: CardType) => boolean
   upgradedCardIds?: Set<string>
   upgradesByCardId?: Map<string, CardType[]>
   hiddenUpgradesByCardId?: Map<string, CardType[]>
@@ -43,6 +44,7 @@ export function AttachedCardStack({
   onCardClick,
   onCardDoubleClick,
   onCardContextMenu,
+  allowCardInteraction,
   upgradedCardIds = new Set(),
   upgradesByCardId,
   hiddenUpgradesByCardId,
@@ -74,6 +76,7 @@ export function AttachedCardStack({
           onContextMenu={(e) => {
             e.preventDefault()
             e.stopPropagation()
+            if (!allowCardInteraction?.(card) && allowCardInteraction) return
             onCardContextMenu?.(e, card)
           }}
         >
@@ -83,8 +86,8 @@ export function AttachedCardStack({
             tapped={attachedTappedIds.has(card.id)}
             counters={attachedCounters[card.id]}
             selected={card.id === selectedCardId}
-            onClick={() => onCardClick?.(card)}
-            onDoubleClick={() => onCardDoubleClick?.(card)}
+            onClick={allowCardInteraction?.(card) === false ? undefined : () => onCardClick?.(card)}
+            onDoubleClick={allowCardInteraction?.(card) === false ? undefined : () => onCardDoubleClick?.(card)}
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={upgradesByCardId?.get(card.id)}
             hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
@@ -102,6 +105,7 @@ export function AttachedCardStack({
         onContextMenu={(e) => {
           e.preventDefault()
           e.stopPropagation()
+          if (!allowCardInteraction?.(parentCard) && allowCardInteraction) return
           onCardContextMenu?.(e, parentCard)
         }}
       >
@@ -111,8 +115,8 @@ export function AttachedCardStack({
           tapped={parentTapped}
           counters={parentCounters}
           selected={parentCard.id === selectedCardId}
-          onClick={() => onCardClick?.(parentCard)}
-          onDoubleClick={() => onCardDoubleClick?.(parentCard)}
+          onClick={allowCardInteraction?.(parentCard) === false ? undefined : () => onCardClick?.(parentCard)}
+          onDoubleClick={allowCardInteraction?.(parentCard) === false ? undefined : () => onCardDoubleClick?.(parentCard)}
           upgraded={upgradedCardIds.has(parentCard.id)}
           appliedUpgrades={upgradesByCardId?.get(parentCard.id)}
           hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(parentCard.id) ?? []).length}

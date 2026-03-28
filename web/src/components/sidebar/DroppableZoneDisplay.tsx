@@ -33,7 +33,8 @@ export function ZoneModal({
   title,
   zone,
   cards,
-  allowInteraction,
+  allowZoneInteraction,
+  allowCardInteraction,
   isOpponent,
   onClose,
   onCardHover,
@@ -52,7 +53,8 @@ export function ZoneModal({
   title: string
   zone: ZoneName
   cards: CardType[]
-  allowInteraction: boolean
+  allowZoneInteraction: boolean
+  allowCardInteraction: boolean
   isOpponent: boolean
   onClose: () => void
   onCardHover?: (cardId: string, zone: ZoneName) => void
@@ -75,7 +77,7 @@ export function ZoneModal({
     onClose()
   }
 
-  if (allowInteraction) {
+  if (allowZoneInteraction) {
     return (
       <DndPanel
         title={title}
@@ -98,10 +100,11 @@ export function ZoneModal({
               dragInstanceKey="modal"
               dimensions={dims}
               isOpponent={isOpponent}
-              onCardHover={onCardHover}
-              onCardHoverEnd={onCardHoverEnd}
+              disabled={!allowCardInteraction}
+              onCardHover={allowCardInteraction ? onCardHover : undefined}
+              onCardHoverEnd={allowCardInteraction ? onCardHoverEnd : undefined}
               selected={selectedCardId === card.id}
-              onClick={onCardClick ? () => onCardClick(card, zone, zoneOwner) : undefined}
+              onClick={allowCardInteraction && onCardClick ? () => onCardClick(card, zone, zoneOwner) : undefined}
               faceDown={forceFaceDown}
               canPeekFaceDown={!forceFaceDown}
               upgraded={upgradedCardIds?.has(card.id)}
@@ -174,7 +177,7 @@ export function DroppableZoneDisplay({
   appliedUpgradesByCardId,
 }: DroppableZoneDisplayProps) {
   const [showModal, setShowModal] = useState(false)
-  const allowInteraction = !isOpponent || canManipulateOpponent
+  const allowZoneInteraction = !isOpponent || canManipulateOpponent
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
   const displayedCards = cards.slice(0, maxThumbnails)
@@ -186,7 +189,7 @@ export function DroppableZoneDisplay({
         zone={zone}
         zoneOwner={zoneOwner}
         validFromZones={validFromZones}
-        disabled={!allowInteraction}
+        disabled={!allowZoneInteraction}
         className="flex-1"
       >
         <button
@@ -211,7 +214,7 @@ export function DroppableZoneDisplay({
             <div className="flex flex-col items-center gap-0.5">
               <div className="flex gap-0.5">
                 {displayedCards.map((card) =>
-                  allowInteraction ? (
+                  allowZoneInteraction ? (
                     <DraggableCard
                       key={card.id}
                       card={card}
@@ -246,7 +249,8 @@ export function DroppableZoneDisplay({
           title={title}
           zone={zone}
           cards={cards}
-          allowInteraction={allowInteraction}
+          allowZoneInteraction={allowZoneInteraction}
+          allowCardInteraction={allowZoneInteraction}
           isOpponent={isOpponent}
           onClose={() => setShowModal(false)}
           upgradedCardIds={upgradedCardIds}
