@@ -78,7 +78,7 @@ function buildWelcomeGuide(): GuideDefinition {
     steps: [
       {
         id: "intro",
-        title: "Playing Magic: The Battling",
+        title: "Playing Crucible",
         placement: "center",
         cardPlacement: "center",
         positionTargetId: "game-content",

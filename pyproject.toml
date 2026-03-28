@@ -1,7 +1,7 @@
 [project]
 name = "mtb"
 version = "0.1.0"
-description = "A FastAPI application for Magic: The Battling game"
+description = "A FastAPI application for the Crucible MtG format"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

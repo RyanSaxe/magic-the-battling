@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
@@ -63,10 +63,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    title="Magic: The Battling",
-    description="Real-time multiplayer Magic: The Gathering draft game",
+    title="Crucible",
+    description="Real-time multiplayer Magic: The Gathering draft format",
     version="0.1.0",
 )
+
+_CANONICAL_HOST = os.getenv("MTB_CANONICAL_HOST", "")
+_REDIRECT_EXEMPT_PATHS = {"/health", "/api/ops/mode"}
+
+
+@app.middleware("http")
+async def redirect_to_canonical_host(request: Request, call_next):
+    if not _CANONICAL_HOST:
+        return await call_next(request)
+    host = (request.headers.get("host") or "").split(":")[0]
+    if host != _CANONICAL_HOST and request.url.path not in _REDIRECT_EXEMPT_PATHS:
+        target = request.url.replace(scheme="https", netloc=_CANONICAL_HOST)
+        return RedirectResponse(url=str(target), status_code=301)
+    return await call_next(request)
 
 
 @app.middleware("http")

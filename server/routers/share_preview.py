@@ -114,7 +114,7 @@ def _build_og_html(
         ordinals = {1: "1st", 2: "2nd", 3: "3rd"}
         placement = f"{ordinals.get(owner.final_placement, f'{owner.final_placement}th')} Place - "
 
-    title = f"{placement}{player_name}'s Game | Magic: The Battling"
+    title = f"{placement}{player_name}'s Game | Crucible"
     description = f"Check out {player_name}'s game with {len(share_data.players)} players"
     image_url = f"{base_url}/game/{game_id}/share/{player_name}/preview.png"
 

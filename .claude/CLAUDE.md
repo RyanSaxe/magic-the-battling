@@ -9,3 +9,18 @@ The following rules should be treated as gospel. Do not deviate from them under 
 3. Abide by the best practice of Atomic Commits. Each commit should represent a single logical change to the codebase. If you find yourself making multiple changes in a single commit, consider breaking them up into smaller commits. This makes it much easier to review and understand the history of your changes. However, prefer isolated file commits over patches.
 4. This repository uses uv as the dependency manager as well as for managing the virtual environment. If you are running any code, you do so with `uv run <script>`. If you are adding dependencies, you do so with `uv add <package>`. However, for tools (e.g. ruff and ty), always do `uvx [tool] [command]` instead of `uv run [tool] [command]`.
 5. When fixing a bug, you must add a test to prevent regression. The bug is not considered fixed until a test exists that would have caught it.
+
+## Naming: Internal vs External
+
+The app was rebranded from "Magic: The Battling" to "Crucible". Internal code retains
+the original naming. When writing user-facing text, use the mapping below:
+
+| Internal name | User-facing (limited) | User-facing (constructed) |
+|---------------|----------------------|--------------------------|
+| `mtb` (package) | — | — |
+| `battler` | Cube | Deck |
+| `mtb_` (localStorage) | — | — |
+| `MTB_` (env vars) | — | — |
+| `magic-the-battling` (Fly) | — | — |
+
+The display name is always "Crucible" (never "Magic: The Battling").

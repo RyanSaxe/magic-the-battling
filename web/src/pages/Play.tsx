@@ -238,7 +238,7 @@ function ConstructedCheckbox({
       />
       <span className="text-white text-sm">Constructed</span>
       <span className="text-gray-500 text-xs">
-        — bring your own battler
+        — bring your own deck
       </span>
     </label>
   );
@@ -571,11 +571,16 @@ export function Play() {
       <header className="shrink-0 py-3 frame-chrome bar-pad-both">
         <div className="hidden sm:flex items-center justify-between">
           <div>
-            <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
-              Magic: The Battling
-            </h1>
+            <div className="flex items-baseline gap-2">
+              <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
+                Crucible
+              </h1>
+              <span className="text-gray-500 text-base font-medium tracking-tight">
+                the MtG format
+              </span>
+            </div>
             <p className="text-gray-400 text-sm">
-              An MtG format inspired by autobattlers
+              inspired by roguelikes and autobattlers
             </p>
           </div>
           <div className="flex gap-2">
@@ -590,11 +595,16 @@ export function Play() {
         <div className="sm:hidden">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
-                Magic: The Battling
-              </h1>
+              <div className="flex items-baseline gap-1.5">
+                <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
+                  Crucible
+                </h1>
+                <span className="text-gray-500 text-xs font-medium tracking-tight">
+                  the MtG format
+                </span>
+              </div>
               <p className="text-gray-400 text-xs">
-                An MtG format inspired by autobattlers
+                inspired by roguelikes and autobattlers
               </p>
             </div>
             <button
