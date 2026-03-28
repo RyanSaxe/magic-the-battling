@@ -39,6 +39,7 @@ import { BattleResolutionOverlay } from "../components/common/BattleResolutionOv
 import { BattleRevealOverlay } from "../components/common/BattleRevealOverlay";
 import { BuildUpgradeOverlay } from "../components/common/BuildUpgradeOverlay";
 import { RevealBeforeSubmitModal } from "../components/common/RevealBeforeSubmitModal";
+import { ServerStatusWindow } from "../components/common/ServerStatusWindow";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
@@ -81,8 +82,6 @@ interface SpectatorConfig {
   requestId: string;
 }
 
-const SCHEDULED_UTC_RE = /scheduled for (\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}) UTC/i;
-const TOP_NOTICE_Z_INDEX = 2147483647;
 const STATIC_DIVIDER_CALLBACKS = {
   onDragStart: () => {},
   onDrag: () => {},
@@ -108,40 +107,6 @@ type OverlayKey =
   | "battleSubmit"
   | "battlePanel"
   | "battleZoneModal";
-
-function scheduledEasternFromNotice(message: string): string | null {
-  const match = SCHEDULED_UTC_RE.exec(message);
-  if (!match) return null;
-
-  const [, year, month, day, hour, minute] = match;
-  const asDate = new Date(
-    Date.UTC(
-      Number(year),
-      Number(month) - 1,
-      Number(day),
-      Number(hour),
-      Number(minute),
-    ),
-  );
-  if (Number.isNaN(asDate.getTime())) return null;
-
-  return new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "America/New_York",
-    timeZoneName: "short",
-  }).format(asDate);
-}
-
-
-function drainingMessageWithEasternTime(message: string, easternTime: string | null): string {
-  if (!message) return "";
-  if (!easternTime) return message;
-  return message.replace(SCHEDULED_UTC_RE, `scheduled for ${easternTime}`);
-}
 
 function isTimelinePhase(phase: string | undefined): phase is Phase {
   return phase === "draft" || phase === "build" || phase === "battle" || phase === "reward";
@@ -2063,15 +2028,6 @@ function GameContent() {
   };
 
   const serverNoticeHidden = !!serverNotice && dismissedServerNoticeAt === serverNotice.updated_at;
-  const drainingScheduledEt = serverNotice?.mode === "draining"
-    ? scheduledEasternFromNotice(serverNotice.message || "")
-    : null;
-  const drainingMessage = serverNotice?.mode === "draining"
-    ? drainingMessageWithEasternTime(serverNotice.message || "", drainingScheduledEt)
-    : "";
-  const recoveryHint = serverNotice?.estimated_recovery_minutes
-    ? `Estimated recovery: about ${serverNotice.estimated_recovery_minutes} minute${serverNotice.estimated_recovery_minutes === 1 ? "" : "s"}.`
-    : null;
 
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
@@ -2087,80 +2043,13 @@ function GameContent() {
             </div>
           </div>
         )}
-        {serverNotice && serverNotice.mode !== "normal" && serverNoticeHidden && (
-          <div className="fixed top-3 right-3 pointer-events-none" style={{ zIndex: TOP_NOTICE_Z_INDEX }}>
-            <button
-              type="button"
-              onClick={() => setDismissedServerNoticeAt(null)}
-              className="pointer-events-auto modal-chrome border gold-border rounded-md px-3 py-1 text-xs text-amber-100 hover:text-white"
-            >
-              Show Server Notice
-            </button>
-          </div>
-        )}
-        {serverNotice?.mode === "draining" && !serverNoticeHidden && (
-          <div className="fixed top-0 inset-x-0 px-3 pt-3 pointer-events-none" style={{ zIndex: TOP_NOTICE_Z_INDEX }}>
-            <div className="mx-auto max-w-3xl pointer-events-auto modal-chrome border gold-border rounded-lg shadow-xl px-4 py-3">
-              <div className="flex items-start gap-3">
-                <span className="inline-flex items-center justify-center rounded-full border gold-border text-amber-200 text-[10px] uppercase tracking-wide px-2 py-0.5 shrink-0">
-                  Update
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-semibold text-amber-200">Scheduled Server Update</h2>
-                  </div>
-                  <p className="text-sm text-gray-100 mt-1 leading-snug">
-                    {drainingMessage || "A server update is scheduled soon."}
-                  </p>
-                  <p className="text-xs text-gray-300 mt-1 leading-snug">
-                    New games are paused temporarily. Your current game can continue and reconnect automatically if needed.
-                  </p>
-                  {recoveryHint && (
-                    <p className="text-xs text-amber-200/90 mt-1">{recoveryHint}</p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setDismissedServerNoticeAt(serverNotice.updated_at)}
-                  className="text-amber-100/70 hover:text-amber-100 text-xs px-1 shrink-0"
-                  aria-label="Dismiss server notice"
-                  title="Dismiss"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        {serverNotice?.mode === "maintenance" && !serverNoticeHidden && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center" style={{ zIndex: TOP_NOTICE_Z_INDEX }}>
-            <div className="modal-chrome border gold-border rounded-xl shadow-2xl p-6 max-w-md mx-4 w-full">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="inline-flex items-center justify-center rounded-full border gold-border text-amber-200 text-[10px] uppercase tracking-wide px-2 py-0.5">
-                  Maintenance
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setDismissedServerNoticeAt(serverNotice.updated_at)}
-                  className="ml-auto text-amber-100/70 hover:text-amber-100 text-sm px-1"
-                  aria-label="Dismiss server maintenance notice"
-                  title="Dismiss"
-                >
-                  ✕
-                </button>
-              </div>
-              <h2 className="text-xl font-semibold text-amber-300 mb-2">Server Maintenance</h2>
-              <p className="text-sm text-gray-100 mb-2 leading-snug">
-                {serverNotice.message || "The server is temporarily unavailable while maintenance is in progress."}
-              </p>
-              <p className="text-xs text-gray-300 leading-snug">
-                Keep this tab open and we’ll reconnect automatically when service returns.
-              </p>
-              {recoveryHint && (
-                <p className="text-xs text-amber-200/90 mt-2">{recoveryHint}</p>
-              )}
-            </div>
-          </div>
+        {serverNotice && serverNotice.mode !== "normal" && (
+          <ServerStatusWindow
+            status={serverNotice}
+            hidden={serverNoticeHidden}
+            onDismiss={() => setDismissedServerNoticeAt(serverNotice.updated_at)}
+            inGame
+          />
         )}
         {/* Spectator Banner */}
         {isSpectator && spectatingPlayer && (

@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { CardCatalogEntry, CompactGameState, GameBootstrap, GameState, LobbyState } from '../types'
+import type {
+  CardCatalogEntry,
+  CompactGameState,
+  GameBootstrap,
+  GameState,
+  LobbyState,
+  ServerNoticeStatus,
+} from '../types'
 import { hydrateGameState } from '../utils/catalogHydration'
 
 interface SpectateRequest {
@@ -12,14 +19,7 @@ interface WebSocketState {
   gameState: GameState | null
   lobbyState: LobbyState | null
   pendingSpectateRequest: SpectateRequest | null
-  serverNotice: {
-    mode: 'normal' | 'draining' | 'maintenance'
-    message: string
-    updated_at: string
-    new_games_blocked?: boolean
-    scheduled_for_utc?: string | null
-    estimated_recovery_minutes?: number | null
-  } | null
+  serverNotice: ServerNoticeStatus | null
   kicked: boolean
   invalidSession: boolean
   gameNotFound: boolean
