@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # ----- Tunables -----
 _MIN_INTERVAL = 0.1  # seconds: minimum spacing between HTTP calls
-_TIMEOUT = httpx.Timeout(10.0, connect=3.05)
+_TIMEOUT = httpx.Timeout(30.0, connect=5.0)
 _CACHE_MAX = 4096  # max entries to keep in memory
 
 
