@@ -73,6 +73,7 @@ import {
   shouldBlockGuidesForBattleResolution,
   type VisibleGuideStep,
 } from "./gameGuideState";
+import { canUseBattleFaceDownAction, canUseBattleFlipAction } from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
 
 interface SpectatorConfig {
@@ -1479,9 +1480,16 @@ function GameContent() {
             }
           };
           map['f'] = () => {
-            if (hoveredCard.owner === 'opponent' && !cb.can_manipulate_opponent) return;
             const ownerZones = hoveredCard.owner === 'player' ? cb.your_zones : cb.opponent_zones;
             const isFaceDown = ownerZones.face_down_card_ids?.includes(hoveredCard.id);
+            if (!canUseBattleFaceDownAction(hoveredCard.owner, cb.can_manipulate_opponent)) {
+              if (!canUseBattleFlipAction(hoveredCard.owner, !!isFaceDown, cb.can_manipulate_opponent)) return;
+              const card = ownerZones[hoveredCard.zone]?.find((c: { id: string }) => c.id === hoveredCard.id);
+              if (card?.flip_image_url) {
+                actions.battleUpdateCardState('flip', hoveredCard.id);
+              }
+              return;
+            }
             if (isFaceDown) {
               actions.battleUpdateCardState('face_down', hoveredCard.id);
             } else {
