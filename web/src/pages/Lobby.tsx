@@ -525,7 +525,7 @@ export function Lobby() {
                 <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
                   Crucible
                 </h1>
-                <span className="text-gray-400 text-3xl font-medium tracking-tight">
+                <span className="text-amber-500/80 text-3xl font-medium tracking-tight">
                   the MtG format
                 </span>
               </div>
@@ -558,7 +558,7 @@ export function Lobby() {
                   <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
                     Crucible
                   </h1>
-                  <span className="text-gray-400 text-xl font-medium tracking-tight">
+                  <span className="text-amber-500/80 text-xl font-medium tracking-tight">
                     the MtG format
                   </span>
                 </div>
@@ -644,7 +644,7 @@ export function Lobby() {
                 <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
                   Crucible
                 </h1>
-                <span className="text-gray-400 text-3xl font-medium tracking-tight">
+                <span className="text-amber-500/80 text-3xl font-medium tracking-tight">
                   the MtG format
                 </span>
               </div>
@@ -677,7 +677,7 @@ export function Lobby() {
                   <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
                     Crucible
                   </h1>
-                  <span className="text-gray-400 text-xl font-medium tracking-tight">
+                  <span className="text-amber-500/80 text-xl font-medium tracking-tight">
                     the MtG format
                   </span>
                 </div>
@@ -783,7 +783,7 @@ export function Lobby() {
               <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
                 Crucible
               </h1>
-              <span className="text-gray-400 text-3xl font-medium tracking-tight">
+              <span className="text-amber-500/80 text-3xl font-medium tracking-tight">
                 the MtG format
               </span>
             </div>
@@ -816,7 +816,7 @@ export function Lobby() {
                 <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
                   Crucible
                 </h1>
-                <span className="text-gray-400 text-xl font-medium tracking-tight">
+                <span className="text-amber-500/80 text-xl font-medium tracking-tight">
                   the MtG format
                 </span>
               </div>
