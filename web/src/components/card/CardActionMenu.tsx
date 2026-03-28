@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../../types'
 import { useFaceDown } from '../../contexts/faceDownState'
+import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../../utils/battleInteraction'
 
 interface CardActionMenuProps {
   card: CardType
@@ -62,7 +63,9 @@ export function CardActionMenu({
   }, [position])
 
   const onBattlefield = zone === 'battlefield'
-  const hideFaceControls = isOpponent && !canManipulateOpponent
+  const owner = isOpponent ? 'opponent' : 'player'
+  const canFaceDown = canUseBattleFaceDownAction(owner, canManipulateOpponent)
+  const canFlip = canUseBattleFlipAction(owner, isFaceDown, canManipulateOpponent)
   const hasFlip = !!card.flip_image_url
   const hasTokens = card.tokens.length > 0
   const hasCounters = Object.keys(counters).length > 0
@@ -110,14 +113,14 @@ export function CardActionMenu({
           </>
         )}
 
-        {hasFlip && !hideFaceControls && (
+        {hasFlip && canFlip && (
           <MenuItem
             label={isFlipped ? 'Flip to Front' : 'Flip to Back'}
             onClick={() => handleAction('flip')}
           />
         )}
 
-        {!hideFaceControls && (
+        {canFaceDown && (
           <MenuItem
             label={isFaceDown ? 'Turn Face Up' : 'Turn Face Down'}
             onClick={() => handleAction('face_down')}
@@ -208,7 +211,7 @@ export function CardActionMenu({
           </>
         )}
 
-        {!hideFaceControls && card.name && (
+        {card.name && (
           <>
             <MenuItem
               label="Make Copy Token"

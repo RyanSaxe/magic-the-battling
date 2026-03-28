@@ -5,6 +5,7 @@ import { DraggableCard, DroppableZone, useGameDnd } from '../../dnd'
 import { Card } from '../card'
 import { ZoneModal } from '../sidebar/DroppableZoneDisplay'
 import { makeDraggableId } from '../../dnd/types'
+import { canInteractWithBattleCard, canInteractWithBattleZone } from '../../utils/battleInteraction'
 
 const CARD_ASPECT = 5 / 7
 const LABEL_HEIGHT = 18
@@ -63,8 +64,12 @@ export function CompactZoneDisplay({
   onRevealHiddenUpgrades,
 }: CompactZoneDisplayProps) {
   const [uncontrolledModalOpen, setUncontrolledModalOpen] = useState(false)
-  const allowInteraction = !isOpponent || canManipulateOpponent
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
+  const allowZoneInteraction = canInteractWithBattleZone({
+    owner: zoneOwner,
+    zone,
+    canManipulateOpponent,
+  })
   const showModal = isModalOpen ?? uncontrolledModalOpen
   const setShowModal = onModalOpenChange ?? setUncontrolledModalOpen
 
@@ -75,6 +80,12 @@ export function CompactZoneDisplay({
     : null
   const isDraggingTopCard = activeDraggableId !== null && activeDraggableId === topCardDraggableId
   const nextCard = isDraggingTopCard ? cards[cards.length - 2] : null
+  const allowCardInteraction = canInteractWithBattleCard({
+    owner: zoneOwner,
+    zone,
+    canManipulateOpponent,
+    isFaceDown: forceFaceDown,
+  })
 
   const availW = width - 4
   const availH = height - LABEL_HEIGHT
@@ -93,7 +104,7 @@ export function CompactZoneDisplay({
         zone={zone}
         zoneOwner={zoneOwner}
         validFromZones={validFromZones}
-        disabled={!allowInteraction}
+        disabled={!allowZoneInteraction}
         className="box-border shrink-0 battle-side-dropzone"
         style={{ width, height }}
       >
@@ -135,10 +146,10 @@ export function CompactZoneDisplay({
                 zoneOwner={zoneOwner}
                 dragInstanceKey="compact"
                 dimensions={{ width: cardW, height: cardH }}
-                disabled={!allowInteraction}
+                disabled={!allowCardInteraction}
                 isOpponent={isOpponent}
-                onCardHover={allowInteraction ? onCardHover : undefined}
-                onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
+                onCardHover={allowCardInteraction ? onCardHover : undefined}
+                onCardHoverEnd={allowCardInteraction ? onCardHoverEnd : undefined}
                 faceDown={forceFaceDown}
                 canPeekFaceDown={forceFaceDown ? false : canPeekFaceDown}
                 upgraded={upgradedCardIds?.has(topCard.id)}
@@ -156,7 +167,8 @@ export function CompactZoneDisplay({
           title={title}
           zone={zone}
           cards={cards}
-          allowInteraction={allowInteraction}
+          allowZoneInteraction={allowZoneInteraction}
+          allowCardInteraction={allowCardInteraction}
           isOpponent={isOpponent}
           tone="battle"
           hideTitle

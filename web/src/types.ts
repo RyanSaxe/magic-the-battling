@@ -386,10 +386,16 @@ export interface GameStatusResponse {
   auto_approve_spectators: boolean
 }
 
-export interface ServerStatus {
+export interface ServerNoticeStatus {
   mode: 'normal' | 'draining' | 'maintenance'
   message: string
   updated_at: string
+  new_games_blocked?: boolean
+  scheduled_for_utc?: string | null
+  estimated_recovery_minutes?: number | null
+}
+
+export interface ServerStatus extends ServerNoticeStatus {
   new_games_blocked: boolean
   scheduled_for_utc: string | null
   estimated_recovery_minutes: number | null

@@ -3,6 +3,7 @@ import type { CardDimensions } from "../../hooks/useViewportCardSizes";
 import { DraggableCard, DroppableZone } from "../../dnd";
 import { AttachedCardStack } from "../card";
 import { PoisonCard } from "../common/PoisonCard";
+import { canInteractWithBattleCard, canInteractWithBattleZone } from "../../utils/battleInteraction";
 
 const isLandOrTreasure = (card: CardType) =>
   card.type_line.toLowerCase().includes("land") ||
@@ -22,6 +23,7 @@ interface BattlefieldZoneProps {
   onCardHoverEnd?: () => void;
   tappedCardIds?: Set<string>;
   flippedCardIds?: Set<string>;
+  faceDownCardIds?: Set<string>;
   counters?: Record<string, Record<string, number>>;
   attachments?: Record<string, string[]>;
   validFromZones?: ZoneName[];
@@ -52,6 +54,7 @@ export function BattlefieldZone({
   onCardHoverEnd,
   tappedCardIds = new Set(),
   flippedCardIds = new Set(),
+  faceDownCardIds = new Set(),
   counters = {},
   attachments = {},
   validFromZones = ["hand", "battlefield", "graveyard", "exile", "sideboard", "command_zone", "library"],
@@ -71,7 +74,12 @@ export function BattlefieldZone({
   nonlandCardDimensions,
   canPeekFaceDown,
 }: BattlefieldZoneProps) {
-  const allowInteraction = !isOpponent || canManipulateOpponent;
+  const zoneOwner = isOpponent ? "opponent" : ("player" as const);
+  const allowZoneInteraction = canInteractWithBattleZone({
+    owner: zoneOwner,
+    zone: "battlefield",
+    canManipulateOpponent,
+  });
   const attachedCardIds = new Set(Object.values(attachments).flat());
   const topLevelCards = cards.filter((c) => !attachedCardIds.has(c.id));
 
@@ -86,6 +94,14 @@ export function BattlefieldZone({
       .map((id) => cards.find((c) => c.id === id))
       .filter((c): c is CardType => !!c);
   };
+
+  const canInteractWithCard = (card: CardType) =>
+    canInteractWithBattleCard({
+      owner: zoneOwner,
+      zone: "battlefield",
+      canManipulateOpponent,
+      isFaceDown: faceDownCardIds.has(card.id),
+    });
 
   const renderCard = (card: CardType, dims?: CardDimensions) => {
     const resolvedDims = dims ?? cardDimensions;
@@ -106,6 +122,7 @@ export function BattlefieldZone({
           onCardClick={onCardClick}
           onCardDoubleClick={onCardDoubleClick}
           onCardContextMenu={onCardContextMenu}
+          allowCardInteraction={canInteractWithCard}
           upgradedCardIds={upgradedCardIds}
           upgradesByCardId={upgradesByCardId}
           hiddenUpgradesByCardId={hiddenUpgradesByCardId}
@@ -114,13 +131,13 @@ export function BattlefieldZone({
       );
     }
 
-    const zoneOwner = isOpponent ? "opponent" : ("player" as const);
+    const allowCardInteraction = canInteractWithCard(card);
 
     return (
       <div
         key={card.id}
         onContextMenu={(e) => {
-          if (allowInteraction) {
+          if (allowCardInteraction) {
             e.preventDefault();
             onCardContextMenu?.(e, card);
           }
@@ -135,23 +152,21 @@ export function BattlefieldZone({
           tapped={tappedCardIds.has(card.id)}
           flipped={flippedCardIds.has(card.id)}
           counters={counters[card.id]}
-          onClick={() => onCardClick?.(card)}
-          onDoubleClick={() => onCardDoubleClick?.(card)}
-          disabled={!draggable || !allowInteraction || !card.name}
+          onClick={allowCardInteraction ? () => onCardClick?.(card) : undefined}
+          onDoubleClick={allowCardInteraction ? () => onCardDoubleClick?.(card) : undefined}
+          disabled={!draggable || !allowCardInteraction || !card.name}
           isOpponent={isOpponent}
           upgraded={upgradedCardIds.has(card.id)}
           appliedUpgrades={upgradesByCardId?.get(card.id)}
           hiddenUpgradeCount={(hiddenUpgradesByCardId?.get(card.id) ?? []).length}
           onRevealHiddenUpgrades={onRevealHiddenUpgrades ? () => onRevealHiddenUpgrades(card.id) : undefined}
           canPeekFaceDown={canPeekFaceDown}
-          onCardHover={allowInteraction ? onCardHover : undefined}
-          onCardHoverEnd={allowInteraction ? onCardHoverEnd : undefined}
+          onCardHover={allowCardInteraction ? onCardHover : undefined}
+          onCardHoverEnd={allowCardInteraction ? onCardHoverEnd : undefined}
         />
       </div>
     );
   };
-
-  const zoneOwner = isOpponent ? "opponent" : ("player" as const);
 
   const minH = cardDimensions ? cardDimensions.height : 112;
   const compact = cardDimensions ? cardDimensions.height <= 70 : false;
@@ -169,7 +184,7 @@ export function BattlefieldZone({
         zone="battlefield"
         zoneOwner={zoneOwner}
         validFromZones={validFromZones}
-        disabled={!allowInteraction}
+        disabled={!allowZoneInteraction}
         className="h-full p-2"
       >
         <div
@@ -215,7 +230,7 @@ export function BattlefieldZone({
       zone="battlefield"
       zoneOwner={zoneOwner}
       validFromZones={validFromZones}
-      disabled={!allowInteraction}
+      disabled={!allowZoneInteraction}
       className={`h-full flex-1 ${compact ? 'p-1' : 'p-4'}`}
     >
       {label && (

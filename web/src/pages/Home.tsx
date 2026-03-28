@@ -19,16 +19,17 @@ export function Home() {
       <header className="shrink-0 py-3 frame-chrome bar-pad-both">
         <div className="hidden sm:flex items-center justify-between">
           <div>
-            <div className="flex items-baseline gap-2">
-              <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
+            <div className="flex items-baseline">
+              <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
                 Crucible
               </h1>
-              <span className="text-[var(--color-gold-dark)] text-xl font-medium tracking-tight">
-                the MtG format
+              <span className="hero-sep mx-2.5">—</span>
+              <span className="hero-subtitle text-base font-normal tracking-widest">
+                an MtG format
               </span>
             </div>
-            <p className="text-gray-400 text-sm">
-              inspired by roguelikes and autobattlers
+            <p className="hero-tagline">
+              Inspired by Roguelikes and Autobattlers
             </p>
           </div>
           <div className="flex gap-2">
@@ -49,16 +50,17 @@ export function Home() {
         <div className="sm:hidden">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex items-baseline gap-1.5">
-                <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
+              <div className="flex items-baseline whitespace-nowrap">
+                <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
                   Crucible
                 </h1>
-                <span className="text-[var(--color-gold-dark)] text-sm font-medium tracking-tight">
-                  the MtG format
+                <span className="hero-sep mx-1 text-xs">—</span>
+                <span className="hero-subtitle text-[11px] font-normal tracking-wider">
+                  an MtG format
                 </span>
               </div>
-              <p className="text-gray-400 text-xs">
-                inspired by roguelikes and autobattlers
+              <p className="hero-tagline !text-[9px] !tracking-[0.04em]">
+                Inspired by Roguelikes and Autobattlers
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
