@@ -47,6 +47,6 @@ A typical game takes 15-30 minutes in goldfish mode, 45-60 minutes online with f
 
 The best source for in-person logistics is the [CubeCobra Primer](https://cubecobra.com/cube/about/auto?view=primer).
 
-## Can I build my own Battler?
+## Can I build my own Cube?
 
-Of course! If you click the settings icon on the Play page, you can provide a CubeCobra ID for your custom battler to play with. For advice on how to build your own battler, refer to the end of the [CubeCobra Primer](https://cubecobra.com/cube/about/auto?view=primer#advice-for-building-your-own).
+Of course! If you click the settings icon on the Play page, you can provide a CubeCobra ID for your custom cube to play with. For advice on how to build your own cube, refer to the end of the [CubeCobra Primer](https://cubecobra.com/cube/about/auto?view=primer#advice-for-building-your-own).

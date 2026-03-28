@@ -23,7 +23,7 @@ export function Home() {
               <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
                 Crucible
               </h1>
-              <span className="text-gray-500 text-base font-medium tracking-tight">
+              <span className="text-gray-400 text-3xl font-medium tracking-tight">
                 the MtG format
               </span>
             </div>
@@ -53,7 +53,7 @@ export function Home() {
                 <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
                   Crucible
                 </h1>
-                <span className="text-gray-500 text-xs font-medium tracking-tight">
+                <span className="text-gray-400 text-xl font-medium tracking-tight">
                   the MtG format
                 </span>
               </div>
