@@ -20,8 +20,6 @@ import {
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 
-const DESKTOP_SUBTITLE = "An MtG format inspired by autobattlers";
-const MOBILE_SUBTITLE = "An MtG format inspired by autobattlers";
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 
 function cubeCobraUrl(battlerId: string) {
@@ -430,7 +428,7 @@ export function Lobby() {
   const submitBattler = () => {
     const battlerId = battlerIdInput.trim();
     if (!battlerId) {
-      addToast("Please enter a battler ID", "error");
+      addToast(isConstructed ? "Please enter a deck" : "Please enter a cube ID", "error");
       return;
     }
     actions.submitBattler(battlerId);
@@ -523,10 +521,17 @@ export function Lobby() {
         <header className="shrink-0 py-3 frame-chrome bar-pad-both">
           <div className="hidden sm:flex items-center justify-between">
             <div>
-              <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
-                Magic: The Battling
-              </h1>
-              <p className="text-gray-400 text-sm">{DESKTOP_SUBTITLE}</p>
+              <div className="flex items-baseline gap-2">
+                <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
+                  Crucible
+                </h1>
+                <span className="text-[var(--color-gold-dark)] text-xl font-medium tracking-tight">
+                  the MtG format
+                </span>
+              </div>
+              <p className="text-gray-400 text-sm">
+                inspired by roguelikes and autobattlers
+              </p>
             </div>
             <div className="flex gap-2">
               <button
@@ -549,10 +554,17 @@ export function Lobby() {
           <div className="sm:hidden">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
-                  Magic: The Battling
-                </h1>
-                <p className="text-gray-400 text-xs">{MOBILE_SUBTITLE}</p>
+                <div className="flex items-baseline gap-1.5">
+                  <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
+                    Crucible
+                  </h1>
+                  <span className="text-[var(--color-gold-dark)] text-sm font-medium tracking-tight">
+                    the MtG format
+                  </span>
+                </div>
+                <p className="text-gray-400 text-xs">
+                  inspired by roguelikes and autobattlers
+                </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -628,10 +640,17 @@ export function Lobby() {
         <header className="shrink-0 py-3 frame-chrome bar-pad-both">
           <div className="hidden sm:flex items-center justify-between">
             <div>
-              <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
-                Magic: The Battling
-              </h1>
-              <p className="text-gray-400 text-sm">{DESKTOP_SUBTITLE}</p>
+              <div className="flex items-baseline gap-2">
+                <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
+                  Crucible
+                </h1>
+                <span className="text-[var(--color-gold-dark)] text-xl font-medium tracking-tight">
+                  the MtG format
+                </span>
+              </div>
+              <p className="text-gray-400 text-sm">
+                inspired by roguelikes and autobattlers
+              </p>
             </div>
             <div className="flex gap-2">
               <button
@@ -654,10 +673,17 @@ export function Lobby() {
           <div className="sm:hidden">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
-                  Magic: The Battling
-                </h1>
-                <p className="text-gray-400 text-xs">{MOBILE_SUBTITLE}</p>
+                <div className="flex items-baseline gap-1.5">
+                  <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
+                    Crucible
+                  </h1>
+                  <span className="text-[var(--color-gold-dark)] text-sm font-medium tracking-tight">
+                    the MtG format
+                  </span>
+                </div>
+                <p className="text-gray-400 text-xs">
+                  inspired by roguelikes and autobattlers
+                </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <button
@@ -753,10 +779,17 @@ export function Lobby() {
       <header className="shrink-0 py-3 frame-chrome bar-pad-both">
         <div className="hidden sm:flex items-center justify-between">
           <div>
-            <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
-              Magic: The Battling
-            </h1>
-            <p className="text-gray-400 text-sm">{DESKTOP_SUBTITLE}</p>
+            <div className="flex items-baseline gap-2">
+              <h1 className="hero-title text-3xl font-bold tracking-tight leading-tight">
+                Crucible
+              </h1>
+              <span className="text-[var(--color-gold-dark)] text-xl font-medium tracking-tight">
+                the MtG format
+              </span>
+            </div>
+            <p className="text-gray-400 text-sm">
+              inspired by roguelikes and autobattlers
+            </p>
           </div>
           <div className="flex gap-2">
             <button
@@ -779,10 +812,17 @@ export function Lobby() {
         <div className="sm:hidden">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
-                Magic: The Battling
-              </h1>
-              <p className="text-gray-400 text-xs">{MOBILE_SUBTITLE}</p>
+              <div className="flex items-baseline gap-1.5">
+                <h1 className="hero-title text-xl font-bold tracking-tight leading-tight">
+                  Crucible
+                </h1>
+                <span className="text-[var(--color-gold-dark)] text-sm font-medium tracking-tight">
+                  the MtG format
+                </span>
+              </div>
+              <p className="text-gray-400 text-xs">
+                inspired by roguelikes and autobattlers
+              </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
@@ -897,7 +937,7 @@ export function Lobby() {
                           </div>
                           <div className="min-w-0 border-l border-black/40 px-2">
                             <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
-                              Battler
+                              {isConstructed ? "Deck" : "Cube"}
                             </div>
                             {summaryBattlerId ? (
                               <a
@@ -940,7 +980,7 @@ export function Lobby() {
 
                       {lobbyState.play_mode === "constructed" && currentPlayer && (
                         <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
-                          <h2 className="text-white font-medium text-sm">Your Battler</h2>
+                          <h2 className="text-white font-medium text-sm">{isConstructed ? "Your Deck" : "Your Cube"}</h2>
                           <div className="mt-3 flex gap-2">
                             {hasLoadedBattler ? (
                               <div
@@ -959,7 +999,7 @@ export function Lobby() {
                                     submitBattler();
                                   }
                                 }}
-                                placeholder="CubeCobra battler ID"
+                                placeholder={isConstructed ? "Enter deck list" : "CubeCobra cube ID"}
                                 disabled={isBattlerLoading}
                                 className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
                               />

@@ -9,7 +9,7 @@ order: 4
 You made it to the end of the round. This is the round wrap-up.
 
 - Every player always gets +1 [treasure](doc:game-pieces#treasures).
-- On the 1st and 2nd round of every stage, every player also gets +1 random card from the [battler](doc:__cards__).
+- On the 1st and 2nd round of every stage, every player also gets +1 random card from the [cube](doc:__cards__).
 - On the 3rd round of every stage, the random card is replaced with The Vanquisher, which increases hand size by 1 and advances you to the next stage.
 - On the 3rd round of every stage, if you are playing with [upgrades](doc:game-pieces#upgrades), select one to add to your pool.
 

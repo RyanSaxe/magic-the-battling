@@ -1,6 +1,6 @@
-# Magic: The Battling
+# Crucible
 
-An online application for playing [Magic: The Battling](https://cubecobra.com/cube/overview/auto), a Magic: The Gathering format that combines drafting with elimination-style battles.
+An online application for playing [Crucible](https://cubecobra.com/cube/overview/auto), a Magic: The Gathering format that combines drafting with elimination-style battles.
 
 ## Community
 
