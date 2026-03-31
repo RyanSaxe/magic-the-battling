@@ -30,7 +30,7 @@ export function CardPreviewModal({ card, appliedUpgrades, onClose }: CardPreview
   return (
     <div
       data-card-preview-modal="true"
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[101]"
       onClick={onClose}
     >
       <div
