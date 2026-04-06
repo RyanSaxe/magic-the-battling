@@ -236,7 +236,7 @@ export function ActionMenu({
                             image_url: token.image_url,
                             type_line: token.type_line,
                           },
-                          for_opponent: false,
+                          for_opponent: selectedOwner === 'opponent',
                         })}
                       />
                     ))}
