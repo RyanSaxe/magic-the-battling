@@ -16,10 +16,15 @@ let namePromise: Promise<string> | null = null
 
 export function prefetchLegendaryName(): void {
   if (namePromise) return
-  namePromise = fetch("https://api.scryfall.com/cards/random?q=t:legend")
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 3000)
+  namePromise = fetch("https://api.scryfall.com/cards/random?q=t:legend", {
+    signal: controller.signal,
+  })
     .then((r) => r.json())
     .then((card) => extractName(card.name))
     .catch(() => generateFallback())
+    .finally(() => clearTimeout(timeout))
 }
 
 export function getLegendaryName(): Promise<string> {
