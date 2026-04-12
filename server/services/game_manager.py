@@ -173,6 +173,7 @@ class PendingGame:
     battler: Battler | None = None
     battler_loading: bool = False
     battler_error: str | None = None
+    player_user_ids: dict[str, str] = field(default_factory=dict)
     _loading_task: asyncio.Task | None = field(default=None, repr=False)
 
 
@@ -474,8 +475,10 @@ class GameManager:
         db_session: Session,
         game_id: str,
         player_pairs: list[tuple[str, str]],
+        player_user_ids: dict[str, str] | None = None,
     ) -> None:
         # Keep one active player_id mapping per human name for deterministic reconnect behavior.
+        user_ids = player_user_ids or {}
         for player_id, player_name in player_pairs:
             db_session.query(GamePlayerRecord).filter(
                 GamePlayerRecord.game_id == game_id,
@@ -488,6 +491,7 @@ class GameManager:
                     player_id=player_id,
                     player_name=player_name,
                     is_puppet=False,
+                    user_id=user_ids.get(player_id),
                 )
             )
 
@@ -698,10 +702,15 @@ class GameManager:
         auto_approve_spectators: bool = False,
         guided_mode_default: bool = False,
         play_mode: PlayMode = "limited",
+        user_id: str | None = None,
     ) -> PendingGame:
         play_mode = normalize_play_mode(play_mode)
         game_id = secrets.token_urlsafe(8)
         join_code = secrets.token_urlsafe(4).upper()[:6]
+
+        player_user_ids: dict[str, str] = {}
+        if user_id:
+            player_user_ids[player_id] = user_id
 
         pending = PendingGame(
             game_id=game_id,
@@ -718,6 +727,7 @@ class GameManager:
             play_mode=play_mode,
             player_ready={player_id: False},
             player_battlers={player_id: PendingPlayerBattler()},
+            player_user_ids=player_user_ids,
         )
         self._pending_games[game_id] = pending
         self._join_code_to_game[join_code] = game_id
@@ -736,7 +746,9 @@ class GameManager:
         game_id = self.get_game_id_by_join_code(join_code)
         return self._pending_games.get(game_id) if game_id else None
 
-    def join_game(self, join_code: str, player_name: str, player_id: str) -> PendingGame | None:
+    def join_game(
+        self, join_code: str, player_name: str, player_id: str, user_id: str | None = None
+    ) -> PendingGame | None:
         pending = self.get_pending_game_by_code(join_code)
         if not pending:
             return None
@@ -754,6 +766,8 @@ class GameManager:
         pending.player_ids.append(player_id)
         pending.player_ready[player_id] = False
         pending.player_battlers[player_id] = PendingPlayerBattler()
+        if user_id:
+            pending.player_user_ids[player_id] = user_id
         self._player_to_game[player_id] = pending.game_id
         self._player_id_to_name[player_id] = player_name
 
@@ -894,12 +908,14 @@ class GameManager:
             game_record = GameRecord(
                 id=game_id,
                 config_json=json.dumps(config_data),
+                cube_id=pending.cube_id,
             )
             db.add(game_record)
             self._persist_human_player_mappings(
                 db,
                 game_id,
                 list(zip(pending.player_ids, pending.player_names, strict=False)),
+                player_user_ids=pending.player_user_ids,
             )
             db.commit()
 
@@ -998,12 +1014,14 @@ class GameManager:
                     game_record = GameRecord(
                         id=game_id,
                         config_json=json.dumps(config_data),
+                        cube_id=pending.cube_id,
                     )
                     db.add(game_record)
                     self._persist_human_player_mappings(
                         db,
                         game_id,
                         list(zip(pending.player_ids, pending.player_names, strict=False)),
+                        player_user_ids=pending.player_user_ids,
                     )
                     db.commit()
 

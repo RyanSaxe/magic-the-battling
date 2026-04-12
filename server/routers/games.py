@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session, joinedload
 from mtb.models.game import restore_snapshot_data
 from mtb.utils.cubecobra import get_cube_data
 from server.db import database
-from server.db.models import GameRecord, PlayerGameHistory
+from server.db.models import GamePlayerRecord as GPR_Model
+from server.db.models import GameRecord, PlayerGameHistory, User
 from server.routers.ws import connection_manager
 from server.schemas.api import (
     CreateGameRequest,
@@ -33,6 +34,7 @@ from server.schemas.api import (
     SpectateRequestStatus,
     StartGameResponse,
 )
+from server.services.auth import get_optional_user
 from server.services.game_manager import game_manager
 from server.services.game_serialization import catalog_entries_for_cards
 from server.services.ops_manager import ops_manager
@@ -197,7 +199,7 @@ def _server_update_http_error(detail: str) -> HTTPException:
     )
 
 
-def _create_game_response(request: CreateGameRequest) -> CreateGameResponse:
+def _create_game_response(request: CreateGameRequest, user_id: str | None = None) -> CreateGameResponse:
     session = session_manager.create_session()
     pending = game_manager.create_game(
         player_name=request.player_name,
@@ -209,6 +211,7 @@ def _create_game_response(request: CreateGameRequest) -> CreateGameResponse:
         auto_approve_spectators=request.auto_approve_spectators,
         guided_mode_default=request.guided_mode_default,
         play_mode=request.play_mode,
+        user_id=user_id,
     )
     pending.puppet_count = request.puppet_count
     session_manager.update_game_id(session.session_id, pending.game_id)
@@ -252,6 +255,7 @@ router = APIRouter(prefix="/api/games", tags=["games"])
 async def create_game(
     request: CreateGameRequest,
     x_mtb_idempotency_key: str | None = Header(default=None, alias=IDEMPOTENCY_KEY_HEADER),
+    current_user: "User | None" = Depends(get_optional_user),  # noqa: B008
 ):
     cache_key = _normalize_idempotency_key(x_mtb_idempotency_key)
     fingerprint = _request_fingerprint(request)
@@ -273,7 +277,8 @@ async def create_game(
         raise error
 
     try:
-        response_payload = _create_game_response(request)
+        user_id = str(current_user.id) if current_user else None
+        response_payload = _create_game_response(request, user_id=user_id)
     except Exception as exc:
         await _resolve_claim_error(claim, exc)
         raise
@@ -296,7 +301,7 @@ async def warm_cube_cache(request: WarmCubeRequest):
 
 
 @router.post("/join", response_model=JoinGameResponse)
-def join_game_by_code(request: JoinGameRequest):
+def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depends(get_optional_user)):  # noqa: B008
     """Join a game using just the join code (no game_id needed)."""
     if ops_manager.blocks_new_games():
         raise _server_update_http_error("Server is updating. Joining new games is temporarily blocked.")
@@ -318,10 +323,12 @@ def join_game_by_code(request: JoinGameRequest):
         raise HTTPException(status_code=400, detail="Lobby is full")
 
     session = session_manager.create_session(pending.game_id)
+    user_id = str(current_user.id) if current_user else None
     result = game_manager.join_game(
         join_code=request.join_code,
         player_name=request.player_name,
         player_id=session.player_id,
+        user_id=user_id,
     )
 
     if not result:
@@ -335,7 +342,7 @@ def join_game_by_code(request: JoinGameRequest):
 
 
 @router.post("/{game_id}/join", response_model=JoinGameResponse)
-def join_game(game_id: str, request: JoinGameRequest):
+def join_game(game_id: str, request: JoinGameRequest, current_user: User | None = Depends(get_optional_user)):  # noqa: B008
     if ops_manager.blocks_new_games():
         raise _server_update_http_error("Server is updating. Joining new games is temporarily blocked.")
 
@@ -355,10 +362,12 @@ def join_game(game_id: str, request: JoinGameRequest):
         raise HTTPException(status_code=400, detail="Lobby is full")
 
     session = session_manager.create_session(game_id)
+    user_id = str(current_user.id) if current_user else None
     result = game_manager.join_game(
         join_code=request.join_code,
         player_name=request.player_name,
         player_id=session.player_id,
+        user_id=user_id,
     )
 
     if not result:
@@ -372,13 +381,30 @@ def join_game(game_id: str, request: JoinGameRequest):
 
 
 @router.post("/{game_id}/rejoin", response_model=JoinGameResponse)
-def rejoin_game(game_id: str, request: RejoinGameRequest):
+def rejoin_game(
+    game_id: str,
+    request: RejoinGameRequest,
+    current_user: User | None = Depends(get_optional_user),  # noqa: B008
+    db: Session = Depends(get_db),  # noqa: B008
+):
     if not game_manager.get_game(game_id):
         game_manager.restore_game_from_snapshot(game_id)
 
     game = game_manager.get_game(game_id)
     if not game or not any(p.name == request.player_name for p in game.players):
         raise HTTPException(status_code=404, detail="Player not found in game")
+
+    gpr = (
+        db.query(GPR_Model)
+        .filter(
+            GPR_Model.game_id == game_id,
+            GPR_Model.player_name == request.player_name,
+            GPR_Model.is_puppet.is_(False),
+        )
+        .first()
+    )
+    if gpr and gpr.user_id and (not current_user or str(current_user.id) != str(gpr.user_id)):
+        raise HTTPException(status_code=403, detail="Log in to reconnect to this player slot")
 
     player_id = game_manager.get_player_id_by_name(game_id, request.player_name)
     if player_id and connection_manager.is_player_connected(game_id, player_id):
@@ -722,11 +748,13 @@ def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)
         )
 
     created_at = game_record.created_at.isoformat() if game_record.created_at else ""
+    cube_id = str(game_record.cube_id) if game_record.cube_id else config.get("cube_id")
 
     return ShareGameResponse(
         game_id=game_id,
         owner_name=player_name,
         created_at=created_at,
         use_upgrades=use_upgrades,
+        cube_id=cube_id,
         players=players,
     )

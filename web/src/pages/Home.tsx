@@ -4,15 +4,23 @@ import { FaDiscord } from "react-icons/fa6";
 import { CardShowcase } from "../components/home/CardShowcase";
 import { JoinGameModal } from "../components/home/JoinGameModal";
 import { CubeCobraPrimerLink } from "../components/common/CubeCobraPrimerLink";
+import { useAuth } from "../contexts/authState";
 import { prefetchLegendaryName } from "../utils/prefetchName";
 
 export function Home() {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const [showJoinModal, setShowJoinModal] = useState(false);
 
   useEffect(() => {
     prefetchLegendaryName();
   }, []);
+
+  useEffect(() => {
+    if (!loading && user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [loading, user, navigate]);
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
@@ -34,16 +42,10 @@ export function Home() {
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setShowJoinModal(true)}
+              onClick={() => navigate("/login")}
               className="btn btn-secondary py-2 px-4"
             >
-              Join Game
-            </button>
-            <button
-              onClick={() => navigate("/play")}
-              className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
-            >
-              Play Game
+              Log in
             </button>
           </div>
         </div>
@@ -65,16 +67,10 @@ export function Home() {
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button
-                onClick={() => setShowJoinModal(true)}
+                onClick={() => navigate("/login")}
                 className="btn btn-secondary py-1.5 px-3 text-sm"
               >
-                Join
-              </button>
-              <button
-                onClick={() => navigate("/play")}
-                className="btn btn-primary py-1.5 px-3 text-sm font-semibold animate-gentle-glow"
-              >
-                Play
+                Log in
               </button>
             </div>
           </div>
@@ -87,6 +83,20 @@ export function Home() {
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
           <div className="zone-pack h-full min-h-0 flex flex-col items-center justify-center px-4">
             <CardShowcase />
+            <div className="flex gap-2 mt-6 mb-4">
+              <button
+                onClick={() => setShowJoinModal(true)}
+                className="btn btn-secondary py-2 px-4"
+              >
+                Join Game
+              </button>
+              <button
+                onClick={() => navigate("/play")}
+                className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
+              >
+                Play Game
+              </button>
+            </div>
           </div>
         </main>
 

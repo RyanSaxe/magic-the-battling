@@ -16,7 +16,7 @@ from starlette.requests import Request
 from server.db.database import init_db
 from server.monitoring import start_monitoring, stop_monitoring
 from server.observability import OBSERVABILITY_LOGGER_NAME, configure_logging, record_http_latency
-from server.routers import games, ops, share_preview, ws
+from server.routers import auth, battlers, discover, games, ops, share_preview, ws
 from server.runtime_config import MAX_SESSIONS_TOTAL, RESTORE_ACTIVE_GAME_SNAPSHOTS, SESSION_TTL_MINUTES
 from server.schemas.api import ServerStatusResponse
 from server.services.game_manager import game_manager
@@ -134,6 +134,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
+app.include_router(battlers.router)
+app.include_router(discover.router)
 app.include_router(games.router)
 app.include_router(ws.router)
 app.include_router(share_preview.router)

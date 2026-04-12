@@ -1,5 +1,5 @@
 import { startTransition, useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { createGame, warmCubeCache } from "../api/client";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
@@ -327,16 +327,20 @@ function GearButton({ onClick }: { onClick: () => void }) {
 
 export function Play() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { saveSession } = useSession();
   const { addToast } = useToast();
 
   const [playerName, setPlayerName, nameLoading] = useRandomMtgName();
   const [showFriendsAdvanced, setShowFriendsAdvanced] = useState(false);
   const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
-  const [cubeId, setCubeId] = useState("auto");
-  const [useUpgrades, setUseUpgrades] = useState(true);
-  const [playMode, setPlayMode] = useState<PlayMode>("limited");
-  const [opponents, setOpponents] = useState<OpponentCount>(3);
+  const [cubeId, setCubeId] = useState(() => searchParams.get("cubeId") || "auto");
+  const [useUpgrades, setUseUpgrades] = useState(() => searchParams.get("useUpgrades") !== "false");
+  const [playMode, setPlayMode] = useState<PlayMode>(() => (searchParams.get("playMode") === "constructed" ? "constructed" : "limited"));
+  const [opponents, setOpponents] = useState<OpponentCount>(() => {
+    const p = Number(searchParams.get("puppetCount"));
+    return OPPONENT_OPTIONS.includes(p as OpponentCount) ? (p as OpponentCount) : 3;
+  });
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [activeMode, setActiveMode] = useState<ActiveMode>("solo");
   const [isGuidedMode, setIsGuidedMode] = useState(() =>

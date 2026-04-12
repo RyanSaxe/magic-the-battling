@@ -434,5 +434,43 @@ export interface ShareGameResponse {
   owner_name: string
   created_at: string
   use_upgrades: boolean
+  cube_id?: string | null
   players: SharePlayerData[]
+}
+
+export interface AuthUser {
+  user_id: string
+  username: string
+  email?: string | null
+}
+
+export interface UserBattler {
+  id: number
+  cube_id: string
+  display_name: string | null
+  use_upgrades: boolean
+  use_vanguards: boolean
+  play_mode: PlayMode
+  puppet_count: number
+  target_player_count: number
+  auto_approve_spectators: boolean
+  guided_mode_default: boolean
+  position: number
+  created_at: string
+}
+
+export interface GameSummary {
+  game_id: string
+  created_at: string
+  player_count: number
+  best_human_name: string
+  best_human_placement: number | null
+  cube_id: string
+}
+
+export interface FollowedBattler {
+  id: number
+  cube_id: string
+  display_name: string | null
+  created_at: string
 }

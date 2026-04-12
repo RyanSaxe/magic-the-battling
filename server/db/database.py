@@ -1,3 +1,5 @@
+import json
+import logging
 import os
 from pathlib import Path
 
@@ -57,6 +59,37 @@ def init_db():
         _migrate(conn, "player_game_history", "poison_history_json", "TEXT")
         _migrate(conn, "battle_snapshots", "play_draw_preference", "TEXT")
         _migrate(conn, "games", "shared", "BOOLEAN", "0")
+
+        _migrate(conn, "games", "cube_id", "TEXT")
+        _migrate(conn, "game_players", "user_id", "TEXT")
+        _migrate(conn, "player_game_history", "user_id", "TEXT")
+
+    _backfill_game_cube_ids()
+
+
+def _backfill_game_cube_ids() -> None:
+    logger = logging.getLogger(__name__)
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT id, config_json FROM games WHERE cube_id IS NULL AND config_json IS NOT NULL")
+        ).fetchall()
+        if not rows:
+            return
+        count = 0
+        for row in rows:
+            try:
+                config = json.loads(row[1])
+                cube_id = config.get("cube_id")
+                if cube_id:
+                    conn.execute(
+                        text("UPDATE games SET cube_id = :cube_id WHERE id = :id"), {"cube_id": cube_id, "id": row[0]}
+                    )
+                    count += 1
+            except (json.JSONDecodeError, KeyError):
+                pass
+        conn.commit()
+        if count:
+            logger.info("Backfilled cube_id on %d game records", count)
 
 
 def _migrate_rename_column_pre_create() -> None:
