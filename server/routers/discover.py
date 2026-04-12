@@ -43,6 +43,7 @@ def browse_cubes(
         .filter(
             GameRecord.cube_id.isnot(None),
             GameRecord.ended_at.isnot(None),
+            GameRecord.winner_player_id.isnot(None),
         )
         .group_by(GameRecord.cube_id)
         .order_by(func.count(distinct(GameRecord.id)).desc())

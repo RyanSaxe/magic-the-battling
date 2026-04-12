@@ -148,7 +148,11 @@ def list_battler_games(
         raise HTTPException(status_code=404, detail="Battler not found")
 
     cube_id = str(battler.cube_id)
-    query = db.query(GameRecord).filter(GameRecord.cube_id == cube_id, GameRecord.ended_at.isnot(None))
+    query = db.query(GameRecord).filter(
+        GameRecord.cube_id == cube_id,
+        GameRecord.ended_at.isnot(None),
+        GameRecord.winner_player_id.isnot(None),
+    )
     if play_mode is not None:
         query = query.filter(func.json_extract(GameRecord.config_json, "$.play_mode") == play_mode)
     if use_upgrades is not None:
