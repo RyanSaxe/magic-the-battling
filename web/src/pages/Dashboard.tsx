@@ -19,6 +19,12 @@ import type { UserBattler, FollowedBattler, PlayMode } from '../types'
 
 type Tab = 'battlers' | 'following' | 'discover'
 
+const TAB_LABELS: Record<Tab, string> = {
+  battlers: 'My Cubes',
+  following: 'Following',
+  discover: 'Discover',
+}
+
 export function Dashboard() {
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
@@ -77,20 +83,22 @@ export function Dashboard() {
 
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col px-4 py-4">
-            <div className="flex gap-1 mb-4">
-              {(['battlers', 'following', 'discover'] as Tab[]).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
-                    tab === t
-                      ? 'bg-amber-500 text-black'
-                      : 'bg-black/35 text-gray-300 hover:bg-black/25 border border-black/40'
-                  }`}
-                >
-                  {t === 'battlers' ? 'My Cubes' : t === 'following' ? 'Following' : 'Discover'}
-                </button>
-              ))}
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
+                {(['battlers', 'following', 'discover'] as Tab[]).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTab(t)}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                      tab === t
+                        ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'
+                        : 'border border-transparent bg-black/10 text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    {TAB_LABELS[t]}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {loadingData ? (
@@ -181,6 +189,19 @@ export function Dashboard() {
   )
 }
 
+function SectionHeading({ title, count }: { title: string; count?: number }) {
+  return (
+    <div className="flex items-center justify-between gap-2 mb-3">
+      <span className="text-[10px] uppercase tracking-[0.14em] text-gray-400">{title}</span>
+      {count !== undefined && (
+        <span className="text-[10px] text-gray-500">
+          {count} {count === 1 ? 'cube' : 'cubes'}
+        </span>
+      )}
+    </div>
+  )
+}
+
 function BattlersGrid({
   battlers,
   onPlay,
@@ -195,37 +216,43 @@ function BattlersGrid({
   if (battlers.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4">
-        <p className="text-gray-400">No cubes saved yet</p>
-        <button onClick={onAdd} className="btn btn-primary py-2 px-6 font-semibold">
-          Add Your First Cube
-        </button>
+        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
+          <p className="text-gray-300 mb-4">No cubes saved yet. Add your first cube to start tracking your games.</p>
+          <button onClick={onAdd} className="btn btn-primary py-2 px-6 font-semibold">
+            Add Your First Cube
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      {battlers.map((b) => (
-        <InfoCard
-          key={b.id}
-          title={b.display_name || b.cube_id}
-          subtitle={b.cube_id !== (b.display_name || '') ? b.cube_id : undefined}
-          badge={{ text: b.play_mode === 'constructed' ? 'Deck' : 'Cube', color: b.play_mode === 'constructed' ? 'blue' : 'gold' }}
-          metadata={[
-            { label: 'Upgrades', value: b.use_upgrades ? 'On' : 'Off' },
-            { label: 'Opponents', value: String(b.puppet_count) },
-          ]}
-          primaryAction={{ label: 'Play', onClick: () => onPlay(b) }}
-          secondaryAction={{ label: 'View', onClick: () => onView(b) }}
-        />
-      ))}
-      <button
-        onClick={onAdd}
-        className="border-2 border-dashed border-amber-700/60 rounded-lg p-4 flex items-center justify-center text-amber-400/80 hover:text-amber-300 hover:border-amber-600 transition-colors min-h-[120px] font-medium"
-      >
-        + Add Cube
-      </button>
-    </div>
+    <>
+      <SectionHeading title="My Cubes" count={battlers.length} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {battlers.map((b) => (
+          <InfoCard
+            key={b.id}
+            variant="cube"
+            title={b.display_name || b.cube_id}
+            subtitle={b.cube_id !== (b.display_name || '') ? b.cube_id : undefined}
+            badge={{ text: b.play_mode === 'constructed' ? 'Deck' : 'Cube', color: b.play_mode === 'constructed' ? 'blue' : 'gold' }}
+            metadata={[
+              { label: 'Upgrades', value: b.use_upgrades ? 'On' : 'Off' },
+              { label: 'Opponents', value: String(b.puppet_count) },
+            ]}
+            primaryAction={{ label: 'Play', onClick: () => onPlay(b) }}
+            secondaryAction={{ label: 'View', onClick: () => onView(b) }}
+          />
+        ))}
+        <button
+          onClick={onAdd}
+          className="border-2 border-dashed border-amber-700/60 rounded-lg p-4 flex items-center justify-center text-amber-400/80 hover:text-amber-300 hover:border-amber-600 hover:animate-gentle-glow transition-colors min-h-[120px] font-medium"
+        >
+          + Add Cube
+        </button>
+      </div>
+    </>
   )
 }
 
@@ -240,24 +267,30 @@ function FollowingGrid({
 }) {
   if (following.length === 0) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-400">Not following any cubes yet. Use the Discover tab to find cubes.</p>
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
+          <p className="text-gray-300">Not following any cubes yet. Use the Discover tab to find cubes.</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      {following.map((f) => (
-        <InfoCard
-          key={f.id}
-          title={f.display_name || f.cube_id}
-          subtitle={f.cube_id !== (f.display_name || '') ? f.cube_id : undefined}
-          primaryAction={{ label: 'Play', onClick: () => onPlay(f) }}
-          secondaryAction={{ label: 'Unfollow', onClick: () => onUnfollow(f) }}
-        />
-      ))}
-    </div>
+    <>
+      <SectionHeading title="Following" count={following.length} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {following.map((f) => (
+          <InfoCard
+            key={f.id}
+            variant="community"
+            title={f.display_name || f.cube_id}
+            subtitle={f.cube_id !== (f.display_name || '') ? f.cube_id : undefined}
+            primaryAction={{ label: 'Play', onClick: () => onPlay(f) }}
+            secondaryAction={{ label: 'Unfollow', onClick: () => onUnfollow(f) }}
+          />
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -418,25 +451,27 @@ function DiscoverGrid({
 }) {
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <form
-        onSubmit={(e) => { e.preventDefault(); onSearch() }}
-        className="flex gap-2 mb-4"
-      >
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by cube ID..."
-          className="flex-1 h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
-        />
-        <button
-          type="submit"
-          disabled={loading}
-          className="btn btn-primary py-2 px-4 font-semibold disabled:opacity-50"
+      <div className="rounded-lg border border-[color:rgba(212,175,55,0.12)] bg-black/10 p-3 mb-4">
+        <form
+          onSubmit={(e) => { e.preventDefault(); onSearch() }}
+          className="flex gap-2"
         >
-          {loading ? 'Searching...' : 'Search'}
-        </button>
-      </form>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by cube ID..."
+            className="flex-1 h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="btn btn-primary py-2 px-4 font-semibold disabled:opacity-50"
+          >
+            {loading ? 'Searching...' : 'Search'}
+          </button>
+        </form>
+      </div>
 
       {!searched ? (
         <div className="flex-1 flex items-center justify-center">
@@ -447,33 +482,37 @@ function DiscoverGrid({
           <p className="text-gray-500">{query ? 'No cubes found matching that query.' : 'No cubes found. Play some games first!'}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {results.map((r) => (
-            <InfoCard
-              key={r.cube_id}
-              title={r.cube_id}
-              badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
-              metadata={[
-                { label: 'Games', value: String(r.game_count) },
-                { label: 'Players', value: String(r.player_count) },
-              ]}
-              primaryAction={{ label: 'Play', onClick: () => onPlay(r.cube_id) }}
-              secondaryAction={
-                r.is_following ? undefined : { label: 'Follow', onClick: () => onFollow(r.cube_id) }
-              }
-            >
-              <a
-                href={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-amber-400 hover:text-amber-300 transition-colors mt-2 inline-block"
-                onClick={(e) => e.stopPropagation()}
+        <>
+          <SectionHeading title="Results" count={results.length} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {results.map((r) => (
+              <InfoCard
+                key={r.cube_id}
+                variant="community"
+                title={r.cube_id}
+                badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
+                metadata={[
+                  { label: 'Games', value: String(r.game_count) },
+                  { label: 'Players', value: String(r.player_count) },
+                ]}
+                primaryAction={{ label: 'Play', onClick: () => onPlay(r.cube_id) }}
+                secondaryAction={
+                  r.is_following ? undefined : { label: 'Follow', onClick: () => onFollow(r.cube_id) }
+                }
               >
-                View on CubeCobra
-              </a>
-            </InfoCard>
-          ))}
-        </div>
+                <a
+                  href={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-amber-400 hover:text-amber-300 transition-colors mt-2 inline-block"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  View on CubeCobra
+                </a>
+              </InfoCard>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )

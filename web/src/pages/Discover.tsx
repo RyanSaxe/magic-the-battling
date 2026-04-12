@@ -75,25 +75,27 @@ export function Discover() {
               <h2 className="text-white font-bold text-lg">Discover Cubes</h2>
             </div>
 
-            <form
-              onSubmit={(e) => { e.preventDefault(); handleSearch() }}
-              className="flex gap-2 mb-4"
-            >
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search by cube ID..."
-                className="flex-1 h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
-              />
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn btn-primary py-2 px-4 font-semibold disabled:opacity-50"
+            <div className="rounded-lg border border-[color:rgba(212,175,55,0.12)] bg-black/10 p-3 mb-4">
+              <form
+                onSubmit={(e) => { e.preventDefault(); handleSearch() }}
+                className="flex gap-2"
               >
-                {loading ? 'Searching...' : 'Search'}
-              </button>
-            </form>
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search by cube ID..."
+                  className="flex-1 h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn btn-primary py-2 px-4 font-semibold disabled:opacity-50"
+                >
+                  {loading ? 'Searching...' : 'Search'}
+                </button>
+              </form>
+            </div>
 
             {!searched ? (
               <div className="flex-1 flex items-center justify-center">
@@ -104,35 +106,45 @@ export function Discover() {
                 <p className="text-gray-500">{query ? 'No cubes found matching that query.' : 'No cubes found. Play some games first!'}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {results.map((r) => (
-                  <InfoCard
-                    key={r.cube_id}
-                    title={r.cube_id}
-                    badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
-                    metadata={[
-                      { label: 'Games', value: String(r.game_count) },
-                      { label: 'Players', value: String(r.player_count) },
-                      { label: 'Last played', value: formatDate(r.last_played) },
-                    ]}
-                    primaryAction={{ label: 'Play', onClick: () => navigate(`/play?cubeId=${encodeURIComponent(r.cube_id)}`) }}
-                    secondaryAction={{
-                      label: r.is_following ? 'Unfollow' : 'Follow',
-                      onClick: () => r.is_following ? handleUnfollow(r.cube_id) : handleFollow(r.cube_id),
-                    }}
-                  >
-                    <a
-                      href={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-amber-400 hover:text-amber-300 transition-colors mt-2 inline-block"
-                      onClick={(e) => e.stopPropagation()}
+              <>
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="text-[10px] uppercase tracking-[0.14em] text-gray-400">Results</span>
+                  <span className="text-[10px] text-gray-500">
+                    {results.length} {results.length === 1 ? 'cube' : 'cubes'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {results.map((r) => (
+                    <InfoCard
+                      key={r.cube_id}
+                      variant="community"
+                      title={r.cube_id}
+                      badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
+                      metadata={[
+                        { label: 'Games', value: String(r.game_count) },
+                        { label: 'Players', value: String(r.player_count) },
+                        { label: 'Last played', value: formatDate(r.last_played) },
+                      ]}
+                      primaryAction={{ label: 'Play', onClick: () => navigate(`/play?cubeId=${encodeURIComponent(r.cube_id)}`) }}
+                      secondaryAction={{
+                        label: r.is_following ? 'Unfollow' : 'Follow',
+                        onClick: () => r.is_following ? handleUnfollow(r.cube_id) : handleFollow(r.cube_id),
+                      }}
+                      className={r.is_following ? 'border-l-2 border-l-emerald-600/60' : ''}
                     >
-                      View on CubeCobra
-                    </a>
-                  </InfoCard>
-                ))}
-              </div>
+                      <a
+                        href={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-amber-400 hover:text-amber-300 transition-colors mt-2 inline-block"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        View on CubeCobra
+                      </a>
+                    </InfoCard>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </main>

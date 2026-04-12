@@ -13,10 +13,17 @@ const BADGE_COLORS: Record<string, string> = {
   gray: 'bg-gray-600/80 text-gray-200',
 }
 
+const VARIANT_HEADER_BG: Record<string, string> = {
+  cube: 'bg-amber-950/40',
+  community: 'bg-[#2a2320]',
+  history: 'bg-[#2d2220]',
+}
+
 export interface InfoCardProps {
   title: string
   subtitle?: string
   badge?: BadgeProps
+  variant?: 'cube' | 'community' | 'history'
   metadata?: { label: string; value: string }[]
   primaryAction?: { label: string; onClick: () => void }
   secondaryAction?: { label: string; onClick: () => void }
@@ -29,6 +36,7 @@ export function InfoCard({
   title,
   subtitle,
   badge,
+  variant = 'community',
   metadata,
   primaryAction,
   secondaryAction,
@@ -41,36 +49,48 @@ export function InfoCard({
   return (
     <div
       onClick={onClick}
-      className={`group relative modal-chrome border border-black/40 rounded-lg p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-700/50 ${onClick ? 'cursor-pointer' : ''} ${className ?? ''}`}
+      className={`group relative modal-chrome felt-raised-panel overflow-hidden rounded-lg flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[inset_0_0_0_1px_rgba(255,236,181,0.58)] ${onClick ? 'cursor-pointer' : ''} ${className ?? ''}`}
     >
-      {badge && (
-        <span className={`absolute top-3 right-3 text-[10px] font-semibold uppercase tracking-wider rounded-full px-2 py-0.5 ${BADGE_COLORS[badge.color ?? 'gray']}`}>
-          {badge.text}
-        </span>
-      )}
-
-      <h3 className="text-white font-semibold text-sm truncate pr-16">{title}</h3>
-      {subtitle && <p className="text-gray-400 text-xs mt-0.5 truncate">{subtitle}</p>}
-
-      {metadata && metadata.length > 0 && (
-        <div className="mt-3 space-y-1">
-          {metadata.map((m) => (
-            <div key={m.label} className="flex justify-between text-xs">
-              <span className="text-gray-500">{m.label}</span>
-              <span className="text-gray-300">{m.value}</span>
-            </div>
-          ))}
+      <div className={`${VARIANT_HEADER_BG[variant]} px-4 py-2.5 border-b border-[color:rgba(212,175,55,0.22)] flex items-center gap-2 min-w-0`}>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-amber-50 font-semibold text-sm truncate font-['Cinzel',serif]">{title}</h3>
+          {subtitle && <p className="text-gray-400 text-xs mt-0.5 truncate">{subtitle}</p>}
         </div>
-      )}
+        {badge && (
+          <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-wider rounded-full px-2 py-0.5 ${BADGE_COLORS[badge.color ?? 'gray']}`}>
+            {badge.text}
+          </span>
+        )}
+      </div>
 
-      {children}
+      <div className="flex-1 px-4 py-3 flex flex-col">
+        {metadata && metadata.length > 0 && (
+          <dl className="overflow-hidden rounded-lg border border-[color:rgba(212,175,55,0.22)] bg-black/10">
+            {metadata.map((m, i) => (
+              <div
+                key={m.label}
+                className={`grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3 px-3 py-1.5 ${
+                  i > 0 ? 'border-t border-[color:rgba(212,175,55,0.12)]' : ''
+                }`}
+              >
+                <dt className="text-[11px] font-medium text-gray-400">{m.label}</dt>
+                <dd className="min-w-0 text-right text-sm text-amber-50">
+                  <span className="block truncate">{m.value}</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        {children}
+      </div>
 
       {hasActions && (
-        <div className="mt-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="px-4 pb-3 pt-1 mt-auto flex gap-2">
           {primaryAction && (
             <button
               onClick={(e) => { e.stopPropagation(); primaryAction.onClick() }}
-              className="btn btn-primary py-1 px-3 text-xs flex-1"
+              className="btn btn-primary py-1.5 px-3 text-xs flex-1 min-h-[36px] sm:min-h-0"
             >
               {primaryAction.label}
             </button>
@@ -78,7 +98,7 @@ export function InfoCard({
           {secondaryAction && (
             <button
               onClick={(e) => { e.stopPropagation(); secondaryAction.onClick() }}
-              className="btn btn-secondary py-1 px-3 text-xs flex-1"
+              className="btn btn-secondary py-1.5 px-3 text-xs flex-1 min-h-[36px] sm:min-h-0"
             >
               {secondaryAction.label}
             </button>

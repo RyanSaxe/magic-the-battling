@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
 import { CubeCobraPrimerLink } from '../components/common/CubeCobraPrimerLink'
+import { LabeledDivider } from '../components/common/LabeledDivider'
 import { InfoCard } from '../components/common/InfoCard'
 import { getBattlers, getBattlerGames, updateBattler, deleteBattler } from '../api/client'
 import type { UserBattler, GameSummary, PlayMode } from '../types'
@@ -101,6 +102,7 @@ export function BattlerView() {
   if (!battler) return null
 
   const cubeCobraUrl = `https://cubecobra.com/cube/overview/${encodeURIComponent(battler.cube_id)}`
+  const wins = games.filter((g) => g.best_human_placement === 1).length
 
   function battlerPlayUrl(b: UserBattler): string {
     const params = new URLSearchParams()
@@ -155,31 +157,47 @@ export function BattlerView() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-gray-300 text-sm font-medium">Game History</h3>
-              <span className="text-gray-500 text-xs">{games.length} game{games.length !== 1 ? 's' : ''}</span>
-            </div>
-
-            {games.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-gray-500">No games played with this cube yet.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-full">
-                {games.map((g) => (
-                  <InfoCard
-                    key={g.game_id}
-                    title={formatDate(g.created_at)}
-                    badge={g.best_human_placement ? { text: ordinal(g.best_human_placement), color: g.best_human_placement === 1 ? 'gold' : 'gray' } : undefined}
-                    metadata={[
-                      { label: 'Players', value: String(g.player_count) },
-                      { label: 'Top Human', value: g.best_human_name },
-                    ]}
-                    onClick={() => navigate(`/game/${g.game_id}/share/${encodeURIComponent(g.best_human_name)}`)}
-                  />
-                ))}
-              </div>
+            {games.length > 0 && (
+              <dl className="overflow-hidden rounded-lg border border-[color:rgba(212,175,55,0.22)] bg-black/10 mb-4">
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3 px-3 py-1.5">
+                  <dt className="text-[11px] font-medium text-gray-400">Games played</dt>
+                  <dd className="min-w-0 text-right text-sm text-amber-50">{games.length}</dd>
+                </div>
+                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3 px-3 py-1.5 border-t border-[color:rgba(212,175,55,0.12)]">
+                  <dt className="text-[11px] font-medium text-gray-400">Wins</dt>
+                  <dd className="min-w-0 text-right text-sm text-amber-50">
+                    {wins}{games.length > 0 ? ` (${Math.round((wins / games.length) * 100)}%)` : ''}
+                  </dd>
+                </div>
+              </dl>
             )}
+
+            <LabeledDivider label="Game History" />
+
+            <div className="mt-3">
+              {games.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center py-8">
+                  <p className="text-gray-500">No games played with this cube yet.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-full">
+                  {games.map((g) => (
+                    <InfoCard
+                      key={g.game_id}
+                      variant="history"
+                      title={formatDate(g.created_at)}
+                      badge={g.best_human_placement ? { text: ordinal(g.best_human_placement), color: g.best_human_placement === 1 ? 'gold' : 'gray' } : undefined}
+                      metadata={[
+                        { label: 'Players', value: String(g.player_count) },
+                        { label: 'Top Human', value: g.best_human_name },
+                      ]}
+                      onClick={() => navigate(`/game/${g.game_id}/share/${encodeURIComponent(g.best_human_name)}`)}
+                      className={g.best_human_placement === 1 ? 'shadow-[0_0_12px_rgba(212,175,55,0.15)]' : ''}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </main>
 
