@@ -1481,12 +1481,22 @@ class GameManager:
         stage = player.stage
 
         if not history:
+            gpr = (
+                db.query(GamePlayerRecord.user_id)
+                .filter(
+                    GamePlayerRecord.game_id == game_id,
+                    GamePlayerRecord.player_name == player.name,
+                    GamePlayerRecord.is_puppet.is_(False),
+                )
+                .first()
+            )
             history = PlayerGameHistory(
                 game_id=game_id,
                 player_name=player.name,
                 battler_elo=battler_elo,
                 max_stage=stage,
                 max_round=player.round,
+                user_id=str(gpr[0]) if gpr and gpr[0] else None,
             )
             db.add(history)
             db.flush()
