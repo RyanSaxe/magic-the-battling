@@ -97,6 +97,8 @@ class GameSummaryResponse(BaseModel):
     best_human_name: str
     best_human_placement: int | None
     cube_id: str
+    play_mode: str | None = None
+    use_upgrades: bool | None = None
 
 
 class FollowedBattlerResponse(BaseModel):

@@ -32,6 +32,11 @@ export function BattlerView() {
 
   const [battler, setBattler] = useState<UserBattler | null>(null)
   const [games, setGames] = useState<GameSummary[]>([])
+  const [gamesHasMore, setGamesHasMore] = useState(false)
+  const [gamesOffset, setGamesOffset] = useState(0)
+  const [gamesLoading, setGamesLoading] = useState(false)
+  const [filterPlayMode, setFilterPlayMode] = useState<string | null>(null)
+  const [filterUpgrades, setFilterUpgrades] = useState<boolean | null>(null)
   const [loadingData, setLoadingData] = useState(true)
   const [showSettings, setShowSettings] = useState(false)
 
@@ -40,6 +45,28 @@ export function BattlerView() {
       navigate('/login', { replace: true })
     }
   }, [authLoading, user, navigate])
+
+  const loadGames = useCallback(async (b: UserBattler, playMode: string | null, upgrades: boolean | null, offset: number) => {
+    setGamesLoading(true)
+    try {
+      const data = await getBattlerGames(b.id, {
+        offset,
+        playMode: playMode ?? undefined,
+        useUpgrades: upgrades ?? undefined,
+      })
+      if (offset === 0) {
+        setGames(data.games)
+      } else {
+        setGames((prev) => [...prev, ...data.games])
+      }
+      setGamesHasMore(data.has_more)
+      setGamesOffset(offset + data.games.length)
+    } catch {
+      addToast('Failed to load games', 'error')
+    } finally {
+      setGamesLoading(false)
+    }
+  }, [addToast])
 
   const refresh = useCallback(async () => {
     if (!user || !battlerId) return
@@ -52,14 +79,15 @@ export function BattlerView() {
         return
       }
       setBattler(b)
-      const g = await getBattlerGames(b.id)
-      setGames(g)
+      setFilterPlayMode(b.play_mode)
+      setFilterUpgrades(b.use_upgrades)
+      await loadGames(b, b.play_mode, b.use_upgrades, 0)
     } catch {
       addToast('Failed to load data', 'error')
     } finally {
       setLoadingData(false)
     }
-  }, [user, battlerId, navigate, addToast])
+  }, [user, battlerId, navigate, addToast, loadGames])
 
   useEffect(() => { refresh() }, [refresh])
 
@@ -174,10 +202,51 @@ export function BattlerView() {
 
             <LabeledDivider label="Game History" />
 
-            <div className="mt-3">
-              {games.length === 0 ? (
+            <div className="flex flex-wrap gap-2 mt-3 mb-3">
+              <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
+                {([['limited', 'Cube'], ['constructed', 'Deck']] as const).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      const next = filterPlayMode === mode ? null : mode
+                      setFilterPlayMode(next)
+                      if (battler) loadGames(battler, next, filterUpgrades, 0)
+                    }}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                      filterPlayMode === mode
+                        ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'
+                        : 'border border-transparent bg-black/10 text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
+                {([[true, 'Upgrades On'], [false, 'Upgrades Off']] as const).map(([val, label]) => (
+                  <button
+                    key={label}
+                    onClick={() => {
+                      const next = filterUpgrades === val ? null : val
+                      setFilterUpgrades(next)
+                      if (battler) loadGames(battler, filterPlayMode, next, 0)
+                    }}
+                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                      filterUpgrades === val
+                        ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'
+                        : 'border border-transparent bg-black/10 text-gray-400 hover:text-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              {games.length === 0 && !gamesLoading ? (
                 <div className="flex-1 flex items-center justify-center py-8">
-                  <p className="text-gray-500">No games played with this cube yet.</p>
+                  <p className="text-gray-500">No games match these filters.</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-full">
@@ -196,6 +265,15 @@ export function BattlerView() {
                     />
                   ))}
                 </div>
+              )}
+              {gamesHasMore && (
+                <button
+                  onClick={() => battler && loadGames(battler, filterPlayMode, filterUpgrades, gamesOffset)}
+                  disabled={gamesLoading}
+                  className="btn btn-secondary py-2 px-6 mx-auto mt-4 block disabled:opacity-50"
+                >
+                  {gamesLoading ? 'Loading...' : 'Load More'}
+                </button>
               )}
             </div>
           </div>

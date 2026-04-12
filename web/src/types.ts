@@ -466,6 +466,8 @@ export interface GameSummary {
   best_human_name: string
   best_human_placement: number | null
   cube_id: string
+  play_mode?: string
+  use_upgrades?: boolean
 }
 
 export interface FollowedBattler {

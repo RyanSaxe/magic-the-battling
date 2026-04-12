@@ -1,8 +1,9 @@
 # ruff: noqa: B008
+import json
 import logging
 from typing import cast
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -119,9 +120,15 @@ def delete_battler(
     return {"ok": True}
 
 
+GAMES_PAGE_SIZE = 20
+
+
 @router.get("/{battler_id}/games")
 def list_battler_games(
     battler_id: int,
+    play_mode: str | None = Query(default=None),
+    use_upgrades: bool | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: Session = Depends(_get_db),
 ):
@@ -130,15 +137,15 @@ def list_battler_games(
         raise HTTPException(status_code=404, detail="Battler not found")
 
     cube_id = str(battler.cube_id)
-    # Finished game histories are intentionally public-by-default. The shared flag
-    # only tracks whether someone explicitly shared the game externally.
-    games = (
-        db.query(GameRecord)
-        .filter(GameRecord.cube_id == cube_id, GameRecord.ended_at.isnot(None))
-        .order_by(GameRecord.created_at.desc())
-        .limit(100)
-        .all()
-    )
+    query = db.query(GameRecord).filter(GameRecord.cube_id == cube_id, GameRecord.ended_at.isnot(None))
+    if play_mode is not None:
+        query = query.filter(func.json_extract(GameRecord.config_json, "$.play_mode") == play_mode)
+    if use_upgrades is not None:
+        query = query.filter(func.json_extract(GameRecord.config_json, "$.use_upgrades") == use_upgrades)
+
+    games = query.order_by(GameRecord.created_at.desc()).offset(offset).limit(GAMES_PAGE_SIZE + 1).all()
+    has_more = len(games) > GAMES_PAGE_SIZE
+    games = games[:GAMES_PAGE_SIZE]
 
     results: list[GameSummaryResponse] = []
     for game in games:
@@ -149,6 +156,7 @@ def list_battler_games(
 
         best = min(humans, key=lambda h: h.final_placement or 999)
 
+        config = json.loads(str(game.config_json)) if game.config_json else {}
         results.append(
             GameSummaryResponse(
                 game_id=str(game.id),
@@ -157,10 +165,12 @@ def list_battler_games(
                 best_human_name=str(best.player_name),
                 best_human_placement=cast(int, best.final_placement) if best.final_placement is not None else None,
                 cube_id=cube_id,
+                play_mode=config.get("play_mode"),
+                use_upgrades=config.get("use_upgrades"),
             )
         )
 
-    return {"games": results}
+    return {"games": results, "has_more": has_more}
 
 
 # ── Follow endpoints ────────────────────────────────────────────────
