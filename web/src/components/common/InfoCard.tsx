@@ -19,14 +19,19 @@ const VARIANT_HEADER_BG: Record<string, string> = {
   history: 'bg-[#2d2220]',
 }
 
+export interface CardAction {
+  label: string
+  onClick: () => void
+  variant?: 'primary' | 'secondary' | 'danger'
+}
+
 export interface InfoCardProps {
   title: string
   subtitle?: string
   badge?: BadgeProps
   variant?: 'cube' | 'community' | 'history'
   metadata?: { label: string; value: string }[]
-  primaryAction?: { label: string; onClick: () => void }
-  secondaryAction?: { label: string; onClick: () => void }
+  actions?: CardAction[]
   onClick?: () => void
   className?: string
   children?: ReactNode
@@ -38,13 +43,11 @@ export function InfoCard({
   badge,
   variant = 'community',
   metadata,
-  primaryAction,
-  secondaryAction,
+  actions,
   onClick,
   className,
   children,
 }: InfoCardProps) {
-  const hasActions = primaryAction || secondaryAction
 
   return (
     <div
@@ -85,24 +88,23 @@ export function InfoCard({
         {children}
       </div>
 
-      {hasActions && (
+      {actions && actions.length > 0 && (
         <div className="px-4 pb-3 pt-1 mt-auto flex gap-2">
-          {primaryAction && (
+          {actions.map((action) => (
             <button
-              onClick={(e) => { e.stopPropagation(); primaryAction.onClick() }}
-              className="btn btn-primary py-1.5 px-3 text-xs flex-1 min-h-[36px] sm:min-h-0"
+              key={action.label}
+              onClick={(e) => { e.stopPropagation(); action.onClick() }}
+              className={`py-1.5 px-3 text-xs flex-1 min-h-[36px] sm:min-h-0 ${
+                action.variant === 'danger'
+                  ? 'btn btn-secondary text-red-400 hover:text-red-300'
+                  : action.variant === 'primary'
+                    ? 'btn btn-primary'
+                    : 'btn btn-secondary'
+              }`}
             >
-              {primaryAction.label}
+              {action.label}
             </button>
-          )}
-          {secondaryAction && (
-            <button
-              onClick={(e) => { e.stopPropagation(); secondaryAction.onClick() }}
-              className="btn btn-secondary py-1.5 px-3 text-xs flex-1 min-h-[36px] sm:min-h-0"
-            >
-              {secondaryAction.label}
-            </button>
-          )}
+          ))}
         </div>
       )}
     </div>
