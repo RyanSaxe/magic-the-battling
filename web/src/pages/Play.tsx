@@ -4,6 +4,7 @@ import { createGame, warmCubeCache } from "../api/client";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
+import { useAuth } from "../contexts/authState";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { InfoIcon } from "../components/icons/InfoIcon";
 import { HintsBanner } from "../components/common/HintsBanner";
@@ -331,7 +332,10 @@ export function Play() {
   const { saveSession } = useSession();
   const { addToast } = useToast();
 
-  const [playerName, setPlayerName, nameLoading] = useRandomMtgName();
+  const { user } = useAuth();
+  const [randomName, setRandomName, nameLoading] = useRandomMtgName();
+  const playerName = user ? user.username : randomName;
+  const setPlayerName = user ? () => {} : setRandomName;
   const [showFriendsAdvanced, setShowFriendsAdvanced] = useState(false);
   const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
   const [cubeId, setCubeId] = useState(() => searchParams.get("cubeId") || "auto");
@@ -643,12 +647,12 @@ export function Play() {
                     <input
                       id="player-name"
                       type="text"
-                      value={nameLoading ? "" : playerName}
+                      value={user ? playerName : nameLoading ? "" : playerName}
                       onChange={(e) => setPlayerName(e.target.value)}
                       onKeyDown={(e) =>
                         e.key === "Enter" && nameValid && handleCreateLobby()
                       }
-                      disabled={nameLoading}
+                      disabled={!!user || nameLoading}
                       placeholder={nameLoading ? "Generating name..." : "Enter your name"}
                       className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
                     />
