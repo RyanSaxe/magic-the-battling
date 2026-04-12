@@ -203,6 +203,69 @@ def list_battler_games(
     return {"games": results, "has_more": has_more}
 
 
+@router.get("/my-games")
+def list_my_games(
+    offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(_get_db),
+):
+    histories = (
+        db.query(PlayerGameHistory)
+        .join(GameRecord, GameRecord.id == PlayerGameHistory.game_id)
+        .filter(
+            PlayerGameHistory.user_id == str(user.id),
+            PlayerGameHistory.is_puppet.is_(False),
+            GameRecord.ended_at.isnot(None),
+            GameRecord.winner_player_id.isnot(None),
+        )
+        .order_by(GameRecord.created_at.desc())
+        .offset(offset)
+        .limit(GAMES_PAGE_SIZE + 1)
+        .all()
+    )
+    has_more = len(histories) > GAMES_PAGE_SIZE
+    histories = histories[:GAMES_PAGE_SIZE]
+
+    results: list[GameSummaryResponse] = []
+    for hist in histories:
+        game = db.query(GameRecord).filter(GameRecord.id == hist.game_id).first()
+        if not game:
+            continue
+
+        all_histories = db.query(PlayerGameHistory).filter(PlayerGameHistory.game_id == game.id).all()
+
+        hand_ids: list[str] = []
+        final_snap = (
+            db.query(BattleSnapshot.hand_json)
+            .filter(BattleSnapshot.player_history_id == hist.id)
+            .order_by(BattleSnapshot.stage.desc(), BattleSnapshot.round.desc())
+            .first()
+        )
+        if final_snap and final_snap[0]:
+            try:
+                hand_refs = json.loads(str(final_snap[0]))
+                hand_ids = [ref["scryfall_id"] for ref in hand_refs if isinstance(ref, dict) and "scryfall_id" in ref]
+            except (json.JSONDecodeError, KeyError):
+                pass
+
+        config = json.loads(str(game.config_json)) if game.config_json else {}
+        results.append(
+            GameSummaryResponse(
+                game_id=str(game.id),
+                created_at=str(game.created_at.isoformat()) if game.created_at else "",
+                player_count=len(all_histories),
+                best_human_name=str(hist.player_name),
+                best_human_placement=cast(int, hist.final_placement) if hist.final_placement is not None else None,
+                cube_id=str(game.cube_id) if game.cube_id else "",
+                play_mode=config.get("play_mode"),
+                use_upgrades=config.get("use_upgrades"),
+                hand_scryfall_ids=hand_ids,
+            )
+        )
+
+    return {"games": results, "has_more": has_more}
+
+
 # ── Follow endpoints ────────────────────────────────────────────────
 
 

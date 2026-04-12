@@ -358,7 +358,13 @@ export async function getBattlerGames(
   return response.json()
 }
 
-// ── Follows ─────────────────────────────────��───────────────────────
+export async function getMyGames(offset = 0): Promise<{ games: GameSummary[]; has_more: boolean }> {
+  const response = await fetch(`${API_BASE}/battlers/my-games?offset=${offset}`, { credentials: 'include' })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load games'))
+  return response.json()
+}
+
+// ── Follows ─────────────────────────────────────────────────────────
 
 export async function getFollowing(offset = 0): Promise<{ following: FollowedBattler[]; has_more: boolean }> {
   const response = await fetch(`${API_BASE}/battlers/following?offset=${offset}`, { credentials: 'include' })
