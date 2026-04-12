@@ -108,6 +108,7 @@ def test_battler_games_includes_unshared_finished_games_for_same_cube(client):
                 cube_id="cube-public",
                 shared=False,
                 ended_at=datetime.now(UTC),
+                winner_player_id="p1",
             )
         )
         db.add(

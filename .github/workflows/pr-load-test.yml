@@ -20,6 +20,7 @@ jobs:
     env:
       BURST_JSON_PATH: /tmp/mtb-pr-load-burst.json
       HOT_JSON_PATH: /tmp/mtb-pr-load-hot.json
+      MTB_AUTH_SECRET_KEY: ci-load-test-secret-key-not-for-production
     steps:
       - uses: actions/checkout@v4
 
