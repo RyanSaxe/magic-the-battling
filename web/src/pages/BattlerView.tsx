@@ -262,7 +262,21 @@ export function BattlerView() {
                       ]}
                       onClick={() => navigate(`/game/${g.game_id}/share/${encodeURIComponent(g.best_human_name)}`)}
                       className={g.best_human_placement === 1 ? 'shadow-[0_0_12px_rgba(212,175,55,0.15)]' : ''}
-                    />
+                    >
+                      {g.hand_scryfall_ids.length > 0 && (
+                        <div className="flex -space-x-2 mt-2">
+                          {g.hand_scryfall_ids.slice(0, 7).map((sid) => (
+                            <img
+                              key={sid}
+                              src={`https://cards.scryfall.io/small/front/${sid[0]}/${sid[1]}/${sid}.jpg`}
+                              alt=""
+                              className="w-8 h-11 rounded-sm border border-black/60 object-cover"
+                              loading="lazy"
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </InfoCard>
                   ))}
                 </div>
               )}

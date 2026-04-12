@@ -468,6 +468,7 @@ export interface GameSummary {
   cube_id: string
   play_mode?: string
   use_upgrades?: boolean
+  hand_scryfall_ids: string[]
 }
 
 export interface FollowedBattler {

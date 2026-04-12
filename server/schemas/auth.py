@@ -99,6 +99,7 @@ class GameSummaryResponse(BaseModel):
     cube_id: str
     play_mode: str | None = None
     use_upgrades: bool | None = None
+    hand_scryfall_ids: list[str] = []
 
 
 class FollowedBattlerResponse(BaseModel):

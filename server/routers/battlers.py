@@ -9,7 +9,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from server.db import database
-from server.db.models import BattlerFollow, GameRecord, PlayerGameHistory, User, UserBattler
+from server.db.models import BattlerFollow, BattleSnapshot, GameRecord, PlayerGameHistory, User, UserBattler
 from server.schemas.auth import (
     FollowedBattlerResponse,
     GameSummaryResponse,
@@ -156,6 +156,20 @@ def list_battler_games(
 
         best = min(humans, key=lambda h: h.final_placement or 999)
 
+        hand_ids: list[str] = []
+        final_snap = (
+            db.query(BattleSnapshot.hand_json)
+            .filter(BattleSnapshot.player_history_id == best.id)
+            .order_by(BattleSnapshot.stage.desc(), BattleSnapshot.round.desc())
+            .first()
+        )
+        if final_snap and final_snap[0]:
+            try:
+                hand_refs = json.loads(str(final_snap[0]))
+                hand_ids = [ref["scryfall_id"] for ref in hand_refs if isinstance(ref, dict) and "scryfall_id" in ref]
+            except (json.JSONDecodeError, KeyError):
+                pass
+
         config = json.loads(str(game.config_json)) if game.config_json else {}
         results.append(
             GameSummaryResponse(
@@ -167,6 +181,7 @@ def list_battler_games(
                 cube_id=cube_id,
                 play_mode=config.get("play_mode"),
                 use_upgrades=config.get("use_upgrades"),
+                hand_scryfall_ids=hand_ids,
             )
         )
 
