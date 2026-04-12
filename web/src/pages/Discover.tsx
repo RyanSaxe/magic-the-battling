@@ -108,11 +108,10 @@ export function Discover() {
                         { label: 'Players', value: String(r.player_count) },
                         { label: 'Last played', value: formatDate(r.last_played) },
                       ]}
-                      primaryAction={{ label: 'Play', onClick: () => navigate(`/play?cubeId=${encodeURIComponent(r.cube_id)}`) }}
-                      secondaryAction={{
-                        label: r.is_following ? 'Unfollow' : 'Follow',
-                        onClick: () => r.is_following ? handleUnfollow(r.cube_id) : handleFollow(r.cube_id),
-                      }}
+                      actions={[
+                        { label: 'Play', onClick: () => navigate(`/play?cubeId=${encodeURIComponent(r.cube_id)}`), variant: 'primary' },
+                        { label: r.is_following ? 'Unfollow' : 'Follow', onClick: () => r.is_following ? handleUnfollow(r.cube_id) : handleFollow(r.cube_id) },
+                      ]}
                       className={r.is_following ? 'border-l-2 border-l-emerald-600/60' : ''}
                     >
                       <a
