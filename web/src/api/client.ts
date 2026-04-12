@@ -296,11 +296,10 @@ export async function authGetMe(): Promise<AuthUser | null> {
 
 // ── Battlers ────────────────────────────────────────────────────────
 
-export async function getBattlers(): Promise<UserBattler[]> {
-  const response = await fetch(`${API_BASE}/battlers`, { credentials: 'include' })
+export async function getBattlers(offset = 0): Promise<{ battlers: UserBattler[]; has_more: boolean }> {
+  const response = await fetch(`${API_BASE}/battlers?offset=${offset}`, { credentials: 'include' })
   if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load battlers'))
-  const data = await response.json()
-  return data.battlers
+  return response.json()
 }
 
 export interface CreateBattlerRequest {
@@ -361,11 +360,10 @@ export async function getBattlerGames(
 
 // ── Follows ─────────────────────────────────��───────────────────────
 
-export async function getFollowing(): Promise<FollowedBattler[]> {
-  const response = await fetch(`${API_BASE}/battlers/following`, { credentials: 'include' })
+export async function getFollowing(offset = 0): Promise<{ following: FollowedBattler[]; has_more: boolean }> {
+  const response = await fetch(`${API_BASE}/battlers/following?offset=${offset}`, { credentials: 'include' })
   if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load following'))
-  const data = await response.json()
-  return data.following
+  return response.json()
 }
 
 export async function followCube(cubeId: string, displayName?: string): Promise<FollowedBattler> {

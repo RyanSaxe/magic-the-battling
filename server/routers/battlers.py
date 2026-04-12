@@ -50,15 +50,26 @@ def _battler_to_response(b: UserBattler) -> UserBattlerResponse:
 router = APIRouter(prefix="/api/battlers", tags=["battlers"])
 
 
+BATTLERS_PAGE_SIZE = 20
+
+
 @router.get("")
-def list_battlers(user: User = Depends(get_current_user), db: Session = Depends(_get_db)):
+def list_battlers(
+    offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(_get_db),
+):
     battlers = (
         db.query(UserBattler)
         .filter(UserBattler.user_id == user.id)
         .order_by(UserBattler.position, UserBattler.created_at)
+        .offset(offset)
+        .limit(BATTLERS_PAGE_SIZE + 1)
         .all()
     )
-    return {"battlers": [_battler_to_response(b) for b in battlers]}
+    has_more = len(battlers) > BATTLERS_PAGE_SIZE
+    battlers = battlers[:BATTLERS_PAGE_SIZE]
+    return {"battlers": [_battler_to_response(b) for b in battlers], "has_more": has_more}
 
 
 @router.post("")
@@ -192,10 +203,21 @@ def list_battler_games(
 
 
 @router.get("/following")
-def list_following(user: User = Depends(get_current_user), db: Session = Depends(_get_db)):
+def list_following(
+    offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(_get_db),
+):
     follows = (
-        db.query(BattlerFollow).filter(BattlerFollow.user_id == user.id).order_by(BattlerFollow.created_at.desc()).all()
+        db.query(BattlerFollow)
+        .filter(BattlerFollow.user_id == user.id)
+        .order_by(BattlerFollow.created_at.desc())
+        .offset(offset)
+        .limit(BATTLERS_PAGE_SIZE + 1)
+        .all()
     )
+    has_more = len(follows) > BATTLERS_PAGE_SIZE
+    follows = follows[:BATTLERS_PAGE_SIZE]
     return {
         "following": [
             FollowedBattlerResponse(
@@ -205,7 +227,8 @@ def list_following(user: User = Depends(get_current_user), db: Session = Depends
                 created_at=str(f.created_at.isoformat()) if f.created_at else "",
             )
             for f in follows
-        ]
+        ],
+        "has_more": has_more,
     }
 
 

@@ -72,7 +72,7 @@ export function BattlerView() {
     if (!user || !battlerId) return
     setLoadingData(true)
     try {
-      const allBattlers = await getBattlers()
+      const { battlers: allBattlers } = await getBattlers()
       const b = allBattlers.find((x) => x.id === Number(battlerId))
       if (!b) {
         navigate('/dashboard', { replace: true })

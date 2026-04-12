@@ -32,7 +32,11 @@ export function Dashboard() {
   const [tab, setTab] = useState<Tab>('battlers')
 
   const [battlers, setBattlers] = useState<UserBattler[]>([])
+  const [battlersHasMore, setBattlersHasMore] = useState(false)
+  const [battlersOffset, setBattlersOffset] = useState(0)
   const [following, setFollowing] = useState<FollowedBattler[]>([])
+  const [followingHasMore, setFollowingHasMore] = useState(false)
+  const [followingOffset, setFollowingOffset] = useState(0)
   const [loadingData, setLoadingData] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
 
@@ -52,9 +56,13 @@ export function Dashboard() {
     if (!user) return
     setLoadingData(true)
     try {
-      const [b, f] = await Promise.all([getBattlers(), getFollowing()])
-      setBattlers(b)
-      setFollowing(f)
+      const [bData, fData] = await Promise.all([getBattlers(), getFollowing()])
+      setBattlers(bData.battlers)
+      setBattlersHasMore(bData.has_more)
+      setBattlersOffset(bData.battlers.length)
+      setFollowing(fData.following)
+      setFollowingHasMore(fData.has_more)
+      setFollowingOffset(fData.following.length)
     } catch {
       addToast('Failed to load data', 'error')
     } finally {
@@ -109,13 +117,25 @@ export function Dashboard() {
             ) : tab === 'battlers' ? (
               <BattlersGrid
                 battlers={battlers}
+                hasMore={battlersHasMore}
                 onPlay={(b) => navigate(battlerPlayUrl(b))}
                 onView={(b) => navigate(`/dashboard/battler/${b.id}`)}
                 onAdd={() => setShowAddModal(true)}
+                onLoadMore={async () => {
+                  try {
+                    const data = await getBattlers(battlersOffset)
+                    setBattlers((prev) => [...prev, ...data.battlers])
+                    setBattlersHasMore(data.has_more)
+                    setBattlersOffset((prev) => prev + data.battlers.length)
+                  } catch {
+                    addToast('Failed to load more', 'error')
+                  }
+                }}
               />
             ) : tab === 'following' ? (
               <FollowingGrid
                 following={following}
+                hasMore={followingHasMore}
                 onPlay={(f) => navigate(`/play?cubeId=${encodeURIComponent(f.cube_id)}`)}
                 onUnfollow={async (f) => {
                   try {
@@ -123,6 +143,16 @@ export function Dashboard() {
                     setFollowing((prev) => prev.filter((x) => x.id !== f.id))
                   } catch {
                     addToast('Failed to unfollow', 'error')
+                  }
+                }}
+                onLoadMore={async () => {
+                  try {
+                    const data = await getFollowing(followingOffset)
+                    setFollowing((prev) => [...prev, ...data.following])
+                    setFollowingHasMore(data.has_more)
+                    setFollowingOffset((prev) => prev + data.following.length)
+                  } catch {
+                    addToast('Failed to load more', 'error')
                   }
                 }}
               />
@@ -220,14 +250,18 @@ function SectionHeading({ title, count }: { title: string; count?: number }) {
 
 function BattlersGrid({
   battlers,
+  hasMore,
   onPlay,
   onView,
   onAdd,
+  onLoadMore,
 }: {
   battlers: UserBattler[]
+  hasMore: boolean
   onPlay: (b: UserBattler) => void
   onView: (b: UserBattler) => void
   onAdd: () => void
+  onLoadMore: () => void
 }) {
   if (battlers.length === 0) {
     return (
@@ -268,18 +302,27 @@ function BattlersGrid({
           + Add Cube
         </button>
       </div>
+      {hasMore && (
+        <button onClick={onLoadMore} className="btn btn-secondary py-2 px-6 mx-auto mt-4 block">
+          Load More
+        </button>
+      )}
     </>
   )
 }
 
 function FollowingGrid({
   following,
+  hasMore,
   onPlay,
   onUnfollow,
+  onLoadMore,
 }: {
   following: FollowedBattler[]
+  hasMore: boolean
   onPlay: (f: FollowedBattler) => void
   onUnfollow: (f: FollowedBattler) => void
+  onLoadMore: () => void
 }) {
   if (following.length === 0) {
     return (
@@ -306,6 +349,11 @@ function FollowingGrid({
           />
         ))}
       </div>
+      {hasMore && (
+        <button onClick={onLoadMore} className="btn btn-secondary py-2 px-6 mx-auto mt-4 block">
+          Load More
+        </button>
+      )}
     </>
   )
 }
