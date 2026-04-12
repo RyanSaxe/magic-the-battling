@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { FaDiscord } from 'react-icons/fa6'
 import { useAuth } from '../contexts/authState'
@@ -21,23 +21,30 @@ export function Discover() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { addToast } = useToast()
-  const [query, setQuery] = useState('')
   const [results, setResults] = useState<DiscoverResult[]>([])
-  const [loading, setLoading] = useState(false)
-  const [searched, setSearched] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [hasMore, setHasMore] = useState(false)
+  const [offset, setOffset] = useState(0)
 
-  const handleSearch = useCallback(async () => {
+  const loadCubes = useCallback(async (loadOffset: number) => {
     setLoading(true)
-    setSearched(true)
     try {
-      const r = await discoverCubes(query)
-      setResults(r)
+      const data = await discoverCubes(loadOffset)
+      if (loadOffset === 0) {
+        setResults(data.results)
+      } else {
+        setResults((prev) => [...prev, ...data.results])
+      }
+      setHasMore(data.has_more)
+      setOffset(loadOffset + data.results.length)
     } catch {
-      addToast('Search failed', 'error')
+      addToast('Failed to load cubes', 'error')
     } finally {
       setLoading(false)
     }
-  }, [query, addToast])
+  }, [addToast])
+
+  useEffect(() => { loadCubes(0) }, [loadCubes])
 
   const handleFollow = async (cubeId: string) => {
     if (!user) {
@@ -75,44 +82,20 @@ export function Discover() {
               <h2 className="text-white font-bold text-lg">Discover Cubes</h2>
             </div>
 
-            <div className="rounded-lg border border-[color:rgba(212,175,55,0.12)] bg-black/10 p-3 mb-4">
-              <form
-                onSubmit={(e) => { e.preventDefault(); handleSearch() }}
-                className="flex gap-2"
-              >
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by cube ID..."
-                  className="flex-1 h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
-                />
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn btn-primary py-2 px-4 font-semibold disabled:opacity-50"
-                >
-                  {loading ? 'Searching...' : 'Search'}
-                </button>
-              </form>
-            </div>
-
-            {!searched ? (
+            {results.length === 0 && !loading ? (
               <div className="flex-1 flex items-center justify-center">
-                <p className="text-gray-500">Search for cubes that have been played on Crucible.</p>
-              </div>
-            ) : results.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-gray-500">{query ? 'No cubes found matching that query.' : 'No cubes found. Play some games first!'}</p>
+                <p className="text-gray-500">No cubes found. Play some games first!</p>
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <span className="text-[10px] uppercase tracking-[0.14em] text-gray-400">Results</span>
-                  <span className="text-[10px] text-gray-500">
-                    {results.length} {results.length === 1 ? 'cube' : 'cubes'}
-                  </span>
-                </div>
+                {results.length > 0 && (
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <span className="text-[10px] uppercase tracking-[0.14em] text-gray-400">Popular Cubes</span>
+                    <span className="text-[10px] text-gray-500">
+                      {results.length} {results.length === 1 ? 'cube' : 'cubes'}
+                    </span>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {results.map((r) => (
                     <InfoCard
@@ -144,6 +127,20 @@ export function Discover() {
                     </InfoCard>
                   ))}
                 </div>
+                {hasMore && (
+                  <button
+                    onClick={() => loadCubes(offset)}
+                    disabled={loading}
+                    className="btn btn-secondary py-2 px-6 mx-auto mt-4 disabled:opacity-50"
+                  >
+                    {loading ? 'Loading...' : 'Load More'}
+                  </button>
+                )}
+                {loading && results.length === 0 && (
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-gray-500">Loading...</p>
+                  </div>
+                )}
               </>
             )}
           </div>

@@ -36,10 +36,11 @@ export function Dashboard() {
   const [loadingData, setLoadingData] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
 
-  const [discoverQuery, setDiscoverQuery] = useState('')
   const [discoverResults, setDiscoverResults] = useState<DiscoverResult[]>([])
   const [discoverLoading, setDiscoverLoading] = useState(false)
-  const [discoverSearched, setDiscoverSearched] = useState(false)
+  const [discoverHasMore, setDiscoverHasMore] = useState(false)
+  const [discoverOffset, setDiscoverOffset] = useState(0)
+  const [discoverLoaded, setDiscoverLoaded] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -127,18 +128,33 @@ export function Dashboard() {
               />
             ) : (
               <DiscoverGrid
-                query={discoverQuery}
-                setQuery={setDiscoverQuery}
                 results={discoverResults}
                 loading={discoverLoading}
-                searched={discoverSearched}
-                onSearch={async () => {
+                hasMore={discoverHasMore}
+                loaded={discoverLoaded}
+                onLoadInitial={async () => {
                   setDiscoverLoading(true)
-                  setDiscoverSearched(true)
                   try {
-                    setDiscoverResults(await discoverCubes(discoverQuery))
+                    const data = await discoverCubes(0)
+                    setDiscoverResults(data.results)
+                    setDiscoverHasMore(data.has_more)
+                    setDiscoverOffset(data.results.length)
+                    setDiscoverLoaded(true)
                   } catch {
-                    addToast('Search failed', 'error')
+                    addToast('Failed to load cubes', 'error')
+                  } finally {
+                    setDiscoverLoading(false)
+                  }
+                }}
+                onLoadMore={async () => {
+                  setDiscoverLoading(true)
+                  try {
+                    const data = await discoverCubes(discoverOffset)
+                    setDiscoverResults((prev) => [...prev, ...data.results])
+                    setDiscoverHasMore(data.has_more)
+                    setDiscoverOffset((prev) => prev + data.results.length)
+                  } catch {
+                    addToast('Failed to load cubes', 'error')
                   } finally {
                     setDiscoverLoading(false)
                   }
@@ -431,88 +447,83 @@ function AddBattlerModal({
 }
 
 function DiscoverGrid({
-  query,
-  setQuery,
   results,
   loading,
-  searched,
-  onSearch,
+  hasMore,
+  loaded,
+  onLoadInitial,
+  onLoadMore,
   onPlay,
   onFollow,
 }: {
-  query: string
-  setQuery: (q: string) => void
   results: DiscoverResult[]
   loading: boolean
-  searched: boolean
-  onSearch: () => void
+  hasMore: boolean
+  loaded: boolean
+  onLoadInitial: () => void
+  onLoadMore: () => void
   onPlay: (cubeId: string) => void
   onFollow: (cubeId: string) => void
 }) {
+  useEffect(() => {
+    if (!loaded) onLoadInitial()
+  }, [loaded, onLoadInitial])
+
+  if (!loaded && loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-gray-500">Loading...</p>
+      </div>
+    )
+  }
+
+  if (results.length === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-gray-500">No cubes found. Play some games first!</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div className="rounded-lg border border-[color:rgba(212,175,55,0.12)] bg-black/10 p-3 mb-4">
-        <form
-          onSubmit={(e) => { e.preventDefault(); onSearch() }}
-          className="flex gap-2"
-        >
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by cube ID..."
-            className="flex-1 h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary py-2 px-4 font-semibold disabled:opacity-50"
+      <SectionHeading title="Popular Cubes" count={results.length} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {results.map((r) => (
+          <InfoCard
+            key={r.cube_id}
+            variant="community"
+            title={r.cube_id}
+            badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
+            metadata={[
+              { label: 'Games', value: String(r.game_count) },
+              { label: 'Players', value: String(r.player_count) },
+            ]}
+            primaryAction={{ label: 'Play', onClick: () => onPlay(r.cube_id) }}
+            secondaryAction={
+              r.is_following ? undefined : { label: 'Follow', onClick: () => onFollow(r.cube_id) }
+            }
           >
-            {loading ? 'Searching...' : 'Search'}
-          </button>
-        </form>
+            <a
+              href={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-amber-400 hover:text-amber-300 transition-colors mt-2 inline-block"
+              onClick={(e) => e.stopPropagation()}
+            >
+              View on CubeCobra
+            </a>
+          </InfoCard>
+        ))}
       </div>
-
-      {!searched ? (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-gray-500">Search for cubes that have been played on Crucible.</p>
-        </div>
-      ) : results.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-gray-500">{query ? 'No cubes found matching that query.' : 'No cubes found. Play some games first!'}</p>
-        </div>
-      ) : (
-        <>
-          <SectionHeading title="Results" count={results.length} />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {results.map((r) => (
-              <InfoCard
-                key={r.cube_id}
-                variant="community"
-                title={r.cube_id}
-                badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
-                metadata={[
-                  { label: 'Games', value: String(r.game_count) },
-                  { label: 'Players', value: String(r.player_count) },
-                ]}
-                primaryAction={{ label: 'Play', onClick: () => onPlay(r.cube_id) }}
-                secondaryAction={
-                  r.is_following ? undefined : { label: 'Follow', onClick: () => onFollow(r.cube_id) }
-                }
-              >
-                <a
-                  href={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-amber-400 hover:text-amber-300 transition-colors mt-2 inline-block"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  View on CubeCobra
-                </a>
-              </InfoCard>
-            ))}
-          </div>
-        </>
+      {hasMore && (
+        <button
+          onClick={onLoadMore}
+          disabled={loading}
+          className="btn btn-secondary py-2 px-6 mx-auto mt-4 disabled:opacity-50"
+        >
+          {loading ? 'Loading...' : 'Load More'}
+        </button>
       )}
     </div>
   )

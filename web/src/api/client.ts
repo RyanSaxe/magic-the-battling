@@ -390,9 +390,8 @@ export interface DiscoverResult {
   is_following: boolean
 }
 
-export async function discoverCubes(query: string): Promise<DiscoverResult[]> {
-  const response = await fetch(`${API_BASE}/discover?q=${encodeURIComponent(query)}`, { credentials: 'include' })
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Search failed'))
-  const data = await response.json()
-  return data.results
+export async function discoverCubes(offset = 0): Promise<{ results: DiscoverResult[]; has_more: boolean }> {
+  const response = await fetch(`${API_BASE}/discover?offset=${offset}`, { credentials: 'include' })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load cubes'))
+  return response.json()
 }

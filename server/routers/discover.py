@@ -23,14 +23,15 @@ def _get_db():
 router = APIRouter(prefix="/api/discover", tags=["discover"])
 
 
+PAGE_SIZE = 20
+
+
 @router.get("")
-def search_cubes(
-    q: str = Query(default="", max_length=100),
+def browse_cubes(
+    offset: int = Query(default=0, ge=0),
     current_user: User | None = Depends(get_optional_user),
     db: Session = Depends(_get_db),
 ):
-    query = q.strip()
-
     base = (
         db.query(
             GameRecord.cube_id,
@@ -47,10 +48,9 @@ def search_cubes(
         .order_by(func.count(distinct(GameRecord.id)).desc())
     )
 
-    if query:
-        base = base.filter(GameRecord.cube_id.contains(query))
-
-    rows = base.limit(50).all()
+    rows = base.offset(offset).limit(PAGE_SIZE + 1).all()
+    has_more = len(rows) > PAGE_SIZE
+    rows = rows[:PAGE_SIZE]
 
     followed_ids: set[str] = set()
     if current_user:
@@ -70,4 +70,4 @@ def search_cubes(
             }
         )
 
-    return {"results": results}
+    return {"results": results, "has_more": has_more}
