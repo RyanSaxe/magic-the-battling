@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from server.db import database
-from server.db.models import User
+from server.db.models import BattlerFollow, User
 from server.runtime_config import AUTH_COOKIE_SECURE
 from server.schemas.auth import LoginRequest, RegisterRequest, UserResponse
 from server.services.auth import (
@@ -55,6 +55,8 @@ def register(request: RegisterRequest, db: Session = Depends(_get_db)):
             raise HTTPException(status_code=409, detail="Email already in use")
 
     user = create_user(db, request.username, request.password, request.email)
+    db.add(BattlerFollow(user_id=str(user.id), cube_id="auto"))
+    db.commit()
     token = create_access_token(str(user.id), str(user.username))
 
     body = UserResponse(
