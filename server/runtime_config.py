@@ -1,4 +1,5 @@
 import os
+import sys
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -35,6 +36,46 @@ def _env_float(name: str, default: float, *, min_value: float = 0.0) -> float:
     return max(parsed, min_value)
 
 
+def _env_str(name: str, default: str = "") -> str:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip()
+
+
+def _is_local_dev() -> bool:
+    if os.getenv("MTB_LOCAL_DEV") is not None:
+        return _env_bool("MTB_LOCAL_DEV", False)
+
+    env_name = _env_str("MTB_ENV").lower()
+    if env_name in {"dev", "development", "local", "test"}:
+        return True
+    if env_name in {"prod", "production", "staging"}:
+        return False
+
+    return "pytest" in sys.modules
+
+
+_DEFAULT_AUTH_SECRET_KEY = "local-dev-secret-key-change-before-production"
+_BLOCKED_PRODUCTION_AUTH_SECRETS = {
+    "dev-secret-change-in-production",
+    _DEFAULT_AUTH_SECRET_KEY,
+}
+
+
+def _resolve_auth_secret_key() -> str:
+    configured = _env_str("MTB_AUTH_SECRET_KEY")
+    if configured:
+        if not IS_LOCAL_DEV and configured in _BLOCKED_PRODUCTION_AUTH_SECRETS:
+            raise RuntimeError("MTB_AUTH_SECRET_KEY must be set to a deployment-specific secret outside local dev")
+        return configured
+
+    if IS_LOCAL_DEV:
+        return _DEFAULT_AUTH_SECRET_KEY
+
+    raise RuntimeError("MTB_AUTH_SECRET_KEY must be set outside local development")
+
+
 SNAPSHOT_INTERVAL_SEC = _env_float("MTB_SNAPSHOT_INTERVAL_SEC", 5.0, min_value=1.0)
 IDLE_EVICT_MINUTES = _env_int("MTB_IDLE_EVICT_MINUTES", 20, min_value=1)
 HOT_ACTION_WINDOW_MINUTES = _env_int("MTB_HOT_ACTION_WINDOW_MINUTES", 20, min_value=1)
@@ -58,5 +99,7 @@ STALE_GAME_CLEANUP_HOURS = _env_int("MTB_STALE_GAME_CLEANUP_HOURS", 48, min_valu
 OPS_API_TOKEN = os.getenv("MTB_OPS_TOKEN", "")
 RESTORE_ACTIVE_GAME_SNAPSHOTS = _env_bool("MTB_RESTORE_ACTIVE_GAME_SNAPSHOTS", True)
 
-AUTH_SECRET_KEY = os.getenv("MTB_AUTH_SECRET_KEY", "dev-secret-change-in-production")
+IS_LOCAL_DEV = _is_local_dev()
+AUTH_SECRET_KEY = _resolve_auth_secret_key()
+AUTH_COOKIE_SECURE = not IS_LOCAL_DEV
 AUTH_TOKEN_EXPIRE_HOURS = _env_int("MTB_AUTH_TOKEN_EXPIRE_HOURS", 168, min_value=1)

@@ -130,6 +130,8 @@ def list_battler_games(
         raise HTTPException(status_code=404, detail="Battler not found")
 
     cube_id = str(battler.cube_id)
+    # Finished game histories are intentionally public-by-default. The shared flag
+    # only tracks whether someone explicitly shared the game externally.
     games = (
         db.query(GameRecord)
         .filter(GameRecord.cube_id == cube_id, GameRecord.ended_at.isnot(None))

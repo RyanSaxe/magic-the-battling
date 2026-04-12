@@ -4,6 +4,8 @@ import server.routers.games as games_module
 import server.services.game_manager as gm_module
 from mtb.models.cards import Battler
 from mtb.models.game import Config, create_game, set_player_battlers
+from server.db import database
+from server.db.models import GamePlayerRecord
 
 
 class TestCreateGame:
@@ -200,3 +202,56 @@ class TestRejoinGame:
 
         second = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice"})
         assert second.status_code == 200
+
+    def test_authenticated_owner_keeps_slot_ownership_after_rejoin(self, client):
+        register = client.post(
+            "/api/auth/register",
+            json={"username": "owner_user", "password": "password123"},
+        )
+        assert register.status_code == 200
+        owner_id = register.json()["user_id"]
+
+        create = client.post(
+            "/api/games",
+            json={"player_name": "Alice", "cube_id": "test", "target_player_count": 2},
+        )
+        assert create.status_code == 200
+        game_id = create.json()["game_id"]
+        join_code = create.json()["join_code"]
+
+        join = client.post(
+            "/api/games/join",
+            json={"join_code": join_code, "player_name": "Bob"},
+        )
+        assert join.status_code == 200
+
+        start = client.post(f"/api/games/{game_id}/start")
+        assert start.status_code == 200
+
+        rejoin = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice"})
+        assert rejoin.status_code == 200
+
+        db = database.SessionLocal()
+        try:
+            player_row = (
+                db.query(GamePlayerRecord)
+                .filter(
+                    GamePlayerRecord.game_id == game_id,
+                    GamePlayerRecord.player_name == "Alice",
+                )
+                .first()
+            )
+            assert player_row is not None
+            assert player_row.user_id == owner_id
+        finally:
+            db.close()
+
+        client.cookies.clear()
+        attacker = client.post(
+            "/api/auth/register",
+            json={"username": "attacker_user", "password": "password123"},
+        )
+        assert attacker.status_code == 200
+
+        blocked = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice"})
+        assert blocked.status_code == 403

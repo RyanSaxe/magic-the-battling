@@ -480,18 +480,28 @@ class GameManager:
         # Keep one active player_id mapping per human name for deterministic reconnect behavior.
         user_ids = player_user_ids or {}
         for player_id, player_name in player_pairs:
-            db_session.query(GamePlayerRecord).filter(
-                GamePlayerRecord.game_id == game_id,
-                GamePlayerRecord.player_name == player_name,
-                GamePlayerRecord.is_puppet.is_(False),
-            ).delete(synchronize_session=False)
+            existing_rows = (
+                db_session.query(GamePlayerRecord)
+                .filter(
+                    GamePlayerRecord.game_id == game_id,
+                    GamePlayerRecord.player_name == player_name,
+                    GamePlayerRecord.is_puppet.is_(False),
+                )
+                .all()
+            )
+            existing_user_id = next((cast(str, row.user_id) for row in existing_rows if row.user_id), None)
+            resolved_user_id = user_ids.get(player_id) or existing_user_id
+
+            for row in existing_rows:
+                db_session.delete(row)
+
             db_session.add(
                 GamePlayerRecord(
                     game_id=game_id,
                     player_id=player_id,
                     player_name=player_name,
                     is_puppet=False,
-                    user_id=user_ids.get(player_id),
+                    user_id=resolved_user_id,
                 )
             )
 

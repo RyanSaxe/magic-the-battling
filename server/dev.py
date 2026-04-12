@@ -134,7 +134,11 @@ def _start_backend(
     if reload_enabled:
         uvicorn_cmd.append("--reload")
 
-    backend_env = {**os.environ, "MTB_COMPRESS_WS": "0" if no_compress else "1"}
+    backend_env = {
+        **os.environ,
+        "MTB_COMPRESS_WS": "0" if no_compress else "1",
+        "MTB_LOCAL_DEV": "1",
+    }
     if temp_db_path is not None:
         backend_env["DATABASE_PATH"] = str(temp_db_path)
 

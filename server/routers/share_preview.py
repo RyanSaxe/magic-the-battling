@@ -54,6 +54,8 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
     if not game_record:
         return None
 
+    # Share pages are public for finished games; this flag is bookkeeping for
+    # "someone actively shared this game", not an authorization gate.
     config = json.loads(str(game_record.config_json)) if game_record.config_json else {}
     use_upgrades = config.get("use_upgrades", True)
 

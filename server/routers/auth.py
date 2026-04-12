@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from server.db import database
 from server.db.models import User
+from server.runtime_config import AUTH_COOKIE_SECURE
 from server.schemas.auth import LoginRequest, RegisterRequest, UserResponse
 from server.services.auth import (
     COOKIE_NAME,
@@ -36,7 +37,7 @@ def _set_auth_cookie(response: JSONResponse, token: str) -> None:
         value=token,
         httponly=True,
         samesite="lax",
-        secure=False,
+        secure=AUTH_COOKIE_SECURE,
         max_age=60 * 60 * 24 * 7,
         path="/",
     )

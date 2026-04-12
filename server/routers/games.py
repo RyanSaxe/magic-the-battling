@@ -711,6 +711,8 @@ def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)
     if not game_record:
         raise HTTPException(status_code=404, detail="Game not found")
 
+    # Finished game snapshots are intentionally public-by-default. GameRecord.shared
+    # is an internal signal that someone actively generated a share link/preview.
     config = json.loads(str(game_record.config_json)) if game_record.config_json else {}
     use_upgrades = config.get("use_upgrades", True)
 
