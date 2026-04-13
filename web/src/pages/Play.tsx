@@ -1,9 +1,10 @@
 import { startTransition, useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { createGame, warmCubeCache } from "../api/client";
 import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
+import { useAuth } from "../contexts/authState";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { InfoIcon } from "../components/icons/InfoIcon";
 import { HintsBanner } from "../components/common/HintsBanner";
@@ -327,16 +328,23 @@ function GearButton({ onClick }: { onClick: () => void }) {
 
 export function Play() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { saveSession } = useSession();
   const { addToast } = useToast();
 
-  const [playerName, setPlayerName, nameLoading] = useRandomMtgName();
+  const { user } = useAuth();
+  const [randomName, setRandomName, nameLoading] = useRandomMtgName();
+  const playerName = user ? user.username : randomName;
+  const setPlayerName = user ? () => {} : setRandomName;
   const [showFriendsAdvanced, setShowFriendsAdvanced] = useState(false);
   const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
-  const [cubeId, setCubeId] = useState("auto");
-  const [useUpgrades, setUseUpgrades] = useState(true);
-  const [playMode, setPlayMode] = useState<PlayMode>("limited");
-  const [opponents, setOpponents] = useState<OpponentCount>(3);
+  const [cubeId, setCubeId] = useState(() => searchParams.get("cubeId") || "auto");
+  const [useUpgrades, setUseUpgrades] = useState(() => searchParams.get("useUpgrades") !== "false");
+  const [playMode, setPlayMode] = useState<PlayMode>(() => (searchParams.get("playMode") === "constructed" ? "constructed" : "limited"));
+  const [opponents, setOpponents] = useState<OpponentCount>(() => {
+    const p = Number(searchParams.get("puppetCount"));
+    return OPPONENT_OPTIONS.includes(p as OpponentCount) ? (p as OpponentCount) : 3;
+  });
   const [autoApproveSpectators, setAutoApproveSpectators] = useState(false);
   const [activeMode, setActiveMode] = useState<ActiveMode>("solo");
   const [isGuidedMode, setIsGuidedMode] = useState(() =>
@@ -639,12 +647,12 @@ export function Play() {
                     <input
                       id="player-name"
                       type="text"
-                      value={nameLoading ? "" : playerName}
+                      value={user ? playerName : nameLoading ? "" : playerName}
                       onChange={(e) => setPlayerName(e.target.value)}
                       onKeyDown={(e) =>
                         e.key === "Enter" && nameValid && handleCreateLobby()
                       }
-                      disabled={nameLoading}
+                      disabled={!!user || nameLoading}
                       placeholder={nameLoading ? "Generating name..." : "Enter your name"}
                       className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
                     />

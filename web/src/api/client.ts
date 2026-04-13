@@ -8,6 +8,10 @@ import type {
   ShareGameResponse,
   ServerStatus,
   PlayMode,
+  AuthUser,
+  UserBattler,
+  GameSummary,
+  FollowedBattler,
 } from '../types'
 import { getOrCreateDeviceId } from '../utils/deviceIdentity'
 import { hydrateCardCatalogEntries } from '../utils/catalogHydration'
@@ -92,6 +96,7 @@ export async function createGame(
           'Content-Type': 'application/json',
           [IDEMPOTENCY_KEY_HEADER]: idempotencyKey,
         }),
+        credentials: 'include',
         body,
       })
 
@@ -131,6 +136,7 @@ export async function joinGame(joinCode: string, playerName: string): Promise<Jo
   const response = await fetch(`${API_BASE}/games/join`, {
     method: 'POST',
     headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
+    credentials: 'include',
     body: JSON.stringify({ join_code: joinCode, player_name: playerName }),
   })
   if (!response.ok) {
@@ -152,6 +158,7 @@ export async function rejoinGame(gameId: string, playerName: string): Promise<Jo
   const response = await fetch(`${API_BASE}/games/${gameId}/rejoin`, {
     method: 'POST',
     headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
+    credentials: 'include',
     body: JSON.stringify({ player_name: playerName }),
   })
   if (!response.ok) {
@@ -243,4 +250,159 @@ export function warmCubeCache(cubeId: string): void {
     headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ cube_id: cubeId }),
   }).catch(() => {})
+}
+
+// ── Auth ────────────────────────────────────────────────────────────
+
+export async function authRegister(username: string, password: string, email?: string): Promise<AuthUser> {
+  const response = await fetch(`${API_BASE}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ username, password, email: email || null }),
+  })
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, 'Failed to register'))
+  }
+  return response.json()
+}
+
+export async function authLogin(username: string, password: string): Promise<AuthUser> {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ username, password }),
+  })
+  if (!response.ok) {
+    throw new Error(await getErrorMessage(response, 'Failed to log in'))
+  }
+  return response.json()
+}
+
+export async function authLogout(): Promise<void> {
+  await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' })
+}
+
+export async function authGetMe(): Promise<AuthUser | null> {
+  try {
+    const response = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' })
+    if (!response.ok) return null
+    return response.json()
+  } catch {
+    return null
+  }
+}
+
+// ── Battlers ────────────────────────────────────────────────────────
+
+export async function getBattlers(offset = 0): Promise<{ battlers: UserBattler[]; has_more: boolean }> {
+  const response = await fetch(`${API_BASE}/battlers?offset=${offset}`, { credentials: 'include' })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load battlers'))
+  return response.json()
+}
+
+export interface CreateBattlerRequest {
+  cube_id: string
+  display_name?: string
+  use_upgrades?: boolean
+  use_vanguards?: boolean
+  play_mode?: PlayMode
+  puppet_count?: number
+  target_player_count?: number
+  auto_approve_spectators?: boolean
+  guided_mode_default?: boolean
+}
+
+export async function createBattler(data: CreateBattlerRequest): Promise<UserBattler> {
+  const response = await fetch(`${API_BASE}/battlers`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to create battler'))
+  return response.json()
+}
+
+export async function updateBattler(id: number, data: Partial<CreateBattlerRequest> & { position?: number }): Promise<UserBattler> {
+  const response = await fetch(`${API_BASE}/battlers/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to update battler'))
+  return response.json()
+}
+
+export async function deleteBattler(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/battlers/${id}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to delete battler'))
+}
+
+export async function getBattlerGames(
+  battlerId: number,
+  opts: { offset?: number; playMode?: string; useUpgrades?: boolean } = {},
+): Promise<{ games: GameSummary[]; has_more: boolean }> {
+  const params = new URLSearchParams()
+  if (opts.offset) params.set('offset', String(opts.offset))
+  if (opts.playMode != null) params.set('play_mode', opts.playMode)
+  if (opts.useUpgrades != null) params.set('use_upgrades', String(opts.useUpgrades))
+  const qs = params.toString()
+  const response = await fetch(`${API_BASE}/battlers/${battlerId}/games${qs ? `?${qs}` : ''}`, { credentials: 'include' })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load games'))
+  return response.json()
+}
+
+export async function getMyGames(offset = 0): Promise<{ games: GameSummary[]; has_more: boolean }> {
+  const response = await fetch(`${API_BASE}/battlers/my-games?offset=${offset}`, { credentials: 'include' })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load games'))
+  return response.json()
+}
+
+// ── Follows ─────────────────────────────────────────────────────────
+
+export async function getFollowing(offset = 0): Promise<{ following: FollowedBattler[]; has_more: boolean }> {
+  const response = await fetch(`${API_BASE}/battlers/following?offset=${offset}`, { credentials: 'include' })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load following'))
+  return response.json()
+}
+
+export async function followCube(cubeId: string, displayName?: string): Promise<FollowedBattler> {
+  const response = await fetch(`${API_BASE}/battlers/follow`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ cube_id: cubeId, display_name: displayName || null }),
+  })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to follow cube'))
+  return response.json()
+}
+
+export async function unfollowCube(followId: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/battlers/follow/${followId}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to unfollow'))
+}
+
+// ── Discover ────────────────────────────────────────────────────────
+
+export interface DiscoverResult {
+  cube_id: string
+  game_count: number
+  player_count: number
+  last_played: string | null
+  is_following: boolean
+}
+
+export async function discoverCubes(offset = 0): Promise<{ results: DiscoverResult[]; has_more: boolean }> {
+  const response = await fetch(`${API_BASE}/discover?offset=${offset}`, { credentials: 'include' })
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load cubes'))
+  return response.json()
 }

@@ -363,6 +363,7 @@ class ShareGameResponse(BaseModel):
     owner_name: str
     created_at: str
     use_upgrades: bool
+    cube_id: str | None = None
     players: list[SharePlayerData]
 
 

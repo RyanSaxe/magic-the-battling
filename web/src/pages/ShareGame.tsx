@@ -297,6 +297,16 @@ export function ShareGame() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {data.cube_id && (
+              <a
+                href={`https://cubecobra.com/cube/overview/${encodeURIComponent(data.cube_id)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-amber-400 hover:text-amber-300 transition-colors mr-1"
+              >
+                CubeCobra
+              </a>
+            )}
             <button
               onClick={() => navigate('/')}
               className="btn btn-secondary py-2 px-4"

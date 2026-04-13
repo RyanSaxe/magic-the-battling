@@ -1,8 +1,10 @@
 import json
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 from mtb.models.game import BattleSnapshotData
-from server.db.models import PlayerGameHistory
+from server.db import database
+from server.db.models import GameRecord, PlayerGameHistory
 from server.routers.games import _build_puppet_snapshots
 
 
@@ -54,3 +56,76 @@ def test_build_puppet_snapshots_reuses_best_prior_source_snapshot():
     ]
     assert [snapshot.poison for snapshot in snapshots] == [1, 2, 5]
     assert [snapshot.treasures for snapshot in snapshots] == [1, 4, 4]
+
+
+def test_share_game_endpoint_allows_public_access_for_unshared_finished_games(client):
+    db = database.SessionLocal()
+    try:
+        db.add(
+            GameRecord(
+                id="public-game",
+                cube_id="cube-public",
+                shared=False,
+                ended_at=datetime.now(UTC),
+            )
+        )
+        db.add(
+            PlayerGameHistory(
+                game_id="public-game",
+                player_name="Alice",
+                battler_elo=1200,
+                max_stage=3,
+                max_round=2,
+                final_placement=1,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get("/api/games/public-game/share/Alice")
+
+    assert response.status_code == 200
+    assert response.json()["game_id"] == "public-game"
+
+
+def test_battler_games_includes_unshared_finished_games_for_same_cube(client):
+    register = client.post(
+        "/api/auth/register",
+        json={"username": "battler_user", "password": "password123"},
+    )
+    assert register.status_code == 200
+
+    battler = client.post("/api/battlers", json={"cube_id": "cube-public"})
+    assert battler.status_code == 200
+    battler_id = battler.json()["id"]
+
+    db = database.SessionLocal()
+    try:
+        db.add(
+            GameRecord(
+                id="cube-public-game",
+                cube_id="cube-public",
+                shared=False,
+                ended_at=datetime.now(UTC),
+                winner_player_id="p1",
+            )
+        )
+        db.add(
+            PlayerGameHistory(
+                game_id="cube-public-game",
+                player_name="Alice",
+                battler_elo=1200,
+                max_stage=3,
+                max_round=2,
+                final_placement=1,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get(f"/api/battlers/{battler_id}/games")
+
+    assert response.status_code == 200
+    assert response.json()["games"][0]["game_id"] == "cube-public-game"

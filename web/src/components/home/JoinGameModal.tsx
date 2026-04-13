@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { joinGame } from '../../api/client'
+import { useAuth } from '../../contexts/authState'
 import { useSession } from '../../hooks/useSession'
 import { rememberPlayerForGame } from '../../utils/deviceIdentity'
 
@@ -10,9 +11,11 @@ interface JoinGameModalProps {
 
 export function JoinGameModal({ onClose }: JoinGameModalProps) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const { saveSession } = useSession()
 
-  const [playerName, setPlayerName] = useState('')
+  const [manualName, setManualName] = useState('')
+  const playerName = user ? user.username : manualName
   const [joinCode, setJoinCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -82,10 +85,11 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
             <input
               type="text"
               value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+              onChange={(e) => !user && setManualName(e.target.value)}
+              disabled={!!user}
+              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
               placeholder="Enter your name"
-              autoFocus
+              autoFocus={!user}
             />
           </div>
 
