@@ -166,6 +166,7 @@ export function Dashboard() {
                     addToast('Failed to load more', 'error')
                   }
                 }}
+                onSwitchToDiscover={() => setTab('discover')}
               />
             ) : tab === 'games' ? (
               <MyGamesGrid
@@ -201,6 +202,7 @@ export function Dashboard() {
                   }
                 }}
                 onView={(g) => navigate(`/game/${g.game_id}/share/${encodeURIComponent(g.best_human_name)}`)}
+                onPlayGame={() => navigate('/play')}
               />
             ) : (
               <DiscoverGrid
@@ -245,6 +247,7 @@ export function Dashboard() {
                     addToast(err instanceof Error ? err.message : 'Failed to follow', 'error')
                   }
                 }}
+                onPlayGame={() => navigate('/play')}
               />
             )}
           </div>
@@ -370,6 +373,7 @@ function FollowingGrid({
   onView,
   onUnfollow,
   onLoadMore,
+  onSwitchToDiscover,
 }: {
   following: FollowedBattler[]
   hasMore: boolean
@@ -377,12 +381,16 @@ function FollowingGrid({
   onView: (f: FollowedBattler) => void
   onUnfollow: (f: FollowedBattler) => void
   onLoadMore: () => void
+  onSwitchToDiscover: () => void
 }) {
   if (following.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center">
         <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
-          <p className="text-gray-300">Not following any cubes yet. Use the Discover tab to find cubes.</p>
+          <p className="text-gray-300">Not following any cubes yet.</p>
+          <button onClick={onSwitchToDiscover} className="btn btn-secondary py-2 px-6 mt-4">
+            Browse Cubes
+          </button>
         </div>
       </div>
     )
@@ -577,6 +585,7 @@ function MyGamesGrid({
   onLoadInitial,
   onLoadMore,
   onView,
+  onPlayGame,
 }: {
   games: GameSummary[]
   hasMore: boolean
@@ -585,6 +594,7 @@ function MyGamesGrid({
   onLoadInitial: () => void
   onLoadMore: () => void
   onView: (g: GameSummary) => void
+  onPlayGame: () => void
 }) {
   useEffect(() => {
     if (!loaded) onLoadInitial()
@@ -602,7 +612,10 @@ function MyGamesGrid({
     return (
       <div className="flex-1 flex flex-col items-center justify-center">
         <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
-          <p className="text-gray-300">No completed games yet. Play a game to see it here!</p>
+          <p className="text-gray-300">No completed games yet.</p>
+          <button onClick={onPlayGame} className="btn btn-primary py-2 px-6 font-semibold mt-4">
+            Play a Game
+          </button>
         </div>
       </div>
     )
@@ -664,6 +677,7 @@ function DiscoverGrid({
   onPlay,
   onView,
   onFollow,
+  onPlayGame,
 }: {
   results: DiscoverResult[]
   loading: boolean
@@ -674,6 +688,7 @@ function DiscoverGrid({
   onPlay: (cubeId: string) => void
   onView: (cubeId: string) => void
   onFollow: (cubeId: string) => void
+  onPlayGame: () => void
 }) {
   useEffect(() => {
     if (!loaded) onLoadInitial()
@@ -690,7 +705,12 @@ function DiscoverGrid({
   if (results.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-500">No cubes found. Play some games first!</p>
+        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
+          <p className="text-gray-300">No cubes found yet.</p>
+          <button onClick={onPlayGame} className="btn btn-primary py-2 px-6 font-semibold mt-4">
+            Play a Game
+          </button>
+        </div>
       </div>
     )
   }
