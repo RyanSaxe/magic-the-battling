@@ -9,6 +9,7 @@ import { LabeledDivider } from '../components/common/LabeledDivider'
 import { InfoCard } from '../components/common/InfoCard'
 import { getBattlers, getBattlerGames, updateBattler, deleteBattler } from '../api/client'
 import type { UserBattler, GameSummary, PlayMode } from '../types'
+import { battlerPlayUrl } from '../utils/battlerPlayUrl'
 
 function ordinal(n: number): string {
   const s = ['th', 'st', 'nd', 'rd']
@@ -131,15 +132,6 @@ export function BattlerView() {
 
   const cubeCobraUrl = `https://cubecobra.com/cube/overview/${encodeURIComponent(battler.cube_id)}`
   const wins = games.filter((g) => g.best_human_placement === 1).length
-
-  function battlerPlayUrl(b: UserBattler): string {
-    const params = new URLSearchParams()
-    params.set('cubeId', b.cube_id)
-    params.set('useUpgrades', String(b.use_upgrades))
-    params.set('playMode', b.play_mode)
-    params.set('puppetCount', String(b.puppet_count))
-    return `/play?${params.toString()}`
-  }
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">

@@ -18,6 +18,7 @@ import {
   type DiscoverResult,
 } from '../api/client'
 import type { UserBattler, FollowedBattler, GameSummary, PlayMode } from '../types'
+import { battlerPlayUrl } from '../utils/battlerPlayUrl'
 
 type Tab = 'battlers' | 'following' | 'games' | 'discover'
 
@@ -82,15 +83,6 @@ export function Dashboard() {
   useEffect(() => { refresh() }, [refresh])
 
   if (authLoading || !user) return null
-
-  function battlerPlayUrl(b: UserBattler): string {
-    const params = new URLSearchParams()
-    params.set('cubeId', b.cube_id)
-    params.set('useUpgrades', String(b.use_upgrades))
-    params.set('playMode', b.play_mode)
-    params.set('puppetCount', String(b.puppet_count))
-    return `/play?${params.toString()}`
-  }
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
