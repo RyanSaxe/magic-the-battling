@@ -22,6 +22,8 @@ export function Home() {
     }
   }, [loading, user, navigate]);
 
+  if (loading || user) return null;
+
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
       <header className="shrink-0 py-3 frame-chrome bar-pad-both">
