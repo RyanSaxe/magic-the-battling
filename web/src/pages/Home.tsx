@@ -97,21 +97,7 @@ export function Home() {
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
           <div className="zone-pack h-full min-h-0 flex flex-col items-center justify-center px-4">
             <CardShowcase />
-            <div className="flex gap-2 mt-6 mb-2">
-              <button
-                onClick={() => setShowJoinModal(true)}
-                className="btn btn-secondary py-2 px-4"
-              >
-                Join Game
-              </button>
-              <button
-                onClick={() => navigate("/play")}
-                className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
-              >
-                Play Game
-              </button>
-            </div>
-            <p className="text-gray-400 text-sm mb-4">
+            <p className="text-gray-400 text-sm mt-6">
               Have an account?{" "}
               <Link to="/login" className="text-amber-400 hover:text-amber-300">
                 Log in
