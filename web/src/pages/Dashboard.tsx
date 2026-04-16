@@ -58,7 +58,7 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate('/login', { replace: true })
+      navigate('/login?returnTo=/dashboard', { replace: true })
     }
   }, [authLoading, user, navigate])
 

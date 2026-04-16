@@ -1,11 +1,14 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { FaDiscord } from 'react-icons/fa6'
 import { useAuth } from '../contexts/authState'
+import { AppHeader } from '../components/common/AppHeader'
 import { CubeCobraPrimerLink } from '../components/common/CubeCobraPrimerLink'
 
 export function Login() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const returnTo = searchParams.get('returnTo') || '/'
   const { login } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -18,7 +21,7 @@ export function Login() {
     setLoading(true)
     try {
       await login(username, password)
-      navigate('/')
+      navigate(returnTo)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
@@ -28,56 +31,14 @@ export function Login() {
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <header className="shrink-0 py-3 frame-chrome bar-pad-both">
-        <div className="hidden sm:flex items-center justify-between">
-          <div>
-            <div className="flex items-baseline">
-              <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-                Crucible
-              </h1>
-              <span className="hero-sep mx-2.5">—</span>
-              <span className="hero-subtitle text-base font-normal tracking-widest">
-                an MtG format
-              </span>
-            </div>
-            <p className="hero-tagline">
-              Inspired by Roguelikes and Autobattlers
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => navigate("/")}
-              className="btn btn-secondary py-2 px-4"
-            >
-              Home
-            </button>
-          </div>
-        </div>
-        <div className="sm:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-baseline whitespace-nowrap">
-                <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
-                  Crucible
-                </h1>
-                <span className="hero-sep mx-1 text-xs">—</span>
-                <span className="hero-subtitle text-[11px] font-normal tracking-wider">
-                  an MtG format
-                </span>
-              </div>
-              <p className="hero-tagline !text-[9px] !tracking-[0.04em]">
-                Inspired by Roguelikes and Autobattlers
-              </p>
-            </div>
-            <button
-              onClick={() => navigate("/")}
-              className="btn btn-secondary py-1.5 px-3 text-sm shrink-0"
-            >
-              Home
-            </button>
-          </div>
-        </div>
-      </header>
+      <AppHeader renderRight={({ compact }) => (
+        <button
+          onClick={() => navigate('/')}
+          className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
+        >
+          Home
+        </button>
+      )} />
 
       <div className="flex-1 flex min-h-0 game-surface">
         <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
@@ -129,7 +90,7 @@ export function Login() {
 
               <p className="text-center text-gray-400 text-sm mt-4">
                 Don't have an account?{' '}
-                <Link to="/register" className="text-amber-400 hover:text-amber-300">Create one</Link>
+                <Link to={`/register${returnTo !== '/' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} className="text-amber-400 hover:text-amber-300">Create one</Link>
               </p>
             </form>
           </div>

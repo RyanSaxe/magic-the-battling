@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { FaDiscord } from 'react-icons/fa6'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
@@ -28,6 +28,7 @@ function formatDate(iso: string): string {
 export function BattlerView() {
   const { battlerId } = useParams<{ battlerId: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, loading: authLoading } = useAuth()
   const { addToast } = useToast()
 
@@ -43,9 +44,9 @@ export function BattlerView() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate('/login', { replace: true })
+      navigate(`/login?returnTo=${encodeURIComponent(location.pathname)}`, { replace: true })
     }
-  }, [authLoading, user, navigate])
+  }, [authLoading, user, navigate, location.pathname])
 
   const loadGames = useCallback(async (b: UserBattler, playMode: string | null, upgrades: boolean | null, offset: number) => {
     setGamesLoading(true)
