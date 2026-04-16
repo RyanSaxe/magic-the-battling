@@ -254,12 +254,12 @@ export function warmCubeCache(cubeId: string): void {
 
 // ── Auth ────────────────────────────────────────────────────────────
 
-export async function authRegister(username: string, password: string, email?: string): Promise<AuthUser> {
+export async function authRegister(username: string, password: string, email: string): Promise<AuthUser> {
   const response = await fetch(`${API_BASE}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ username, password, email: email || null }),
+    body: JSON.stringify({ username, password, email }),
   })
   if (!response.ok) {
     throw new Error(await getErrorMessage(response, 'Failed to register'))

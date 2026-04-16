@@ -5,7 +5,7 @@ export interface AuthState {
   user: AuthUser | null
   loading: boolean
   login: (username: string, password: string) => Promise<void>
-  register: (username: string, password: string, email?: string) => Promise<void>
+  register: (username: string, password: string, email: string) => Promise<void>
   logout: () => Promise<void>
 }
 

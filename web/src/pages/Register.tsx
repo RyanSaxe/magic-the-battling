@@ -12,16 +12,21 @@ export function Register() {
   const { register } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (password !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
     setError('')
     setLoading(true)
     try {
-      await register(username, password, email || undefined)
+      await register(username, password, email)
       navigate(returnTo)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
@@ -75,19 +80,18 @@ export function Register() {
               </div>
 
               <div className="mb-4">
-                <label htmlFor="email" className="block text-gray-300 text-sm mb-1">
-                  Email <span className="text-gray-500">(optional)</span>
-                </label>
+                <label htmlFor="email" className="block text-gray-300 text-sm mb-1">Email</label>
                 <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  required
                 />
               </div>
 
-              <div className="mb-6">
+              <div className="mb-4">
                 <label htmlFor="password" className="block text-gray-300 text-sm mb-1">Password</label>
                 <input
                   id="password"
@@ -101,9 +105,22 @@ export function Register() {
                 <p className="text-gray-500 text-xs mt-1">At least 8 characters</p>
               </div>
 
+              <div className="mb-6">
+                <label htmlFor="confirm-password" className="block text-gray-300 text-sm mb-1">Confirm Password</label>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  required
+                  minLength={8}
+                />
+              </div>
+
               <button
                 type="submit"
-                disabled={loading || !username || !password || password.length < 8}
+                disabled={loading || !username || !email || !password || password.length < 8 || password !== confirmPassword}
                 className="btn btn-primary w-full py-2 font-semibold disabled:opacity-50"
               >
                 {loading ? 'Creating account...' : 'Create Account'}
