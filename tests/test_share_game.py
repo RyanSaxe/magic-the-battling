@@ -92,7 +92,7 @@ def test_share_game_endpoint_allows_public_access_for_unshared_finished_games(cl
 def test_battler_games_includes_unshared_finished_games_for_same_cube(client):
     register = client.post(
         "/api/auth/register",
-        json={"username": "battler_user", "password": "password123"},
+        json={"username": "battler_user", "password": "password123", "email": "battler@test.com"},
     )
     assert register.status_code == 200
 

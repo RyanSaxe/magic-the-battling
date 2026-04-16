@@ -13,7 +13,7 @@ class TestAuthCookies:
 
         response = client.post(
             "/api/auth/register",
-            json={"username": "secure_user", "password": "password123"},
+            json={"username": "secure_user", "password": "password123", "email": "secure@test.com"},
         )
 
         assert response.status_code == 200
@@ -24,14 +24,14 @@ class TestAuthCookies:
 
         register = client.post(
             "/api/auth/register",
-            json={"username": "local_user", "password": "password123"},
+            json={"username": "local_user", "password": "password123", "email": "local@test.com"},
         )
         assert register.status_code == 200
         client.post("/api/auth/logout")
 
         response = client.post(
             "/api/auth/login",
-            json={"username": "local_user", "password": "password123"},
+            json={"username": "local_user", "password": "password123", "email": "local@test.com"},
         )
 
         assert response.status_code == 200
