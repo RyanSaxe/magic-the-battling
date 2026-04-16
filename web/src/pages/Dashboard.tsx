@@ -238,13 +238,26 @@ export function Dashboard() {
                   }
                 }}
                 onPlay={(cubeId) => navigate(`/play?cubeId=${encodeURIComponent(cubeId)}`)}
-                onView={(cubeId) => window.open(`https://cubecobra.com/cube/overview/${encodeURIComponent(cubeId)}`, '_blank')}
                 onFollow={async (cubeId) => {
                   try {
                     await followCube(cubeId)
                     setDiscoverResults((prev) => prev.map((r) => r.cube_id === cubeId ? { ...r, is_following: true } : r))
                   } catch (err) {
                     addToast(err instanceof Error ? err.message : 'Failed to follow', 'error')
+                  }
+                }}
+                onUnfollow={async (cubeId) => {
+                  const match = following.find((f) => f.cube_id === cubeId)
+                  if (!match) {
+                    addToast('Reload the page and try again', 'error')
+                    return
+                  }
+                  try {
+                    await unfollowCube(match.id)
+                    setFollowing((prev) => prev.filter((x) => x.id !== match.id))
+                    setDiscoverResults((prev) => prev.map((r) => r.cube_id === cubeId ? { ...r, is_following: false } : r))
+                  } catch {
+                    addToast('Failed to unfollow', 'error')
                   }
                 }}
                 onPlayGame={() => navigate('/play')}
@@ -559,7 +572,8 @@ function AddBattlerModal({
   )
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  if (!iso) return 'Never'
   try {
     return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   } catch {
@@ -675,8 +689,8 @@ function DiscoverGrid({
   onLoadInitial,
   onLoadMore,
   onPlay,
-  onView,
   onFollow,
+  onUnfollow,
   onPlayGame,
 }: {
   results: DiscoverResult[]
@@ -686,8 +700,8 @@ function DiscoverGrid({
   onLoadInitial: () => void
   onLoadMore: () => void
   onPlay: (cubeId: string) => void
-  onView: (cubeId: string) => void
   onFollow: (cubeId: string) => void
+  onUnfollow: (cubeId: string) => void
   onPlayGame: () => void
 }) {
   useEffect(() => {
@@ -728,13 +742,26 @@ function DiscoverGrid({
             metadata={[
               { label: 'Games', value: String(r.game_count) },
               { label: 'Players', value: String(r.player_count) },
+              { label: 'Last played', value: formatDate(r.last_played) },
             ]}
             actions={[
               { label: 'Play', onClick: () => onPlay(r.cube_id), variant: 'primary' },
-              { label: 'View', onClick: () => onView(r.cube_id), variant: 'secondary' },
-              ...(r.is_following ? [] : [{ label: 'Follow', onClick: () => onFollow(r.cube_id), variant: 'secondary' as const }]),
+              ...(r.is_following
+                ? [{ label: 'Unfollow', onClick: () => onUnfollow(r.cube_id), variant: 'danger' as const }]
+                : [{ label: 'Follow', onClick: () => onFollow(r.cube_id), variant: 'secondary' as const }]),
             ]}
-          />
+            className={r.is_following ? 'border-l-2 border-l-emerald-600/60' : ''}
+          >
+            <a
+              href={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-amber-400 hover:text-amber-300 transition-colors mt-2 inline-block"
+              onClick={(e) => e.stopPropagation()}
+            >
+              View on CubeCobra
+            </a>
+          </InfoCard>
         ))}
       </div>
       {hasMore && (
