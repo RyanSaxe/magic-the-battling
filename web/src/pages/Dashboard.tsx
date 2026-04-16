@@ -120,7 +120,7 @@ export function Dashboard() {
                 battlers={battlers}
                 hasMore={battlersHasMore}
                 onPlay={(b) => navigate(battlerPlayUrl(b))}
-                onView={(b) => navigate(`/dashboard/battler/${b.id}`)}
+                onView={(b) => navigate(`/dashboard/list/${b.id}`)}
                 onDelete={async (b) => {
                   if (!window.confirm(`Delete "${b.display_name || b.cube_id}"?`)) return
                   try {

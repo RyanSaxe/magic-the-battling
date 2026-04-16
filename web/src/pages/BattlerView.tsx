@@ -26,7 +26,7 @@ function formatDate(iso: string): string {
 }
 
 export function BattlerView() {
-  const { battlerId } = useParams<{ battlerId: string }>()
+  const { listId } = useParams<{ listId: string }>()
   const navigate = useNavigate()
   const location = useLocation()
   const { user, loading: authLoading } = useAuth()
@@ -71,11 +71,11 @@ export function BattlerView() {
   }, [addToast])
 
   const refresh = useCallback(async () => {
-    if (!user || !battlerId) return
+    if (!user || !listId) return
     setLoadingData(true)
     try {
       const { battlers: allBattlers } = await getBattlers()
-      const b = allBattlers.find((x) => x.id === Number(battlerId))
+      const b = allBattlers.find((x) => x.id === Number(listId))
       if (!b) {
         navigate('/dashboard', { replace: true })
         return
@@ -89,7 +89,7 @@ export function BattlerView() {
     } finally {
       setLoadingData(false)
     }
-  }, [user, battlerId, navigate, addToast, loadGames])
+  }, [user, listId, navigate, addToast, loadGames])
 
   useEffect(() => { refresh() }, [refresh])
 
