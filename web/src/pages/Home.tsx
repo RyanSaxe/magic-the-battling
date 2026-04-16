@@ -95,7 +95,7 @@ export function Home() {
         <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
 
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
-          <div className="zone-pack h-full min-h-0 flex flex-col items-center justify-center px-4">
+          <div className="zone-pack h-full min-h-0 flex flex-col items-center justify-center px-4 pb-6">
             <CardShowcase />
             <p className="text-gray-400 text-sm mt-6">
               <Link to="/login" className="text-amber-400 hover:text-amber-300">
