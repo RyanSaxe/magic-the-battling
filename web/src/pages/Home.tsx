@@ -98,10 +98,14 @@ export function Home() {
           <div className="zone-pack h-full min-h-0 flex flex-col items-center justify-center px-4">
             <CardShowcase />
             <p className="text-gray-400 text-sm mt-6">
-              Have an account?{" "}
               <Link to="/login" className="text-amber-400 hover:text-amber-300">
                 Log in
               </Link>
+              {" or "}
+              <Link to="/register" className="text-amber-400 hover:text-amber-300">
+                create an account
+              </Link>
+              {" to track your games"}
             </p>
           </div>
         </main>
