@@ -37,6 +37,8 @@ export function BattlerView() {
   const [gamesHasMore, setGamesHasMore] = useState(false)
   const [gamesOffset, setGamesOffset] = useState(0)
   const [gamesLoading, setGamesLoading] = useState(false)
+  const [totalGames, setTotalGames] = useState(0)
+  const [totalWins, setTotalWins] = useState(0)
   const [filterPlayMode, setFilterPlayMode] = useState<string | null>(null)
   const [filterUpgrades, setFilterUpgrades] = useState<boolean | null>(null)
   const [loadingData, setLoadingData] = useState(true)
@@ -63,6 +65,8 @@ export function BattlerView() {
       }
       setGamesHasMore(data.has_more)
       setGamesOffset(offset + data.games.length)
+      setTotalGames(data.total_games)
+      setTotalWins(data.total_wins)
     } catch {
       addToast('Failed to load games', 'error')
     } finally {
@@ -132,7 +136,6 @@ export function BattlerView() {
   if (!battler) return null
 
   const cubeCobraUrl = `https://cubecobra.com/cube/overview/${encodeURIComponent(battler.cube_id)}`
-  const wins = games.filter((g) => g.best_human_placement === 1).length
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
@@ -178,16 +181,16 @@ export function BattlerView() {
               </div>
             </div>
 
-            {games.length > 0 && (
+            {totalGames > 0 && (
               <dl className="overflow-hidden rounded-lg border border-[color:rgba(212,175,55,0.22)] bg-black/10 mb-4">
                 <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3 px-3 py-1.5">
                   <dt className="text-[11px] font-medium text-gray-400">Games played</dt>
-                  <dd className="min-w-0 text-right text-sm text-amber-50">{games.length}</dd>
+                  <dd className="min-w-0 text-right text-sm text-amber-50">{totalGames}</dd>
                 </div>
                 <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3 px-3 py-1.5 border-t border-[color:rgba(212,175,55,0.12)]">
                   <dt className="text-[11px] font-medium text-gray-400">Wins</dt>
                   <dd className="min-w-0 text-right text-sm text-amber-50">
-                    {wins}{games.length > 0 ? ` (${Math.round((wins / games.length) * 100)}%)` : ''}
+                    {totalWins}{totalGames > 0 ? ` (${Math.round((totalWins / totalGames) * 100)}%)` : ''}
                   </dd>
                 </div>
               </dl>
@@ -394,6 +397,7 @@ function SettingsModal({
               className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
             />
             <span className="text-white text-sm">Constructed</span>
+            <span className="text-gray-500 text-xs">— bring your own deck</span>
           </label>
 
           <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
@@ -434,7 +438,9 @@ function SettingsModal({
             {saving ? 'Saving...' : 'Save'}
           </button>
           <button
-            onClick={onDelete}
+            onClick={() => {
+              if (window.confirm(`Delete "${battler.display_name || battler.cube_id}"?`)) onDelete()
+            }}
             className="btn btn-secondary py-2 px-4 text-red-400 hover:text-red-300"
           >
             Delete

@@ -158,6 +158,12 @@ def list_battler_games(
     if use_upgrades is not None:
         query = query.filter(func.json_extract(GameRecord.config_json, "$.use_upgrades") == use_upgrades)
 
+    total_games = query.count()
+    win_subquery = query.join(PlayerGameHistory, PlayerGameHistory.game_id == GameRecord.id).filter(
+        PlayerGameHistory.is_puppet.is_(False), PlayerGameHistory.final_placement == 1
+    )
+    total_wins = win_subquery.count()
+
     games = query.order_by(GameRecord.created_at.desc()).offset(offset).limit(GAMES_PAGE_SIZE + 1).all()
     has_more = len(games) > GAMES_PAGE_SIZE
     games = games[:GAMES_PAGE_SIZE]
@@ -200,7 +206,7 @@ def list_battler_games(
             )
         )
 
-    return {"games": results, "has_more": has_more}
+    return {"games": results, "has_more": has_more, "total_games": total_games, "total_wins": total_wins}
 
 
 @router.get("/my-games")
