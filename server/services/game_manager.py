@@ -606,7 +606,7 @@ class GameManager:
         try:
             record = session.query(GameRecord).filter(GameRecord.id == game_id).first()
             if record and record.ended_at is None:
-                record.ended_at = datetime.now(UTC)
+                record.ended_at = datetime.now(UTC)  # ty: ignore[invalid-assignment]
                 session.commit()
         except Exception:
             logger.debug("Skipping ended_at update for game_id=%s", game_id, exc_info=True)
@@ -626,7 +626,7 @@ class GameManager:
             stale_ids = [record.id for record in stale]
             now = datetime.now(UTC)
             for record in stale:
-                record.ended_at = now
+                record.ended_at = now  # ty: ignore[invalid-assignment]
 
             session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id.in_(stale_ids)).delete(
                 synchronize_session=False
@@ -1100,9 +1100,9 @@ class GameManager:
         if db is not None:
             game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
             if game_record:
-                game_record.ended_at = datetime.now(UTC)
+                game_record.ended_at = datetime.now(UTC)  # ty: ignore[invalid-assignment]
                 if winner:
-                    game_record.winner_player_id = winner.name
+                    game_record.winner_player_id = winner.name  # ty: ignore[invalid-assignment]
                 db.commit()
 
             self._persist_final_placements(db, game_id, game)
@@ -1122,7 +1122,7 @@ class GameManager:
             .first()
         )
         if history:
-            history.final_placement = placement
+            history.final_placement = placement  # ty: ignore[invalid-assignment]
             db.commit()
 
     def _persist_final_placements(self, db: Session, game_id: str, game: Game) -> None:
@@ -1139,7 +1139,7 @@ class GameManager:
                 .first()
             )
             if history:
-                history.final_placement = placement
+                history.final_placement = placement  # ty: ignore[invalid-assignment]
         db.commit()
 
     def _schedule_cleanup(self, game_id: str, delay: float = 300.0) -> None:
@@ -1501,8 +1501,8 @@ class GameManager:
             db.add(history)
             db.flush()
         elif stage > history.max_stage or (stage == history.max_stage and player.round > history.max_round):
-            history.max_stage = stage
-            history.max_round = player.round
+            history.max_stage = stage  # ty: ignore[invalid-assignment]
+            history.max_round = player.round  # ty: ignore[invalid-assignment]
 
         snapshot_data = BattleSnapshotData(
             hand=[c.model_copy() for c in player.hand],
@@ -1575,13 +1575,13 @@ class GameManager:
             db.add(history)
             db.flush()
         elif stage > history.max_stage or (stage == history.max_stage and round_num > history.max_round):
-            history.max_stage = stage
-            history.max_round = round_num
+            history.max_stage = stage  # ty: ignore[invalid-assignment]
+            history.max_round = round_num  # ty: ignore[invalid-assignment]
 
         raw = cast(str, history.poison_history_json) if history.poison_history_json else ""
         poison_map: dict[str, int] = json.loads(raw) if raw else {}
         poison_map[f"{stage}_{round_num}"] = fp.poison
-        history.poison_history_json = json.dumps(poison_map)
+        history.poison_history_json = json.dumps(poison_map)  # ty: ignore[invalid-assignment]
         db.commit()
 
     def load_fake_players_for_game(

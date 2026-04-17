@@ -74,7 +74,7 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
         return None
 
     if not game_record.shared:
-        game_record.shared = True
+        game_record.shared = True  # ty: ignore[invalid-assignment]
         db.commit()
 
     players: list[SharePlayerData] = []

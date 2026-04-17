@@ -10,7 +10,7 @@ USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,30}$")
 class RegisterRequest(BaseModel):
     username: str
     password: str
-    email: str | None = None
+    email: str
 
     @field_validator("username")
     @classmethod
@@ -25,6 +25,14 @@ class RegisterRequest(BaseModel):
     def _validate_password(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters")
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def _validate_email(cls, v: str) -> str:
+        v = v.strip()
+        if not v or "@" not in v:
+            raise ValueError("A valid email address is required")
         return v
 
 

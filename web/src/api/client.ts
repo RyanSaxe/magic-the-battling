@@ -254,12 +254,12 @@ export function warmCubeCache(cubeId: string): void {
 
 // ── Auth ────────────────────────────────────────────────────────────
 
-export async function authRegister(username: string, password: string, email?: string): Promise<AuthUser> {
+export async function authRegister(username: string, password: string, email: string): Promise<AuthUser> {
   const response = await fetch(`${API_BASE}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ username, password, email: email || null }),
+    body: JSON.stringify({ username, password, email }),
   })
   if (!response.ok) {
     throw new Error(await getErrorMessage(response, 'Failed to register'))
@@ -347,7 +347,7 @@ export async function deleteBattler(id: number): Promise<void> {
 export async function getBattlerGames(
   battlerId: number,
   opts: { offset?: number; playMode?: string; useUpgrades?: boolean } = {},
-): Promise<{ games: GameSummary[]; has_more: boolean }> {
+): Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }> {
   const params = new URLSearchParams()
   if (opts.offset) params.set('offset', String(opts.offset))
   if (opts.playMode != null) params.set('play_mode', opts.playMode)

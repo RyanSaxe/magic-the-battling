@@ -206,7 +206,7 @@ class TestRejoinGame:
     def test_authenticated_owner_keeps_slot_ownership_after_rejoin(self, client):
         register = client.post(
             "/api/auth/register",
-            json={"username": "owner_user", "password": "password123"},
+            json={"username": "owner_user", "password": "password123", "email": "owner@test.com"},
         )
         assert register.status_code == 200
         owner_id = register.json()["user_id"]
@@ -249,7 +249,7 @@ class TestRejoinGame:
         client.cookies.clear()
         attacker = client.post(
             "/api/auth/register",
-            json={"username": "attacker_user", "password": "password123"},
+            json={"username": "attacker_user", "password": "password123", "email": "attacker@test.com"},
         )
         assert attacker.status_code == 200
 

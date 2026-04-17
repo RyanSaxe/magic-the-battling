@@ -1,3 +1,8 @@
+# ty (the Rust type checker) does not understand SQLAlchemy's Column descriptor
+# protocol. Assigning plain Python values to Column-typed attributes is valid at
+# runtime but ty reports invalid-assignment. Suppress with `ty: ignore` until ty
+# adds SQLAlchemy support. See usages in game_manager.py, ops_manager.py, and
+# share_preview.py.
 from datetime import UTC, datetime
 
 from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint

@@ -18,6 +18,7 @@ import {
   type DiscoverResult,
 } from '../api/client'
 import type { UserBattler, FollowedBattler, GameSummary, PlayMode } from '../types'
+import { battlerPlayUrl } from '../utils/battlerPlayUrl'
 
 type Tab = 'battlers' | 'following' | 'games' | 'discover'
 
@@ -57,7 +58,7 @@ export function Dashboard() {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate('/login', { replace: true })
+      navigate('/login?returnTo=/dashboard', { replace: true })
     }
   }, [authLoading, user, navigate])
 
@@ -82,15 +83,6 @@ export function Dashboard() {
   useEffect(() => { refresh() }, [refresh])
 
   if (authLoading || !user) return null
-
-  function battlerPlayUrl(b: UserBattler): string {
-    const params = new URLSearchParams()
-    params.set('cubeId', b.cube_id)
-    params.set('useUpgrades', String(b.use_upgrades))
-    params.set('playMode', b.play_mode)
-    params.set('puppetCount', String(b.puppet_count))
-    return `/play?${params.toString()}`
-  }
 
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
@@ -128,7 +120,7 @@ export function Dashboard() {
                 battlers={battlers}
                 hasMore={battlersHasMore}
                 onPlay={(b) => navigate(battlerPlayUrl(b))}
-                onView={(b) => navigate(`/dashboard/battler/${b.id}`)}
+                onView={(b) => navigate(`/dashboard/list/${b.id}`)}
                 onDelete={async (b) => {
                   if (!window.confirm(`Delete "${b.display_name || b.cube_id}"?`)) return
                   try {
@@ -174,6 +166,7 @@ export function Dashboard() {
                     addToast('Failed to load more', 'error')
                   }
                 }}
+                onSwitchToDiscover={() => setTab('discover')}
               />
             ) : tab === 'games' ? (
               <MyGamesGrid
@@ -209,6 +202,7 @@ export function Dashboard() {
                   }
                 }}
                 onView={(g) => navigate(`/game/${g.game_id}/share/${encodeURIComponent(g.best_human_name)}`)}
+                onPlayGame={() => navigate('/play')}
               />
             ) : (
               <DiscoverGrid
@@ -244,7 +238,6 @@ export function Dashboard() {
                   }
                 }}
                 onPlay={(cubeId) => navigate(`/play?cubeId=${encodeURIComponent(cubeId)}`)}
-                onView={(cubeId) => window.open(`https://cubecobra.com/cube/overview/${encodeURIComponent(cubeId)}`, '_blank')}
                 onFollow={async (cubeId) => {
                   try {
                     await followCube(cubeId)
@@ -253,6 +246,21 @@ export function Dashboard() {
                     addToast(err instanceof Error ? err.message : 'Failed to follow', 'error')
                   }
                 }}
+                onUnfollow={async (cubeId) => {
+                  const match = following.find((f) => f.cube_id === cubeId)
+                  if (!match) {
+                    addToast('Reload the page and try again', 'error')
+                    return
+                  }
+                  try {
+                    await unfollowCube(match.id)
+                    setFollowing((prev) => prev.filter((x) => x.id !== match.id))
+                    setDiscoverResults((prev) => prev.map((r) => r.cube_id === cubeId ? { ...r, is_following: false } : r))
+                  } catch {
+                    addToast('Failed to unfollow', 'error')
+                  }
+                }}
+                onPlayGame={() => navigate('/play')}
               />
             )}
           </div>
@@ -378,6 +386,7 @@ function FollowingGrid({
   onView,
   onUnfollow,
   onLoadMore,
+  onSwitchToDiscover,
 }: {
   following: FollowedBattler[]
   hasMore: boolean
@@ -385,12 +394,16 @@ function FollowingGrid({
   onView: (f: FollowedBattler) => void
   onUnfollow: (f: FollowedBattler) => void
   onLoadMore: () => void
+  onSwitchToDiscover: () => void
 }) {
   if (following.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center">
         <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
-          <p className="text-gray-300">Not following any cubes yet. Use the Discover tab to find cubes.</p>
+          <p className="text-gray-300">Not following any cubes yet.</p>
+          <button onClick={onSwitchToDiscover} className="btn btn-secondary py-2 px-6 mt-4">
+            Browse Cubes
+          </button>
         </div>
       </div>
     )
@@ -559,7 +572,8 @@ function AddBattlerModal({
   )
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null): string {
+  if (!iso) return 'Never'
   try {
     return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
   } catch {
@@ -585,6 +599,7 @@ function MyGamesGrid({
   onLoadInitial,
   onLoadMore,
   onView,
+  onPlayGame,
 }: {
   games: GameSummary[]
   hasMore: boolean
@@ -593,6 +608,7 @@ function MyGamesGrid({
   onLoadInitial: () => void
   onLoadMore: () => void
   onView: (g: GameSummary) => void
+  onPlayGame: () => void
 }) {
   useEffect(() => {
     if (!loaded) onLoadInitial()
@@ -610,7 +626,10 @@ function MyGamesGrid({
     return (
       <div className="flex-1 flex flex-col items-center justify-center">
         <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
-          <p className="text-gray-300">No completed games yet. Play a game to see it here!</p>
+          <p className="text-gray-300">No completed games yet.</p>
+          <button onClick={onPlayGame} className="btn btn-primary py-2 px-6 font-semibold mt-4">
+            Play a Game
+          </button>
         </div>
       </div>
     )
@@ -670,8 +689,9 @@ function DiscoverGrid({
   onLoadInitial,
   onLoadMore,
   onPlay,
-  onView,
   onFollow,
+  onUnfollow,
+  onPlayGame,
 }: {
   results: DiscoverResult[]
   loading: boolean
@@ -680,8 +700,9 @@ function DiscoverGrid({
   onLoadInitial: () => void
   onLoadMore: () => void
   onPlay: (cubeId: string) => void
-  onView: (cubeId: string) => void
   onFollow: (cubeId: string) => void
+  onUnfollow: (cubeId: string) => void
+  onPlayGame: () => void
 }) {
   useEffect(() => {
     if (!loaded) onLoadInitial()
@@ -698,7 +719,12 @@ function DiscoverGrid({
   if (results.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-500">No cubes found. Play some games first!</p>
+        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
+          <p className="text-gray-300">No cubes found yet.</p>
+          <button onClick={onPlayGame} className="btn btn-primary py-2 px-6 font-semibold mt-4">
+            Play a Game
+          </button>
+        </div>
       </div>
     )
   }
@@ -716,13 +742,26 @@ function DiscoverGrid({
             metadata={[
               { label: 'Games', value: String(r.game_count) },
               { label: 'Players', value: String(r.player_count) },
+              { label: 'Last played', value: formatDate(r.last_played) },
             ]}
             actions={[
               { label: 'Play', onClick: () => onPlay(r.cube_id), variant: 'primary' },
-              { label: 'View', onClick: () => onView(r.cube_id), variant: 'secondary' },
-              ...(r.is_following ? [] : [{ label: 'Follow', onClick: () => onFollow(r.cube_id), variant: 'secondary' as const }]),
+              ...(r.is_following
+                ? [{ label: 'Unfollow', onClick: () => onUnfollow(r.cube_id), variant: 'danger' as const }]
+                : [{ label: 'Follow', onClick: () => onFollow(r.cube_id), variant: 'secondary' as const }]),
             ]}
-          />
+            className={r.is_following ? 'border-l-2 border-l-emerald-600/60' : ''}
+          >
+            <a
+              href={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-amber-400 hover:text-amber-300 transition-colors mt-2 inline-block"
+              onClick={(e) => e.stopPropagation()}
+            >
+              View on CubeCobra
+            </a>
+          </InfoCard>
         ))}
       </div>
       {hasMore && (

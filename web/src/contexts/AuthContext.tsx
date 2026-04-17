@@ -18,7 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u)
   }, [])
 
-  const register = useCallback(async (username: string, password: string, email?: string) => {
+  const register = useCallback(async (username: string, password: string, email: string) => {
     const u = await authRegister(username, password, email)
     setUser(u)
   }, [])
