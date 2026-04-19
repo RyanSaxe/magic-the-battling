@@ -171,6 +171,26 @@ if static_dir.exists():
     async def favicon():
         return FileResponse(static_dir / "favicon.svg")
 
+    @app.get("/og-image.png")
+    async def og_image():
+        return FileResponse(static_dir / "og-image.png", media_type="image/png")
+
+    @app.get("/icon-192.png")
+    async def icon_192():
+        return FileResponse(static_dir / "icon-192.png", media_type="image/png")
+
+    @app.get("/icon-512.png")
+    async def icon_512():
+        return FileResponse(static_dir / "icon-512.png", media_type="image/png")
+
+    @app.get("/apple-touch-icon.png")
+    async def apple_touch_icon():
+        return FileResponse(static_dir / "apple-touch-icon.png", media_type="image/png")
+
+    @app.get("/site.webmanifest")
+    async def webmanifest():
+        return FileResponse(static_dir / "site.webmanifest", media_type="application/manifest+json")
+
     @app.get("/{path:path}")
     async def spa_fallback(path: str):
         return FileResponse(static_dir / "index.html")
