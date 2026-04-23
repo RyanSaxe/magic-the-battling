@@ -16,7 +16,7 @@ from starlette.requests import Request
 from server.db.database import init_db
 from server.monitoring import start_monitoring, stop_monitoring
 from server.observability import OBSERVABILITY_LOGGER_NAME, configure_logging, record_http_latency
-from server.routers import games, ops, share_preview, ws
+from server.routers import auth, battlers, discover, games, ops, share_preview, ws
 from server.runtime_config import MAX_SESSIONS_TOTAL, RESTORE_ACTIVE_GAME_SNAPSHOTS, SESSION_TTL_MINUTES
 from server.schemas.api import ServerStatusResponse
 from server.services.game_manager import game_manager
@@ -134,6 +134,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
+app.include_router(battlers.router)
+app.include_router(discover.router)
 app.include_router(games.router)
 app.include_router(ws.router)
 app.include_router(share_preview.router)
@@ -167,6 +170,26 @@ if static_dir.exists():
     @app.get("/favicon.svg")
     async def favicon():
         return FileResponse(static_dir / "favicon.svg")
+
+    @app.get("/og-image.png")
+    async def og_image():
+        return FileResponse(static_dir / "og-image.png", media_type="image/png")
+
+    @app.get("/icon-192.png")
+    async def icon_192():
+        return FileResponse(static_dir / "icon-192.png", media_type="image/png")
+
+    @app.get("/icon-512.png")
+    async def icon_512():
+        return FileResponse(static_dir / "icon-512.png", media_type="image/png")
+
+    @app.get("/apple-touch-icon.png")
+    async def apple_touch_icon():
+        return FileResponse(static_dir / "apple-touch-icon.png", media_type="image/png")
+
+    @app.get("/site.webmanifest")
+    async def webmanifest():
+        return FileResponse(static_dir / "site.webmanifest", media_type="application/manifest+json")
 
     @app.get("/{path:path}")
     async def spa_fallback(path: str):

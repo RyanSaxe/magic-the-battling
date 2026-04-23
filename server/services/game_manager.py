@@ -173,6 +173,7 @@ class PendingGame:
     battler: Battler | None = None
     battler_loading: bool = False
     battler_error: str | None = None
+    player_user_ids: dict[str, str] = field(default_factory=dict)
     _loading_task: asyncio.Task | None = field(default=None, repr=False)
 
 
@@ -474,20 +475,33 @@ class GameManager:
         db_session: Session,
         game_id: str,
         player_pairs: list[tuple[str, str]],
+        player_user_ids: dict[str, str] | None = None,
     ) -> None:
         # Keep one active player_id mapping per human name for deterministic reconnect behavior.
+        user_ids = player_user_ids or {}
         for player_id, player_name in player_pairs:
-            db_session.query(GamePlayerRecord).filter(
-                GamePlayerRecord.game_id == game_id,
-                GamePlayerRecord.player_name == player_name,
-                GamePlayerRecord.is_puppet.is_(False),
-            ).delete(synchronize_session=False)
+            existing_rows = (
+                db_session.query(GamePlayerRecord)
+                .filter(
+                    GamePlayerRecord.game_id == game_id,
+                    GamePlayerRecord.player_name == player_name,
+                    GamePlayerRecord.is_puppet.is_(False),
+                )
+                .all()
+            )
+            existing_user_id = next((cast(str, row.user_id) for row in existing_rows if row.user_id), None)
+            resolved_user_id = user_ids.get(player_id) or existing_user_id
+
+            for row in existing_rows:
+                db_session.delete(row)
+
             db_session.add(
                 GamePlayerRecord(
                     game_id=game_id,
                     player_id=player_id,
                     player_name=player_name,
                     is_puppet=False,
+                    user_id=resolved_user_id,
                 )
             )
 
@@ -592,7 +606,7 @@ class GameManager:
         try:
             record = session.query(GameRecord).filter(GameRecord.id == game_id).first()
             if record and record.ended_at is None:
-                record.ended_at = datetime.now(UTC)
+                record.ended_at = datetime.now(UTC)  # ty: ignore[invalid-assignment]
                 session.commit()
         except Exception:
             logger.debug("Skipping ended_at update for game_id=%s", game_id, exc_info=True)
@@ -612,7 +626,7 @@ class GameManager:
             stale_ids = [record.id for record in stale]
             now = datetime.now(UTC)
             for record in stale:
-                record.ended_at = now
+                record.ended_at = now  # ty: ignore[invalid-assignment]
 
             session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id.in_(stale_ids)).delete(
                 synchronize_session=False
@@ -698,10 +712,15 @@ class GameManager:
         auto_approve_spectators: bool = False,
         guided_mode_default: bool = False,
         play_mode: PlayMode = "limited",
+        user_id: str | None = None,
     ) -> PendingGame:
         play_mode = normalize_play_mode(play_mode)
         game_id = secrets.token_urlsafe(8)
         join_code = secrets.token_urlsafe(4).upper()[:6]
+
+        player_user_ids: dict[str, str] = {}
+        if user_id:
+            player_user_ids[player_id] = user_id
 
         pending = PendingGame(
             game_id=game_id,
@@ -718,6 +737,7 @@ class GameManager:
             play_mode=play_mode,
             player_ready={player_id: False},
             player_battlers={player_id: PendingPlayerBattler()},
+            player_user_ids=player_user_ids,
         )
         self._pending_games[game_id] = pending
         self._join_code_to_game[join_code] = game_id
@@ -736,7 +756,9 @@ class GameManager:
         game_id = self.get_game_id_by_join_code(join_code)
         return self._pending_games.get(game_id) if game_id else None
 
-    def join_game(self, join_code: str, player_name: str, player_id: str) -> PendingGame | None:
+    def join_game(
+        self, join_code: str, player_name: str, player_id: str, user_id: str | None = None
+    ) -> PendingGame | None:
         pending = self.get_pending_game_by_code(join_code)
         if not pending:
             return None
@@ -754,6 +776,8 @@ class GameManager:
         pending.player_ids.append(player_id)
         pending.player_ready[player_id] = False
         pending.player_battlers[player_id] = PendingPlayerBattler()
+        if user_id:
+            pending.player_user_ids[player_id] = user_id
         self._player_to_game[player_id] = pending.game_id
         self._player_id_to_name[player_id] = player_name
 
@@ -894,12 +918,14 @@ class GameManager:
             game_record = GameRecord(
                 id=game_id,
                 config_json=json.dumps(config_data),
+                cube_id=pending.cube_id,
             )
             db.add(game_record)
             self._persist_human_player_mappings(
                 db,
                 game_id,
                 list(zip(pending.player_ids, pending.player_names, strict=False)),
+                player_user_ids=pending.player_user_ids,
             )
             db.commit()
 
@@ -998,12 +1024,14 @@ class GameManager:
                     game_record = GameRecord(
                         id=game_id,
                         config_json=json.dumps(config_data),
+                        cube_id=pending.cube_id,
                     )
                     db.add(game_record)
                     self._persist_human_player_mappings(
                         db,
                         game_id,
                         list(zip(pending.player_ids, pending.player_names, strict=False)),
+                        player_user_ids=pending.player_user_ids,
                     )
                     db.commit()
 
@@ -1072,9 +1100,9 @@ class GameManager:
         if db is not None:
             game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
             if game_record:
-                game_record.ended_at = datetime.now(UTC)
+                game_record.ended_at = datetime.now(UTC)  # ty: ignore[invalid-assignment]
                 if winner:
-                    game_record.winner_player_id = winner.name
+                    game_record.winner_player_id = winner.name  # ty: ignore[invalid-assignment]
                 db.commit()
 
             self._persist_final_placements(db, game_id, game)
@@ -1094,7 +1122,7 @@ class GameManager:
             .first()
         )
         if history:
-            history.final_placement = placement
+            history.final_placement = placement  # ty: ignore[invalid-assignment]
             db.commit()
 
     def _persist_final_placements(self, db: Session, game_id: str, game: Game) -> None:
@@ -1111,7 +1139,7 @@ class GameManager:
                 .first()
             )
             if history:
-                history.final_placement = placement
+                history.final_placement = placement  # ty: ignore[invalid-assignment]
         db.commit()
 
     def _schedule_cleanup(self, game_id: str, delay: float = 300.0) -> None:
@@ -1453,18 +1481,28 @@ class GameManager:
         stage = player.stage
 
         if not history:
+            gpr = (
+                db.query(GamePlayerRecord.user_id)
+                .filter(
+                    GamePlayerRecord.game_id == game_id,
+                    GamePlayerRecord.player_name == player.name,
+                    GamePlayerRecord.is_puppet.is_(False),
+                )
+                .first()
+            )
             history = PlayerGameHistory(
                 game_id=game_id,
                 player_name=player.name,
                 battler_elo=battler_elo,
                 max_stage=stage,
                 max_round=player.round,
+                user_id=str(gpr[0]) if gpr and gpr[0] else None,
             )
             db.add(history)
             db.flush()
         elif stage > history.max_stage or (stage == history.max_stage and player.round > history.max_round):
-            history.max_stage = stage
-            history.max_round = player.round
+            history.max_stage = stage  # ty: ignore[invalid-assignment]
+            history.max_round = player.round  # ty: ignore[invalid-assignment]
 
         snapshot_data = BattleSnapshotData(
             hand=[c.model_copy() for c in player.hand],
@@ -1537,13 +1575,13 @@ class GameManager:
             db.add(history)
             db.flush()
         elif stage > history.max_stage or (stage == history.max_stage and round_num > history.max_round):
-            history.max_stage = stage
-            history.max_round = round_num
+            history.max_stage = stage  # ty: ignore[invalid-assignment]
+            history.max_round = round_num  # ty: ignore[invalid-assignment]
 
         raw = cast(str, history.poison_history_json) if history.poison_history_json else ""
         poison_map: dict[str, int] = json.loads(raw) if raw else {}
         poison_map[f"{stage}_{round_num}"] = fp.poison
-        history.poison_history_json = json.dumps(poison_map)
+        history.poison_history_json = json.dumps(poison_map)  # ty: ignore[invalid-assignment]
         db.commit()
 
     def load_fake_players_for_game(

@@ -54,6 +54,8 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
     if not game_record:
         return None
 
+    # Share pages are public for finished games; this flag is bookkeeping for
+    # "someone actively shared this game", not an authorization gate.
     config = json.loads(str(game_record.config_json)) if game_record.config_json else {}
     use_upgrades = config.get("use_upgrades", True)
 
@@ -72,7 +74,7 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
         return None
 
     if not game_record.shared:
-        game_record.shared = True
+        game_record.shared = True  # ty: ignore[invalid-assignment]
         db.commit()
 
     players: list[SharePlayerData] = []
@@ -96,11 +98,14 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
 
     created_at = game_record.created_at.isoformat() if game_record.created_at else ""
 
+    cube_id = str(game_record.cube_id) if game_record.cube_id else config.get("cube_id")
+
     return ShareGameResponse(
         game_id=game_id,
         owner_name=player_name,
         created_at=created_at,
         use_upgrades=use_upgrades,
+        cube_id=cube_id,
         players=players,
     )
 

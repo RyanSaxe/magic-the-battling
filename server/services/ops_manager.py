@@ -80,10 +80,10 @@ class OpsManager:
                 row = OpsState(id=1)
                 session.add(row)
 
-            row.mode = mode
-            row.message = message
-            row.updated_by = updated_by
-            row.updated_at = now
+            row.mode = mode  # ty: ignore[invalid-assignment]
+            row.message = message  # ty: ignore[invalid-assignment]
+            row.updated_by = updated_by  # ty: ignore[invalid-assignment]
+            row.updated_at = now  # ty: ignore[invalid-assignment]
             session.commit()
         finally:
             session.close()

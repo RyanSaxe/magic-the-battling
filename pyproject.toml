@@ -13,12 +13,15 @@ dependencies = [
     "alembic>=1.13",
     "python-multipart>=0.0.9",
     "playwright>=1.40",
+    "bcrypt>=5.0.0",
+    "pyjwt>=2.12.1",
 ]
 
 [dependency-groups]
 dev = [
     "pytest-cov>=7.0.0",
     "pytest>=8.3.4",
+    "pillow>=12.2.0",
 ]
 
 [tool.coverage.run]
