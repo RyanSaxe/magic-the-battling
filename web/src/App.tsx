@@ -13,6 +13,7 @@ import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { Dashboard } from './pages/Dashboard'
 import { BattlerView } from './pages/BattlerView'
+import { CubeView } from './pages/CubeView'
 
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/dashboard/list/:listId" element={<BattlerView />} />
+              <Route path="/cube/:cubeId" element={<CubeView />} />
               <Route path="/play" element={<Play />} />
               <Route path="/game/:gameId/lobby" element={<Lobby />} />
               <Route path="/game/:gameId/play" element={<Game />} />

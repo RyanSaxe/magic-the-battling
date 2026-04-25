@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FaDiscord } from 'react-icons/fa6'
+import { FaDiscord, FaUser } from 'react-icons/fa6'
+import { PuppetIcon } from '../components/icons/PuppetIcon'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
@@ -49,6 +50,8 @@ export function Dashboard() {
   const [myGamesOffset, setMyGamesOffset] = useState(0)
   const [myGamesLoading, setMyGamesLoading] = useState(false)
   const [myGamesLoaded, setMyGamesLoaded] = useState(false)
+  const [myGamesTotalGames, setMyGamesTotalGames] = useState(0)
+  const [myGamesTotalWins, setMyGamesTotalWins] = useState(0)
 
   const [discoverResults, setDiscoverResults] = useState<DiscoverResult[]>([])
   const [discoverLoading, setDiscoverLoading] = useState(false)
@@ -147,7 +150,7 @@ export function Dashboard() {
                 following={following}
                 hasMore={followingHasMore}
                 onPlay={(f) => navigate(`/play?cubeId=${encodeURIComponent(f.cube_id)}`)}
-                onView={(f) => window.open(`https://cubecobra.com/cube/overview/${encodeURIComponent(f.cube_id)}`, '_blank')}
+                onView={(f) => navigate(`/cube/${encodeURIComponent(f.cube_id)}`)}
                 onUnfollow={async (f) => {
                   try {
                     await unfollowCube(f.id)
@@ -174,6 +177,8 @@ export function Dashboard() {
                 hasMore={myGamesHasMore}
                 loading={myGamesLoading}
                 loaded={myGamesLoaded}
+                totalGames={myGamesTotalGames}
+                totalWins={myGamesTotalWins}
                 onLoadInitial={async () => {
                   setMyGamesLoading(true)
                   try {
@@ -181,6 +186,8 @@ export function Dashboard() {
                     setMyGames(data.games)
                     setMyGamesHasMore(data.has_more)
                     setMyGamesOffset(data.games.length)
+                    setMyGamesTotalGames(data.total_games)
+                    setMyGamesTotalWins(data.total_wins)
                     setMyGamesLoaded(true)
                   } catch {
                     addToast('Failed to load games', 'error')
@@ -238,6 +245,7 @@ export function Dashboard() {
                   }
                 }}
                 onPlay={(cubeId) => navigate(`/play?cubeId=${encodeURIComponent(cubeId)}`)}
+                onView={(cubeId) => navigate(`/cube/${encodeURIComponent(cubeId)}`)}
                 onFollow={async (cubeId) => {
                   try {
                     await followCube(cubeId)
@@ -301,9 +309,9 @@ export function Dashboard() {
 function SectionHeading({ title, count }: { title: string; count?: number }) {
   return (
     <div className="flex items-center justify-between gap-2 mb-3">
-      <span className="text-[10px] uppercase tracking-[0.14em] text-gray-400">{title}</span>
+      <span className="text-[10px] uppercase tracking-[0.14em] text-amber-200/80">{title}</span>
       {count !== undefined && (
-        <span className="text-[10px] text-gray-500">
+        <span className="text-[10px] text-amber-200/70">
           {count} {count === 1 ? 'cube' : 'cubes'}
         </span>
       )}
@@ -348,14 +356,17 @@ function BattlersGrid({
         {battlers.map((b) => (
           <InfoCard
             key={b.id}
-            variant="cube"
-            title={b.display_name || b.cube_id}
-            subtitle={b.cube_id !== (b.display_name || '') ? b.cube_id : undefined}
+            imageUrl={b.cube_image_uri ?? undefined}
+            title={b.cube_name || b.display_name || b.cube_id}
+            subtitle={b.cube_id !== (b.cube_name || b.display_name || '') ? b.cube_id : undefined}
+            subtitleUrl={`https://cubecobra.com/cube/overview/${encodeURIComponent(b.cube_id)}`}
             badge={{ text: b.play_mode === 'constructed' ? 'Deck' : 'Cube', color: b.play_mode === 'constructed' ? 'blue' : 'gold' }}
-            metadata={[
-              { label: 'Upgrades', value: b.use_upgrades ? 'On' : 'Off' },
-              { label: 'Opponents', value: String(b.puppet_count) },
-            ]}
+            inlineStats={<>
+              <FaUser className="w-3 h-3 text-gray-500" /><span>{b.human_player_count}</span>
+              <span className="text-gray-600">·</span>
+              <span>{b.game_count} games</span>
+            </>}
+            onClick={() => onView(b)}
             actions={[
               { label: 'Play', onClick: () => onPlay(b), variant: 'primary' },
               { label: 'View', onClick: () => onView(b), variant: 'secondary' },
@@ -416,9 +427,20 @@ function FollowingGrid({
         {following.map((f) => (
           <InfoCard
             key={f.id}
-            variant="community"
-            title={f.display_name || f.cube_id}
-            subtitle={f.cube_id !== (f.display_name || '') ? f.cube_id : undefined}
+            imageUrl={f.cube_image_uri ?? undefined}
+            title={f.cube_name || f.display_name || f.cube_id}
+            subtitle={f.cube_id !== (f.cube_name || f.display_name || '') ? f.cube_id : undefined}
+            subtitleUrl={`https://cubecobra.com/cube/overview/${encodeURIComponent(f.cube_id)}`}
+            inlineStats={<>
+              <FaUser className="w-3 h-3 text-gray-500" /><span>{f.human_player_count}</span>
+              <span className="text-gray-600">·</span>
+              <span>{f.game_count} games</span>
+              {f.last_played && <>
+                <span className="text-gray-600">·</span>
+                <span>{formatDate(f.last_played)}</span>
+              </>}
+            </>}
+            onClick={() => onView(f)}
             actions={[
               { label: 'Play', onClick: () => onPlay(f), variant: 'primary' },
               { label: 'View', onClick: () => onView(f), variant: 'secondary' },
@@ -596,6 +618,8 @@ function MyGamesGrid({
   hasMore,
   loading,
   loaded,
+  totalGames,
+  totalWins,
   onLoadInitial,
   onLoadMore,
   onView,
@@ -605,6 +629,8 @@ function MyGamesGrid({
   hasMore: boolean
   loading: boolean
   loaded: boolean
+  totalGames: number
+  totalWins: number
   onLoadInitial: () => void
   onLoadMore: () => void
   onView: (g: GameSummary) => void
@@ -617,7 +643,7 @@ function MyGamesGrid({
   if (!loaded && loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-amber-200/70">Loading...</p>
       </div>
     )
   }
@@ -637,29 +663,39 @@ function MyGamesGrid({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <SectionHeading title="My Games" count={games.length} />
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="text-[10px] uppercase tracking-[0.14em] text-amber-200/80">My Games</span>
+        <div className="flex items-center gap-3 text-[10px] text-amber-200/70">
+          <span>{totalGames} games</span>
+          <span className="text-amber-200/40">·</span>
+          <span>{totalGames > 0 ? `${totalWins} wins (${Math.round((totalWins / totalGames) * 100)}%)` : '0 wins'}</span>
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {games.map((g) => (
           <InfoCard
             key={g.game_id}
-            variant="history"
             title={formatDate(g.created_at)}
-            subtitle={g.cube_id || undefined}
+            subtitle={g.cube_name || g.cube_id || undefined}
             badge={g.best_human_placement ? { text: ordinal(g.best_human_placement), color: g.best_human_placement === 1 ? 'gold' : 'gray' } : undefined}
-            metadata={[
-              { label: 'Players', value: String(g.player_count) },
-            ]}
+            inlineStats={<>
+              <FaUser className="w-3 h-3 text-gray-500" /><span>{g.human_count}</span>
+              {g.player_count - g.human_count > 0 && <>
+                <PuppetIcon size="sm" className="opacity-60" />
+                <span>{g.player_count - g.human_count}</span>
+              </>}
+            </>}
             onClick={() => onView(g)}
             className={g.best_human_placement === 1 ? 'shadow-[0_0_12px_rgba(212,175,55,0.15)]' : ''}
           >
             {g.hand_scryfall_ids.length > 0 && (
-              <div className="flex -space-x-2 mt-2">
+              <div className="flex -space-x-3 mt-2">
                 {g.hand_scryfall_ids.slice(0, 7).map((sid) => (
                   <img
                     key={sid}
                     src={scryfallSmall(sid)}
                     alt=""
-                    className="w-8 h-11 rounded-sm border border-black/60 object-cover"
+                    className="w-10 h-14 rounded-sm border border-black/60 object-cover"
                     loading="lazy"
                   />
                 ))}
@@ -689,6 +725,7 @@ function DiscoverGrid({
   onLoadInitial,
   onLoadMore,
   onPlay,
+  onView,
   onFollow,
   onUnfollow,
   onPlayGame,
@@ -700,6 +737,7 @@ function DiscoverGrid({
   onLoadInitial: () => void
   onLoadMore: () => void
   onPlay: (cubeId: string) => void
+  onView: (cubeId: string) => void
   onFollow: (cubeId: string) => void
   onUnfollow: (cubeId: string) => void
   onPlayGame: () => void
@@ -711,7 +749,7 @@ function DiscoverGrid({
   if (!loaded && loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-amber-200/70">Loading...</p>
       </div>
     )
   }
@@ -736,32 +774,30 @@ function DiscoverGrid({
         {results.map((r) => (
           <InfoCard
             key={r.cube_id}
-            variant="community"
-            title={r.cube_id}
+            imageUrl={r.cube_image_uri ?? undefined}
+            title={r.cube_name || r.cube_id}
+            subtitle={r.cube_name && r.cube_name !== r.cube_id ? r.cube_id : undefined}
+            subtitleUrl={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
             badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
-            metadata={[
-              { label: 'Games', value: String(r.game_count) },
-              { label: 'Players', value: String(r.player_count) },
-              { label: 'Last played', value: formatDate(r.last_played) },
-            ]}
+            inlineStats={<>
+              <FaUser className="w-3 h-3 text-gray-500" /><span>{r.player_count}</span>
+              <span className="text-gray-600">·</span>
+              <span>{r.game_count} games</span>
+              {r.last_played && <>
+                <span className="text-gray-600">·</span>
+                <span>{formatDate(r.last_played)}</span>
+              </>}
+            </>}
+            onClick={() => onView(r.cube_id)}
             actions={[
               { label: 'Play', onClick: () => onPlay(r.cube_id), variant: 'primary' },
+              { label: 'View', onClick: () => onView(r.cube_id), variant: 'secondary' },
               ...(r.is_following
                 ? [{ label: 'Unfollow', onClick: () => onUnfollow(r.cube_id), variant: 'danger' as const }]
                 : [{ label: 'Follow', onClick: () => onFollow(r.cube_id), variant: 'secondary' as const }]),
             ]}
             className={r.is_following ? 'border-l-2 border-l-emerald-600/60' : ''}
-          >
-            <a
-              href={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-amber-400 hover:text-amber-300 transition-colors mt-2 inline-block"
-              onClick={(e) => e.stopPropagation()}
-            >
-              View on CubeCobra
-            </a>
-          </InfoCard>
+          />
         ))}
       </div>
       {hasMore && (

@@ -68,7 +68,7 @@ export function AuthHeaderButton({ compact }: { compact: boolean }) {
 
 export function UserMenuButton({ compact }: { compact: boolean }) {
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -100,6 +100,9 @@ export function UserMenuButton({ compact }: { compact: boolean }) {
         </button>
         {open && (
           <div className="absolute right-0 top-full mt-1 z-50 modal-chrome border gold-border rounded-lg shadow-2xl py-1 min-w-[160px]">
+            <div className="px-4 py-2 text-xs text-gray-500 border-b border-black/40">
+              {user?.username}
+            </div>
             <button
               onClick={() => { setOpen(false); navigate('/dashboard') }}
               className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"

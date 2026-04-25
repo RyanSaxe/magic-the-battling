@@ -296,6 +296,7 @@ async def warm_cube_cache(request: WarmCubeRequest):
     logger.info("warming cube cache: %s", request.cube_id)
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, get_cube_data, request.cube_id)
+    await loop.run_in_executor(None, database.save_cube_metadata, request.cube_id)
     logger.info("warming complete: %s", request.cube_id)
     return {"status": "ok"}
 

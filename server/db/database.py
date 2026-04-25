@@ -1,3 +1,4 @@
+# ruff: noqa: PLC0415
 import json
 import logging
 import os
@@ -65,6 +66,7 @@ def init_db():
         _migrate(conn, "player_game_history", "user_id", "TEXT")
 
     _backfill_game_cube_ids()
+    _backfill_cube_metadata()
 
 
 def _backfill_game_cube_ids() -> None:
@@ -90,6 +92,80 @@ def _backfill_game_cube_ids() -> None:
         conn.commit()
         if count:
             logger.info("Backfilled cube_id on %d game records", count)
+
+
+def save_cube_metadata(cube_id: str) -> None:
+    """Persist cube name and image from the CubeCobra JSON cache (no extra fetch if already cached)."""
+    logger = logging.getLogger(__name__)
+    try:
+        from mtb.utils.json_helpers import get_json
+
+        url = f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
+        data = get_json(url)
+        name = data.get("name")
+        image = data.get("image", {})
+        image_uri = image.get("uri") if isinstance(image, dict) else None
+        with engine.connect() as conn:
+            conn.execute(
+                text(
+                    "INSERT OR REPLACE INTO cube_metadata (cube_id, name, image_uri, updated_at) "
+                    "VALUES (:cube_id, :name, :image_uri, datetime('now'))"
+                ),
+                {"cube_id": cube_id, "name": name, "image_uri": image_uri},
+            )
+            conn.commit()
+    except Exception:
+        logger.debug("Could not save cube metadata for %s", cube_id)
+
+
+def _backfill_cube_metadata() -> None:
+    logger = logging.getLogger(__name__)
+    with engine.connect() as conn:
+        existing = {row[0] for row in conn.execute(text("SELECT cube_id FROM cube_metadata")).fetchall()}
+        game_cubes = {
+            row[0]
+            for row in conn.execute(text("SELECT DISTINCT cube_id FROM games WHERE cube_id IS NOT NULL")).fetchall()
+        }
+        follow_cubes = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT DISTINCT cube_id FROM battler_follows WHERE cube_id IS NOT NULL")
+            ).fetchall()
+        }
+        battler_cubes = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT DISTINCT cube_id FROM user_battlers WHERE cube_id IS NOT NULL")
+            ).fetchall()
+        }
+        missing = (game_cubes | follow_cubes | battler_cubes) - existing
+        if not missing:
+            return
+
+        logger.info("Backfilling cube metadata for %d cube(s)", len(missing))
+        from mtb.utils.json_helpers import get_json
+
+        count = 0
+        for cube_id in missing:
+            try:
+                url = f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
+                data = get_json(url)
+                name = data.get("name")
+                image = data.get("image", {})
+                image_uri = image.get("uri") if isinstance(image, dict) else None
+                conn.execute(
+                    text(
+                        "INSERT INTO cube_metadata (cube_id, name, image_uri, updated_at) "
+                        "VALUES (:cube_id, :name, :image_uri, datetime('now'))"
+                    ),
+                    {"cube_id": cube_id, "name": name, "image_uri": image_uri},
+                )
+                count += 1
+            except Exception:
+                logger.warning("Failed to fetch metadata for cube %s", cube_id)
+        conn.commit()
+        if count:
+            logger.info("Backfilled metadata for %d cube(s)", count)
 
 
 def _migrate_rename_column_pre_create() -> None:

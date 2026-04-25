@@ -448,6 +448,8 @@ export interface UserBattler {
   id: number
   cube_id: string
   display_name: string | null
+  cube_name?: string | null
+  cube_image_uri?: string | null
   use_upgrades: boolean
   use_vanguards: boolean
   play_mode: PlayMode
@@ -457,15 +459,21 @@ export interface UserBattler {
   guided_mode_default: boolean
   position: number
   created_at: string
+  game_count: number
+  human_player_count: number
+  last_played?: string | null
 }
 
 export interface GameSummary {
   game_id: string
   created_at: string
   player_count: number
+  human_count: number
   best_human_name: string
   best_human_placement: number | null
   cube_id: string
+  cube_name?: string | null
+  cube_image_uri?: string | null
   play_mode?: string
   use_upgrades?: boolean
   hand_scryfall_ids: string[]
@@ -475,5 +483,10 @@ export interface FollowedBattler {
   id: number
   cube_id: string
   display_name: string | null
+  cube_name?: string | null
+  cube_image_uri?: string | null
   created_at: string
+  game_count: number
+  human_player_count: number
+  last_played?: string | null
 }
