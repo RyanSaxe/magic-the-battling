@@ -22,6 +22,7 @@ export interface CardAction {
 export interface InfoCardProps {
   title: string
   subtitle?: string
+  subtitleUrl?: string
   badge?: BadgeProps
   imageUrl?: string
   inlineStats?: ReactNode
@@ -35,6 +36,7 @@ export interface InfoCardProps {
 export function InfoCard({
   title,
   subtitle,
+  subtitleUrl,
   badge,
   imageUrl,
   inlineStats,
@@ -62,7 +64,11 @@ export function InfoCard({
           <div className="absolute bottom-0 left-0 right-0 px-4 pb-2 flex items-end gap-2 min-w-0">
             <div className="flex-1 min-w-0">
               <h3 className="text-amber-50 font-semibold text-sm truncate font-['Cinzel',serif] drop-shadow-md">{title}</h3>
-              {subtitle && <p className="text-gray-300 text-xs truncate drop-shadow-sm">{subtitle}</p>}
+              {subtitle && (subtitleUrl ? (
+                <a href={subtitleUrl} target="_blank" rel="noopener noreferrer" className="text-amber-400/80 text-xs truncate drop-shadow-sm hover:text-amber-300 transition-colors block" onClick={(e) => e.stopPropagation()}>{subtitle} ↗</a>
+              ) : (
+                <p className="text-gray-300 text-xs truncate drop-shadow-sm">{subtitle}</p>
+              ))}
             </div>
             {badge && (
               <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-wider rounded-full px-2 py-0.5 ${BADGE_COLORS[badge.color ?? 'gray']}`}>
@@ -75,7 +81,11 @@ export function InfoCard({
         <div className="bg-amber-950/40 px-4 py-2.5 border-b border-[color:rgba(212,175,55,0.22)] flex items-center gap-2 min-w-0">
           <div className="flex-1 min-w-0">
             <h3 className="text-amber-50 font-semibold text-sm truncate font-['Cinzel',serif]">{title}</h3>
-            {subtitle && <p className="text-gray-400 text-xs mt-0.5 truncate">{subtitle}</p>}
+            {subtitle && (subtitleUrl ? (
+              <a href={subtitleUrl} target="_blank" rel="noopener noreferrer" className="text-amber-400/80 text-xs mt-0.5 truncate hover:text-amber-300 transition-colors block" onClick={(e) => e.stopPropagation()}>{subtitle} ↗</a>
+            ) : (
+              <p className="text-gray-400 text-xs mt-0.5 truncate">{subtitle}</p>
+            ))}
           </div>
           {badge && (
             <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-wider rounded-full px-2 py-0.5 ${BADGE_COLORS[badge.color ?? 'gray']}`}>

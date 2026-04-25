@@ -152,7 +152,13 @@ def create_battler(
     db.add(battler)
     db.commit()
     db.refresh(battler)
-    return _battler_to_response(battler)
+    database.save_cube_metadata(request.cube_id)
+    resp = _battler_to_response(battler)
+    meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == request.cube_id).first()
+    if meta:
+        resp.cube_name = str(meta.name) if meta.name else None
+        resp.cube_image_uri = str(meta.image_uri) if meta.image_uri else None
+    return resp
 
 
 @router.put("/{battler_id}")
@@ -207,14 +213,17 @@ def _query_cube_games(
     if use_upgrades is not None:
         base_filter.append(func.json_extract(GameRecord.config_json, "$.use_upgrades") == use_upgrades)
 
-    completed_ids = (
-        db.query(GameRecord.id)
-        .join(PlayerGameHistory, PlayerGameHistory.game_id == GameRecord.id)
-        .filter(*base_filter, PlayerGameHistory.is_puppet.is_(False), PlayerGameHistory.final_placement.isnot(None))
-        .distinct()
-        .subquery()
+    has_placed_human = (
+        db.query(PlayerGameHistory.id)
+        .filter(
+            PlayerGameHistory.game_id == GameRecord.id,
+            PlayerGameHistory.is_puppet.is_(False),
+            PlayerGameHistory.final_placement.isnot(None),
+        )
+        .correlate(GameRecord)
+        .exists()
     )
-    query = db.query(GameRecord).filter(GameRecord.id.in_(db.query(completed_ids)))
+    query = db.query(GameRecord).filter(*base_filter, has_placed_human)
 
     total_games = query.count()
     win_subquery = query.join(PlayerGameHistory, PlayerGameHistory.game_id == GameRecord.id).filter(
@@ -448,10 +457,14 @@ def follow_cube(
     db.add(follow)
     db.commit()
     db.refresh(follow)
+    database.save_cube_metadata(request.cube_id)
+    meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == request.cube_id).first()
     return FollowedBattlerResponse(
         id=cast(int, follow.id),
         cube_id=cast(str, follow.cube_id),
         display_name=cast(str, follow.display_name) if follow.display_name else None,
+        cube_name=str(meta.name) if meta and meta.name else None,
+        cube_image_uri=str(meta.image_uri) if meta and meta.image_uri else None,
         created_at=str(follow.created_at.isoformat()) if follow.created_at else "",
     )
 

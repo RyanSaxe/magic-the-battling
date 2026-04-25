@@ -353,12 +353,14 @@ function BattlersGrid({
             imageUrl={b.cube_image_uri ?? undefined}
             title={b.cube_name || b.display_name || b.cube_id}
             subtitle={b.cube_id !== (b.cube_name || b.display_name || '') ? b.cube_id : undefined}
+            subtitleUrl={`https://cubecobra.com/cube/overview/${encodeURIComponent(b.cube_id)}`}
             badge={{ text: b.play_mode === 'constructed' ? 'Deck' : 'Cube', color: b.play_mode === 'constructed' ? 'blue' : 'gold' }}
             inlineStats={<>
               <FaUser className="w-3 h-3 text-gray-500" /><span>{b.human_player_count}</span>
               <span className="text-gray-600">·</span>
               <span>{b.game_count} games</span>
             </>}
+            onClick={() => onView(b)}
             actions={[
               { label: 'Play', onClick: () => onPlay(b), variant: 'primary' },
               { label: 'View', onClick: () => onView(b), variant: 'secondary' },
@@ -422,6 +424,7 @@ function FollowingGrid({
             imageUrl={f.cube_image_uri ?? undefined}
             title={f.cube_name || f.display_name || f.cube_id}
             subtitle={f.cube_id !== (f.cube_name || f.display_name || '') ? f.cube_id : undefined}
+            subtitleUrl={`https://cubecobra.com/cube/overview/${encodeURIComponent(f.cube_id)}`}
             inlineStats={<>
               <FaUser className="w-3 h-3 text-gray-500" /><span>{f.human_player_count}</span>
               <span className="text-gray-600">·</span>
@@ -431,6 +434,7 @@ function FollowingGrid({
                 <span>{formatDate(f.last_played)}</span>
               </>}
             </>}
+            onClick={() => onView(f)}
             actions={[
               { label: 'Play', onClick: () => onPlay(f), variant: 'primary' },
               { label: 'View', onClick: () => onView(f), variant: 'secondary' },
@@ -756,6 +760,7 @@ function DiscoverGrid({
             imageUrl={r.cube_image_uri ?? undefined}
             title={r.cube_name || r.cube_id}
             subtitle={r.cube_name && r.cube_name !== r.cube_id ? r.cube_id : undefined}
+            subtitleUrl={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
             badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
             inlineStats={<>
               <FaUser className="w-3 h-3 text-gray-500" /><span>{r.player_count}</span>
@@ -766,6 +771,7 @@ function DiscoverGrid({
                 <span>{formatDate(r.last_played)}</span>
               </>}
             </>}
+            onClick={() => onView(r.cube_id)}
             actions={[
               { label: 'Play', onClick: () => onPlay(r.cube_id), variant: 'primary' },
               { label: 'View', onClick: () => onView(r.cube_id), variant: 'secondary' },
