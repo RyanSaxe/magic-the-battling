@@ -313,12 +313,6 @@ export function ShareGame() {
             >
               Home
             </button>
-            <button
-              onClick={() => navigate('/play')}
-              className="btn btn-primary py-2 px-4 font-semibold animate-gentle-glow"
-            >
-              Play Game
-            </button>
           </div>
         </div>
         ) : (
@@ -343,12 +337,6 @@ export function ShareGame() {
                 className="btn btn-secondary py-1.5 px-3 text-sm"
               >
                 Home
-              </button>
-              <button
-                onClick={() => navigate('/play')}
-                className="btn btn-primary py-1.5 px-3 text-sm font-semibold animate-gentle-glow"
-              >
-                Play
               </button>
             </div>
           </div>
