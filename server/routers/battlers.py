@@ -9,7 +9,15 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from server.db import database
-from server.db.models import BattlerFollow, BattleSnapshot, GameRecord, PlayerGameHistory, User, UserBattler
+from server.db.models import (
+    BattlerFollow,
+    BattleSnapshot,
+    CubeMetadata,
+    GameRecord,
+    PlayerGameHistory,
+    User,
+    UserBattler,
+)
 from server.schemas.auth import (
     FollowedBattlerResponse,
     GameSummaryResponse,
@@ -160,14 +168,19 @@ def _query_cube_games(
     has_more = len(games) > GAMES_PAGE_SIZE
     games = games[:GAMES_PAGE_SIZE]
 
+    meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first()
+    cube_name = str(meta.name) if meta and meta.name else None
+    cube_image_uri = str(meta.image_uri) if meta and meta.image_uri else None
+
     results: list[GameSummaryResponse] = []
     for game in games:
         histories = db.query(PlayerGameHistory).filter(PlayerGameHistory.game_id == game.id).all()
         humans = [h for h in histories if not h.is_puppet]
-        if not humans:
+        placed_humans = [h for h in humans if h.final_placement is not None]
+        if not placed_humans:
             continue
 
-        best = min(humans, key=lambda h: h.final_placement or 999)
+        best = min(placed_humans, key=lambda h: h.final_placement or 999)
 
         hand_ids: list[str] = []
         final_snap = (
@@ -192,6 +205,8 @@ def _query_cube_games(
                 best_human_name=str(best.player_name),
                 best_human_placement=cast(int, best.final_placement) if best.final_placement is not None else None,
                 cube_id=cube_id,
+                cube_name=cube_name,
+                cube_image_uri=cube_image_uri,
                 play_mode=config.get("play_mode"),
                 use_upgrades=config.get("use_upgrades"),
                 hand_scryfall_ids=hand_ids,
@@ -207,7 +222,6 @@ def list_cube_games(
     play_mode: str | None = Query(default=None),
     use_upgrades: bool | None = Query(default=None),
     offset: int = Query(default=0, ge=0),
-    user: User = Depends(get_current_user),
     db: Session = Depends(_get_db),
 ):
     return _query_cube_games(db, cube_id, play_mode, use_upgrades, offset)
@@ -252,9 +266,15 @@ def list_my_games(
     has_more = len(histories) > GAMES_PAGE_SIZE
     histories = histories[:GAMES_PAGE_SIZE]
 
+    game_ids = [str(h.game_id) for h in histories]
+    games_by_id = {str(g.id): g for g in db.query(GameRecord).filter(GameRecord.id.in_(game_ids)).all()}
+    cube_ids = {str(g.cube_id) for g in games_by_id.values() if g.cube_id}
+    metadata_rows = db.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids)).all() if cube_ids else []
+    metadata_map = {str(m.cube_id): m for m in metadata_rows}
+
     results: list[GameSummaryResponse] = []
     for hist in histories:
-        game = db.query(GameRecord).filter(GameRecord.id == hist.game_id).first()
+        game = games_by_id.get(str(hist.game_id))
         if not game:
             continue
 
@@ -274,6 +294,8 @@ def list_my_games(
             except (json.JSONDecodeError, KeyError):
                 pass
 
+        game_cube_id = str(game.cube_id) if game.cube_id else ""
+        meta = metadata_map.get(game_cube_id)
         config = json.loads(str(game.config_json)) if game.config_json else {}
         results.append(
             GameSummaryResponse(
@@ -282,7 +304,9 @@ def list_my_games(
                 player_count=len(all_histories),
                 best_human_name=str(hist.player_name),
                 best_human_placement=cast(int, hist.final_placement) if hist.final_placement is not None else None,
-                cube_id=str(game.cube_id) if game.cube_id else "",
+                cube_id=game_cube_id,
+                cube_name=str(meta.name) if meta and meta.name else None,
+                cube_image_uri=str(meta.image_uri) if meta and meta.image_uri else None,
                 play_mode=config.get("play_mode"),
                 use_upgrades=config.get("use_upgrades"),
                 hand_scryfall_ids=hand_ids,
@@ -311,12 +335,23 @@ def list_following(
     )
     has_more = len(follows) > BATTLERS_PAGE_SIZE
     follows = follows[:BATTLERS_PAGE_SIZE]
+
+    cube_ids = [str(f.cube_id) for f in follows]
+    metadata_rows = db.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids)).all()
+    metadata_map = {str(m.cube_id): m for m in metadata_rows}
+
     return {
         "following": [
             FollowedBattlerResponse(
                 id=cast(int, f.id),
                 cube_id=cast(str, f.cube_id),
                 display_name=cast(str, f.display_name) if f.display_name else None,
+                cube_name=str(metadata_map[str(f.cube_id)].name)
+                if str(f.cube_id) in metadata_map and metadata_map[str(f.cube_id)].name
+                else None,
+                cube_image_uri=str(metadata_map[str(f.cube_id)].image_uri)
+                if str(f.cube_id) in metadata_map and metadata_map[str(f.cube_id)].image_uri
+                else None,
                 created_at=str(f.created_at.isoformat()) if f.created_at else "",
             )
             for f in follows

@@ -466,6 +466,8 @@ export interface GameSummary {
   best_human_name: string
   best_human_placement: number | null
   cube_id: string
+  cube_name?: string | null
+  cube_image_uri?: string | null
   play_mode?: string
   use_upgrades?: boolean
   hand_scryfall_ids: string[]
@@ -475,5 +477,7 @@ export interface FollowedBattler {
   id: number
   cube_id: string
   display_name: string | null
+  cube_name?: string | null
+  cube_image_uri?: string | null
   created_at: string
 }

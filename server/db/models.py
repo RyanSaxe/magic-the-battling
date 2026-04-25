@@ -156,6 +156,15 @@ class BattlerFollow(Base):
     )
 
 
+class CubeMetadata(Base):
+    __tablename__ = "cube_metadata"
+
+    cube_id = Column(String, primary_key=True)
+    name = Column(String, nullable=True)
+    image_uri = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=_utc_now)
+
+
 class OpsState(Base):
     __tablename__ = "ops_state"
 

@@ -418,8 +418,8 @@ function FollowingGrid({
           <InfoCard
             key={f.id}
             variant="community"
-            title={f.display_name || f.cube_id}
-            subtitle={f.cube_id !== (f.display_name || '') ? f.cube_id : undefined}
+            title={f.cube_name || f.display_name || f.cube_id}
+            subtitle={f.cube_id !== (f.cube_name || f.display_name || '') ? f.cube_id : undefined}
             actions={[
               { label: 'Play', onClick: () => onPlay(f), variant: 'primary' },
               { label: 'View', onClick: () => onView(f), variant: 'secondary' },
@@ -654,13 +654,13 @@ function MyGamesGrid({
             className={g.best_human_placement === 1 ? 'shadow-[0_0_12px_rgba(212,175,55,0.15)]' : ''}
           >
             {g.hand_scryfall_ids.length > 0 && (
-              <div className="flex -space-x-2 mt-2">
+              <div className="flex -space-x-3 mt-2">
                 {g.hand_scryfall_ids.slice(0, 7).map((sid) => (
                   <img
                     key={sid}
                     src={scryfallSmall(sid)}
                     alt=""
-                    className="w-8 h-11 rounded-sm border border-black/60 object-cover"
+                    className="w-10 h-14 rounded-sm border border-black/60 object-cover"
                     loading="lazy"
                   />
                 ))}
@@ -740,7 +740,8 @@ function DiscoverGrid({
           <InfoCard
             key={r.cube_id}
             variant="community"
-            title={r.cube_id}
+            title={r.cube_name || r.cube_id}
+            subtitle={r.cube_name && r.cube_name !== r.cube_id ? r.cube_id : undefined}
             badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
             metadata={[
               { label: 'Games', value: String(r.game_count) },

@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { FaDiscord } from 'react-icons/fa6'
-import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
 import { CubeCobraPrimerLink } from '../components/common/CubeCobraPrimerLink'
@@ -27,8 +26,6 @@ function formatDate(iso: string): string {
 export function CubeView() {
   const { cubeId } = useParams<{ cubeId: string }>()
   const navigate = useNavigate()
-  const location = useLocation()
-  const { user, loading: authLoading } = useAuth()
   const { addToast } = useToast()
 
   const [games, setGames] = useState<GameSummary[]>([])
@@ -40,12 +37,9 @@ export function CubeView() {
   const [filterPlayMode, setFilterPlayMode] = useState<string | null>(null)
   const [filterUpgrades, setFilterUpgrades] = useState<boolean | null>(null)
   const [initialLoad, setInitialLoad] = useState(true)
+  const [cubeName, setCubeName] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate(`/login?returnTo=${encodeURIComponent(location.pathname)}`, { replace: true })
-    }
-  }, [authLoading, user, navigate, location.pathname])
+  // No auth required — this page is publicly viewable
 
   const loadGames = useCallback(async (id: string, playMode: string | null, upgrades: boolean | null, offset: number) => {
     setGamesLoading(true)
@@ -57,6 +51,9 @@ export function CubeView() {
       })
       if (offset === 0) {
         setGames(data.games)
+        if (data.games.length > 0) {
+          setCubeName(data.games[0].cube_name ?? null)
+        }
       } else {
         setGames((prev) => [...prev, ...data.games])
       }
@@ -73,16 +70,16 @@ export function CubeView() {
   }, [addToast])
 
   useEffect(() => {
-    if (user && cubeId) {
+    if (cubeId) {
       loadGames(cubeId, null, null, 0)
     }
-  }, [user, cubeId, loadGames])
+  }, [cubeId, loadGames])
 
   const cubeCobraUrl = cubeId
     ? `https://cubecobra.com/cube/overview/${encodeURIComponent(cubeId)}`
     : '#'
 
-  if (authLoading || !user || initialLoad) {
+  if (initialLoad) {
     return (
       <div className="game-table h-dvh flex flex-col overflow-hidden">
         <AppHeader renderRight={({ compact }) => (
@@ -138,7 +135,10 @@ export function CubeView() {
         <main className="flex-1 min-w-0 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className="zone-pack shell-scroll-col flex-1 min-w-0 min-h-0 flex flex-col px-4 py-4 overflow-auto">
             <div className="mb-4 pb-4 border-b border-black/40">
-              <h2 className="text-white font-bold text-lg">{cubeId}</h2>
+              <h2 className="text-white font-bold text-lg">{cubeName || cubeId}</h2>
+              {cubeName && cubeName !== cubeId && (
+                <p className="text-xs text-gray-400 mt-0.5">{cubeId}</p>
+              )}
               <a
                 href={cubeCobraUrl}
                 target="_blank"
@@ -172,7 +172,7 @@ export function CubeView() {
               </dl>
             )}
 
-            <LabeledDivider label="Game History" />
+            <LabeledDivider label={totalGames > 0 ? `Game History (${totalGames})` : 'Game History'} />
 
             <div className="flex flex-wrap gap-2 mt-3 mb-3">
               <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
@@ -236,13 +236,13 @@ export function CubeView() {
                       className={g.best_human_placement === 1 ? 'shadow-[0_0_12px_rgba(212,175,55,0.15)]' : ''}
                     >
                       {g.hand_scryfall_ids.length > 0 && (
-                        <div className="flex -space-x-2 mt-2">
+                        <div className="flex -space-x-3 mt-2">
                           {g.hand_scryfall_ids.slice(0, 7).map((sid) => (
                             <img
                               key={sid}
                               src={`https://cards.scryfall.io/small/front/${sid[0]}/${sid[1]}/${sid}.jpg`}
                               alt=""
-                              className="w-8 h-11 rounded-sm border border-black/60 object-cover"
+                              className="w-10 h-14 rounded-sm border border-black/60 object-cover"
                               loading="lazy"
                             />
                           ))}

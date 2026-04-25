@@ -196,7 +196,7 @@ export function BattlerView() {
               </dl>
             )}
 
-            <LabeledDivider label="Game History" />
+            <LabeledDivider label={totalGames > 0 ? `Game History (${totalGames})` : 'Game History'} />
 
             <div className="flex flex-wrap gap-2 mt-3 mb-3">
               <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
@@ -260,13 +260,13 @@ export function BattlerView() {
                       className={g.best_human_placement === 1 ? 'shadow-[0_0_12px_rgba(212,175,55,0.15)]' : ''}
                     >
                       {g.hand_scryfall_ids.length > 0 && (
-                        <div className="flex -space-x-2 mt-2">
+                        <div className="flex -space-x-3 mt-2">
                           {g.hand_scryfall_ids.slice(0, 7).map((sid) => (
                             <img
                               key={sid}
                               src={`https://cards.scryfall.io/small/front/${sid[0]}/${sid[1]}/${sid}.jpg`}
                               alt=""
-                              className="w-8 h-11 rounded-sm border border-black/60 object-cover"
+                              className="w-10 h-14 rounded-sm border border-black/60 object-cover"
                               loading="lazy"
                             />
                           ))}

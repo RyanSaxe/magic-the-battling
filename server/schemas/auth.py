@@ -105,6 +105,8 @@ class GameSummaryResponse(BaseModel):
     best_human_name: str
     best_human_placement: int | None
     cube_id: str
+    cube_name: str | None = None
+    cube_image_uri: str | None = None
     play_mode: str | None = None
     use_upgrades: bool | None = None
     hand_scryfall_ids: list[str] = []
@@ -114,4 +116,6 @@ class FollowedBattlerResponse(BaseModel):
     id: int
     cube_id: str
     display_name: str | None
+    cube_name: str | None = None
+    cube_image_uri: str | None = None
     created_at: str

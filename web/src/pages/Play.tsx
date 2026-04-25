@@ -644,18 +644,24 @@ export function Play() {
                     </span>
                   </div>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 sm:gap-3">
-                    <input
-                      id="player-name"
-                      type="text"
-                      value={user ? playerName : nameLoading ? "" : playerName}
-                      onChange={(e) => setPlayerName(e.target.value)}
-                      onKeyDown={(e) =>
-                        e.key === "Enter" && nameValid && handleCreateLobby()
-                      }
-                      disabled={!!user || nameLoading}
-                      placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-                      className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-                    />
+                    {user ? (
+                      <div className="w-full h-[42px] bg-black/20 border border-black/30 text-amber-100 rounded px-3 py-2 text-base flex items-center">
+                        {playerName}
+                      </div>
+                    ) : (
+                      <input
+                        id="player-name"
+                        type="text"
+                        value={nameLoading ? "" : playerName}
+                        onChange={(e) => setPlayerName(e.target.value)}
+                        onKeyDown={(e) =>
+                          e.key === "Enter" && nameValid && handleCreateLobby()
+                        }
+                        disabled={nameLoading}
+                        placeholder={nameLoading ? "Generating name..." : "Enter your name"}
+                        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+                      />
+                    )}
                     <GuidedModeField enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
                   </div>
                 </div>

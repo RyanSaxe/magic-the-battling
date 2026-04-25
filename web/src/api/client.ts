@@ -369,7 +369,6 @@ export async function getCubeGames(
   const qs = params.toString()
   const response = await fetch(
     `${API_BASE}/battlers/cube/${encodeURIComponent(cubeId)}/games${qs ? `?${qs}` : ''}`,
-    { credentials: 'include' },
   )
   if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load games'))
   return response.json()
@@ -412,6 +411,8 @@ export async function unfollowCube(followId: number): Promise<void> {
 
 export interface DiscoverResult {
   cube_id: string
+  cube_name?: string | null
+  cube_image_uri?: string | null
   game_count: number
   player_count: number
   last_played: string | null
