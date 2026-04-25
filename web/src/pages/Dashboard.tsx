@@ -147,7 +147,7 @@ export function Dashboard() {
                 following={following}
                 hasMore={followingHasMore}
                 onPlay={(f) => navigate(`/play?cubeId=${encodeURIComponent(f.cube_id)}`)}
-                onView={(f) => window.open(`https://cubecobra.com/cube/overview/${encodeURIComponent(f.cube_id)}`, '_blank')}
+                onView={(f) => navigate(`/cube/${encodeURIComponent(f.cube_id)}`)}
                 onUnfollow={async (f) => {
                   try {
                     await unfollowCube(f.id)
@@ -238,6 +238,7 @@ export function Dashboard() {
                   }
                 }}
                 onPlay={(cubeId) => navigate(`/play?cubeId=${encodeURIComponent(cubeId)}`)}
+                onView={(cubeId) => navigate(`/cube/${encodeURIComponent(cubeId)}`)}
                 onFollow={async (cubeId) => {
                   try {
                     await followCube(cubeId)
@@ -689,6 +690,7 @@ function DiscoverGrid({
   onLoadInitial,
   onLoadMore,
   onPlay,
+  onView,
   onFollow,
   onUnfollow,
   onPlayGame,
@@ -700,6 +702,7 @@ function DiscoverGrid({
   onLoadInitial: () => void
   onLoadMore: () => void
   onPlay: (cubeId: string) => void
+  onView: (cubeId: string) => void
   onFollow: (cubeId: string) => void
   onUnfollow: (cubeId: string) => void
   onPlayGame: () => void
@@ -746,6 +749,7 @@ function DiscoverGrid({
             ]}
             actions={[
               { label: 'Play', onClick: () => onPlay(r.cube_id), variant: 'primary' },
+              { label: 'View', onClick: () => onView(r.cube_id), variant: 'secondary' },
               ...(r.is_following
                 ? [{ label: 'Unfollow', onClick: () => onUnfollow(r.cube_id), variant: 'danger' as const }]
                 : [{ label: 'Follow', onClick: () => onFollow(r.cube_id), variant: 'secondary' as const }]),

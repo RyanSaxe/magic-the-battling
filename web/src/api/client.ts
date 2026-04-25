@@ -358,6 +358,23 @@ export async function getBattlerGames(
   return response.json()
 }
 
+export async function getCubeGames(
+  cubeId: string,
+  opts: { offset?: number; playMode?: string; useUpgrades?: boolean } = {},
+): Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }> {
+  const params = new URLSearchParams()
+  if (opts.offset) params.set('offset', String(opts.offset))
+  if (opts.playMode != null) params.set('play_mode', opts.playMode)
+  if (opts.useUpgrades != null) params.set('use_upgrades', String(opts.useUpgrades))
+  const qs = params.toString()
+  const response = await fetch(
+    `${API_BASE}/battlers/cube/${encodeURIComponent(cubeId)}/games${qs ? `?${qs}` : ''}`,
+    { credentials: 'include' },
+  )
+  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load games'))
+  return response.json()
+}
+
 export async function getMyGames(offset = 0): Promise<{ games: GameSummary[]; has_more: boolean }> {
   const response = await fetch(`${API_BASE}/battlers/my-games?offset=${offset}`, { credentials: 'include' })
   if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load games'))
