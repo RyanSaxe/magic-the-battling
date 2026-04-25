@@ -129,3 +129,127 @@ def test_battler_games_includes_unshared_finished_games_for_same_cube(client):
 
     assert response.status_code == 200
     assert response.json()["games"][0]["game_id"] == "cube-public-game"
+
+
+def test_battler_games_includes_games_where_human_lost(client):
+    """Games where all humans died (winner_player_id=None) should still appear."""
+    register = client.post(
+        "/api/auth/register",
+        json={"username": "loser_user", "password": "password123", "email": "loser@test.com"},
+    )
+    assert register.status_code == 200
+
+    battler = client.post("/api/battlers", json={"cube_id": "cube-lost"})
+    assert battler.status_code == 200
+    battler_id = battler.json()["id"]
+
+    db = database.SessionLocal()
+    try:
+        db.add(
+            GameRecord(
+                id="lost-game",
+                cube_id="cube-lost",
+                shared=False,
+                ended_at=datetime.now(UTC),
+                winner_player_id=None,
+            )
+        )
+        db.add(
+            PlayerGameHistory(
+                game_id="lost-game",
+                player_name="Alice",
+                battler_elo=1200,
+                max_stage=3,
+                max_round=2,
+                final_placement=2,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get(f"/api/battlers/{battler_id}/games")
+
+    assert response.status_code == 200
+    assert len(response.json()["games"]) == 1
+    assert response.json()["games"][0]["game_id"] == "lost-game"
+
+
+def test_my_games_includes_games_where_human_lost(client):
+    """The Games tab should show games even when the player lost (winner_player_id=None)."""
+    register = client.post(
+        "/api/auth/register",
+        json={"username": "mygames_user", "password": "password123", "email": "mygames@test.com"},
+    )
+    assert register.status_code == 200
+    user_id = register.json()["user_id"]
+
+    db = database.SessionLocal()
+    try:
+        db.add(
+            GameRecord(
+                id="my-lost-game",
+                cube_id="cube-x",
+                ended_at=datetime.now(UTC),
+                winner_player_id=None,
+            )
+        )
+        db.add(
+            PlayerGameHistory(
+                game_id="my-lost-game",
+                player_name="mygames_user",
+                battler_elo=1200,
+                max_stage=2,
+                max_round=3,
+                final_placement=3,
+                user_id=user_id,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get("/api/battlers/my-games")
+
+    assert response.status_code == 200
+    assert len(response.json()["games"]) == 1
+    assert response.json()["games"][0]["game_id"] == "my-lost-game"
+
+
+def test_cube_games_endpoint_returns_games_for_any_user(client):
+    """The public cube games endpoint works without owning the cube as a battler."""
+    client.post(
+        "/api/auth/register",
+        json={"username": "cube_viewer", "password": "password123", "email": "viewer@test.com"},
+    )
+
+    db = database.SessionLocal()
+    try:
+        db.add(
+            GameRecord(
+                id="public-cube-game",
+                cube_id="someone-elses-cube",
+                ended_at=datetime.now(UTC),
+            )
+        )
+        db.add(
+            PlayerGameHistory(
+                game_id="public-cube-game",
+                player_name="OtherPlayer",
+                battler_elo=1200,
+                max_stage=3,
+                max_round=2,
+                final_placement=1,
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get("/api/battlers/cube/someone-elses-cube/games")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["games"]) == 1
+    assert data["games"][0]["game_id"] == "public-cube-game"
+    assert data["total_games"] == 1

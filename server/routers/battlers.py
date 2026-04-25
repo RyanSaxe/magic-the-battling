@@ -134,24 +134,16 @@ def delete_battler(
 GAMES_PAGE_SIZE = 20
 
 
-@router.get("/{battler_id}/games")
-def list_battler_games(
-    battler_id: int,
-    play_mode: str | None = Query(default=None),
-    use_upgrades: bool | None = Query(default=None),
-    offset: int = Query(default=0, ge=0),
-    user: User = Depends(get_current_user),
-    db: Session = Depends(_get_db),
-):
-    battler = db.query(UserBattler).filter(UserBattler.id == battler_id, UserBattler.user_id == user.id).first()
-    if not battler:
-        raise HTTPException(status_code=404, detail="Battler not found")
-
-    cube_id = str(battler.cube_id)
+def _query_cube_games(
+    db: Session,
+    cube_id: str,
+    play_mode: str | None,
+    use_upgrades: bool | None,
+    offset: int,
+) -> dict:
     query = db.query(GameRecord).filter(
         GameRecord.cube_id == cube_id,
         GameRecord.ended_at.isnot(None),
-        GameRecord.winner_player_id.isnot(None),
     )
     if play_mode is not None:
         query = query.filter(func.json_extract(GameRecord.config_json, "$.play_mode") == play_mode)
@@ -209,6 +201,34 @@ def list_battler_games(
     return {"games": results, "has_more": has_more, "total_games": total_games, "total_wins": total_wins}
 
 
+@router.get("/cube/{cube_id}/games")
+def list_cube_games(
+    cube_id: str,
+    play_mode: str | None = Query(default=None),
+    use_upgrades: bool | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(_get_db),
+):
+    return _query_cube_games(db, cube_id, play_mode, use_upgrades, offset)
+
+
+@router.get("/{battler_id}/games")
+def list_battler_games(
+    battler_id: int,
+    play_mode: str | None = Query(default=None),
+    use_upgrades: bool | None = Query(default=None),
+    offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(_get_db),
+):
+    battler = db.query(UserBattler).filter(UserBattler.id == battler_id, UserBattler.user_id == user.id).first()
+    if not battler:
+        raise HTTPException(status_code=404, detail="Battler not found")
+
+    return _query_cube_games(db, str(battler.cube_id), play_mode, use_upgrades, offset)
+
+
 @router.get("/my-games")
 def list_my_games(
     offset: int = Query(default=0, ge=0),
@@ -221,8 +241,8 @@ def list_my_games(
         .filter(
             PlayerGameHistory.user_id == str(user.id),
             PlayerGameHistory.is_puppet.is_(False),
+            PlayerGameHistory.final_placement.isnot(None),
             GameRecord.ended_at.isnot(None),
-            GameRecord.winner_player_id.isnot(None),
         )
         .order_by(GameRecord.created_at.desc())
         .offset(offset)
