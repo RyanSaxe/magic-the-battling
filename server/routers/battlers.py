@@ -5,7 +5,7 @@ from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import distinct, func
 from sqlalchemy.orm import Session
 
 from server.db import database
@@ -55,6 +55,36 @@ def _battler_to_response(b: UserBattler) -> UserBattlerResponse:
     )
 
 
+def _cube_stats_for_ids(db: Session, cube_ids: set[str]) -> dict[str, dict]:
+    if not cube_ids:
+        return {}
+    rows = (
+        db.query(
+            GameRecord.cube_id,
+            func.count(distinct(GameRecord.id)),
+            func.count(distinct(PlayerGameHistory.player_name)),
+            func.max(GameRecord.created_at),
+        )
+        .join(PlayerGameHistory, PlayerGameHistory.game_id == GameRecord.id)
+        .filter(
+            GameRecord.cube_id.in_(cube_ids),
+            GameRecord.ended_at.isnot(None),
+            PlayerGameHistory.is_puppet.is_(False),
+            PlayerGameHistory.final_placement.isnot(None),
+        )
+        .group_by(GameRecord.cube_id)
+        .all()
+    )
+    return {
+        str(r[0]): {
+            "game_count": r[1],
+            "human_player_count": r[2],
+            "last_played": r[3].isoformat() if r[3] else None,
+        }
+        for r in rows
+    }
+
+
 router = APIRouter(prefix="/api/battlers", tags=["battlers"])
 
 
@@ -77,7 +107,26 @@ def list_battlers(
     )
     has_more = len(battlers) > BATTLERS_PAGE_SIZE
     battlers = battlers[:BATTLERS_PAGE_SIZE]
-    return {"battlers": [_battler_to_response(b) for b in battlers], "has_more": has_more}
+
+    cube_ids = {str(b.cube_id) for b in battlers}
+    stats_map = _cube_stats_for_ids(db, cube_ids)
+    metadata_rows = db.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids)).all() if cube_ids else []
+    metadata_map = {str(m.cube_id): m for m in metadata_rows}
+
+    results = []
+    for b in battlers:
+        cid = str(b.cube_id)
+        meta = metadata_map.get(cid)
+        stats = stats_map.get(cid, {})
+        resp = _battler_to_response(b)
+        resp.cube_name = str(meta.name) if meta and meta.name else None
+        resp.cube_image_uri = str(meta.image_uri) if meta and meta.image_uri else None
+        resp.game_count = stats.get("game_count", 0)
+        resp.human_player_count = stats.get("human_player_count", 0)
+        resp.last_played = stats.get("last_played")
+        results.append(resp)
+
+    return {"battlers": results, "has_more": has_more}
 
 
 @router.post("")
@@ -149,14 +198,23 @@ def _query_cube_games(
     use_upgrades: bool | None,
     offset: int,
 ) -> dict:
-    query = db.query(GameRecord).filter(
+    base_filter = [
         GameRecord.cube_id == cube_id,
         GameRecord.ended_at.isnot(None),
-    )
+    ]
     if play_mode is not None:
-        query = query.filter(func.json_extract(GameRecord.config_json, "$.play_mode") == play_mode)
+        base_filter.append(func.json_extract(GameRecord.config_json, "$.play_mode") == play_mode)
     if use_upgrades is not None:
-        query = query.filter(func.json_extract(GameRecord.config_json, "$.use_upgrades") == use_upgrades)
+        base_filter.append(func.json_extract(GameRecord.config_json, "$.use_upgrades") == use_upgrades)
+
+    completed_ids = (
+        db.query(GameRecord.id)
+        .join(PlayerGameHistory, PlayerGameHistory.game_id == GameRecord.id)
+        .filter(*base_filter, PlayerGameHistory.is_puppet.is_(False), PlayerGameHistory.final_placement.isnot(None))
+        .distinct()
+        .subquery()
+    )
+    query = db.query(GameRecord).filter(GameRecord.id.in_(db.query(completed_ids)))
 
     total_games = query.count()
     win_subquery = query.join(PlayerGameHistory, PlayerGameHistory.game_id == GameRecord.id).filter(
@@ -196,12 +254,14 @@ def _query_cube_games(
             except (json.JSONDecodeError, KeyError):
                 pass
 
+        humans = [h for h in histories if not h.is_puppet]
         config = json.loads(str(game.config_json)) if game.config_json else {}
         results.append(
             GameSummaryResponse(
                 game_id=str(game.id),
                 created_at=str(game.created_at.isoformat()) if game.created_at else "",
                 player_count=len(histories),
+                human_count=len(humans),
                 best_human_name=str(best.player_name),
                 best_human_placement=cast(int, best.final_placement) if best.final_placement is not None else None,
                 cube_id=cube_id,
@@ -296,12 +356,14 @@ def list_my_games(
 
         game_cube_id = str(game.cube_id) if game.cube_id else ""
         meta = metadata_map.get(game_cube_id)
+        humans = [h for h in all_histories if not h.is_puppet]
         config = json.loads(str(game.config_json)) if game.config_json else {}
         results.append(
             GameSummaryResponse(
                 game_id=str(game.id),
                 created_at=str(game.created_at.isoformat()) if game.created_at else "",
                 player_count=len(all_histories),
+                human_count=len(humans),
                 best_human_name=str(hist.player_name),
                 best_human_placement=cast(int, hist.final_placement) if hist.final_placement is not None else None,
                 cube_id=game_cube_id,
@@ -336,28 +398,31 @@ def list_following(
     has_more = len(follows) > BATTLERS_PAGE_SIZE
     follows = follows[:BATTLERS_PAGE_SIZE]
 
-    cube_ids = [str(f.cube_id) for f in follows]
-    metadata_rows = db.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids)).all()
+    cube_id_set = {str(f.cube_id) for f in follows}
+    stats_map = _cube_stats_for_ids(db, cube_id_set)
+    metadata_rows = db.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_id_set)).all() if cube_id_set else []
     metadata_map = {str(m.cube_id): m for m in metadata_rows}
 
-    return {
-        "following": [
+    results = []
+    for f in follows:
+        cid = str(f.cube_id)
+        meta = metadata_map.get(cid)
+        stats = stats_map.get(cid, {})
+        results.append(
             FollowedBattlerResponse(
                 id=cast(int, f.id),
-                cube_id=cast(str, f.cube_id),
+                cube_id=cid,
                 display_name=cast(str, f.display_name) if f.display_name else None,
-                cube_name=str(metadata_map[str(f.cube_id)].name)
-                if str(f.cube_id) in metadata_map and metadata_map[str(f.cube_id)].name
-                else None,
-                cube_image_uri=str(metadata_map[str(f.cube_id)].image_uri)
-                if str(f.cube_id) in metadata_map and metadata_map[str(f.cube_id)].image_uri
-                else None,
+                cube_name=str(meta.name) if meta and meta.name else None,
+                cube_image_uri=str(meta.image_uri) if meta and meta.image_uri else None,
                 created_at=str(f.created_at.isoformat()) if f.created_at else "",
+                game_count=stats.get("game_count", 0),
+                human_player_count=stats.get("human_player_count", 0),
+                last_played=stats.get("last_played"),
             )
-            for f in follows
-        ],
-        "has_more": has_more,
-    }
+        )
+
+    return {"following": results, "has_more": has_more}
 
 
 class FollowCubeRequest(BaseModel):

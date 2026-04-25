@@ -87,6 +87,8 @@ class UserBattlerResponse(BaseModel):
     id: int
     cube_id: str
     display_name: str | None
+    cube_name: str | None = None
+    cube_image_uri: str | None = None
     use_upgrades: bool
     use_vanguards: bool
     play_mode: str
@@ -96,12 +98,16 @@ class UserBattlerResponse(BaseModel):
     guided_mode_default: bool
     position: int
     created_at: str
+    game_count: int = 0
+    human_player_count: int = 0
+    last_played: str | None = None
 
 
 class GameSummaryResponse(BaseModel):
     game_id: str
     created_at: str
     player_count: int
+    human_count: int = 0
     best_human_name: str
     best_human_placement: int | None
     cube_id: str
@@ -119,3 +125,6 @@ class FollowedBattlerResponse(BaseModel):
     cube_name: str | None = None
     cube_image_uri: str | None = None
     created_at: str
+    game_count: int = 0
+    human_player_count: int = 0
+    last_played: str | None = None

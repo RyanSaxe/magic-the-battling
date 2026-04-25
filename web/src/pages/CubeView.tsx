@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { FaDiscord } from 'react-icons/fa6'
+import { FaDiscord, FaUser } from 'react-icons/fa6'
+import { PuppetIcon } from '../components/icons/PuppetIcon'
 import { useToast } from '../contexts'
 import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
 import { CubeCobraPrimerLink } from '../components/common/CubeCobraPrimerLink'
@@ -157,20 +158,18 @@ export function CubeView() {
               </div>
             </div>
 
-            {totalGames > 0 && (
-              <dl className="overflow-hidden rounded-lg border border-[color:rgba(212,175,55,0.22)] bg-black/10 mb-4">
-                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3 px-3 py-1.5">
-                  <dt className="text-[11px] font-medium text-gray-400">Games played</dt>
-                  <dd className="min-w-0 text-right text-sm text-amber-50">{totalGames}</dd>
-                </div>
-                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3 px-3 py-1.5 border-t border-[color:rgba(212,175,55,0.12)]">
-                  <dt className="text-[11px] font-medium text-gray-400">Wins</dt>
-                  <dd className="min-w-0 text-right text-sm text-amber-50">
-                    {totalWins}{totalGames > 0 ? ` (${Math.round((totalWins / totalGames) * 100)}%)` : ''}
-                  </dd>
-                </div>
-              </dl>
-            )}
+            <dl className="overflow-hidden rounded-lg border border-[color:rgba(212,175,55,0.22)] bg-black/10 mb-4">
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3 px-3 py-1.5">
+                <dt className="text-[11px] font-medium text-gray-400">Games played</dt>
+                <dd className="min-w-0 text-right text-sm text-amber-50">{totalGames}</dd>
+              </div>
+              <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3 px-3 py-1.5 border-t border-[color:rgba(212,175,55,0.12)]">
+                <dt className="text-[11px] font-medium text-gray-400">Wins</dt>
+                <dd className="min-w-0 text-right text-sm text-amber-50">
+                  {totalGames > 0 ? `${totalWins} (${Math.round((totalWins / totalGames) * 100)}%)` : '—'}
+                </dd>
+              </div>
+            </dl>
 
             <LabeledDivider label={totalGames > 0 ? `Game History (${totalGames})` : 'Game History'} />
 
@@ -225,13 +224,17 @@ export function CubeView() {
                   {games.map((g) => (
                     <InfoCard
                       key={g.game_id}
-                      variant="history"
                       title={formatDate(g.created_at)}
                       badge={g.best_human_placement ? { text: ordinal(g.best_human_placement), color: g.best_human_placement === 1 ? 'gold' : 'gray' } : undefined}
-                      metadata={[
-                        { label: 'Players', value: String(g.player_count) },
-                        { label: 'Top Human', value: g.best_human_name },
-                      ]}
+                      inlineStats={<>
+                        <FaUser className="w-3 h-3 text-gray-500" /><span>{g.human_count}</span>
+                        {g.player_count - g.human_count > 0 && <>
+                          <PuppetIcon size="sm" className="opacity-60" />
+                          <span>{g.player_count - g.human_count}</span>
+                        </>}
+                        <span className="text-gray-600">·</span>
+                        <span>{g.best_human_name}</span>
+                      </>}
                       onClick={() => navigate(`/game/${g.game_id}/share/${encodeURIComponent(g.best_human_name)}`)}
                       className={g.best_human_placement === 1 ? 'shadow-[0_0_12px_rgba(212,175,55,0.15)]' : ''}
                     >

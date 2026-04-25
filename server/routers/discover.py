@@ -43,6 +43,7 @@ def browse_cubes(
         .filter(
             GameRecord.cube_id.isnot(None),
             GameRecord.ended_at.isnot(None),
+            PlayerGameHistory.is_puppet.is_(False),
             PlayerGameHistory.final_placement.isnot(None),
         )
         .group_by(GameRecord.cube_id)

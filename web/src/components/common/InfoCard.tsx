@@ -13,12 +13,6 @@ const BADGE_COLORS: Record<string, string> = {
   gray: 'bg-gray-600/80 text-gray-200',
 }
 
-const VARIANT_HEADER_BG: Record<string, string> = {
-  cube: 'bg-amber-950/40',
-  community: 'bg-[#2a2320]',
-  history: 'bg-[#2d2220]',
-}
-
 export interface CardAction {
   label: string
   onClick: () => void
@@ -29,7 +23,8 @@ export interface InfoCardProps {
   title: string
   subtitle?: string
   badge?: BadgeProps
-  variant?: 'cube' | 'community' | 'history'
+  imageUrl?: string
+  inlineStats?: ReactNode
   metadata?: { label: string; value: string }[]
   actions?: CardAction[]
   onClick?: () => void
@@ -41,7 +36,8 @@ export function InfoCard({
   title,
   subtitle,
   badge,
-  variant = 'community',
+  imageUrl,
+  inlineStats,
   metadata,
   actions,
   onClick,
@@ -54,19 +50,48 @@ export function InfoCard({
       onClick={onClick}
       className={`group relative modal-chrome felt-raised-panel overflow-hidden rounded-lg flex flex-col transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[inset_0_0_0_1px_rgba(255,236,181,0.58)] ${onClick ? 'cursor-pointer' : ''} ${className ?? ''}`}
     >
-      <div className={`${VARIANT_HEADER_BG[variant]} px-4 py-2.5 border-b border-[color:rgba(212,175,55,0.22)] flex items-center gap-2 min-w-0`}>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-amber-50 font-semibold text-sm truncate font-['Cinzel',serif]">{title}</h3>
-          {subtitle && <p className="text-gray-400 text-xs mt-0.5 truncate">{subtitle}</p>}
+      {imageUrl ? (
+        <div className="relative h-[70px] overflow-hidden">
+          <img
+            src={imageUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover brightness-[0.4]"
+            loading="lazy"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#2a2118] via-transparent to-transparent" />
+          <div className="absolute bottom-0 left-0 right-0 px-4 pb-2 flex items-end gap-2 min-w-0">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-amber-50 font-semibold text-sm truncate font-['Cinzel',serif] drop-shadow-md">{title}</h3>
+              {subtitle && <p className="text-gray-300 text-xs truncate drop-shadow-sm">{subtitle}</p>}
+            </div>
+            {badge && (
+              <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-wider rounded-full px-2 py-0.5 ${BADGE_COLORS[badge.color ?? 'gray']}`}>
+                {badge.text}
+              </span>
+            )}
+          </div>
         </div>
-        {badge && (
-          <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-wider rounded-full px-2 py-0.5 ${BADGE_COLORS[badge.color ?? 'gray']}`}>
-            {badge.text}
-          </span>
-        )}
-      </div>
+      ) : (
+        <div className="bg-amber-950/40 px-4 py-2.5 border-b border-[color:rgba(212,175,55,0.22)] flex items-center gap-2 min-w-0">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-amber-50 font-semibold text-sm truncate font-['Cinzel',serif]">{title}</h3>
+            {subtitle && <p className="text-gray-400 text-xs mt-0.5 truncate">{subtitle}</p>}
+          </div>
+          {badge && (
+            <span className={`shrink-0 text-[10px] font-semibold uppercase tracking-wider rounded-full px-2 py-0.5 ${BADGE_COLORS[badge.color ?? 'gray']}`}>
+              {badge.text}
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="flex-1 px-4 py-3 flex flex-col">
+        {inlineStats && (
+          <div className="flex items-center gap-2 text-xs text-gray-400 mb-2">
+            {inlineStats}
+          </div>
+        )}
+
         {metadata && metadata.length > 0 && (
           <dl className="overflow-hidden rounded-lg border border-[color:rgba(212,175,55,0.22)] bg-black/10">
             {metadata.map((m, i) => (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FaDiscord } from 'react-icons/fa6'
+import { FaDiscord, FaUser } from 'react-icons/fa6'
+import { PuppetIcon } from '../components/icons/PuppetIcon'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
@@ -349,14 +350,15 @@ function BattlersGrid({
         {battlers.map((b) => (
           <InfoCard
             key={b.id}
-            variant="cube"
-            title={b.display_name || b.cube_id}
-            subtitle={b.cube_id !== (b.display_name || '') ? b.cube_id : undefined}
+            imageUrl={b.cube_image_uri ?? undefined}
+            title={b.cube_name || b.display_name || b.cube_id}
+            subtitle={b.cube_id !== (b.cube_name || b.display_name || '') ? b.cube_id : undefined}
             badge={{ text: b.play_mode === 'constructed' ? 'Deck' : 'Cube', color: b.play_mode === 'constructed' ? 'blue' : 'gold' }}
-            metadata={[
-              { label: 'Upgrades', value: b.use_upgrades ? 'On' : 'Off' },
-              { label: 'Opponents', value: String(b.puppet_count) },
-            ]}
+            inlineStats={<>
+              <FaUser className="w-3 h-3 text-gray-500" /><span>{b.human_player_count}</span>
+              <span className="text-gray-600">·</span>
+              <span>{b.game_count} games</span>
+            </>}
             actions={[
               { label: 'Play', onClick: () => onPlay(b), variant: 'primary' },
               { label: 'View', onClick: () => onView(b), variant: 'secondary' },
@@ -417,9 +419,18 @@ function FollowingGrid({
         {following.map((f) => (
           <InfoCard
             key={f.id}
-            variant="community"
+            imageUrl={f.cube_image_uri ?? undefined}
             title={f.cube_name || f.display_name || f.cube_id}
             subtitle={f.cube_id !== (f.cube_name || f.display_name || '') ? f.cube_id : undefined}
+            inlineStats={<>
+              <FaUser className="w-3 h-3 text-gray-500" /><span>{f.human_player_count}</span>
+              <span className="text-gray-600">·</span>
+              <span>{f.game_count} games</span>
+              {f.last_played && <>
+                <span className="text-gray-600">·</span>
+                <span>{formatDate(f.last_played)}</span>
+              </>}
+            </>}
             actions={[
               { label: 'Play', onClick: () => onPlay(f), variant: 'primary' },
               { label: 'View', onClick: () => onView(f), variant: 'secondary' },
@@ -643,13 +654,16 @@ function MyGamesGrid({
         {games.map((g) => (
           <InfoCard
             key={g.game_id}
-            variant="history"
             title={formatDate(g.created_at)}
-            subtitle={g.cube_id || undefined}
+            subtitle={g.cube_name || g.cube_id || undefined}
             badge={g.best_human_placement ? { text: ordinal(g.best_human_placement), color: g.best_human_placement === 1 ? 'gold' : 'gray' } : undefined}
-            metadata={[
-              { label: 'Players', value: String(g.player_count) },
-            ]}
+            inlineStats={<>
+              <FaUser className="w-3 h-3 text-gray-500" /><span>{g.human_count}</span>
+              {g.player_count - g.human_count > 0 && <>
+                <PuppetIcon size="sm" className="opacity-60" />
+                <span>{g.player_count - g.human_count}</span>
+              </>}
+            </>}
             onClick={() => onView(g)}
             className={g.best_human_placement === 1 ? 'shadow-[0_0_12px_rgba(212,175,55,0.15)]' : ''}
           >
@@ -739,15 +753,19 @@ function DiscoverGrid({
         {results.map((r) => (
           <InfoCard
             key={r.cube_id}
-            variant="community"
+            imageUrl={r.cube_image_uri ?? undefined}
             title={r.cube_name || r.cube_id}
             subtitle={r.cube_name && r.cube_name !== r.cube_id ? r.cube_id : undefined}
             badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
-            metadata={[
-              { label: 'Games', value: String(r.game_count) },
-              { label: 'Players', value: String(r.player_count) },
-              { label: 'Last played', value: formatDate(r.last_played) },
-            ]}
+            inlineStats={<>
+              <FaUser className="w-3 h-3 text-gray-500" /><span>{r.player_count}</span>
+              <span className="text-gray-600">·</span>
+              <span>{r.game_count} games</span>
+              {r.last_played && <>
+                <span className="text-gray-600">·</span>
+                <span>{formatDate(r.last_played)}</span>
+              </>}
+            </>}
             actions={[
               { label: 'Play', onClick: () => onPlay(r.cube_id), variant: 'primary' },
               { label: 'View', onClick: () => onView(r.cube_id), variant: 'secondary' },
@@ -756,17 +774,7 @@ function DiscoverGrid({
                 : [{ label: 'Follow', onClick: () => onFollow(r.cube_id), variant: 'secondary' as const }]),
             ]}
             className={r.is_following ? 'border-l-2 border-l-emerald-600/60' : ''}
-          >
-            <a
-              href={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-amber-400 hover:text-amber-300 transition-colors mt-2 inline-block"
-              onClick={(e) => e.stopPropagation()}
-            >
-              View on CubeCobra
-            </a>
-          </InfoCard>
+          />
         ))}
       </div>
       {hasMore && (
