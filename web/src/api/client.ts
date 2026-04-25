@@ -374,7 +374,7 @@ export async function getCubeGames(
   return response.json()
 }
 
-export async function getMyGames(offset = 0): Promise<{ games: GameSummary[]; has_more: boolean }> {
+export async function getMyGames(offset = 0): Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }> {
   const response = await fetch(`${API_BASE}/battlers/my-games?offset=${offset}`, { credentials: 'include' })
   if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load games'))
   return response.json()

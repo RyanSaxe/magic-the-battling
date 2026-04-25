@@ -29,7 +29,7 @@ interface CubeGameHistoryProps {
   defaultPlayMode: string | null
   defaultUpgrades: boolean | null
   actions: ReactNode
-  loadGames: (cubeId: string, opts: { offset?: number; playMode?: string; useUpgrades?: boolean }) => Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }>
+  loadGames: (cubeId: string, opts: { offset?: number; playMode?: string; useUpgrades?: boolean }) => Promise<{ games: GameSummary[]; has_more: boolean; total_games: number }>
   onMetadata?: (name: string | null, imageUri: string | null) => void
 }
 
@@ -52,7 +52,6 @@ export function CubeGameHistory({
   const [gamesOffset, setGamesOffset] = useState(0)
   const [gamesLoading, setGamesLoading] = useState(false)
   const [totalGames, setTotalGames] = useState(0)
-  const [totalWins, setTotalWins] = useState(0)
   const [filterPlayMode, setFilterPlayMode] = useState<string | null>(defaultPlayMode)
   const [filterUpgrades, setFilterUpgrades] = useState<boolean | null>(defaultUpgrades)
   const [initialLoad, setInitialLoad] = useState(true)
@@ -76,7 +75,6 @@ export function CubeGameHistory({
       setGamesHasMore(data.has_more)
       setGamesOffset(offset + data.games.length)
       setTotalGames(data.total_games)
-      setTotalWins(data.total_wins)
     } catch {
       addToast('Failed to load games', 'error')
     } finally {
@@ -92,7 +90,7 @@ export function CubeGameHistory({
   if (initialLoad) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-amber-200/70">Loading...</p>
       </div>
     )
   }
@@ -141,10 +139,8 @@ export function CubeGameHistory({
 
         {/* Stats + actions bar */}
         <div className="flex items-center justify-between mt-3 gap-3">
-          <div className="flex items-center gap-3 text-sm text-gray-400">
+          <div className="flex items-center gap-3 text-sm text-amber-200/80">
             <span className="text-amber-50">{totalGames}</span> games
-            <span className="text-gray-600">·</span>
-            <span className="text-amber-50">{totalGames > 0 ? `${totalWins} (${Math.round((totalWins / totalGames) * 100)}%)` : '—'}</span> wins
           </div>
           <div className="flex gap-2 shrink-0">
             {actions}
@@ -168,7 +164,7 @@ export function CubeGameHistory({
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 filterPlayMode === mode
                   ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'
-                  : 'border border-transparent bg-black/10 text-gray-400 hover:text-gray-200'
+                  : 'border border-transparent bg-black/10 text-amber-200/80 hover:text-gray-200'
               }`}
             >
               {label}
@@ -187,7 +183,7 @@ export function CubeGameHistory({
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 filterUpgrades === val
                   ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'
-                  : 'border border-transparent bg-black/10 text-gray-400 hover:text-gray-200'
+                  : 'border border-transparent bg-black/10 text-amber-200/80 hover:text-gray-200'
               }`}
             >
               {label}
@@ -200,7 +196,7 @@ export function CubeGameHistory({
       <div>
         {games.length === 0 && !gamesLoading ? (
           <div className="flex-1 flex items-center justify-center py-8">
-            <p className="text-gray-500">No games match these filters.</p>
+            <p className="text-amber-200/70">No games match these filters.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-w-full">

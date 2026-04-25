@@ -50,6 +50,8 @@ export function Dashboard() {
   const [myGamesOffset, setMyGamesOffset] = useState(0)
   const [myGamesLoading, setMyGamesLoading] = useState(false)
   const [myGamesLoaded, setMyGamesLoaded] = useState(false)
+  const [myGamesTotalGames, setMyGamesTotalGames] = useState(0)
+  const [myGamesTotalWins, setMyGamesTotalWins] = useState(0)
 
   const [discoverResults, setDiscoverResults] = useState<DiscoverResult[]>([])
   const [discoverLoading, setDiscoverLoading] = useState(false)
@@ -175,6 +177,8 @@ export function Dashboard() {
                 hasMore={myGamesHasMore}
                 loading={myGamesLoading}
                 loaded={myGamesLoaded}
+                totalGames={myGamesTotalGames}
+                totalWins={myGamesTotalWins}
                 onLoadInitial={async () => {
                   setMyGamesLoading(true)
                   try {
@@ -182,6 +186,8 @@ export function Dashboard() {
                     setMyGames(data.games)
                     setMyGamesHasMore(data.has_more)
                     setMyGamesOffset(data.games.length)
+                    setMyGamesTotalGames(data.total_games)
+                    setMyGamesTotalWins(data.total_wins)
                     setMyGamesLoaded(true)
                   } catch {
                     addToast('Failed to load games', 'error')
@@ -303,9 +309,9 @@ export function Dashboard() {
 function SectionHeading({ title, count }: { title: string; count?: number }) {
   return (
     <div className="flex items-center justify-between gap-2 mb-3">
-      <span className="text-[10px] uppercase tracking-[0.14em] text-gray-400">{title}</span>
+      <span className="text-[10px] uppercase tracking-[0.14em] text-amber-200/80">{title}</span>
       {count !== undefined && (
-        <span className="text-[10px] text-gray-500">
+        <span className="text-[10px] text-amber-200/70">
           {count} {count === 1 ? 'cube' : 'cubes'}
         </span>
       )}
@@ -612,6 +618,8 @@ function MyGamesGrid({
   hasMore,
   loading,
   loaded,
+  totalGames,
+  totalWins,
   onLoadInitial,
   onLoadMore,
   onView,
@@ -621,6 +629,8 @@ function MyGamesGrid({
   hasMore: boolean
   loading: boolean
   loaded: boolean
+  totalGames: number
+  totalWins: number
   onLoadInitial: () => void
   onLoadMore: () => void
   onView: (g: GameSummary) => void
@@ -633,7 +643,7 @@ function MyGamesGrid({
   if (!loaded && loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-amber-200/70">Loading...</p>
       </div>
     )
   }
@@ -653,7 +663,14 @@ function MyGamesGrid({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <SectionHeading title="My Games" count={games.length} />
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <span className="text-[10px] uppercase tracking-[0.14em] text-amber-200/80">My Games</span>
+        <div className="flex items-center gap-3 text-[10px] text-amber-200/70">
+          <span>{totalGames} games</span>
+          <span className="text-amber-200/40">·</span>
+          <span>{totalGames > 0 ? `${totalWins} wins (${Math.round((totalWins / totalGames) * 100)}%)` : '0 wins'}</span>
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {games.map((g) => (
           <InfoCard
@@ -732,7 +749,7 @@ function DiscoverGrid({
   if (!loaded && loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-amber-200/70">Loading...</p>
       </div>
     )
   }

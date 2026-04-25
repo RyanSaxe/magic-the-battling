@@ -68,7 +68,7 @@ export function BattlerView() {
           <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
           <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
             <div className="zone-pack h-full min-h-0 flex items-center justify-center">
-              <p className="text-gray-500">Loading...</p>
+              <p className="text-amber-200/70">Loading...</p>
             </div>
           </main>
           <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />

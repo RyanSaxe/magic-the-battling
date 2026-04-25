@@ -5,7 +5,7 @@ from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import distinct, func
+from sqlalchemy import distinct, func, or_
 from sqlalchemy.orm import Session
 
 from server.db import database
@@ -209,9 +209,17 @@ def _query_cube_games(
         GameRecord.ended_at.isnot(None),
     ]
     if play_mode is not None:
-        base_filter.append(func.json_extract(GameRecord.config_json, "$.play_mode") == play_mode)
+        extracted = func.json_extract(GameRecord.config_json, "$.play_mode")
+        if play_mode == "limited":
+            base_filter.append(or_(extracted == play_mode, extracted.is_(None)))
+        else:
+            base_filter.append(extracted == play_mode)
     if use_upgrades is not None:
-        base_filter.append(func.json_extract(GameRecord.config_json, "$.use_upgrades") == use_upgrades)
+        extracted = func.json_extract(GameRecord.config_json, "$.use_upgrades")
+        if use_upgrades is True:
+            base_filter.append(or_(extracted == use_upgrades, extracted.is_(None)))
+        else:
+            base_filter.append(extracted == use_upgrades)
 
     has_placed_human = (
         db.query(PlayerGameHistory.id)
@@ -226,10 +234,6 @@ def _query_cube_games(
     query = db.query(GameRecord).filter(*base_filter, has_placed_human)
 
     total_games = query.count()
-    win_subquery = query.join(PlayerGameHistory, PlayerGameHistory.game_id == GameRecord.id).filter(
-        PlayerGameHistory.is_puppet.is_(False), PlayerGameHistory.final_placement == 1
-    )
-    total_wins = win_subquery.count()
 
     games = query.order_by(GameRecord.created_at.desc()).offset(offset).limit(GAMES_PAGE_SIZE + 1).all()
     has_more = len(games) > GAMES_PAGE_SIZE
@@ -282,7 +286,7 @@ def _query_cube_games(
             )
         )
 
-    return {"games": results, "has_more": has_more, "total_games": total_games, "total_wins": total_wins}
+    return {"games": results, "has_more": has_more, "total_games": total_games}
 
 
 @router.get("/cube/{cube_id}/games")
@@ -318,15 +322,29 @@ def list_my_games(
     user: User = Depends(get_current_user),
     db: Session = Depends(_get_db),
 ):
+    user_filter = [
+        PlayerGameHistory.user_id == str(user.id),
+        PlayerGameHistory.is_puppet.is_(False),
+        PlayerGameHistory.final_placement.isnot(None),
+        GameRecord.ended_at.isnot(None),
+    ]
+    total_games = (
+        db.query(func.count(PlayerGameHistory.id))
+        .join(GameRecord, GameRecord.id == PlayerGameHistory.game_id)
+        .filter(*user_filter)
+        .scalar()
+    ) or 0
+    total_wins = (
+        db.query(func.count(PlayerGameHistory.id))
+        .join(GameRecord, GameRecord.id == PlayerGameHistory.game_id)
+        .filter(*user_filter, PlayerGameHistory.final_placement == 1)
+        .scalar()
+    ) or 0
+
     histories = (
         db.query(PlayerGameHistory)
         .join(GameRecord, GameRecord.id == PlayerGameHistory.game_id)
-        .filter(
-            PlayerGameHistory.user_id == str(user.id),
-            PlayerGameHistory.is_puppet.is_(False),
-            PlayerGameHistory.final_placement.isnot(None),
-            GameRecord.ended_at.isnot(None),
-        )
+        .filter(*user_filter)
         .order_by(GameRecord.created_at.desc())
         .offset(offset)
         .limit(GAMES_PAGE_SIZE + 1)
@@ -384,7 +402,7 @@ def list_my_games(
             )
         )
 
-    return {"games": results, "has_more": has_more}
+    return {"games": results, "has_more": has_more, "total_games": total_games, "total_wins": total_wins}
 
 
 # ── Follow endpoints ────────────────────────────────────────────────
