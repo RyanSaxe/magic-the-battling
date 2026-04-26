@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import cast
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
@@ -14,6 +14,7 @@ from mtb.utils.cubecobra import get_cube_data
 from server.db import database
 from server.db.models import GamePlayerRecord as GPR_Model
 from server.db.models import GameRecord, PlayerGameHistory, User
+from server.errors import ErrorCode, api_error
 from server.routers.ws import connection_manager
 from server.schemas.api import (
     CreateGameRequest,
@@ -122,9 +123,10 @@ async def _claim_create_idempotency(
         cached = _create_idempotency_cache.get(cache_key)
         if cached:
             if cached.request_fingerprint != request_fingerprint:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Idempotency key already used with a different create payload.",
+                raise api_error(
+                    409,
+                    ErrorCode.INVALID_REQUEST,
+                    "Idempotency key already used with a different create payload.",
                 )
             return cached.response, claim
 
@@ -191,10 +193,11 @@ def _update_retry_after_seconds() -> str:
     return str(max(60, estimate_minutes * 60))
 
 
-def _server_update_http_error(detail: str) -> HTTPException:
-    return HTTPException(
-        status_code=503,
-        detail=detail,
+def _server_update_http_error(detail: str):
+    return api_error(
+        503,
+        ErrorCode.SERVER_UPDATING,
+        detail,
         headers={"Retry-After": _update_retry_after_seconds()},
     )
 
@@ -271,7 +274,7 @@ async def create_game(
         error = (
             _server_update_http_error(block_reason)
             if ops_manager.blocks_new_games()
-            else HTTPException(status_code=503, detail=block_reason)
+            else api_error(503, ErrorCode.SERVER_CAPACITY, block_reason)
         )
         await _resolve_claim_error(claim, error)
         raise error
@@ -309,19 +312,19 @@ def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depe
 
     game_id = game_manager.get_game_id_by_join_code(request.join_code)
     if not game_id:
-        raise HTTPException(status_code=404, detail="Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
     if game_manager.get_game(game_id):
-        raise HTTPException(status_code=400, detail="Game has already started")
+        raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
 
     pending = game_manager.get_pending_game(game_id)
     if not pending:
-        raise HTTPException(status_code=404, detail="Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
     if request.player_name in pending.player_names:
-        raise HTTPException(status_code=409, detail="Player name already taken")
+        raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
     if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
-        raise HTTPException(status_code=400, detail="Lobby is full")
+        raise api_error(400, ErrorCode.LOBBY_FULL, "Lobby is full")
 
     session = session_manager.create_session(pending.game_id)
     user_id = str(current_user.id) if current_user else None
@@ -333,7 +336,7 @@ def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depe
     )
 
     if not result:
-        raise HTTPException(status_code=400, detail="Failed to join game")
+        raise api_error(400, ErrorCode.UNKNOWN, "Failed to join game")
 
     return JoinGameResponse(
         game_id=pending.game_id,
@@ -349,18 +352,18 @@ def join_game(game_id: str, request: JoinGameRequest, current_user: User | None 
 
     pending = game_manager.get_pending_game(game_id)
     if not pending:
-        raise HTTPException(status_code=404, detail="Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
     if pending.join_code.upper() != request.join_code.upper():
-        raise HTTPException(status_code=400, detail="Invalid join code")
+        raise api_error(400, ErrorCode.INVALID_JOIN_CODE, "Invalid join code")
 
     if pending.is_started:
-        raise HTTPException(status_code=400, detail="Game has already started")
+        raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
 
     if request.player_name in pending.player_names:
-        raise HTTPException(status_code=409, detail="Player name already taken")
+        raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
     if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
-        raise HTTPException(status_code=400, detail="Lobby is full")
+        raise api_error(400, ErrorCode.LOBBY_FULL, "Lobby is full")
 
     session = session_manager.create_session(game_id)
     user_id = str(current_user.id) if current_user else None
@@ -372,7 +375,7 @@ def join_game(game_id: str, request: JoinGameRequest, current_user: User | None 
     )
 
     if not result:
-        raise HTTPException(status_code=400, detail="Failed to join game")
+        raise api_error(400, ErrorCode.UNKNOWN, "Failed to join game")
 
     return JoinGameResponse(
         game_id=game_id,
@@ -393,7 +396,7 @@ def rejoin_game(
 
     game = game_manager.get_game(game_id)
     if not game or not any(p.name == request.player_name for p in game.players):
-        raise HTTPException(status_code=404, detail="Player not found in game")
+        raise api_error(404, ErrorCode.PLAYER_NOT_IN_GAME, "Player not found in game")
 
     gpr = (
         db.query(GPR_Model)
@@ -405,19 +408,19 @@ def rejoin_game(
         .first()
     )
     if gpr and gpr.user_id and (not current_user or str(current_user.id) != str(gpr.user_id)):
-        raise HTTPException(status_code=403, detail="Log in to reconnect to this player slot")
+        raise api_error(403, ErrorCode.NOT_AUTHENTICATED, "Log in to reconnect to this player slot")
 
     player_id = game_manager.get_player_id_by_name(game_id, request.player_name)
     if player_id and connection_manager.is_player_connected(game_id, player_id):
         recovered = connection_manager.clear_stale_pending_connection(game_id, player_id)
         if not recovered:
-            raise HTTPException(status_code=409, detail="Player is already connected")
+            raise api_error(409, ErrorCode.PLAYER_ALREADY_CONNECTED, "Player is already connected")
 
     session = session_manager.create_session(game_id)
     success = game_manager.rejoin_game(game_id, request.player_name, session.player_id)
 
     if not success:
-        raise HTTPException(status_code=400, detail="Failed to rejoin game")
+        raise api_error(400, ErrorCode.UNKNOWN, "Failed to rejoin game")
 
     connection_manager.reserve_connection(game_id, session.player_id)
 
@@ -432,7 +435,7 @@ def rejoin_game(
 def get_lobby(game_id: str):
     lobby = game_manager.get_lobby_state(game_id)
     if not lobby:
-        raise HTTPException(status_code=404, detail="Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
     return lobby
 
 
@@ -456,7 +459,7 @@ def get_game_cards(game_id: str, player_name: str | None = None):
         battler = game.battler
 
     if not battler:
-        raise HTTPException(status_code=404, detail="Card pool not available")
+        raise api_error(404, ErrorCode.CARD_POOL_NOT_AVAILABLE, "Card pool not available")
 
     return GameCardsResponse(
         cards=catalog_entries_for_cards(battler.original_cards or battler.cards),
@@ -471,17 +474,17 @@ def start_game(game_id: str, db: Session = Depends(get_db)):  # noqa: B008
 
     pending = game_manager.get_pending_game(game_id)
     if not pending:
-        raise HTTPException(status_code=404, detail="Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
     if pending.is_started:
-        raise HTTPException(status_code=400, detail="Game has already started")
+        raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
 
     if pending.target_player_count < 2:
-        raise HTTPException(status_code=400, detail="Need at least 2 players to start")
+        raise api_error(400, ErrorCode.INVALID_REQUEST, "Need at least 2 players to start")
 
     game = game_manager.start_game(game_id, db)
     if not game:
-        raise HTTPException(status_code=500, detail="Failed to start game")
+        raise api_error(500, ErrorCode.UNKNOWN, "Failed to start game")
 
     return StartGameResponse(success=True)
 
@@ -490,11 +493,11 @@ def start_game(game_id: str, db: Session = Depends(get_db)):  # noqa: B008
 def get_game_state(game_id: str, session_id: str):
     session = session_manager.get_session(session_id)
     if not session:
-        raise HTTPException(status_code=401, detail="Invalid session")
+        raise api_error(401, ErrorCode.INVALID_SESSION, "Invalid session")
 
     bootstrap = game_manager.get_game_bootstrap(game_id, session.player_id)
     if not bootstrap:
-        raise HTTPException(status_code=404, detail="Game not found or player not in game")
+        raise api_error(404, ErrorCode.PLAYER_NOT_IN_GAME, "Game not found or player not in game")
 
     return bootstrap
 
@@ -508,7 +511,7 @@ def get_game_status(game_id: str):
         game = game_manager.get_game(game_id)
 
     if not pending and not game:
-        raise HTTPException(status_code=404, detail="Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
     connected_player_ids = connection_manager.get_connected_player_ids(game_id)
 
@@ -565,7 +568,7 @@ def get_game_status(game_id: str):
             auto_approve_spectators=game.config.auto_approve_spectators,
         )
 
-    raise HTTPException(status_code=404, detail="Game not found")
+    raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
 
 @router.post("/{game_id}/spectate-request", response_model=SpectateRequestResponse)
@@ -574,7 +577,7 @@ async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
     game = game_manager.get_game(game_id)
 
     if not pending and not game:
-        raise HTTPException(status_code=404, detail="Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
     target_name = request.target_player_name
     player_exists = False
@@ -586,12 +589,12 @@ async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
         player_exists = player_exists or any(f.name == target_name for f in game.puppets)
 
     if not player_exists:
-        raise HTTPException(status_code=404, detail="Target player not found")
+        raise api_error(404, ErrorCode.SPECTATE_TARGET_NOT_FOUND, "Target player not found")
 
     try:
         request_id = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
     except ValueError as exc:
-        raise HTTPException(status_code=429, detail=str(exc)) from exc
+        raise api_error(429, ErrorCode.INVALID_REQUEST, str(exc)) from exc
 
     auto_approve = (pending and pending.auto_approve_spectators) or (game and game.config.auto_approve_spectators)
     if not auto_approve:
@@ -616,7 +619,7 @@ async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
 def get_spectate_request_status(game_id: str, request_id: str):
     req = game_manager.get_spectate_request(request_id)
     if not req or req.game_id != game_id:
-        raise HTTPException(status_code=404, detail="Spectate request not found")
+        raise api_error(404, ErrorCode.SPECTATE_REQUEST_NOT_FOUND, "Spectate request not found")
 
     return SpectateRequestStatus(
         status=req.status,
@@ -710,7 +713,7 @@ def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[Sha
 def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)):  # noqa: B008
     game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
     if not game_record:
-        raise HTTPException(status_code=404, detail="Game not found")
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
     # Finished game snapshots are intentionally public-by-default. GameRecord.shared
     # is an internal signal that someone actively generated a share link/preview.
@@ -725,11 +728,11 @@ def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)
     )
 
     if not histories:
-        raise HTTPException(status_code=404, detail="No player data found for this game")
+        raise api_error(404, ErrorCode.SHARE_DATA_NOT_FOUND, "No player data found for this game")
 
     owner_exists = any(str(h.player_name) == player_name for h in histories)
     if not owner_exists:
-        raise HTTPException(status_code=404, detail="Player not found in this game")
+        raise api_error(404, ErrorCode.PLAYER_NOT_IN_GAME, "Player not found in this game")
 
     players: list[SharePlayerData] = []
     for history in histories:

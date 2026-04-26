@@ -8,6 +8,7 @@ import { CubeCobraPrimerLink } from '../components/common/CubeCobraPrimerLink'
 import { CubeGameHistory } from '../components/CubeGameHistory'
 import { getBattlers, getBattlerGames, updateBattler, deleteBattler } from '../api/client'
 import type { UserBattler, PlayMode } from '../types'
+import { unknownToAppError } from '../utils/appError'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
 
 export function BattlerView() {
@@ -150,7 +151,7 @@ export function BattlerView() {
               setBattler(updated)
               setShowSettings(false)
             } catch (err) {
-              addToast(err instanceof Error ? err.message : 'Failed to save', 'error')
+              addToast(unknownToAppError(err, 'update-battler', 'Failed to save').message, 'error')
             }
           }}
           onDelete={async () => {
@@ -158,7 +159,7 @@ export function BattlerView() {
               await deleteBattler(battler.id)
               navigate('/dashboard', { replace: true })
             } catch (err) {
-              addToast(err instanceof Error ? err.message : 'Failed to delete', 'error')
+              addToast(unknownToAppError(err, 'delete-battler', 'Failed to delete').message, 'error')
             }
           }}
         />

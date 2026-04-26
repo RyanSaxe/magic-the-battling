@@ -3,7 +3,7 @@ import json
 import logging
 from typing import cast
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import distinct, func, or_
 from sqlalchemy.orm import Session
@@ -18,6 +18,7 @@ from server.db.models import (
     User,
     UserBattler,
 )
+from server.errors import ErrorCode, api_error
 from server.schemas.auth import (
     FollowedBattlerResponse,
     GameSummaryResponse,
@@ -170,7 +171,7 @@ def update_battler(
 ):
     battler = db.query(UserBattler).filter(UserBattler.id == battler_id, UserBattler.user_id == user.id).first()
     if not battler:
-        raise HTTPException(status_code=404, detail="Battler not found")
+        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, "Battler not found")
 
     updates = request.model_dump(exclude_none=True)
     for field, value in updates.items():
@@ -188,7 +189,7 @@ def delete_battler(
 ):
     battler = db.query(UserBattler).filter(UserBattler.id == battler_id, UserBattler.user_id == user.id).first()
     if not battler:
-        raise HTTPException(status_code=404, detail="Battler not found")
+        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, "Battler not found")
     db.delete(battler)
     db.commit()
     return {"ok": True}
@@ -311,7 +312,7 @@ def list_battler_games(
 ):
     battler = db.query(UserBattler).filter(UserBattler.id == battler_id, UserBattler.user_id == user.id).first()
     if not battler:
-        raise HTTPException(status_code=404, detail="Battler not found")
+        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, "Battler not found")
 
     return _query_cube_games(db, str(battler.cube_id), play_mode, use_upgrades, offset)
 
@@ -469,7 +470,7 @@ def follow_cube(
         .first()
     )
     if existing:
-        raise HTTPException(status_code=409, detail="Already following this cube")
+        raise api_error(409, ErrorCode.ALREADY_FOLLOWING, "Already following this cube")
 
     follow = BattlerFollow(user_id=user.id, cube_id=request.cube_id, display_name=request.display_name)
     db.add(follow)
@@ -495,7 +496,7 @@ def unfollow_cube(
 ):
     follow = db.query(BattlerFollow).filter(BattlerFollow.id == follow_id, BattlerFollow.user_id == user.id).first()
     if not follow:
-        raise HTTPException(status_code=404, detail="Follow not found")
+        raise api_error(404, ErrorCode.FOLLOW_NOT_FOUND, "Follow not found")
     db.delete(follow)
     db.commit()
     return {"ok": True}

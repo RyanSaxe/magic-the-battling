@@ -1,12 +1,13 @@
 # ruff: noqa: B008
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from server.db import database
 from server.db.models import BattlerFollow, User
+from server.errors import ErrorCode, api_error
 from server.runtime_config import AUTH_COOKIE_SECURE
 from server.schemas.auth import LoginRequest, RegisterRequest, UserResponse
 from server.services.auth import (
@@ -47,12 +48,12 @@ def _set_auth_cookie(response: JSONResponse, token: str) -> None:
 def register(request: RegisterRequest, db: Session = Depends(_get_db)):
     existing = db.query(User).filter(User.username == request.username).first()
     if existing:
-        raise HTTPException(status_code=409, detail="Username already taken")
+        raise api_error(409, ErrorCode.USERNAME_TAKEN, "Username already taken")
 
     if request.email:
         email_exists = db.query(User).filter(User.email == request.email).first()
         if email_exists:
-            raise HTTPException(status_code=409, detail="Email already in use")
+            raise api_error(409, ErrorCode.EMAIL_IN_USE, "Email already in use")
 
     user = create_user(db, request.username, request.password, request.email)
     db.add(BattlerFollow(user_id=str(user.id), cube_id="auto"))
@@ -71,7 +72,7 @@ def register(request: RegisterRequest, db: Session = Depends(_get_db)):
 def login(request: LoginRequest, db: Session = Depends(_get_db)):
     user = db.query(User).filter(User.username == request.username).first()
     if not user or not verify_password(request.password, str(user.password_hash)):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        raise api_error(401, ErrorCode.INVALID_CREDENTIALS, "Invalid username or password")
 
     token = create_access_token(str(user.id), str(user.username))
 

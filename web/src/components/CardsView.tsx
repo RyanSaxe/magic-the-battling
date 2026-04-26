@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { getGameCards, type GameCardsResponse } from '../api/client'
 import { CardPreviewModal } from './card/CardPreviewModal'
 import type { Card } from '../types'
+import { unknownToAppError } from '../utils/appError'
 
 const COLOR_CHIPS: { code: string; label: string; bg: string; text: string; ring: string }[] = [
   { code: 'W', label: 'W', bg: 'bg-amber-100', text: 'text-amber-900', ring: 'ring-amber-300' },
@@ -58,7 +59,7 @@ export function CardsView({
       })
       .catch((err) => {
         if (cancelled) return
-        setError(err instanceof Error ? err.message : 'Failed to load cards')
+        setError(unknownToAppError(err, 'default', 'Failed to load cards').message)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

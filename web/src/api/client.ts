@@ -13,6 +13,7 @@ import type {
   GameSummary,
   FollowedBattler,
 } from '../types'
+import { AppError, responseToAppError } from '../utils/appError'
 import { getOrCreateDeviceId } from '../utils/deviceIdentity'
 import { hydrateCardCatalogEntries } from '../utils/catalogHydration'
 
@@ -50,13 +51,8 @@ function withDeviceHeaders(baseHeaders: HeadersInit = {}): HeadersInit {
   return { ...baseHeaders, [DEVICE_ID_HEADER]: deviceId }
 }
 
-async function getErrorMessage(response: Response, fallback: string): Promise<string> {
-  try {
-    const data = await response.json()
-    return data.detail || fallback
-  } catch {
-    return fallback
-  }
+async function throwResponseError(response: Response, context: Parameters<typeof responseToAppError>[1], fallback: string): Promise<never> {
+  throw await responseToAppError(response, context, fallback)
 }
 
 export interface GameOptions {
@@ -104,15 +100,17 @@ export async function createGame(
         return response.json()
       }
 
-      const message = await getErrorMessage(response, 'Failed to create game')
       const elapsed = Date.now() - startedAt
       const canRetry = isRetryableStatus(response.status)
         && attempt < CREATE_RETRY_MAX_ATTEMPTS - 1
         && elapsed < CREATE_RETRY_MAX_TOTAL_MS
       if (!canRetry) {
-        throw new Error(message)
+        await throwResponseError(response, 'create-game', 'Failed to create game')
       }
     } catch (err) {
+      if (err instanceof AppError) {
+        throw err
+      }
       const elapsed = Date.now() - startedAt
       const isAbortError = err instanceof DOMException && err.name === 'AbortError'
       const canRetry = !isAbortError
@@ -140,7 +138,7 @@ export async function joinGame(joinCode: string, playerName: string): Promise<Jo
     body: JSON.stringify({ join_code: joinCode, player_name: playerName }),
   })
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to join game'))
+    await throwResponseError(response, 'join-game', 'Failed to join game')
   }
   return response.json()
 }
@@ -150,7 +148,7 @@ export async function startGame(gameId: string): Promise<void> {
     method: 'POST',
   })
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to start game'))
+    await throwResponseError(response, 'game-action', 'Failed to start game')
   }
 }
 
@@ -162,7 +160,7 @@ export async function rejoinGame(gameId: string, playerName: string): Promise<Jo
     body: JSON.stringify({ player_name: playerName }),
   })
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to rejoin game'))
+    await throwResponseError(response, 'rejoin-game', 'Failed to rejoin game')
   }
   return response.json()
 }
@@ -170,7 +168,7 @@ export async function rejoinGame(gameId: string, playerName: string): Promise<Jo
 export async function getGameStatus(gameId: string): Promise<GameStatusResponse> {
   const response = await fetch(`${API_BASE}/games/${gameId}/status`)
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to get game status'))
+    await throwResponseError(response, 'game-status', 'Failed to get game status')
   }
   return response.json()
 }
@@ -186,7 +184,7 @@ export async function createSpectateRequest(
     body: JSON.stringify({ target_player_name: targetPlayerName, spectator_name: spectatorName }),
   })
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to create spectate request'))
+    await throwResponseError(response, 'spectate-request', 'Failed to create spectate request')
   }
   return response.json()
 }
@@ -197,7 +195,7 @@ export async function getSpectateRequestStatus(
 ): Promise<SpectateRequestStatus> {
   const response = await fetch(`${API_BASE}/games/${gameId}/spectate-request/${requestId}`)
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to get spectate status'))
+    await throwResponseError(response, 'spectate-status', 'Failed to get spectate status')
   }
   return response.json()
 }
@@ -211,7 +209,7 @@ export async function getGameCards(gameId: string, playerName?: string): Promise
   const query = playerName ? `?player_name=${encodeURIComponent(playerName)}` : ''
   const response = await fetch(`${API_BASE}/games/${gameId}/cards${query}`)
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to load card pool'))
+    await throwResponseError(response, 'default', 'Failed to load card pool')
   }
   const payload = await response.json() as { cards: CardCatalogEntry[]; upgrades: CardCatalogEntry[] }
   const mergedCatalog = Object.fromEntries(
@@ -226,7 +224,7 @@ export async function getGameCards(gameId: string, playerName?: string): Promise
 export async function getShareGame(gameId: string, playerName: string): Promise<ShareGameResponse> {
   const response = await fetch(`${API_BASE}/games/${gameId}/share/${encodeURIComponent(playerName)}`)
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to load shared game'))
+    await throwResponseError(response, 'share-game', 'Failed to load shared game')
   }
   return response.json()
 }
@@ -234,7 +232,7 @@ export async function getShareGame(gameId: string, playerName: string): Promise<
 export async function getServerStatus(): Promise<ServerStatus> {
   const response = await fetch(`${API_BASE}/server/status`)
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to load server status'))
+    await throwResponseError(response, 'default', 'Failed to load server status')
   }
   return response.json()
 }
@@ -262,7 +260,7 @@ export async function authRegister(username: string, password: string, email: st
     body: JSON.stringify({ username, password, email }),
   })
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to register'))
+    await throwResponseError(response, 'register', 'Failed to register')
   }
   return response.json()
 }
@@ -275,7 +273,7 @@ export async function authLogin(username: string, password: string): Promise<Aut
     body: JSON.stringify({ username, password }),
   })
   if (!response.ok) {
-    throw new Error(await getErrorMessage(response, 'Failed to log in'))
+    await throwResponseError(response, 'login', 'Failed to log in')
   }
   return response.json()
 }
@@ -298,7 +296,7 @@ export async function authGetMe(): Promise<AuthUser | null> {
 
 export async function getBattlers(offset = 0): Promise<{ battlers: UserBattler[]; has_more: boolean }> {
   const response = await fetch(`${API_BASE}/battlers?offset=${offset}`, { credentials: 'include' })
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load battlers'))
+  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load battlers')
   return response.json()
 }
 
@@ -321,7 +319,7 @@ export async function createBattler(data: CreateBattlerRequest): Promise<UserBat
     credentials: 'include',
     body: JSON.stringify(data),
   })
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to create battler'))
+  if (!response.ok) await throwResponseError(response, 'create-battler', 'Failed to create battler')
   return response.json()
 }
 
@@ -332,7 +330,7 @@ export async function updateBattler(id: number, data: Partial<CreateBattlerReque
     credentials: 'include',
     body: JSON.stringify(data),
   })
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to update battler'))
+  if (!response.ok) await throwResponseError(response, 'update-battler', 'Failed to update battler')
   return response.json()
 }
 
@@ -341,7 +339,7 @@ export async function deleteBattler(id: number): Promise<void> {
     method: 'DELETE',
     credentials: 'include',
   })
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to delete battler'))
+  if (!response.ok) await throwResponseError(response, 'delete-battler', 'Failed to delete battler')
 }
 
 export async function getBattlerGames(
@@ -354,7 +352,7 @@ export async function getBattlerGames(
   if (opts.useUpgrades != null) params.set('use_upgrades', String(opts.useUpgrades))
   const qs = params.toString()
   const response = await fetch(`${API_BASE}/battlers/${battlerId}/games${qs ? `?${qs}` : ''}`, { credentials: 'include' })
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load games'))
+  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load games')
   return response.json()
 }
 
@@ -370,13 +368,13 @@ export async function getCubeGames(
   const response = await fetch(
     `${API_BASE}/battlers/cube/${encodeURIComponent(cubeId)}/games${qs ? `?${qs}` : ''}`,
   )
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load games'))
+  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load games')
   return response.json()
 }
 
 export async function getMyGames(offset = 0): Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }> {
   const response = await fetch(`${API_BASE}/battlers/my-games?offset=${offset}`, { credentials: 'include' })
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load games'))
+  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load games')
   return response.json()
 }
 
@@ -384,7 +382,7 @@ export async function getMyGames(offset = 0): Promise<{ games: GameSummary[]; ha
 
 export async function getFollowing(offset = 0): Promise<{ following: FollowedBattler[]; has_more: boolean }> {
   const response = await fetch(`${API_BASE}/battlers/following?offset=${offset}`, { credentials: 'include' })
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load following'))
+  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load following')
   return response.json()
 }
 
@@ -395,7 +393,7 @@ export async function followCube(cubeId: string, displayName?: string): Promise<
     credentials: 'include',
     body: JSON.stringify({ cube_id: cubeId, display_name: displayName || null }),
   })
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to follow cube'))
+  if (!response.ok) await throwResponseError(response, 'follow-cube', 'Failed to follow cube')
   return response.json()
 }
 
@@ -404,7 +402,7 @@ export async function unfollowCube(followId: number): Promise<void> {
     method: 'DELETE',
     credentials: 'include',
   })
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to unfollow'))
+  if (!response.ok) await throwResponseError(response, 'unfollow-cube', 'Failed to unfollow')
 }
 
 // ── Discover ────────────────────────────────────────────────────────
@@ -421,6 +419,6 @@ export interface DiscoverResult {
 
 export async function discoverCubes(offset = 0): Promise<{ results: DiscoverResult[]; has_more: boolean }> {
   const response = await fetch(`${API_BASE}/discover?offset=${offset}`, { credentials: 'include' })
-  if (!response.ok) throw new Error(await getErrorMessage(response, 'Failed to load cubes'))
+  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load cubes')
   return response.json()
 }

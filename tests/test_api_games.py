@@ -66,6 +66,18 @@ class TestJoinGame:
 
         assert response.status_code == 400
 
+    def test_join_route_with_wrong_code_returns_structured_error(self, client):
+        create = client.post("/api/games", json={"player_name": "Alice", "cube_id": "test"})
+        game_id = create.json()["game_id"]
+
+        response = client.post(
+            f"/api/games/{game_id}/join",
+            json={"join_code": "WRONG1", "player_name": "Bob"},
+        )
+
+        assert response.status_code == 400
+        assert response.json()["code"] == "INVALID_JOIN_CODE"
+
 
 class TestGetLobby:
     def test_returns_lobby_shape(self, client):
@@ -164,6 +176,7 @@ class TestGetGameState:
         )
 
         assert response.status_code == 401
+        assert response.json()["code"] == "INVALID_SESSION"
 
     def test_returns_game_state_shape(self, game_with_players, client):
         game_id = game_with_players["game_id"]

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { joinGame } from '../../api/client'
 import { useAuth } from '../../contexts/authState'
 import { useSession } from '../../hooks/useSession'
+import { unknownToAppError } from '../../utils/appError'
 import { rememberPlayerForGame } from '../../utils/deviceIdentity'
 
 interface JoinGameModalProps {
@@ -47,7 +48,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
       rememberPlayerForGame(response.game_id, playerName.trim())
       navigate(`/game/${response.game_id}/lobby`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join game')
+      setError(unknownToAppError(err, 'join-game', 'Failed to join game').message)
     } finally {
       setLoading(false)
     }

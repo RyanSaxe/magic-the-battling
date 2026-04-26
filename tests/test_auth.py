@@ -37,6 +37,15 @@ class TestAuthCookies:
         assert response.status_code == 200
         assert "Secure" not in response.headers["set-cookie"]
 
+    def test_login_invalid_credentials_returns_structured_error(self, client):
+        response = client.post(
+            "/api/auth/login",
+            json={"username": "missing_user", "password": "password123"},
+        )
+
+        assert response.status_code == 401
+        assert response.json()["code"] == "INVALID_CREDENTIALS"
+
 
 class TestRuntimeConfig:
     def test_requires_auth_secret_outside_local_dev(self, monkeypatch):

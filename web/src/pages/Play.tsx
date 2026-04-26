@@ -18,6 +18,7 @@ import {
 } from "../utils/deviceIdentity";
 import { FaDiscord } from "react-icons/fa6";
 import type { LobbyState, PlayMode } from "../types";
+import { getAppErrorMessage, unknownToAppError } from "../utils/appError";
 
 type SoloPhase =
   | "idle"
@@ -30,12 +31,7 @@ type ActiveMode = "friends" | "solo";
 const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
 
 function normalizeCreateGameError(error: unknown): string {
-  const raw =
-    error instanceof Error ? error.message : "Failed to create game";
-  if (raw.toLowerCase().includes("server is updating")) {
-    return "New games are temporarily paused for a scheduled server update. If you are already in a game, you can keep playing and reconnect. Try again in about 10-15 minutes.";
-  }
-  return raw;
+  return unknownToAppError(error, "create-game", "Failed to create game").message;
 }
 
 function useSoloLobbyWatcher(
@@ -366,7 +362,7 @@ export function Play() {
     setSoloPhase(phase);
   }, []);
 
-  const { lobbyState, gameState, actions, gameNotFound } = useGame(
+  const { lobbyState, gameState, actions, connectionError } = useGame(
     pendingGameId,
     pendingSessionId,
     null,
@@ -450,8 +446,11 @@ export function Play() {
   }, [pendingGameId]);
 
   useEffect(() => {
-    if (gameNotFound && pendingGameId) {
-      addToast("That game is no longer available. Please start a new one.", "error");
+    if (connectionError && pendingGameId) {
+      addToast(
+        getAppErrorMessage(connectionError, "play-connection", "That game is no longer available. Please start a new one."),
+        "error",
+      );
       startTransition(() => {
         setPendingGameId(null);
         setPendingSessionId(null);
@@ -460,7 +459,7 @@ export function Play() {
         resetWatcher();
       });
     }
-  }, [gameNotFound, pendingGameId, addToast, updateSoloPhase, resetWatcher]);
+  }, [connectionError, pendingGameId, addToast, updateSoloPhase, resetWatcher]);
 
   useEffect(() => {
     if (!cubeId) return;

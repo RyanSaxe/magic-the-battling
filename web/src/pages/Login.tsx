@@ -4,6 +4,7 @@ import { FaDiscord } from 'react-icons/fa6'
 import { useAuth } from '../contexts/authState'
 import { AppHeader } from '../components/common/AppHeader'
 import { CubeCobraPrimerLink } from '../components/common/CubeCobraPrimerLink'
+import { unknownToAppError } from '../utils/appError'
 
 export function Login() {
   const navigate = useNavigate()
@@ -23,7 +24,7 @@ export function Login() {
       await login(username, password)
       navigate(returnTo)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(unknownToAppError(err, 'login', 'Login failed').message)
     } finally {
       setLoading(false)
     }

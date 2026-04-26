@@ -38,6 +38,7 @@ import { useElementHeight } from "../hooks/useElementHeight";
 import { BattleResolutionOverlay } from "../components/common/BattleResolutionOverlay";
 import { BattleRevealOverlay } from "../components/common/BattleRevealOverlay";
 import { BuildUpgradeOverlay } from "../components/common/BuildUpgradeOverlay";
+import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
 import { RevealBeforeSubmitModal } from "../components/common/RevealBeforeSubmitModal";
 import { ServerStatusWindow } from "../components/common/ServerStatusWindow";
 import { UpgradesModal } from "../components/common/UpgradesModal";
@@ -211,7 +212,7 @@ function PlayerSelectionModal({
         onSessionCreated(response.session_id, response.player_id);
       } catch (err) {
         if (!options?.silent) {
-          setError(err instanceof Error ? err.message : "Failed to reconnect");
+          setError(unknownToAppError(err, "rejoin-game", "Failed to reconnect").message);
         }
       } finally {
         setRejoinLoading(false);
@@ -251,7 +252,7 @@ function PlayerSelectionModal({
       setRequestStatus("waiting");
       pollForApproval(request_id, selectedPlayer);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send watch request");
+      setError(unknownToAppError(err, "spectate-request", "Failed to send watch request").message);
     }
   };
 
@@ -270,7 +271,7 @@ function PlayerSelectionModal({
           pollingRef.current = window.setTimeout(poll, 1000);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to check request status");
+        setError(unknownToAppError(err, "spectate-status", "Failed to check request status").message);
         setRequestStatus("idle");
       }
     };
@@ -288,7 +289,7 @@ function PlayerSelectionModal({
       );
       pollForApproval(request_id, playerName);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start spectating");
+      setError(unknownToAppError(err, "spectate-request", "Failed to start spectating").message);
     }
   };
 
@@ -795,12 +796,12 @@ function GameContent() {
   const { addToast } = useToast();
   const buildReadyPendingRef = useRef(false);
   const [buildReadyPending, setBuildReadyPending] = useState(false);
-  const handleServerError = useCallback((message: string) => {
+  const handleServerError = useCallback((error: AppError) => {
     if (buildReadyPendingRef.current) {
       buildReadyPendingRef.current = false;
       setBuildReadyPending(false);
     }
-    addToast(message, "error");
+    addToast(getAppErrorMessage(error, "game-action", "That action could not be completed."), "error");
   }, [addToast]);
 
   const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(null);
@@ -809,7 +810,7 @@ function GameContent() {
   }, []);
 
   const navigate = useNavigate();
-  const { gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, invalidSession, gameNotFound } = useGame(
+  const { gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, connectionError, invalidSession } = useGame(
     gameId ?? null,
     isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
@@ -1575,16 +1576,21 @@ function GameContent() {
     );
   }
 
-  if (gameNotFound) {
+  if (connectionError && !invalidSession) {
+    const title = connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Game Unavailable";
+    const message = getAppErrorMessage(
+      connectionError,
+      "game-connection",
+      "This game is no longer available. It may have ended or been cleared during a server restart.",
+    );
     return (
       <div className="game-table flex items-center justify-center">
         <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
           <h2 className="text-lg font-semibold text-amber-200">
-            Game Unavailable
+            {title}
           </h2>
           <p className="text-sm text-gray-200 mt-2 leading-snug">
-            This game is no longer available. It may have ended or been
-            cleared during a server restart.
+            {message}
           </p>
           <div className="mt-4 flex gap-2">
             <button

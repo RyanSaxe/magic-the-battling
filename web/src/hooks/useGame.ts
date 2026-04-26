@@ -3,6 +3,7 @@ import { useWebSocket } from './useWebSocket'
 import type { VoiceSignalPayload } from './useWebSocket'
 import type { CardDestination, BuildSource, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
+import type { AppError } from '../utils/appError'
 
 interface SpectatorConfig {
   spectatePlayer: string
@@ -13,7 +14,7 @@ export function useGame(
   gameId: string | null,
   sessionId: string | null,
   spectatorConfig?: SpectatorConfig | null,
-  onServerError?: (message: string) => void,
+  onServerError?: (error: AppError) => void,
   onVoiceSignal?: (payload: VoiceSignalPayload) => void,
 ) {
   const {
@@ -23,6 +24,7 @@ export function useGame(
     send,
     pendingSpectateRequest,
     serverNotice,
+    connectionError,
     clearSpectateRequest,
     kicked,
     invalidSession,
@@ -157,6 +159,7 @@ export function useGame(
     lobbyState,
     pendingSpectateRequest,
     serverNotice,
+    connectionError,
     kicked,
     invalidSession,
     gameNotFound,
