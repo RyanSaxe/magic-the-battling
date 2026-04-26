@@ -16,22 +16,26 @@ class TestWebSocketConnection:
     def test_invalid_session_closes_connection(self, client, game_with_players, ws_receive_json):
         game_id = game_with_players["game_id"]
 
-        with (
-            client.websocket_connect(f"/ws/{game_id}?session_id=invalid") as ws,
-            pytest.raises(WebSocketDisconnect) as exc_info,
-        ):
-            ws_receive_json(ws)
+        with client.websocket_connect(f"/ws/{game_id}?session_id=invalid") as ws:
+            message = ws_receive_json(ws)
+            assert message["type"] == "connection_error"
+            assert message["payload"]["code"] == "INVALID_SESSION"
+
+            with pytest.raises(WebSocketDisconnect) as exc_info:
+                ws_receive_json(ws)
 
         assert exc_info.value.code == 4001
 
     def test_nonexistent_game_closes_connection(self, client, game_with_players, ws_receive_json):
         session_id = game_with_players["alice"]["session_id"]
 
-        with (
-            client.websocket_connect(f"/ws/nonexistent?session_id={session_id}") as ws,
-            pytest.raises(WebSocketDisconnect) as exc_info,
-        ):
-            ws_receive_json(ws)
+        with client.websocket_connect(f"/ws/nonexistent?session_id={session_id}") as ws:
+            message = ws_receive_json(ws)
+            assert message["type"] == "connection_error"
+            assert message["payload"]["code"] == "GAME_NOT_FOUND"
+
+            with pytest.raises(WebSocketDisconnect) as exc_info:
+                ws_receive_json(ws)
 
         assert exc_info.value.code == 4004
 
@@ -178,6 +182,7 @@ class TestGameWebSocket:
 
             assert msg["type"] == "error"
             assert "payload" in msg
+            assert msg["payload"]["code"] == "UNKNOWN_ACTION"
 
     def test_start_game_broadcasts_game_state(self, client, game_with_players, ws_receive_json, ws_receive_json_until):
         game_id = game_with_players["game_id"]
@@ -269,11 +274,13 @@ class TestGameWebSocket:
         game_manager = ws_module.game_manager
         game_manager._clear_runtime_player_mappings_for_game(game_id)
 
-        with (
-            client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws,
-            pytest.raises(WebSocketDisconnect) as exc_info,
-        ):
-            ws_receive_json(ws)
+        with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
+            message = ws_receive_json(ws)
+            assert message["type"] == "connection_error"
+            assert message["payload"]["code"] == "PLAYER_NOT_IN_GAME"
+
+            with pytest.raises(WebSocketDisconnect) as exc_info:
+                ws_receive_json(ws)
 
         assert exc_info.value.code == 4001
 

@@ -5,15 +5,17 @@ from pathlib import Path
 from time import perf_counter
 from uuid import uuid4
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.gzip import GZipMiddleware
 from starlette.requests import Request
 
 from server.db.database import init_db
+from server.errors import AppHTTPException, ErrorCode
 from server.monitoring import start_monitoring, stop_monitoring
 from server.observability import OBSERVABILITY_LOGGER_NAME, configure_logging, record_http_latency
 from server.routers import auth, battlers, discover, games, ops, share_preview, ws
@@ -67,6 +69,39 @@ app = FastAPI(
     description="Real-time multiplayer Magic: The Gathering draft format",
     version="0.1.0",
 )
+
+
+def _http_error_payload(exc: HTTPException) -> dict[str, str]:
+    detail = exc.detail if isinstance(exc.detail, str) else "Request failed"
+    code = getattr(exc, "code", None)
+    if isinstance(exc, AppHTTPException):
+        code = exc.code
+    return {
+        "detail": detail,
+        "code": str(code or ErrorCode.UNKNOWN),
+    }
+
+
+@app.exception_handler(HTTPException)
+async def handle_http_exception(request: Request, exc: HTTPException) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=_http_error_payload(exc),
+        headers=exc.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def handle_validation_exception(request: Request, exc: RequestValidationError) -> JSONResponse:
+    first_error = exc.errors()[0].get("msg") if exc.errors() else "Request validation failed"
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": str(first_error),
+            "code": str(ErrorCode.INVALID_REQUEST),
+        },
+    )
+
 
 _CANONICAL_HOST = os.getenv("MTB_CANONICAL_HOST", "")
 _REDIRECT_EXEMPT_PATHS = {"/health", "/api/ops/mode"}

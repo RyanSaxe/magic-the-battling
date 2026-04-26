@@ -12,6 +12,7 @@ import { MicToggle } from "../components/sidebar/MicToggle";
 import { useToast } from "../contexts";
 import { HintsBanner } from "../components/common/HintsBanner";
 import { CubeCobraPrimerLink } from "../components/common/CubeCobraPrimerLink";
+import { type AppError, getAppErrorMessage } from "../utils/appError";
 import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import {
   getDefaultNewPlayerPreference,
@@ -284,6 +285,9 @@ export function Lobby() {
   const navigate = useNavigate();
   const { session, clearSession } = useSession();
   const { addToast } = useToast();
+  const handleServerError = useCallback((error: AppError) => {
+    addToast(getAppErrorMessage(error, "lobby-action", "That action could not be completed."), "error");
+  }, [addToast]);
 
   const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(null);
   const handleVoiceSignal = useCallback((payload: VoiceSignalPayload) => {
@@ -295,15 +299,15 @@ export function Lobby() {
     gameState,
     isConnected,
     kicked,
+    connectionError,
     invalidSession,
-    gameNotFound,
     actions,
     send,
   } = useGame(
     gameId ?? null,
     session?.sessionId ?? null,
     null,
-    addToast,
+    handleServerError,
     handleVoiceSignal,
   );
 
@@ -713,14 +717,17 @@ export function Lobby() {
           <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
           <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
             <div className="zone-pack shell-scroll-row h-full min-h-0 flex items-center justify-center">
-              {gameNotFound ? (
+              {connectionError && !invalidSession ? (
                 <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
                   <h2 className="text-lg font-semibold text-amber-200">
-                    Lobby Unavailable
+                    {connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Lobby Unavailable"}
                   </h2>
                   <p className="text-sm text-gray-200 mt-2 leading-snug">
-                    This lobby is no longer available. It may have ended or been
-                    cleared during a server restart.
+                    {getAppErrorMessage(
+                      connectionError,
+                      "lobby-connection",
+                      "This lobby is no longer available. It may have ended or been cleared during a server restart.",
+                    )}
                   </p>
                   <div className="mt-4 flex gap-2">
                     <button

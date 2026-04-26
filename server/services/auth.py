@@ -7,11 +7,12 @@ from uuid import uuid4
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from server.db import database
 from server.db.models import User
+from server.errors import ErrorCode, api_error
 from server.runtime_config import AUTH_SECRET_KEY, AUTH_TOKEN_EXPIRE_HOURS
 
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ def _user_from_token(request: Request, db: Session) -> User | None:
 def get_current_user(request: Request, db: Session = Depends(_get_db)) -> User:
     user = _user_from_token(request, db)
     if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
+        raise api_error(401, ErrorCode.NOT_AUTHENTICATED, "Not authenticated")
     return user
 
 

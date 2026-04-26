@@ -4,6 +4,7 @@ import { FaDiscord } from 'react-icons/fa6'
 import { useAuth } from '../contexts/authState'
 import { AppHeader } from '../components/common/AppHeader'
 import { CubeCobraPrimerLink } from '../components/common/CubeCobraPrimerLink'
+import { unknownToAppError } from '../utils/appError'
 
 export function Register() {
   const navigate = useNavigate()
@@ -29,7 +30,7 @@ export function Register() {
       await register(username, password, email)
       navigate(returnTo)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registration failed')
+      setError(unknownToAppError(err, 'register', 'Registration failed').message)
     } finally {
       setLoading(false)
     }

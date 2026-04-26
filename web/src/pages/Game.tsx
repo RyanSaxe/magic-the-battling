@@ -38,6 +38,7 @@ import { useElementHeight } from "../hooks/useElementHeight";
 import { BattleResolutionOverlay } from "../components/common/BattleResolutionOverlay";
 import { BattleRevealOverlay } from "../components/common/BattleRevealOverlay";
 import { BuildUpgradeOverlay } from "../components/common/BuildUpgradeOverlay";
+import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
 import { RevealBeforeSubmitModal } from "../components/common/RevealBeforeSubmitModal";
 import { ServerStatusWindow } from "../components/common/ServerStatusWindow";
 import { UpgradesModal } from "../components/common/UpgradesModal";
@@ -140,6 +141,7 @@ function selectDraftGuideOpponent(
 function PlayerSelectionModal({
   gameId,
   onSessionCreated,
+  spectateOnly = false,
 }: {
   gameId: string;
   onSessionCreated: (
@@ -147,6 +149,7 @@ function PlayerSelectionModal({
     playerId: string,
     spectatorConfig?: SpectatorConfig
   ) => void;
+  spectateOnly?: boolean;
 }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<GameStatusResponse | null>(null);
@@ -211,7 +214,7 @@ function PlayerSelectionModal({
         onSessionCreated(response.session_id, response.player_id);
       } catch (err) {
         if (!options?.silent) {
-          setError(err instanceof Error ? err.message : "Failed to reconnect");
+          setError(unknownToAppError(err, "rejoin-game", "Failed to reconnect").message);
         }
       } finally {
         setRejoinLoading(false);
@@ -221,7 +224,7 @@ function PlayerSelectionModal({
   );
 
   useEffect(() => {
-    if (rejoinLoading || requestStatus !== "idle" || selectedPlayer !== null || !status) {
+    if (spectateOnly || rejoinLoading || requestStatus !== "idle" || selectedPlayer !== null || !status) {
       return;
     }
 
@@ -233,7 +236,7 @@ function PlayerSelectionModal({
 
     autoReconnectAttemptedRef.current = true;
     void handleReconnect(autoPlayer, { silent: true });
-  }, [gameId, handleReconnect, rejoinLoading, requestStatus, selectedPlayer, status]);
+  }, [spectateOnly, gameId, handleReconnect, rejoinLoading, requestStatus, selectedPlayer, status]);
 
   const handleWatchRequest = async () => {
     if (!selectedPlayer || !spectatorName.trim()) {
@@ -251,7 +254,7 @@ function PlayerSelectionModal({
       setRequestStatus("waiting");
       pollForApproval(request_id, selectedPlayer);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send watch request");
+      setError(unknownToAppError(err, "spectate-request", "Failed to send watch request").message);
     }
   };
 
@@ -270,7 +273,7 @@ function PlayerSelectionModal({
           pollingRef.current = window.setTimeout(poll, 1000);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to check request status");
+        setError(unknownToAppError(err, "spectate-status", "Failed to check request status").message);
         setRequestStatus("idle");
       }
     };
@@ -288,7 +291,7 @@ function PlayerSelectionModal({
       );
       pollForApproval(request_id, playerName);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start spectating");
+      setError(unknownToAppError(err, "spectate-request", "Failed to start spectating").message);
     }
   };
 
@@ -361,7 +364,7 @@ function PlayerSelectionModal({
         {requestStatus === "idle" && !selectedPlayer && (
           <>
             <p className="text-gray-400 text-center mb-4">
-              Select a player to reconnect or watch
+              {spectateOnly ? "Select a player to watch" : "Select a player to reconnect or watch"}
             </p>
             <div className="space-y-3 mb-6">
               {humanPlayers.map((player) => (
@@ -381,7 +384,7 @@ function PlayerSelectionModal({
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    {!player.is_connected ? (
+                    {!spectateOnly && !player.is_connected ? (
                       <button
                         onClick={() => handleReconnect(player.name)}
                         disabled={rejoinLoading}
@@ -795,12 +798,12 @@ function GameContent() {
   const { addToast } = useToast();
   const buildReadyPendingRef = useRef(false);
   const [buildReadyPending, setBuildReadyPending] = useState(false);
-  const handleServerError = useCallback((message: string) => {
+  const handleServerError = useCallback((error: AppError) => {
     if (buildReadyPendingRef.current) {
       buildReadyPendingRef.current = false;
       setBuildReadyPending(false);
     }
-    addToast(message, "error");
+    addToast(getAppErrorMessage(error, "game-action", "That action could not be completed."), "error");
   }, [addToast]);
 
   const voiceSignalRef = useRef<((payload: VoiceSignalPayload) => void) | null>(null);
@@ -808,7 +811,8 @@ function GameContent() {
     voiceSignalRef.current?.(payload);
   }, []);
 
-  const { gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, invalidSession } = useGame(
+  const navigate = useNavigate();
+  const { gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, connectionError, invalidSession } = useGame(
     gameId ?? null,
     isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
@@ -1570,7 +1574,43 @@ function GameContent() {
       <PlayerSelectionModal
         gameId={gameId!}
         onSessionCreated={handleSessionCreated}
+        spectateOnly={isSpectateMode}
       />
+    );
+  }
+
+  if (connectionError && !invalidSession) {
+    const title = connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Game Unavailable";
+    const message = getAppErrorMessage(
+      connectionError,
+      "game-connection",
+      "This game is no longer available. It may have ended or been cleared during a server restart.",
+    );
+    return (
+      <div className="game-table flex items-center justify-center">
+        <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
+          <h2 className="text-lg font-semibold text-amber-200">
+            {title}
+          </h2>
+          <p className="text-sm text-gray-200 mt-2 leading-snug">
+            {message}
+          </p>
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={() => navigate("/play")}
+              className="btn btn-primary flex-1 py-2"
+            >
+              New Game
+            </button>
+            <button
+              onClick={() => navigate("/")}
+              className="btn btn-secondary flex-1 py-2"
+            >
+              Home
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -1611,6 +1651,7 @@ function GameContent() {
       }
     : undefined;
 
+  const timelinePhase = displayBattleResolution ? "battle" : currentPhase;
   const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
   const isWinner = selfPlacement === 1;
@@ -2078,7 +2119,7 @@ function GameContent() {
         {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
         <div ref={phaseTimelineRef} className="relative">
           <PhaseTimeline
-            currentPhase={currentPhase}
+            currentPhase={timelinePhase}
             stage={self_player.stage}
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
@@ -2096,11 +2137,7 @@ function GameContent() {
                 ☰
               </button>
             ) : undefined}
-            title={isEndPhase ? (
-              <span className={`font-bold ${isWinner ? 'text-amber-400' : 'text-gray-300'}`}>
-                {getOrdinal(selfPlacement)} Place
-              </span>
-            ) : undefined}
+            title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
           />
         </div>
 

@@ -19,6 +19,7 @@ import {
   type DiscoverResult,
 } from '../api/client'
 import type { UserBattler, FollowedBattler, GameSummary, PlayMode } from '../types'
+import { unknownToAppError } from '../utils/appError'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
 
 type Tab = 'battlers' | 'following' | 'games' | 'discover'
@@ -251,7 +252,7 @@ export function Dashboard() {
                     await followCube(cubeId)
                     setDiscoverResults((prev) => prev.map((r) => r.cube_id === cubeId ? { ...r, is_following: true } : r))
                   } catch (err) {
-                    addToast(err instanceof Error ? err.message : 'Failed to follow', 'error')
+                    addToast(unknownToAppError(err, 'follow-cube', 'Failed to follow').message, 'error')
                   }
                 }}
                 onUnfollow={async (cubeId) => {
@@ -492,7 +493,7 @@ function AddBattlerModal({
       })
       onCreated(b)
     } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Failed to create', 'error')
+      addToast(unknownToAppError(err, 'create-battler', 'Failed to create').message, 'error')
     } finally {
       setSaving(false)
     }

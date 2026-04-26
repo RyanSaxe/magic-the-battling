@@ -11,6 +11,7 @@ from typing import Any, Literal, cast
 from uuid import uuid4
 
 from httpx import HTTPStatusError, RequestError
+from sqlalchemy import func
 from sqlalchemy import true as sql_true
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session, joinedload
@@ -618,7 +619,13 @@ class GameManager:
         session = db.SessionLocal()
         try:
             stale = (
-                session.query(GameRecord).filter(GameRecord.ended_at.is_(None), GameRecord.created_at < cutoff).all()
+                session.query(GameRecord)
+                .outerjoin(ActiveGameSnapshot, ActiveGameSnapshot.game_id == GameRecord.id)
+                .filter(
+                    GameRecord.ended_at.is_(None),
+                    func.coalesce(ActiveGameSnapshot.last_human_activity_at, GameRecord.created_at) < cutoff,
+                )
+                .all()
             )
             if not stale:
                 return 0

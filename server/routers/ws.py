@@ -6,6 +6,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 import server.db.database as db
 from server.compression import send_ws
+from server.errors import ErrorCode, ws_error_payload
 from server.observability import (
     OBSERVABILITY_LOGGER_NAME,
     record_ws_action_latency,
@@ -44,11 +45,21 @@ ACTION_REQUIRED_PHASES: dict[str, str] = {
 }
 
 
-async def _reject_websocket(websocket: WebSocket, code: int, reason: str) -> None:
+async def _reject_websocket(websocket: WebSocket, code: int, reason: str, error_code: ErrorCode | str) -> None:
     # Accept-then-close ensures browsers receive the WebSocket close code
     # instead of a generic HTTP 403 handshake rejection.
     try:
         await websocket.accept()
+    except Exception:
+        pass
+    try:
+        await send_ws(
+            websocket,
+            {
+                "type": "connection_error",
+                "payload": ws_error_payload(error_code, reason),
+            },
+        )
     except Exception:
         pass
     await websocket.close(code=code, reason=reason)
@@ -102,7 +113,12 @@ class ConnectionManager:
     async def connect(self, game_id: str, player_id: str, websocket: WebSocket):
         if self.total_connections() >= MAX_WS_CONNECTIONS:
             self._pending_connections[game_id].discard(player_id)
-            await _reject_websocket(websocket, code=1013, reason="Server is at websocket capacity")
+            await _reject_websocket(
+                websocket,
+                code=1013,
+                reason="Server is at websocket capacity",
+                error_code=ErrorCode.WS_CAPACITY,
+            )
             return False
         game_manager.cancel_abandoned_cleanup(game_id)
         await websocket.accept()
@@ -240,12 +256,17 @@ class ConnectionManager:
             duration_ms,
         )
 
-    async def send_error(self, websocket: WebSocket, message: str):
+    async def send_error(
+        self,
+        websocket: WebSocket,
+        message: str,
+        error_code: ErrorCode | str = ErrorCode.USER_MESSAGE,
+    ):
         await send_ws(
             websocket,
             {
                 "type": "error",
-                "payload": {"message": message},
+                "payload": ws_error_payload(error_code, message),
             },
         )
 
@@ -317,12 +338,22 @@ async def _handle_spectator_connection(
 ) -> bool:
     req = game_manager.get_spectate_request(request_id)
     if not req or req.status != "approved" or req.session_id != session_id:
-        await _reject_websocket(websocket, code=4003, reason="Invalid spectate request")
+        await _reject_websocket(
+            websocket,
+            code=4003,
+            reason="Invalid spectate request",
+            error_code=ErrorCode.INVALID_REQUEST,
+        )
         return True
 
     target_player_id = game_manager.get_player_id_by_name(game_id, spectate_player)
     if not target_player_id:
-        await _reject_websocket(websocket, code=4004, reason="Target player not found")
+        await _reject_websocket(
+            websocket,
+            code=4004,
+            reason="Target player not found",
+            error_code=ErrorCode.SPECTATE_TARGET_NOT_FOUND,
+        )
         return True
 
     await connection_manager.connect_spectator(game_id, target_player_id, websocket)
@@ -362,15 +393,30 @@ async def _connect_player_to_game(websocket: WebSocket, game_id: str, player_id:
     pending, game = _resolve_pending_or_game(game_id)
     if not pending and not game:
         connection_manager.disconnect(game_id, player_id, websocket)
-        await _reject_websocket(websocket, code=4004, reason="Game not found")
+        await _reject_websocket(
+            websocket,
+            code=4004,
+            reason="Game not found",
+            error_code=ErrorCode.GAME_NOT_FOUND,
+        )
         return None
 
     if pending and player_id not in pending.player_ids:
-        await _reject_websocket(websocket, code=4001, reason="Invalid session")
+        await _reject_websocket(
+            websocket,
+            code=4001,
+            reason="Invalid session",
+            error_code=ErrorCode.INVALID_SESSION,
+        )
         return None
 
     if game and not game_manager.get_player(game, player_id):
-        await _reject_websocket(websocket, code=4001, reason="Player not found in game")
+        await _reject_websocket(
+            websocket,
+            code=4001,
+            reason="Player not found in game",
+            error_code=ErrorCode.PLAYER_NOT_IN_GAME,
+        )
         return None
 
     game_manager.cancel_pending_disconnect(game_id, player_id)
@@ -421,7 +467,12 @@ async def websocket_endpoint(
 ):
     session = session_manager.get_session(session_id)
     if not session:
-        await _reject_websocket(websocket, code=4001, reason="Invalid session")
+        await _reject_websocket(
+            websocket,
+            code=4001,
+            reason="Invalid session",
+            error_code=ErrorCode.INVALID_SESSION,
+        )
         return
 
     if spectate_player and request_id:
@@ -492,7 +543,7 @@ async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
     if action == "submit_battler":
         pending = game_manager.get_pending_game(game_id)
         if not pending:
-            await connection_manager.send_error(websocket, "Game not found")
+            await connection_manager.send_error(websocket, "Game not found", ErrorCode.GAME_NOT_FOUND)
             return True
 
         error = game_manager.start_player_battler_preload(
@@ -517,7 +568,11 @@ async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
 
     if action == "start_game":
         if ops_manager.blocks_new_games():
-            await connection_manager.send_error(websocket, "Server is updating. New games are temporarily blocked.")
+            await connection_manager.send_error(
+                websocket,
+                "Server is updating. New games are temporarily blocked.",
+                ErrorCode.SERVER_UPDATING,
+            )
             return True
         can_start, error = game_manager.can_start_game(game_id, player_id)
         if not can_start:
@@ -735,7 +790,11 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
         return
 
     if ops_manager.is_maintenance():
-        await connection_manager.send_error(websocket, "Server maintenance in progress. Please reconnect shortly.")
+        await connection_manager.send_error(
+            websocket,
+            "Server maintenance in progress. Please reconnect shortly.",
+            ErrorCode.SERVER_MAINTENANCE,
+        )
         return
 
     lock = game_manager.get_action_lock(game_id)
@@ -745,12 +804,16 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
 
         game = game_manager.get_game(game_id)
         if not game:
-            await connection_manager.send_error(websocket, "Game not started")
+            await connection_manager.send_error(websocket, "Game not started", ErrorCode.GAME_NOT_FOUND)
             return
 
         player = game_manager.get_player(game, player_id)
         if not player:
-            await connection_manager.send_error(websocket, "Player not found in game")
+            await connection_manager.send_error(
+                websocket,
+                "Player not found in game",
+                ErrorCode.PLAYER_NOT_IN_GAME,
+            )
             return
 
         phase_error = _validate_action_phase(action, player)
@@ -763,7 +826,11 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
             game_manager.mark_game_dirty(game_id)
 
         if result is False:
-            await connection_manager.send_error(websocket, f"Unknown action: {action}")
+            await connection_manager.send_error(
+                websocket,
+                f"Unknown action: {action}",
+                ErrorCode.UNKNOWN_ACTION,
+            )
         elif result == "game_over":
             winners = [p for p in game.players if p.phase == "winner"]
             winner_name = winners[0].name if winners else None

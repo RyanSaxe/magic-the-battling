@@ -7,6 +7,7 @@ import type {
   LobbyState,
   ServerNoticeStatus,
 } from '../types'
+import { type AppError, createAppError, wsPayloadToAppError } from '../utils/appError'
 import { hydrateGameState } from '../utils/catalogHydration'
 
 interface SpectateRequest {
@@ -20,6 +21,7 @@ interface WebSocketState {
   lobbyState: LobbyState | null
   pendingSpectateRequest: SpectateRequest | null
   serverNotice: ServerNoticeStatus | null
+  connectionError: AppError | null
   kicked: boolean
   invalidSession: boolean
   gameNotFound: boolean
@@ -45,7 +47,7 @@ export function useWebSocket(
   gameId: string | null,
   sessionId: string | null,
   spectatorConfig?: SpectatorConfig | null,
-  onServerError?: (message: string) => void,
+  onServerError?: (error: AppError) => void,
   onVoiceSignal?: (payload: VoiceSignalPayload) => void,
 ) {
   const [state, setState] = useState<WebSocketState>({
@@ -54,6 +56,7 @@ export function useWebSocket(
     lobbyState: null,
     pendingSpectateRequest: null,
     serverNotice: null,
+    connectionError: null,
     kicked: false,
     invalidSession: false,
     gameNotFound: false,
@@ -65,6 +68,7 @@ export function useWebSocket(
   const reconnectAttempts = useRef(0)
   const isClosingRef = useRef(false)
   const connectionGenerationRef = useRef(0)
+  const connectionErrorRef = useRef<AppError | null>(null)
   const onServerErrorRef = useRef(onServerError)
   useEffect(() => {
     onServerErrorRef.current = onServerError
@@ -78,6 +82,7 @@ export function useWebSocket(
     if (!gameId || !sessionId) {
       isClosingRef.current = true
       catalogRef.current = {}
+      connectionErrorRef.current = null
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
       }
@@ -107,12 +112,23 @@ export function useWebSocket(
       const ws = new WebSocket(url)
       wsRef.current = ws
       const isCurrentSocket = () => connectionGenerationRef.current === generation && wsRef.current === ws
+      const applyConnectionError = (error: AppError) => {
+        connectionErrorRef.current = error
+        setState(s => ({
+          ...s,
+          connectionError: error,
+          invalidSession: error.code === 'INVALID_SESSION' || error.code === 'PLAYER_NOT_IN_GAME',
+          gameNotFound: error.code === 'GAME_NOT_FOUND',
+        }))
+      }
 
       ws.onopen = () => {
         if (!isCurrentSocket()) return
+        connectionErrorRef.current = null
         setState(s => ({
           ...s,
           isConnected: true,
+          connectionError: null,
           invalidSession: false,
           gameNotFound: false,
         }))
@@ -163,7 +179,14 @@ export function useWebSocket(
             } else if (message.type === 'lobby_state') {
               setState(s => ({ ...s, lobbyState: message.payload }))
             } else if (message.type === 'error') {
-              onServerErrorRef.current?.(message.payload.message)
+              onServerErrorRef.current?.(
+                wsPayloadToAppError(message.payload, 'default', 'That action could not be completed.'),
+              )
+            } else if (message.type === 'connection_error') {
+              isClosingRef.current = true
+              applyConnectionError(
+                wsPayloadToAppError(message.payload, 'default', 'The connection could not be established.'),
+              )
             } else if (message.type === 'spectate_request') {
               setState(s => ({ ...s, pendingSpectateRequest: message.payload }))
             } else if (message.type === 'server_notice') {
@@ -191,15 +214,48 @@ export function useWebSocket(
         if (!isCurrentSocket()) return
         setState(s => ({ ...s, isConnected: false }))
         wsRef.current = null
+        const priorError = connectionErrorRef.current
+
+        if (priorError) {
+          isClosingRef.current = true
+          applyConnectionError(priorError)
+          return
+        }
 
         if (event.code === 4001) {
           isClosingRef.current = true
-          setState(s => ({ ...s, invalidSession: true }))
+          applyConnectionError(
+            createAppError({
+              code: 'INVALID_SESSION',
+              detail: event.reason || 'Invalid session',
+              context: 'default',
+              fallbackMessage: 'The connection could not be established.',
+            }),
+          )
           return
         }
         if (event.code === 4004) {
           isClosingRef.current = true
-          setState(s => ({ ...s, gameNotFound: true }))
+          applyConnectionError(
+            createAppError({
+              code: 'GAME_NOT_FOUND',
+              detail: event.reason || 'Game not found',
+              context: 'default',
+              fallbackMessage: 'The connection could not be established.',
+            }),
+          )
+          return
+        }
+        if (event.code === 1013) {
+          isClosingRef.current = true
+          applyConnectionError(
+            createAppError({
+              code: 'WS_CAPACITY',
+              detail: event.reason || 'Server is at websocket capacity',
+              context: 'default',
+              fallbackMessage: 'The connection could not be established.',
+            }),
+          )
           return
         }
 

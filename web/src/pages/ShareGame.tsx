@@ -215,8 +215,13 @@ export function ShareGame() {
   const renderContent = () => {
     if (roundOptions.length === 0) {
       return (
-        <div className="flex-1 flex items-center justify-center text-gray-500">
-          No round data available for this game.
+        <div className="flex-1 flex items-center justify-center">
+          <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
+            <h2 className="text-lg font-semibold text-amber-200">No Round Data</h2>
+            <p className="text-sm text-gray-200 mt-2 leading-snug">
+              No round data is available for this game.
+            </p>
+          </div>
         </div>
       )
     }
@@ -238,10 +243,14 @@ export function ShareGame() {
     }
 
     return (
-      <div className="flex-1 flex items-center justify-center text-gray-500">
-        {currentPlayerData
-          ? 'This player was not in the game during this round.'
-          : 'Select a player to view their deck.'}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
+          <p className="text-sm text-gray-200 leading-snug">
+            {currentPlayerData
+              ? 'This player was not in the game during this round.'
+              : 'Select a player to view their deck.'}
+          </p>
+        </div>
       </div>
     )
   }
@@ -348,8 +357,10 @@ export function ShareGame() {
         {shellMode === 'mobile' && (
           <div className="w-[4px] shrink-0 frame-chrome" />
         )}
-        <main className="flex-1 flex flex-col min-h-0 min-w-0">
-          {renderContent()}
+        <main className="flex-1 flex flex-col min-h-0 min-w-0 p-[2px] zone-divider-bg">
+          <div className="zone-pack flex-1 min-h-0 flex flex-col">
+            {renderContent()}
+          </div>
         </main>
 
         {usesOverlaySidebar ? (

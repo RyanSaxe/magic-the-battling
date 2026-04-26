@@ -18,6 +18,7 @@ import {
 } from "../utils/deviceIdentity";
 import { FaDiscord } from "react-icons/fa6";
 import type { LobbyState, PlayMode } from "../types";
+import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
 
 type SoloPhase =
   | "idle"
@@ -30,12 +31,7 @@ type ActiveMode = "friends" | "solo";
 const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
 
 function normalizeCreateGameError(error: unknown): string {
-  const raw =
-    error instanceof Error ? error.message : "Failed to create game";
-  if (raw.toLowerCase().includes("server is updating")) {
-    return "New games are temporarily paused for a scheduled server update. If you are already in a game, you can keep playing and reconnect. Try again in about 10-15 minutes.";
-  }
-  return raw;
+  return unknownToAppError(error, "create-game", "Failed to create game").message;
 }
 
 function useSoloLobbyWatcher(
@@ -366,11 +362,15 @@ export function Play() {
     setSoloPhase(phase);
   }, []);
 
-  const { lobbyState, gameState, actions } = useGame(
+  const handleServerError = useCallback((error: AppError) => {
+    addToast(getAppErrorMessage(error, "play-connection", "Something went wrong."), "error");
+  }, [addToast]);
+
+  const { lobbyState, gameState, actions, connectionError } = useGame(
     pendingGameId,
     pendingSessionId,
     null,
-    addToast,
+    handleServerError,
   );
   const lastLobbyErrorRef = useRef<string | null>(null);
 
@@ -448,6 +448,22 @@ export function Play() {
       lastLobbyErrorRef.current = null;
     }
   }, [pendingGameId]);
+
+  useEffect(() => {
+    if (connectionError && pendingGameId) {
+      addToast(
+        getAppErrorMessage(connectionError, "play-connection", "That game is no longer available. Please start a new one."),
+        "error",
+      );
+      startTransition(() => {
+        setPendingGameId(null);
+        setPendingSessionId(null);
+        setFriendsLoading(false);
+        updateSoloPhase("idle");
+        resetWatcher();
+      });
+    }
+  }, [connectionError, pendingGameId, addToast, updateSoloPhase, resetWatcher]);
 
   useEffect(() => {
     if (!cubeId) return;
