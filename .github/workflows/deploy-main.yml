@@ -235,9 +235,8 @@ jobs:
             | sed 's/^release://')
 
           if [ -z "$BUMP" ]; then
-            echo "No release label on PR #${PR_NUMBER}; skipping release."
-            echo "skip=true" >> $GITHUB_OUTPUT
-            exit 0
+            BUMP="patch"
+            echo "No release label on PR #${PR_NUMBER}; defaulting to patch."
           fi
 
           echo "bump=$BUMP" >> $GITHUB_OUTPUT

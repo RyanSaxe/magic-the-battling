@@ -1,14 +1,15 @@
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
 from conftest import setup_battle_ready
 
+import server.db.database as db
 from mtb.models.cards import Battler, Card
 from mtb.models.game import Game, Puppet, StaticOpponent, create_game, set_battler
 from mtb.phases import battle, reward
-from server.db.models import PlayerGameHistory
+from server.db.models import ActiveGameSnapshot, GameRecord, PlayerGameHistory
 from server.routers.ws import ConnectionManager
 from server.runtime_config import MAX_GAME_START_QUEUE
 from server.services.game_manager import GameManager
@@ -809,3 +810,74 @@ class TestRestoreRecovery:
         assert state.catalog_delta["basic-forest"].name == "Forest"
         assert state.catalog_delta["basic-mountain"].name == "Mountain"
         assert state.catalog_delta["treasure"].name == "Treasure"
+
+
+class TestCleanupStaleGameRecords:
+    def _create_game_record(self, session, game_id: str, created_at: datetime) -> GameRecord:
+        record = GameRecord(id=game_id, created_at=created_at)
+        session.add(record)
+        session.commit()
+        return record
+
+    def _create_snapshot(self, session, game_id: str, last_activity: datetime) -> ActiveGameSnapshot:
+        snapshot = ActiveGameSnapshot(
+            game_id=game_id,
+            state_json="{}",
+            last_human_activity_at=last_activity,
+            updated_at=last_activity,
+        )
+        session.add(snapshot)
+        session.commit()
+        return snapshot
+
+    def test_skips_game_with_recent_activity(self, game_manager, test_db):
+        session = db.SessionLocal()
+        old_time = datetime.now(UTC) - timedelta(hours=72)
+        recent_time = datetime.now(UTC) - timedelta(hours=1)
+        self._create_game_record(session, "active_game", old_time)
+        self._create_snapshot(session, "active_game", recent_time)
+        session.close()
+
+        cleaned = game_manager.cleanup_stale_game_records(max_age_hours=48)
+
+        assert cleaned == 0
+        session = db.SessionLocal()
+        record = session.query(GameRecord).filter(GameRecord.id == "active_game").first()
+        assert record is not None
+        assert record.ended_at is None
+        snapshot = session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id == "active_game").first()
+        assert snapshot is not None
+        session.close()
+
+    def test_cleans_game_without_snapshot(self, game_manager, test_db):
+        session = db.SessionLocal()
+        old_time = datetime.now(UTC) - timedelta(hours=72)
+        self._create_game_record(session, "abandoned_game", old_time)
+        session.close()
+
+        cleaned = game_manager.cleanup_stale_game_records(max_age_hours=48)
+
+        assert cleaned == 1
+        session = db.SessionLocal()
+        record = session.query(GameRecord).filter(GameRecord.id == "abandoned_game").first()
+        assert record is not None
+        assert record.ended_at is not None
+        session.close()
+
+    def test_cleans_game_with_old_activity(self, game_manager, test_db):
+        session = db.SessionLocal()
+        old_time = datetime.now(UTC) - timedelta(hours=72)
+        self._create_game_record(session, "stale_game", old_time)
+        self._create_snapshot(session, "stale_game", old_time)
+        session.close()
+
+        cleaned = game_manager.cleanup_stale_game_records(max_age_hours=48)
+
+        assert cleaned == 1
+        session = db.SessionLocal()
+        record = session.query(GameRecord).filter(GameRecord.id == "stale_game").first()
+        assert record is not None
+        assert record.ended_at is not None
+        snapshot = session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id == "stale_game").first()
+        assert snapshot is None
+        session.close()

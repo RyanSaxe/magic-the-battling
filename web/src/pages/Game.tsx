@@ -808,7 +808,8 @@ function GameContent() {
     voiceSignalRef.current?.(payload);
   }, []);
 
-  const { gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, invalidSession } = useGame(
+  const navigate = useNavigate();
+  const { gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, invalidSession, gameNotFound } = useGame(
     gameId ?? null,
     isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
@@ -1571,6 +1572,36 @@ function GameContent() {
         gameId={gameId!}
         onSessionCreated={handleSessionCreated}
       />
+    );
+  }
+
+  if (gameNotFound) {
+    return (
+      <div className="game-table flex items-center justify-center">
+        <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
+          <h2 className="text-lg font-semibold text-amber-200">
+            Game Unavailable
+          </h2>
+          <p className="text-sm text-gray-200 mt-2 leading-snug">
+            This game is no longer available. It may have ended or been
+            cleared during a server restart.
+          </p>
+          <div className="mt-4 flex gap-2">
+            <button
+              onClick={() => navigate("/play")}
+              className="btn btn-primary flex-1 py-2"
+            >
+              New Game
+            </button>
+            <button
+              onClick={() => navigate("/")}
+              className="btn btn-secondary flex-1 py-2"
+            >
+              Home
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 

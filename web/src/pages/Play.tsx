@@ -366,7 +366,7 @@ export function Play() {
     setSoloPhase(phase);
   }, []);
 
-  const { lobbyState, gameState, actions } = useGame(
+  const { lobbyState, gameState, actions, gameNotFound } = useGame(
     pendingGameId,
     pendingSessionId,
     null,
@@ -448,6 +448,19 @@ export function Play() {
       lastLobbyErrorRef.current = null;
     }
   }, [pendingGameId]);
+
+  useEffect(() => {
+    if (gameNotFound && pendingGameId) {
+      addToast("That game is no longer available. Please start a new one.", "error");
+      startTransition(() => {
+        setPendingGameId(null);
+        setPendingSessionId(null);
+        setFriendsLoading(false);
+        updateSoloPhase("idle");
+        resetWatcher();
+      });
+    }
+  }, [gameNotFound, pendingGameId, addToast, updateSoloPhase, resetWatcher]);
 
   useEffect(() => {
     if (!cubeId) return;
