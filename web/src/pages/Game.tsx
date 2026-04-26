@@ -141,6 +141,7 @@ function selectDraftGuideOpponent(
 function PlayerSelectionModal({
   gameId,
   onSessionCreated,
+  spectateOnly = false,
 }: {
   gameId: string;
   onSessionCreated: (
@@ -148,6 +149,7 @@ function PlayerSelectionModal({
     playerId: string,
     spectatorConfig?: SpectatorConfig
   ) => void;
+  spectateOnly?: boolean;
 }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<GameStatusResponse | null>(null);
@@ -222,7 +224,7 @@ function PlayerSelectionModal({
   );
 
   useEffect(() => {
-    if (rejoinLoading || requestStatus !== "idle" || selectedPlayer !== null || !status) {
+    if (spectateOnly || rejoinLoading || requestStatus !== "idle" || selectedPlayer !== null || !status) {
       return;
     }
 
@@ -234,7 +236,7 @@ function PlayerSelectionModal({
 
     autoReconnectAttemptedRef.current = true;
     void handleReconnect(autoPlayer, { silent: true });
-  }, [gameId, handleReconnect, rejoinLoading, requestStatus, selectedPlayer, status]);
+  }, [spectateOnly, gameId, handleReconnect, rejoinLoading, requestStatus, selectedPlayer, status]);
 
   const handleWatchRequest = async () => {
     if (!selectedPlayer || !spectatorName.trim()) {
@@ -362,7 +364,7 @@ function PlayerSelectionModal({
         {requestStatus === "idle" && !selectedPlayer && (
           <>
             <p className="text-gray-400 text-center mb-4">
-              Select a player to reconnect or watch
+              {spectateOnly ? "Select a player to watch" : "Select a player to reconnect or watch"}
             </p>
             <div className="space-y-3 mb-6">
               {humanPlayers.map((player) => (
@@ -382,7 +384,7 @@ function PlayerSelectionModal({
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    {!player.is_connected ? (
+                    {!spectateOnly && !player.is_connected ? (
                       <button
                         onClick={() => handleReconnect(player.name)}
                         disabled={rejoinLoading}
@@ -1572,6 +1574,7 @@ function GameContent() {
       <PlayerSelectionModal
         gameId={gameId!}
         onSessionCreated={handleSessionCreated}
+        spectateOnly={isSpectateMode}
       />
     );
   }
