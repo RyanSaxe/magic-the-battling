@@ -18,7 +18,7 @@ import {
 } from "../utils/deviceIdentity";
 import { FaDiscord } from "react-icons/fa6";
 import type { LobbyState, PlayMode } from "../types";
-import { getAppErrorMessage, unknownToAppError } from "../utils/appError";
+import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
 
 type SoloPhase =
   | "idle"
@@ -362,11 +362,15 @@ export function Play() {
     setSoloPhase(phase);
   }, []);
 
+  const handleServerError = useCallback((error: AppError) => {
+    addToast(getAppErrorMessage(error, "solo-action", "Something went wrong."), "error");
+  }, [addToast]);
+
   const { lobbyState, gameState, actions, connectionError } = useGame(
     pendingGameId,
     pendingSessionId,
     null,
-    addToast,
+    handleServerError,
   );
   const lastLobbyErrorRef = useRef<string | null>(null);
 
