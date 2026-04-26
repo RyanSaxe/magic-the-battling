@@ -363,7 +363,7 @@ export function Play() {
   }, []);
 
   const handleServerError = useCallback((error: AppError) => {
-    addToast(getAppErrorMessage(error, "solo-action", "Something went wrong."), "error");
+    addToast(getAppErrorMessage(error, "play-connection", "Something went wrong."), "error");
   }, [addToast]);
 
   const { lobbyState, gameState, actions, connectionError } = useGame(
