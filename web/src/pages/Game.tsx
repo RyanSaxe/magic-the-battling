@@ -1648,6 +1648,7 @@ function GameContent() {
       }
     : undefined;
 
+  const timelinePhase = displayBattleResolution ? "battle" : currentPhase;
   const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
   const isWinner = selfPlacement === 1;
@@ -2115,7 +2116,7 @@ function GameContent() {
         {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
         <div ref={phaseTimelineRef} className="relative">
           <PhaseTimeline
-            currentPhase={currentPhase}
+            currentPhase={timelinePhase}
             stage={self_player.stage}
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
@@ -2133,11 +2134,7 @@ function GameContent() {
                 ☰
               </button>
             ) : undefined}
-            title={isEndPhase ? (
-              <span className={`font-bold ${isWinner ? 'text-amber-400' : 'text-gray-300'}`}>
-                {getOrdinal(selfPlacement)} Place
-              </span>
-            ) : undefined}
+            title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
           />
         </div>
 
