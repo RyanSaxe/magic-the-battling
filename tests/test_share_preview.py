@@ -27,6 +27,22 @@ def _make_share_data(player_name: str = "Alice", placement: int | None = 1) -> S
     )
 
 
+_HTML_WITH_STATIC_OG = """\
+<html><head>
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://www.cruciblemtg.com/" />
+    <meta property="og:title" content="Crucible" />
+    <meta property="og:description" content="A Magic: The Gathering format" />
+    <meta property="og:image" content="https://www.cruciblemtg.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Crucible" />
+    <meta name="twitter:description" content="A Magic: The Gathering format" />
+    <meta name="twitter:image" content="https://www.cruciblemtg.com/og-image.png" />
+</head></html>"""
+
+
 class TestBuildOgHtml:
     def test_image_url_is_absolute(self):
         html = _build_og_html(
@@ -47,6 +63,44 @@ class TestBuildOgHtml:
             "http://localhost:8000",
         )
         assert 'content="http://localhost:8000/game/g1/share/Bob/preview.png"' in html
+
+    def test_static_og_tags_stripped(self):
+        html = _build_og_html(_HTML_WITH_STATIC_OG, "g1", "Alice", _make_share_data(), "https://example.com")
+        assert "og-image.png" not in html
+        assert 'content="Crucible"' not in html
+        assert "A Magic: The Gathering format" not in html
+        assert 'content="https://www.cruciblemtg.com/"' not in html
+
+    def test_dynamic_tags_present_after_stripping(self):
+        html = _build_og_html(_HTML_WITH_STATIC_OG, "g1", "Alice", _make_share_data(), "https://example.com")
+        assert 'og:image" content="https://example.com/game/g1/share/Alice/preview.png"' in html
+        assert "1st Place" in html
+        assert html.count('property="og:image"') == 1
+
+    def test_og_url_points_to_share_page(self):
+        html = _build_og_html(_HTML_WITH_STATIC_OG, "g1", "Alice", _make_share_data(), "https://example.com")
+        assert 'og:url" content="https://example.com/game/g1/share/Alice"' in html
+
+    def test_html_escaping_in_player_name(self):
+        html = _build_og_html(
+            "<html><head></head></html>",
+            "g1",
+            'Al"ice<script>',
+            _make_share_data('Al"ice<script>', 1),
+            "https://example.com",
+        )
+        assert 'Al"ice' not in html
+        assert "Al&quot;ice&lt;script&gt;" in html
+        assert "Al%22ice%3Cscript%3E" in html  # URL-encoded in og:url/og:image
+
+    def test_non_og_meta_tags_preserved(self):
+        source = (
+            '<html><head><meta name="description" content="Keep me" />'
+            '<meta property="og:title" content="Remove" /></head></html>'
+        )
+        html = _build_og_html(source, "g1", "A", _make_share_data("A", 1), "https://x.com")
+        assert 'content="Keep me"' in html
+        assert 'content="Remove"' not in html
 
 
 class TestPreviewServiceRestart:

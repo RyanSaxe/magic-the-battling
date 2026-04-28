@@ -4,8 +4,10 @@ import logging
 import re
 import time
 from collections import defaultdict
+from html import escape
 from pathlib import Path
 from typing import cast
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
@@ -110,6 +112,9 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
     )
 
 
+_STATIC_OG_RE = re.compile(r"\s*<meta\s+(?:property=\"og:|name=\"twitter:)[^>]*/?\s*>\s*")
+
+
 def _build_og_html(
     index_html: str, game_id: str, player_name: str, share_data: ShareGameResponse, base_url: str
 ) -> str:
@@ -119,13 +124,18 @@ def _build_og_html(
         ordinals = {1: "1st", 2: "2nd", 3: "3rd"}
         placement = f"{ordinals.get(owner.final_placement, f'{owner.final_placement}th')} Place - "
 
-    title = f"{placement}{player_name}'s Game | Crucible"
-    description = f"Check out {player_name}'s game with {len(share_data.players)} players"
-    image_url = f"{base_url}/game/{game_id}/share/{player_name}/preview.png"
+    title = escape(f"{placement}{player_name}'s Game | Crucible", quote=True)
+    description = escape(f"Check out {player_name}'s game with {len(share_data.players)} players", quote=True)
+    encoded_name = quote(player_name, safe="")
+    share_url = escape(f"{base_url}/game/{game_id}/share/{encoded_name}", quote=True)
+    image_url = escape(f"{base_url}/game/{game_id}/share/{encoded_name}/preview.png", quote=True)
+
+    html = _STATIC_OG_RE.sub("", index_html)
 
     og_tags = f"""
     <meta property="og:title" content="{title}" />
     <meta property="og:description" content="{description}" />
+    <meta property="og:url" content="{share_url}" />
     <meta property="og:image" content="{image_url}" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -135,7 +145,7 @@ def _build_og_html(
     <meta name="twitter:description" content="{description}" />
     <meta name="twitter:image" content="{image_url}" />"""
 
-    return index_html.replace("</head>", f"{og_tags}\n  </head>", 1)
+    return html.replace("</head>", f"{og_tags}\n  </head>", 1)
 
 
 @router.get("/game/{game_id}/share/{player_name}")
