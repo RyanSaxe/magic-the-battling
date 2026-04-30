@@ -14,9 +14,9 @@ import { CardGrid } from "../../components/common/CardGrid";
 import { LayoutResetControl } from "../../components/common/LayoutResetControl";
 import { UpgradeGrid } from "../../components/common/UpgradeGrid";
 import { ZoneLayout } from "../../components/common/ZoneLayout";
-import { useCardLayout, ZONE_LAYOUT_PADDING } from "../../hooks/useCardLayout";
+import { ZONE_LAYOUT_PADDING } from "../../hooks/useCardLayout";
 import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
-import { useZoneDividers } from "../../hooks/useZoneDividers";
+import { useResizableLayout } from "../../hooks/useResizableLayout";
 import { getUpgradeGridColumns } from "../../utils/upgradeGrid";
 
 type Selection =
@@ -108,10 +108,6 @@ export function BuildPhase({
   const selectedBasicsCount = selectedBasics.filter(Boolean).length;
 
   const hasUserInteracted = useRef(false);
-  const handZoneRef = useRef<HTMLDivElement | null>(null);
-  const battlefieldZoneRef = useRef<HTMLDivElement | null>(null);
-  const sideboardZoneRef = useRef<HTMLDivElement | null>(null);
-  const upgradesZoneRef = useRef<HTMLDivElement | null>(null);
   const pendingHandAddsRef = useRef(0);
   const pendingHandAddsTimeoutRef = useRef<number | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
@@ -300,26 +296,6 @@ export function BuildPhase({
   const battlefieldCount = 3 + 1 + 1; // 3 basic slots + treasure + poison
   const upgradeCount = hasDesktopUpgradeRail ? self_player.upgrades.length : 0;
   const upgradeColumns = getUpgradeGridColumns(upgradeCount);
-  const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
-    zones: {
-      hand: { count: maxHandSize },
-      battlefield: { count: battlefieldCount, priority: "fill", maxRows: 1 },
-      sideboard: { count: stableSBCount },
-      commandZone: {
-        count: upgradeCount,
-        minColumns: upgradeColumns,
-        maxColumns: upgradeColumns,
-      },
-    },
-    layout: {
-      top: ["hand"],
-      bottomLeft: ["battlefield", "sideboard"],
-      bottomRight: hasDesktopUpgradeRail ? ["commandZone"] : [],
-    },
-    ...ZONE_LAYOUT_PADDING,
-    constraints,
-  });
-
   const layoutConfig = {
     zones: {
       hand: { count: maxHandSize },
@@ -339,65 +315,13 @@ export function BuildPhase({
     ...ZONE_LAYOUT_PADDING,
   };
 
-  const dividerCallbacks = useZoneDividers({
-    containerHeight: containerSize.height,
-    containerWidth: containerSize.width,
-    currentLayout: dims,
-    layoutConfig,
-    measureInitialConstraints: () => {
-      const handOuter = handZoneRef.current?.getBoundingClientRect().height ?? 0;
-      const battlefieldRect = battlefieldZoneRef.current?.getBoundingClientRect();
-      const sideboardOuter =
-        sideboardZoneRef.current?.getBoundingClientRect().height ?? 0;
-      const upgradesRect = upgradesZoneRef.current?.getBoundingClientRect();
-      const battlefieldOuter = battlefieldRect?.height ?? 0;
-      const upgradesOuter = upgradesRect?.height ?? 0;
-      const battlefieldOuterWidth = battlefieldRect?.width ?? 0;
-      const upgradesOuterWidth = upgradesRect?.width ?? 0;
-      const sectionGap = ZONE_LAYOUT_PADDING.sectionGap;
-      const sectionPadV =
-        ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom;
-
-      const lowerOuter =
-        battlefieldOuter + (hasSideboard ? sideboardOuter + sectionGap : 0);
-      const bottomOuter = Math.max(lowerOuter, upgradesOuter);
-      const usableH = handOuter + bottomOuter;
-      const totalBottomWidth =
-        battlefieldOuterWidth
-        + (hasDesktopUpgradeRail ? upgradesOuterWidth + sectionGap : 0);
-      const leftFraction =
-        hasDesktopUpgradeRail && totalBottomWidth > sectionGap
-          ? battlefieldOuterWidth / (totalBottomWidth - sectionGap)
-          : 0.7;
-
-      let bottomLeftSplit = 0.5;
-      if (hasSideboard) {
-        const battlefieldInner = Math.max(0, battlefieldOuter - sectionPadV);
-        const sideboardInner = Math.max(0, sideboardOuter - sectionPadV);
-        const totalInner = battlefieldInner + sideboardInner;
-        if (totalInner > 0) {
-          bottomLeftSplit = battlefieldInner / totalInner;
-        }
-      }
-
-      return usableH > 0
-        ? {
-            topFraction: handOuter / usableH,
-            leftFraction,
-            bottomLeftSplit,
-            usableHeight: usableH,
-            bottomInnerHeight: Math.max(
-              0,
-              lowerOuter - (hasSideboard ? sectionGap : 0) - (hasSideboard ? 2 * sectionPadV : sectionPadV),
-            ),
-            usableWidth: totalBottomWidth > 0 ? totalBottomWidth : containerSize.width,
-          }
-        : null;
-    },
-    constraints,
-    onConstraintsChange: setConstraints,
-    onConstraintsClear: clearConstraints,
-  });
+  const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
+    useResizableLayout({
+      layoutConfig,
+      constraints,
+      onConstraintsChange: setConstraints,
+      onConstraintsClear: clearConstraints,
+    });
 
   const handDims = { width: dims.hand.width, height: dims.hand.height };
   const bfDims = {
@@ -545,18 +469,10 @@ export function BuildPhase({
           upgrades: zoneFrames.commandZone.outerWidth,
         } : null}
         zoneRefs={{
-          hand: (node) => {
-            handZoneRef.current = node;
-          },
-          battlefield: (node) => {
-            battlefieldZoneRef.current = node;
-          },
-          sideboard: (node) => {
-            sideboardZoneRef.current = node;
-          },
-          upgrades: (node) => {
-            upgradesZoneRef.current = node;
-          },
+          hand: zoneRefs.hand,
+          battlefield: zoneRefs.battlefield,
+          sideboard: zoneRefs.sideboard,
+          upgrades: zoneRefs.commandZone,
         }}
         overlay={
           persistedLayout.canReset ? (
@@ -655,7 +571,7 @@ export function BuildPhase({
             <UpgradeGrid
               upgrades={self_player.upgrades}
               fallbackDims={upgradeDims}
-              frame={zoneFrames?.commandZone}
+              frame={zoneFrames.commandZone}
               renderOverlay={renderUpgradeApplyButton}
             />
           ) : null

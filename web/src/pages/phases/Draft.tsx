@@ -1,12 +1,11 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback } from 'react'
 import { Card } from '../../components/card'
 import type { GameState, Card as CardType, CardDestination } from '../../types'
-import { useCardLayout } from '../../hooks/useCardLayout'
 import { LayoutResetControl } from '../../components/common/LayoutResetControl'
 import { UpgradeGrid } from '../../components/common/UpgradeGrid'
 import { ZoneLayout } from '../../components/common/ZoneLayout'
 import { usePersistedConstraints } from '../../hooks/usePersistedConstraints'
-import { useZoneDividers } from '../../hooks/useZoneDividers'
+import { useResizableLayout } from '../../hooks/useResizableLayout'
 import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
 import { getUpgradeGridColumns } from '../../utils/upgradeGrid'
 
@@ -32,9 +31,6 @@ interface CardWithIndex {
 
 export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRail = false }: DraftPhaseProps) {
   const [selectedCard, setSelectedCard] = useState<CardWithIndex | null>(null)
-  const packZoneRef = useRef<HTMLDivElement | null>(null)
-  const poolZoneRef = useRef<HTMLDivElement | null>(null)
-  const upgradesZoneRef = useRef<HTMLDivElement | null>(null)
 
   const { self_player } = gameState
   const currentPack = self_player.current_pack ?? []
@@ -87,52 +83,17 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     ? draftConstrainedLayoutConfig
     : draftDefaultLayoutConfig
 
-  const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
-    ...activeLayoutConfig,
-    constraints,
-  })
+  const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
+    useResizableLayout({
+      layoutConfig: activeLayoutConfig,
+      constraints,
+      onConstraintsChange: setConstraints,
+      onConstraintsClear: clearConstraints,
+      allowHorizontalResize: !isMobile,
+    })
   const packDims = dims.pack
   const poolDims = dims.pool
   const upgradesDims = dims.upgrades
-
-  const dividerCallbacks = useZoneDividers({
-    containerHeight: containerSize.height,
-    containerWidth: containerSize.width,
-    currentLayout: dims,
-    layoutConfig: activeLayoutConfig,
-    allowHorizontalResize: !isMobile,
-    measureInitialConstraints: () => {
-      const packOuter = packZoneRef.current?.getBoundingClientRect().height ?? 0
-      const poolRect = poolZoneRef.current?.getBoundingClientRect()
-      const upgradesRect = upgradesZoneRef.current?.getBoundingClientRect()
-      const poolOuter = poolRect?.height ?? 0
-      const upgradesOuter = upgradesRect?.height ?? 0
-      const poolOuterWidth = poolRect?.width ?? 0
-      const upgradesOuterWidth = upgradesRect?.width ?? 0
-      const sectionGap = 2
-      const bottomOuter = Math.max(poolOuter, upgradesOuter)
-      const usableH = packOuter + bottomOuter
-      const totalBottomWidth =
-        poolOuterWidth + (hasDesktopUpgradeRail ? upgradesOuterWidth + sectionGap : 0)
-      const leftFraction =
-        hasDesktopUpgradeRail && totalBottomWidth > sectionGap
-          ? poolOuterWidth / (totalBottomWidth - sectionGap)
-          : 0.7
-
-      return usableH > 0
-        ? {
-            topFraction: packOuter / usableH,
-            leftFraction,
-            bottomLeftSplit: 0.5,
-            usableHeight: usableH,
-            usableWidth: totalBottomWidth > 0 ? totalBottomWidth : containerSize.width,
-          }
-        : null
-    },
-    constraints,
-    onConstraintsChange: setConstraints,
-    onConstraintsClear: clearConstraints,
-  })
   const appliedUpgradesList = self_player.upgrades.filter((u) => u.upgrade_target)
   const upgradedCardIds = new Set(appliedUpgradesList.map((u) => u.upgrade_target!.id))
   const getAppliedUpgrades = (cardId: string) =>
@@ -286,15 +247,9 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
         upgrades: zoneFrames.upgrades.outerWidth,
       } : null}
       zoneRefs={{
-        hand: (node) => {
-          packZoneRef.current = node
-        },
-        sideboard: (node) => {
-          poolZoneRef.current = node
-        },
-        upgrades: (node) => {
-          upgradesZoneRef.current = node
-        },
+        hand: zoneRefs.pack,
+        sideboard: zoneRefs.pool,
+        upgrades: zoneRefs.upgrades,
       }}
       overlay={
         persistedLayout.canReset ? (
@@ -336,7 +291,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
               rows: upgradesDims.rows,
               columns: upgradesDims.columns,
             }}
-            frame={zoneFrames?.upgrades}
+            frame={zoneFrames.upgrades}
           />
         ) : null
       }
