@@ -164,6 +164,64 @@ describe("computeConstrainedLayout", () => {
       expect(usedHeight).toBe(650);
     });
 
+    // Regression: Draft.tsx's draftDefaultLayoutConfig dropped ...ZONE_LAYOUT_PADDING in
+    // commit 5f22010 ("Refactor draft layout onto ZoneLayout"). Pre two-pass collapse the
+    // bug was masked because the unconstrained `computeLayout` ignores sectionPad*. After
+    // the two-pass collapse, the constrained pass always runs and treats inner == outer
+    // when sectionPad* defaults to 0, oversizing cards by ~32px and overflowing the pool
+    // section on Draft load.
+    it("draft-style layout: cards fit inside frames when ZONE_LAYOUT_PADDING is included", () => {
+      const draftConfig = {
+        zones: {
+          pack: { count: 5, maxCardWidth: 400 },
+          pool: { count: 4, maxCardWidth: 300 },
+          upgrades: {
+            count: 3,
+            maxCardWidth: 200,
+            minColumns: 1,
+            maxColumns: 1,
+          },
+        },
+        layout: {
+          top: ["pack"],
+          bottomLeft: ["pool"],
+          bottomRight: ["upgrades"],
+        },
+        ...ZONE_LAYOUT_PADDING,
+      };
+      const containerW = 1400;
+      const containerH = 800;
+
+      const unconstrained = computeLayout(containerW, containerH, draftConfig);
+      const derived = deriveConstraintsFromLayout(
+        unconstrained,
+        draftConfig,
+        containerH,
+        containerW,
+      );
+      const { dims, frames } = computeConstrainedLayoutState(
+        containerW,
+        containerH,
+        draftConfig,
+        derived,
+      );
+
+      const sectionPadV =
+        ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom;
+      // Frames must reserve sectionPad — outer must exceed inner by exactly sectionPadV.
+      // If a caller forgets ...ZONE_LAYOUT_PADDING, this delta becomes 0 and cards overflow.
+      expect(frames.pack.outerHeight - frames.pack.innerHeight).toBe(sectionPadV);
+      expect(frames.pool.outerHeight - frames.pool.innerHeight).toBe(sectionPadV);
+      expect(frames.upgrades.outerHeight - frames.upgrades.innerHeight).toBe(sectionPadV);
+
+      const packGridH =
+        dims.pack.rows * dims.pack.height + Math.max(0, dims.pack.rows - 1) * 6;
+      const poolGridH =
+        dims.pool.rows * dims.pool.height + Math.max(0, dims.pool.rows - 1) * 6;
+      expect(packGridH).toBeLessThanOrEqual(frames.pack.innerHeight);
+      expect(poolGridH).toBeLessThanOrEqual(frames.pool.innerHeight);
+    });
+
     it("re-fits cards to derived frames for reward-style top fill layouts", () => {
       const config = {
         zones: {
