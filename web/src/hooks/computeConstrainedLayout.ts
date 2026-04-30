@@ -1,6 +1,7 @@
 import { bestFit, CARD_ASPECT_RATIO, type ZoneDims } from "./cardSizeUtils";
 import {
   computeLayout,
+  DEFAULT_PASS_2_MAX_CARD_WIDTH,
   type CardLayoutConfig,
   type CardLayoutResult,
 } from "./useCardLayout";
@@ -51,12 +52,9 @@ function fitZone(
   w: number,
   h: number,
   minCardWidth: number,
-  respectMaxCardWidth: boolean,
+  effectiveMaxWidth: number,
 ): ZoneDims {
   if (zone.count <= 0 || w <= 0 || h <= 0) return DEFAULT_DIMS;
-  const effectiveMaxWidth = respectMaxCardWidth
-    ? zone.maxCardWidth
-    : Number.POSITIVE_INFINITY;
   const fit = bestFit(
     zone.count,
     w,
@@ -333,6 +331,7 @@ export function computeConstrainedLayoutState(
   const {
     minCardWidth = 1,
     maxCardWidth = 200,
+    pass2MaxCardWidth = DEFAULT_PASS_2_MAX_CARD_WIDTH,
   } = config;
 
   const zoneIds = Object.keys(config.zones);
@@ -359,12 +358,15 @@ export function computeConstrainedLayoutState(
     const zone = resolve(id);
     const frame = frames[id];
     if (!frame || frame.innerWidth <= 0 || frame.innerHeight <= 0) continue;
+    // Pass 2 cap: never shrink below pass 1's per-zone allocation, but apply a
+    // sanity ceiling to prevent absurd card sizes on large screens.
+    const effectiveMaxWidth = Math.max(pass2MaxCardWidth, zone.maxCardWidth);
     dims[id] = fitZone(
       zone,
       frame.innerWidth,
       frame.innerHeight,
       minCardWidth,
-      false,
+      effectiveMaxWidth,
     );
   }
 

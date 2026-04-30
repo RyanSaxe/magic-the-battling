@@ -434,6 +434,57 @@ describe("computeConstrainedLayout", () => {
     });
   });
 
+  describe("pass 2 ceiling (pass2MaxCardWidth)", () => {
+    it("caps cards at the default 500px ceiling on huge containers", () => {
+      const result = computeConstrainedLayout(
+        4000,
+        2000,
+        {
+          zones: {
+            pack: { count: 2, maxCardWidth: 200 },
+            pool: { count: 2, maxCardWidth: 200 },
+          },
+          layout: { top: ["pack"], bottomLeft: ["pool"] },
+        },
+        { topFraction: 0.5 },
+      );
+
+      expect(result.pack.width).toBeLessThanOrEqual(500);
+      expect(result.pool.width).toBeLessThanOrEqual(500);
+    });
+
+    it("does not shrink below pass 1's per-zone maxCardWidth (Math.max wins)", () => {
+      const result = computeConstrainedLayout(
+        4000,
+        2000,
+        {
+          zones: {
+            pack: { count: 2, maxCardWidth: 600 },
+          },
+          layout: { top: ["pack"], bottomLeft: [] },
+        },
+        { topFraction: 1 },
+      );
+      expect(result.pack.width).toBeGreaterThanOrEqual(600);
+    });
+
+    it("respects an explicit pass2MaxCardWidth override", () => {
+      const result = computeConstrainedLayout(
+        4000,
+        2000,
+        {
+          zones: {
+            pack: { count: 2, maxCardWidth: 200 },
+          },
+          layout: { top: ["pack"], bottomLeft: [] },
+          pass2MaxCardWidth: 250,
+        },
+        { topFraction: 1 },
+      );
+      expect(result.pack.width).toBeLessThanOrEqual(250);
+    });
+  });
+
   // Pass 2 (constrained re-fit) must never produce *smaller* sideboard cards
   // than pass 1 alone, since pass 2 receives identical or larger frames after
   // the algorithm's pessimistic estimates settle. A regression here would

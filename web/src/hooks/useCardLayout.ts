@@ -36,8 +36,11 @@ export interface CardLayoutConfig {
   maxBottomRightFraction?: number;
   minBottomRightOuterWidth?: number;
   maxTopFraction?: number;
+  pass2MaxCardWidth?: number;
   constraints?: ZoneConstraints | null;
 }
+
+export const DEFAULT_PASS_2_MAX_CARD_WIDTH = 500;
 
 export type CardLayoutResult = Record<string, ZoneDims>;
 
