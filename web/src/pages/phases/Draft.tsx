@@ -4,6 +4,7 @@ import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { LayoutResetControl } from '../../components/common/LayoutResetControl'
 import { UpgradeGrid } from '../../components/common/UpgradeGrid'
 import { ZoneLayout } from '../../components/common/ZoneLayout'
+import { ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
 import { usePersistedConstraints } from '../../hooks/usePersistedConstraints'
 import { useResizableLayout } from '../../hooks/useResizableLayout'
 import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
@@ -50,7 +51,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
 
   const upgradeCount = hasDesktopUpgradeRail ? self_player.upgrades.length : 0
   const upgradeColumns = getUpgradeGridColumns(upgradeCount)
-  const draftDefaultLayoutConfig = {
+  const layoutConfig = {
     zones: {
       pool: { count: pool.length, maxCardWidth: 300 },
       pack: { count: currentPack.length, maxCardWidth: 400 },
@@ -66,26 +67,12 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
       bottomLeft: ['pool'],
       bottomRight: hasDesktopUpgradeRail ? ['upgrades'] : [],
     },
-    fixedHeight: 65,
-    padding: 24,
+    ...ZONE_LAYOUT_PADDING,
   }
-
-  const draftConstrainedLayoutConfig = {
-    zones: draftDefaultLayoutConfig.zones,
-    layout: draftDefaultLayoutConfig.layout,
-    sectionPadH: 12,
-    sectionPadTop: 20,
-    sectionPadBottom: 12,
-    sectionGap: 2,
-  }
-
-  const activeLayoutConfig = constraints
-    ? draftConstrainedLayoutConfig
-    : draftDefaultLayoutConfig
 
   const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
     useResizableLayout({
-      layoutConfig: activeLayoutConfig,
+      layoutConfig,
       constraints,
       onConstraintsChange: setConstraints,
       onConstraintsClear: clearConstraints,
