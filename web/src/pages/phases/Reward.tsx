@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { Card } from "../../components/card";
 import { CardGrid } from "../../components/common/CardGrid";
 import { LayoutResetControl } from "../../components/common/LayoutResetControl";
@@ -9,12 +9,11 @@ import {
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
 import {
-  useCardLayout,
   ZONE_LAYOUT_PADDING,
   type CardLayoutConfig,
 } from "../../hooks/useCardLayout";
 import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
-import { useZoneDividers } from "../../hooks/useZoneDividers";
+import { useResizableLayout } from "../../hooks/useResizableLayout";
 import type { GameState, Card as CardType } from "../../types";
 
 interface RewardPhaseProps {
@@ -84,9 +83,6 @@ export function RewardPhase({
 }: RewardPhaseProps) {
   void actions;
 
-  const rewardsZoneRef = useRef<HTMLDivElement | null>(null);
-  const upgradesZoneRef = useRef<HTMLDivElement | null>(null);
-  const poolZoneRef = useRef<HTMLDivElement | null>(null);
   const [selectedRewardCardId, setSelectedRewardCardId] = useState<
     string | null
   >(null);
@@ -170,54 +166,32 @@ export function RewardPhase({
     maxTopFraction: hasUpgradeSection ? 0.2 : undefined,
   } satisfies CardLayoutConfig;
 
-  const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
-    ...rewardLayoutConfig,
-    constraints: activeConstraints,
-  });
-
-  const dividerCallbacks = useZoneDividers({
-    containerHeight: containerSize.height,
-    containerWidth: containerSize.width,
-    currentLayout: dims,
-    layoutConfig: rewardLayoutConfig,
-    allowHorizontalResize: false,
-    measureInitialConstraints: hasUpgradeSection
-      ? () => {
-          const rewardsOuter =
-            rewardsZoneRef.current?.getBoundingClientRect().height ?? 0;
-          const upgradesOuter =
-            upgradesZoneRef.current?.getBoundingClientRect().height ?? 0;
-          const poolOuter = poolZoneRef.current?.getBoundingClientRect().height ?? 0;
-          const sectionGap = ZONE_LAYOUT_PADDING.sectionGap;
-          const sectionPadV =
-            ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom;
-
-          const lowerOuter = upgradesOuter + poolOuter + sectionGap;
-          const usableH = rewardsOuter + lowerOuter;
-          const upgradesInner = Math.max(0, upgradesOuter - sectionPadV);
-          const poolInner = Math.max(0, poolOuter - sectionPadV);
-          const totalInner = upgradesInner + poolInner;
-
-          return usableH > 0
-            ? {
-                topFraction: rewardsOuter / usableH,
-                leftFraction: 0.7,
-                bottomLeftSplit:
-                  totalInner > 0 ? upgradesInner / totalInner : 0.5,
-                usableHeight: usableH,
-                bottomInnerHeight: Math.max(
-                  0,
-                  lowerOuter - sectionGap - 2 * sectionPadV,
-                ),
-                usableWidth: containerSize.width,
-              }
-            : null;
-        }
-      : undefined,
-    constraints: activeConstraints,
-    onConstraintsChange: setConstraints,
-    onConstraintsClear: clearConstraints,
-  });
+  const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
+    useResizableLayout({
+      layoutConfig: rewardLayoutConfig,
+      constraints: activeConstraints,
+      onConstraintsChange: setConstraints,
+      onConstraintsClear: clearConstraints,
+      allowHorizontalResize: false,
+    });
+  // Wrap each refCallback in a stable useCallback so the react-hooks/refs
+  // lint rule (which can't see through hook-returned member access) doesn't
+  // false-positive on `ref={zoneRefs.X}`.
+  const rewardsRefSetter = zoneRefs.rewards;
+  const upgradesRefSetter = zoneRefs.upgrades;
+  const poolRefSetter = zoneRefs.pool;
+  const setRewardsNode = useCallback(
+    (node: HTMLDivElement | null) => rewardsRefSetter(node),
+    [rewardsRefSetter],
+  );
+  const setUpgradesNode = useCallback(
+    (node: HTMLDivElement | null) => upgradesRefSetter(node),
+    [upgradesRefSetter],
+  );
+  const setPoolNode = useCallback(
+    (node: HTMLDivElement | null) => poolRefSetter(node),
+    [poolRefSetter],
+  );
 
   const rewardsDims = {
     width: dims.rewards.width,
@@ -267,7 +241,7 @@ export function RewardPhase({
         )}
 
         <div
-          ref={rewardsZoneRef}
+          ref={setRewardsNode}
           className={`zone-pack w-full px-3 pt-5 pb-3 relative ${hasUpgradeSection ? "" : "flex-1 min-h-0"}`}
           style={rewardsStyle}
           data-guide-target="reward-summary"
@@ -339,7 +313,7 @@ export function RewardPhase({
             style={{ flex: "1 1 auto", minHeight: 0 }}
           >
             <div
-              ref={upgradesZoneRef}
+              ref={setUpgradesNode}
               className="zone-upgrades w-full px-3 pt-5 pb-3 relative"
               style={upgradesStyle}
               data-guide-target="reward-upgrades"
@@ -378,7 +352,7 @@ export function RewardPhase({
             )}
 
             <div
-              ref={poolZoneRef}
+              ref={setPoolNode}
                 className="zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0"
                 style={poolStyle}
               >
