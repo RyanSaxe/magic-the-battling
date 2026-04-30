@@ -89,7 +89,7 @@ function makeDefaultDims(zoneIds: string[]): CardLayoutResult {
   return result;
 }
 
-function makeDefaultFrames(zoneIds: string[]): ZoneFrameResult {
+export function makeDefaultFrames(zoneIds: string[]): ZoneFrameResult {
   const result: ZoneFrameResult = {};
   for (const id of zoneIds) result[id] = DEFAULT_FRAME;
   return result;
