@@ -108,16 +108,23 @@ export function DeckDisplay({
   const clearConstraints = resizeState?.clearConstraints ?? clearLocalConstraints
   const showResetControl = enableResize && !!activeConstraints && !!resetControl
 
-  const layoutConfig = useMemo(() => ({
-    zones: {
-      hand: { count: hasHand ? hand.length : 0 },
-      battlefield: { count: battlefieldCount, priority: 'fill' as const, maxRows: 1 },
-      sideboard: { count: sideboard.length },
-      commandZone: { count: commandZoneCount, minColumns: getUpgradeGridColumns(commandZoneCount) },
-    },
-    layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
-    ...ZONE_LAYOUT_PADDING,
-  }), [battlefieldCount, commandZoneCount, hand.length, hasHand, sideboard.length])
+  const layoutConfig = useMemo(() => {
+    const upgradeColumns = getUpgradeGridColumns(commandZoneCount)
+    return {
+      zones: {
+        hand: { count: hasHand ? hand.length : 0 },
+        battlefield: { count: battlefieldCount, priority: 'fill' as const, maxRows: 1 },
+        sideboard: { count: sideboard.length },
+        commandZone: {
+          count: commandZoneCount,
+          minColumns: upgradeColumns,
+          maxColumns: upgradeColumns,
+        },
+      },
+      layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+      ...ZONE_LAYOUT_PADDING,
+    }
+  }, [battlefieldCount, commandZoneCount, hand.length, hasHand, sideboard.length])
 
   const [ref, dims, containerSize, zoneFrames] = useCardLayout({
     ...layoutConfig,
