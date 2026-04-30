@@ -3,9 +3,11 @@ import { CARD_ASPECT_RATIO, bestFit, type ZoneDims } from "./cardSizeUtils";
 import {
   computeConstrainedLayoutState,
   deriveConstraintsFromLayout,
+  makeDefaultFrames,
   type ZoneConstraints,
   type ZoneFrameResult,
 } from "./computeConstrainedLayout";
+import { redistributeSlack } from "./redistributeSlack";
 
 export interface ZoneSpec {
   count: number;
@@ -13,7 +15,12 @@ export interface ZoneSpec {
   maxCardWidth?: number;
   maxRows?: number;
   minColumns?: number;
+  maxColumns?: number;
   priority?: "primary" | "fill";
+  // Pass 3 (slack redistribution) routing weight. Default 1; "fill" zones default to 0.
+  // 0 means "do not absorb slack from neighbors" — pinned-size zones like the Build
+  // battlefield rely on this so leftover sideboard height bubbles up to hand instead.
+  growPriority?: number;
 }
 
 export interface CardLayoutConfig {
@@ -34,9 +41,11 @@ export interface CardLayoutConfig {
   maxBottomRightFraction?: number;
   minBottomRightOuterWidth?: number;
   maxTopFraction?: number;
+  pass2MaxCardWidth?: number;
   constraints?: ZoneConstraints | null;
-  alwaysComputeFrames?: boolean;
 }
+
+export const DEFAULT_PASS_2_MAX_CARD_WIDTH = 500;
 
 export type CardLayoutResult = Record<string, ZoneDims>;
 
@@ -56,6 +65,7 @@ interface ResolvedZone {
   maxCardWidth: number;
   maxRows: number;
   minColumns: number;
+  maxColumns: number;
   priority: "primary" | "fill";
 }
 
@@ -71,6 +81,7 @@ function resolveZone(
     maxCardWidth: spec.maxCardWidth ?? globalMax,
     maxRows: spec.maxRows ?? Infinity,
     minColumns: spec.minColumns ?? 1,
+    maxColumns: spec.maxColumns ?? Infinity,
     priority: spec.priority ?? "primary",
   };
 }
@@ -204,8 +215,13 @@ export function computeLayout(
   let bestOverflow = Infinity;
   let bestOverflowResult = bestResult;
 
-  const brMinCols = Math.max(...brZones.map((z) => z.minColumns));
-  const brMaxCols = Math.min(2, Math.max(...brZones.map((z) => z.count)));
+  const brMaxColsHardCap = Math.min(2, Math.max(...brZones.map((z) => z.count)));
+  const brMaxColsFromZones = Math.min(...brZones.map((z) => z.maxColumns));
+  const brMaxCols = Math.min(brMaxColsHardCap, brMaxColsFromZones);
+  const brMinCols = Math.min(
+    brMaxCols,
+    Math.max(...brZones.map((z) => z.minColumns)),
+  );
   const brColVariants = hasBR
     ? Array.from(
         { length: brMaxCols - brMinCols + 1 },
@@ -941,9 +957,8 @@ export interface ContainerSize {
   height: number;
 }
 
-function framesEqual(a: ZoneFrameResult | null, b: ZoneFrameResult | null): boolean {
+function framesEqual(a: ZoneFrameResult, b: ZoneFrameResult): boolean {
   if (a === b) return true;
-  if (!a || !b) return false;
 
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
@@ -972,7 +987,7 @@ export function useCardLayout(
   React.RefCallback<HTMLElement>,
   CardLayoutResult,
   ContainerSize,
-  ZoneFrameResult | null,
+  ZoneFrameResult,
 ] {
   const zoneIds = Object.keys(config.zones);
 
@@ -983,7 +998,9 @@ export function useCardLayout(
     width: 0,
     height: 0,
   });
-  const [zoneFrames, setZoneFrames] = useState<ZoneFrameResult | null>(null);
+  const [zoneFrames, setZoneFrames] = useState<ZoneFrameResult>(() =>
+    makeDefaultFrames(zoneIds),
+  );
 
   const configRef = useRef(config);
   // eslint-disable-next-line react-hooks/refs -- must sync before useLayoutEffect reads it
@@ -992,25 +1009,31 @@ export function useCardLayout(
   const observerRef = useRef<ResizeObserver | null>(null);
   const elementRef = useRef<HTMLElement | null>(null);
 
+  // Three-pass model:
+  //   1. computeLayout — uses maxCardWidth and similar guardrails to find a
+  //      balanced allocation that no zone can cannibalize.
+  //   2. computeConstrainedLayoutState — treats the derived frames as fixed
+  //      and grows each zone's cards to fill its frame (subject to a 500px
+  //      sanity ceiling so big screens don't get absurd card sizes).
+  //   3. redistributeSlack — when a zone underfills its frame (capped by
+  //      aspect ratio, not height), shrink its frame and grow a neighbor's
+  //      via fraction adjustments. Iterates until convergence.
+  // User-supplied constraints (divider drag) skip both pass 1 and pass 3 so
+  // the user's explicit fractions are honored without bouncing.
   const compute = useCallback(
     (w: number, h: number) => {
       const cfg = configRef.current;
       if (cfg.constraints) {
         return computeConstrainedLayoutState(w, h, cfg, cfg.constraints);
       }
-      if (cfg.alwaysComputeFrames) {
-        const derivedConstraints = deriveConstraintsFromLayout(
-          computeLayout(w, h, cfg),
-          cfg,
-          h,
-          w,
-        );
-        return computeConstrainedLayoutState(w, h, cfg, derivedConstraints);
-      }
-      return {
-        dims: computeLayout(w, h, cfg),
-        frames: null,
-      };
+      const initial = deriveConstraintsFromLayout(
+        computeLayout(w, h, cfg),
+        cfg,
+        h,
+        w,
+      );
+      const { constraints } = redistributeSlack(initial, cfg, w, h);
+      return computeConstrainedLayoutState(w, h, cfg, constraints);
     },
     [],
   );

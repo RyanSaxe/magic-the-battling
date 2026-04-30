@@ -201,6 +201,33 @@ describe('computeLayout', () => {
       expect(czTotalH).toBeLessThanOrEqual(bottomH)
     })
 
+    it('CZ does not overflow after scale-up grows top/bL into the bottom row', () => {
+      // Real bug: scale-up pass treats availH - (top + bL) as free slack and
+      // grows hand/battlefield/sideboard into it without recomputing the
+      // bottomRight zone, which shares the bottom row with bL. When CZ needs
+      // a taller bottom row than bL, the grown hand steals from CZ and the
+      // upgrades overflow visually (zone-upgrades has overflow-visible).
+      const containerW = 1400
+      const containerH = 800
+      const result = computeLayout(containerW, containerH, {
+        zones: {
+          hand: { count: 6 },
+          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          sideboard: { count: 9 },
+          commandZone: { count: 3, minColumns: 1 },
+        },
+        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        ...ZONE_LAYOUT_PADDING,
+      })
+      const handGridH = result.hand.rows * result.hand.height + (result.hand.rows - 1) * 6
+      const topSectionH = handGridH + ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom
+      const bottomRowH = containerH - topSectionH - ZONE_LAYOUT_PADDING.sectionGap
+      const czStackH = result.commandZone.rows * result.commandZone.height
+        + (result.commandZone.rows - 1) * 6
+        + ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom
+      expect(czStackH).toBeLessThanOrEqual(bottomRowH)
+    })
+
     it('keeps 1 CZ column when only 1 CZ card', () => {
       const result = computeLayout(1200, 700, {
         zones: {
@@ -227,6 +254,27 @@ describe('computeLayout', () => {
         ...ZONE_LAYOUT_PADDING,
       })
       expect(result.commandZone.columns).toBe(2)
+    })
+
+    it('respects maxColumns on command zone (forces exact column count)', () => {
+      // Regression: with only minColumns=1, the algorithm picked 2 columns
+      // for 3 upgrades when score was higher, but the renderer
+      // (UpgradeGrid via getUpgradeGridColumns) always uses 1 column for
+      // count<4. The mismatch caused the rendered grid to massively
+      // overflow the budgeted bottom-row height (e.g., 199px overflow at
+      // 1024x800), with cards spilling above and below the upgrades zone.
+      const result = computeLayout(1024, 800, {
+        zones: {
+          hand: { count: 5 },
+          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          sideboard: { count: 9 },
+          commandZone: { count: 3, minColumns: 1, maxColumns: 1 },
+        },
+        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        ...ZONE_LAYOUT_PADDING,
+      })
+      expect(result.commandZone.columns).toBe(1)
+      expect(result.commandZone.rows).toBe(3)
     })
   })
 
