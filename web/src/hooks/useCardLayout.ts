@@ -7,6 +7,7 @@ import {
   type ZoneConstraints,
   type ZoneFrameResult,
 } from "./computeConstrainedLayout";
+import { redistributeSlack } from "./redistributeSlack";
 
 export interface ZoneSpec {
   count: number;
@@ -16,6 +17,10 @@ export interface ZoneSpec {
   minColumns?: number;
   maxColumns?: number;
   priority?: "primary" | "fill";
+  // Pass 3 (slack redistribution) routing weight. Default 1; "fill" zones default to 0.
+  // 0 means "do not absorb slack from neighbors" — pinned-size zones like the Build
+  // battlefield rely on this so leftover sideboard height bubbles up to hand instead.
+  growPriority?: number;
 }
 
 export interface CardLayoutConfig {
@@ -1004,18 +1009,30 @@ export function useCardLayout(
   const observerRef = useRef<ResizeObserver | null>(null);
   const elementRef = useRef<HTMLElement | null>(null);
 
-  // Two-pass model: pass 1 (computeLayout) uses maxCardWidth and similar
-  // guardrails to find a balanced allocation that no zone can cannibalize;
-  // pass 2 (computeConstrainedLayoutState → fitZone) treats the resulting
-  // frames as fixed and grows each zone's cards to fill its frame, ignoring
-  // per-zone maxCardWidth so cards are always as big as the allocated space
-  // permits. User-supplied constraints (divider drag) skip pass 1.
+  // Three-pass model:
+  //   1. computeLayout — uses maxCardWidth and similar guardrails to find a
+  //      balanced allocation that no zone can cannibalize.
+  //   2. computeConstrainedLayoutState — treats the derived frames as fixed
+  //      and grows each zone's cards to fill its frame (subject to a 500px
+  //      sanity ceiling so big screens don't get absurd card sizes).
+  //   3. redistributeSlack — when a zone underfills its frame (capped by
+  //      aspect ratio, not height), shrink its frame and grow a neighbor's
+  //      via fraction adjustments. Iterates until convergence.
+  // User-supplied constraints (divider drag) skip both pass 1 and pass 3 so
+  // the user's explicit fractions are honored without bouncing.
   const compute = useCallback(
     (w: number, h: number) => {
       const cfg = configRef.current;
-      const constraints =
-        cfg.constraints
-        ?? deriveConstraintsFromLayout(computeLayout(w, h, cfg), cfg, h, w);
+      if (cfg.constraints) {
+        return computeConstrainedLayoutState(w, h, cfg, cfg.constraints);
+      }
+      const initial = deriveConstraintsFromLayout(
+        computeLayout(w, h, cfg),
+        cfg,
+        h,
+        w,
+      );
+      const { constraints } = redistributeSlack(initial, cfg, w, h);
       return computeConstrainedLayoutState(w, h, cfg, constraints);
     },
     [],
