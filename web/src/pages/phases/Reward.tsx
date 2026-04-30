@@ -168,7 +168,6 @@ export function RewardPhase({
     layout: { top: ["rewards"], bottomLeft: ["upgrades", "pool"] },
     ...ZONE_LAYOUT_PADDING,
     maxTopFraction: hasUpgradeSection ? 0.2 : undefined,
-    alwaysComputeFrames: hasUpgradeSection,
   } satisfies CardLayoutConfig;
 
   const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
@@ -233,19 +232,17 @@ export function RewardPhase({
     height: dims.pool.height,
   };
 
-  const controlledStyle = (height?: number) =>
-    zoneFrames && height != null
-      ? { height, flex: "0 0 auto" as const }
-      : undefined;
+  const controlledStyle = (height: number) => ({
+    height,
+    flex: "0 0 auto" as const,
+  });
 
-  const rewardsStyle = controlledStyle(zoneFrames?.rewards?.outerHeight);
-  const upgradesStyle = controlledStyle(zoneFrames?.upgrades?.outerHeight);
-  const poolStyle = zoneFrames
-    ? {
-        minHeight: zoneFrames.pool.outerHeight,
-        flex: "1 1 auto" as const,
-      }
-    : undefined;
+  const rewardsStyle = controlledStyle(zoneFrames.rewards.outerHeight);
+  const upgradesStyle = controlledStyle(zoneFrames.upgrades.outerHeight);
+  const poolStyle = {
+    minHeight: zoneFrames.pool.outerHeight,
+    flex: "1 1 auto" as const,
+  };
 
   void last_battle_result;
 
@@ -338,8 +335,8 @@ export function RewardPhase({
 
         {hasUpgradeSection && (
           <div
-            className={`flex flex-col min-h-0 w-full ${zoneFrames ? "" : "flex-1"}`}
-            style={zoneFrames ? { flex: "1 1 auto", minHeight: 0 } : undefined}
+            className="flex flex-col min-h-0 w-full"
+            style={{ flex: "1 1 auto", minHeight: 0 }}
           >
             <div
               ref={upgradesZoneRef}
@@ -382,7 +379,7 @@ export function RewardPhase({
 
             <div
               ref={poolZoneRef}
-                className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${zoneFrames ? "" : "flex-1"}`}
+                className="zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0"
                 style={poolStyle}
               >
                 <ZoneLabel

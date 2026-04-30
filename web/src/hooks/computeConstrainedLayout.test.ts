@@ -375,4 +375,140 @@ describe("computeConstrainedLayout", () => {
       expect(result.pool.width).toBeGreaterThan(120);
     });
   });
+
+  // Pass 2 (constrained re-fit) must never produce *smaller* sideboard cards
+  // than pass 1 alone, since pass 2 receives identical or larger frames after
+  // the algorithm's pessimistic estimates settle. A regression here would
+  // reintroduce the bug where dragging the upgrades divider 1px wider made
+  // sideboard cards bigger (the opposite of expected direction).
+  describe("two-pass model: pass 2 never under-sizes vs pass 1", () => {
+    it("sideboard width is at least as big after pass 2 as after pass 1 alone", () => {
+      const config = {
+        zones: {
+          hand: { count: 6 },
+          battlefield: { count: 5, priority: "fill" as const, maxRows: 1 },
+          sideboard: { count: 9 },
+          commandZone: { count: 3, minColumns: 1, maxColumns: 1 },
+        },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
+        ...ZONE_LAYOUT_PADDING,
+      };
+      const containerW = 1400;
+      const containerH = 800;
+
+      const pass1 = computeLayout(containerW, containerH, config);
+      const derived = deriveConstraintsFromLayout(
+        pass1,
+        config,
+        containerH,
+        containerW,
+      );
+      const { dims: pass2, frames } = computeConstrainedLayoutState(
+        containerW,
+        containerH,
+        config,
+        derived,
+      );
+
+      expect(pass2.sideboard.width).toBeGreaterThanOrEqual(pass1.sideboard.width);
+      const sideboardGridH =
+        pass2.sideboard.rows * pass2.sideboard.height
+        + Math.max(0, pass2.sideboard.rows - 1) * 6;
+      expect(sideboardGridH).toBeLessThanOrEqual(frames.sideboard.innerHeight);
+    });
+
+    it("holds across a sweep of realistic resolutions", () => {
+      const config = (cz: number) => ({
+        zones: {
+          hand: { count: 6 },
+          battlefield: { count: 5, priority: "fill" as const, maxRows: 1 },
+          sideboard: { count: 9 },
+          commandZone: {
+            count: cz,
+            minColumns: cz >= 4 ? 2 : 1,
+            maxColumns: cz >= 4 ? 2 : 1,
+          },
+        },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
+        ...ZONE_LAYOUT_PADDING,
+      });
+      const widths = [1024, 1280, 1366, 1440, 1600, 1920];
+      const heights = [600, 700, 800, 900, 1080];
+      const upgradeCounts = [1, 2, 3, 4, 5];
+
+      for (const w of widths) {
+        for (const h of heights) {
+          for (const cz of upgradeCounts) {
+            const cfg = config(cz);
+            const pass1 = computeLayout(w, h, cfg);
+            const derived = deriveConstraintsFromLayout(pass1, cfg, h, w);
+            const { dims: pass2 } = computeConstrainedLayoutState(w, h, cfg, derived);
+            expect(
+              pass2.sideboard.width,
+              `sideboard shrank at ${w}x${h} cz=${cz}: ${pass1.sideboard.width} -> ${pass2.sideboard.width}`,
+            ).toBeGreaterThanOrEqual(pass1.sideboard.width);
+          }
+        }
+      }
+    });
+  });
+
+  describe("two-pass model: idempotence", () => {
+    it("re-deriving constraints from pass-2 dims yields the same constraints", () => {
+      // The full pipeline (pass 1 -> derive -> pass 2) should be a fixed point:
+      // running it again on its own output should not change the constraints.
+      // Otherwise we'd see successive renders thrashing between sizes.
+      const config = {
+        zones: {
+          hand: { count: 6 },
+          battlefield: { count: 5, priority: "fill" as const, maxRows: 1 },
+          sideboard: { count: 9 },
+          commandZone: { count: 3, minColumns: 1, maxColumns: 1 },
+        },
+        layout: {
+          top: ["hand"],
+          bottomLeft: ["battlefield", "sideboard"],
+          bottomRight: ["commandZone"],
+        },
+        ...ZONE_LAYOUT_PADDING,
+      };
+      const containerW = 1400;
+      const containerH = 800;
+
+      const pass1 = computeLayout(containerW, containerH, config);
+      const derived1 = deriveConstraintsFromLayout(
+        pass1,
+        config,
+        containerH,
+        containerW,
+      );
+      const { dims: pass2 } = computeConstrainedLayoutState(
+        containerW,
+        containerH,
+        config,
+        derived1,
+      );
+      const derived2 = deriveConstraintsFromLayout(
+        pass2,
+        config,
+        containerH,
+        containerW,
+      );
+
+      // Allow tiny rounding deltas (≤ 1px-equivalent in fraction space).
+      expect(Math.abs(derived2.topFraction - derived1.topFraction)).toBeLessThan(0.01);
+      expect(Math.abs(derived2.leftFraction - derived1.leftFraction)).toBeLessThan(0.01);
+      expect(
+        Math.abs(derived2.bottomLeftSplit - derived1.bottomLeftSplit),
+      ).toBeLessThan(0.05);
+    });
+  });
 });

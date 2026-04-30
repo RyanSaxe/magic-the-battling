@@ -208,13 +208,13 @@ export function DeckDisplay({
       className={className}
       onClick={handleBackgroundClick}
       isMobile={isMobile}
-      zoneHeights={enableResize && zoneFrames ? {
+      zoneHeights={enableResize ? {
         hand: zoneFrames.hand.outerHeight,
         battlefield: zoneFrames.battlefield.outerHeight,
         sideboard: zoneFrames.sideboard.outerHeight,
         upgrades: zoneFrames.commandZone.outerHeight,
       } : null}
-      zoneWidths={enableResize && zoneFrames && hasUpgrades ? {
+      zoneWidths={enableResize && hasUpgrades ? {
         upgrades: zoneFrames.commandZone.outerWidth,
       } : null}
       zoneRefs={enableResize ? {

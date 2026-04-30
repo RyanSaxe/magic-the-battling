@@ -3,6 +3,7 @@ import { CARD_ASPECT_RATIO, bestFit, type ZoneDims } from "./cardSizeUtils";
 import {
   computeConstrainedLayoutState,
   deriveConstraintsFromLayout,
+  makeDefaultFrames,
   type ZoneConstraints,
   type ZoneFrameResult,
 } from "./computeConstrainedLayout";
@@ -36,7 +37,6 @@ export interface CardLayoutConfig {
   minBottomRightOuterWidth?: number;
   maxTopFraction?: number;
   constraints?: ZoneConstraints | null;
-  alwaysComputeFrames?: boolean;
 }
 
 export type CardLayoutResult = Record<string, ZoneDims>;
@@ -949,9 +949,8 @@ export interface ContainerSize {
   height: number;
 }
 
-function framesEqual(a: ZoneFrameResult | null, b: ZoneFrameResult | null): boolean {
+function framesEqual(a: ZoneFrameResult, b: ZoneFrameResult): boolean {
   if (a === b) return true;
-  if (!a || !b) return false;
 
   const aKeys = Object.keys(a);
   const bKeys = Object.keys(b);
@@ -980,7 +979,7 @@ export function useCardLayout(
   React.RefCallback<HTMLElement>,
   CardLayoutResult,
   ContainerSize,
-  ZoneFrameResult | null,
+  ZoneFrameResult,
 ] {
   const zoneIds = Object.keys(config.zones);
 
@@ -991,7 +990,9 @@ export function useCardLayout(
     width: 0,
     height: 0,
   });
-  const [zoneFrames, setZoneFrames] = useState<ZoneFrameResult | null>(null);
+  const [zoneFrames, setZoneFrames] = useState<ZoneFrameResult>(() =>
+    makeDefaultFrames(zoneIds),
+  );
 
   const configRef = useRef(config);
   // eslint-disable-next-line react-hooks/refs -- must sync before useLayoutEffect reads it
@@ -1000,25 +1001,19 @@ export function useCardLayout(
   const observerRef = useRef<ResizeObserver | null>(null);
   const elementRef = useRef<HTMLElement | null>(null);
 
+  // Two-pass model: pass 1 (computeLayout) uses maxCardWidth and similar
+  // guardrails to find a balanced allocation that no zone can cannibalize;
+  // pass 2 (computeConstrainedLayoutState → fitZone) treats the resulting
+  // frames as fixed and grows each zone's cards to fill its frame, ignoring
+  // per-zone maxCardWidth so cards are always as big as the allocated space
+  // permits. User-supplied constraints (divider drag) skip pass 1.
   const compute = useCallback(
     (w: number, h: number) => {
       const cfg = configRef.current;
-      if (cfg.constraints) {
-        return computeConstrainedLayoutState(w, h, cfg, cfg.constraints);
-      }
-      if (cfg.alwaysComputeFrames) {
-        const derivedConstraints = deriveConstraintsFromLayout(
-          computeLayout(w, h, cfg),
-          cfg,
-          h,
-          w,
-        );
-        return computeConstrainedLayoutState(w, h, cfg, derivedConstraints);
-      }
-      return {
-        dims: computeLayout(w, h, cfg),
-        frames: null,
-      };
+      const constraints =
+        cfg.constraints
+        ?? deriveConstraintsFromLayout(computeLayout(w, h, cfg), cfg, h, w);
+      return computeConstrainedLayoutState(w, h, cfg, constraints);
     },
     [],
   );

@@ -535,13 +535,13 @@ export function BuildPhase({
         className={`transition-opacity ${locked ? "opacity-60" : ""}`}
         onClick={handleBackgroundClick}
         isMobile={isMobile}
-        zoneHeights={zoneFrames ? {
+        zoneHeights={{
           hand: zoneFrames.hand.outerHeight,
           battlefield: zoneFrames.battlefield.outerHeight,
           sideboard: zoneFrames.sideboard.outerHeight,
           upgrades: hasDesktopUpgradeRail ? zoneFrames.commandZone.outerHeight : undefined,
-        } : null}
-        zoneWidths={zoneFrames && hasDesktopUpgradeRail ? {
+        }}
+        zoneWidths={hasDesktopUpgradeRail ? {
           upgrades: zoneFrames.commandZone.outerWidth,
         } : null}
         zoneRefs={{

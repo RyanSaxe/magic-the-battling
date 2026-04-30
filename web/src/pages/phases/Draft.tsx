@@ -277,12 +277,12 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
       containerRef={containerRef}
       onClick={handleBackgroundClick}
       isMobile={isMobile}
-      zoneHeights={zoneFrames ? {
+      zoneHeights={{
         hand: zoneFrames.pack.outerHeight,
         sideboard: zoneFrames.pool.outerHeight,
         upgrades: hasDesktopUpgradeRail ? zoneFrames.upgrades.outerHeight : undefined,
-      } : null}
-      zoneWidths={zoneFrames && hasDesktopUpgradeRail ? {
+      }}
+      zoneWidths={hasDesktopUpgradeRail ? {
         upgrades: zoneFrames.upgrades.outerWidth,
       } : null}
       zoneRefs={{
