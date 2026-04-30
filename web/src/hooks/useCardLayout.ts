@@ -13,6 +13,7 @@ export interface ZoneSpec {
   maxCardWidth?: number;
   maxRows?: number;
   minColumns?: number;
+  maxColumns?: number;
   priority?: "primary" | "fill";
 }
 
@@ -56,6 +57,7 @@ interface ResolvedZone {
   maxCardWidth: number;
   maxRows: number;
   minColumns: number;
+  maxColumns: number;
   priority: "primary" | "fill";
 }
 
@@ -71,6 +73,7 @@ function resolveZone(
     maxCardWidth: spec.maxCardWidth ?? globalMax,
     maxRows: spec.maxRows ?? Infinity,
     minColumns: spec.minColumns ?? 1,
+    maxColumns: spec.maxColumns ?? Infinity,
     priority: spec.priority ?? "primary",
   };
 }
@@ -204,8 +207,13 @@ export function computeLayout(
   let bestOverflow = Infinity;
   let bestOverflowResult = bestResult;
 
-  const brMinCols = Math.max(...brZones.map((z) => z.minColumns));
-  const brMaxCols = Math.min(2, Math.max(...brZones.map((z) => z.count)));
+  const brMaxColsHardCap = Math.min(2, Math.max(...brZones.map((z) => z.count)));
+  const brMaxColsFromZones = Math.min(...brZones.map((z) => z.maxColumns));
+  const brMaxCols = Math.min(brMaxColsHardCap, brMaxColsFromZones);
+  const brMinCols = Math.min(
+    brMaxCols,
+    Math.max(...brZones.map((z) => z.minColumns)),
+  );
   const brColVariants = hasBR
     ? Array.from(
         { length: brMaxCols - brMinCols + 1 },

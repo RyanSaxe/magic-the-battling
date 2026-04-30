@@ -17,6 +17,7 @@ import { ZoneLayout } from "../../components/common/ZoneLayout";
 import { useCardLayout, ZONE_LAYOUT_PADDING } from "../../hooks/useCardLayout";
 import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
 import { useZoneDividers } from "../../hooks/useZoneDividers";
+import { getUpgradeGridColumns } from "../../utils/upgradeGrid";
 
 type Selection =
   | { type: "card"; cardId: string; zone: "hand" | "sideboard" }
@@ -297,12 +298,18 @@ export function BuildPhase({
   });
 
   const battlefieldCount = 3 + 1 + 1; // 3 basic slots + treasure + poison
+  const upgradeCount = hasDesktopUpgradeRail ? self_player.upgrades.length : 0;
+  const upgradeColumns = getUpgradeGridColumns(upgradeCount);
   const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
     zones: {
       hand: { count: maxHandSize },
       battlefield: { count: battlefieldCount, priority: "fill", maxRows: 1 },
       sideboard: { count: stableSBCount },
-      commandZone: { count: hasDesktopUpgradeRail ? self_player.upgrades.length : 0 },
+      commandZone: {
+        count: upgradeCount,
+        minColumns: upgradeColumns,
+        maxColumns: upgradeColumns,
+      },
     },
     layout: {
       top: ["hand"],
@@ -318,7 +325,11 @@ export function BuildPhase({
       hand: { count: maxHandSize },
       battlefield: { count: battlefieldCount, priority: "fill" as const, maxRows: 1 },
       sideboard: { count: stableSBCount },
-      commandZone: { count: hasDesktopUpgradeRail ? self_player.upgrades.length : 0 },
+      commandZone: {
+        count: upgradeCount,
+        minColumns: upgradeColumns,
+        maxColumns: upgradeColumns,
+      },
     },
     layout: {
       top: ["hand"],

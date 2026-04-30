@@ -8,6 +8,7 @@ import { ZoneLayout } from '../../components/common/ZoneLayout'
 import { usePersistedConstraints } from '../../hooks/usePersistedConstraints'
 import { useZoneDividers } from '../../hooks/useZoneDividers'
 import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
+import { getUpgradeGridColumns } from '../../utils/upgradeGrid'
 
 interface DraftPhaseProps {
   gameState: GameState
@@ -51,11 +52,18 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     round: self_player.round,
   })
 
+  const upgradeCount = hasDesktopUpgradeRail ? self_player.upgrades.length : 0
+  const upgradeColumns = getUpgradeGridColumns(upgradeCount)
   const draftDefaultLayoutConfig = {
     zones: {
       pool: { count: pool.length, maxCardWidth: 300 },
       pack: { count: currentPack.length, maxCardWidth: 400 },
-      upgrades: { count: hasDesktopUpgradeRail ? self_player.upgrades.length : 0, maxCardWidth: 200 },
+      upgrades: {
+        count: upgradeCount,
+        maxCardWidth: 200,
+        minColumns: upgradeColumns,
+        maxColumns: upgradeColumns,
+      },
     },
     layout: {
       top: ['pack'],
