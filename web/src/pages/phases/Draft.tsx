@@ -121,65 +121,34 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
   )
 
   const packContent = (
-    <>
-      <div className="absolute top-0 left-0 pointer-events-none z-10">
-        <div
-          className="relative draft-token-frame draft-token-frame--treasure"
-          data-guide-target="draft-mobile-treasure"
-        >
-          <img
-            src={TREASURE_TOKEN_IMAGE}
-            alt="Treasure"
-            className="h-[56px] sm:h-[84px] block shadow-lg"
-            style={{ borderRadius: 'var(--card-border-radius)' }}
-          />
-          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-amber-400 text-xs sm:text-sm font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none">
-            {self_player.treasures}
-          </span>
-        </div>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex-1 min-h-0 overflow-auto">
+        {currentPack.length === 0 ? (
+          <div className="text-center">
+            <div className="text-gray-400 text-sm">No pack available</div>
+          </div>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${packDims.columns}, ${packDims.width}px)`,
+            gap: '6px',
+            justifyContent: 'center',
+            maxWidth: '100%',
+            overflow: 'hidden',
+          }}>
+            {currentPack.map((card, index) => (
+              <Card
+                key={card.id}
+                card={card}
+                onClick={() => handleCardClick(card, index, 'pack', false)}
+                selected={selectedCard?.card.id === card.id}
+                dimensions={packDims}
+              />
+            ))}
+          </div>
+        )}
       </div>
-      <div className="absolute top-0 right-0 pointer-events-none z-10">
-        <div className="relative draft-token-frame draft-token-frame--poison">
-          <img
-            src={POISON_COUNTER_IMAGE}
-            alt="Poison"
-            className="h-[56px] sm:h-[84px] block shadow-lg"
-            style={{ borderRadius: 'var(--card-border-radius)' }}
-          />
-          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-purple-400 text-xs sm:text-sm font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none">
-            {self_player.poison}
-          </span>
-        </div>
-      </div>
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="flex-1 min-h-0 overflow-auto">
-          {currentPack.length === 0 ? (
-            <div className="text-center">
-              <div className="text-gray-400 text-sm">No pack available</div>
-            </div>
-          ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: `repeat(${packDims.columns}, ${packDims.width}px)`,
-              gap: '6px',
-              justifyContent: 'center',
-              maxWidth: '100%',
-              overflow: 'hidden',
-            }}>
-              {currentPack.map((card, index) => (
-                <Card
-                  key={card.id}
-                  card={card}
-                  onClick={() => handleCardClick(card, index, 'pack', false)}
-                  selected={selectedCard?.card.id === card.id}
-                  dimensions={packDims}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </>
+    </div>
   )
 
   const poolContent = (
@@ -220,6 +189,44 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     </div>
   )
 
+  // Anchored to the outer ZoneLayout container (via the `overlay` slot) so the
+  // tokens sit at the page's bottom corners regardless of inner zone layout —
+  // when the upgrade rail exists, the pool zone's right edge is in the middle
+  // of the page, and we don't want poison to land there.
+  const tokensOverlay = (
+    <>
+      <div className="absolute bottom-0 left-0 pointer-events-none z-20 flex">
+        <div
+          className="relative draft-token-frame draft-token-frame--treasure"
+          data-guide-target="draft-mobile-treasure"
+        >
+          <img
+            src={TREASURE_TOKEN_IMAGE}
+            alt="Treasure"
+            className="h-[56px] sm:h-[84px] block shadow-lg"
+            style={{ borderRadius: 'var(--card-border-radius)' }}
+          />
+          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-amber-400 text-xs sm:text-sm font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none">
+            {self_player.treasures}
+          </span>
+        </div>
+      </div>
+      <div className="absolute bottom-0 right-0 pointer-events-none z-20 flex">
+        <div className="relative draft-token-frame draft-token-frame--poison">
+          <img
+            src={POISON_COUNTER_IMAGE}
+            alt="Poison"
+            className="h-[56px] sm:h-[84px] block shadow-lg"
+            style={{ borderRadius: 'var(--card-border-radius)' }}
+          />
+          <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black/80 text-purple-400 text-xs sm:text-sm font-bold px-1.5 sm:px-2 py-0.5 rounded-full leading-none">
+            {self_player.poison}
+          </span>
+        </div>
+      </div>
+    </>
+  )
+
   return (
     <ZoneLayout
       containerRef={containerRef}
@@ -239,18 +246,21 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
         upgrades: zoneRefs.upgrades,
       }}
       overlay={
-        persistedLayout.canReset ? (
-          <LayoutResetControl
-            phaseLabel="Draft"
-            currentStage={self_player.stage}
-            currentRound={self_player.round}
-            originStage={persistedLayout.originStage}
-            originRound={persistedLayout.originRound}
-            isInherited={persistedLayout.source === 'inherited'}
-            onConfirm={clearConstraints}
-            position={isMobile ? 'bottom-right' : 'top-right'}
-          />
-        ) : null
+        <>
+          {tokensOverlay}
+          {persistedLayout.canReset ? (
+            <LayoutResetControl
+              phaseLabel="Draft"
+              currentStage={self_player.stage}
+              currentRound={self_player.round}
+              originStage={persistedLayout.originStage}
+              originRound={persistedLayout.originRound}
+              isInherited={persistedLayout.source === 'inherited'}
+              onConfirm={clearConstraints}
+              position={isMobile ? 'bottom-right' : 'top-right'}
+            />
+          ) : null}
+        </>
       }
       hasHand={true}
       hasBattlefield={false}
