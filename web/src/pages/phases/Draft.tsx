@@ -8,7 +8,7 @@ import { ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
 import { usePersistedConstraints } from '../../hooks/usePersistedConstraints'
 import { useResizableLayout } from '../../hooks/useResizableLayout'
 import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
-import { getUpgradeGridColumns } from '../../utils/upgradeGrid'
+import { getUpgradeZoneLayoutBounds } from '../../utils/upgradeGrid'
 
 interface DraftPhaseProps {
   gameState: GameState
@@ -50,7 +50,6 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
   })
 
   const upgradeCount = hasDesktopUpgradeRail ? self_player.upgrades.length : 0
-  const upgradeColumns = getUpgradeGridColumns(upgradeCount)
   const layoutConfig = {
     zones: {
       pool: { count: pool.length, maxCardWidth: 300 },
@@ -58,8 +57,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
       upgrades: {
         count: upgradeCount,
         maxCardWidth: 200,
-        minColumns: upgradeColumns,
-        maxColumns: upgradeColumns,
+        ...getUpgradeZoneLayoutBounds(upgradeCount),
       },
     },
     layout: {

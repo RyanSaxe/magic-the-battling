@@ -3,9 +3,20 @@ import { CARD_ASPECT_RATIO, type ZoneDims } from "../hooks/cardSizeUtils";
 
 const UPGRADE_GRID_GAP = 6;
 const UPGRADE_MAX_CARD_WIDTH = 200;
+const UPGRADE_MAX_COLUMNS = 2;
 
-export function getUpgradeGridColumns(count: number): number {
-  return count >= 4 ? 2 : 1;
+// Column bounds for the upgrade/commandZone layout. count=3 is the only
+// flexible case — pass 1 picks 1 vs 2 based on container shape (cramped
+// viewports get 2-col cards instead of tiny 1-col stacks). count<=2 stays
+// 1-col, count>=4 stays 2-col, both because freeing those choices lets
+// computeLayout starve the zone of width and produce smaller cards.
+export function getUpgradeZoneLayoutBounds(count: number): {
+  minColumns: number;
+  maxColumns: number;
+} {
+  if (count >= 4) return { minColumns: 2, maxColumns: UPGRADE_MAX_COLUMNS };
+  if (count === 3) return { minColumns: 1, maxColumns: UPGRADE_MAX_COLUMNS };
+  return { minColumns: 1, maxColumns: 1 };
 }
 
 export function getUpgradeGridDims(
@@ -13,19 +24,14 @@ export function getUpgradeGridDims(
   frame: ZoneFrame | null | undefined,
   fallbackDims: ZoneDims,
 ): ZoneDims {
-  const columns = getUpgradeGridColumns(count);
+  const layoutColumns = fallbackDims.columns > 0 ? fallbackDims.columns : 1;
+  const columns = Math.min(UPGRADE_MAX_COLUMNS, Math.max(1, layoutColumns));
   const rows = Math.max(1, Math.ceil(count / columns));
 
   if (count <= 0) {
     return { ...fallbackDims, columns, rows };
   }
 
-  // When the constrained layout supplies a frame, fit cards inside it.
-  // Otherwise derive a virtual frame from fallbackDims (the grid the
-  // unconstrained algorithm sized for, which may have different cols/rows
-  // than this renderer wants). Re-fitting prevents overflow when the
-  // algorithm picked, e.g., a 2x2 grid for count=3 while this renderer
-  // wants 1x3.
   const availW = frame && frame.innerWidth > 0
     ? frame.innerWidth
     : fallbackDims.columns * fallbackDims.width

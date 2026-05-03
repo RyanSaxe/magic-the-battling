@@ -257,12 +257,8 @@ describe('computeLayout', () => {
     })
 
     it('respects maxColumns on command zone (forces exact column count)', () => {
-      // Regression: with only minColumns=1, the algorithm picked 2 columns
-      // for 3 upgrades when score was higher, but the renderer
-      // (UpgradeGrid via getUpgradeGridColumns) always uses 1 column for
-      // count<4. The mismatch caused the rendered grid to massively
-      // overflow the budgeted bottom-row height (e.g., 199px overflow at
-      // 1024x800), with cards spilling above and below the upgrades zone.
+      // The renderer mirrors whatever pass 1 picks, so honoring maxColumns
+      // is what keeps the rendered grid in sync with the budgeted space.
       const result = computeLayout(1024, 800, {
         zones: {
           hand: { count: 5 },
@@ -275,6 +271,25 @@ describe('computeLayout', () => {
       })
       expect(result.commandZone.columns).toBe(1)
       expect(result.commandZone.rows).toBe(3)
+    })
+
+    it('picks 2 columns for 3 upgrades when the zone is height-constrained', () => {
+      // On a small viewport (e.g. 1024x800) the bottom-right zone runs out
+      // of vertical space first, so 2 columns × 2 rows yields wider cards
+      // than 1 column × 3 rows. Wide viewports stay 1-col because the
+      // zone is width-capped at maxCardWidth and 1-col wins on fill.
+      const result = computeLayout(1024, 800, {
+        zones: {
+          hand: { count: 5 },
+          battlefield: { count: 5, priority: 'fill', maxRows: 1 },
+          sideboard: { count: 9 },
+          commandZone: { count: 3, minColumns: 1, maxColumns: 2 },
+        },
+        layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+        ...ZONE_LAYOUT_PADDING,
+      })
+      expect(result.commandZone.columns).toBe(2)
+      expect(result.commandZone.rows).toBe(2)
     })
   })
 
