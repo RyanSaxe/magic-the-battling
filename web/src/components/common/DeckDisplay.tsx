@@ -12,7 +12,7 @@ import { PoisonCard } from './PoisonCard'
 import { ZoneLayout } from './ZoneLayout'
 import { UpgradeGrid } from './UpgradeGrid'
 import { buildAppliedUpgradeMap, type UpgradeDisplayScope } from '../../utils/upgrades'
-import { getUpgradeGridColumns } from '../../utils/upgradeGrid'
+import { getUpgradeZoneLayoutBounds } from '../../utils/upgradeGrid'
 
 export interface DeckDisplayResizeState {
   constraints: ZoneConstraints | null
@@ -104,7 +104,6 @@ export function DeckDisplay({
   const showResetControl = enableResize && !!activeConstraints && !!resetControl
 
   const layoutConfig = useMemo(() => {
-    const upgradeColumns = getUpgradeGridColumns(commandZoneCount)
     return {
       zones: {
         hand: { count: hasHand ? hand.length : 0 },
@@ -112,8 +111,7 @@ export function DeckDisplay({
         sideboard: { count: sideboard.length },
         commandZone: {
           count: commandZoneCount,
-          minColumns: upgradeColumns,
-          maxColumns: upgradeColumns,
+          ...getUpgradeZoneLayoutBounds(commandZoneCount),
         },
       },
       layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },

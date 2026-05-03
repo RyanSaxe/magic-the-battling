@@ -17,7 +17,7 @@ import { ZoneLayout } from "../../components/common/ZoneLayout";
 import { ZONE_LAYOUT_PADDING } from "../../hooks/useCardLayout";
 import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
 import { useResizableLayout } from "../../hooks/useResizableLayout";
-import { getUpgradeGridColumns } from "../../utils/upgradeGrid";
+import { getUpgradeZoneLayoutBounds } from "../../utils/upgradeGrid";
 
 type Selection =
   | { type: "card"; cardId: string; zone: "hand" | "sideboard" }
@@ -295,7 +295,6 @@ export function BuildPhase({
 
   const battlefieldCount = 3 + 1 + 1; // 3 basic slots + treasure + poison
   const upgradeCount = hasDesktopUpgradeRail ? self_player.upgrades.length : 0;
-  const upgradeColumns = getUpgradeGridColumns(upgradeCount);
   const layoutConfig = {
     zones: {
       hand: { count: maxHandSize },
@@ -303,8 +302,7 @@ export function BuildPhase({
       sideboard: { count: stableSBCount },
       commandZone: {
         count: upgradeCount,
-        minColumns: upgradeColumns,
-        maxColumns: upgradeColumns,
+        ...getUpgradeZoneLayoutBounds(upgradeCount),
       },
     },
     layout: {
