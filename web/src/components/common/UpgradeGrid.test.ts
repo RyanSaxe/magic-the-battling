@@ -1,21 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getUpgradeGridColumns, getUpgradeGridDims } from "../../utils/upgradeGrid";
-
-describe("getUpgradeGridColumns", () => {
-  it("uses one column for up to three upgrades", () => {
-    expect(getUpgradeGridColumns(1)).toBe(1);
-    expect(getUpgradeGridColumns(2)).toBe(1);
-    expect(getUpgradeGridColumns(3)).toBe(1);
-  });
-
-  it("uses two columns for four or more upgrades", () => {
-    expect(getUpgradeGridColumns(4)).toBe(2);
-    expect(getUpgradeGridColumns(6)).toBe(2);
-  });
-});
+import { getUpgradeGridDims } from "../../utils/upgradeGrid";
 
 describe("getUpgradeGridDims", () => {
-  it("forces a single-column layout for three upgrades", () => {
+  it("renders a single column when the layout picked 1 column", () => {
     const dims = getUpgradeGridDims(
       3,
       {
@@ -24,7 +11,7 @@ describe("getUpgradeGridDims", () => {
         outerWidth: 324,
         outerHeight: 632,
       },
-      { width: 100, height: 140, columns: 2, rows: 2 },
+      { width: 100, height: 140, columns: 1, rows: 3 },
     );
 
     expect(dims.columns).toBe(1);
@@ -32,7 +19,7 @@ describe("getUpgradeGridDims", () => {
     expect(dims.width).toBeGreaterThan(100);
   });
 
-  it("forces a two-column layout for four upgrades", () => {
+  it("renders two columns when the layout picked 2 columns", () => {
     const dims = getUpgradeGridDims(
       4,
       {
@@ -41,7 +28,7 @@ describe("getUpgradeGridDims", () => {
         outerWidth: 304,
         outerHeight: 552,
       },
-      { width: 100, height: 140, columns: 1, rows: 4 },
+      { width: 100, height: 140, columns: 2, rows: 2 },
     );
 
     expect(dims.columns).toBe(2);

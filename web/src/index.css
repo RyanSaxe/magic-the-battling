@@ -394,16 +394,17 @@ input:-webkit-autofill:focus {
   line-height: 0;
 }
 
+.draft-token-frame--treasure,
+.draft-token-frame--poison {
+  border: 2px solid var(--seam-stroke);
+}
+
 .draft-token-frame--treasure {
-  border-bottom: 2px solid var(--seam-stroke);
-  border-right: 2px solid var(--seam-stroke);
-  box-shadow: 2px 2px 7px rgba(0, 0, 0, 0.42);
+  box-shadow: 2px -2px 7px rgba(0, 0, 0, 0.42);
 }
 
 .draft-token-frame--poison {
-  border-bottom: 2px solid var(--seam-stroke);
-  border-left: 2px solid var(--seam-stroke);
-  box-shadow: -2px 2px 7px rgba(0, 0, 0, 0.42);
+  box-shadow: -2px -2px 7px rgba(0, 0, 0, 0.42);
 }
 
 /* Utility classes for gold borders */

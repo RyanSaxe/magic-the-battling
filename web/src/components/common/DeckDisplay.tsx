@@ -1,9 +1,9 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import type { Card as CardType } from '../../types'
 import type { ZoneConstraints } from '../../hooks/computeConstrainedLayout'
 import { Card } from '../card'
-import { useCardLayout, ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
-import { useZoneDividers } from '../../hooks/useZoneDividers'
+import { ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
+import { useResizableLayout } from '../../hooks/useResizableLayout'
 import { BasicLandCard } from './BasicLandCard'
 import { CardGrid } from './CardGrid'
 import { LayoutResetControl } from './LayoutResetControl'
@@ -12,7 +12,7 @@ import { PoisonCard } from './PoisonCard'
 import { ZoneLayout } from './ZoneLayout'
 import { UpgradeGrid } from './UpgradeGrid'
 import { buildAppliedUpgradeMap, type UpgradeDisplayScope } from '../../utils/upgrades'
-import { getUpgradeGridColumns } from '../../utils/upgradeGrid'
+import { getUpgradeZoneLayoutBounds } from '../../utils/upgradeGrid'
 
 export interface DeckDisplayResizeState {
   constraints: ZoneConstraints | null
@@ -69,11 +69,6 @@ export function DeckDisplay({
     key: localLayoutStateKey,
     constraints: null,
   })
-  const handZoneRef = useRef<HTMLDivElement | null>(null)
-  const battlefieldZoneRef = useRef<HTMLDivElement | null>(null)
-  const sideboardZoneRef = useRef<HTMLDivElement | null>(null)
-  const upgradesZoneRef = useRef<HTMLDivElement | null>(null)
-
   const handleCardClick = useCallback((cardId: string) => {
     setSelectedCardId((prev) => prev === cardId ? null : cardId)
   }, [])
@@ -108,82 +103,29 @@ export function DeckDisplay({
   const clearConstraints = resizeState?.clearConstraints ?? clearLocalConstraints
   const showResetControl = enableResize && !!activeConstraints && !!resetControl
 
-  const layoutConfig = useMemo(() => ({
-    zones: {
-      hand: { count: hasHand ? hand.length : 0 },
-      battlefield: { count: battlefieldCount, priority: 'fill' as const, maxRows: 1 },
-      sideboard: { count: sideboard.length },
-      commandZone: { count: commandZoneCount, minColumns: getUpgradeGridColumns(commandZoneCount) },
-    },
-    layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
-    ...ZONE_LAYOUT_PADDING,
-  }), [battlefieldCount, commandZoneCount, hand.length, hasHand, sideboard.length])
+  const layoutConfig = useMemo(() => {
+    return {
+      zones: {
+        hand: { count: hasHand ? hand.length : 0 },
+        battlefield: { count: battlefieldCount, priority: 'fill' as const, maxRows: 1 },
+        sideboard: { count: sideboard.length },
+        commandZone: {
+          count: commandZoneCount,
+          ...getUpgradeZoneLayoutBounds(commandZoneCount),
+        },
+      },
+      layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
+      ...ZONE_LAYOUT_PADDING,
+    }
+  }, [battlefieldCount, commandZoneCount, hand.length, hasHand, sideboard.length])
 
-  const [ref, dims, containerSize, zoneFrames] = useCardLayout({
-    ...layoutConfig,
-    constraints: enableResize ? activeConstraints : null,
-  })
-
-  const dividerCallbacks = useZoneDividers({
-    containerHeight: containerSize.height,
-    containerWidth: containerSize.width,
-    currentLayout: dims,
-    layoutConfig,
-    measureInitialConstraints: enableResize
-      ? () => {
-          const handOuter = handZoneRef.current?.getBoundingClientRect().height ?? 0
-          const battlefieldRect = battlefieldZoneRef.current?.getBoundingClientRect()
-          const sideboardOuter = sideboardZoneRef.current?.getBoundingClientRect().height ?? 0
-          const upgradesRect = upgradesZoneRef.current?.getBoundingClientRect()
-          const battlefieldOuter = battlefieldRect?.height ?? 0
-          const upgradesOuter = upgradesRect?.height ?? 0
-          const battlefieldOuterWidth = battlefieldRect?.width ?? 0
-          const upgradesOuterWidth = upgradesRect?.width ?? 0
-          const sectionGap = ZONE_LAYOUT_PADDING.sectionGap
-          const sectionPadV =
-            ZONE_LAYOUT_PADDING.sectionPadTop + ZONE_LAYOUT_PADDING.sectionPadBottom
-
-          const bottomLeftOuter =
-            battlefieldOuter + (hasSideboard ? sideboardOuter + sectionGap : 0)
-          const bottomOuter = Math.max(bottomLeftOuter, upgradesOuter)
-          const usableHeight = handOuter + bottomOuter
-          const totalBottomWidth = battlefieldOuterWidth + (hasUpgrades ? upgradesOuterWidth + sectionGap : 0)
-          const leftFraction =
-            hasUpgrades && totalBottomWidth > sectionGap
-              ? battlefieldOuterWidth / (totalBottomWidth - sectionGap)
-              : 0.7
-
-          let bottomLeftSplit = 0.5
-          if (hasSideboard) {
-            const battlefieldInner = Math.max(0, battlefieldOuter - sectionPadV)
-            const sideboardInner = Math.max(0, sideboardOuter - sectionPadV)
-            const totalInner = battlefieldInner + sideboardInner
-            if (totalInner > 0) {
-              bottomLeftSplit = battlefieldInner / totalInner
-            }
-          }
-
-          return bottomOuter > 0
-            ? {
-                topFraction: usableHeight > 0 ? handOuter / usableHeight : 0,
-                leftFraction,
-                bottomLeftSplit,
-                usableHeight,
-                bottomInnerHeight: Math.max(
-                  0,
-                  bottomLeftOuter -
-                    (hasSideboard ? sectionGap : 0) -
-                    ((hasSideboard ? 2 : 1) * sectionPadV),
-                ),
-                usableWidth: totalBottomWidth > 0 ? totalBottomWidth : containerSize.width,
-              }
-            : null
-        }
-      : undefined,
-    constraints: enableResize ? activeConstraints : null,
-    onConstraintsChange: setConstraints,
-    onConstraintsClear: clearConstraints,
-  })
+  const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
+    useResizableLayout({
+      layoutConfig,
+      constraints: enableResize ? activeConstraints : null,
+      onConstraintsChange: setConstraints,
+      onConstraintsClear: clearConstraints,
+    })
 
   const handDims = { width: dims.hand.width, height: dims.hand.height }
   const sideboardDims = { width: dims.sideboard.width, height: dims.sideboard.height }
@@ -197,32 +139,24 @@ export function DeckDisplay({
 
   return (
     <ZoneLayout
-      containerRef={ref}
+      containerRef={containerRef}
       className={className}
       onClick={handleBackgroundClick}
       isMobile={isMobile}
-      zoneHeights={enableResize && zoneFrames ? {
+      zoneHeights={enableResize ? {
         hand: zoneFrames.hand.outerHeight,
         battlefield: zoneFrames.battlefield.outerHeight,
         sideboard: zoneFrames.sideboard.outerHeight,
         upgrades: zoneFrames.commandZone.outerHeight,
       } : null}
-      zoneWidths={enableResize && zoneFrames && hasUpgrades ? {
+      zoneWidths={enableResize && hasUpgrades ? {
         upgrades: zoneFrames.commandZone.outerWidth,
       } : null}
       zoneRefs={enableResize ? {
-        hand: (node) => {
-          handZoneRef.current = node
-        },
-        battlefield: (node) => {
-          battlefieldZoneRef.current = node
-        },
-        sideboard: (node) => {
-          sideboardZoneRef.current = node
-        },
-        upgrades: (node) => {
-          upgradesZoneRef.current = node
-        },
+        hand: zoneRefs.hand,
+        battlefield: zoneRefs.battlefield,
+        sideboard: zoneRefs.sideboard,
+        upgrades: zoneRefs.commandZone,
       } : undefined}
       hasHand={hasHand}
       hasBattlefield={battlefieldCount > 0}
@@ -291,7 +225,7 @@ export function DeckDisplay({
         <UpgradeGrid
           upgrades={upgrades}
           fallbackDims={czDims}
-          frame={zoneFrames?.commandZone}
+          frame={zoneFrames.commandZone}
         />
       }
     />
