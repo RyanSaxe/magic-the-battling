@@ -2535,7 +2535,7 @@ function GameContent() {
               className={`flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 ${actionBarPaddingClass} timeline-actions`}
               data-guide-target="phase-action-bar"
             >
-              {isEndPhase && gameId ? (
+              {isEndPhase && gameId && !displayBattleResolution ? (
                 <>
                   <div className="flex items-center gap-1.5 sm:gap-2 py-1">
                     <button
