@@ -464,6 +464,7 @@ export function PlayerDetailPanel({
           emptyText="No upgrades applied."
           maxWidth={92}
           minWidth={44}
+          measureKey={`${player.name}:upgrades:${allUpgrades.length}:${allUpgrades.map((u) => (u.is_revealed ? "1" : "0")).join("")}`}
         />
       )}
     </div>
