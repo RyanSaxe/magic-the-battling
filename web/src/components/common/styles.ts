@@ -8,6 +8,9 @@ export const FIELD_LABEL = 'block text-[var(--ivory-muted)] text-sm mb-1'
 /** The line under a text field that says what it takes. */
 export const FIELD_HINT = 'text-[var(--ivory-muted)] text-xs mt-1'
 
+/** The line under a text field that says why the form can't be sent yet, in place of its hint. */
+export const FIELD_ERROR = 'text-red-300 text-xs mt-1'
+
 /** The recessed box that holds one option, such as a checkbox and its label, inside a card or dialog. */
 export const OPTION_BOX = 'bg-black/35 border border-black/40 rounded-lg'
 

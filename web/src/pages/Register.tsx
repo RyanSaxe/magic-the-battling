@@ -1,11 +1,48 @@
-import { useState } from 'react'
+import { useState, type ComponentPropsWithoutRef } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
 import { AppHeader, HomeButton } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { unknownToAppError } from '../utils/appError'
-import { FIELD_HINT, FIELD_LABEL, LINK, TEXT_INPUT } from '../components/common/styles'
+import { FIELD_ERROR, FIELD_HINT, FIELD_LABEL, LINK, TEXT_INPUT } from '../components/common/styles'
+
+/** Why each field keeps Create Account disabled, or null when the field is ready. */
+function reasonsNotReady(username: string, email: string, password: string, confirmPassword: string) {
+  return {
+    username: username ? null : 'Enter a username',
+    email: email ? null : 'Enter your email',
+    password: password.length >= 8 ? null : 'At least 8 characters',
+    confirmPassword:
+      confirmPassword === password ? null : confirmPassword ? "Passwords don't match" : 'Enter your password again',
+  }
+}
+
+type FieldProps = ComponentPropsWithoutRef<'input'> & {
+  id: string
+  label: string
+  hint?: string
+  /** Shown in place of the hint, and marks the field invalid. */
+  reason: string | null
+  wrapperClassName: string
+}
+
+function Field({ id, label, hint, reason, wrapperClassName, ...inputProps }: FieldProps) {
+  const message = reason ?? hint
+  return (
+    <div className={wrapperClassName}>
+      <label htmlFor={id} className={FIELD_LABEL}>{label}</label>
+      <input
+        id={id}
+        className={TEXT_INPUT}
+        aria-invalid={reason ? true : undefined}
+        aria-describedby={message ? `${id}-message` : undefined}
+        {...inputProps}
+      />
+      {message && <p id={`${id}-message`} className={reason ? FIELD_ERROR : FIELD_HINT}>{message}</p>}
+    </div>
+  )
+}
 
 export function Register() {
   const navigate = useNavigate()
@@ -18,13 +55,21 @@ export function Register() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // How many fields, from the top, the player has left or skipped past. An empty field explains itself only after
+  // that, so a new form isn't covered in reasons.
+  const [fieldsPassed, setFieldsPassed] = useState(0)
+
+  const reasons = reasonsNotReady(username, email, password, confirmPassword)
+  const ready = Object.values(reasons).every((reason) => reason === null)
+  const tracksPassing = (index: number) => ({
+    onFocus: () => setFieldsPassed((passed) => Math.max(passed, index)),
+    onBlur: () => setFieldsPassed((passed) => Math.max(passed, index + 1)),
+  })
+  const shownReason = (index: number, value: string, reason: string | null) =>
+    value || index < fieldsPassed ? reason : null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (password !== confirmPassword) {
-      setError('Passwords do not match')
-      return
-    }
     setError('')
     setLoading(true)
     try {
@@ -50,66 +95,66 @@ export function Register() {
           <p className="text-red-400 text-sm mb-4 bg-red-900/20 border border-red-800/40 rounded px-3 py-2">{error}</p>
         )}
 
-        <div className="mb-4">
-          <label htmlFor="username" className={FIELD_LABEL}>Username</label>
-          <input
-            id="username"
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className={TEXT_INPUT}
-            autoFocus
-            required
-            minLength={3}
-            maxLength={30}
-            pattern="[a-zA-Z0-9_]+"
-            title="Letters, numbers, and underscores only"
-          />
-          <p className={FIELD_HINT}>3-30 characters: letters, numbers, underscores</p>
-        </div>
+        <Field
+          id="username"
+          label="Username"
+          hint="3-30 characters: letters, numbers, underscores"
+          reason={shownReason(0, username, reasons.username)}
+          wrapperClassName="mb-4"
+          type="text"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          {...tracksPassing(0)}
+          autoFocus
+          required
+          minLength={3}
+          maxLength={30}
+          pattern="[a-zA-Z0-9_]+"
+          title="Letters, numbers, and underscores only"
+        />
 
-        <div className="mb-4">
-          <label htmlFor="email" className={FIELD_LABEL}>Email</label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={TEXT_INPUT}
-            required
-          />
-        </div>
+        <Field
+          id="email"
+          label="Email"
+          reason={shownReason(1, email, reasons.email)}
+          wrapperClassName="mb-4"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          {...tracksPassing(1)}
+          required
+        />
 
-        <div className="mb-4">
-          <label htmlFor="password" className={FIELD_LABEL}>Password</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className={TEXT_INPUT}
-            required
-            minLength={8}
-          />
-          <p className={FIELD_HINT}>At least 8 characters</p>
-        </div>
+        <Field
+          id="password"
+          label="Password"
+          hint="At least 8 characters"
+          reason={shownReason(2, password, reasons.password)}
+          wrapperClassName="mb-4"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          {...tracksPassing(2)}
+          required
+          minLength={8}
+        />
 
-        <div className="mb-6">
-          <label htmlFor="confirm-password" className={FIELD_LABEL}>Confirm Password</label>
-          <input
-            id="confirm-password"
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className={TEXT_INPUT}
-            required
-            minLength={8}
-          />
-        </div>
+        <Field
+          id="confirm-password"
+          label="Confirm Password"
+          reason={shownReason(3, confirmPassword, reasons.confirmPassword)}
+          wrapperClassName="mb-6"
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          {...tracksPassing(3)}
+          required
+          minLength={8}
+        />
 
         <button
           type="submit"
-          disabled={loading || !username || !email || !password || password.length < 8 || password !== confirmPassword}
+          disabled={loading || !ready}
           className="btn btn-primary w-full py-2 font-semibold disabled:opacity-50"
         >
           {loading ? 'Creating account...' : 'Create Account'}
