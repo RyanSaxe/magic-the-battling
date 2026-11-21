@@ -121,15 +121,15 @@ export function RecapCard({ game }: { game: GameSummary }) {
             <h3 className="truncate text-sm font-semibold text-amber-50">
               <Link to={href} onClick={(e) => e.stopPropagation()}>{game.best_human_name}</Link>
             </h3>
-            <p className="truncate text-[11px] leading-4 text-gray-400">
+            <p className="truncate text-[11px] leading-4 text-amber-100/60">
               {seatsLabel(game.human_count, game.player_count - game.human_count)}
             </p>
           </div>
         </div>
-        <span className="shrink-0 text-[11px] leading-4 text-gray-400">{formatWhen(game.created_at)}</span>
+        <span className="shrink-0 text-[11px] leading-4 text-amber-100/60">{formatWhen(game.created_at)}</span>
       </div>
       {game.hand_scryfall_ids.length > 0 && (
-        <div className="rounded-lg border border-white/5 bg-black/30 px-2.5 py-2">
+        <div className="rounded-lg border border-black/40 bg-black/30 px-2.5 py-2">
           <HandFan scryfallIds={game.hand_scryfall_ids} className="h-[111px]" imageSize="normal" centered />
         </div>
       )}

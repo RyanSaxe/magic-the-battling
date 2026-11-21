@@ -33,16 +33,16 @@ export function DetailHero({ imageUri, badge, title, links, chips, actions, stat
             className="absolute inset-0 h-full w-full object-cover object-[center_30%] brightness-[0.45]"
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#2a2118] via-transparent to-transparent" />
         <div className="relative flex flex-col gap-4 p-4 sm:p-5 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <span
-              className={`inline-block rounded-full border bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${BADGE_CLASSES[badge.tone]}`}
+              className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${BADGE_CLASSES[badge.tone]}`}
             >
               {badge.label}
             </span>
             <h1 className="mt-2 font-['Cinzel',serif] text-2xl font-bold leading-tight text-amber-50 drop-shadow-md">{title}</h1>
-            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-gray-200">{links}</div>
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-amber-100/85">{links}</div>
             {chips && chips.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {chips.map((chip) => (
@@ -54,18 +54,18 @@ export function DetailHero({ imageUri, badge, title, links, chips, actions, stat
           <div className="flex shrink-0 flex-wrap gap-2 [&>*]:flex-1 md:[&>*]:flex-none">{actions}</div>
         </div>
       </div>
-      <dl className="grid grid-cols-2 gap-px border-t border-white/10 bg-white/10 md:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-px border-t gold-divider bg-black/40 md:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.label} className="modal-chrome px-4 py-2.5">
-            <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">{stat.label}</dt>
+            <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-100/60">{stat.label}</dt>
             <dd className="mt-0.5 text-base font-semibold tabular-nums text-amber-50">
               {stat.value}
-              {stat.detail && <span className="ml-1.5 text-xs font-normal text-gray-400">{stat.detail}</span>}
+              {stat.detail && <span className="ml-1.5 text-xs font-normal text-amber-100/60">{stat.detail}</span>}
             </dd>
           </div>
         ))}
       </dl>
-      {caption && <p className="border-t border-white/10 px-4 py-1.5 text-[11px] leading-4 text-gray-400">{caption}</p>}
+      {caption && <p className="border-t gold-divider px-4 py-1.5 text-[11px] leading-4 text-amber-100/60">{caption}</p>}
     </SurfaceCard>
   )
 }

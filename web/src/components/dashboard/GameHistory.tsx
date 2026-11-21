@@ -105,7 +105,7 @@ export function GameHistory({ loadGames, initialFilters, scoped = false, title }
           )}
           {title?.(current?.totalGames ?? null)}
           {scoped && current && (
-            <span className="text-xs tabular-nums text-gray-400">{countLabel(current.totalGames, 'game')}</span>
+            <span className="text-xs tabular-nums text-amber-100/60">{countLabel(current.totalGames, 'game')}</span>
           )}
         </div>
         <div className="flex flex-wrap gap-2">

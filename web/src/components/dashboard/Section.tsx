@@ -81,8 +81,8 @@ export function Breadcrumb({ to, label, current }: { to: string; label: string; 
       <Link to={to} className="shrink-0 text-amber-400 hover:text-amber-300 transition-colors">
         ← {label}
       </Link>
-      <span className="text-gray-500">/</span>
-      <span className="truncate text-gray-400">{current}</span>
+      <span className="text-amber-200/45">/</span>
+      <span className="truncate text-amber-100/60">{current}</span>
     </nav>
   )
 }
