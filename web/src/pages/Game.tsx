@@ -40,6 +40,7 @@ import { BattleRevealOverlay } from "../components/common/BattleRevealOverlay";
 import { BuildUpgradeOverlay } from "../components/common/BuildUpgradeOverlay";
 import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
 import { RevealBeforeSubmitModal } from "../components/common/RevealBeforeSubmitModal";
+import { RotatePrompt } from "../components/common/RotatePrompt";
 import { ServerStatusWindow } from "../components/common/ServerStatusWindow";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
@@ -2704,6 +2705,7 @@ function GameContent() {
           useUpgrades={gameState.use_upgrades}
         />
       )}
+      <RotatePrompt />
     </CardPreviewContext.Provider>
   );
 }
