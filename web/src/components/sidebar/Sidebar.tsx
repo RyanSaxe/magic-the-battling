@@ -76,8 +76,8 @@ export function Sidebar({
 
   return (
     <aside
-      className={`relative w-[var(--sidebar-width)] h-full frame-chrome flex flex-col ${
-        isMobile ? "overflow-hidden" : "overflow-visible"
+      className={`relative h-full frame-chrome flex flex-col ${
+        isMobile ? "w-full overflow-hidden" : "w-[var(--sidebar-width)] overflow-visible"
       } ${
         shouldRenderDesktopDrawer ? "z-[45]" : ""
       }`}

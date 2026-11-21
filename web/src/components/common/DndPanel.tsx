@@ -1,12 +1,13 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { bestFit, MIN_CARD_WIDTH, type ZoneDims } from '../../hooks/cardSizeUtils'
 import { DroppableZone } from '../../dnd'
 import type { ZoneName } from '../../types'
 import type { ZoneOwner } from '../../dnd/types'
 import { PANEL_GAP, PANEL_MAX_WIDTH, resolveBattlePanelLayout } from './DndPanelLayout'
-import { useGameShellMode } from '../../hooks/useGameShellMode'
+import { SidePanel } from './SidePanel'
 
 interface DndPanelProps {
+  open: boolean
   title: string
   count: number
   onClose: () => void
@@ -14,9 +15,11 @@ interface DndPanelProps {
   zone?: ZoneName
   zoneOwner?: ZoneOwner
   validFromZones?: ZoneName[]
+  /** A Fight's panels lay their cards out in a scrolling grid. */
   tone?: 'default' | 'battle'
-  hideTitle?: boolean
   headerActions?: React.ReactNode
+  /** A click on the panel that misses its cards and buttons, which moves a selected card into this zone. */
+  onEmptyClick?: () => void
 }
 
 const DEFAULT_DIMS: ZoneDims = { width: 80, height: 112, rows: 1, columns: 1 }
@@ -29,7 +32,9 @@ function contentBoxSize(node: HTMLElement) {
   }
 }
 
+/** A zone's cards in a side panel, sized to fit it, and a drop target for that zone. */
 export function DndPanel({
+  open,
   title,
   count,
   onClose,
@@ -38,37 +43,12 @@ export function DndPanel({
   zoneOwner,
   validFromZones,
   tone = 'default',
-  hideTitle = false,
   headerActions,
+  onEmptyClick,
 }: DndPanelProps) {
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_DIMS)
-  const [mobileHeight, setMobileHeight] = useState<number | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
   const isBattleTone = tone === 'battle'
-  // A battle panel covers the sidebar, which docks inside the frame only in the big shell.
-  const dockedSidebar = useGameShellMode() === 'big'
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
-
-  useEffect(() => {
-    const el = document.getElementById('opponent-hand')
-    if (!el) return
-
-    const update = () => {
-      setMobileHeight(el.getBoundingClientRect().bottom)
-    }
-    update()
-
-    const observer = new ResizeObserver(update)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
 
   const bodyRef = useCallback(
     (node: HTMLElement | null) => {
@@ -114,20 +94,15 @@ export function DndPanel({
   }
 
   return (
-    <div
-      className={`fixed top-0 left-0 right-0 sm:left-auto sm:!max-h-none sm:!h-full ${isBattleTone ? `${dockedSidebar ? 'sm:w-[var(--frame-dock-width)]' : 'sm:w-[calc(16rem-1px)]'} battle-panel-chrome` : 'sm:w-64 modal-chrome border-b sm:border-b-0 sm:border-l-2 gold-border'} z-50 flex flex-col${mobileHeight == null ? ' max-h-[50vh]' : ''}`}
-      style={mobileHeight != null ? { height: mobileHeight } : undefined}
-    >
-      <div className={`px-2 py-1.5 sm:px-3 sm:py-[10px] flex justify-between items-center shrink-0 ${isBattleTone ? 'dnd-panel-header-battle' : 'border-b sm:border-b-2 gold-border'}`}>
-        {hideTitle ? <div /> : <h3 className="text-white font-medium text-sm">{title}</h3>}
-        <div className="flex items-center gap-2">
-          {headerActions}
-          <button onClick={onClose} className="text-[var(--ivory-muted)] hover:text-white text-lg leading-none">
-            &times;
-          </button>
-        </div>
-      </div>
-      <div ref={bodyRef} className="flex-1 min-h-0 p-2 flex items-center justify-center">
+    <SidePanel open={open} title={title} count={count} onClose={onClose} headerActions={headerActions}>
+      <div
+        ref={bodyRef}
+        className="flex-1 min-h-0 p-2 flex items-center justify-center"
+        onClick={onEmptyClick && ((event) => {
+          const target = event.target as HTMLElement
+          if (!target.closest('.card, button')) onEmptyClick()
+        })}
+      >
         {zone ? (
           <DroppableZone
             zone={zone}
@@ -156,6 +131,6 @@ export function DndPanel({
           )
         )}
       </div>
-    </div>
+    </SidePanel>
   )
 }

@@ -10,7 +10,7 @@ export const badgeCls =
   "inline-flex items-center gap-1.5";
 
 const badgeWrapCls =
-  "absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 z-40 inline-flex px-2 py-1 select-none";
+  "zone-label absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 z-40 inline-flex px-2 py-1 select-none";
 
 const constrainedWrapCls = "max-w-[calc(100%-0.5rem)]";
 const constrainedBadgeCls = "min-w-0 max-w-full";

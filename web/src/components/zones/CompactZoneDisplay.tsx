@@ -162,29 +162,28 @@ export function CompactZoneDisplay({
         </div>
       </DroppableZone>
 
-      {showModal && (
-        <ZoneModal
-          title={title}
-          zone={zone}
-          cards={cards}
-          allowZoneInteraction={allowZoneInteraction}
-          allowCardInteraction={allowCardInteraction}
-          isOpponent={isOpponent}
-          tone="battle"
-          hideTitle
-          headerActions={modalHeaderActions}
-          onClose={() => setShowModal(false)}
-          onCardHover={onCardHover}
-          onCardHoverEnd={onCardHoverEnd}
-          onCardClick={onCardClick}
-          selectedCardId={selectedCardId}
-          forceFaceDown={forceFaceDown}
-          upgradedCardIds={upgradedCardIds}
-          appliedUpgradesByCardId={upgradesByCardId}
-          hiddenUpgradesByCardId={hiddenUpgradesByCardId}
-          onRevealHiddenUpgrades={onRevealHiddenUpgrades}
-        />
-      )}
+      <ZoneModal
+        open={showModal}
+        title={title}
+        zone={zone}
+        cards={cards}
+        allowZoneInteraction={allowZoneInteraction}
+        allowCardInteraction={allowCardInteraction}
+        isOpponent={isOpponent}
+        tone="battle"
+        headerActions={modalHeaderActions}
+        onClose={() => setShowModal(false)}
+        onCardHover={onCardHover}
+        onCardHoverEnd={onCardHoverEnd}
+        onCardClick={onCardClick}
+        selectedCardId={selectedCardId}
+        forceFaceDown={forceFaceDown}
+        upgradedCardIds={upgradedCardIds}
+        appliedUpgradesByCardId={upgradesByCardId}
+        hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+        onRevealHiddenUpgrades={onRevealHiddenUpgrades}
+        onEmptyClick={selectedCardId ? onZoneClick : undefined}
+      />
     </>
   )
 }

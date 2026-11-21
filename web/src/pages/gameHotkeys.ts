@@ -45,17 +45,16 @@ export function findBattleCard(
 
 export function buildPanelHotkeys(options: {
   guideOpen: boolean;
-  sidebarDrawerOpen: boolean;
   gameplayHotkeysDisabled: boolean;
   openGuide: () => void;
   closeGuide: () => void;
-  closeSidebarDrawer: () => void;
+  /** Closes the Actions menu while it is open. Side panels close themselves on Escape. */
+  closeMenu: (() => void) | null;
 }): HotkeyMap {
   if (options.guideOpen) return { "?": options.closeGuide };
+  if (options.closeMenu) return { escape: options.closeMenu };
   if (options.gameplayHotkeysDisabled) return {};
-  const map: HotkeyMap = { "?": options.openGuide };
-  if (options.sidebarDrawerOpen) map.escape = options.closeSidebarDrawer;
-  return map;
+  return { "?": options.openGuide };
 }
 
 export function buildCardMoveHotkeys(options: {

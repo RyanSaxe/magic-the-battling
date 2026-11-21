@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { FaDiscord } from 'react-icons/fa6'
 import { CubeCobraPrimerLink } from './CubeCobraPrimerLink'
 import { BottomBar } from './FrameBar'
 import { HintsBanner } from './HintsBanner'
+import { SidePanelFrame } from './SidePanel'
+import { SidePanelHostContext } from './sidePanelHost'
 
 interface PageFrameProps {
   header: ReactNode
@@ -34,9 +36,11 @@ export function PageFrame({
   aside,
   footer,
 }: PageFrameProps) {
+  const [sidePanelHost, setSidePanelHost] = useState<HTMLElement | null>(null)
   const centerClass = center ? 'page-center' : ''
   const scrollClass = scroll ? 'overflow-y-auto overflow-x-hidden overscroll-contain p-4' : ''
   return (
+    <SidePanelHostContext.Provider value={sidePanelHost}>
     <div className="game-table h-dvh flex flex-col overflow-hidden">
       {header}
 
@@ -52,6 +56,7 @@ export function PageFrame({
 
         {aside && <FrameSidebar>{aside}</FrameSidebar>}
         <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
+        <SidePanelFrame ref={setSidePanelHost} />
       </div>
 
       {footer ?? (
@@ -71,5 +76,6 @@ export function PageFrame({
         />
       )}
     </div>
+    </SidePanelHostContext.Provider>
   )
 }

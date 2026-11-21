@@ -56,6 +56,7 @@ export function PileZone({
     if (draggable && allowInteraction) {
       return (
         <DndPanel
+          open
           title={zoneName}
           count={cards.length}
           onClose={() => setIsExpanded(false)}
