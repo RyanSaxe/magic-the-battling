@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getShareGame } from '../api/client'
 import type { ShareGameResponse, SharePlayerSnapshot, Card as CardType } from '../types'
@@ -15,6 +15,8 @@ import { getSidebarPlayerOrder } from '../utils/playerPlacement'
 import { AppHeader } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
+import { BusyNotice, StatusNotice } from '../components/common/StatusNotice'
+import { type AppError, unknownToAppError } from '../utils/appError'
 
 interface RoundOption {
   label: string
@@ -88,13 +90,42 @@ function RoundPopover({
   )
 }
 
+const NOT_FOUND_CODES = new Set(['GAME_NOT_FOUND', 'PLAYER_NOT_IN_GAME', 'SHARE_DATA_NOT_FOUND'])
+
+function shareErrorTitle(error: AppError): string {
+  if (error.code === 'GAME_IN_PROGRESS') return 'Game in progress'
+  if (NOT_FOUND_CODES.has(error.code)) return 'Game not found'
+  return "Couldn't load this game"
+}
+
+function ShareNoticeFrame({ children }: { children: ReactNode }) {
+  const navigate = useNavigate()
+  const header = (
+    <AppHeader
+      renderRight={({ compact }) => (
+        <button
+          onClick={() => navigate('/')}
+          className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
+        >
+          Home
+        </button>
+      )}
+    />
+  )
+  return (
+    <PageFrame header={header} center contentClassName="items-center px-4">
+      {children}
+    </PageFrame>
+  )
+}
+
 export function ShareGame() {
   const { gameId, playerName } = useParams<{ gameId: string; playerName: string }>()
   const navigate = useNavigate()
   const sizes = useViewportCardSizes()
   const shellMode = useGameShellMode()
   const [data, setData] = useState<ShareGameResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<AppError | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedRound, setSelectedRound] = useState('')
   const [selectedPlayer, setSelectedPlayer] = useState('')
@@ -135,7 +166,7 @@ export function ShareGame() {
         const referenceSnapshots = ownerPlayer?.snapshots ?? res.players[0]?.snapshots ?? []
         setSelectedRound(getLatestRoundValue(referenceSnapshots))
       })
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(unknownToAppError(e, 'share-game', 'Failed to load shared game')))
       .finally(() => setLoading(false))
   }, [gameId, playerName])
 
@@ -163,23 +194,26 @@ export function ShareGame() {
 
   if (loading) {
     return (
-      <div className="h-dvh flex items-center justify-center bg-gray-900 text-gray-400">
-        Loading game...
-      </div>
+      <ShareNoticeFrame>
+        <BusyNotice label="Loading game..." />
+      </ShareNoticeFrame>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="h-dvh flex flex-col items-center justify-center bg-gray-900 text-gray-400 gap-4">
-        <p>{error || 'Game not found'}</p>
-        <button
-          className="bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-500"
-          onClick={() => navigate('/')}
+      <ShareNoticeFrame>
+        <StatusNotice
+          title={error ? shareErrorTitle(error) : 'Game not found'}
+          actions={
+            <button onClick={() => navigate('/')} className="btn btn-secondary flex-1 py-2">
+              Home
+            </button>
+          }
         >
-          Go Home
-        </button>
-      </div>
+          {error?.message ?? 'This game is no longer available to share.'}
+        </StatusNotice>
+      </ShareNoticeFrame>
     )
   }
 
