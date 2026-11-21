@@ -9,14 +9,20 @@ import pytest
 from server.db import database
 from server.db.models import BattleSnapshot, CubeMetadata, GameRecord, PlayerGameHistory
 
+CARD_NAMES = {"bolt": "Lightning Bolt", "oko": "Oko, Thief of Crowns", "crown": "Sprouting Crown"}
+
 
 @dataclass(frozen=True)
 class Seat:
+    """A seat in a finished game. hand and upgrades hold Scryfall ids, basics hold land names."""
+
     name: str
     placement: int | None
     user_id: str | None = None
     is_puppet: bool = False
     hand: tuple[str, ...] = ()
+    basics: tuple[str, ...] = ()
+    upgrades: tuple[str, ...] = ()
 
 
 def _add_game(
@@ -54,17 +60,18 @@ def _add_game(
             )
             db.add(history)
             db.flush()
-            if seat.hand:
+            if seat.hand or seat.basics or seat.upgrades:
+                registry = {card: {"name": CARD_NAMES.get(card, card)} for card in seat.hand + seat.upgrades}
                 db.add(
                     BattleSnapshot(
                         player_history_id=history.id,
                         stage=3,
                         round=1,
                         hand_json=json.dumps([{"scryfall_id": card} for card in seat.hand]),
-                        basic_lands_json="[]",
-                        applied_upgrades_json="[]",
+                        basic_lands_json=json.dumps(list(seat.basics)),
+                        applied_upgrades_json=json.dumps([{"scryfall_id": card} for card in seat.upgrades]),
                         treasures=0,
-                        full_state_json="{}",
+                        full_state_json=json.dumps({"data": {}, "card_registry": registry}),
                     )
                 )
         db.commit()
@@ -341,20 +348,23 @@ class TestGameSearch:
             "limited",
             cube_id="vintage",
             played_on=_day(10),
-            seats=[Seat("kestrel", 1, kestrel), Seat("rook", 2)],
+            seats=[Seat("kestrel", 1, kestrel, hand=("bolt",)), Seat("rook", 2)],
         )
         _add_game(
             "constructed",
             cube_id="vintage",
             config={"play_mode": "constructed", "use_upgrades": True},
             played_on=_day(11),
-            seats=[Seat("kestrel", 2, kestrel), Seat("wren", 1)],
+            seats=[Seat("kestrel", 2, kestrel), Seat("wren", 1, hand=("oko",))],
         )
         _add_game(
             "legacy",
             cube_id="legacy",
             played_on=_day(12),
-            seats=[Seat("kestrel", 1, kestrel), Seat("Puppet A", 2, is_puppet=True)],
+            seats=[
+                Seat("kestrel", 1, kestrel, basics=("Island", "Swamp"), upgrades=("crown",)),
+                Seat("Puppet A", 2, is_puppet=True),
+            ],
         )
         _save_preset(client, display_name="Friday Vintage", play_mode="limited", use_upgrades=True)
 
@@ -375,6 +385,16 @@ class TestGameSearch:
 
     def test_finds_the_games_a_preset_name_stands_for(self, client, kestrels_games):
         assert self._search(client, "friday") == (["limited"], 1, 1)
+
+    def test_finds_games_by_a_card_in_the_players_hand(self, client, kestrels_games):
+        assert self._search(client, "LIGHTNING") == (["limited"], 1, 1)
+
+    def test_finds_games_by_a_basic_land_or_an_applied_upgrade(self, client, kestrels_games):
+        assert self._search(client, "island") == (["legacy"], 1, 1)
+        assert self._search(client, "sprouting") == (["legacy"], 1, 1)
+
+    def test_does_not_match_a_card_only_another_player_held(self, client, kestrels_games):
+        assert self._search(client, "oko") == ([], 0, 0)
 
     def test_an_empty_search_lists_every_game(self, client, kestrels_games):
         assert self._search(client, "") == (["legacy", "constructed", "limited"], 3, 2)

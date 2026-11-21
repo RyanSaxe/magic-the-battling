@@ -19,7 +19,7 @@ from server.db.models import (
     User,
     UserBattler,
 )
-from server.db.search import contains_text
+from server.db.search import card_in_players_fights, contains_text
 from server.errors import ErrorCode, api_error
 from server.schemas.auth import (
     CubeSetup,
@@ -448,7 +448,8 @@ def list_battler_games(
 
 def _my_game_matches(db: Session, user_id: str, search: str):
     """Whether a game of the player's matches the search: its cube's name or id, the name of one of the
-    player's presets with the game's cube and settings, or the name of another player in the game."""
+    player's presets with the game's cube and settings, the name of another player in the game, or a card
+    the player had in a fight."""
     other_seat = aliased(PlayerGameHistory)
     named_cube = (
         db.query(CubeMetadata.cube_id)
@@ -475,7 +476,13 @@ def _my_game_matches(db: Session, user_id: str, search: str):
         and_(GameRecord.cube_id == cube_id, _game_play_mode() == play_mode, _game_uses_upgrades() == use_upgrades)
         for cube_id, play_mode, use_upgrades in {_preset_settings(preset) for preset in named_presets}
     ]
-    return or_(contains_text(GameRecord.cube_id, search), named_cube, named_opponent, *preset_games)
+    return or_(
+        contains_text(GameRecord.cube_id, search),
+        named_cube,
+        named_opponent,
+        card_in_players_fights(search),
+        *preset_games,
+    )
 
 
 @router.get("/my-games")
