@@ -9,7 +9,7 @@ from server.services.game_manager import GameManager
 BASICS = ["Plains", "Island", "Swamp"]
 
 
-def _start_game(client, player_names: list[str]) -> tuple[str, Game]:
+def _start_game(client, start_lobby, player_names: list[str]) -> tuple[str, Game]:
     created = client.post(
         "/api/games",
         json={"player_name": player_names[0], "cube_id": "test", "target_player_count": len(player_names)},
@@ -17,7 +17,7 @@ def _start_game(client, player_names: list[str]) -> tuple[str, Game]:
     for name in player_names[1:]:
         client.post("/api/games/join", json={"join_code": created["join_code"], "player_name": name})
     game_id = created["game_id"]
-    assert client.post(f"/api/games/{game_id}/start").status_code == 200
+    assert start_lobby(game_id, created["session_id"]).status_code == 200
     game = ws_module.game_manager.get_game(game_id)
     assert game is not None
     return game_id, game
@@ -59,8 +59,8 @@ def _share_rows(client, game_id: str, owner: str) -> dict[str, dict]:
     return {p["name"]: p for p in response.json()["players"]}
 
 
-def test_share_page_shows_state_after_the_final_battle(client):
-    game_id, game = _start_game(client, ["Alice", "Bob"])
+def test_share_page_shows_state_after_the_final_battle(client, start_lobby):
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob"])
     gm = ws_module.game_manager
     alice, bob = game.players
     bob.poison = 9
@@ -76,8 +76,8 @@ def test_share_page_shows_state_after_the_final_battle(client):
     assert rows["Alice"]["final_treasures"] == alice.treasures
 
 
-def test_share_page_shows_final_state_of_player_eliminated_mid_game(client):
-    game_id, game = _start_game(client, ["Alice", "Bob", "Carol", "Dave"])
+def test_share_page_shows_final_state_of_player_eliminated_mid_game(client, start_lobby):
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob", "Carol", "Dave"])
     gm = ws_module.game_manager
     dave = next(p for p in game.players if p.name == "Dave")
     dave.poison = 9
@@ -101,8 +101,8 @@ def test_share_page_shows_final_state_of_player_eliminated_mid_game(client):
     assert rows["Alice"]["final_treasures"] is None
 
 
-def test_share_page_shows_how_sudden_death_ended(client):
-    game_id, game = _start_game(client, ["Alice", "Bob"])
+def test_share_page_shows_how_sudden_death_ended(client, start_lobby):
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob"])
     gm = ws_module.game_manager
     alice, bob = game.players
     alice.poison = 9
@@ -192,8 +192,8 @@ def _odds_seen_by(game_id: str, viewer: str) -> dict[str, float | None]:
     return {p.name: p.pairing_probability for p in state.players if p.name != viewer}
 
 
-def test_eliminated_player_sees_no_next_opponent_odds(client):
-    game_id, game = _start_game(client, ["Alice", "Bob", "Carol", "Dave"])
+def test_eliminated_player_sees_no_next_opponent_odds(client, start_lobby):
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob", "Carol", "Dave"])
     gm = ws_module.game_manager
     dave = next(p for p in game.players if p.name == "Dave")
     dave.poison = 9
@@ -214,8 +214,8 @@ def test_eliminated_player_sees_no_next_opponent_odds(client):
     assert None not in _odds_seen_by(game_id, "Alice").values()
 
 
-def test_no_next_opponent_odds_after_the_game_ends(client):
-    game_id, game = _start_game(client, ["Alice", "Bob"])
+def test_no_next_opponent_odds_after_the_game_ends(client, start_lobby):
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob"])
     gm = ws_module.game_manager
     alice, bob = game.players
     bob.poison = 9
