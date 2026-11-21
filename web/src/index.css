@@ -216,11 +216,15 @@ input:-webkit-autofill:focus {
   --btn-secondary-fill-pressed: #453b35;
 }
 
-/* A switch's track. It sits in the components layer so peer-checked: can turn it gold. */
+/* A switch's track: walnut when off and gold when on */
 @layer components {
   .switch-track {
     background-color: var(--walnut-track);
     box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.22);
+  }
+
+  .peer:checked ~ .switch-track {
+    background-color: var(--color-gold);
   }
 }
 
