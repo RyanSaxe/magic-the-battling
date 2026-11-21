@@ -18,11 +18,17 @@ import { useResumableGames } from '../hooks/useResumableGames'
 import type { FollowedBattler, GameSummary, UserBattler } from '../types'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
 import { countLabel, cubeTitle, formatWhen, upgradesLabel, winsLabel } from '../utils/accountFormat'
-import { libraryEntries, type FirstPageStatus, type LibraryEntry, type LibraryFilter } from './dashboardState'
+import { libraryEntries, type FirstPageStatus, type LibraryEntry } from './dashboardState'
 
 const RECENT_GAME_COUNT = 3
 
 type BoardSection = 'library' | 'recent'
+
+/** The two sections' names, shared by their headers on wide screens and the switch that stands in for them below. */
+const SECTION_NAMES: Record<BoardSection, string> = { library: 'Cubes & Decks', recent: 'Recent Games' }
+
+/** Both headers share a height and center their items, so their titles share a baseline. */
+const SECTION_HEADER = 'flex min-h-9 flex-wrap items-center gap-x-3 gap-y-2'
 
 /** Places a card in the grid on screens 1280px and wider: the library fills columns 1 and 2, and recent games column 4, after a spacer. */
 function gridCell(row: number, column: number): CSSProperties {
@@ -52,7 +58,6 @@ export function Dashboard() {
 
   const [library, setLibrary] = useState<Library | null>(null)
   const [libraryStatus, setLibraryStatus] = useState<FirstPageStatus>('idle')
-  const [filter, setFilter] = useState<LibraryFilter>('all')
   const [phoneSection, setPhoneSection] = useState<BoardSection>('library')
   const [loadingMore, setLoadingMore] = useState(false)
   const [myGames, setMyGames] = useState<MyGames | null>(null)
@@ -136,18 +141,16 @@ export function Dashboard() {
 
   if (authLoading || !user) return null
 
-  const entries = library ? libraryEntries(library.presets, library.follows, filter) : []
+  const entries = library ? libraryEntries(library.presets, library.follows) : []
   const libraryHasMore = !!library && (library.presetsHaveMore || library.followsHaveMore)
-  const savedCount = library ? `${library.presets.length}${library.presetsHaveMore ? '+' : ''}` : ''
-  const followingCount = library ? `${library.follows.length}${library.followsHaveMore ? '+' : ''}` : ''
   const allCount = library ? `${library.presets.length + library.follows.length}${libraryHasMore ? '+' : ''}` : ''
   const libraryRows = Math.max(1, Math.ceil(entries.length / 2))
   const recentGames = myGames?.games.slice(0, RECENT_GAME_COUNT) ?? []
   // Equal flexible rows: each row of cards is as tall as the tallest card on the board, in either column.
-  const cardRows = Math.max(libraryRows, recentGames.length, 1)
+  const recentRows = Math.max(recentGames.length, 1)
+  const cardRows = Math.max(libraryRows, recentRows)
   // Below 1280px the sections stack, so a switch shows one at a time instead of a long scroll past every cube.
   const libraryCell = `${GRID_CELL} ${phoneSection === 'library' ? '' : 'max-xl:hidden'}`
-  const recentCell = `${GRID_CELL} ${phoneSection === 'recent' ? '' : 'max-xl:hidden'}`
   const libraryNotice = `col-span-full ${libraryCell} xl:col-span-2`
 
   return (
@@ -208,33 +211,25 @@ export function Dashboard() {
           >
             <SegmentedFilter
               label="Section"
+              variant="heading"
               value={phoneSection}
               onChange={setPhoneSection}
               className="col-span-full w-full sm:w-auto sm:justify-self-start xl:hidden"
               options={[
-                { value: 'library', label: 'Cubes & Decks' },
-                { value: 'recent', label: 'Recent Games' },
+                { value: 'library', label: SECTION_NAMES.library },
+                { value: 'recent', label: SECTION_NAMES.recent },
               ]}
             />
 
             <div
               data-testid="library-header"
               style={gridCell(1, 1)}
-              className={`col-span-full ${libraryCell} xl:col-span-2 self-baseline flex flex-wrap items-baseline gap-x-3 gap-y-2 pt-2`}
+              className={`col-span-full ${libraryCell} xl:col-span-2 ${SECTION_HEADER}`}
             >
-              <SectionTitle>My Cubes &amp; Decks</SectionTitle>
-              <SegmentedFilter
-                label="Show"
-                value={filter}
-                onChange={setFilter}
-                className="w-full sm:w-auto"
-                options={[
-                  { value: 'all', label: `All (${allCount})` },
-                  { value: 'saved', label: `Saved (${savedCount})` },
-                  { value: 'following', label: `Following (${followingCount})` },
-                ]}
-              />
-              <div className="flex w-full items-baseline gap-3 sm:ml-auto sm:w-auto">
+              <div className="max-xl:hidden">
+                <SectionTitle>{SECTION_NAMES.library}</SectionTitle>
+              </div>
+              <div className="flex w-full items-center gap-3 sm:ml-auto sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(true)}
@@ -255,23 +250,13 @@ export function Dashboard() {
                 Loading...
               </NoticeTile>
             ) : entries.length === 0 ? (
-              filter === 'following' ? (
-                <NoticeTile
-                  style={gridCell(2, 1)}
-                  className={libraryNotice}
-                  action={{ label: 'Discover cubes', onClick: () => navigate('/dashboard/discover') }}
-                >
-                  You aren&apos;t following any cubes yet.
-                </NoticeTile>
-              ) : (
-                <NoticeTile
-                  style={gridCell(2, 1)}
-                  className={libraryNotice}
-                  action={{ label: 'Add Cube / Deck', onClick: () => setShowAddModal(true) }}
-                >
-                  Save a cube or deck with your settings to play it again in one click.
-                </NoticeTile>
-              )
+              <NoticeTile
+                style={gridCell(2, 1)}
+                className={libraryNotice}
+                action={{ label: 'Add Cube / Deck', onClick: () => setShowAddModal(true) }}
+              >
+                Save a cube or deck with your settings to play it again in one click.
+              </NoticeTile>
             ) : (
               entries.map((entry, index) => (
                 <LibraryTile
@@ -297,32 +282,29 @@ export function Dashboard() {
               </button>
             )}
 
-            <div
-              data-testid="recent-header"
-              style={gridCell(1, 4)}
-              className={`col-span-full ${recentCell} self-baseline flex items-baseline justify-between gap-3 pt-2`}
+            {/* One section, so it can stay in view while the cubes scroll; subgrid keeps its cards on the cube rows. */}
+            <section
+              aria-label={SECTION_NAMES.recent}
+              style={{ '--recent-rows': `1 / span ${1 + recentRows}` } as CSSProperties}
+              className={`${phoneSection === 'recent' ? 'contents' : 'hidden'} xl:sticky xl:top-0 xl:col-start-4 xl:grid xl:[grid-row:var(--recent-rows)] xl:[grid-template-rows:subgrid] xl:self-start`}
             >
-              <SectionTitle>Recent Games</SectionTitle>
-              <SectionLink to="/dashboard/games">All games →</SectionLink>
-            </div>
+              <div data-testid="recent-header" className={`col-span-full justify-end xl:justify-between ${SECTION_HEADER}`}>
+                <div className="max-xl:hidden">
+                  <SectionTitle>{SECTION_NAMES.recent}</SectionTitle>
+                </div>
+                <SectionLink to="/dashboard/games">All games →</SectionLink>
+              </div>
 
-            {myGamesStatus === 'failed' ? (
-              <NoticeTile style={gridCell(2, 4)} className={recentCell} action={{ label: 'Retry', onClick: loadMyGames }}>
-                Your games didn&apos;t load.
-              </NoticeTile>
-            ) : !myGames ? (
-              <NoticeTile style={gridCell(2, 4)} className={recentCell}>
-                Loading...
-              </NoticeTile>
-            ) : recentGames.length === 0 ? (
-              <NoticeTile style={gridCell(2, 4)} className={recentCell}>
-                Your finished games show up here.
-              </NoticeTile>
-            ) : (
-              recentGames.map((game, index) => (
-                <GameTile key={game.game_id} game={game} style={gridCell(2 + index, 4)} className={recentCell} />
-              ))
-            )}
+              {myGamesStatus === 'failed' ? (
+                <NoticeTile action={{ label: 'Retry', onClick: loadMyGames }}>Your games didn&apos;t load.</NoticeTile>
+              ) : !myGames ? (
+                <NoticeTile>Loading...</NoticeTile>
+              ) : recentGames.length === 0 ? (
+                <NoticeTile>Your finished games show up here.</NoticeTile>
+              ) : (
+                recentGames.map((game) => <GameTile key={game.game_id} game={game} />)
+              )}
+            </section>
           </div>
         </div>
       </PageFrame>

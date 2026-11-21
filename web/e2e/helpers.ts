@@ -30,7 +30,7 @@ const SIGNED_OUT_RESPONSES: Record<string, MockResponse> = {
 
 const USER: AuthUser = { user_id: 'user-1', username: 'tester' }
 
-function battler(id: number, cubeId: string, name: string): UserBattler {
+export function battler(id: number, cubeId: string, name: string): UserBattler {
   return {
     id,
     cube_id: cubeId,

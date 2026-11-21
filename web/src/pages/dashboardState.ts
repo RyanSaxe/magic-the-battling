@@ -85,20 +85,14 @@ export function isFollowing(follows: Follows, cubeId: string): boolean {
   return follows.unloadedCubeIds.has(cubeId) || followFor(follows, cubeId) !== undefined
 }
 
-/** Which of the player's cubes and decks the dashboard lists. */
-export type LibraryFilter = 'all' | 'saved' | 'following'
-
 export type LibraryEntry =
   | { kind: 'saved'; preset: UserBattler }
   | { kind: 'following'; follow: FollowedBattler }
 
 /** Saved cubes and decks first, in the player's order, then followed cubes, newest first. */
-export function libraryEntries(
-  presets: UserBattler[],
-  follows: FollowedBattler[],
-  filter: LibraryFilter,
-): LibraryEntry[] {
-  const saved = filter === 'following' ? [] : presets.map((preset) => ({ kind: 'saved' as const, preset }))
-  const following = filter === 'saved' ? [] : follows.map((follow) => ({ kind: 'following' as const, follow }))
-  return [...saved, ...following]
+export function libraryEntries(presets: UserBattler[], follows: FollowedBattler[]): LibraryEntry[] {
+  return [
+    ...presets.map((preset) => ({ kind: 'saved' as const, preset })),
+    ...follows.map((follow) => ({ kind: 'following' as const, follow })),
+  ]
 }

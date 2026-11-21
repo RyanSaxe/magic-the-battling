@@ -119,18 +119,14 @@ describe('findFollow', () => {
 })
 
 describe('libraryEntries', () => {
-  const preset = (id: number) => ({ id, cube_id: `cube-${id}` }) as UserBattler
-  const presets = [preset(1), preset(2)]
-  const follows = [followed(7, 'auto')]
-  const ids = (filter: 'all' | 'saved' | 'following') =>
-    libraryEntries(presets, follows, filter).map((e) => (e.kind === 'saved' ? `saved ${e.preset.id}` : `following ${e.follow.id}`))
-
   it('lists saved cubes and decks before followed cubes', () => {
-    expect(ids('all')).toEqual(['saved 1', 'saved 2', 'following 7'])
-  })
+    const preset = (id: number) => ({ id, cube_id: `cube-${id}` }) as UserBattler
+    const entries = libraryEntries([preset(1), preset(2)], [followed(7, 'auto')])
 
-  it('lists only one kind under Saved or Following', () => {
-    expect(ids('saved')).toEqual(['saved 1', 'saved 2'])
-    expect(ids('following')).toEqual(['following 7'])
+    expect(entries.map((e) => (e.kind === 'saved' ? `saved ${e.preset.id}` : `following ${e.follow.id}`))).toEqual([
+      'saved 1',
+      'saved 2',
+      'following 7',
+    ])
   })
 })

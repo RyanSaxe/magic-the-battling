@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { PAGES, openPage } from './helpers'
+import { PAGES, battler, openPage } from './helpers'
 
 const dashboard = PAGES.find((pageUnderTest) => pageUnderTest.name === 'dashboard')!
 
@@ -39,10 +39,10 @@ for (const { name, viewport } of SCREENS) {
   test.describe(name, () => {
     test.use({ viewport, isMobile: false })
 
-    test('My Cubes & Decks and Recent Games line up as one grid', async ({ page, baseURL }) => {
+    test('Cubes & Decks and Recent Games line up as one grid', async ({ page, baseURL }) => {
       await openPage(page, baseURL!, dashboard)
 
-      const libraryTitle = page.getByTestId('library-header').getByRole('heading', { name: 'My Cubes & Decks' })
+      const libraryTitle = page.getByTestId('library-header').getByRole('heading', { name: 'Cubes & Decks' })
       const recentTitle = page.getByTestId('recent-header').getByRole('heading', { name: 'Recent Games' })
       expect(Math.abs((await baselineOf(libraryTitle)) - (await baselineOf(recentTitle)))).toBeLessThanOrEqual(1)
 
@@ -64,9 +64,38 @@ test.describe('390×844 phone', () => {
     await expect(page.getByRole('radio', { name: 'Cubes & Decks' })).toBeChecked()
     await expect(libraryHeader).toBeVisible()
     await expect(recentHeader).toBeHidden()
+    await expect(page.getByRole('heading', { name: 'Cubes & Decks' })).toBeHidden()
 
     await page.getByRole('radio', { name: 'Recent Games' }).click()
     await expect(recentHeader).toBeVisible()
     await expect(libraryHeader).toBeHidden()
+  })
+})
+
+test.describe('1280×800 laptop with many cubes', () => {
+  test.use({ viewport: { width: 1280, height: 800 }, isMobile: false })
+
+  test('Recent Games stays in view while the cubes scroll past', async ({ page, baseURL }) => {
+    const presets = Array.from({ length: 12 }, (_, i) => battler(i + 1, `cube-${i + 1}`, `Cube ${i + 1}`))
+    await openPage(page, baseURL!, {
+      ...dashboard,
+      serve: async (p, url) => {
+        await dashboard.serve(p, url)
+        await p.route('**/api/battlers?*', (route) => route.fulfill({ json: { battlers: presets, has_more: false } }))
+      },
+    })
+    const recentTitle = page.getByTestId('recent-header').getByRole('heading', { name: 'Recent Games' })
+    const feltTop = (await page.getByRole('main').boundingBox())!.y
+
+    await page.getByRole('main').evaluate((main) => {
+      const felt = main.firstElementChild!
+      felt.scrollTop = felt.scrollHeight
+    })
+
+    const lastCube = page.getByRole('heading', { name: 'Cube 12' })
+    await expect(lastCube).toBeInViewport()
+    const titleTop = (await recentTitle.boundingBox())!.y
+    expect(titleTop).toBeGreaterThanOrEqual(feltTop)
+    expect(titleTop).toBeLessThan(feltTop + 60)
   })
 })
