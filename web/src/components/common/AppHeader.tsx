@@ -25,10 +25,25 @@ export function GuideButton({ onClick, className = '' }: { onClick: () => void; 
   )
 }
 
-export function HomeButton({ to = '/', className = '' }: { to?: string; className?: string }) {
+/** `onHome` runs before the page is left, for a screen that has something to undo first. */
+export function HomeButton({
+  to = '/',
+  className = '',
+  onHome,
+}: {
+  to?: string
+  className?: string
+  onHome?: () => void
+}) {
   const navigate = useNavigate()
   return (
-    <button onClick={() => navigate(to)} className={`btn btn-secondary ${className}`}>
+    <button
+      onClick={() => {
+        onHome?.()
+        navigate(to)
+      }}
+      className={`btn btn-secondary ${className}`}
+    >
       Home
     </button>
   )

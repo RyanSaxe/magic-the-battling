@@ -331,7 +331,7 @@ function PlayerSelectionModal({
 
   if (request.kind === "waiting") {
     return (
-      <NoticeFrame>
+      <NoticeFrame onHome={spectate.cancel}>
         <StatusNotice
           title={`Waiting for ${request.target}`}
           actions={
