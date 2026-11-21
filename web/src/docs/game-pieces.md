@@ -18,3 +18,5 @@ Additionally, the player with the most poison gets their choice play or draw dur
 If you're playing with upgrades, after every third [fight](doc:battle) you will have the option of selecting an upgrade during the stage-end [round wrap-up](doc:reward). Upgrades are Conspiracies with the mechanic "hidden agenda".
 
 During the [build phase](doc:build), you can apply the upgrade to any card in your pool. This action cannot be undone. Basically, once you name a card with the hidden agenda mechanic, you are not allowed to change it for the rest of the game.
+
+An applied upgrade stays hidden until you reveal it during a [fight](doc:battle). Revealing it makes the upgrade public for the rest of the game. Only revealed upgrades add to the [poison](doc:game-pieces#poison) your opponent gets when they lose a fight to you.

@@ -25,7 +25,7 @@ The fight phase is where you play a quick mini-game of magic with a few modified
 
 ## After the Fight Ends
 
-- The losing player(s) get N [poison counters](doc:game-pieces#poison), where N is 1 + the number of [upgrades](doc:game-pieces#upgrades) their opponent has applied to cards they submitted for the fight: their submitted hand, plus their selected companion if they have one. If you are not playing with upgrades, N is Fibonacci(stage - 2).
+- The losing player(s) get N [poison counters](doc:game-pieces#poison), where N is 1 + the number of revealed [upgrades](doc:game-pieces#upgrades) their opponent has applied to cards they submitted for the fight: their submitted hand, plus their selected companion if they have one. An upgrade counts only once it has been revealed, in this fight or an earlier one. If you are not playing with upgrades, N is Fibonacci(stage - 2).
 - Each player keeps up to 5 [treasures](doc:game-pieces#treasures) that are still on their battlefield and exiles the rest.
 
 ## Controls
