@@ -15,6 +15,7 @@ import { BusyNotice } from "../components/common/StatusNotice";
 import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { type AppError, getAppErrorMessage } from "../utils/appError";
+import type { LobbyState } from "../types";
 import {
   getDefaultNewPlayerPreference,
   getNewPlayerPreferenceForGame,
@@ -271,7 +272,9 @@ export function Lobby() {
   const { seat, claim, adopt, connectionOpened, connectionEnded, takeBack } = useGameSeat(gameId);
   const session = seat.kind === "held" ? seat.session : null;
   const { addToast } = useToast();
+  const [startSentIn, setStartSentIn] = useState<LobbyState | null>(null);
   const handleServerError = useCallback((error: AppError) => {
+    setStartSentIn(null);
     addToast(getAppErrorMessage(error, "lobby-action", "That action could not be completed."), "error");
   }, [addToast]);
 
@@ -315,7 +318,6 @@ export function Lobby() {
   const voiceChat = useVoiceChat(send, peerNames, selfName, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
 
   const [copied, setCopied] = useState(false);
-  const [startingGame, setStartingGame] = useState(false);
   const [showRulesPanel, setShowRulesPanel] = useState(false);
   const [isGuidedMode, setIsGuidedMode] = useState(() =>
     getDefaultNewPlayerPreference(),
@@ -359,11 +361,21 @@ export function Lobby() {
   const battlerStatus = currentPlayer?.battler_status ?? null;
   const hasLoadedBattler = battlerStatus === "ready";
   const isBattlerLoading = battlerStatus === "loading";
+  const isStarting = lobbyState?.start_status === "starting";
   const readyActionDisabled =
-    !!currentPlayer &&
-    isConstructed === true &&
-    !currentPlayer.is_ready &&
-    battlerStatus !== "ready";
+    isStarting ||
+    (!!currentPlayer &&
+      isConstructed === true &&
+      !currentPlayer.is_ready &&
+      battlerStatus !== "ready");
+  // The server answers a start with a new lobby state or an error, and either one re-enables the button.
+  const startAwaitingServer = startSentIn !== null && startSentIn === lobbyState;
+
+  const requestStart = () => {
+    if (!lobbyState?.can_start || startAwaitingServer) return;
+    setStartSentIn(lobbyState);
+    actions.startGame();
+  };
 
   const toggleReady = () => {
     if (!currentPlayer || readyActionDisabled) return;
@@ -445,14 +457,13 @@ export function Lobby() {
     lobbyHotkeyMap["r"] = toggleReady;
     if (isConstructed) {
       lobbyHotkeyMap["b"] = () => {
-        if (isBattlerLoading) return;
+        if (isBattlerLoading || isStarting) return;
         handleBattlerButtonClick();
       };
     }
     lobbyHotkeyMap["Enter"] = () => {
-      if (isHost && lobbyState.can_start && !startingGame) {
-        setStartingGame(true);
-        actions.startGame();
+      if (isHost && lobbyState.can_start) {
+        requestStart();
       } else {
         toggleReady();
       }
@@ -597,11 +608,13 @@ export function Lobby() {
                   ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex + 1]
                   : null;
               const canDecreasePlayerCap =
+                !isStarting &&
                 previousPlayerCap !== null &&
                 previousPlayerCap >= occupiedSlots;
-              const canIncreasePlayerCap = nextPlayerCap !== null;
+              const canIncreasePlayerCap = !isStarting && nextPlayerCap !== null;
               const availablePuppets = lobbyState.available_puppet_count;
               const canAddPuppet =
+                !isStarting &&
                 availablePuppets !== null &&
                 puppetCount < availablePuppets &&
                 occupiedSlots < playerCap;
@@ -612,6 +625,30 @@ export function Lobby() {
               const canBrowseCards =
                 lobbyState.play_mode === "limited" ||
                 currentPlayer?.battler_status === "ready";
+              const startingLabel = (
+                <span className="flex items-center justify-center gap-2">
+                  <svg
+                    className="animate-spin h-5 w-5"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Starting...
+                </span>
+              );
 
               const openGuide = (target?: RulesPanelTarget) => {
                 setRulesPanelTarget(target);
@@ -735,18 +772,18 @@ export function Lobby() {
                             value={battlerIdInput}
                             onChange={(event) => setBattlerIdInput(event.target.value)}
                             onKeyDown={(event) => {
-                              if (event.key === "Enter" && !isBattlerLoading) {
+                              if (event.key === "Enter" && !isBattlerLoading && !isStarting) {
                                 submitBattler();
                               }
                             }}
                             placeholder={isConstructed ? "Enter deck list" : "CubeCobra cube ID"}
-                            disabled={isBattlerLoading}
+                            disabled={isBattlerLoading || isStarting}
                             className={`${TEXT_INPUT} disabled:opacity-50 disabled:cursor-not-allowed`}
                           />
                         )}
                         <button
                           onClick={handleBattlerButtonClick}
-                          disabled={isBattlerLoading}
+                          disabled={isBattlerLoading || isStarting}
                           className="btn btn-primary btn-dark-border px-4 py-2 shrink-0"
                         >
                           {hasLoadedBattler ? "Change" : isBattlerLoading ? "Loading..." : "Submit"}
@@ -881,7 +918,7 @@ export function Lobby() {
                             Host
                           </span>
                         )}
-                        {isHost && !player.is_host && (
+                        {isHost && !player.is_host && !isStarting && (
                           <button
                             onClick={() => actions.kickPlayer(player.player_id)}
                             className="text-[var(--ivory-muted)] hover:text-red-400 transition-colors shrink-0 text-xs"
@@ -939,7 +976,7 @@ export function Lobby() {
                         >
                           Puppet {slot.puppetIndex + 1}
                         </span>
-                        {isHost && (
+                        {isHost && !isStarting && (
                           <button
                             onClick={() => actions.removePuppet()}
                             className="text-[var(--ivory-muted)] hover:text-red-400 transition-colors shrink-0 ml-auto text-xs"
@@ -988,44 +1025,16 @@ export function Lobby() {
                     isReady ? "btn-secondary" : "btn-success"
                   }`}
                 >
-                  {isReady ? "Unready" : "Ready"}
+                  {isStarting && !isHost ? startingLabel : isReady ? "Unready" : "Ready"}
                 </button>
 
                 {isHost && (
                   <button
-                    onClick={() => {
-                      setStartingGame(true);
-                      actions.startGame();
-                    }}
-                    disabled={!lobbyState.can_start || startingGame}
+                    onClick={requestStart}
+                    disabled={!lobbyState.can_start || startAwaitingServer}
                     className="btn btn-primary btn-dark-border w-full py-2"
                   >
-                    {startingGame ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg
-                          className="animate-spin h-5 w-5"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                            fill="none"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
-                        Starting...
-                      </span>
-                    ) : (
-                      "Start Game"
-                    )}
+                    {isStarting ? startingLabel : "Start Game"}
                   </button>
                 )}
               </div>
