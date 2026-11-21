@@ -352,3 +352,26 @@ for (const screen of SCREENS) {
     })
   })
 }
+
+test.describe('a stylesheet that arrives after the game renders', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  // Unstyled, the board's height follows its content, so a layout that measures on every render keeps growing it.
+  test('leaves the board laid out once it applies', async ({ page, baseURL }) => {
+    await serveGame(page, baseURL!, TYPICAL.draft)
+    let stylesheet = ''
+    await page.route(/\/assets\/.*\.css$/, async (route) => {
+      stylesheet = await (await route.fetch()).text()
+      await route.fulfill({ body: '', contentType: 'text/css' })
+    })
+    await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+    const crashed = page.getByRole('heading', { name: 'Something went wrong' })
+    await expect(page.locator('main .card').first().or(crashed)).toBeAttached()
+    await page.waitForTimeout(500)
+    await page.addStyleTag({ content: stylesheet })
+
+    await expect(crashed).toHaveCount(0)
+    await waitForStableLayout(page)
+    expect((await measure(page)).failures).toEqual({})
+  })
+})
