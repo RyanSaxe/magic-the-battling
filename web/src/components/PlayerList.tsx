@@ -8,7 +8,6 @@ import {
   PuppetIcon,
   SkullIcon,
 } from "./icons";
-import { useContextStrip } from "../contexts";
 import { PlacementBadge } from "./sidebar/PlacementBadge";
 import { getSidebarPlayerOrder } from "../utils/playerPlacement";
 import { getPlayerPhaseStatusLabel } from "../utils/format";
@@ -16,6 +15,9 @@ import { getPlayerPhaseStatusLabel } from "../utils/format";
 interface PlayerListProps {
   players: PlayerView[];
   currentPlayerName: string;
+  /** The player whose scouting panel is open, shown selected. */
+  scoutedPlayerName: string | null;
+  onPlayerClick: (playerName: string) => void;
   renderMicToggle?: (player: PlayerView) => ReactNode;
 }
 
@@ -214,18 +216,10 @@ export function PlayerRow({
 export function PlayerList({
   players,
   currentPlayerName,
+  scoutedPlayerName,
+  onPlayerClick,
   renderMicToggle,
 }: PlayerListProps) {
-  const { state, setRevealedPlayerName } = useContextStrip();
-
-  const handlePlayerClick = (player: PlayerView) => {
-    if (state.revealedPlayerName === player.name) {
-      setRevealedPlayerName(null);
-    } else {
-      setRevealedPlayerName(player.name, "seen");
-    }
-  };
-
   const sortedPlayers = getSidebarPlayerOrder(players);
 
   return (
@@ -240,8 +234,8 @@ export function PlayerList({
             player={player}
             players={players}
             currentPlayerName={currentPlayerName}
-            isSelected={state.revealedPlayerName === player.name}
-            onClick={() => handlePlayerClick(player)}
+            isSelected={scoutedPlayerName === player.name}
+            onClick={() => onPlayerClick(player.name)}
             micToggle={renderMicToggle?.(player)}
           />
         ))}
