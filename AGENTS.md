@@ -105,8 +105,8 @@ uv run pytest
 The commit hook in `.pre-commit-config.yaml` runs ruff and ty with `uv run`,
 then ESLint and the web type check. pre-commit itself isn't a project
 dependency, so install the hook once per clone with `uvx pre-commit install`.
-CI runs the same checks, pytest with coverage, the web build and a load test on
-every pull request. CI does not run `npm test`, so run it yourself.
+CI runs the same checks, pytest with coverage, the web build, `npm test` and a
+load test on every pull request.
 
 ## Branches, deploys and releases
 
