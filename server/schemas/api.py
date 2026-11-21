@@ -337,11 +337,6 @@ class BattleUpdateLifeAction(BaseModel):
     life: int
 
 
-class RewardPickUpgradeAction(BaseModel):
-    action: str = "pick_upgrade"
-    upgrade_id: str
-
-
 class RewardApplyUpgradeAction(BaseModel):
     action: str = "apply_upgrade"
     upgrade_id: str
@@ -397,6 +392,9 @@ class GameCardsResponse(BaseModel):
     upgrades: list[CardCatalogEntry]
 
 
+ShareSnapshotVisibility = Literal["full", "hand_hidden", "hidden"]
+
+
 class SharePlayerSnapshot(BaseModel):
     stage: int
     round: int
@@ -409,6 +407,7 @@ class SharePlayerSnapshot(BaseModel):
     treasures: int
     poison: int
     vanguard: Card | None = None
+    visibility: ShareSnapshotVisibility = "full"
 
 
 class SharePlayerData(BaseModel):
@@ -426,6 +425,7 @@ class ShareGameResponse(BaseModel):
     created_at: str
     use_upgrades: bool
     cube_id: str | None = None
+    in_progress: bool = False
     players: list[SharePlayerData]
 
 

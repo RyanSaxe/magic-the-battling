@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { bestFit, type ZoneDims } from '../../hooks/cardSizeUtils'
+import { bestFit, MIN_CARD_WIDTH, type ZoneDims } from '../../hooks/cardSizeUtils'
 import { DroppableZone } from '../../dnd'
 import type { ZoneName } from '../../types'
 import type { ZoneOwner } from '../../dnd/types'
-import { resolveBattlePanelLayout } from './DndPanelLayout'
+import { PANEL_GAP, PANEL_MAX_WIDTH, resolveBattlePanelLayout } from './DndPanelLayout'
 
 interface DndPanelProps {
   title: string
@@ -19,9 +19,6 @@ interface DndPanelProps {
 }
 
 const DEFAULT_DIMS: ZoneDims = { width: 80, height: 112, rows: 1, columns: 1 }
-const PANEL_GAP = 6
-const PANEL_MAX_WIDTH = 200
-const PANEL_MIN_WIDTH = 40
 
 function contentBoxSize(node: HTMLElement) {
   const cs = getComputedStyle(node)
@@ -82,7 +79,7 @@ export function DndPanel({
       const measure = (w: number, h: number) => {
         const next = isBattleTone
           ? resolveBattlePanelLayout(count, w, h)
-          : bestFit(count, w, h, PANEL_GAP, PANEL_MAX_WIDTH, PANEL_MIN_WIDTH)
+          : bestFit(count, w, h, PANEL_GAP, PANEL_MAX_WIDTH, MIN_CARD_WIDTH)
         setDims((prev) =>
           prev.width === next.width
           && prev.height === next.height

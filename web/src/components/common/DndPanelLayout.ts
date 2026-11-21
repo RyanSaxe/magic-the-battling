@@ -1,16 +1,15 @@
-import { bestFit, type ZoneDims } from '../../hooks/cardSizeUtils'
+import { bestFit, MIN_CARD_WIDTH, type ZoneDims } from '../../hooks/cardSizeUtils'
 
 const DEFAULT_DIMS: ZoneDims = { width: 80, height: 112, rows: 1, columns: 1 }
-const PANEL_GAP = 6
-const PANEL_MAX_WIDTH = 200
-const PANEL_MIN_WIDTH = 40
+export const PANEL_GAP = 6
+export const PANEL_MAX_WIDTH = 200
 
 export function resolveBattlePanelLayout(count: number, width: number, height: number): ZoneDims {
   if (count <= 0 || width <= 0 || height <= 0) {
     return DEFAULT_DIMS
   }
 
-  const baseFit = bestFit(count, width, height, PANEL_GAP, PANEL_MAX_WIDTH, PANEL_MIN_WIDTH)
+  const baseFit = bestFit(count, width, height, PANEL_GAP, PANEL_MAX_WIDTH, MIN_CARD_WIDTH)
   let best = baseFit
   let bestScore = baseFit.width
     + (baseFit.columns > 1 ? 12 : 0)

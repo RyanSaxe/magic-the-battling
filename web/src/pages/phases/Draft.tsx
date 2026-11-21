@@ -4,11 +4,10 @@ import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { LayoutResetControl } from '../../components/common/LayoutResetControl'
 import { UpgradeGrid } from '../../components/common/UpgradeGrid'
 import { ZoneLayout } from '../../components/common/ZoneLayout'
-import { ZONE_LAYOUT_PADDING } from '../../hooks/useCardLayout'
-import { usePersistedConstraints } from '../../hooks/usePersistedConstraints'
+import { usePersistedConstraints, type BoardSize } from '../../hooks/usePersistedConstraints'
 import { useResizableLayout } from '../../hooks/useResizableLayout'
 import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
-import { getUpgradeZoneLayoutBounds } from '../../utils/upgradeGrid'
+import { draftLayoutConfig } from './phaseLayouts'
 
 interface DraftPhaseProps {
   gameState: GameState
@@ -38,37 +37,28 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
   const pool = [...self_player.hand, ...self_player.sideboard]
   const hasDesktopUpgradeRail = showDesktopUpgradeRail && self_player.upgrades.length > 0
 
+  const [measuredBoard, setMeasuredBoard] = useState<BoardSize | null>(null)
   const {
     constraints,
     setConstraints,
     clearConstraints,
     resolution: persistedLayout,
-  } = usePersistedConstraints({
-    scopeKey: 'phase:draft',
-    stage: self_player.stage,
-    round: self_player.round,
+  } = usePersistedConstraints(
+    {
+      scopeKey: 'phase:draft',
+      stage: self_player.stage,
+      round: self_player.round,
+    },
+    measuredBoard,
+  )
+
+  const layoutConfig = draftLayoutConfig({
+    packCount: currentPack.length,
+    poolCount: pool.length,
+    upgradeRailCount: hasDesktopUpgradeRail ? self_player.upgrades.length : 0,
   })
 
-  const upgradeCount = hasDesktopUpgradeRail ? self_player.upgrades.length : 0
-  const layoutConfig = {
-    zones: {
-      pool: { count: pool.length, maxCardWidth: 300 },
-      pack: { count: currentPack.length, maxCardWidth: 400 },
-      upgrades: {
-        count: upgradeCount,
-        maxCardWidth: 200,
-        ...getUpgradeZoneLayoutBounds(upgradeCount),
-      },
-    },
-    layout: {
-      top: ['pack'],
-      bottomLeft: ['pool'],
-      bottomRight: hasDesktopUpgradeRail ? ['upgrades'] : [],
-    },
-    ...ZONE_LAYOUT_PADDING,
-  }
-
-  const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
+  const { containerRef, dims, containerSize, zoneFrames, zoneRefs, dividerCallbacks } =
     useResizableLayout({
       layoutConfig,
       constraints,
@@ -76,6 +66,9 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
       onConstraintsClear: clearConstraints,
       allowHorizontalResize: !isMobile,
     })
+  // A saved layout belongs to a board size band, known once the board is measured.
+  if (measuredBoard !== containerSize) setMeasuredBoard(containerSize)
+
   const packDims = dims.pack
   const poolDims = dims.pool
   const upgradesDims = dims.upgrades

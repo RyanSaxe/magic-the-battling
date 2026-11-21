@@ -8,19 +8,15 @@ import {
   THE_VANQUISHER_IMAGE,
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
-import {
-  ZONE_LAYOUT_PADDING,
-  type CardLayoutConfig,
-} from "../../hooks/useCardLayout";
-import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
+import { usePersistedConstraints, type BoardSize } from "../../hooks/usePersistedConstraints";
 import { useResizableLayout } from "../../hooks/useResizableLayout";
 import type { GameState, Card as CardType } from "../../types";
+import { rewardLayoutConfig } from "./phaseLayouts";
 import { rewardZoneStyles } from "./rewardZoneStyles";
 
 interface RewardPhaseProps {
   gameState: GameState;
   actions: {
-    rewardPickUpgrade: (upgradeId: string) => void;
     rewardDone: (upgradeId?: string) => void;
   };
   selectedUpgradeId: string | null;
@@ -136,45 +132,39 @@ export function RewardPhase({
   const rewardsCount = Math.max(rewardItems.length, 1);
   const poolCount = hasUpgradeSection ? Math.max(poolCards.length, 1) : 0;
 
+  const [measuredBoard, setMeasuredBoard] = useState<BoardSize | null>(null);
   const {
     constraints,
     setConstraints,
     clearConstraints,
     resolution: persistedLayout,
-  } = usePersistedConstraints({
-    scopeKey: "phase:reward",
-    stage: self_player.stage,
-    round: self_player.round,
-  });
+  } = usePersistedConstraints(
+    {
+      scopeKey: "phase:reward",
+      stage: self_player.stage,
+      round: self_player.round,
+    },
+    measuredBoard,
+  );
 
   const activeConstraints = hasUpgradeSection ? constraints : null;
-  const rewardLayoutConfig = {
-    zones: {
-      rewards: {
-        count: rewardsCount,
-        maxCardWidth: 300,
-        priority: "fill",
-        maxRows: 1,
-      },
-      upgrades: {
-        count: hasUpgradeSection ? available_upgrades.length : 0,
-        maxCardWidth: 200,
-      },
-      pool: { count: poolCount, maxCardWidth: 180 },
-    },
-    layout: { top: ["rewards"], bottomLeft: ["upgrades", "pool"] },
-    ...ZONE_LAYOUT_PADDING,
-    maxTopFraction: hasUpgradeSection ? 0.2 : undefined,
-  } satisfies CardLayoutConfig;
+  const layoutConfig = rewardLayoutConfig({
+    rewardCount: rewardsCount,
+    hasUpgradeSection,
+    upgradeCount: available_upgrades.length,
+    poolCount,
+  });
 
-  const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
+  const { containerRef, dims, containerSize, zoneFrames, zoneRefs, dividerCallbacks } =
     useResizableLayout({
-      layoutConfig: rewardLayoutConfig,
+      layoutConfig,
       constraints: activeConstraints,
       onConstraintsChange: setConstraints,
       onConstraintsClear: clearConstraints,
       allowHorizontalResize: false,
     });
+  // A saved layout belongs to a board size band, known once the board is measured.
+  if (measuredBoard !== containerSize) setMeasuredBoard(containerSize);
   // Wrap each refCallback in a stable useCallback so the react-hooks/refs
   // lint rule (which can't see through hook-returned member access) doesn't
   // false-positive on `ref={zoneRefs.X}`.

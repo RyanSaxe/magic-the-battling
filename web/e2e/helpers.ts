@@ -1,4 +1,6 @@
-import type { Locator, Page } from '@playwright/test'
+import { basename } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { expect, test as base, type Locator, type Page, type Route } from '@playwright/test'
 import type {
   AuthUser,
   FollowedBattler,
@@ -8,8 +10,26 @@ import type {
   SharePlayerSnapshot,
   UserBattler,
 } from '../src/types'
+import { gameBootstrap, type ScreenState } from './gameStates'
 
 type MockResponse = { status?: number; json: unknown }
+
+const isLoopback = (ipAddress: string) => ipAddress.startsWith('127.') || ipAddress === '::1' || ipAddress === '[::1]'
+
+/** Fails a test when any response came from a server other than this machine, so the tests never depend on the network. */
+export const test = base.extend<{ stayOffline: void }>({
+  stayOffline: [async ({ page }, use) => {
+    const outsideResponses: Promise<string | null>[] = []
+    page.on('response', (response) => {
+      outsideResponses.push(response.serverAddr().then((address) => (address && !isLoopback(address.ipAddress) ? response.url() : null)))
+    })
+    await use()
+    const reachedNetwork = (await Promise.all(outsideResponses)).filter((url) => url !== null)
+    expect(reachedNetwork, 'responses from servers outside this machine').toEqual([])
+  }, { auto: true }],
+})
+
+export { expect }
 
 const SERVER_STATUS: MockResponse = {
   json: {
@@ -139,6 +159,7 @@ function shareSnapshot(stage: number, round: number): SharePlayerSnapshot {
     treasures: 2,
     poison: round,
     vanguard: null,
+    visibility: 'full',
   }
 }
 
@@ -150,6 +171,7 @@ const SHARE_GAME: ShareGameResponse = {
   created_at: '2026-01-02T00:00:00Z',
   use_upgrades: true,
   cube_id: 'vintage-cube',
+  in_progress: false,
   players: ['Alice', 'Bob', 'Carol', 'Dave'].map((name, index) => ({
     name,
     final_placement: index + 1,
@@ -160,14 +182,24 @@ const SHARE_GAME: ShareGameResponse = {
   })),
 }
 
-const GOOGLE_FONTS_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com']
+const FONT_FIXTURES = fileURLToPath(new URL('./fixtures/fonts/', import.meta.url))
+
+// The header's Cinzel title sets how much room its buttons have, so the tests serve the
+// Google Fonts stylesheet and font files the app loads from copies in fixtures/fonts.
+function serveGoogleFont(route: Route, url: URL) {
+  const headers = { 'Access-Control-Allow-Origin': '*' }
+  if (url.hostname === 'fonts.googleapis.com') {
+    return route.fulfill({ path: `${FONT_FIXTURES}cinzel.css`, contentType: 'text/css', headers })
+  }
+  return route.fulfill({ path: `${FONT_FIXTURES}${basename(url.pathname)}`, contentType: 'font/woff2', headers })
+}
 
 async function serveFromTable(page: Page, baseURL: string, responses: Record<string, MockResponse>) {
   const appOrigin = new URL(baseURL).origin
   await page.route('**/*', (route) => {
     const url = new URL(route.request().url())
-    // The header's Cinzel title sets how much room its buttons have, so its font is the one outside request let through.
-    if (url.origin !== appOrigin) return GOOGLE_FONTS_HOSTS.includes(url.hostname) ? route.continue() : route.abort()
+    if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') return serveGoogleFont(route, url)
+    if (url.origin !== appOrigin) return route.abort()
     if (!url.pathname.startsWith('/api/')) return route.continue()
     const response = responses[url.pathname]
     if (!response) return route.fulfill({ status: 404, json: { detail: 'Not mocked' } })
@@ -190,6 +222,37 @@ export async function serveShareGame(page: Page, baseURL: string) {
   })
 }
 
+// Dave went out first and shares while the others play on, so their rounds show only poison and treasures.
+const SHARE_MID_GAME: ShareGameResponse = {
+  ...SHARE_GAME,
+  owner_name: 'Dave',
+  in_progress: true,
+  players: SHARE_GAME.players.map((player) => ({
+    ...player,
+    final_placement: player.name === 'Dave' ? 4 : null,
+    snapshots: player.name === 'Dave'
+      ? SHARE_SNAPSHOTS
+      : SHARE_SNAPSHOTS.map((snapshot) => ({ ...snapshot, basic_lands: [], visibility: 'hidden' as const })),
+  })),
+}
+
+export async function serveShareMidGame(page: Page, baseURL: string) {
+  await serveFromTable(page, baseURL, {
+    ...SIGNED_OUT_RESPONSES,
+    [`/api/games/${SHARE_GAME_ID}/share/Dave`]: { json: SHARE_MID_GAME },
+  })
+}
+
+export async function serveShareInProgress(page: Page, baseURL: string) {
+  await serveFromTable(page, baseURL, {
+    ...SIGNED_OUT_RESPONSES,
+    [`/api/games/${SHARE_GAME_ID}/share/Bob`]: {
+      status: 404,
+      json: { detail: 'This game is still being played', code: 'GAME_IN_PROGRESS' },
+    },
+  })
+}
+
 /** The lobby's states: connected to a lobby, waiting for its first update, or holding no session. */
 export type LobbyMode = 'connected' | 'loading' | 'no-session'
 
@@ -202,6 +265,31 @@ export async function serveLobby(page: Page, baseURL: string, mode: LobbyMode = 
   }, LOBBY_SESSION)
   await page.routeWebSocket(/\/ws\//, (ws) => {
     if (mode === 'connected') ws.send(JSON.stringify({ type: 'lobby_state', payload: LOBBY_STATE }))
+  })
+}
+
+// A plain card-shaped frame, so an offline run doesn't look like a broken image or a logo.
+const CARD_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 680">
+  <rect x="6" y="6" width="476" height="668" rx="28" fill="#3b3a36" stroke="#8a7a52" stroke-width="12"/>
+  <rect x="40" y="70" width="408" height="300" rx="6" fill="#55534d"/>
+</svg>`
+
+/** Set LAYOUT_CARD_ART=real to load real card images from Scryfall, for screenshots; runs stay offline otherwise. */
+const SHOW_REAL_CARD_ART = process.env.LAYOUT_CARD_ART === 'real'
+
+/** Opens a game whose server sends `screen` as its state. */
+export async function serveGame(page: Page, baseURL: string, screen: ScreenState) {
+  await serveWithoutBackend(page, baseURL)
+  await page.route(/^https:\/\/(cards|backs)\.scryfall\.io\//, (route) =>
+    SHOW_REAL_CARD_ART ? route.continue() : route.fulfill({ body: CARD_PLACEHOLDER_SVG, contentType: 'image/svg+xml' }))
+  await page.addInitScript((session) => {
+    sessionStorage.setItem('mtb_session', session.sessionId)
+    sessionStorage.setItem('mtb_player', session.playerId)
+    // Guided Mode is on for new players and opens panels over the board, so play as a returning player.
+    localStorage.setItem('mtb_guided_mode_preference', '0')
+  }, LOBBY_SESSION)
+  await page.routeWebSocket(/\/ws\//, (ws) => {
+    ws.send(JSON.stringify({ type: 'game_bootstrap', payload: gameBootstrap(screen) }))
   })
 }
 
@@ -282,6 +370,19 @@ export const PAGES: PageUnderTest[] = [
     serve: serveShareGame,
     primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
     fillsFelt: true,
+  },
+  {
+    name: 'share mid-game',
+    path: `/game/${SHARE_GAME_ID}/share/Dave`,
+    serve: serveShareMidGame,
+    primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
+    fillsFelt: true,
+  },
+  {
+    name: 'share in progress',
+    path: `/game/${SHARE_GAME_ID}/share/Bob`,
+    serve: serveShareInProgress,
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Home' }),
   },
 ]
 
