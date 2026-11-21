@@ -511,6 +511,20 @@ export interface GameSummary {
   hand_scryfall_ids: string[]
 }
 
+/** A cube's community record, whatever filters its game list has. */
+export interface CubeSummary {
+  cube_id: string
+  cube_name: string | null
+  cube_image_uri: string | null
+  game_count: number
+  human_player_count: number
+  last_played: string | null
+  /** The most played mode and upgrades setting; null before the cube's first finished game. */
+  popular_setup: { play_mode: PlayMode; use_upgrades: boolean } | null
+  is_following: boolean
+  follow_id: number | null
+}
+
 export interface FollowedBattler {
   id: number
   cube_id: string

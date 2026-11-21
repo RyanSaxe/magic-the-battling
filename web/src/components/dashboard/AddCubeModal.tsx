@@ -5,15 +5,17 @@ import { unknownToAppError } from '../../utils/appError'
 import { SurfaceCard } from '../common/SurfaceCard'
 
 export function AddCubeModal({
+  initialCubeId = '',
   onClose,
   onCreated,
   addToast,
 }: {
+  initialCubeId?: string
   onClose: () => void
   onCreated: (b: UserBattler) => void
   addToast: (msg: string, type: 'error' | 'info') => void
 }) {
-  const [cubeId, setCubeId] = useState('')
+  const [cubeId, setCubeId] = useState(initialCubeId)
   const [displayName, setDisplayName] = useState('')
   const [playMode, setPlayMode] = useState<PlayMode>('limited')
   const [useUpgrades, setUseUpgrades] = useState(true)
