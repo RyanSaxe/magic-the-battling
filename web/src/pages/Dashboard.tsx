@@ -21,7 +21,18 @@ import {
 import type { UserBattler, FollowedBattler, GameSummary, PlayMode } from '../types'
 import { unknownToAppError } from '../utils/appError'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
-import { visitLoadsFirstPage, type FirstPageStatus } from './dashboardState'
+import {
+  NO_FOLLOWS,
+  findFollow,
+  isFollowing,
+  visitLoadsFirstPage,
+  withDiscoverResults,
+  withFollow,
+  withFollowingPage,
+  withoutFollow,
+  type FirstPageStatus,
+  type Follows,
+} from './dashboardState'
 
 type Tab = 'battlers' | 'following' | 'games' | 'discover'
 
@@ -41,9 +52,7 @@ export function Dashboard() {
   const [battlers, setBattlers] = useState<UserBattler[]>([])
   const [battlersHasMore, setBattlersHasMore] = useState(false)
   const [battlersOffset, setBattlersOffset] = useState(0)
-  const [following, setFollowing] = useState<FollowedBattler[]>([])
-  const [followingHasMore, setFollowingHasMore] = useState(false)
-  const [followingOffset, setFollowingOffset] = useState(0)
+  const [follows, setFollows] = useState<Follows>(NO_FOLLOWS)
   const [loadingData, setLoadingData] = useState(true)
   const [showAddModal, setShowAddModal] = useState(false)
 
@@ -75,9 +84,7 @@ export function Dashboard() {
       setBattlers(bData.battlers)
       setBattlersHasMore(bData.has_more)
       setBattlersOffset(bData.battlers.length)
-      setFollowing(fData.following)
-      setFollowingHasMore(fData.has_more)
-      setFollowingOffset(fData.following.length)
+      setFollows((prev) => withFollowingPage(prev, fData, 0))
     } catch {
       addToast('Failed to load data', 'error')
     } finally {
@@ -109,9 +116,42 @@ export function Dashboard() {
       setDiscoverResults(data.results)
       setDiscoverHasMore(data.has_more)
       setDiscoverOffset(data.results.length)
+      setFollows((prev) => withDiscoverResults(prev, data.results))
       setDiscoverStatus('loaded')
     } catch {
       setDiscoverStatus('failed')
+    }
+  }
+
+  const loadFollowingPage = async (offset: number) => {
+    const page = await getFollowing(offset)
+    setFollows((prev) => withFollowingPage(prev, page, offset))
+    return page
+  }
+
+  const follow = async (result: DiscoverResult) => {
+    try {
+      const record = await followCube(result.cube_id)
+      // POST /follow returns the follow without cube stats, and Discover already has them.
+      setFollows((prev) => withFollow(prev, {
+        ...record,
+        game_count: result.game_count,
+        human_player_count: result.player_count,
+        last_played: result.last_played,
+      }))
+    } catch (err) {
+      addToast(unknownToAppError(err, 'follow-cube', 'Failed to follow').message, 'error')
+    }
+  }
+
+  const unfollow = async (cubeId: string) => {
+    try {
+      const record = await findFollow(follows, cubeId, loadFollowingPage)
+      // A cube on no Following page is no longer followed, so there is nothing to delete.
+      if (record) await unfollowCube(record.id)
+      setFollows((prev) => withoutFollow(prev, cubeId))
+    } catch {
+      addToast('Failed to unfollow', 'error')
     }
   }
 
@@ -184,24 +224,14 @@ export function Dashboard() {
               />
             ) : tab === 'following' ? (
               <FollowingGrid
-                following={following}
-                hasMore={followingHasMore}
+                following={follows.records}
+                hasMore={follows.hasMore}
                 onPlay={(f) => navigate(`/play?cubeId=${encodeURIComponent(f.cube_id)}`)}
                 onView={(f) => navigate(`/cube/${encodeURIComponent(f.cube_id)}`)}
-                onUnfollow={async (f) => {
-                  try {
-                    await unfollowCube(f.id)
-                    setFollowing((prev) => prev.filter((x) => x.id !== f.id))
-                  } catch {
-                    addToast('Failed to unfollow', 'error')
-                  }
-                }}
+                onUnfollow={(f) => unfollow(f.cube_id)}
                 onLoadMore={async () => {
                   try {
-                    const data = await getFollowing(followingOffset)
-                    setFollowing((prev) => [...prev, ...data.following])
-                    setFollowingHasMore(data.has_more)
-                    setFollowingOffset((prev) => prev + data.following.length)
+                    await loadFollowingPage(follows.records.length)
                   } catch {
                     addToast('Failed to load more', 'error')
                   }
@@ -247,6 +277,7 @@ export function Dashboard() {
                     setDiscoverResults((prev) => [...prev, ...data.results])
                     setDiscoverHasMore(data.has_more)
                     setDiscoverOffset((prev) => prev + data.results.length)
+                    setFollows((prev) => withDiscoverResults(prev, data.results))
                   } catch {
                     addToast('Failed to load cubes', 'error')
                   } finally {
@@ -255,28 +286,9 @@ export function Dashboard() {
                 }}
                 onPlay={(cubeId) => navigate(`/play?cubeId=${encodeURIComponent(cubeId)}`)}
                 onView={(cubeId) => navigate(`/cube/${encodeURIComponent(cubeId)}`)}
-                onFollow={async (cubeId) => {
-                  try {
-                    await followCube(cubeId)
-                    setDiscoverResults((prev) => prev.map((r) => r.cube_id === cubeId ? { ...r, is_following: true } : r))
-                  } catch (err) {
-                    addToast(unknownToAppError(err, 'follow-cube', 'Failed to follow').message, 'error')
-                  }
-                }}
-                onUnfollow={async (cubeId) => {
-                  const match = following.find((f) => f.cube_id === cubeId)
-                  if (!match) {
-                    addToast('Reload the page and try again', 'error')
-                    return
-                  }
-                  try {
-                    await unfollowCube(match.id)
-                    setFollowing((prev) => prev.filter((x) => x.id !== match.id))
-                    setDiscoverResults((prev) => prev.map((r) => r.cube_id === cubeId ? { ...r, is_following: false } : r))
-                  } catch {
-                    addToast('Failed to unfollow', 'error')
-                  }
-                }}
+                isFollowing={(cubeId) => isFollowing(follows, cubeId)}
+                onFollow={follow}
+                onUnfollow={unfollow}
                 onPlayGame={() => navigate('/play')}
               />
             )}
@@ -748,6 +760,7 @@ function DiscoverGrid({
   onLoadMore,
   onPlay,
   onView,
+  isFollowing,
   onFollow,
   onUnfollow,
   onPlayGame,
@@ -760,7 +773,8 @@ function DiscoverGrid({
   onLoadMore: () => void
   onPlay: (cubeId: string) => void
   onView: (cubeId: string) => void
-  onFollow: (cubeId: string) => void
+  isFollowing: (cubeId: string) => boolean
+  onFollow: (result: DiscoverResult) => void
   onUnfollow: (cubeId: string) => void
   onPlayGame: () => void
 }) {
@@ -800,7 +814,7 @@ function DiscoverGrid({
             title={r.cube_name || r.cube_id}
             subtitle={r.cube_name && r.cube_name !== r.cube_id ? r.cube_id : undefined}
             subtitleUrl={`https://cubecobra.com/cube/overview/${encodeURIComponent(r.cube_id)}`}
-            badge={r.is_following ? { text: 'Following', color: 'green' } : undefined}
+            badge={isFollowing(r.cube_id) ? { text: 'Following', color: 'green' } : undefined}
             inlineStats={<>
               <FaUser className="w-3 h-3 text-gray-500" /><span>{r.player_count}</span>
               <span className="text-gray-600">·</span>
@@ -814,11 +828,11 @@ function DiscoverGrid({
             actions={[
               { label: 'Play', onClick: () => onPlay(r.cube_id), variant: 'primary' },
               { label: 'View', onClick: () => onView(r.cube_id), variant: 'secondary' },
-              ...(r.is_following
+              ...(isFollowing(r.cube_id)
                 ? [{ label: 'Unfollow', onClick: () => onUnfollow(r.cube_id), variant: 'danger' as const }]
-                : [{ label: 'Follow', onClick: () => onFollow(r.cube_id), variant: 'secondary' as const }]),
+                : [{ label: 'Follow', onClick: () => onFollow(r), variant: 'secondary' as const }]),
             ]}
-            className={r.is_following ? 'border-l-2 border-l-emerald-600/60' : ''}
+            className={isFollowing(r.cube_id) ? 'border-l-2 border-l-emerald-600/60' : ''}
           />
         ))}
       </div>
