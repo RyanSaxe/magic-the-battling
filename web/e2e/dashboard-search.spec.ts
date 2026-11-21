@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { PAGES, gameSummary, openPage } from './helpers'
+import { PAGES, expect, gameSummary, openPage, test } from './helpers'
 
 const discover = PAGES.find((pageUnderTest) => pageUnderTest.name === 'discover')!
 const games = PAGES.find((pageUnderTest) => pageUnderTest.name === 'games')!
