@@ -157,7 +157,7 @@ def get_available_fake_players(game: Game) -> list[Puppet]:
     return available
 
 
-def resolve_puppet_vs_puppet(bot1: Puppet, bot2: Puppet, stage: int, round_num: int) -> None:
+def resolve_puppet_vs_puppet(bot1: Puppet, bot2: Puppet, stage: int, round_num: int, *, use_upgrades: bool) -> None:
     """Auto-resolve puppet vs puppet battle with random outcome."""
     snap1 = bot1.get_opponent_for_round(stage, round_num)
     snap2 = bot2.get_opponent_for_round(stage, round_num)
@@ -166,8 +166,8 @@ def resolve_puppet_vs_puppet(bot1: Puppet, bot2: Puppet, stage: int, round_num: 
         return
 
     reward_phase = _reward_phase()
-    dmg1 = reward_phase.calculate_damage(snap1)
-    dmg2 = reward_phase.calculate_damage(snap2)
+    dmg1 = reward_phase.calculate_damage(snap1, use_upgrades=use_upgrades)
+    dmg2 = reward_phase.calculate_damage(snap2, use_upgrades=use_upgrades)
 
     outcome = random.choices(["bot1_wins", "bot2_wins", "draw"], weights=[45, 45, 10], k=1)[0]
     if outcome == "bot1_wins":
@@ -198,7 +198,7 @@ def resolve_unpaired_bot_battles(
     while len(unpaired_bots) >= 2:
         bot1 = unpaired_bots.pop(0)
         bot2 = unpaired_bots.pop(0)
-        resolve_puppet_vs_puppet(bot1, bot2, stage, round_num)
+        resolve_puppet_vs_puppet(bot1, bot2, stage, round_num, use_upgrades=game.config.use_upgrades)
 
     for fp in game.puppets:
         if not fp.is_eliminated and fp.name not in paired_bot_names:
@@ -218,7 +218,8 @@ def get_viable_candidates(player: Player, all_candidates: list[PairingCandidate]
     if len(all_candidates) <= 3:
         return all_candidates
 
-    seed = hash((player.name, player.round, player.stage))
+    # hash() of a str changes with every process, so the three shown in Build would change on restart.
+    seed = hashlib.sha256(f"{player.name}:{player.round}:{player.stage}".encode()).digest()
     rng = random.Random(seed)
     return rng.sample(all_candidates, 3)
 

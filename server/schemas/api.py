@@ -94,6 +94,16 @@ class ResumableGame(BaseModel):
     player_name: str
     kind: Literal["lobby", "game"]
     last_active_at: datetime | None = None
+    cube_id: str
+    cube_name: str | None = None
+    cube_image_uri: str | None = None
+    play_mode: PlayMode
+    use_upgrades: bool
+    player_count: int
+    # A lobby has no stage, round or poison yet.
+    stage: int | None = None
+    round: int | None = None
+    poison: int | None = None
 
 
 class ResumableResponse(BaseModel):
@@ -325,11 +335,6 @@ class BattleUpdateLifeAction(BaseModel):
     action: str = "update_life"
     target: str  # "you" or "opponent"
     life: int
-
-
-class RewardPickUpgradeAction(BaseModel):
-    action: str = "pick_upgrade"
-    upgrade_id: str
 
 
 class RewardApplyUpgradeAction(BaseModel):
