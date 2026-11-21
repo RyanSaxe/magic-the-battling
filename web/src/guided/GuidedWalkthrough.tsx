@@ -150,6 +150,17 @@ export function GuidedWalkthrough({
       });
       return () => cancelAnimationFrame(exitId);
     }
+
+    if (transition === "restart") {
+      const restartId = requestAnimationFrame(() => {
+        clearPhaseTimer();
+        hasCommittedInitialLayoutRef.current = false;
+        setDisplayState(null);
+        setPendingState(null);
+        setAnimPhase("entering");
+      });
+      return () => cancelAnimationFrame(restartId);
+    }
   }, [animPhase, clearPhaseTimer, displayState, reducedMotion, requestActive]);
 
   useEffect(() => {

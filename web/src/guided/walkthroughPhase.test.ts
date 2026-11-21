@@ -29,6 +29,17 @@ describe("planRequestTransition", () => {
     })).toBe("idle");
   });
 
+  it("restarts the entry when the next guide's request arrives during the exit", () => {
+    // "Got it" on the Play/Draw tip starts its exit; tapping "Play" right after
+    // moves to Battle, whose guide is requested before the exiting tip unmounts.
+    expect(planRequestTransition({
+      animPhase: "exiting",
+      requestActive: true,
+      hasDisplayState: true,
+      reducedMotion: false,
+    })).toBe("restart");
+  });
+
   it("leaves a guide alone while its request is active", () => {
     expect(planRequestTransition({
       animPhase: "idle",
