@@ -154,6 +154,8 @@ const LOBBY_STATE: LobbyState = {
   ],
   can_start: true,
   is_started: false,
+  start_status: 'open',
+  start_error: null,
   target_player_count: 4,
   puppet_count: 1,
   cube_loading_status: 'ready',
