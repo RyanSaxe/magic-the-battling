@@ -107,9 +107,9 @@ const LOBBY_STATE: LobbyState = {
   join_code: 'WXYZ',
   cube_id: 'vintage-cube',
   players: [
-    { player_id: 'player-1', name: 'Alice', is_ready: false, is_host: true, battler_id: null, battler_status: null, battler_error: null },
-    { player_id: 'player-2', name: 'Bob', is_ready: true, is_host: false, battler_id: null, battler_status: null, battler_error: null },
-    { player_id: 'player-3', name: 'Carol', is_ready: true, is_host: false, battler_id: null, battler_status: null, battler_error: null },
+    { player_id: 'player-1', name: 'Alice', is_ready: false, is_host: true, is_connected: true, battler_id: null, battler_status: null, battler_error: null },
+    { player_id: 'player-2', name: 'Bob', is_ready: true, is_host: false, is_connected: true, battler_id: null, battler_status: null, battler_error: null },
+    { player_id: 'player-3', name: 'Carol', is_ready: true, is_host: false, is_connected: true, battler_id: null, battler_status: null, battler_error: null },
   ],
   can_start: true,
   is_started: false,
