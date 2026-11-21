@@ -61,6 +61,7 @@ On container startup, deploys now run `scripts/maintain_db.py --apply` against `
 Labels on the merged PR control deploy behavior and release creation.
 
 **Deploy delay** (`deploy:*`) — controls how long players are warned before the server restarts.
+During the warning the server is in draining mode and blocks new games. Once the deploy finishes, fails or is cancelled, the workflow returns the server to normal mode. If that step fails, set the mode by hand with `APP_BASE_URL=https://<app>.fly.dev OPS_API_TOKEN=<token> OPS_UPDATED_BY=<your name> sh scripts/ops_mode.sh normal`.
 Both workflows support the same labels but have different defaults:
 
 | Label | Dev default | Prod default | Use case |
