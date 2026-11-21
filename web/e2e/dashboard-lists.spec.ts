@@ -59,6 +59,61 @@ function heldResponse() {
   return { release, released }
 }
 
+test('a saved preset past the first page of the list opens', async ({ page, baseURL }) => {
+  const presets = presetsNamed(21)
+  await serveSignedIn(page, baseURL!)
+  await servePresets(page, presets)
+  await page.route('**/api/battlers/21', (route) => route.fulfill({ json: presets[20] }))
+
+  await page.goto('/dashboard/list/21')
+
+  await expect(page.getByRole('heading', { name: 'Preset 21' })).toBeVisible()
+})
+
+test('a saved preset that is missing or another player’s sends the player back to the dashboard', async ({ page, baseURL }) => {
+  await serveSignedIn(page, baseURL!)
+  await page.route('**/api/battlers/99', (route) =>
+    route.fulfill({ status: 404, json: { detail: 'Battler not found', code: 'BATTLER_NOT_FOUND' } }),
+  )
+
+  await page.goto('/dashboard/list/99')
+
+  await expect(page).toHaveURL(/\/dashboard$/)
+})
+
+test('a saved preset that fails to load says so, and Retry loads it', async ({ page, baseURL }) => {
+  let failing = true
+  await serveSignedIn(page, baseURL!)
+  await page.route('**/api/battlers/1', (route) =>
+    failing
+      ? route.fulfill({ status: 500, json: { detail: 'Internal Server Error' } })
+      : route.fulfill({ json: battler(1, 'vintage-cube', 'Vintage Cube') }),
+  )
+
+  await page.goto('/dashboard/list/1')
+  await expect(page.getByText("This preset didn't load.")).toBeVisible()
+  failing = false
+  await page.getByRole('button', { name: 'Retry' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Vintage Cube' })).toBeVisible()
+})
+
+test('a cube whose details fail to load says so, and Retry loads them', async ({ page, baseURL }) => {
+  let failing = true
+  await serveSignedIn(page, baseURL!)
+  await page.route('**/api/battlers/cube/vintage-cube', async (route) =>
+    failing ? route.fulfill({ status: 500, json: { detail: 'Internal Server Error' } }) : route.fallback(),
+  )
+
+  await page.goto('/cube/vintage-cube')
+  await expect(page.getByText("This cube's details didn't load.")).toBeVisible()
+  failing = false
+  await page.getByRole('button', { name: 'Retry' }).click()
+
+  await expect(page.getByRole('button', { name: '+ Follow' })).toBeVisible()
+  await expect(page.getByText("This cube's details didn't load.")).toBeHidden()
+})
+
 test.describe('on a phone held upright', () => {
   // The Add Cube / Deck dialog can't scroll, so on a landscape phone its submit button is off screen.
   test.use({ viewport: { width: 390, height: 844 } })

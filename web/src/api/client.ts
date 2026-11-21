@@ -343,6 +343,12 @@ export async function getBattlers(offset = 0): Promise<{ battlers: UserBattler[]
   return response.json()
 }
 
+export async function getBattler(id: number): Promise<UserBattler> {
+  const response = await fetch(`${API_BASE}/battlers/${id}`, { credentials: 'include' })
+  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load battler')
+  return response.json()
+}
+
 export interface CreateBattlerRequest {
   cube_id: string
   display_name?: string
