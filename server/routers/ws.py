@@ -385,8 +385,11 @@ async def _handle_spectator_connection(
 
 async def _handle_player_disconnect(game_id: str, player_id: str, websocket: WebSocket) -> None:
     connection_manager.disconnect(game_id, player_id, websocket)
-    # A late close from a socket that a newer one replaced must not mark the still-connected player as gone.
+    # A late close from a socket that a newer one replaced must not mark the still-connected player as gone,
+    # and a kicked player has no seat left to mark.
     if player_id in connection_manager.get_connected_player_ids(game_id):
+        return
+    if not game_manager.holds_seat(game_id, player_id):
         return
     game_manager.schedule_pending_disconnect(
         game_id,

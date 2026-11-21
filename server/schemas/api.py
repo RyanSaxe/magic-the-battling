@@ -53,6 +53,7 @@ class CreateGameResponse(BaseModel):
     join_code: str
     session_id: str
     player_id: str
+    seat_token: str
 
 
 class JoinGameRequest(BaseModel):
@@ -67,12 +68,14 @@ class JoinGameRequest(BaseModel):
 
 class RejoinGameRequest(BaseModel):
     player_name: str
+    seat_token: str | None = None
 
 
 class JoinGameResponse(BaseModel):
     game_id: str
     session_id: str
     player_id: str
+    seat_token: str
 
 
 class StartGameResponse(BaseModel):

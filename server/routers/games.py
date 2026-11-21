@@ -12,7 +12,6 @@ from sqlalchemy.orm import Session, joinedload
 from mtb.models.game import restore_snapshot_data
 from mtb.utils.cubecobra import get_cube_data
 from server.db import database
-from server.db.models import GamePlayerRecord as GPR_Model
 from server.db.models import GameRecord, PlayerGameHistory, User
 from server.errors import ErrorCode, api_error
 from server.routers.ws import connection_manager
@@ -36,9 +35,10 @@ from server.schemas.api import (
     StartGameResponse,
 )
 from server.services.auth import get_optional_user
-from server.services.game_manager import game_manager
+from server.services.game_manager import PendingGame, game_manager
 from server.services.game_serialization import catalog_entries_for_cards
 from server.services.ops_manager import ops_manager
+from server.services.seat_tokens import SeatClaimRefusal, SeatClaimRefusedError
 from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
@@ -240,6 +240,7 @@ def _create_game_response(request: CreateGameRequest, user_id: str | None = None
         join_code=pending.join_code,
         session_id=session.session_id,
         player_id=session.player_id,
+        seat_token=game_manager.issue_lobby_seat_token(pending.game_id, request.player_name),
     )
 
 
@@ -305,7 +306,7 @@ async def warm_cube_cache(request: WarmCubeRequest):
 
 
 @router.post("/join", response_model=JoinGameResponse)
-def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depends(get_optional_user)):  # noqa: B008
+async def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depends(get_optional_user)):  # noqa: B008
     """Join a game using just the join code (no game_id needed)."""
     if ops_manager.blocks_new_games():
         raise _server_update_http_error("Server is updating. Joining new games is temporarily blocked.")
@@ -314,13 +315,35 @@ def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depe
     if not game_id:
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
-    if game_manager.get_game(game_id):
-        raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
+    async with game_manager.get_action_lock(game_id):
+        if game_manager.get_game(game_id):
+            raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
+        pending = game_manager.get_pending_game(game_id)
+        if not pending:
+            raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+        return _join_lobby(pending, request, current_user)
 
-    pending = game_manager.get_pending_game(game_id)
-    if not pending:
+
+@router.post("/{game_id}/join", response_model=JoinGameResponse)
+async def join_game(game_id: str, request: JoinGameRequest, current_user: User | None = Depends(get_optional_user)):  # noqa: B008
+    if ops_manager.blocks_new_games():
+        raise _server_update_http_error("Server is updating. Joining new games is temporarily blocked.")
+
+    if not game_manager.get_pending_game(game_id):
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
+    async with game_manager.get_action_lock(game_id):
+        pending = game_manager.get_pending_game(game_id)
+        if not pending:
+            raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+        if pending.join_code.upper() != request.join_code.upper():
+            raise api_error(400, ErrorCode.INVALID_JOIN_CODE, "Invalid join code")
+        if pending.is_started:
+            raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
+        return _join_lobby(pending, request, current_user)
+
+
+def _join_lobby(pending: PendingGame, request: JoinGameRequest, current_user: User | None) -> JoinGameResponse:
     if pending.has_player_named(request.player_name):
         raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
     if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
@@ -329,12 +352,11 @@ def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depe
     session = session_manager.create_session(pending.game_id)
     user_id = str(current_user.id) if current_user else None
     result = game_manager.join_game(
-        join_code=request.join_code,
+        join_code=pending.join_code,
         player_name=request.player_name,
         player_id=session.player_id,
         user_id=user_id,
     )
-
     if not result:
         raise api_error(400, ErrorCode.UNKNOWN, "Failed to join game")
 
@@ -342,92 +364,58 @@ def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depe
         game_id=pending.game_id,
         session_id=session.session_id,
         player_id=session.player_id,
+        seat_token=game_manager.issue_lobby_seat_token(pending.game_id, request.player_name),
     )
 
 
-@router.post("/{game_id}/join", response_model=JoinGameResponse)
-def join_game(game_id: str, request: JoinGameRequest, current_user: User | None = Depends(get_optional_user)):  # noqa: B008
-    if ops_manager.blocks_new_games():
-        raise _server_update_http_error("Server is updating. Joining new games is temporarily blocked.")
-
-    pending = game_manager.get_pending_game(game_id)
-    if not pending:
-        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
-
-    if pending.join_code.upper() != request.join_code.upper():
-        raise api_error(400, ErrorCode.INVALID_JOIN_CODE, "Invalid join code")
-
-    if pending.is_started:
-        raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
-
-    if pending.has_player_named(request.player_name):
-        raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
-    if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
-        raise api_error(400, ErrorCode.LOBBY_FULL, "Lobby is full")
-
-    session = session_manager.create_session(game_id)
-    user_id = str(current_user.id) if current_user else None
-    result = game_manager.join_game(
-        join_code=request.join_code,
-        player_name=request.player_name,
-        player_id=session.player_id,
-        user_id=user_id,
-    )
-
-    if not result:
-        raise api_error(400, ErrorCode.UNKNOWN, "Failed to join game")
-
-    return JoinGameResponse(
-        game_id=game_id,
-        session_id=session.session_id,
-        player_id=session.player_id,
-    )
+_SEAT_REFUSAL_ERRORS: dict[SeatClaimRefusal, tuple[int, ErrorCode, str]] = {
+    SeatClaimRefusal.GAME_NOT_FOUND: (404, ErrorCode.GAME_NOT_FOUND, "Game not found"),
+    SeatClaimRefusal.SEAT_NOT_FOUND: (404, ErrorCode.PLAYER_NOT_IN_GAME, "Player not found in game"),
+    SeatClaimRefusal.LOGIN_REQUIRED: (403, ErrorCode.NOT_AUTHENTICATED, "Log in to reconnect to this player slot"),
+    SeatClaimRefusal.TOKEN_REQUIRED: (
+        403,
+        ErrorCode.SEAT_CLAIM_REQUIRED,
+        "This seat can only be reclaimed from the browser that joined with it",
+    ),
+}
 
 
 @router.post("/{game_id}/rejoin", response_model=JoinGameResponse)
-def rejoin_game(
+async def rejoin_game(
     game_id: str,
     request: RejoinGameRequest,
     current_user: User | None = Depends(get_optional_user),  # noqa: B008
-    db: Session = Depends(get_db),  # noqa: B008
 ):
-    if not game_manager.get_game(game_id):
-        game_manager.restore_game_from_snapshot(game_id)
+    """Take a seat back, from a new tab or after the session expired.
 
-    game = game_manager.get_game(game_id)
-    if not game or not any(p.name == request.player_name for p in game.players):
-        raise api_error(404, ErrorCode.PLAYER_NOT_IN_GAME, "Player not found in game")
+    The caller must hold the seat's token or be logged in as the account that took it. The new session's
+    socket replaces any socket still open on the seat."""
+    if not (
+        game_manager.get_pending_game(game_id)
+        or game_manager.get_game(game_id)
+        or game_manager.restore_game_from_snapshot(game_id)
+    ):
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
-    gpr = (
-        db.query(GPR_Model)
-        .filter(
-            GPR_Model.game_id == game_id,
-            GPR_Model.player_name == request.player_name,
-            GPR_Model.is_puppet.is_(False),
-        )
-        .first()
-    )
-    if gpr and gpr.user_id and (not current_user or str(current_user.id) != str(gpr.user_id)):
-        raise api_error(403, ErrorCode.NOT_AUTHENTICATED, "Log in to reconnect to this player slot")
-
-    player_id = game_manager.get_player_id_by_name(game_id, request.player_name)
-    if player_id and connection_manager.is_player_connected(game_id, player_id):
-        recovered = connection_manager.clear_stale_pending_connection(game_id, player_id)
-        if not recovered:
-            raise api_error(409, ErrorCode.PLAYER_ALREADY_CONNECTED, "Player is already connected")
-
-    session = session_manager.create_session(game_id)
-    success = game_manager.rejoin_game(game_id, request.player_name, session.player_id)
-
-    if not success:
-        raise api_error(400, ErrorCode.UNKNOWN, "Failed to rejoin game")
-
-    connection_manager.reserve_connection(game_id, session.player_id)
+    async with game_manager.get_action_lock(game_id):
+        try:
+            claim = game_manager.reclaim_seat(
+                game_id,
+                request.player_name,
+                seat_token=request.seat_token,
+                user_id=str(current_user.id) if current_user else None,
+            )
+        except SeatClaimRefusedError as refused:
+            status, code, detail = _SEAT_REFUSAL_ERRORS[refused.refusal]
+            raise api_error(status, code, detail) from None
+        session = session_manager.create_session(game_id, player_id=claim.player_id)
+        connection_manager.reserve_connection(game_id, claim.player_id)
 
     return JoinGameResponse(
         game_id=game_id,
         session_id=session.session_id,
         player_id=session.player_id,
+        seat_token=claim.seat_token,
     )
 
 

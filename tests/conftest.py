@@ -311,8 +311,8 @@ def game_with_players(client):
     return {
         "game_id": d1["game_id"],
         "join_code": d1["join_code"],
-        "alice": {"session_id": d1["session_id"], "player_id": d1["player_id"]},
-        "bob": {"session_id": d2["session_id"], "player_id": d2["player_id"]},
+        "alice": {"session_id": d1["session_id"], "player_id": d1["player_id"], "seat_token": d1["seat_token"]},
+        "bob": {"session_id": d2["session_id"], "player_id": d2["player_id"], "seat_token": d2["seat_token"]},
     }
 
 

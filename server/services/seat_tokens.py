@@ -1,0 +1,50 @@
+"""Who may reclaim a seat: the browser holding its seat token, or the account that took it."""
+
+import hashlib
+import hmac
+import secrets
+from enum import StrEnum
+
+
+class SeatClaimRefusal(StrEnum):
+    GAME_NOT_FOUND = "game_not_found"
+    SEAT_NOT_FOUND = "seat_not_found"
+    LOGIN_REQUIRED = "login_required"
+    TOKEN_REQUIRED = "token_required"
+
+
+class SeatClaimRefusedError(Exception):
+    def __init__(self, refusal: SeatClaimRefusal) -> None:
+        super().__init__(refusal.value)
+        self.refusal = refusal
+
+
+def new_seat_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def hash_seat_token(seat_token: str) -> str:
+    return hashlib.sha256(seat_token.encode()).hexdigest()
+
+
+def seat_token_matches(seat_token: str | None, stored_hash: str | None) -> bool:
+    if not seat_token or not stored_hash:
+        return False
+    return hmac.compare_digest(hash_seat_token(seat_token), stored_hash)
+
+
+def seat_claim_refusal(
+    *,
+    stored_hash: str | None,
+    owner_user_id: str | None,
+    seat_token: str | None,
+    user_id: str | None,
+) -> SeatClaimRefusal | None:
+    if owner_user_id is not None and user_id == owner_user_id:
+        return None
+    if seat_token_matches(seat_token, stored_hash):
+        return None
+    # Seats taken before seat tokens existed have no hash. Their first claim issues one, so this closes over time.
+    if stored_hash is None and owner_user_id is None:
+        return None
+    return SeatClaimRefusal.LOGIN_REQUIRED if owner_user_id is not None else SeatClaimRefusal.TOKEN_REQUIRED

@@ -24,7 +24,7 @@ def test_a_game_resumed_after_eviction_outlives_its_abandoned_cleanup(mock_cube_
             game_manager.persist_dirty_games()
             game_manager._cleanup_game(game_id, preserve_snapshot=True)
 
-            assert game_manager.rejoin_game(game_id, "Alice", "pid-alice-2")
+            game_manager.reclaim_seat(game_id, "Alice", seat_token=None, user_id=None)
             await asyncio.sleep(0.4)
 
             still_loaded = game_manager.get_game(game_id) is not None
@@ -53,3 +53,4 @@ def test_the_scheduled_cleanup_still_removes_a_finished_game(mock_cube_data, tes
             db.close()
 
     assert asyncio.run(scenario())
+
