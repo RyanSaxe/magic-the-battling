@@ -519,18 +519,22 @@ test.describe('the player cards', () => {
       if (await drawerToggle.isVisible()) await drawerToggle.click()
 
       const card = page.locator(`[data-guide-player-row="${longName}"]`)
-      const name = card.getByText(longName, { exact: true })
-      const result = card.getByText('Drew', { exact: true })
-      await expect(result).toBeVisible()
-      const cardBox = (await card.boundingBox())!
-      const nameBox = (await name.boundingBox())!
-      const resultBox = (await result.boundingBox())!
+      // The phone's drawer slides in, so measure once it's whole on screen, and all in one frame.
+      await expect(card).toBeInViewport({ ratio: 1 })
+      const { card: cardBox, name, result } = await card.evaluate((element, longName) => {
+        const box = (target: Element) => {
+          const { left, right, top, bottom } = target.getBoundingClientRect()
+          return { left, right, middle: (top + bottom) / 2, cut: target.scrollWidth > target.clientWidth }
+        }
+        const byText = (text: string) => Array.from(element.querySelectorAll('span')).find((span) => span.textContent === text)!
+        return { card: box(element), name: box(byText(longName)), result: box(byText('Drew')) }
+      }, longName)
 
-      expect(await name.evaluate((element) => element.scrollWidth > element.clientWidth), 'the name is cut short').toBe(true)
-      expect(await result.evaluate((element) => element.scrollWidth <= element.clientWidth), 'the result is whole').toBe(true)
-      expect(resultBox.x).toBeGreaterThanOrEqual(nameBox.x + nameBox.width)
-      expect(resultBox.x + resultBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width)
-      expect(Math.abs(resultBox.y + resultBox.height / 2 - (nameBox.y + nameBox.height / 2))).toBeLessThan(3)
+      expect(name.cut, 'the name is cut short').toBe(true)
+      expect(result.cut, 'the result is cut short').toBe(false)
+      expect(result.left).toBeGreaterThanOrEqual(name.right)
+      expect(result.right).toBeLessThanOrEqual(cardBox.right)
+      expect(Math.abs(result.middle - name.middle)).toBeLessThan(3)
     })
   }
 
@@ -543,7 +547,7 @@ test.describe('the player cards', () => {
     const card = page.locator('[data-guide-player-row="Bob"]')
     await expect(card.getByTitle('Last fight')).toHaveText('Lost')
     await card.getByRole('button').click()
-    await page.getByRole('button', { name: 'Overview' }).click()
+    await page.getByRole('radio', { name: 'Overview' }).click()
     const lastResult = page.locator('dl > div', { has: page.getByText('Last result', { exact: true }) }).locator('dd')
     await expect(lastResult).toHaveText('Lost')
   })
