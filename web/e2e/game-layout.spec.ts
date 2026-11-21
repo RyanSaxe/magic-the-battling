@@ -46,7 +46,6 @@ const SAMPLE: Screen[] = [
     name: 'build 1280x720',
     viewport: { width: 1280, height: 720 },
     state: TYPICAL.build,
-    knownFailures: { 'grab-moves-layout': 'grabbing the battlefield/sideboard divider shrinks the hand from 285px to 189px' },
   },
   {
     name: 'build-with-upgrades 1280x720',
@@ -63,7 +62,6 @@ const SAMPLE: Screen[] = [
     name: 'reward-stage-end 1280x800',
     viewport: { width: 1280, height: 800 },
     state: TYPICAL['reward-stage-end'],
-    knownFailures: { 'grab-moves-layout': 'grabbing the top divider moves the upgrades/pool divider by 2px' },
   },
   { name: 'draft 393x852', viewport: { width: 393, height: 852 }, state: TYPICAL.draft },
   {
@@ -259,12 +257,23 @@ async function restoreSavedLayout(page: Page, screen: Screen) {
       entries: [{ stage: 4, round: 2, mode: 'constraints', constraints: saved }],
     }))
   }, { phase: screen.state.phase, saved: screen.saved ?? null })
-  await page.reload({ waitUntil: 'domcontentloaded' })
-  // The header's Cinzel title sets the header's height, and with it the board's.
-  await page.evaluate(() => document.fonts.load('16px Cinzel'))
-  const crashed = page.getByRole('heading', { name: 'Something went wrong' })
-  await expect(page.locator('main .card').first().or(crashed)).toBeVisible()
-  if (await crashed.isVisible()) throw new Error(`the game crashed: ${await page.locator('p').first().innerText()}`)
+  await reloadStyled(page)
+}
+
+/** Reloads the game and waits until it shows cards on a settled board. */
+async function reloadStyled(page: Page) {
+  // Under Playwright's request routing, WebKit now and then loads the page without applying its stylesheet,
+  // although the stylesheet's request succeeds; the board measured then is not the one players see.
+  for (let attempt = 1; ; attempt++) {
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    // The header's Cinzel title sets the header's height, and with it the board's.
+    await page.evaluate(() => document.fonts.load('16px Cinzel'))
+    const crashed = page.getByRole('heading', { name: 'Something went wrong' })
+    await expect(page.locator('main .card').first().or(crashed)).toBeVisible()
+    if (await crashed.isVisible()) throw new Error(`the game crashed: ${await page.locator('p').first().innerText()}`)
+    if (await page.evaluate(() => document.styleSheets.length > 0)) break
+    if (attempt === 3) throw new Error('the page loaded without its stylesheet three times')
+  }
   await waitForStableLayout(page)
 }
 
@@ -313,21 +322,40 @@ async function dividerFractions(page: Page) {
   })
 }
 
-/** Presses and releases each divider without moving it, each from the screen's starting layout. */
+/**
+ * Presses and releases each divider, each from the screen's starting layout: once without moving it, and once after
+ * moving it a few pixels and back, which saves a layout that must reload as the same board.
+ */
 async function grabEachDivider(page: Page, screen: Screen): Promise<string[]> {
   const handles = page.locator('main .zone-divider-line > div[style*="resize"]')
   const moved: string[] = []
-  for (let index = 0; index < (await handles.count()); index++) {
-    if (index > 0) await restoreSavedLayout(page, screen)
-    const before = zoneBoxes(await measure(page))
-    const box = (await handles.nth(index).boundingBox())!
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    await page.mouse.down()
-    await page.mouse.up()
-    await waitForStableLayout(page)
-    const after = zoneBoxes(await measure(page))
+  const compare = (label: string, before: string[], after: string[]) => {
     const changed = after.map((zone, position) => [before[position], zone]).filter(([was, now]) => was !== now)
-    if (changed.length > 0) moved.push(`divider ${index}: ${changed.map(([was, now]) => `${was} -> ${now}`).join(', ')}`)
+    if (changed.length > 0) moved.push(`${label}: ${changed.map(([was, now]) => `${was} -> ${now}`).join(', ')}`)
+  }
+  const count = await handles.count()
+  for (let index = 0; index < count; index++) {
+    for (const offset of [0, 4]) {
+      if (index > 0 || offset > 0) await restoreSavedLayout(page, screen)
+      const before = zoneBoxes(await measure(page))
+      const box = (await handles.nth(index).boundingBox())!
+      const [x, y] = [box.x + box.width / 2, box.y + box.height / 2]
+      const vertical = box.width < box.height
+      await page.mouse.move(x, y)
+      await page.mouse.down()
+      if (offset > 0) {
+        await page.mouse.move(vertical ? x + offset : x, vertical ? y : y + offset)
+        await page.mouse.move(x, y)
+      }
+      await page.mouse.up()
+      await waitForStableLayout(page)
+      const label = offset > 0 ? `moving divider ${index} and back` : `grabbing divider ${index}`
+      compare(label, before, zoneBoxes(await measure(page)))
+      if (offset > 0) {
+        await reloadStyled(page)
+        compare(`${label}, after a reload`, before, zoneBoxes(await measure(page)))
+      }
+    }
   }
   return moved
 }

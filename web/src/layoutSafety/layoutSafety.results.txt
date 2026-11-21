@@ -140,52 +140,6 @@ divider-off-saved-layout
   reward-stage-end     1280x600       20/220  fa813021
   reward-stage-end     1280x720       20/220  fa813021
   reward-stage-end     1440x600       20/220  fa813021
-grab-moves-layout
-  build                768x1024      144/353  a66bccfc
-  build                820x1180      144/353  5669bb3e
-  build                1024x768      205/353  3adc7cf4
-  build                1024x500      261/353  86775dca
-  build                1180x820    1000/1591  daa51412
-  build                1280x600    1111/1591  097e5088
-  build                1280x720     997/1591  2a1558d2
-  build                1280x800     982/1591  30f3bdd1
-  build                1366x768    1037/1591  4044812e
-  build                1366x1024    872/1591  07873e9f
-  build                1440x600    1087/1591  081842ab
-  build                1440x900     790/1591  bfbb1cc9
-  build                1536x864     779/1591  edee99bb
-  build                1920x1080    994/1591  23aa457c
-  build                2560x1440    672/1591  e6fe9dfe
-  draft                768x1024       10/204  55f15a69
-  draft                820x1180        5/204  a02892be
-  draft                1024x768       21/204  79c1ad36
-  draft                1024x500       36/204  aec41fc5
-  draft                1180x820      186/900  67108b2d
-  draft                1280x600      189/900  15e116f3
-  draft                1280x720      343/900  41c31d13
-  draft                1280x800      206/900  abc99222
-  draft                1366x768      186/900  708e5aa4
-  draft                1366x1024     197/900  6767727c
-  draft                1440x600      186/900  b6f7c215
-  draft                1440x900      243/900  51ad9f51
-  draft                1536x864      309/900  80936503
-  draft                1920x1080     246/900  b84a7514
-  draft                2560x1440     178/900  1e9f29f4
-  reward-stage-end     768x1024      210/436  42bb0d1e
-  reward-stage-end     820x1180      194/436  bf2673df
-  reward-stage-end     1024x768      176/436  99438559
-  reward-stage-end     1024x500      216/436  c915ed29
-  reward-stage-end     1180x820      277/436  9aac8be2
-  reward-stage-end     1280x600      164/436  5a1b5335
-  reward-stage-end     1280x720      248/436  2346e601
-  reward-stage-end     1280x800      236/436  371bd241
-  reward-stage-end     1366x768      196/436  3107bd09
-  reward-stage-end     1366x1024     187/436  8947af32
-  reward-stage-end     1440x600      168/436  dc34a491
-  reward-stage-end     1440x900      220/436  b57341b5
-  reward-stage-end     1536x864      224/436  1f0c00a9
-  reward-stage-end     1920x1080     156/436  768677fd
-  reward-stage-end     2560x1440     220/436  e03c2643
 measurement-changes-layout
   battle               320x568           5/5  ebb62454
   battle               375x667           5/5  a666684b
