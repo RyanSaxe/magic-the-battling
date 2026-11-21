@@ -983,12 +983,8 @@ export function Lobby() {
                 <button
                   onClick={toggleReady}
                   disabled={readyActionDisabled}
-                  className={`btn btn-dark-border w-full py-2 disabled:cursor-not-allowed ${
-                    isReady
-                      ? "bg-gray-600 text-white hover:bg-gray-500"
-                      : readyActionDisabled
-                        ? "bg-gray-700 text-gray-400"
-                        : "bg-green-600 text-white hover:bg-green-500"
+                  className={`btn btn-dark-border w-full py-2 ${
+                    isReady ? "btn-secondary" : "btn-success"
                   }`}
                 >
                   {isReady ? "Unready" : "Ready"}

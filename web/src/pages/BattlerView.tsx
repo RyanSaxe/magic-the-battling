@@ -236,7 +236,7 @@ function SettingsModal({
             onClick={() => {
               if (window.confirm(`Delete "${battler.display_name || battler.cube_id}"?`)) onDelete()
             }}
-            className="btn btn-secondary py-2 px-4 text-red-400 hover:text-red-300"
+            className="btn btn-secondary btn-destructive py-2 px-4"
           >
             Delete
           </button>

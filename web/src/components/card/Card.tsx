@@ -298,7 +298,7 @@ export function Card({
         )}
         {showRevealHiddenUpgradeButton && (
           <button
-            className="absolute bottom-1 left-1 bg-purple-600/90 rounded px-2 py-0.5 text-white text-xs hover:bg-purple-500 transition-colors"
+            className="btn-game absolute bottom-1 left-1 rounded px-2 py-0.5 text-xs transition-colors"
             onClick={(e) => {
               e.stopPropagation()
               onRevealHiddenUpgrades?.()
