@@ -129,9 +129,7 @@ export function RecapCard({ game }: { game: GameSummary }) {
         <span className="shrink-0 text-[11px] leading-4 text-amber-100/60">{formatWhen(game.created_at)}</span>
       </div>
       {game.hand_scryfall_ids.length > 0 && (
-        <div className="rounded-lg border border-black/40 bg-black/30 px-2.5 py-2">
-          <HandFan scryfallIds={game.hand_scryfall_ids} className="h-[111px]" imageSize="normal" centered />
-        </div>
+        <HandFan scryfallIds={game.hand_scryfall_ids} className="h-[111px]" imageSize="normal" centered />
       )}
       <div className="mt-auto flex items-center justify-between gap-2">
         <div className="flex flex-wrap gap-1.5">
