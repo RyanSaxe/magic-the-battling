@@ -1706,6 +1706,14 @@ function GameContent() {
   }
 
   if (!gameState) {
+    if (watching) {
+      // A game still in its lobby sends spectators nothing until it starts.
+      return (
+        <NoticeFrame>
+          <BusyNotice label={isConnected ? `Waiting for ${watching.target}'s game to start...` : "Connecting..."} />
+        </NoticeFrame>
+      );
+    }
     return (
       <div className="game-table flex items-center justify-center">
         <div className="text-white">{isConnected ? 'Loading game...' : 'Connecting...'}</div>
