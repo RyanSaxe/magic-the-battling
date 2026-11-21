@@ -282,3 +282,80 @@ test('Escape closes the account menu', async ({ page, baseURL }) => {
   await page.keyboard.press('Escape')
   await expect(dashboardItem).toHaveCount(0)
 })
+
+const DRAFT: ScreenState = { phase: 'draft', counts: { pack: 5, sideboard: 10, upgrades: 2, opponentRevealed: 7 } }
+const SCOUTING_WIDTH = 288
+
+/** The player list's box: the docked sidebar from 1120px, the drawer's panel below that. */
+async function playerListBox(page: Page) {
+  return page.evaluate(() => {
+    const list = document.querySelector('[data-guide-target="sidebar-opponent-list"]')!
+    const column = list.closest('.side-panel') ?? list.closest('.frame-sidebar')!
+    const { left, right } = column.getBoundingClientRect()
+    return { left, right }
+  })
+}
+
+const boardBox = (page: Page) => page.locator('main').evaluate((main) => main.getBoundingClientRect().toJSON())
+
+for (const { name, viewport } of SCREENS.filter((screen) => screen.viewport.width >= 640)) {
+  test.describe(name, () => {
+    test.use({ viewport })
+
+    test('scouting opens beside the player list, over a board that stays put, and follows the player clicked', async ({ page, baseURL }) => {
+      await openGame(page, baseURL!, DRAFT)
+      if (viewport.width < DOCKED_SIDEBAR_FROM) await page.getByRole('button', { name: '☰' }).click()
+      const board = await boardBox(page)
+
+      await page.getByRole('button', { name: /Bob/ }).click()
+      const scouting = sidePanel(page, 'Scouting Bob')
+      await expect(scouting).toBeVisible()
+      const { box, headerBottom, footerTop, panelOverHeader, panelOverFooter } = await measure(page, scouting)
+      const list = await playerListBox(page)
+
+      expect.soft(panelOverHeader || panelOverFooter, 'the panel shows over a bar').toBe(false)
+      expect.soft(box.y, 'top, on the gold edge under the top bar').toBe(headerBottom + SEAM)
+      expect.soft(box.y + box.height, 'bottom, on the gold edge over the bottom bar').toBe(footerTop - SEAM)
+      expect.soft(box.x + box.width, 'right, on the player list\'s gold edge').toBe(list.left - (viewport.width >= DOCKED_SIDEBAR_FROM ? SEAM : 0))
+      expect.soft(box.width, 'width').toBe(SCOUTING_WIDTH)
+      expect.soft(await boardBox(page), 'the board under the panel').toEqual(board)
+
+      await page.getByRole('button', { name: /Carol/ }).click()
+      await expect(sidePanel(page, 'Scouting Carol')).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expect(sidePanel(page, 'Scouting Carol')).toHaveCount(0)
+    })
+  })
+}
+
+test.describe('a Fight at 1280', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  test('the Fight | Players switch shows the player list, and scouting from it closes when the Fight returns', async ({ page, baseURL }) => {
+    await openGame(page, baseURL!, { ...FIGHT, counts: { ...FIGHT.counts, opponentRevealed: 7 } })
+    const sidebar = page.locator('.frame-sidebar')
+
+    await sidebar.getByRole('radio', { name: 'Players' }).click()
+    await sidebar.getByRole('button', { name: /Bob/ }).click()
+    await expect(sidePanel(page, 'Scouting Bob')).toBeVisible()
+
+    await sidebar.getByRole('radio', { name: 'Fight' }).click()
+    await expect(sidePanel(page, 'Scouting Bob')).toHaveCount(0)
+    await expect(sidebar.getByRole('button', { name: 'Pass' })).toBeVisible()
+  })
+})
+
+test.describe('a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+
+  test('scouting takes the list\'s place in the drawer, and Back returns to the list', async ({ page, baseURL }) => {
+    await openGame(page, baseURL!, DRAFT)
+    await page.getByRole('button', { name: '☰' }).click()
+    await page.getByRole('button', { name: /Bob/ }).click()
+
+    const drawer = sidePanel(page, 'Scouting')
+    await expect(drawer.getByText('Bob', { exact: true })).toBeVisible()
+    await drawer.getByRole('button', { name: /Back/ }).click()
+    await expect(sidePanel(page, 'Players').getByRole('button', { name: /Carol/ })).toBeVisible()
+  })
+})

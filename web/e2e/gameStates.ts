@@ -152,6 +152,8 @@ export interface Counts {
   opponentNonlands?: number
   graveyard?: number
   exile?: number
+  /** Cards Bob showed in his last fight, which his scouting panel lists. */
+  opponentRevealed?: number
 }
 
 export type GamePhase = 'draft' | 'build' | 'battle' | 'reward' | 'eliminated' | 'game_over'
@@ -240,7 +242,10 @@ export function gameBootstrap({ phase, counts, stageEnd = false, suddenDeath = f
     starting_life: 20,
     players: [
       self,
-      playerView(OPPONENT_NAME, othersPhase, { placement: placements[OPPONENT_NAME] ?? 0 }),
+      playerView(OPPONENT_NAME, othersPhase, {
+        placement: placements[OPPONENT_NAME] ?? 0,
+        most_recently_revealed_cards: cards('revealed', counts.opponentRevealed ?? 0, 'spell', 6),
+      }),
       playerView('Carol', othersPhase, { placement: placements.Carol ?? 0 }),
       playerView('Dave', othersPhase, { is_puppet: true, placement: placements.Dave ?? 0 }),
     ],
