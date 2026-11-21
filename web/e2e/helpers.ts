@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import type { Locator, Page } from '@playwright/test'
 import type {
   AuthUser,
@@ -8,6 +9,7 @@ import type {
   SharePlayerSnapshot,
   UserBattler,
 } from '../src/types'
+import { gameBootstrap, type ScreenState } from './gameStates'
 
 type MockResponse = { status?: number; json: unknown }
 
@@ -198,6 +200,23 @@ export async function serveLobby(page: Page, baseURL: string, mode: LobbyMode = 
   }, LOBBY_SESSION)
   await page.routeWebSocket(/\/ws\//, (ws) => {
     if (mode === 'connected') ws.send(JSON.stringify({ type: 'lobby_state', payload: LOBBY_STATE }))
+  })
+}
+
+const CARD_IMAGE_PATH = fileURLToPath(new URL('../public/icon-192.png', import.meta.url))
+
+/** Opens a game whose server sends `screen` as its state, with every card image served from disk. */
+export async function serveGame(page: Page, baseURL: string, screen: ScreenState) {
+  await serveWithoutBackend(page, baseURL)
+  await page.route(/^https:\/\/(cards|backs)\.scryfall\.io\//, (route) => route.fulfill({ path: CARD_IMAGE_PATH }))
+  await page.addInitScript((session) => {
+    sessionStorage.setItem('mtb_session', session.sessionId)
+    sessionStorage.setItem('mtb_player', session.playerId)
+    // Guided Mode is on for new players and opens panels over the board, so play as a returning player.
+    localStorage.setItem('mtb_guided_mode_preference', '0')
+  }, LOBBY_SESSION)
+  await page.routeWebSocket(/\/ws\//, (ws) => {
+    ws.send(JSON.stringify({ type: 'game_bootstrap', payload: gameBootstrap(screen) }))
   })
 }
 
