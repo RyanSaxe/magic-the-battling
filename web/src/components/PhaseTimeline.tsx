@@ -40,6 +40,7 @@ interface PhaseTimelineProps {
   nextStage: number;
   nextRound: number;
   inSuddenDeath?: boolean;
+  suddenDeathDecidesGame?: boolean;
   useUpgrades?: boolean;
   autoOpenPhase?: Phase | null;
   autoOpenDurationMs?: number;
@@ -89,6 +90,7 @@ export function PhaseTimeline({
   nextStage,
   nextRound,
   inSuddenDeath = false,
+  suddenDeathDecidesGame = false,
   useUpgrades = true,
   autoOpenPhase = null,
   autoOpenDurationMs = GUIDED_POPOVER_AUTO_CLOSE_MS,
@@ -247,6 +249,7 @@ export function PhaseTimeline({
 
   const isEnd = !isGamePhase(currentPhase);
   const timelinePhases = getTimelinePhases(inSuddenDeath && !isEnd);
+  const endsInWinner = inSuddenDeath && suddenDeathDecidesGame && !isEnd;
 
   return (
     <header className={`frame-chrome ${headerCls}`}>
@@ -279,7 +282,11 @@ export function PhaseTimeline({
                   ${welcomeGuideActive || isEnd ? "hover:brightness-100" : "hover:brightness-125"}
                 `}
               >
-                {isEndReward ? (title ?? END_STATE_LABELS[currentPhase as EndState]) : PHASE_TIMELINE_LABELS[phase]}
+                {isEndReward
+                  ? (title ?? END_STATE_LABELS[currentPhase as EndState])
+                  : endsInWinner && phase === "reward"
+                    ? "winner"
+                    : PHASE_TIMELINE_LABELS[phase]}
               </button>
             );
 
@@ -292,7 +299,7 @@ export function PhaseTimeline({
                     data-guide-target="timeline-next-stage-round"
                   >
                     {phaseButton}
-                    {!isEnd && (
+                    {!isEnd && !endsInWinner && (
                       <span className="text-xs sm:text-sm text-gray-500">
                         to <span className="font-mono">{nextStage}-{nextRound}</span>
                       </span>

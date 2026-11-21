@@ -4,6 +4,7 @@ import {
   comparePlayersForSidebar,
   getSidebarPlacementRank,
   getSidebarPlayerOrder,
+  suddenDeathDecidesGame,
 } from "./playerPlacement";
 
 function makePlayer(
@@ -84,5 +85,28 @@ describe("player placement ordering", () => {
     expect(players.map((player) => getSidebarPlacementRank(player, players))).toEqual([
       1, 1, 3, 3, 5,
     ]);
+  });
+});
+
+describe("suddenDeathDecidesGame", () => {
+  it("is true when no one outside the sudden death is still alive", () => {
+    const players = [
+      makePlayer({ name: "Alpha", in_sudden_death: true }),
+      makePlayer({ name: "Bravo", in_sudden_death: true }),
+      makePlayer({ name: "Charlie", placement: 3 }),
+    ];
+
+    expect(suddenDeathDecidesGame(players)).toBe(true);
+  });
+
+  it("is false when another player is still alive", () => {
+    const players = [
+      makePlayer({ name: "Alpha", in_sudden_death: true }),
+      makePlayer({ name: "Bravo", in_sudden_death: true }),
+      makePlayer({ name: "Charlie", poison: 4 }),
+      makePlayer({ name: "Delta", placement: 4 }),
+    ];
+
+    expect(suddenDeathDecidesGame(players)).toBe(false);
   });
 });

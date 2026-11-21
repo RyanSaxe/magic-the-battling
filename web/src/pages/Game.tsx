@@ -50,6 +50,7 @@ import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import {
   comparePlayersForSidebar,
   getSidebarPlayerOrder,
+  suddenDeathDecidesGame,
 } from "../utils/playerPlacement";
 import {
   buildAppliedUpgradeMap,
@@ -2132,6 +2133,7 @@ function GameContent() {
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
             inSuddenDeath={self_player.in_sudden_death}
+            suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
             useUpgrades={gameState.use_upgrades}
             headerClassName={phaseTimelineHeaderClassName}
             rightActionsClassName={phaseTimelineRightActionsClassName}

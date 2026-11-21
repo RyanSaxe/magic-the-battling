@@ -20,6 +20,10 @@ export function comparePlayersForSidebar(
   return a.name.localeCompare(b.name);
 }
 
+export function suddenDeathDecidesGame(players: PlayerView[]): boolean {
+  return !players.some((player) => !player.in_sudden_death && player.placement === 0);
+}
+
 export function getSidebarPlayerOrder(players: PlayerView[]): PlayerView[] {
   return [...players].sort(comparePlayersForSidebar);
 }

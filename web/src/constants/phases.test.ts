@@ -6,7 +6,7 @@ describe("getTimelinePhases", () => {
     expect(getTimelinePhases(false)).toEqual(["draft", "build", "battle", "reward"]);
   });
 
-  it("shows only the build and battle loop in sudden death", () => {
-    expect(getTimelinePhases(true)).toEqual(["build", "battle"]);
+  it("leaves out the draft in sudden death", () => {
+    expect(getTimelinePhases(true)).toEqual(["build", "battle", "reward"]);
   });
 });
