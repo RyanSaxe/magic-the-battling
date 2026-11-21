@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
+import { SurfaceCard } from '../components/common/SurfaceCard'
 import { InfoCard } from '../components/common/InfoCard'
 import {
   getBattlers,
@@ -338,12 +339,12 @@ function BattlersGrid({
   if (battlers.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4">
-        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
+        <SurfaceCard width="fit-sm" padding={8} bordered={false} className="text-center">
           <p className="text-gray-300 mb-4">No cubes saved yet. Add your first cube to start tracking your games.</p>
           <button onClick={onAdd} className="btn btn-primary py-2 px-6 font-semibold">
             Add Your First Cube
           </button>
-        </div>
+        </SurfaceCard>
       </div>
     )
   }
@@ -409,12 +410,12 @@ function FollowingGrid({
   if (following.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
+        <SurfaceCard width="fit-sm" padding={8} bordered={false} className="text-center">
           <p className="text-gray-300">Not following any cubes yet.</p>
           <button onClick={onSwitchToDiscover} className="btn btn-secondary py-2 px-6 mt-4">
             Browse Cubes
           </button>
-        </div>
+        </SurfaceCard>
       </div>
     )
   }
@@ -500,9 +501,12 @@ function AddBattlerModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <form
+      <SurfaceCard
+        as="form"
         onSubmit={handleSubmit}
-        className="relative modal-chrome border gold-border rounded-lg p-5 w-full max-w-sm felt-raised-panel"
+        width="sm"
+        padding={5}
+        className="relative"
       >
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
           <h3 className="text-white font-semibold">Add Cube</h3>
@@ -588,7 +592,7 @@ function AddBattlerModal({
         >
           {saving ? 'Saving...' : 'Add Cube'}
         </button>
-      </form>
+      </SurfaceCard>
     </div>
   )
 }
@@ -663,12 +667,12 @@ function MyGamesGrid({
   if (games.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
+        <SurfaceCard width="fit-sm" padding={8} bordered={false} className="text-center">
           <p className="text-gray-300">No completed games yet.</p>
           <button onClick={onPlayGame} className="btn btn-primary py-2 px-6 font-semibold mt-4">
             Play a Game
           </button>
-        </div>
+        </SurfaceCard>
       </div>
     )
   }
@@ -771,12 +775,12 @@ function DiscoverGrid({
   if (results.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
+        <SurfaceCard width="fit-sm" padding={8} bordered={false} className="text-center">
           <p className="text-gray-300">No cubes found yet.</p>
           <button onClick={onPlayGame} className="btn btn-primary py-2 px-6 font-semibold mt-4">
             Play a Game
           </button>
-        </div>
+        </SurfaceCard>
       </div>
     )
   }

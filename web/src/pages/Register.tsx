@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
 import { AppHeader } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
+import { SurfaceCard } from '../components/common/SurfaceCard'
 import { unknownToAppError } from '../utils/appError'
 
 export function Register() {
@@ -48,9 +49,11 @@ export function Register() {
       center="always"
       contentClassName="items-center px-4"
     >
-      <form
+      <SurfaceCard
+        as="form"
         onSubmit={handleSubmit}
-        className="w-full max-w-sm modal-chrome border gold-border rounded-lg p-6 felt-raised-panel"
+        width="sm"
+        padding={6}
       >
         <h2 className="text-xl font-bold text-white mb-5">Create Account</h2>
 
@@ -127,7 +130,7 @@ export function Register() {
           Already have an account?{' '}
           <Link to={`/login${returnTo !== '/' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} className="text-amber-400 hover:text-amber-300">Log in</Link>
         </p>
-      </form>
+      </SurfaceCard>
     </PageFrame>
   )
 }

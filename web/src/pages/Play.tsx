@@ -9,6 +9,7 @@ import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { InfoIcon } from "../components/icons/InfoIcon";
 import { AppHeader } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
+import { SurfaceCard } from "../components/common/SurfaceCard";
 import { getLegendaryName } from "../utils/prefetchName";
 import {
   getDefaultNewPlayerPreference,
@@ -150,7 +151,7 @@ function AdvancedOptionsModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative modal-chrome border gold-border rounded-lg p-5 w-full max-w-sm felt-raised-panel">
+      <SurfaceCard width="sm" padding={5} className="relative">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
           <h3 className="text-white font-semibold">{title}</h3>
           <button
@@ -167,7 +168,7 @@ function AdvancedOptionsModal({
         >
           Done
         </button>
-      </div>
+      </SurfaceCard>
     </div>
   );
 }
@@ -606,7 +607,7 @@ export function Play() {
         contentClassName="px-4 sm:items-center"
         hints
       >
-        <section className="w-full max-w-md mx-auto modal-chrome border gold-border rounded-lg overflow-hidden grow shrink-0 flex flex-col sm:flex-none felt-raised-panel">
+        <SurfaceCard as="section" width="md" className="mx-auto overflow-hidden grow shrink-0 flex flex-col sm:flex-none">
           <div className="p-4 sm:p-5 flex-1 min-h-0 flex flex-col sm:flex-none">
             <div className="mb-4">
               <div className="mb-1 flex items-center justify-between gap-3">
@@ -735,7 +736,7 @@ export function Play() {
               )}
             </div>
           </div>
-        </section>
+        </SurfaceCard>
       </PageFrame>
 
       {showFriendsAdvanced && (
@@ -808,7 +809,7 @@ export function Play() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={handleCancelSolo}
           />
-          <div className="relative modal-chrome border gold-border rounded-lg p-8 w-full max-w-md text-center">
+          <SurfaceCard width="md" padding={8} raised={false} className="relative text-center">
             <h2 className="text-xl font-bold text-white mb-4">
               Not enough puppet data
             </h2>
@@ -842,7 +843,7 @@ export function Play() {
             >
               Cancel
             </button>
-          </div>
+          </SurfaceCard>
         </div>
       )}
     </>

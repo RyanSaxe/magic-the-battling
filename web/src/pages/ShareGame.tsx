@@ -14,6 +14,7 @@ import { useHotkeys } from '../hooks/useHotkeys'
 import { getSidebarPlayerOrder } from '../utils/playerPlacement'
 import { AppHeader } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
+import { SurfaceCard } from '../components/common/SurfaceCard'
 
 interface RoundOption {
   label: string
@@ -212,12 +213,12 @@ export function ShareGame() {
     if (roundOptions.length === 0) {
       return (
         <div className="flex-1 flex items-center justify-center">
-          <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
+          <SurfaceCard width="md-viewport" padding={5} raised={false}>
             <h2 className="text-lg font-semibold text-amber-200">No Round Data</h2>
             <p className="text-sm text-gray-200 mt-2 leading-snug">
               No round data is available for this game.
             </p>
-          </div>
+          </SurfaceCard>
         </div>
       )
     }
@@ -240,13 +241,13 @@ export function ShareGame() {
 
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
+        <SurfaceCard width="md-viewport" padding={5} raised={false}>
           <p className="text-sm text-gray-200 leading-snug">
             {currentPlayerData
               ? 'This player was not in the game during this round.'
               : 'Select a player to view their deck.'}
           </p>
-        </div>
+        </SurfaceCard>
       </div>
     )
   }
