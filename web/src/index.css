@@ -314,6 +314,44 @@ input:-webkit-autofill:focus {
   }
 }
 
+/* Page content centers with auto margins rather than justify-content: center,
+   so content taller than its column starts at the top and can be scrolled to. */
+.page-center > :first-child {
+  margin-top: auto;
+}
+
+.page-center > :last-child {
+  margin-bottom: auto;
+}
+
+@media (width < 640px), (height > 820px) {
+  .page-center-except-short-wide > :first-child {
+    margin-top: auto;
+  }
+
+  .page-center-except-short-wide > :last-child {
+    margin-bottom: auto;
+  }
+}
+
+@media (width >= 640px) and (height > 820px) {
+  .page-center-tall-wide > :first-child {
+    margin-top: auto;
+  }
+
+  .page-center-tall-wide > :last-child {
+    margin-bottom: auto;
+  }
+}
+
+@media (width >= 640px) and (height <= 820px) {
+  .page-center-except-short-wide,
+  .page-center-tall-wide {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+}
+
 .zone-divider-line--horizontal {
   background:
     linear-gradient(
