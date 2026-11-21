@@ -408,6 +408,7 @@ class SharePlayerSnapshot(BaseModel):
     poison: int
     vanguard: Card | None = None
     visibility: ShareSnapshotVisibility = "full"
+    sudden_death_build: int | None = None
 
 
 class SharePlayerData(BaseModel):

@@ -11,7 +11,7 @@ from server.schemas.api import ShareGameResponse, SharePlayerData, SharePlayerSn
 
 def _build_human_snapshots(history: PlayerGameHistory) -> list[SharePlayerSnapshot]:
     snapshots: list[SharePlayerSnapshot] = []
-    sorted_snaps = sorted(history.snapshots, key=lambda s: (s.stage, s.round))
+    sorted_snaps = sorted(history.snapshots, key=lambda s: (s.stage, s.round, s.sudden_death_build or 0))
     for snap in sorted_snaps:
         snapshot_data = restore_snapshot_data(snap.full_state_json)
         poison = snap.poison if snap.poison is not None else snapshot_data.poison
@@ -28,6 +28,7 @@ def _build_human_snapshots(history: PlayerGameHistory) -> list[SharePlayerSnapsh
                 treasures=snapshot_data.treasures,
                 poison=poison,
                 vanguard=snapshot_data.vanguard,
+                sudden_death_build=cast(int | None, snap.sudden_death_build),
             )
         )
     return snapshots
@@ -118,8 +119,12 @@ def _build_share_player(history: PlayerGameHistory, db: Session) -> SharePlayerD
     )
 
 
-def _round_of(snapshot: SharePlayerSnapshot) -> tuple[int, int]:
-    return snapshot.stage, snapshot.round
+# A Sudden Death build comes after the ordinary build of its round, so it is part of what makes a round distinct.
+ShareRound = tuple[int, int, int]
+
+
+def _round_of(snapshot: SharePlayerSnapshot) -> ShareRound:
+    return snapshot.stage, snapshot.round, snapshot.sudden_death_build or 0
 
 
 def _poison_and_treasures_only(snapshot: SharePlayerSnapshot) -> SharePlayerSnapshot:
@@ -136,10 +141,11 @@ def _poison_and_treasures_only(snapshot: SharePlayerSnapshot) -> SharePlayerSnap
         poison=snapshot.poison,
         vanguard=None,
         visibility="hidden",
+        sudden_death_build=snapshot.sudden_death_build,
     )
 
 
-def _sharer_mid_game(sharer: SharePlayerData, last_round: tuple[int, int] | None) -> SharePlayerData:
+def _sharer_mid_game(sharer: SharePlayerData, last_round: ShareRound | None) -> SharePlayerData:
     # The sharer's last build is the ghost a remaining player may still fight, and its
     # applied upgrades name the hand cards they target.
     snapshots = [
@@ -152,7 +158,7 @@ def _sharer_mid_game(sharer: SharePlayerData, last_round: tuple[int, int] | None
 
 
 def _other_player_mid_game(
-    player: SharePlayerData, sharer_rounds: set[tuple[int, int]], sharer_last_round: tuple[int, int] | None
+    player: SharePlayerData, sharer_rounds: set[ShareRound], sharer_last_round: ShareRound | None
 ) -> SharePlayerData:
     snapshots = [_poison_and_treasures_only(s) for s in player.snapshots if _round_of(s) in sharer_rounds]
     out_by_sharers_last_round = (

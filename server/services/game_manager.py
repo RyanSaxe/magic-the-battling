@@ -1657,7 +1657,16 @@ class GameManager:
             return 1200.0
         return sum(elos) / len(elos)
 
-    def _record_snapshot(self, db: Session, game_id: str, player: Player, battler_elo: float) -> BattleSnapshot:
+    def _record_snapshot(
+        self,
+        db: Session,
+        game_id: str,
+        player: Player,
+        battler_elo: float,
+        *,
+        opponent_name: str | None = None,
+        sudden_death_build: int | None = None,
+    ) -> BattleSnapshot:
         history = (
             db.query(PlayerGameHistory)
             .filter(
@@ -1733,6 +1742,8 @@ class GameManager:
             treasures=player.treasures,
             poison=player.poison,
             play_draw_preference=player.play_draw_preference,
+            opponent_name=opponent_name,
+            sudden_death_build=sudden_death_build,
             full_state_json=slim_snapshot_dump(snapshot_data),
         )
         db.add(snapshot)
@@ -3079,6 +3090,7 @@ class GameManager:
                 if fp.in_sudden_death and not fp.is_eliminated:
                     static_opp = fp.get_opponent_for_round(player.stage, player.round)
                     if static_opp:
+                        self._record_sudden_death_builds(db, game_id, [(player, static_opp.name)])
                         player.phase = "battle"
                         player.build_ready = False
                         battle.start(game, player, static_opp, is_sudden_death=True)
@@ -3090,12 +3102,48 @@ class GameManager:
             return None
 
         # Both ready - start sudden death battle
+        self._record_sudden_death_builds(db, game_id, [(player, other_sd_player.name), (other_sd_player, player.name)])
         player.phase = "battle"
         other_sd_player.phase = "battle"
         player.build_ready = False
         other_sd_player.build_ready = False
         battle.start(game, player, other_sd_player, is_sudden_death=True)
         return None
+
+    def _record_sudden_death_builds(
+        self, db: Session | None, game_id: str | None, fighters: list[tuple[Player, str]]
+    ) -> None:
+        if db is None or game_id is None:
+            return
+        # The share page is a record of the game, so a build that fails to save must never stop the fight.
+        try:
+            for player, opponent_name in fighters:
+                battler_elo = player.battler.elo if player.battler is not None else 1200.0
+                self._record_snapshot(
+                    db,
+                    game_id,
+                    player,
+                    battler_elo,
+                    opponent_name=opponent_name,
+                    sudden_death_build=self._next_sudden_death_build(db, game_id, player),
+                )
+        except Exception:
+            logger.exception("Could not save Sudden Death builds: game_id=%s", game_id)
+            db.rollback()
+
+    def _next_sudden_death_build(self, db: Session, game_id: str, player: Player) -> int:
+        previous = (
+            db.query(func.max(BattleSnapshot.sudden_death_build))
+            .join(PlayerGameHistory, BattleSnapshot.player_history_id == PlayerGameHistory.id)
+            .filter(
+                PlayerGameHistory.game_id == game_id,
+                PlayerGameHistory.player_name == player.name,
+                BattleSnapshot.stage == player.stage,
+                BattleSnapshot.round == player.round,
+            )
+            .scalar()
+        )
+        return (previous or 0) + 1
 
     def _find_sudden_death_opponent(self, game: Game, player: Player) -> Player | None:
         """Find the other player in sudden death mode."""
