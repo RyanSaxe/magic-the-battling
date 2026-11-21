@@ -9,6 +9,17 @@ const MAX_TRACKED_GAMES = 100;
 interface TrackedPlayerEntry {
   name: string;
   seen_at: number;
+  seat_token?: string;
+  join_code?: string;
+}
+
+/** A seat this browser has held in a game: the name it plays under and the token that reclaims it. */
+export interface RememberedSeat {
+  gameId: string;
+  name: string;
+  seatToken: string | null;
+  joinCode: string | null;
+  seenAt: number;
 }
 
 interface NewPlayerPreferenceEntry {
@@ -18,12 +29,6 @@ interface NewPlayerPreferenceEntry {
 
 type TrackedPlayerMap = Record<string, TrackedPlayerEntry>;
 type NewPlayerPreferenceMap = Record<string, NewPlayerPreferenceEntry>;
-
-export interface ReconnectStatusPlayer {
-  name: string;
-  is_connected: boolean;
-  is_puppet: boolean;
-}
 
 function canUseStorage(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -43,9 +48,13 @@ function readTrackedPlayerMap(): TrackedPlayerMap {
       if (!value || typeof value !== "object") continue;
       const name = (value as { name?: unknown }).name;
       const seenAt = (value as { seen_at?: unknown }).seen_at;
+      const seatToken = (value as { seat_token?: unknown }).seat_token;
+      const joinCode = (value as { join_code?: unknown }).join_code;
       if (typeof name !== "string" || !name) continue;
       if (typeof seenAt !== "number") continue;
       result[gameId] = { name, seen_at: seenAt };
+      if (typeof seatToken === "string" && seatToken) result[gameId].seat_token = seatToken;
+      if (typeof joinCode === "string" && joinCode) result[gameId].join_code = joinCode;
     }
     return result;
   } catch {
@@ -139,22 +148,67 @@ export function getOrCreateDeviceId(): string {
   return next;
 }
 
-export function rememberPlayerForGame(gameId: string, playerName: string): void {
+/** Remember this browser's seat in a game. Details not given keep what the same seat already had. */
+export function rememberPlayerForGame(
+  gameId: string,
+  playerName: string,
+  details: { seatToken?: string; joinCode?: string } = {},
+): void {
   if (!gameId || !playerName) return;
   getOrCreateDeviceId();
 
   const map = readTrackedPlayerMap();
+  const previous = map[gameId]?.name === playerName ? map[gameId] : undefined;
+  const token = details.seatToken ?? previous?.seat_token;
+  const joinCode = details.joinCode ?? previous?.join_code;
   map[gameId] = {
     name: playerName,
     seen_at: Date.now(),
+    ...(token ? { seat_token: token } : {}),
+    ...(joinCode ? { join_code: joinCode } : {}),
   };
   writeTrackedPlayerMap(pruneTrackedPlayerMap(map));
 }
 
-export function getRememberedPlayerForGame(gameId: string): string | null {
+function toRememberedSeat(gameId: string, entry: TrackedPlayerEntry): RememberedSeat {
+  return {
+    gameId,
+    name: entry.name,
+    seatToken: entry.seat_token ?? null,
+    joinCode: entry.join_code ?? null,
+    seenAt: entry.seen_at,
+  };
+}
+
+export function getRememberedSeat(gameId: string): RememberedSeat | null {
   if (!gameId) return null;
+  const entry = readTrackedPlayerMap()[gameId];
+  return entry ? toRememberedSeat(gameId, entry) : null;
+}
+
+export function findRememberedSeatByJoinCode(joinCode: string): RememberedSeat | null {
+  const wanted = joinCode.trim().toUpperCase();
+  if (!wanted) return null;
+  const match = Object.entries(readTrackedPlayerMap()).find(
+    ([, entry]) => entry.join_code?.toUpperCase() === wanted && entry.seat_token,
+  );
+  return match ? toRememberedSeat(match[0], match[1]) : null;
+}
+
+/** Seats this browser can reclaim, most recently seen first. */
+export function listReclaimableSeats(limit: number): RememberedSeat[] {
+  return Object.entries(readTrackedPlayerMap())
+    .filter(([, entry]) => entry.seat_token)
+    .sort((a, b) => b[1].seen_at - a[1].seen_at)
+    .slice(0, limit)
+    .map(([gameId, entry]) => toRememberedSeat(gameId, entry));
+}
+
+export function forgetSeatForGame(gameId: string): void {
   const map = readTrackedPlayerMap();
-  return map[gameId]?.name ?? null;
+  if (!(gameId in map)) return;
+  delete map[gameId];
+  writeTrackedPlayerMap(map);
 }
 
 export function hasPlayedBefore(): boolean {
@@ -242,14 +296,3 @@ export function resolveNewPlayerPreferenceForGame(
   );
 }
 
-export function pickAutoReconnectPlayer(
-  rememberedPlayerName: string | null,
-  players: ReconnectStatusPlayer[],
-): string | null {
-  if (!rememberedPlayerName) return null;
-  const match = players.find(
-    (player) => !player.is_puppet && player.name === rememberedPlayerName,
-  );
-  if (!match || match.is_connected) return null;
-  return match.name;
-}
