@@ -3,7 +3,7 @@ import type { Phase, PlayerView } from "../types";
 import { MoneyBagIcon, PoisonIcon } from "./icons";
 import { useContextStrip } from "../contexts";
 import { getLastResultWord, getOrdinal } from "../utils/format";
-import { getSidebarPlacementRank, getSidebarPlayerOrder } from "../utils/playerPlacement";
+import { getSidebarPlacementRank, getSidebarPlayerOrder, isSidebarLastPlace } from "../utils/playerPlacement";
 
 interface PlayerListProps {
   players: PlayerView[];
@@ -120,7 +120,7 @@ export function PlayerRow({
     <div className={cardClassName} data-guide-player-row={player.name}>
       <button type="button" className="player-card-button" aria-pressed={isSelected} onClick={onClick}>
         {rank !== null && (
-          <span className={`player-card-rank ${rank === players.length ? "is-last" : ""}`} title={`${ordinal} place`}>
+          <span className={`player-card-rank ${isSidebarLastPlace(player, players) ? "is-last" : ""}`} title={`${ordinal} place`}>
             <span className="player-card-rank-number">{rank}</span>
             <span className="player-card-rank-suffix">{ordinal?.slice(-2)}</span>
           </span>
