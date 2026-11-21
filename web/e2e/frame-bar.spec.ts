@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { PAGES, openPage } from './helpers'
+import { PAGES, expect, openPage, test } from './helpers'
 
 const GAME_ACTION_BAR_HEIGHT = 42
 

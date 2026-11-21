@@ -349,8 +349,9 @@ game_manager.attach_connected_player_ids(connection_manager.get_connected_player
 async def _handle_spectator_connection(
     websocket: WebSocket, game_id: str, session_id: str, spectate_player: str, request_id: str
 ) -> bool:
-    req = game_manager.get_spectate_request(request_id)
-    if not req or req.status != "approved" or req.session_id != session_id:
+    if not game_manager.is_spectator_approved(
+        request_id, session_id=session_id, game_id=game_id, target_player_name=spectate_player
+    ):
         await _reject_websocket(
             websocket,
             code=4003,
@@ -766,14 +767,16 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
             return False
 
 
-def _handle_spectate_response(payload: dict) -> None:
+def _handle_spectate_response(game_id: str, player_id: str, payload: dict) -> None:
     request_id = payload.get("request_id")
     if not request_id:
         return
-    if payload.get("allowed", False):
-        game_manager.approve_spectate_request(request_id)
-    else:
-        game_manager.deny_spectate_request(request_id)
+    game_manager.respond_to_spectate_request(
+        request_id,
+        game_id=game_id,
+        responder_id=player_id,
+        allowed=bool(payload.get("allowed", False)),
+    )
 
 
 async def _handle_phase_error(
@@ -819,7 +822,7 @@ async def _handle_passthrough_action(action: str, game_id: str, player_id: str, 
         await _handle_voice_signal(game_id, player_id, payload)
         return True
     if action == "spectate_response":
-        _handle_spectate_response(payload)
+        _handle_spectate_response(game_id, player_id, payload)
         return True
     return False
 
