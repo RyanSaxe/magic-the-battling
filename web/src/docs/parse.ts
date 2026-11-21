@@ -70,3 +70,10 @@ export function extractBullets(section: string): string[] {
     .filter((l) => l.startsWith('- '))
     .map((l) => l.slice(2).trim())
 }
+
+const INPUT_BLOCK_RE = /^:::(touch|pointer)\n([\s\S]*?)^:::$/gm
+
+export function selectInputBlocks(markdown: string, canHover: boolean): string {
+  const kept = canHover ? 'pointer' : 'touch'
+  return markdown.replace(INPUT_BLOCK_RE, (_, input: string, body: string) => (input === kept ? body : ''))
+}

@@ -34,6 +34,20 @@ function getLatestShareSnapshot(player: SharePlayerData): SharePlayerSnapshot | 
   return player.snapshots[player.snapshots.length - 1] ?? null
 }
 
+// From a player's last round on, their row shows how their game ended rather than what they took into that battle.
+// Games saved before final state was recorded have no final treasures, so they keep showing the last snapshot.
+function getShareFinalStateForRound(
+  player: SharePlayerData,
+  selectedRound: string,
+): { poison: number; treasures: number } | null {
+  if (player.final_treasures === null) return null
+  const latestSnapshot = getLatestShareSnapshot(player)
+  const round = parseShareRoundValue(selectedRound)
+  if (latestSnapshot && round && compareShareRounds(round, latestSnapshot) < 0) return null
+
+  return { poison: player.final_poison, treasures: player.final_treasures }
+}
+
 function hasExactShareSnapshotForRound(
   player: SharePlayerData,
   selectedRound: string,
@@ -70,6 +84,9 @@ export function getSharePlayerRowBadge(
   selectedRound: string,
 ): SharePlayerRowBadge {
   if (player.name === selectedPlayer) return 'viewing'
+  if (getShareFinalStateForRound(player, selectedRound)) {
+    return player.final_placement === 1 ? 'alive' : 'dead'
+  }
   return hasExactShareSnapshotForRound(player, selectedRound) ? 'alive' : 'dead'
 }
 
@@ -83,11 +100,12 @@ export function buildSharePlayerViews(
     const snapshot = getSharePlayerSnapshotForRound(player, selectedRound)
     const latestSnapshot = getLatestShareSnapshot(player)
     const displaySnapshot = snapshot ?? latestSnapshot
+    const finalState = getShareFinalStateForRound(player, selectedRound)
 
     return {
       name: player.name,
-      treasures: displaySnapshot?.treasures ?? 0,
-      poison: displaySnapshot?.poison ?? player.final_poison,
+      treasures: finalState?.treasures ?? displaySnapshot?.treasures ?? 0,
+      poison: finalState?.poison ?? displaySnapshot?.poison ?? player.final_poison,
       phase: 'game_over',
       round: displaySnapshot?.round ?? 0,
       stage: displaySnapshot?.stage ?? 0,
@@ -130,7 +148,7 @@ export function buildGameSummaryData(
   const selfPlayer: SelfPlayerView = {
     name: target.name,
     treasures: lastSnap.treasures,
-    poison: lastSnap.poison,
+    poison: target.final_poison,
     phase: 'game_over',
     round: lastSnap.round,
     stage: lastSnap.stage,
@@ -174,7 +192,7 @@ export function buildGameSummaryData(
     const snap = p.snapshots[p.snapshots.length - 1]
     return {
       name: p.name,
-      treasures: snap?.treasures ?? 0,
+      treasures: p.final_treasures ?? snap?.treasures ?? 0,
       poison: p.final_poison,
       phase: 'game_over',
       round: snap?.round ?? 0,

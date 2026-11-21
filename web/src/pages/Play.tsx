@@ -290,7 +290,7 @@ function GuidedModeField({
       <div ref={guidedModeHelpRef} className="relative group shrink-0">
         <button
           type="button"
-          className="text-gray-400 hover:text-gray-200"
+          className="touch-area [--touch-area-left:-7px] text-gray-400 hover:text-gray-200"
           aria-label="What guided mode does"
           aria-expanded={showGuidedModeHelp}
           onClick={() => setShowGuidedModeHelp((v) => !v)}
@@ -477,7 +477,8 @@ export function Play() {
   }, []);
 
   const handleCreateLobby = async () => {
-    if (!playerName.trim()) {
+    const name = playerName.trim();
+    if (!name) {
       addToast("Please enter your name", "error");
       return;
     }
@@ -489,7 +490,7 @@ export function Play() {
     lastLobbyErrorRef.current = null;
     setFriendsLoading(true);
     try {
-      const response = await createGame(playerName, {
+      const response = await createGame(name, {
         cubeId: submittedCubeId || "auto",
         useUpgrades,
         autoApproveSpectators,
@@ -497,7 +498,7 @@ export function Play() {
         playMode,
       });
       saveSession(response.session_id, response.player_id);
-      rememberPlayerForGame(response.game_id, playerName.trim());
+      rememberPlayerForGame(response.game_id, name);
       setNewPlayerPreferenceForGame(
         response.game_id,
         isGuidedMode,
@@ -513,7 +514,8 @@ export function Play() {
 
   const handleStartSolo = async (opponentOverride?: OpponentCount) => {
     const count = opponentOverride ?? opponents;
-    if (!playerName.trim()) {
+    const name = playerName.trim();
+    if (!name) {
       addToast("Please enter your name", "error");
       return;
     }
@@ -527,7 +529,7 @@ export function Play() {
     resetWatcher();
     try {
       const targetCount = count + 1;
-      const response = await createGame(playerName, {
+      const response = await createGame(name, {
         cubeId: submittedCubeId || "auto",
         useUpgrades,
         targetPlayerCount: targetCount,
@@ -536,7 +538,7 @@ export function Play() {
         playMode,
       });
       saveSession(response.session_id, response.player_id);
-      rememberPlayerForGame(response.game_id, playerName.trim());
+      rememberPlayerForGame(response.game_id, name);
       setNewPlayerPreferenceForGame(
         response.game_id,
         isGuidedMode,

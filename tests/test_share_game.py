@@ -2,9 +2,11 @@ import json
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
+import pytest
+
 from mtb.models.game import BattleSnapshotData
 from server.db import database
-from server.db.models import GameRecord, PlayerGameHistory
+from server.db.models import CubeMetadata, GameRecord, PlayerGameHistory
 from server.routers.games import _build_puppet_snapshots
 
 
@@ -253,3 +255,62 @@ def test_cube_games_endpoint_returns_games_for_any_user(client):
     assert len(data["games"]) == 1
     assert data["games"][0]["game_id"] == "public-cube-game"
     assert data["total_games"] == 1
+
+
+@pytest.fixture
+def cubecobra_cube_json(monkeypatch):
+    responses = {
+        "https://cubecobra.com/cube/api/cubejson/vintage": {"name": "Vintage Cube", "image": {"uri": "https://img/v"}},
+    }
+
+    def _get_json(url: str):
+        if url not in responses:
+            raise LookupError(url)
+        return responses[url]
+
+    monkeypatch.setattr("mtb.utils.json_helpers.get_json", _get_json)
+
+
+def test_cube_games_endpoint_names_a_cube_with_no_games(client):
+    db = database.SessionLocal()
+    try:
+        db.add(CubeMetadata(cube_id="auto", name="Crucible Starter Cube", image_uri="https://img/auto"))
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get("/api/battlers/cube/auto/games")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["games"] == []
+    assert data["cube_name"] == "Crucible Starter Cube"
+    assert data["cube_image_uri"] == "https://img/auto"
+
+
+def test_cube_games_endpoint_fills_missing_cube_metadata_from_cubecobra(client, cubecobra_cube_json):
+    response = client.get("/api/battlers/cube/vintage/games")
+
+    assert response.status_code == 200
+    assert response.json()["cube_name"] == "Vintage Cube"
+    assert response.json()["cube_image_uri"] == "https://img/v"
+
+
+def test_cube_games_endpoint_leaves_name_empty_when_cubecobra_has_none(client, cubecobra_cube_json):
+    response = client.get("/api/battlers/cube/unknown-cube/games")
+
+    assert response.status_code == 200
+    assert response.json()["cube_name"] is None
+
+
+def test_battler_games_endpoint_names_the_cube(client, cubecobra_cube_json):
+    client.post(
+        "/api/auth/register",
+        json={"username": "vintage_fan", "password": "password123", "email": "vintage@test.com"},
+    )
+    battler_id = client.post("/api/battlers", json={"cube_id": "vintage"}).json()["id"]
+
+    response = client.get(f"/api/battlers/{battler_id}/games")
+
+    assert response.status_code == 200
+    assert response.json()["cube_name"] == "Vintage Cube"

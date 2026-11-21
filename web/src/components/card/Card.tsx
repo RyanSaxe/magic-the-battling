@@ -3,6 +3,8 @@ import type { Card as CardType } from '../../types'
 import { CardPreviewContext } from './CardPreviewContext'
 import { useFaceDown } from '../../contexts/faceDownState'
 import { CARD_BACK_IMAGE, BASIC_LANDS } from '../../constants/assets'
+import { canHover } from '../../utils/inputMode'
+import { registerTap } from '../../utils/doubleTap'
 
 interface CardProps {
   card: CardType
@@ -48,8 +50,6 @@ const glowColors = {
   green: '0 0 20px rgba(34, 197, 94, 0.6)',
   red: '0 0 20px rgba(239, 68, 68, 0.6)',
 }
-
-const canHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches
 
 const BASIC_LAND_NAMES: Set<string> = new Set(BASIC_LANDS.map(l => l.name))
 
@@ -108,6 +108,7 @@ export function Card({
   const [isLoading, setIsLoading] = useState(true)
   const [isHovered, setIsHovered] = useState(false)
   const anchorRef = useRef<HTMLDivElement | null>(null)
+  const lastTapAtRef = useRef<number | null>(null)
 
   const contextFaceDown = useFaceDown(card.id)
   const effectiveFaceDown = faceDown || contextFaceDown
@@ -177,9 +178,21 @@ export function Card({
     onMouseEnter: interactiveOnMouseEnter,
     onMouseLeave: interactiveOnMouseLeave,
     onContextMenu: interactiveOnContextMenu,
+    onTouchEnd: interactiveOnTouchEnd,
     style: interactiveExternalStyle,
     ...restInteractiveProps
   } = interactiveProps ?? {}
+
+  // iOS does not reliably fire dblclick, so touch screens count taps instead. Each tap
+  // still clicks, so the second tap undoes the first tap's selection, as a double click does.
+  const detectsDoubleTap = !canHover && !disabled && !!onDoubleClick
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    interactiveOnTouchEnd?.(e)
+    if ((e.target as HTMLElement).closest('button')) return
+    const tap = registerTap(lastTapAtRef.current, e.timeStamp)
+    lastTapAtRef.current = tap.lastTapAt
+    if (tap.isDoubleTap) onDoubleClick?.()
+  }
 
   return (
     <div
@@ -205,7 +218,8 @@ export function Card({
           transform: interactiveTransform,
         }}
         onClick={disabled ? undefined : onClick}
-        onDoubleClick={disabled ? undefined : onDoubleClick}
+        onDoubleClick={disabled || !canHover ? undefined : onDoubleClick}
+        onTouchEnd={detectsDoubleTap ? handleTouchEnd : interactiveOnTouchEnd}
         onContextMenu={(e) => {
           interactiveOnContextMenu?.(e)
           onContextMenu?.(e)

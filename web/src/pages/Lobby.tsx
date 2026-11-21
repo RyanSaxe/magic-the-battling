@@ -110,7 +110,7 @@ function GuidedModeSwitch({
       <div ref={guidedModeHelpRef} className="relative group shrink-0">
         <button
           type="button"
-          className="text-gray-400 hover:text-gray-200"
+          className="touch-area [--touch-area-left:-7px] text-gray-400 hover:text-gray-200"
           aria-label="What guided mode does"
           aria-expanded={showGuidedModeHelp}
           onClick={() => setShowGuidedModeHelp((v) => !v)}
@@ -212,7 +212,7 @@ function VoiceChatSwitch({
         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
           Voice
         </span>
-        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400">
+        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400 max-[389px]:hidden">
           Beta
         </span>
         <input
@@ -233,7 +233,7 @@ function VoiceChatSwitch({
       <div ref={voiceHelpRef} className="relative group shrink-0">
         <button
           type="button"
-          className="text-gray-400 hover:text-gray-200"
+          className="touch-area [--touch-area-left:-7px] text-gray-400 hover:text-gray-200"
           aria-label="Voice chat info"
           aria-expanded={showVoiceHelp}
           onClick={() => setShowVoiceHelp((v) => !v)}
@@ -1015,7 +1015,7 @@ export function Lobby() {
             </div>
 
             <div className="space-y-3 mb-3">
-              <div className="flex items-center justify-between rounded-md border border-black/40 bg-black/40 px-2 py-1">
+              <div className="flex items-center justify-between gap-2 rounded-md border border-black/40 bg-black/40 px-2 py-1">
                 <GuidedModeSwitch
                   enabled={isGuidedMode}
                   setEnabled={handleGuidedModeToggle}

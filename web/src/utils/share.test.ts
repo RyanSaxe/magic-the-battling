@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { Card, ShareGameResponse, SharePlayerSnapshot } from '../types'
 import {
+  buildGameSummaryData,
   buildSharePlayerViews,
   getSharePlayerRowBadge,
 } from './share'
@@ -56,6 +57,7 @@ function makeShareData(): ShareGameResponse {
         name: 'Alice',
         final_placement: 1,
         final_poison: 6,
+        final_treasures: null,
         is_puppet: false,
         snapshots: [
           makeSnapshot(4, 2, 4, 2),
@@ -66,6 +68,7 @@ function makeShareData(): ShareGameResponse {
         name: 'Bob',
         final_placement: 2,
         final_poison: 10,
+        final_treasures: null,
         is_puppet: false,
         snapshots: [
           makeSnapshot(4, 1, 7, 1),
@@ -114,5 +117,46 @@ describe('share row helpers', () => {
     expect(getSharePlayerRowBadge(bob, 'Alice', '4_3')).toBe('dead')
     expect(getSharePlayerRowBadge(alice, 'Bob', '4_2')).toBe('alive')
     expect(getSharePlayerRowBadge(bob, 'Alice', '4_2')).toBe('alive')
+  })
+})
+
+function makeFinishedShareData(): ShareGameResponse {
+  const data = makeShareData()
+  const [alice, bob] = data.players
+  alice.final_poison = 7
+  alice.final_treasures = 3
+  bob.snapshots = [makeSnapshot(4, 1, 7, 1), makeSnapshot(4, 2, 9, 6)]
+  bob.final_poison = 12
+  bob.final_treasures = 5
+  return data
+}
+
+describe('share rows after the final battle', () => {
+  it('shows each player\'s final state from their last round on', () => {
+    const data = makeFinishedShareData()
+
+    const atBobsLastRound = buildSharePlayerViews(data, '4_2')
+    expect(atBobsLastRound.find((p) => p.name === 'Bob')).toMatchObject({ poison: 12, treasures: 5 })
+    expect(atBobsLastRound.find((p) => p.name === 'Alice')).toMatchObject({ poison: 4, treasures: 2 })
+
+    const atTheFinalRound = buildSharePlayerViews(data, '4_3')
+    expect(atTheFinalRound.find((p) => p.name === 'Bob')).toMatchObject({ poison: 12, treasures: 5 })
+    expect(atTheFinalRound.find((p) => p.name === 'Alice')).toMatchObject({ poison: 7, treasures: 3 })
+  })
+
+  it('marks a player dead in the round they were knocked out, and the winner alive', () => {
+    const [alice, bob] = makeFinishedShareData().players
+
+    expect(getSharePlayerRowBadge(bob, 'Alice', '4_1')).toBe('alive')
+    expect(getSharePlayerRowBadge(bob, 'Alice', '4_2')).toBe('dead')
+    expect(getSharePlayerRowBadge(alice, 'Bob', '4_3')).toBe('alive')
+  })
+
+  it('shows the final poison on the summary board but keeps the treasures the build was played with', () => {
+    const summary = buildGameSummaryData(makeFinishedShareData(), 'Bob')
+
+    expect(summary?.selfPlayer).toMatchObject({ poison: 12, treasures: 6 })
+    expect(summary?.selfPlayer.last_battle_result?.pre_battle_treasures).toBe(6)
+    expect(summary?.players.find((p) => p.name === 'Bob')).toMatchObject({ poison: 12, treasures: 5 })
   })
 })
