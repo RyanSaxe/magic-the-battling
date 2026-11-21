@@ -321,7 +321,7 @@ def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depe
     if not pending:
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
-    if request.player_name in pending.player_names:
+    if pending.has_player_named(request.player_name):
         raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
     if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
         raise api_error(400, ErrorCode.LOBBY_FULL, "Lobby is full")
@@ -360,7 +360,7 @@ def join_game(game_id: str, request: JoinGameRequest, current_user: User | None 
     if pending.is_started:
         raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
 
-    if request.player_name in pending.player_names:
+    if pending.has_player_named(request.player_name):
         raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
     if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
         raise api_error(400, ErrorCode.LOBBY_FULL, "Lobby is full")

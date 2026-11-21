@@ -79,6 +79,19 @@ class TestJoinGame:
 
         assert _lobby_player_names(client, game_id) == ["Alice", "bOb"]
 
+    @pytest.mark.parametrize("route", ["by_code", "by_game_id"])
+    @pytest.mark.parametrize("player_name", ["Alice ", " Alice", "alice", "ALICE"])
+    def test_name_matching_a_player_after_trimming_or_ignoring_case_is_taken(self, client, route, player_name):
+        create = client.post("/api/games", json={"player_name": "Alice", "cube_id": "test"})
+        game_id = create.json()["game_id"]
+        path = "/api/games/join" if route == "by_code" else f"/api/games/{game_id}/join"
+
+        response = client.post(path, json={"join_code": create.json()["join_code"], "player_name": player_name})
+
+        assert response.status_code == 409
+        assert response.json()["code"] == "PLAYER_NAME_TAKEN"
+        assert _lobby_player_names(client, game_id) == ["Alice"]
+
     def test_join_with_invalid_code_returns_404(self, client):
         response = client.post("/api/games/join", json={"join_code": "BADCODE", "player_name": "Bob"})
 
