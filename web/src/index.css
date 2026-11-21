@@ -84,11 +84,7 @@
   --frame-sidebar-width: 242px;
   /* From the board's gold edge to the screen's right edge: the docked sidebar, its 2px edge and the rail. */
   --frame-dock-width: calc(var(--frame-sidebar-width) + 2px + var(--frame-rail-width));
-  --sidebar-lane-nudge: 10px;
-  --surface-gutter: 12px;
   --bar-mobile-inline: 6px;
-  --bar-bottom-left-desktop: calc(var(--frame-rail-edge) - 4px);
-  --bar-bottom-right-desktop: calc(var(--sidebar-width) + var(--surface-gutter) - var(--sidebar-lane-nudge) - 4px);
 }
 
 body {
@@ -161,11 +157,6 @@ input:-webkit-autofill:focus {
   padding-right: var(--bar-mobile-inline);
 }
 
-.bar-pad-main {
-  padding-left: var(--bar-mobile-inline);
-  padding-right: var(--bar-mobile-inline);
-}
-
 /* Felt content area — gold emboss + dark groove for 3D depth */
 .game-surface {
   position: relative;
@@ -205,11 +196,6 @@ input:-webkit-autofill:focus {
   .frame-bar-pad {
     padding-left: var(--frame-rail-edge);
     padding-right: var(--frame-rail-edge);
-  }
-
-  .bar-pad-main {
-    padding-left: var(--bar-bottom-left-desktop);
-    padding-right: var(--bar-bottom-right-desktop);
   }
 
   .game-surface {

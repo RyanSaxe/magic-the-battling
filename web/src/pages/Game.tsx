@@ -876,7 +876,6 @@ function GameContent() {
   const [actionBarRef, actionBarHeight] = useElementHeight();
   const usesOverlaySidebar = shellMode !== "big";
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
-  const actionBarPaddingClass = shellMode === "big" ? "bar-pad-main" : undefined;
 
   const { addToast } = useToast();
   const buildReadyPendingRef = useRef(false);
@@ -2680,11 +2679,11 @@ function GameContent() {
         {!isSpectator && (() => {
           const endOfGame = isEndPhase && gameId && !displayBattleResolution;
           const groups = endOfGame ? null : renderActionButtons();
+          // Above the docked sidebar's z-[45], so the popovers over Submit Hand and Submit Result show over it.
           return (
             <BottomBar
               ref={actionBarRef}
-              className="relative z-40"
-              padClassName={actionBarPaddingClass}
+              className="relative z-[46]"
               guideTarget="phase-action-bar"
               secondary={endOfGame ? (
                 <>

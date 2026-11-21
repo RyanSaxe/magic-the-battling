@@ -334,7 +334,6 @@ export function ShareGame() {
         footer={
           <BottomBar
             ref={bottomBarRef}
-            padClassName={shellMode === 'big' ? 'bar-pad-main' : undefined}
             secondary={
               <div className="relative">
                 <button
