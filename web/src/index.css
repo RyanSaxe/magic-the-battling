@@ -28,6 +28,9 @@
   /* Modal / popover chrome */
   --chrome-modal: #3d3330;
 
+  /* The colour a cube's art fades into on its card and page */
+  --art-fade: #2a2118;
+
   /* Zone column — blends toward sidebar chrome */
   --zone-column-bg: #3d3330;
 
@@ -80,7 +83,6 @@
   --sidebar-lane-nudge: 10px;
   --surface-gutter: 12px;
   --bar-mobile-inline: 6px;
-  --bar-top-right-desktop: 6px;
   --bar-bottom-left-desktop: calc(var(--frame-rail-edge) - 4px);
   --bar-bottom-right-desktop: calc(var(--sidebar-width) + var(--surface-gutter) - var(--sidebar-lane-nudge) - 4px);
 }
@@ -149,12 +151,8 @@ input:-webkit-autofill:focus {
       var(--chrome) 70%);
 }
 
-.bar-pad-both {
-  padding-left: var(--surface-gutter);
-  padding-right: var(--surface-gutter);
-}
-
-.bar-pad-left {
+/* The 42px bars above and below the felt line their content up with the felt's gold edge. */
+.frame-bar-pad {
   padding-left: var(--bar-mobile-inline);
   padding-right: var(--bar-mobile-inline);
 }
@@ -194,14 +192,9 @@ input:-webkit-autofill:focus {
 
 /* Desktop left chrome strip — game pages only */
 @media (min-width: 640px) {
-  .bar-pad-both {
+  .frame-bar-pad {
     padding-left: var(--frame-rail-edge);
     padding-right: var(--frame-rail-edge);
-  }
-
-  .bar-pad-left {
-    padding-left: var(--frame-rail-edge);
-    padding-right: var(--bar-top-right-desktop);
   }
 
   .bar-pad-main {
@@ -452,13 +445,13 @@ input:-webkit-autofill:focus {
    page still lays out, centers and scrolls around its scaled size. A browser
    without zoom shows the card at its normal size. */
 @media (min-width: 1600px) {
-  .surface-card {
+  .surface-card-page {
     zoom: 1.15;
   }
 }
 
 @media (min-width: 1920px) {
-  .surface-card {
+  .surface-card-page {
     zoom: 1.3;
   }
 }
@@ -812,11 +805,26 @@ input:-webkit-autofill:focus {
   border: 1px solid #000 !important;
 }
 
-.timeline-actions .btn {
-  min-height: 30px;
+/* Every bar button is 30px tall. Icon buttons such as ☰ are 30px squares, and .btn-icon-phone ones are squares
+   only below 640px, where their label shortens to an icon. Display is left to each button so it can hide on phones. */
+.frame-bar .btn {
+  height: 30px;
+  min-width: 30px;
   padding: 0 10px;
   line-height: 1;
   font-size: 13px;
+}
+
+.frame-bar .btn-icon {
+  width: 30px;
+  padding: 0;
+}
+
+@media (width < 640px) {
+  .frame-bar .btn-icon-phone {
+    width: 30px;
+    padding: 0;
+  }
 }
 
 /* Applied only while the timeline steps don't fit beside the header buttons, so they scroll instead of running

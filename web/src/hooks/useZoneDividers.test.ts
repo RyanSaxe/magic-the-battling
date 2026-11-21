@@ -66,14 +66,30 @@ describe("useZoneDividers", () => {
   });
 
   it("returns a divider drawn closer than 80px to an edge to where it was when moved back", () => {
-    const { dividers, writes, before, frameHeights } = dividersFor({ topFraction: 0.05 });
-    expect(before.hand).toBeLessThan(80);
-    const top = dividers.topDivider!;
-    top.onDragStart();
-    top.onDrag(-6);
-    top.onDrag(6);
-    top.onDragEnd();
+    // Eight upgrades leave the automatic upgrade rail narrower than the divider's 80px limit.
+    const railConfig = buildLayoutConfig({ handSize: 3, sideboardCount: 0, upgradeRailCount: 8 });
+    const board = { width: 880, height: 732 };
+    const rendered = layoutForContainer(board.width, board.height, railConfig);
+    expect(rendered.frames.commandZone.outerWidth).toBeLessThan(80);
+    const writes: ZoneConstraints[] = [];
+    const { result } = renderHook(() =>
+      useZoneDividers({
+        containerHeight: rendered.containerSize.height,
+        containerWidth: rendered.containerSize.width,
+        layoutConfig: railConfig,
+        renderedConstraints: rendered.constraints,
+        constraints: null,
+        onConstraintsChange: (constraints) => writes.push(constraints),
+        onConstraintsClear: () => {},
+      }),
+    );
+    const rail = result.current.leftDivider!;
+    rail.onDragStart();
+    rail.onDrag(6);
+    rail.onDrag(-6);
+    rail.onDragEnd();
 
-    expect(frameHeights(writes[writes.length - 1])).toEqual(before);
+    const after = layoutForContainer(board.width, board.height, { ...railConfig, constraints: writes[writes.length - 1] });
+    expect(after.frames).toEqual(rendered.frames);
   });
 });

@@ -1,4 +1,6 @@
 export const CARD_ASPECT_RATIO = 7 / 5
+/** The narrowest a card should be drawn. */
+export const MIN_CARD_WIDTH = 40
 
 export interface ZoneDims {
   width: number

@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
+import { MIN_CARD_WIDTH } from '../src/hooks/cardSizeUtils'
 import type { ZoneConstraints } from '../src/hooks/computeConstrainedLayout'
+import { boardSizeBand } from '../src/hooks/usePersistedConstraints'
 import { serveGame } from './helpers'
 import { GAME_ID, type ScreenState } from './gameStates'
 
@@ -18,6 +20,7 @@ type Check =
   | 'sidebar-seams-off-board'
   | 'text-cut-off'
   | 'divider-off-saved-layout'
+  | 'saved-layout-squeezes-zone'
   | 'grab-moves-layout'
 
 interface Screen {
@@ -28,8 +31,6 @@ interface Screen {
   /** Checks that fail on this screen today, each with what fails. */
   knownFailures?: Partial<Record<Check, string>>
 }
-
-const MIN_CARD_WIDTH = 40
 
 const TYPICAL: Record<string, ScreenState> = {
   draft: { phase: 'draft', counts: { pack: 5, sideboard: 10, upgrades: 2 } },
@@ -57,6 +58,12 @@ const SAMPLE: Screen[] = [
     viewport: { width: 1440, height: 900 },
     state: TYPICAL['build-with-upgrades'],
     saved: { topFraction: 0.3, bottomLeftSplit: 0.3 },
+  },
+  {
+    name: 'build 1024x768 with a layout that leaves the lower zones no room',
+    viewport: { width: 1024, height: 768 },
+    state: TYPICAL.build,
+    saved: { topFraction: 0.9 },
   },
   {
     name: 'reward-stage-end 1280x800',
@@ -244,19 +251,36 @@ function measureBoard({ zoneSelector, minCardWidth }: { zoneSelector: string; mi
 async function openScreen(page: Page, baseURL: string, screen: Screen) {
   await serveGame(page, baseURL, screen.state)
   await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+  // Only a first load fetches the stylesheet; a reload takes it from the cache. WebKit can render the game
+  // before a fetched stylesheet applies, so the game must survive that before the reload below.
+  await expectGameShown(page)
+  await waitForStableLayout(page)
+  await expectGameShown(page)
   await restoreSavedLayout(page, screen)
+}
+
+/** Waits until the game shows a card, and fails if it crashed instead. */
+async function expectGameShown(page: Page) {
+  const crashed = page.getByRole('heading', { name: 'Something went wrong' })
+  await expect(page.locator('main .card').first().or(crashed)).toBeVisible()
+  if (await crashed.isVisible()) throw new Error(`the game crashed: ${await page.locator('p').first().innerText()}`)
 }
 
 /** Puts back the layout the screen starts from, saved or not, and reloads the game. */
 async function restoreSavedLayout(page: Page, screen: Screen) {
-  await page.evaluate(({ phase, saved }) => {
+  // The game saves a layout for the size band of the board, measured the way useCardLayout measures it.
+  const board = await page.locator('main .zone-divider-bg > div, .battle-layout').first().evaluate((element) => ({
+    width: Math.floor(element.clientWidth / 4) * 4,
+    height: Math.floor(element.clientHeight / 4) * 4,
+  }))
+  await page.evaluate(({ phase, saved, band }) => {
     const key = `mtb_zone_constraints:v2:phase:${phase}`
     if (!saved) return localStorage.removeItem(key)
     localStorage.setItem(key, JSON.stringify({
-      version: 2,
-      entries: [{ stage: 4, round: 2, mode: 'constraints', constraints: saved }],
+      version: 3,
+      bands: { [band]: [{ stage: 4, round: 2, mode: 'constraints', constraints: saved }] },
     }))
-  }, { phase: screen.state.phase, saved: screen.saved ?? null })
+  }, { phase: screen.state.phase, saved: screen.saved ?? null, band: boardSizeBand(board) })
   await reloadStyled(page)
 }
 
@@ -268,9 +292,7 @@ async function reloadStyled(page: Page) {
     await page.reload({ waitUntil: 'domcontentloaded' })
     // The header's Cinzel title sets the header's height, and with it the board's.
     await page.evaluate(() => document.fonts.load('16px Cinzel'))
-    const crashed = page.getByRole('heading', { name: 'Something went wrong' })
-    await expect(page.locator('main .card').first().or(crashed)).toBeVisible()
-    if (await crashed.isVisible()) throw new Error(`the game crashed: ${await page.locator('p').first().innerText()}`)
+    await expectGameShown(page)
     if (await page.evaluate(() => document.styleSheets.length > 0)) break
     if (attempt === 3) throw new Error('the page loaded without its stylesheet three times')
   }
@@ -371,12 +393,22 @@ for (const screen of SCREENS) {
       const failures = { ...measurement.failures }
 
       if (screen.saved) {
+        // A saved divider gives way only to keep a zone one row of 40px cards tall: 56px plus 32px of padding.
+        const oneRowZone = 88
+        const heights = measurement.zones.map((zone) => Math.round(zone.box.height))
         const fractions = await dividerFractions(page)
         for (const key of ['topFraction', 'bottomLeftSplit'] as const) {
           const want = screen.saved[key]
           if (want === undefined) continue
           const offPx = Math.abs(fractions[key] - want) * fractions.space[key]
-          if (offPx > 1) (failures['divider-off-saved-layout'] ??= []).push(`${key} ${want} sits ${Math.round(offPx)}px away`)
+          if (offPx > 1 && !heights.includes(oneRowZone)) {
+            (failures['divider-off-saved-layout'] ??= []).push(`${key} ${want} sits ${Math.round(offPx)}px away`)
+          }
+        }
+        for (const zone of measurement.zones) {
+          if (zone.box.height < oneRowZone - 0.5) {
+            (failures['saved-layout-squeezes-zone'] ??= []).push(`${zone.name} is ${Math.round(zone.box.height)}px tall`)
+          }
         }
       }
 
@@ -415,5 +447,55 @@ test.describe('a stylesheet that arrives after the game renders', () => {
     await expect(crashed).toHaveCount(0)
     await waitForStableLayout(page)
     expect((await measure(page)).failures).toEqual({})
+  })
+})
+
+// On a slow network the game's script can run before its stylesheet has loaded, and WebKit then measures an
+// unstyled board on the first load. A reload takes the stylesheet from the cache, so only a first load shows it.
+test.describe('the first load over a slow network', () => {
+  for (const viewport of [{ width: 393, height: 852 }, { width: 1280, height: 800 }]) {
+    test(`shows Draft without crashing at ${viewport.width}x${viewport.height}`, async ({ page, baseURL }) => {
+      await page.setViewportSize(viewport)
+      await serveGame(page, baseURL!, { phase: 'draft', counts: { pack: 5, sideboard: 10 } })
+      await page.route(/\/assets\/.*\.css$/, async (route) => {
+        const response = await route.fetch()
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        await route.fulfill({ response })
+      })
+      await page.goto(`/game/${GAME_ID}/play`)
+      await expectGameShown(page)
+      await waitForStableLayout(page)
+      await expectGameShown(page)
+    })
+  }
+})
+
+test.describe('a saved layout', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  test('stays with the board size band it was saved in', async ({ page, baseURL }) => {
+    const handHeight = async () => Math.round((await page.locator('main .zone-hand').boundingBox())!.height)
+    await openScreen(page, baseURL!, { name: 'build', viewport: { width: 1280, height: 800 }, state: TYPICAL.build })
+    const automaticOnLaptop = await handHeight()
+
+    // A load measures the board at once, so the drag starts from the desktop's own layout.
+    await page.setViewportSize({ width: 1920, height: 1080 })
+    await reloadStyled(page)
+    const automaticOnDesktop = await handHeight()
+    const divider = (await page.locator('main .zone-divider-line > div[style*="resize"]').first().boundingBox())!
+    await page.mouse.move(divider.x + divider.width / 2, divider.y + divider.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(divider.x + divider.width / 2, divider.y + divider.height / 2 + 80, { steps: 4 })
+    await page.mouse.up()
+    await waitForStableLayout(page)
+    const savedOnDesktop = await handHeight()
+    expect(savedOnDesktop).toBeGreaterThan(automaticOnDesktop + 60)
+
+    // After a resize the zones keep their old sizes until the game has measured the board again.
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await expect.poll(handHeight).toBe(automaticOnLaptop)
+
+    await page.setViewportSize({ width: 1920, height: 1080 })
+    await expect.poll(handHeight).toBe(savedOnDesktop)
   })
 })

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useLayoutEffect } from "react";
 import { CARD_ASPECT_RATIO, bestFit, type ZoneDims } from "./cardSizeUtils";
 import {
+  clampSavedConstraints,
   computeConstrainedLayoutState,
   deriveConstraintsFromLayout,
   makeDefaultFrames,
@@ -1011,19 +1012,25 @@ export function layoutForContainer(
   //      via fraction adjustments. Iterates until convergence.
   // User-supplied constraints (divider drag) skip both pass 1 and pass 3 so
   // the user's explicit fractions are honored without bouncing.
+  const automatic = computeConstrainedLayoutState(
+    w,
+    h,
+    config,
+    redistributeSlack(
+      deriveConstraintsFromLayout(computeLayout(w, h, config), config, h, w),
+      config,
+      w,
+      h,
+    ).constraints,
+  );
   const state = config.constraints
-    ? computeConstrainedLayoutState(w, h, config, config.constraints)
-    : computeConstrainedLayoutState(
+    ? computeConstrainedLayoutState(
         w,
         h,
         config,
-        redistributeSlack(
-          deriveConstraintsFromLayout(computeLayout(w, h, config), config, h, w),
-          config,
-          w,
-          h,
-        ).constraints,
-      );
+        clampSavedConstraints(w, h, config, config.constraints, automatic.frames),
+      )
+    : automatic;
   return { containerSize: { width: w, height: h }, ...state };
 }
 

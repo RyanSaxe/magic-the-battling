@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import { FaDiscord } from 'react-icons/fa6'
 import { CubeCobraPrimerLink } from './CubeCobraPrimerLink'
+import { BottomBar } from './FrameBar'
 import { HintsBanner } from './HintsBanner'
 
 interface PageFrameProps {
   header: ReactNode
   children: ReactNode
-  /** Horizontal padding and alignment of the scrolling content column, which has 1rem of vertical padding. */
+  /** Alignment of the scrolling content column, which has 1rem of padding on every side. */
   contentClassName?: string
   /** Center content that fits in the column. Content taller than the column starts at the top and scrolls. */
   center?: boolean
@@ -29,7 +30,7 @@ export function PageFrame({
   footer,
 }: PageFrameProps) {
   const centerClass = center ? 'page-center' : ''
-  const scrollClass = scroll ? 'overflow-y-auto overflow-x-hidden overscroll-contain py-4' : ''
+  const scrollClass = scroll ? 'overflow-y-auto overflow-x-hidden overscroll-contain p-4' : ''
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
       {header}
@@ -48,8 +49,8 @@ export function PageFrame({
       </div>
 
       {footer ?? (
-        <footer className="shrink-0 frame-chrome bar-pad-both">
-          <div className="h-[var(--frame-bar-height)] flex items-center justify-between">
+        <BottomBar
+          secondary={
             <a
               href="https://discord.gg/2NAjcWXNKn"
               target="_blank"
@@ -59,9 +60,9 @@ export function PageFrame({
               <FaDiscord className="w-4 h-4" />
               Join Discord
             </a>
-            <CubeCobraPrimerLink />
-          </div>
-        </footer>
+          }
+          main={<CubeCobraPrimerLink />}
+        />
       )}
     </div>
   )
