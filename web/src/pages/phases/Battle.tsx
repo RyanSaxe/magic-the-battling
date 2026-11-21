@@ -387,10 +387,10 @@ export function BattlePhase({
               Sudden Death
             </span>
             <span className="hero-sep text-[15px]">·</span>
-            <span className="text-[13px] text-gray-300">Loser is eliminated</span>
+            <span className="text-[13px] text-[var(--color-gold-dark)]">Loser is eliminated</span>
             <span className="relative group cursor-help">
-              <span className="text-xs text-red-300/80">ⓘ</span>
-              <span className="absolute right-0 top-full mt-2 w-64 p-2 bg-black/95 border border-red-500/50 rounded text-xs text-left text-red-100 whitespace-normal leading-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              <span className="text-xs text-[var(--color-gold-dark)]">ⓘ</span>
+              <span className="absolute right-0 top-full mt-2 w-64 p-2 modal-chrome border gold-border rounded-lg felt-raised-panel text-xs text-left whitespace-normal leading-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                 Multiple players reached lethal poison. The two with the lowest poison are reset to 9 and face off. A draw causes both players to rebuild. Play continues until one is eliminated.
               </span>
             </span>
