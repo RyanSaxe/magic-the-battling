@@ -1,4 +1,4 @@
-import type { FollowedBattler } from '../types'
+import type { FollowedBattler, UserBattler } from '../types'
 
 export type FirstPageStatus = 'idle' | 'loading' | 'loaded' | 'failed'
 
@@ -83,4 +83,16 @@ export async function findFollow(
 
 export function isFollowing(follows: Follows, cubeId: string): boolean {
   return follows.unloadedCubeIds.has(cubeId) || followFor(follows, cubeId) !== undefined
+}
+
+export type LibraryEntry =
+  | { kind: 'saved'; preset: UserBattler }
+  | { kind: 'following'; follow: FollowedBattler }
+
+/** Saved cubes and decks first, in the player's order, then followed cubes, newest first. */
+export function libraryEntries(presets: UserBattler[], follows: FollowedBattler[]): LibraryEntry[] {
+  return [
+    ...presets.map((preset) => ({ kind: 'saved' as const, preset })),
+    ...follows.map((follow) => ({ kind: 'following' as const, follow })),
+  ]
 }

@@ -936,3 +936,49 @@ class TestFinishedGameSnapshots:
         session.expire_all()
         assert session.get(ActiveGameSnapshot, game_id) is None
         session.close()
+
+
+class TestRoundTablePairing:
+    def test_build_odds_survive_a_restart_and_name_every_opponent_the_round_can_draw(
+        self, game_manager, mock_cube_data, test_db
+    ):
+        player_ids = [f"pid-{i}" for i in range(6)]
+        pending = game_manager.create_game("P0", player_ids[0], cube_id="test", target_player_count=6)
+        for i, player_id in enumerate(player_ids[1:], start=1):
+            game_manager.join_game(pending.join_code, f"P{i}", player_id)
+        game_id = pending.game_id
+        session = db.SessionLocal()
+        assert game_manager.start_game(game_id, session) is not None
+
+        def shown_odds() -> dict[str, dict[str, float]]:
+            odds = {}
+            for player_id in player_ids:
+                state = game_manager.get_game_state(game_id, player_id)
+                assert state is not None
+                odds[state.self_player.name] = {
+                    p.name: p.pairing_probability for p in state.players if p.pairing_probability
+                }
+            return odds
+
+        before_restart = shown_odds()
+        assert all(len(odds) == 3 for odds in before_restart.values())
+        game_manager.persist_all_games()
+
+        opponents_drawn: set[tuple[str, str]] = set()
+        for _ in range(20):
+            game_manager._cleanup_game(game_id, preserve_snapshot=True)
+            assert game_manager.restore_game_from_snapshot(game_id)
+            assert shown_odds() == before_restart
+
+            game = game_manager.get_game(game_id)
+            assert game is not None
+            for player in game.players:
+                player.hand, player.sideboard = player.sideboard[:3], player.sideboard[3:]
+                basics = ["Plains", "Island", "Swamp"]
+                assert game_manager.handle_build_ready(game, player, basics, game_id, None) is None
+            for b in game.active_battles:
+                opponents_drawn.update({(b.player.name, b.opponent.name), (b.opponent.name, b.player.name)})
+
+        assert all(opponent in before_restart[player] for player, opponent in opponents_drawn)
+        assert len(opponents_drawn) > 6
+        session.close()

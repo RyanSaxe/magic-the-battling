@@ -118,16 +118,77 @@ def _build_share_player(history: PlayerGameHistory, db: Session) -> SharePlayerD
     )
 
 
+def _round_of(snapshot: SharePlayerSnapshot) -> tuple[int, int]:
+    return snapshot.stage, snapshot.round
+
+
+def _poison_and_treasures_only(snapshot: SharePlayerSnapshot) -> SharePlayerSnapshot:
+    return SharePlayerSnapshot(
+        stage=snapshot.stage,
+        round=snapshot.round,
+        hand=[],
+        sideboard=[],
+        command_zone=[],
+        applied_upgrades=[],
+        upgrades=[],
+        basic_lands=[],
+        treasures=snapshot.treasures,
+        poison=snapshot.poison,
+        vanguard=None,
+        visibility="hidden",
+    )
+
+
+def _sharer_mid_game(sharer: SharePlayerData, last_round: tuple[int, int] | None) -> SharePlayerData:
+    # The sharer's last build is the ghost a remaining player may still fight, and its
+    # applied upgrades name the hand cards they target.
+    snapshots = [
+        snapshot.model_copy(update={"hand": [], "applied_upgrades": [], "upgrades": [], "visibility": "hand_hidden"})
+        if _round_of(snapshot) == last_round
+        else snapshot
+        for snapshot in sharer.snapshots
+    ]
+    return sharer.model_copy(update={"snapshots": snapshots})
+
+
+def _other_player_mid_game(
+    player: SharePlayerData, sharer_rounds: set[tuple[int, int]], sharer_last_round: tuple[int, int] | None
+) -> SharePlayerData:
+    snapshots = [_poison_and_treasures_only(s) for s in player.snapshots if _round_of(s) in sharer_rounds]
+    out_by_sharers_last_round = (
+        player.final_placement is not None
+        and sharer_last_round is not None
+        and all(_round_of(s) <= sharer_last_round for s in player.snapshots)
+    )
+    if out_by_sharers_last_round:
+        return player.model_copy(update={"snapshots": snapshots})
+    # Their final state comes from a round after the sharer's, so show them as they were in the sharer's rounds.
+    final_poison = snapshots[-1].poison if snapshots else 0
+    return player.model_copy(update={"snapshots": snapshots, "final_treasures": None, "final_poison": final_poison})
+
+
+def _mid_game_players(players: list[SharePlayerData], sharer_name: str) -> list[SharePlayerData]:
+    sharer = next(player for player in players if player.name == sharer_name)
+    sharer_rounds = {_round_of(snapshot) for snapshot in sharer.snapshots}
+    sharer_last_round = max(sharer_rounds, default=None)
+    return [
+        _sharer_mid_game(player, sharer_last_round)
+        if player is sharer
+        else _other_player_mid_game(player, sharer_rounds, sharer_last_round)
+        for player in players
+    ]
+
+
 def build_share_data(db: Session, game_id: str, player_name: str) -> ShareGameResponse:
+    """Build a player's share page; while the game runs, only a player who is out can share it.
+
+    Mid-game the page lists only the sharer's rounds. The sharer's run is shown in full apart from
+    their last build, and every other player shows only poison and treasures, so nothing a
+    remaining player could use reaches the page.
+    """
     game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
     if not game_record:
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
-
-    # Snapshots hold every player's hand and sideboard, so they stay hidden while the game
-    # is played. Once it ends they are public by default; GameRecord.shared only records
-    # that someone generated a share link or preview.
-    if game_record.ended_at is None:
-        raise api_error(404, ErrorCode.GAME_IN_PROGRESS, "This game is still being played")
 
     config = json.loads(str(game_record.config_json)) if game_record.config_json else {}
     use_upgrades = config.get("use_upgrades", True)
@@ -138,15 +199,22 @@ def build_share_data(db: Session, game_id: str, player_name: str) -> ShareGameRe
         .filter(PlayerGameHistory.game_id == game_id)
         .all()
     )
+    sharer_history = next((h for h in histories if str(h.player_name) == player_name), None)
+
+    # GameRecord.shared only records that someone generated a share link or preview; it never gates access.
+    in_progress = game_record.ended_at is None
+    if in_progress and (sharer_history is None or sharer_history.final_placement is None):
+        raise api_error(404, ErrorCode.GAME_IN_PROGRESS, "This game is still being played")
 
     if not histories:
         raise api_error(404, ErrorCode.SHARE_DATA_NOT_FOUND, "No player data found for this game")
 
-    owner_exists = any(str(h.player_name) == player_name for h in histories)
-    if not owner_exists:
+    if sharer_history is None:
         raise api_error(404, ErrorCode.PLAYER_NOT_IN_GAME, "Player not found in this game")
 
     players = [_build_share_player(history, db) for history in histories]
+    if in_progress:
+        players = _mid_game_players(players, player_name)
 
     created_at = game_record.created_at.isoformat() if game_record.created_at else ""
     cube_id = str(game_record.cube_id) if game_record.cube_id else config.get("cube_id")
@@ -157,5 +225,6 @@ def build_share_data(db: Session, game_id: str, player_name: str) -> ShareGameRe
         created_at=created_at,
         use_upgrades=use_upgrades,
         cube_id=cube_id,
+        in_progress=in_progress,
         players=players,
     )

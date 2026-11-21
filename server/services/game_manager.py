@@ -1657,7 +1657,7 @@ class GameManager:
             return 1200.0
         return sum(elos) / len(elos)
 
-    def _record_snapshot(self, db: Session, game_id: str, player: Player, battler_elo: float) -> None:
+    def _record_snapshot(self, db: Session, game_id: str, player: Player, battler_elo: float) -> BattleSnapshot:
         history = (
             db.query(PlayerGameHistory)
             .filter(
@@ -1737,6 +1737,7 @@ class GameManager:
         )
         db.add(snapshot)
         db.commit()
+        return snapshot
 
     def _record_bot_poison(
         self, db: Session, game_id: str, fp: Puppet, *, battler_elo: float, stage: int, round_num: int
@@ -3148,32 +3149,38 @@ class GameManager:
             player.phase = "battle"
             player.build_ready = False
 
+        snapshots_by_player: dict[str, BattleSnapshot] = {}
         if db is not None and game_id is not None:
             for player in live_players:
                 battler_elo = player.battler.elo if player.battler is not None else 1200.0
-                self._record_snapshot(db, game_id, player, battler_elo)
+                snapshots_by_player[player.name] = self._record_snapshot(db, game_id, player, battler_elo)
             battler_elo = self._get_game_target_elo(game)
             for fp in game.puppets:
                 if not fp.is_eliminated:
                     self._record_bot_poison(db, game_id, fp, battler_elo=battler_elo, stage=stage, round_num=round_num)
 
-        paired: set[str] = set()
         paired_bot_names: set[str] = set()
-        for player in live_players:
-            if player.name in paired:
-                continue
-            opponent = battle.find_opponent(game, player)
-            if opponent and opponent.name not in paired:
-                battle.start(game, player, opponent)
-                paired.add(player.name)
-                paired.add(opponent.name)
-                if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
-                    for fp in game.puppets:
-                        if fp.player_history_id == opponent.source_player_history_id:
-                            paired_bot_names.add(fp.name)
-                            break
+        for player, opponent in battle.get_round_table(game).draw_battles():
+            battle.start(game, player, opponent)
+            if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
+                for fp in game.puppets:
+                    if fp.player_history_id == opponent.source_player_history_id:
+                        paired_bot_names.add(fp.name)
+                        break
 
         battle.resolve_unpaired_bot_battles(game, paired_bot_names, stage, round_num, game.config.num_rounds_per_stage)
+        self._record_opponents(db, snapshots_by_player, game.active_battles)
+
+    def _record_opponents(
+        self, db: Session | None, snapshots_by_player: dict[str, BattleSnapshot], battles: list[Battle]
+    ) -> None:
+        if db is None or not snapshots_by_player:
+            return
+        for b in battles:
+            for name, opponent_name in ((b.player.name, b.opponent.name), (b.opponent.name, b.player.name)):
+                if name in snapshots_by_player:
+                    snapshots_by_player[name].opponent_name = opponent_name  # ty: ignore[invalid-assignment]
+        db.commit()
 
     def handle_build_apply_upgrade(self, player: Player, upgrade_id: str, target_card_id: str) -> bool:
         return self._apply_upgrade(player, upgrade_id, target_card_id)

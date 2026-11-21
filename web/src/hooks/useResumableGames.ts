@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getResumableGames } from '../api/client'
+import type { PlayMode } from '../types'
 import { listReclaimableSeats } from '../utils/deviceIdentity'
 
 /** A lobby or game this browser can go back to, with the details its resume card shows. */
@@ -9,6 +10,15 @@ export interface ResumableSeat {
   kind: 'lobby' | 'game'
   lastActiveAt: string | null
   joinCode: string | null
+  cubeId: string
+  cubeName: string | null
+  cubeImageUri: string | null
+  playMode: PlayMode
+  useUpgrades: boolean
+  playerCount: number
+  stage: number | null
+  round: number | null
+  poison: number | null
 }
 
 const SEATS_TO_CHECK = 10
@@ -33,6 +43,15 @@ export function useResumableGames(limit: number): ResumableSeat[] {
             kind: game.kind,
             lastActiveAt: game.last_active_at,
             joinCode: joinCodes.get(game.game_id) ?? null,
+            cubeId: game.cube_id,
+            cubeName: game.cube_name,
+            cubeImageUri: game.cube_image_uri,
+            playMode: game.play_mode,
+            useUpgrades: game.use_upgrades,
+            playerCount: game.player_count,
+            stage: game.stage,
+            round: game.round,
+            poison: game.poison,
           })),
         )
       })

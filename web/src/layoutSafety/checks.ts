@@ -1,6 +1,11 @@
 import { act, renderHook } from "@testing-library/react";
-import type { ZoneDims } from "../hooks/cardSizeUtils";
-import type { ZoneConstraints, ZoneFrame } from "../hooks/computeConstrainedLayout";
+import { MIN_CARD_WIDTH, type ZoneDims } from "../hooks/cardSizeUtils";
+import {
+  MIN_ZONE_CARD,
+  clampSavedConstraints,
+  type ZoneConstraints,
+  type ZoneFrame,
+} from "../hooks/computeConstrainedLayout";
 import { computeBattleZones, useBattleCardSizes } from "../hooks/useBattleCardSizes";
 import { layoutForContainer, useCardLayout, type ContainerLayout } from "../hooks/useCardLayout";
 import { measureFromPlacement } from "../hooks/useResizableLayout";
@@ -15,18 +20,12 @@ import {
   type ZoneCase,
 } from "./cases";
 
-/**
- * The narrowest card any card grid in the app asks for (DndPanelLayout's
- * PANEL_MIN_WIDTH). The zone engine and the battle board declare no minimum of
- * their own beyond 1px.
- */
-export const MIN_CARD_WIDTH = 40;
-
 export type CheckId =
   | "card-outside-zone"
   | "card-below-minimum"
   | "zones-off-board"
   | "divider-off-saved-layout"
+  | "saved-layout-squeezes-zone"
   | "grab-moves-layout"
   | "measurement-changes-layout";
 
@@ -138,12 +137,24 @@ export function checkZoneLayout(
       bottomLeftSplit: measured?.bottomInnerHeight ?? 0,
       leftFraction: (measured?.usableWidth ?? 0) - gap,
     };
+    // A divider sits where the layout was saved, unless that leaves a zone without room for one row of cards.
+    const automatic = layoutForContainer(board.width, board.height, { ...config, constraints: null });
+    const drawable = clampSavedConstraints(boardW, boardH, config, saved, automatic.frames);
     for (const key of ["topFraction", "bottomLeftSplit", "leftFraction"] as const) {
-      const want = saved[key];
+      const want = drawable[key];
       if (want === undefined || !visible[key] || !measured) continue;
       const offPx = Math.abs(measured[key] - want) * space[key];
       if (offPx > 1) {
-        fail("divider-off-saved-layout", `${key} ${want} sits at ${measured[key].toFixed(3)} (${Math.round(offPx)}px off)`);
+        fail("divider-off-saved-layout", `${key} ${want.toFixed(3)} sits at ${measured[key].toFixed(3)} (${Math.round(offPx)}px off)`);
+      }
+    }
+    // A saved layout leaves each zone room for one row of cards, or the room the automatic layout gives it if less.
+    for (const id of allActive) {
+      const frame = layout.frames[id];
+      const minWidth = Math.min(MIN_ZONE_CARD.width, automatic.frames[id].innerWidth);
+      const minHeight = Math.min(MIN_ZONE_CARD.height, automatic.frames[id].innerHeight);
+      if (frame.innerWidth < minWidth || frame.innerHeight < minHeight) {
+        fail("saved-layout-squeezes-zone", `${id} has ${frame.innerWidth}x${frame.innerHeight}px inside its padding`);
       }
     }
   }

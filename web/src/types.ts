@@ -392,6 +392,16 @@ export interface ResumableGame {
   player_name: string
   kind: 'lobby' | 'game'
   last_active_at: string | null
+  cube_id: string
+  cube_name: string | null
+  cube_image_uri: string | null
+  play_mode: PlayMode
+  use_upgrades: boolean
+  player_count: number
+  /** A lobby has no stage, round or poison yet. */
+  stage: number | null
+  round: number | null
+  poison: number | null
 }
 
 export interface GameStatusResponse {
@@ -423,6 +433,8 @@ export interface SpectateRequestStatus {
   player_id?: string
 }
 
+export type ShareSnapshotVisibility = 'full' | 'hand_hidden' | 'hidden'
+
 export interface SharePlayerSnapshot {
   stage: number
   round: number
@@ -435,6 +447,7 @@ export interface SharePlayerSnapshot {
   treasures: number
   poison: number
   vanguard: Card | null
+  visibility: ShareSnapshotVisibility
 }
 
 export interface SharePlayerData {
@@ -452,6 +465,7 @@ export interface ShareGameResponse {
   created_at: string
   use_upgrades: boolean
   cube_id?: string | null
+  in_progress: boolean
   players: SharePlayerData[]
 }
 
@@ -479,6 +493,11 @@ export interface UserBattler {
   game_count: number
   human_player_count: number
   last_played?: string | null
+  /** The signed-in player's finished games on this cube with this preset's mode and upgrades setting. */
+  my_game_count: number
+  my_win_count: number
+  my_average_placement: number | null
+  my_last_played: string | null
 }
 
 export interface GameSummary {
@@ -494,6 +513,20 @@ export interface GameSummary {
   play_mode?: string
   use_upgrades?: boolean
   hand_scryfall_ids: string[]
+}
+
+/** A cube's community record, whatever filters its game list has. */
+export interface CubeSummary {
+  cube_id: string
+  cube_name: string | null
+  cube_image_uri: string | null
+  game_count: number
+  human_player_count: number
+  last_played: string | null
+  /** The most played mode and upgrades setting; null before the cube's first finished game. */
+  popular_setup: { play_mode: PlayMode; use_upgrades: boolean } | null
+  is_following: boolean
+  follow_id: number | null
 }
 
 export interface FollowedBattler {

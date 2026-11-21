@@ -112,6 +112,22 @@ export function UserMenuButton({ compact }: { compact: boolean }) {
             >
               Dashboard
             </button>
+            {compact && (
+              <>
+                <button
+                  onClick={() => { setOpen(false); navigate('/dashboard/games') }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+                >
+                  Games
+                </button>
+                <button
+                  onClick={() => { setOpen(false); navigate('/dashboard/discover') }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+                >
+                  Discover
+                </button>
+              </>
+            )}
             <button
               onClick={() => { setOpen(false); navigate('/play') }}
               className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"

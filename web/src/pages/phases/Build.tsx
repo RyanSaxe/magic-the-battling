@@ -14,7 +14,7 @@ import { CardGrid } from "../../components/common/CardGrid";
 import { LayoutResetControl } from "../../components/common/LayoutResetControl";
 import { UpgradeGrid } from "../../components/common/UpgradeGrid";
 import { ZoneLayout } from "../../components/common/ZoneLayout";
-import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
+import { usePersistedConstraints, type BoardSize } from "../../hooks/usePersistedConstraints";
 import { useResizableLayout } from "../../hooks/useResizableLayout";
 import { buildLayoutConfig } from "./phaseLayouts";
 
@@ -283,16 +283,20 @@ export function BuildPhase({
     setStableSBCount(self_player.sideboard.length);
   }
 
+  const [measuredBoard, setMeasuredBoard] = useState<BoardSize | null>(null);
   const {
     constraints,
     setConstraints,
     clearConstraints,
     resolution: persistedLayout,
-  } = usePersistedConstraints({
-    scopeKey: "phase:build",
-    stage: self_player.stage,
-    round: self_player.round,
-  });
+  } = usePersistedConstraints(
+    {
+      scopeKey: "phase:build",
+      stage: self_player.stage,
+      round: self_player.round,
+    },
+    measuredBoard,
+  );
 
   const layoutConfig = buildLayoutConfig({
     handSize: maxHandSize,
@@ -300,13 +304,15 @@ export function BuildPhase({
     upgradeRailCount: hasDesktopUpgradeRail ? self_player.upgrades.length : 0,
   });
 
-  const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
+  const { containerRef, dims, containerSize, zoneFrames, zoneRefs, dividerCallbacks } =
     useResizableLayout({
       layoutConfig,
       constraints,
       onConstraintsChange: setConstraints,
       onConstraintsClear: clearConstraints,
     });
+  // A saved layout belongs to a board size band, known once the board is measured.
+  if (measuredBoard !== containerSize) setMeasuredBoard(containerSize);
 
   const handDims = { width: dims.hand.width, height: dims.hand.height };
   const bfDims = {
