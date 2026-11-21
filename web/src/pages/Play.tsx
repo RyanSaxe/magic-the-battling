@@ -601,8 +601,8 @@ export function Play() {
             Home
           </button>
         )} />}
-        center="tall-wide"
-        contentClassName="px-4 sm:items-center"
+        center
+        contentClassName="px-4"
         hints
       >
         <SurfaceCard as="section" className="overflow-hidden flex flex-col">

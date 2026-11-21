@@ -527,7 +527,7 @@ export function Lobby() {
   if (!session) {
     return (
       <>
-        <PageFrame header={header} center="except-short-wide" contentClassName="items-center px-4">
+        <PageFrame header={header} center contentClassName="items-center px-4">
           <SurfaceCard>
             <h2 className="text-lg font-semibold text-amber-200">
               Unable to Reconnect
@@ -569,7 +569,7 @@ export function Lobby() {
   if (!lobbyState) {
     return (
       <>
-        <PageFrame header={header} center="except-short-wide" contentClassName="items-center px-4">
+        <PageFrame header={header} center contentClassName="items-center px-4">
           {connectionError && !invalidSession ? (
             <SurfaceCard>
               <h2 className="text-lg font-semibold text-amber-200">
@@ -636,8 +636,8 @@ export function Lobby() {
       )}
       <PageFrame
         header={header}
-        center="tall-wide"
-        contentClassName="px-4 sm:items-center"
+        center
+        contentClassName="px-4"
         hints
       >
         <SurfaceCard className="overflow-visible">

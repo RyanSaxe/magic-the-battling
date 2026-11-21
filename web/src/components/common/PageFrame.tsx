@@ -3,27 +3,13 @@ import { FaDiscord } from 'react-icons/fa6'
 import { CubeCobraPrimerLink } from './CubeCobraPrimerLink'
 import { HintsBanner } from './HintsBanner'
 
-/**
- * Which screens center content that fits in the column. Elsewhere it starts at
- * the top, and content taller than the column always starts at the top and scrolls.
- * - always: every screen.
- * - except-short-wide: all but screens 640px or wider and 820px or shorter.
- * - tall-wide: only screens 640px or wider and taller than 820px.
- */
-export type PageFrameCenter = 'always' | 'except-short-wide' | 'tall-wide'
-
-const CENTER_CLASS: Record<PageFrameCenter, string> = {
-  always: 'page-center',
-  'except-short-wide': 'page-center-except-short-wide',
-  'tall-wide': 'page-center-tall-wide',
-}
-
 interface PageFrameProps {
   header: ReactNode
   children: ReactNode
   /** Horizontal padding and alignment of the scrolling content column, which has 1rem of vertical padding. */
   contentClassName?: string
-  center?: PageFrameCenter
+  /** Center content that fits in the column. Content taller than the column starts at the top and scrolls. */
+  center?: boolean
   hints?: boolean
   /** False for content that sizes itself to the column and may overhang its edges. */
   scroll?: boolean
@@ -36,13 +22,13 @@ export function PageFrame({
   header,
   children,
   contentClassName = '',
-  center,
+  center = false,
   hints = false,
   scroll = true,
   aside,
   footer,
 }: PageFrameProps) {
-  const centerClass = center ? CENTER_CLASS[center] : ''
+  const centerClass = center ? 'page-center' : ''
   const scrollClass = scroll ? 'overflow-y-auto overflow-x-hidden overscroll-contain py-4' : ''
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">

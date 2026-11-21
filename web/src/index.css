@@ -303,26 +303,6 @@ input:-webkit-autofill:focus {
   margin-bottom: auto;
 }
 
-@media (width < 640px), (height > 820px) {
-  .page-center-except-short-wide > :first-child {
-    margin-top: auto;
-  }
-
-  .page-center-except-short-wide > :last-child {
-    margin-bottom: auto;
-  }
-}
-
-@media (width >= 640px) and (height > 820px) {
-  .page-center-tall-wide > :first-child {
-    margin-top: auto;
-  }
-
-  .page-center-tall-wide > :last-child {
-    margin-bottom: auto;
-  }
-}
-
 .zone-divider-line--horizontal {
   background:
     linear-gradient(

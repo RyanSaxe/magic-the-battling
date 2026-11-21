@@ -40,7 +40,7 @@ export function Login() {
           Home
         </button>
       )} />}
-      center="always"
+      center
       contentClassName="items-center px-4"
     >
       <SurfaceCard as="form" onSubmit={handleSubmit}>

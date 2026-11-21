@@ -67,7 +67,7 @@ export function BattlerView() {
 
   if (authLoading || !user || loadingData || !battler) {
     return (
-      <PageFrame header={header} center="always" contentClassName="items-center">
+      <PageFrame header={header} center contentClassName="items-center">
         <p className="text-amber-200/70">Loading...</p>
       </PageFrame>
     )
