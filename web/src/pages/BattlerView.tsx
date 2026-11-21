@@ -64,7 +64,7 @@ export function BattlerView() {
 
   if (authLoading || !user || loadingData || !battler) {
     return (
-      <PageFrame header={<HomeHeader newGame />} center contentClassName="items-center">
+      <PageFrame header={<HomeHeader />} center contentClassName="items-center">
         <p className="text-amber-200/70">Loading...</p>
       </PageFrame>
     )
@@ -75,7 +75,7 @@ export function BattlerView() {
 
   return (
     <>
-      <DashboardFrame header={<HomeHeader newGame />}>
+      <DashboardFrame>
         <Breadcrumb to="/dashboard" label="Cubes & Decks" current={title} />
         <DetailHero
           imageUri={battler.cube_image_uri}
