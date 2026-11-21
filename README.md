@@ -77,7 +77,7 @@ Both workflows support the same labels but have different defaults:
 
 | Label | Effect |
 |-------|--------|
-| *(none)* | No release created |
+| *(none)* | Bump patch version |
 | `release:patch` | Bump patch version (e.g. v1.0.0 → v1.0.1) |
 | `release:minor` | Bump minor version (e.g. v1.0.0 → v1.1.0) |
 | `release:major` | Bump major version (e.g. v1.0.0 → v2.0.0) |
