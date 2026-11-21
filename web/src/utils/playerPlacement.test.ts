@@ -71,4 +71,18 @@ describe("player placement ordering", () => {
       "Bravo",
     ]);
   });
+
+  it("gives alive players tied on poison the same place", () => {
+    const players = [
+      makePlayer({ name: "Zulu", poison: 0 }),
+      makePlayer({ name: "Alpha", poison: 0 }),
+      makePlayer({ name: "Charlie", poison: 1 }),
+      makePlayer({ name: "Bravo", poison: 1 }),
+      makePlayer({ name: "Delta", placement: 5 }),
+    ];
+
+    expect(players.map((player) => getSidebarPlacementRank(player, players))).toEqual([
+      1, 1, 3, 3, 5,
+    ]);
+  });
 });

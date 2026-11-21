@@ -24,12 +24,17 @@ export function getSidebarPlayerOrder(players: PlayerView[]): PlayerView[] {
   return [...players].sort(comparePlayersForSidebar);
 }
 
+function isTiedOnPoison(a: PlayerView, b: PlayerView): boolean {
+  return a.placement === 0 && b.placement === 0 && a.poison === b.poison;
+}
+
 export function getSidebarPlacementRank(
   player: PlayerView,
   players: PlayerView[],
 ): number {
   const index = getSidebarPlayerOrder(players).findIndex(
-    (candidate) => candidate.name === player.name,
+    (candidate) =>
+      candidate.name === player.name || isTiedOnPoison(candidate, player),
   );
 
   return index >= 0 ? index + 1 : players.length;
