@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useSession } from "../hooks/useSession";
+import { useGameSeat } from "../hooks/useGameSeat";
 import { useGame } from "../hooks/useGame";
 import { useVoiceChat } from "../hooks/useVoiceChat";
 import type { VoiceSignalPayload } from "../hooks/useWebSocket";
@@ -11,8 +11,10 @@ import { MicToggle } from "../components/sidebar/MicToggle";
 import { useToast } from "../contexts";
 import { AppHeader } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
+import { BusyNotice } from "../components/common/StatusNotice";
+import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
+import { SurfaceCard } from "../components/common/SurfaceCard";
 import { type AppError, getAppErrorMessage } from "../utils/appError";
-import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import {
   getDefaultNewPlayerPreference,
   getNewPlayerPreferenceForGame,
@@ -211,7 +213,7 @@ function VoiceChatSwitch({
         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
           Voice
         </span>
-        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400">
+        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400 max-[389px]:hidden">
           Beta
         </span>
         <input
@@ -263,9 +265,10 @@ function VoiceChatSwitch({
 }
 
 export function Lobby() {
-  const { gameId } = useParams<{ gameId: string }>();
+  const { gameId = "" } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
-  const { session, clearSession } = useSession();
+  const { seat, claim, adopt, connectionOpened, connectionEnded, takeBack } = useGameSeat(gameId);
+  const session = seat.kind === "held" ? seat.session : null;
   const { addToast } = useToast();
   const handleServerError = useCallback((error: AppError) => {
     addToast(getAppErrorMessage(error, "lobby-action", "That action could not be completed."), "error");
@@ -277,16 +280,14 @@ export function Lobby() {
   }, []);
 
   const {
+    status,
     lobbyState,
     gameState,
     isConnected,
-    kicked,
-    connectionError,
-    invalidSession,
     actions,
     send,
   } = useGame(
-    gameId ?? null,
+    gameId || null,
     session?.sessionId ?? null,
     null,
     handleServerError,
@@ -322,7 +323,6 @@ export function Lobby() {
   const [rulesPanelTarget, setRulesPanelTarget] = useState<
     RulesPanelTarget | undefined
   >(undefined);
-  const wasInvalidSessionRef = useRef(false);
   const lastCubeLoadingErrorRef = useRef<string | null>(null);
   const lastBattlerErrorRef = useRef<string | null>(null);
 
@@ -466,22 +466,25 @@ export function Lobby() {
   }, [gameState, gameId, navigate]);
 
   useEffect(() => {
-    if (kicked) {
-      navigate("/play");
-    }
-  }, [kicked, navigate]);
+    if (!session) return;
+    if (status.kind === "open") connectionOpened(session.sessionId);
+    if (status.kind === "ended") connectionEnded(session.sessionId, status.error);
+  }, [status, session, connectionOpened, connectionEnded]);
 
+  const hostName = lobbyState?.players.find((p) => p.is_host)?.name ?? null;
+  const awayHost = lobbyState?.players.find((p) => p.is_host && !p.is_connected) ?? null;
+  const previousHostRef = useRef<string | null>(null);
   useEffect(() => {
-    const shouldClear = shouldClearSessionOnInvalidEvent(
-      invalidSession,
-      wasInvalidSessionRef.current,
-      !!session,
+    const previousHost = previousHostRef.current;
+    previousHostRef.current = hostName;
+    if (!previousHost || !hostName || previousHost === hostName) return;
+    addToast(
+      hostName === selfName
+        ? `You're the host now. ${previousHost} left the lobby.`
+        : `${hostName} is now the host.`,
+      "info",
     );
-    wasInvalidSessionRef.current = invalidSession;
-    if (shouldClear) {
-      clearSession();
-    }
-  }, [invalidSession, session, clearSession]);
+  }, [hostName, selfName, addToast]);
 
   const copyJoinCode = async () => {
     if (!lobbyState?.join_code) return;
@@ -523,44 +526,30 @@ export function Lobby() {
     )} />
   );
 
-  if (!session) {
+  const rulesPanel = showRulesPanel && (
+    <RulesPanel
+      onClose={() => setShowRulesPanel(false)}
+      initialDocId={rulesPanelTarget?.docId}
+      initialTab={rulesPanelTarget?.tab}
+      gameId={gameId}
+      playerName={currentPlayer?.name}
+      useUpgrades={undefined}
+    />
+  );
+
+  if (seat.kind !== "held") {
     return (
       <>
-        <PageFrame header={header} center="except-short-wide" contentClassName="items-center">
-          <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
-            <h2 className="text-lg font-semibold text-amber-200">
-              Unable to Reconnect
-            </h2>
-            <p className="text-sm text-gray-200 mt-2 leading-snug">
-              Your prior lobby session is no longer valid. Start a new game
-              or join another lobby.
-            </p>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => navigate("/play")}
-                className="btn btn-primary flex-1 py-2"
-              >
-                Go to Play
-              </button>
-              <button
-                onClick={() => navigate("/")}
-                className="btn btn-secondary flex-1 py-2"
-              >
-                Home
-              </button>
-            </div>
-          </div>
-        </PageFrame>
-        {showRulesPanel && (
-          <RulesPanel
-            onClose={() => setShowRulesPanel(false)}
-            initialDocId={rulesPanelTarget?.docId}
-            initialTab={rulesPanelTarget?.tab}
+        <PageFrame header={header} center contentClassName="items-center px-4">
+          <LobbySeatNotice
             gameId={gameId}
-            playerName={currentPlayer?.name}
-            useUpgrades={undefined}
+            seat={seat}
+            onJoined={adopt}
+            onClaim={(playerName) => void claim(playerName)}
+            onTakeBack={takeBack}
           />
-        )}
+        </PageFrame>
+        {rulesPanel}
       </>
     );
   }
@@ -568,54 +557,10 @@ export function Lobby() {
   if (!lobbyState) {
     return (
       <>
-        <PageFrame header={header} center="except-short-wide" contentClassName="items-center">
-          {connectionError && !invalidSession ? (
-            <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
-              <h2 className="text-lg font-semibold text-amber-200">
-                {connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Lobby Unavailable"}
-              </h2>
-              <p className="text-sm text-gray-200 mt-2 leading-snug">
-                {getAppErrorMessage(
-                  connectionError,
-                  "lobby-connection",
-                  "This lobby is no longer available. It may have ended or been cleared during a server restart.",
-                )}
-              </p>
-              <div className="mt-4 flex gap-2">
-                <button
-                  onClick={() => navigate("/play")}
-                  className="btn btn-primary flex-1 py-2"
-                >
-                  Go to Play
-                </button>
-                <button
-                  onClick={() => navigate("/")}
-                  className="btn btn-secondary flex-1 py-2"
-                >
-                  Home
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="modal-chrome border gold-border rounded-lg px-5 py-3 flex items-center gap-3">
-              <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-              <span className="text-sm text-gray-100">Loading lobby...</span>
-            </div>
-          )}
+        <PageFrame header={header} center contentClassName="items-center px-4">
+          <BusyNotice label="Loading lobby..." />
         </PageFrame>
-        {showRulesPanel && (
-          <RulesPanel
-            onClose={() => setShowRulesPanel(false)}
-            initialDocId={rulesPanelTarget?.docId}
-            initialTab={rulesPanelTarget?.tab}
-            gameId={gameId}
-            playerName={currentPlayer?.name}
-            useUpgrades={undefined}
-          />
-        )}
+        {rulesPanel}
       </>
     );
   }
@@ -635,11 +580,11 @@ export function Lobby() {
       )}
       <PageFrame
         header={header}
-        center="tall-wide"
-        contentClassName="px-4 sm:items-center"
+        center
+        contentClassName="px-4"
         hints
       >
-        <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md overflow-visible sm:flex-none felt-raised-panel">
+        <SurfaceCard className="overflow-visible">
           {lobbyState &&
             (() => {
               const isHost = currentPlayer?.is_host ?? false;
@@ -769,6 +714,18 @@ export function Lobby() {
                     </div>
                   </div>
 
+                  {awayHost && (
+                    <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 mb-3 text-xs leading-snug text-amber-200">
+                      <svg aria-hidden className="w-4 h-4 shrink-0 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+                      </svg>
+                      <span>
+                        <b>{awayHost.name}</b> (host) is away. If they&apos;re not back within a minute, the next
+                        player becomes host.
+                      </span>
+                    </div>
+                  )}
+
                   {lobbyState.play_mode === "constructed" && currentPlayer && (
                     <div className="bg-black/35 rounded-lg border border-black/40 p-3 mb-3">
                       <h2 className="text-white font-medium text-sm">{isConstructed ? "Your Deck" : "Your Cube"}</h2>
@@ -894,12 +851,17 @@ export function Lobby() {
                         <span
                           className={`w-2 h-2 rounded-full shrink-0 ${
                             player.is_ready ? "bg-green-500" : "bg-gray-500"
-                          }`}
+                          }${player.is_connected ? "" : " opacity-40"}`}
                         />
                         <div className="min-w-0 flex-1">
-                          <div className="text-white text-sm truncate">
+                          <div className={`text-sm truncate ${player.is_connected ? "text-white" : "text-gray-400"}`}>
                             {player.name}
                           </div>
+                          {!player.is_connected && (
+                            <div className="text-[10px] leading-3 uppercase tracking-[0.08em] text-gray-400">
+                              Away
+                            </div>
+                          )}
                         </div>
                         {player.player_id === session?.playerId && voiceChat.state.peers.length > 0 && (
                           <MicToggle
@@ -1014,7 +976,7 @@ export function Lobby() {
             </div>
 
             <div className="space-y-3 mb-3">
-              <div className="flex items-center justify-between rounded-md border border-black/40 bg-black/40 px-2 py-1">
+              <div className="flex items-center justify-between gap-2 rounded-md border border-black/40 bg-black/40 px-2 py-1">
                 <GuidedModeSwitch
                   enabled={isGuidedMode}
                   setEnabled={handleGuidedModeToggle}
@@ -1084,7 +1046,7 @@ export function Lobby() {
                 </>
               );
             })()}
-        </div>
+        </SurfaceCard>
       </PageFrame>
       {showRulesPanel && (
         <RulesPanel

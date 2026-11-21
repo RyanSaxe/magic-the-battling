@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { joinGame } from '../../api/client'
 import { useAuth } from '../../contexts/authState'
-import { useSession } from '../../hooks/useSession'
 import { unknownToAppError } from '../../utils/appError'
-import { rememberPlayerForGame } from '../../utils/deviceIdentity'
+import { findRememberedSeatByJoinCode, rememberPlayerForGame } from '../../utils/deviceIdentity'
+import { saveTabSession } from '../../utils/tabSession'
+import { SurfaceCard } from '../common/SurfaceCard'
 
 interface JoinGameModalProps {
   onClose: () => void
@@ -13,7 +14,6 @@ interface JoinGameModalProps {
 export function JoinGameModal({ onClose }: JoinGameModalProps) {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { saveSession } = useSession()
 
   const [manualName, setManualName] = useState('')
   const playerName = user ? user.username : manualName
@@ -41,13 +41,20 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
       return
     }
 
+    // This browser already holds that seat: the lobby page takes it back with the seat token.
+    const heldSeat = findRememberedSeatByJoinCode(code)
+    if (heldSeat && heldSeat.name === name) {
+      navigate(`/game/${heldSeat.gameId}/lobby`)
+      return
+    }
+
     setLoading(true)
     setError('')
 
     try {
       const response = await joinGame(code, name)
-      saveSession(response.session_id, response.player_id)
-      rememberPlayerForGame(response.game_id, name)
+      saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id })
+      rememberPlayerForGame(response.game_id, name, { seatToken: response.seat_token, joinCode: code.toUpperCase() })
       navigate(`/game/${response.game_id}/lobby`)
     } catch (err) {
       setError(unknownToAppError(err, 'join-game', 'Failed to join game').message)
@@ -61,10 +68,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
-      <div
-        className="relative modal-chrome border gold-border rounded-lg p-5 w-full max-w-sm felt-raised-panel"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <SurfaceCard className="relative" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
           <h2 className="text-white font-semibold">Join Game</h2>
           <button
@@ -121,7 +125,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
             </button>
           </div>
         </div>
-      </div>
+      </SurfaceCard>
     </div>
   )
 }

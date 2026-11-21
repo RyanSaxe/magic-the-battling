@@ -303,10 +303,16 @@ class TestRejoinGame:
         game_id = game_with_players["game_id"]
         start_lobby(game_id, game_with_players["alice"]["session_id"])
 
-        first = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice"})
+        first = client.post(
+            f"/api/games/{game_id}/rejoin",
+            json={"player_name": "Alice", "seat_token": game_with_players["alice"]["seat_token"]},
+        )
         assert first.status_code == 200
 
-        second = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice"})
+        second = client.post(
+            f"/api/games/{game_id}/rejoin",
+            json={"player_name": "Alice", "seat_token": first.json()["seat_token"]},
+        )
         assert second.status_code == 200
 
     def test_authenticated_owner_keeps_slot_ownership_after_rejoin(self, client, start_lobby):
