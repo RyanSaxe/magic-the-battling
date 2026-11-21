@@ -1,24 +1,11 @@
 import { useNavigate } from 'react-router-dom'
-import { AppHeader } from '../components/common/AppHeader'
-import { PageFrame } from '../components/common/PageFrame'
+import { NoticeFrame } from '../components/common/NoticeFrame'
 import { StatusNotice } from '../components/common/StatusNotice'
 
 export function NotFound() {
   const navigate = useNavigate()
-  const header = (
-    <AppHeader
-      renderRight={({ compact }) => (
-        <button
-          onClick={() => navigate('/')}
-          className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
-        >
-          Home
-        </button>
-      )}
-    />
-  )
   return (
-    <PageFrame header={header} center contentClassName="items-center px-4">
+    <NoticeFrame>
       <StatusNotice
         title="Page not found"
         actions={
@@ -34,6 +21,6 @@ export function NotFound() {
       >
         There&apos;s nothing at this address. It may have been mistyped or moved.
       </StatusNotice>
-    </PageFrame>
+    </NoticeFrame>
   )
 }

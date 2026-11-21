@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { getShareGame } from '../api/client'
 import type { ShareGameResponse, SharePlayerSnapshot, Card as CardType } from '../types'
@@ -16,6 +16,7 @@ import { AppHeader } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { BusyNotice, StatusNotice } from '../components/common/StatusNotice'
+import { NoticeFrame } from '../components/common/NoticeFrame'
 import { type AppError, unknownToAppError } from '../utils/appError'
 
 interface RoundOption {
@@ -98,27 +99,6 @@ function shareErrorTitle(error: AppError): string {
   return "Couldn't load this game"
 }
 
-function ShareNoticeFrame({ children }: { children: ReactNode }) {
-  const navigate = useNavigate()
-  const header = (
-    <AppHeader
-      renderRight={({ compact }) => (
-        <button
-          onClick={() => navigate('/')}
-          className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
-        >
-          Home
-        </button>
-      )}
-    />
-  )
-  return (
-    <PageFrame header={header} center contentClassName="items-center px-4">
-      {children}
-    </PageFrame>
-  )
-}
-
 export function ShareGame() {
   const { gameId, playerName } = useParams<{ gameId: string; playerName: string }>()
   const navigate = useNavigate()
@@ -194,15 +174,15 @@ export function ShareGame() {
 
   if (loading) {
     return (
-      <ShareNoticeFrame>
+      <NoticeFrame>
         <BusyNotice label="Loading game..." />
-      </ShareNoticeFrame>
+      </NoticeFrame>
     )
   }
 
   if (error || !data) {
     return (
-      <ShareNoticeFrame>
+      <NoticeFrame>
         <StatusNotice
           title={error ? shareErrorTitle(error) : 'Game not found'}
           actions={
@@ -213,7 +193,7 @@ export function ShareGame() {
         >
           {error?.message ?? 'This game is no longer available to share.'}
         </StatusNotice>
-      </ShareNoticeFrame>
+      </NoticeFrame>
     )
   }
 
