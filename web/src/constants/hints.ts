@@ -7,7 +7,7 @@ export const GAME_HINTS = [
   "Higher poison gets to choose play or draw",
   "In Build, hover a card and press U to upgrade",
   "Press Enter to advance to the next phase",
-  "In Battle, double click on a card to tap it",
+  "In Fight, double click on a card to tap it",
   "Managing treasures well is key to victory",
   "Check the sidebar to see other players' cards",
   "Upgrading can't be undone. Choose wisely!",
