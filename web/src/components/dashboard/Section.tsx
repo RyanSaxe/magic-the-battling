@@ -30,7 +30,7 @@ export function NoticeTile({
     <SurfaceCard
       layout="tile"
       style={style}
-      className={`flex flex-col items-center justify-center gap-3 px-5 py-6 text-center text-sm text-gray-300 ${className ?? ''}`}
+      className={`flex flex-col items-center justify-center gap-3 px-5 py-6 text-center text-sm text-amber-100/70 ${className ?? ''}`}
     >
       <p>{children}</p>
       {action && (

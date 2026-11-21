@@ -147,7 +147,7 @@ export function DashboardDiscover() {
           <div className="flex items-baseline gap-4">
             <SectionTitle>Discover</SectionTitle>
             {current && current.total > 0 && (
-              <span className="text-[12.5px] leading-5 tabular-nums text-gray-300">
+              <span className="text-[12.5px] leading-5 tabular-nums text-amber-100/70">
                 <strong className="text-amber-50">{current.total}</strong>{' '}
                 {search ? (current.total === 1 ? 'matching cube' : 'matching cubes') : current.total === 1 ? 'popular cube' : 'popular cubes'}
               </span>

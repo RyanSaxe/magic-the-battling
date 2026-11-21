@@ -92,7 +92,7 @@ export function DashboardGames() {
           <div className="flex items-baseline gap-4">
             <SectionTitle>Games</SectionTitle>
             {current && (
-              <div className="flex items-baseline gap-4 text-[12.5px] leading-5 tabular-nums text-gray-300">
+              <div className="flex items-baseline gap-4 text-[12.5px] leading-5 tabular-nums text-amber-100/70">
                 <span>
                   <strong className="text-amber-50">{current.totalGames}</strong>{' '}
                   {search ? 'matching ' : ''}

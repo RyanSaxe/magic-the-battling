@@ -189,7 +189,7 @@ export function Dashboard() {
               </button>
             </div>
             {myGames && (
-              <div className="flex items-center justify-between gap-4 whitespace-nowrap text-[12.5px] leading-5 tabular-nums text-gray-300 sm:justify-end">
+              <div className="flex items-center justify-between gap-4 whitespace-nowrap text-[12.5px] leading-5 tabular-nums text-amber-100/70 sm:justify-end">
                 <span>
                   <strong className="text-amber-50">{myGames.totalGames}</strong>{' '}
                   {myGames.totalGames === 1 ? 'game' : 'games'}

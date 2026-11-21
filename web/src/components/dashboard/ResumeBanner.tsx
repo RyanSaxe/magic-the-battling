@@ -33,7 +33,7 @@ export function ResumeBanner({ seat }: { seat: ResumableSeat }) {
           </div>
           <div className="flex flex-wrap items-baseline gap-x-2">
             <span className="truncate text-[15px] leading-5 font-semibold text-amber-50">{seat.cubeName ?? seat.cubeId}</span>
-            <span className="text-xs text-gray-400">{resumeDetail(seat)}</span>
+            <span className="text-xs text-amber-100/60">{resumeDetail(seat)}</span>
           </div>
         </div>
       </div>

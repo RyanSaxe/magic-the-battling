@@ -41,7 +41,7 @@ function HandFan({ scryfallIds }: { scryfallIds: string[] }) {
             src={scryfallSmall(id)}
             alt=""
             loading="lazy"
-            className="aspect-[5/7] rounded-[4px] border border-black/80 bg-black/60 object-cover shadow-[0_2px_6px_rgba(0,0,0,0.45)]"
+            className="aspect-[5/7] rounded-[4px] border border-black/60 bg-black/60 object-cover"
             style={{ height: `min(100cqh, ${fitsWidth})`, marginLeft: index === 0 ? 0 : -HAND_OVERLAP_PX }}
           />
         ))}
@@ -73,7 +73,7 @@ export function GameTile({ game, className, style }: GameTileProps) {
           <h3 className="truncate text-[13px] leading-5 font-semibold text-amber-50">
             <Link to={href} onClick={(e) => e.stopPropagation()}>{cubeTitle(game)}</Link>
           </h3>
-          <p className="truncate text-[11px] leading-4 text-gray-400">{gameMeta(game)}</p>
+          <p className="truncate text-[11px] leading-4 text-amber-100/60">{gameMeta(game)}</p>
         </div>
         {game.best_human_placement !== null && (
           <PlacementBadge placement={game.best_human_placement} playerCount={game.player_count} />

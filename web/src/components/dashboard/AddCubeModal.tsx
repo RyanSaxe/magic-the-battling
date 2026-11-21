@@ -53,7 +53,7 @@ export function AddCubeModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-gray-300 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-amber-100/70 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
           >
             ✕
           </button>
@@ -74,7 +74,7 @@ export function AddCubeModal({
           </div>
 
           <div>
-            <label className="block text-white text-sm mb-1">Display Name <span className="text-gray-500">(optional)</span></label>
+            <label className="block text-white text-sm mb-1">Display Name <span className="text-amber-200/45">(optional)</span></label>
             <input
               type="text"
               value={displayName}
@@ -92,7 +92,7 @@ export function AddCubeModal({
               className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
             />
             <span className="text-white text-sm">Constructed</span>
-            <span className="text-gray-500 text-xs">— bring your own deck</span>
+            <span className="text-amber-200/45 text-xs">— bring your own deck</span>
           </label>
 
           <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
@@ -103,20 +103,18 @@ export function AddCubeModal({
               className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
             />
             <span className="text-white text-sm">Upgrades</span>
-            <span className="text-gray-500 text-xs">— upgrade a card every 3 rounds</span>
+            <span className="text-amber-200/45 text-xs">— upgrade a card every 3 rounds</span>
           </label>
 
           <div className="bg-black/35 border border-black/40 rounded-lg p-3">
-            <label className="block text-gray-300 text-sm mb-2">Default Opponents</label>
+            <label className="block text-amber-100/70 text-sm mb-2">Default Opponents</label>
             <div className="flex gap-1.5">
               {([1, 3, 5, 7] as const).map((n) => (
                 <button
                   key={n}
                   type="button"
                   onClick={() => setPuppetCount(n)}
-                  className={`px-3 py-1.5 rounded text-sm font-medium btn-dark-border transition-colors ${
-                    puppetCount === n ? 'bg-amber-500 text-black' : 'bg-black/40 text-gray-300 hover:bg-black/30'
-                  }`}
+                  className={`btn ${puppetCount === n ? 'btn-primary' : 'btn-secondary'} px-3 py-1.5 text-sm font-medium`}
                 >
                   {n}
                 </button>

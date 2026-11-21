@@ -27,7 +27,7 @@ export function JoinCodeBox({ playerName, className }: { playerName: string; cla
   return (
     <form
       onSubmit={submit}
-      className={`flex h-9 items-center rounded-md border border-white/15 bg-black/40 pl-2.5 pr-0.5 ${className ?? ''}`}
+      className={`flex h-9 items-center rounded-md border border-black/40 bg-black/40 pl-2.5 pr-0.5 ${className ?? ''}`}
     >
       <input
         type="text"
@@ -35,7 +35,7 @@ export function JoinCodeBox({ playerName, className }: { playerName: string; cla
         onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
         aria-label="Join code"
         placeholder="Enter join code"
-        className="w-[9.5rem] min-w-0 bg-transparent font-mono text-sm uppercase text-white placeholder:font-sans placeholder:normal-case placeholder:text-gray-500 focus:outline-none"
+        className="w-[9.5rem] min-w-0 bg-transparent font-mono text-sm uppercase text-white placeholder:font-sans placeholder:normal-case focus:outline-none"
       />
       <button
         type="submit"

@@ -61,7 +61,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
           <h2 className="text-white font-semibold">Join Game</h2>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-gray-300 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-amber-100/70 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
             aria-label="Close join game modal"
           >
             ✕

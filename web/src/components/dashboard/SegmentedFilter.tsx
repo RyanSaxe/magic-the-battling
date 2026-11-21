@@ -40,7 +40,7 @@ export function SegmentedFilter<T extends string>({
           } ${
             option.value === value
               ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'
-              : 'border border-transparent bg-black/10 text-gray-400 hover:text-gray-200'
+              : 'border border-transparent bg-black/10 text-amber-100/60 hover:text-amber-100'
           }`}
         >
           {option.label}
