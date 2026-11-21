@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { AddCubeModal } from '../components/dashboard/AddCubeModal'
 import { DashboardFrame } from '../components/dashboard/DashboardFrame'
+import { HomeHeader } from '../components/dashboard/HomeHeader'
 import { DetailHero, HeroLink, type HeroAction } from '../components/dashboard/DetailHero'
 import { GameHistory, type LoadGames } from '../components/dashboard/GameHistory'
 import { Breadcrumb, SectionTitle } from '../components/dashboard/Section'
@@ -82,7 +83,7 @@ export function CubeView() {
 
   return (
     <>
-      <DashboardFrame>
+      <DashboardFrame header={<HomeHeader newGame />}>
         {user && <Breadcrumb to="/dashboard/discover" label="Discover Cubes" current={title} />}
         <DetailHero
           imageUri={summary?.cube_image_uri}

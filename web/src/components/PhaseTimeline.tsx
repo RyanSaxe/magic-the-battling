@@ -1,6 +1,4 @@
 import { useState, useRef, useCallback, useEffect, useLayoutEffect, useContext } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaHouse } from "react-icons/fa6";
 import { getTimelinePhases, type Phase } from "../constants/phases";
 import type { RulesPanelTarget } from "./RulesPanel";
 import { PhasePopover } from "./PhasePopover";
@@ -47,41 +45,11 @@ interface PhaseTimelineProps {
   autoOpenDurationMs?: number;
   onAutoOpenHandled?: (phase: Phase) => void;
   onOpenRules?: (target?: RulesPanelTarget) => void;
-  hamburger?: React.ReactNode;
   title?: string;
-  headerClassName?: string;
-  rightActionsClassName?: string;
 }
 
 function isGamePhase(phase: string): phase is Phase {
   return PHASES.includes(phase as Phase);
-}
-
-function RulesButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="btn btn-secondary text-xs sm:text-sm"
-      title="Guide"
-      data-guide-target="guide-button"
-    >
-      <span className="hidden sm:inline">Guide</span>
-      <span className="sm:hidden">?</span>
-    </button>
-  );
-}
-
-function HomeButton({ iconOnly = false }: { iconOnly?: boolean }) {
-  const navigate = useNavigate();
-  return (
-    <button
-      onClick={() => navigate("/")}
-      className="btn btn-secondary text-xs sm:text-sm"
-      title="Home"
-    >
-      {iconOnly ? <FaHouse /> : "Home"}
-    </button>
-  );
 }
 
 export function PhaseTimeline({
@@ -97,10 +65,7 @@ export function PhaseTimeline({
   autoOpenDurationMs = GUIDED_POPOVER_AUTO_CLOSE_MS,
   onAutoOpenHandled,
   onOpenRules,
-  hamburger,
   title,
-  headerClassName,
-  rightActionsClassName,
 }: PhaseTimelineProps) {
   const guideState = useContext(GuideStateContext);
   const welcomeGuideActive = guideState?.guideRequest?.guideId === "welcome";
@@ -263,98 +228,77 @@ export function PhaseTimeline({
     onOpenRules?.(phase ? { docId: phase, tab: 'controls' } : undefined);
   }, [closePopoverImmediately, onOpenRules, popoverPhase]);
 
-  const headerCls = headerClassName ?? "py-1.5 pl-4 pr-1.5";
-  const resolvedRightActionsClassName = rightActionsClassName ?? "sm:-translate-x-2";
-
   const isEnd = !isGamePhase(currentPhase);
   const timelinePhases = getTimelinePhases(inSuddenDeath && !isEnd);
   const endsInWinner = inSuddenDeath && suddenDeathDecidesGame && !isEnd;
 
   return (
-    <header className={`frame-chrome ${headerCls}`}>
-      <div className="flex items-center">
-        <div ref={stepsRowRef} className={`flex items-center flex-1 min-w-0 ${stepsOverflow ? "phase-timeline-scroll" : ""}`}>
-          <div ref={stepsRef} className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            <span
-              className="text-xs sm:text-sm text-gray-300 font-mono"
-              data-guide-target="timeline-stage-round"
-            >
-              {stage}-{round}
-            </span>
+    <>
+      <div ref={stepsRowRef} className={`flex items-center flex-1 min-w-0 ${stepsOverflow ? "phase-timeline-scroll" : ""}`}>
+        <div ref={stepsRef} className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+          <span
+            className="text-xs sm:text-sm text-gray-300 font-mono"
+            data-guide-target="timeline-stage-round"
+          >
+            {stage}-{round}
+          </span>
 
-            {timelinePhases.map((phase, index) => {
-              const currentIndex = isEnd ? timelinePhases.length : timelinePhases.indexOf(currentPhase as Phase);
-              const isActive = !isEnd && index === currentIndex;
-              const isCompleted = index < currentIndex;
-              const isUpcoming = !isEnd && index > currentIndex;
-              const isEndReward = isEnd && phase === "reward";
-              const phaseButton = (
-                <button
-                  ref={(el) => { phaseButtonRefs.current[phase] = el; }}
-                  disabled={welcomeGuideActive || isEnd}
-                  onClick={() => handlePhaseClick(phase)}
-                  data-guide-target={`timeline-phase-${phase}`}
-                  className={`text-xs sm:text-sm font-medium capitalize transition-colors
-                    ${!isEnd ? "cursor-pointer" : "cursor-default"}
-                    ${isActive || isEndReward ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
-                    ${isCompleted && !isEndReward ? "text-gray-500 line-through decoration-gray-600" : ""}
-                    ${isUpcoming ? "text-gray-500" : ""}
-                    ${welcomeGuideActive || isEnd ? "hover:brightness-100" : "hover:brightness-125"}
-                  `}
-                >
-                  {isEndReward
-                    ? (title ?? END_STATE_LABELS[currentPhase as EndState])
-                    : endsInWinner && phase === "reward"
-                      ? "winner"
-                      : PHASE_TIMELINE_LABELS[phase]}
-                </button>
-              );
+          {timelinePhases.map((phase, index) => {
+            const currentIndex = isEnd ? timelinePhases.length : timelinePhases.indexOf(currentPhase as Phase);
+            const isActive = !isEnd && index === currentIndex;
+            const isCompleted = index < currentIndex;
+            const isUpcoming = !isEnd && index > currentIndex;
+            const isEndReward = isEnd && phase === "reward";
+            const phaseButton = (
+              <button
+                ref={(el) => { phaseButtonRefs.current[phase] = el; }}
+                disabled={welcomeGuideActive || isEnd}
+                onClick={() => handlePhaseClick(phase)}
+                data-guide-target={`timeline-phase-${phase}`}
+                className={`text-xs sm:text-sm font-medium capitalize transition-colors
+                  ${!isEnd ? "cursor-pointer" : "cursor-default"}
+                  ${isActive || isEndReward ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
+                  ${isCompleted && !isEndReward ? "text-gray-500 line-through decoration-gray-600" : ""}
+                  ${isUpcoming ? "text-gray-500" : ""}
+                  ${welcomeGuideActive || isEnd ? "hover:brightness-100" : "hover:brightness-125"}
+                `}
+              >
+                {isEndReward
+                  ? (title ?? END_STATE_LABELS[currentPhase as EndState])
+                  : endsInWinner && phase === "reward"
+                    ? "winner"
+                    : PHASE_TIMELINE_LABELS[phase]}
+              </button>
+            );
 
-              const stepRef = (el: HTMLDivElement | null) => { phaseStepRefs.current[phase] = el; };
+            const stepRef = (el: HTMLDivElement | null) => { phaseStepRefs.current[phase] = el; };
 
-              if (phase === "reward") {
-                return (
-                  <div key={phase} ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
-                    <span className="text-gray-600 text-xs">→</span>
-                    <div
-                      className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
-                      data-guide-target="timeline-next-stage-round"
-                    >
-                      {phaseButton}
-                      {!isEnd && !endsInWinner && (
-                        <span className="text-xs sm:text-sm text-gray-500">
-                          to <span className="font-mono">{nextStage}-{nextRound}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              }
-
+            if (phase === "reward") {
               return (
                 <div key={phase} ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
                   <span className="text-gray-600 text-xs">→</span>
-                  {phaseButton}
+                  <div
+                    className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+                    data-guide-target="timeline-next-stage-round"
+                  >
+                    {phaseButton}
+                    {!isEnd && !endsInWinner && (
+                      <span className="text-xs sm:text-sm text-gray-500">
+                        to <span className="font-mono">{nextStage}-{nextRound}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
-            })}
-          </div>
-        </div>
+            }
 
-        <div className={`flex items-center gap-1.5 shrink-0 timeline-actions ${resolvedRightActionsClassName}`}>
-          {isEnd ? (
-            <HomeButton iconOnly />
-          ) : (
-            onOpenRules && <RulesButton onClick={() => onOpenRules()} />
-          )}
-          <div className="hidden sm:block">
-            {isEnd ? (
-              onOpenRules && <RulesButton onClick={() => onOpenRules()} />
-            ) : (
-              <HomeButton />
-            )}
-          </div>
-          {hamburger && <div className="shrink-0">{hamburger}</div>}
+            return (
+              <div key={phase} ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
+                <span className="text-gray-600 text-xs">→</span>
+                {phaseButton}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -369,6 +313,6 @@ export function PhaseTimeline({
           onOpenControls={handleOpenControlsFromPopover}
         />
       )}
-    </header>
+    </>
   );
 }

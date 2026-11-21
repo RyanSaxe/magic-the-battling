@@ -6,7 +6,8 @@ import { useToast } from "../contexts";
 import { useAuth } from "../contexts/authState";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { InfoIcon } from "../components/icons/InfoIcon";
-import { AppHeader } from "../components/common/AppHeader";
+import { AppHeader, HomeButton } from "../components/common/AppHeader";
+import { JoinGameModal } from "../components/home/JoinGameModal";
 import { PageFrame } from "../components/common/PageFrame";
 import { ResumeGameCard } from "../components/ResumeGame";
 import { useResumableGames } from "../hooks/useResumableGames";
@@ -335,6 +336,7 @@ export function Play() {
   const [randomName, setRandomName, nameLoading] = useRandomMtgName();
   const playerName = user ? user.username : randomName;
   const setPlayerName = user ? () => {} : setRandomName;
+  const [showJoinModal, setShowJoinModal] = useState(false);
   const [showFriendsAdvanced, setShowFriendsAdvanced] = useState(false);
   const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
   const [cubeId, setCubeId] = useState(() => searchParams.get("cubeId") || "auto");
@@ -608,16 +610,15 @@ export function Play() {
   return (
     <>
       <PageFrame
-        header={<AppHeader renderRight={({ compact }) => (
-          <button
-            onClick={() => navigate("/")}
-            className={`btn btn-secondary ${compact ? "py-1.5 px-3 text-sm" : "py-2 px-4"}`}
-          >
-            Home
-          </button>
-        )} />}
+        header={<AppHeader
+          helpers={
+            <button onClick={() => setShowJoinModal(true)} className="btn btn-secondary hidden sm:inline-block">
+              Join Game
+            </button>
+          }
+          home={<HomeButton />}
+        />}
         center
-        contentClassName="px-4"
         hints
       >
         <SurfaceCard as="section" className="overflow-hidden flex flex-col">
@@ -754,6 +755,8 @@ export function Play() {
           </div>
         </SurfaceCard>
       </PageFrame>
+
+      {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
 
       {showFriendsAdvanced && (
         <AdvancedOptionsModal
