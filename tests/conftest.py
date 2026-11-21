@@ -6,11 +6,13 @@ from time import monotonic
 from typing import Any
 
 import pytest
+import starlette
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import close_all_sessions, sessionmaker
 from sqlalchemy.pool import StaticPool
 from starlette.testclient import WebSocketTestSession
+from starlette.types import Message
 
 import server.db.database as db_module
 import server.main as main_module
@@ -30,6 +32,34 @@ from server.services.game_manager import GameManager
 from server.services.session_manager import SessionManager
 
 WS_MESSAGE_TIMEOUT_SECONDS = 1.0
+
+
+# Starlette 0.41's WebSocketTestSession.send decides on the test thread whether the app is waiting for a message,
+# racing the app's check-then-wait on the event loop, so a message can sit unread until the next send. Waking the
+# app from the event loop puts the wake after that check. Starlette 1.x passes messages through anyio streams
+# instead, so upgrading to it removes the race and this patch.
+if not {"_receive_queue", "_queue_event"} <= set(WebSocketTestSession._asgi_receive.__code__.co_names):
+    raise RuntimeError(
+        f"Starlette {starlette.__version__}'s WebSocketTestSession no longer waits on _receive_queue and "
+        "_queue_event, which the WebSocket wake-up patch in tests/conftest.py relies on. If it now uses anyio "
+        "streams, delete that patch and its test in tests/test_api_websocket.py."
+    )
+
+
+async def _wake_websocket_receiver(session: WebSocketTestSession) -> None:
+    event = getattr(session, "_queue_event", None)
+    if event is not None:
+        event.set()
+
+
+def _send_and_wake_from_the_event_loop(session: WebSocketTestSession, message: Message) -> None:
+    session._receive_queue.put(message)
+    session.portal.start_task_soon(_wake_websocket_receiver, session)
+
+
+@pytest.fixture(autouse=True)
+def _never_lose_a_websocket_wakeup(monkeypatch):
+    monkeypatch.setattr(WebSocketTestSession, "send", _send_and_wake_from_the_event_loop)
 
 
 @pytest.fixture(autouse=True)

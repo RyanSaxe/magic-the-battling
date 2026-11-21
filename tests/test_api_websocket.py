@@ -1,11 +1,14 @@
 """WebSocket connection tests - focus on message shapes, not game logic."""
 
 import asyncio
+import threading
 from typing import cast
 from unittest.mock import AsyncMock
 
+import anyio
 import pytest
 from fastapi import WebSocket
+from starlette.testclient import WebSocketTestSession
 from starlette.websockets import WebSocketDisconnect
 
 import server.db.database as db_module
@@ -152,6 +155,49 @@ class TestLobbyWebSocket:
             assert cleared_message["payload"]["players"][0]["battler_id"] is None
             assert cleared_message["payload"]["players"][0]["battler_status"] == "missing"
             assert cleared_message["payload"]["players"][0]["is_ready"] is False
+
+
+class TestWebSocketTestClient:
+    def test_message_sent_as_the_app_starts_waiting_is_still_received(
+        self, client, game_with_players, ws_receive_json_until, start_lobby, monkeypatch
+    ):
+        app_found_queue_empty, test_sent = threading.Event(), threading.Event()
+        receive_calls = 0
+
+        # Starlette 0.41.3's _asgi_receive, held between its empty check and its wait until the test has sent.
+        async def receive_with_the_test_sending_in_between(self):
+            nonlocal receive_calls
+            receive_calls += 1
+            while self._receive_queue.empty():
+                if receive_calls == 2 and not test_sent.is_set():
+                    app_found_queue_empty.set()
+                    test_sent.wait(timeout=2)
+                self._queue_event = anyio.Event()
+                await self._queue_event.wait()
+            return self._receive_queue.get()
+
+        monkeypatch.setattr(WebSocketTestSession, "_asgi_receive", receive_with_the_test_sending_in_between)
+        game_id = game_with_players["game_id"]
+        session_id = game_with_players["alice"]["session_id"]
+        start_lobby(game_id, session_id)
+
+        with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
+            bootstrap = ws_receive_json_until(ws, lambda message: message["type"] == "game_bootstrap")
+            card = bootstrap["payload"]["state"]["self_player"]["sideboard"][0]
+            assert app_found_queue_empty.wait(timeout=2)
+            ws.send_json(
+                {
+                    "action": "build_move",
+                    "payload": {"card_id": card["id"], "source": "sideboard", "destination": "hand"},
+                }
+            )
+            test_sent.set()
+
+            ws_receive_json_until(
+                ws,
+                lambda message: message["type"] == "game_state",
+                description="game_state after build_move",
+            )
 
 
 class TestGameWebSocket:
