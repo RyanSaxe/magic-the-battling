@@ -1,9 +1,9 @@
+import { GAME_BANNER_HEIGHT } from "../components/common/bannerSizes";
 import type { ZoneConstraints } from "../hooks/computeConstrainedLayout";
 import type { CardLayoutConfig } from "../hooks/useCardLayout";
 import { GAME_SHELL_SMALL_BREAKPOINT_PX } from "../hooks/useGameShellMode";
 import { MOBILE_BREAKPOINT_PX } from "../hooks/useViewportCardSizes";
 import {
-  SUDDEN_DEATH_BAR_HEIGHT,
   battleBoardMetrics,
   buildLayoutConfig,
   draftLayoutConfig,
@@ -236,11 +236,14 @@ export function battleCases(): BattleCase[] {
   return cases;
 }
 
-export function battleConfig(viewport: Viewport, battleCase: BattleCase, isSuddenDeath: boolean) {
-  const { fixedHeight, zoneColumnWidth } = battleBoardMetrics({
-    isMobile: isMobileViewport(viewport),
-    bannerHeight: isSuddenDeath ? SUDDEN_DEATH_BAR_HEIGHT : 0,
-  });
+/** Sudden Death's banner spans the board and the sidebar above them, so the board gives up the banner's height. */
+export function battleBoard(viewport: Viewport, isSuddenDeath: boolean): Box {
+  const { width, height } = viewport.battleBoard;
+  return isSuddenDeath ? { width, height: height - GAME_BANNER_HEIGHT } : viewport.battleBoard;
+}
+
+export function battleConfig(viewport: Viewport, battleCase: BattleCase) {
+  const { fixedHeight, zoneColumnWidth } = battleBoardMetrics({ isMobile: isMobileViewport(viewport) });
   // Defaults useBattleCardSizes applies to what Battle.tsx passes.
   return {
     ...battleCase,

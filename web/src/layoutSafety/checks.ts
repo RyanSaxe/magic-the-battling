@@ -12,6 +12,7 @@ import { measureFromPlacement } from "../hooks/useResizableLayout";
 import { useZoneDividers, type DividerCallbacks } from "../hooks/useZoneDividers";
 import { getUpgradeGridDims } from "../utils/upgradeGrid";
 import {
+  battleBoard,
   battleConfig,
   isMobileViewport,
   type BattleCase,
@@ -258,13 +259,13 @@ export function checkBattleLayout(
   viewport: Viewport,
   battleCase: BattleCase,
   isSuddenDeath: boolean,
-  board: Box = viewport.battleBoard,
+  board: Box = battleBoard(viewport, isSuddenDeath),
 ): Failure[] {
   const failures: Failure[] = [];
   const surface = isSuddenDeath ? "battle-sudden-death" : "battle";
   const fail = (check: CheckId, detail: string) =>
     failures.push({ check, surface, viewport: viewport.name, label: battleCase.label, detail });
-  const config = battleConfig(viewport, battleCase, isSuddenDeath);
+  const config = battleConfig(viewport, battleCase);
   const zones = computeBattleZones(board.width, board.height, config);
   // The horizontal padding computeBattleZones subtracts for hands and battlefields.
   const handWidth = board.width - config.zoneColumnWidth - 48;
@@ -362,7 +363,7 @@ export function checkZoneMeasurement(viewport: Viewport, zoneCase: ZoneCase, boa
 }
 
 export function checkBattleMeasurement(viewport: Viewport, battleCase: BattleCase, board: Box): Failure[] {
-  const config = battleConfig(viewport, battleCase, false);
+  const config = battleConfig(viewport, battleCase);
   const sizes = sizesPerMeasurement(board, 0, () => useBattleCardSizes(config));
   const changed = describeChanges(sizes, (zones) =>
     `row ${zones.rowHeight.toFixed(2)}px, hand ${zones.playerHand.width}px, lands ${zones.playerLands.width}px`,
