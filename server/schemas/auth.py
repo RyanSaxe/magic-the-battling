@@ -84,6 +84,8 @@ class UserBattlerUpdate(BaseModel):
 
 
 class UserBattlerResponse(BaseModel):
+    """A saved preset. The game counts cover its cube; the my_ stats cover the player's games with its settings."""
+
     id: int
     cube_id: str
     display_name: str | None
@@ -101,6 +103,10 @@ class UserBattlerResponse(BaseModel):
     game_count: int = 0
     human_player_count: int = 0
     last_played: str | None = None
+    my_game_count: int = 0
+    my_win_count: int = 0
+    my_average_placement: float | None = None
+    my_last_played: str | None = None
 
 
 class GameSummaryResponse(BaseModel):

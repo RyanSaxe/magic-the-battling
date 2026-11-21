@@ -5,9 +5,10 @@ from typing import cast
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import distinct, func, or_
+from sqlalchemy import case, distinct, func
 from sqlalchemy.orm import Session
 
+from mtb.models.types import normalize_play_mode
 from server.db import database
 from server.db.models import (
     BattlerFollow,
@@ -54,6 +55,89 @@ def _battler_to_response(b: UserBattler) -> UserBattlerResponse:
         position=cast(int, b.position),
         created_at=str(b.created_at.isoformat()) if b.created_at else "",
     )
+
+
+def _game_play_mode():
+    """A game's play mode, counting games saved before Constructed existed as Limited."""
+    extracted = func.json_extract(GameRecord.config_json, "$.play_mode")
+    return case((extracted == "constructed", "constructed"), else_="limited")
+
+
+def _game_uses_upgrades():
+    """Whether a game used upgrades, counting games saved before the setting existed as using them."""
+    return func.coalesce(func.json_extract(GameRecord.config_json, "$.use_upgrades"), True)
+
+
+PresetSettings = tuple[str, str, bool]
+
+
+def _preset_settings(battler: UserBattler) -> PresetSettings:
+    return (str(battler.cube_id), normalize_play_mode(cast(str, battler.play_mode)), bool(battler.use_upgrades))
+
+
+def _my_stats_by_settings(db: Session, user_id: str, cube_ids: set[str]) -> dict[PresetSettings, dict]:
+    """The player's finished games on each cube, split by play mode and upgrades setting."""
+    if not cube_ids:
+        return {}
+    play_mode = _game_play_mode().label("play_mode")
+    uses_upgrades = _game_uses_upgrades().label("uses_upgrades")
+    rows = (
+        db.query(
+            GameRecord.cube_id,
+            play_mode,
+            uses_upgrades,
+            func.count(PlayerGameHistory.id),
+            func.sum(case((PlayerGameHistory.final_placement == 1, 1), else_=0)),
+            func.avg(PlayerGameHistory.final_placement),
+            func.max(GameRecord.created_at),
+        )
+        .join(PlayerGameHistory, PlayerGameHistory.game_id == GameRecord.id)
+        .filter(
+            GameRecord.cube_id.in_(cube_ids),
+            GameRecord.ended_at.isnot(None),
+            PlayerGameHistory.user_id == user_id,
+            PlayerGameHistory.is_puppet.is_(False),
+            PlayerGameHistory.final_placement.isnot(None),
+        )
+        .group_by(GameRecord.cube_id, play_mode, uses_upgrades)
+        .all()
+    )
+    return {
+        (str(r[0]), str(r[1]), bool(r[2])): {
+            "my_game_count": r[3],
+            "my_win_count": r[4],
+            "my_average_placement": float(r[5]),
+            "my_last_played": r[6].isoformat() if r[6] else None,
+        }
+        for r in rows
+    }
+
+
+def _cube_metadata_map(db: Session, cube_ids: set[str]) -> dict[str, CubeMetadata]:
+    if not cube_ids:
+        return {}
+    return {str(m.cube_id): m for m in db.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids))}
+
+
+def _battler_responses(db: Session, user_id: str, battlers: list[UserBattler]) -> list[UserBattlerResponse]:
+    cube_ids = {str(b.cube_id) for b in battlers}
+    cube_stats = _cube_stats_for_ids(db, cube_ids)
+    my_stats = _my_stats_by_settings(db, user_id, cube_ids)
+    metadata_map = _cube_metadata_map(db, cube_ids)
+
+    results = []
+    for b in battlers:
+        meta = metadata_map.get(str(b.cube_id))
+        resp = _battler_to_response(b).model_copy(
+            update={
+                "cube_name": str(meta.name) if meta and meta.name else None,
+                "cube_image_uri": str(meta.image_uri) if meta and meta.image_uri else None,
+                **cube_stats.get(str(b.cube_id), {}),
+                **my_stats.get(_preset_settings(b), {}),
+            }
+        )
+        results.append(resp)
+    return results
 
 
 def _cube_stats_for_ids(db: Session, cube_ids: set[str]) -> dict[str, dict]:
@@ -108,26 +192,7 @@ def list_battlers(
     )
     has_more = len(battlers) > BATTLERS_PAGE_SIZE
     battlers = battlers[:BATTLERS_PAGE_SIZE]
-
-    cube_ids = {str(b.cube_id) for b in battlers}
-    stats_map = _cube_stats_for_ids(db, cube_ids)
-    metadata_rows = db.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids)).all() if cube_ids else []
-    metadata_map = {str(m.cube_id): m for m in metadata_rows}
-
-    results = []
-    for b in battlers:
-        cid = str(b.cube_id)
-        meta = metadata_map.get(cid)
-        stats = stats_map.get(cid, {})
-        resp = _battler_to_response(b)
-        resp.cube_name = str(meta.name) if meta and meta.name else None
-        resp.cube_image_uri = str(meta.image_uri) if meta and meta.image_uri else None
-        resp.game_count = stats.get("game_count", 0)
-        resp.human_player_count = stats.get("human_player_count", 0)
-        resp.last_played = stats.get("last_played")
-        results.append(resp)
-
-    return {"battlers": results, "has_more": has_more}
+    return {"battlers": _battler_responses(db, str(user.id), battlers), "has_more": has_more}
 
 
 @router.post("")
@@ -154,11 +219,7 @@ def create_battler(
     db.commit()
     db.refresh(battler)
     database.save_cube_metadata(request.cube_id)
-    resp = _battler_to_response(battler)
-    meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == request.cube_id).first()
-    if meta:
-        resp.cube_name = str(meta.name) if meta.name else None
-        resp.cube_image_uri = str(meta.image_uri) if meta.image_uri else None
+    [resp] = _battler_responses(db, str(user.id), [battler])
     return resp
 
 
@@ -178,7 +239,8 @@ def update_battler(
         setattr(battler, field, value)
     db.commit()
     db.refresh(battler)
-    return _battler_to_response(battler)
+    [resp] = _battler_responses(db, str(user.id), [battler])
+    return resp
 
 
 @router.delete("/{battler_id}")
@@ -218,17 +280,9 @@ def _query_cube_games(
         GameRecord.ended_at.isnot(None),
     ]
     if play_mode is not None:
-        extracted = func.json_extract(GameRecord.config_json, "$.play_mode")
-        if play_mode == "limited":
-            base_filter.append(or_(extracted == play_mode, extracted.is_(None)))
-        else:
-            base_filter.append(extracted == play_mode)
+        base_filter.append(_game_play_mode() == play_mode)
     if use_upgrades is not None:
-        extracted = func.json_extract(GameRecord.config_json, "$.use_upgrades")
-        if use_upgrades is True:
-            base_filter.append(or_(extracted == use_upgrades, extracted.is_(None)))
-        else:
-            base_filter.append(extracted == use_upgrades)
+        base_filter.append(_game_uses_upgrades() == use_upgrades)
 
     has_placed_human = (
         db.query(PlayerGameHistory.id)
