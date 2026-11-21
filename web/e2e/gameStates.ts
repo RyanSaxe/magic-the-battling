@@ -11,7 +11,7 @@ import type {
 } from '../src/types'
 
 export const GAME_ID = 'game-layout'
-const PLAYER_NAME = 'Alice'
+export const PLAYER_NAME = 'Alice'
 const OPPONENT_NAME = 'Bob'
 type CardKind = 'spell' | 'land' | 'upgrade'
 
