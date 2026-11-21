@@ -203,6 +203,33 @@ export function deriveConstraintsFromLayout(
   return { topFraction, leftFraction, bottomLeftSplit };
 }
 
+/**
+ * The fractions a layout is drawn with: the given constraints, and for any
+ * fraction they leave out, the one the first layout pass derives.
+ */
+export function resolveConstraints(
+  containerW: number,
+  containerH: number,
+  config: CardLayoutConfig,
+  constraints: ZoneConstraints,
+): Required<ZoneConstraints> {
+  const { topFraction, leftFraction, bottomLeftSplit } = constraints;
+  if (topFraction !== undefined && leftFraction !== undefined && bottomLeftSplit !== undefined) {
+    return { topFraction, leftFraction, bottomLeftSplit };
+  }
+  const derived = deriveConstraintsFromLayout(
+    computeLayout(containerW, containerH, config),
+    config,
+    containerH,
+    containerW,
+  );
+  return {
+    topFraction: constraints.topFraction ?? derived.topFraction,
+    leftFraction: constraints.leftFraction ?? derived.leftFraction,
+    bottomLeftSplit: constraints.bottomLeftSplit ?? derived.bottomLeftSplit,
+  };
+}
+
 export function computeConstrainedFrames(
   containerW: number,
   containerH: number,
@@ -230,18 +257,12 @@ export function computeConstrainedFrames(
   const activeIds = [...topIds, ...blIds, ...brIds];
   if (activeIds.length === 0) return frames;
 
-  const unconstrained = computeLayout(containerW, containerH, config);
-  const derived = deriveConstraintsFromLayout(
-    unconstrained,
-    config,
-    containerH,
+  const { topFraction, leftFraction, bottomLeftSplit } = resolveConstraints(
     containerW,
+    containerH,
+    config,
+    constraints,
   );
-
-  const topFraction = constraints.topFraction ?? derived.topFraction;
-  const leftFraction = constraints.leftFraction ?? derived.leftFraction;
-  const bottomLeftSplit =
-    constraints.bottomLeftSplit ?? derived.bottomLeftSplit;
 
   const hasTop = topIds.length > 0;
   const hasBottom = blIds.length > 0 || brIds.length > 0;
@@ -320,6 +341,8 @@ export function computeConstrainedFrames(
 export interface ConstrainedLayoutState {
   dims: CardLayoutResult;
   frames: ZoneFrameResult;
+  /** The fractions the frames were drawn with. */
+  constraints: Required<ZoneConstraints>;
 }
 
 export function computeConstrainedLayoutState(
@@ -336,11 +359,12 @@ export function computeConstrainedLayoutState(
 
   const zoneIds = Object.keys(config.zones);
   const dims = makeDefaultDims(zoneIds);
+  const resolved = resolveConstraints(containerW, containerH, config, constraints);
   const frames = computeConstrainedFrames(
     containerW,
     containerH,
     config,
-    constraints,
+    resolved,
   );
 
   const resolve = (id: string): ResolvedZone => {
@@ -370,7 +394,7 @@ export function computeConstrainedLayoutState(
     );
   }
 
-  return { dims, frames };
+  return { dims, frames, constraints: resolved };
 }
 
 export function computeConstrainedLayout(
