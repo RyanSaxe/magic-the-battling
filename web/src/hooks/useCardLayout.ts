@@ -1051,7 +1051,7 @@ export function useCardLayout(
   configRef.current = config;
 
   const observerRef = useRef<ResizeObserver | null>(null);
-  const elementRef = useRef<HTMLElement | null>(null);
+  const measuredRef = useRef<ContainerSize | null>(null);
 
   const update = useCallback(
     (w: number, h: number) => {
@@ -1068,6 +1068,24 @@ export function useCardLayout(
     [],
   );
 
+  const measure = useCallback(
+    (node: HTMLElement) => {
+      const cs = getComputedStyle(node);
+      measuredRef.current = {
+        width:
+          node.clientWidth -
+          parseFloat(cs.paddingLeft) -
+          parseFloat(cs.paddingRight),
+        height:
+          node.clientHeight -
+          parseFloat(cs.paddingTop) -
+          parseFloat(cs.paddingBottom),
+      };
+      update(measuredRef.current.width, measuredRef.current.height);
+    },
+    [update],
+  );
+
   const refCallback = useCallback(
     (node: HTMLElement | null) => {
       if (observerRef.current) {
@@ -1075,45 +1093,24 @@ export function useCardLayout(
         observerRef.current = null;
       }
 
-      elementRef.current = node;
+      measuredRef.current = null;
       if (!node) return;
 
-      const cs = getComputedStyle(node);
-      const w =
-        node.clientWidth -
-        parseFloat(cs.paddingLeft) -
-        parseFloat(cs.paddingRight);
-      const h =
-        node.clientHeight -
-        parseFloat(cs.paddingTop) -
-        parseFloat(cs.paddingBottom);
-      update(w, h);
-
-      const observer = new ResizeObserver((entries) => {
-        const entry = entries[0];
-        if (!entry) return;
-        const { width, height } = entry.contentRect;
-        update(width, height);
-      });
-
+      measure(node);
+      const observer = new ResizeObserver(() => measure(node));
       observer.observe(node);
       observerRef.current = observer;
     },
-    [update],
+    [measure],
   );
 
+  // Card counts change on renders that leave the board's size alone, so lay
+  // out again from the last measurement. Measuring here instead fed a board
+  // whose height follows its content (as it does before the stylesheet
+  // applies) back into its own layout on every render, until React gave up.
   useLayoutEffect(() => {
-    if (elementRef.current) {
-      const cs = getComputedStyle(elementRef.current);
-      const w =
-        elementRef.current.clientWidth -
-        parseFloat(cs.paddingLeft) -
-        parseFloat(cs.paddingRight);
-      const h =
-        elementRef.current.clientHeight -
-        parseFloat(cs.paddingTop) -
-        parseFloat(cs.paddingBottom);
-      update(w, h);
+    if (measuredRef.current) {
+      update(measuredRef.current.width, measuredRef.current.height);
     }
   });
 
