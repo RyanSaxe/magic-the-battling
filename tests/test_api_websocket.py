@@ -152,10 +152,10 @@ class TestLobbyWebSocket:
 
 
 class TestGameWebSocket:
-    def test_connect_to_started_game_receives_game_state(self, client, game_with_players, ws_receive_json):
+    def test_connect_to_started_game_receives_game_state(self, client, game_with_players, ws_receive_json, start_lobby):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             msg = ws_receive_json(ws)
@@ -167,11 +167,11 @@ class TestGameWebSocket:
             assert "self_player" in msg["payload"]["state"]
 
     def test_basic_lands_picked_in_build_survive_a_reconnect(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until, start_lobby
     ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             ws_receive_json(ws)
@@ -188,12 +188,12 @@ class TestGameWebSocket:
         assert bootstrap["payload"]["state"]["self_player"]["chosen_basics"] == ["Plains", "Island"]
 
     def test_basic_lands_picked_in_build_are_hidden_from_other_players_until_battle(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until, start_lobby
     ):
         game_id = game_with_players["game_id"]
         alice_session_id = game_with_players["alice"]["session_id"]
         bob_session_id = game_with_players["bob"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, alice_session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={alice_session_id}") as ws:
             ws_receive_json(ws)
@@ -219,10 +219,12 @@ class TestGameWebSocket:
         players_in_battle = {p.name: p for p in bob_state.players}
         assert players_in_battle["Alice"].chosen_basics == ["Plains", "Island"]
 
-    def test_unknown_action_receives_error(self, client, game_with_players, ws_receive_json, ws_receive_json_until):
+    def test_unknown_action_receives_error(
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until, start_lobby
+    ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             ws_receive_json(ws)
@@ -305,10 +307,12 @@ class TestGameWebSocket:
                 assert msg_alice["type"] == "game_state"
                 assert msg_bob["type"] == "game_state"
 
-    def test_reconnect_after_snapshot_restore_uses_persisted_mapping(self, client, game_with_players, ws_receive_json):
+    def test_reconnect_after_snapshot_restore_uses_persisted_mapping(
+        self, client, game_with_players, ws_receive_json, start_lobby
+    ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         game_manager = ws_module.game_manager
         game_manager.mark_game_dirty(game_id)
@@ -319,10 +323,12 @@ class TestGameWebSocket:
             msg = ws_receive_json(ws)
             assert msg["type"] == "game_bootstrap"
 
-    def test_missing_runtime_mapping_rejects_invalid_session(self, client, game_with_players, ws_receive_json):
+    def test_missing_runtime_mapping_rejects_invalid_session(
+        self, client, game_with_players, ws_receive_json, start_lobby
+    ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         game_manager = ws_module.game_manager
         game_manager._clear_runtime_player_mappings_for_game(game_id)
@@ -337,10 +343,12 @@ class TestGameWebSocket:
 
         assert exc_info.value.code == 4001
 
-    def test_duplicate_build_ready_after_battle_transition_resyncs_instead_of_error(self, client, game_with_players):
+    def test_duplicate_build_ready_after_battle_transition_resyncs_instead_of_error(
+        self, client, game_with_players, start_lobby
+    ):
         game_id = game_with_players["game_id"]
         alice_player_id = game_with_players["alice"]["player_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, game_with_players["alice"]["session_id"])
 
         game = ws_module.game_manager.get_game(game_id)
         assert game is not None

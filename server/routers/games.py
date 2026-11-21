@@ -321,7 +321,7 @@ def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depe
     if not pending:
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
-    if request.player_name in pending.player_names:
+    if pending.has_player_named(request.player_name):
         raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
     if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
         raise api_error(400, ErrorCode.LOBBY_FULL, "Lobby is full")
@@ -360,7 +360,7 @@ def join_game(game_id: str, request: JoinGameRequest, current_user: User | None 
     if pending.is_started:
         raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
 
-    if request.player_name in pending.player_names:
+    if pending.has_player_named(request.player_name):
         raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
     if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
         raise api_error(400, ErrorCode.LOBBY_FULL, "Lobby is full")
@@ -468,7 +468,7 @@ def get_game_cards(game_id: str, player_name: str | None = None):
 
 
 @router.post("/{game_id}/start", response_model=StartGameResponse)
-def start_game(game_id: str, db: Session = Depends(get_db)):  # noqa: B008
+def start_game(game_id: str, session_id: str | None = None, db: Session = Depends(get_db)):  # noqa: B008
     if ops_manager.blocks_new_games():
         raise _server_update_http_error("Server is updating. New games are temporarily blocked.")
 
@@ -476,11 +476,21 @@ def start_game(game_id: str, db: Session = Depends(get_db)):  # noqa: B008
     if not pending:
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
+    session = session_manager.get_session(session_id) if session_id else None
+    if not session:
+        raise api_error(401, ErrorCode.INVALID_SESSION, "Starting a game needs the host's session_id")
+    if session.player_id != pending.host_player_id:
+        raise api_error(403, ErrorCode.INVALID_REQUEST, "Only the host can start the game")
+
     if pending.is_started:
         raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
 
     if pending.target_player_count < 2:
         raise api_error(400, ErrorCode.INVALID_REQUEST, "Need at least 2 players to start")
+
+    can_start, reason = game_manager.can_start_game(game_id, session.player_id)
+    if not can_start:
+        raise api_error(400, ErrorCode.INVALID_REQUEST, reason or "Cannot start game")
 
     game = game_manager.start_game(game_id, db)
     if not game:

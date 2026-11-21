@@ -177,6 +177,11 @@ class PendingGame:
     player_user_ids: dict[str, str] = field(default_factory=dict)
     _loading_task: asyncio.Task | None = field(default=None, repr=False)
 
+    def has_player_named(self, name: str) -> bool:
+        """Whether a player in this lobby already has the name, ignoring case."""
+        folded = name.casefold()
+        return any(existing.casefold() == folded for existing in self.player_names)
+
 
 class GameStartQueueFullError(RuntimeError):
     pass
@@ -771,7 +776,7 @@ class GameManager:
         if not pending:
             return None
 
-        if player_name in pending.player_names:
+        if pending.has_player_named(player_name):
             return None
 
         total = len(pending.player_names) + pending.puppet_count
