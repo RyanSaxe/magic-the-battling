@@ -45,20 +45,12 @@
   /* Bright gold marker for something waiting on the player */
   --color-gold-bright: #f5d76e;
 
-  /* Game actions: walnut with brass trim */
-  --brass-fill: #352c25;
-  --brass-fill-hover: #3f362d;
-  --brass-fill-pressed: #2c241e;
-  --brass-border: #9a8040;
-  --brass-border-hover: #b4964c;
-  --brass-border-pressed: #8c7338;
-
   /* Ready, play and win. Hover darkens, since a lighter green fails contrast with white. */
   --success: #1d7d3e;
   --success-hover: #186b35;
   --success-pressed: #176632;
 
-  /* Top highlight of a raised button on walnut or brass; brighter fills set their own */
+  /* Top highlight of a raised walnut button; brighter fills set their own */
   --btn-raise-edge: rgba(255, 236, 181, 0.14);
 
   /* Secondary buttons on bars and felt; a surface that matches this fill sets its own */
@@ -964,17 +956,28 @@ input:-webkit-autofill:focus {
   opacity: 1;
 }
 
-.btn-secondary {
+/* Moves on the table (Treasure, Untap, Pass, rolls and upgrades) take .btn-game. They look like secondary buttons,
+   and keep their own class so they can be restyled together. */
+.btn-secondary,
+.btn-game {
   background: var(--btn-secondary-fill);
   color: var(--ivory);
 }
 
-.btn-secondary:hover:not(:disabled) {
+.btn-secondary:hover:not(:disabled),
+.btn-game:hover:not(:disabled) {
   background: var(--btn-secondary-fill-hover);
 }
 
-.btn-secondary:active:not(:disabled) {
+.btn-secondary:active:not(:disabled),
+.btn-game:active:not(:disabled) {
   background: var(--btn-secondary-fill-pressed);
+}
+
+.btn-game:disabled {
+  background: color-mix(in srgb, var(--btn-secondary-fill) 55%, transparent);
+  color: color-mix(in srgb, var(--ivory) 42%, transparent);
+  cursor: not-allowed;
 }
 
 /* A destructive action that isn't the main one, like Delete. These reds keep 4.5:1 on every secondary fill. */
@@ -1000,30 +1003,6 @@ input:-webkit-autofill:focus {
 
 .btn-danger:active:not(:disabled) {
   background: linear-gradient(135deg, #b01821 0%, #8a131a 100%);
-}
-
-/* Moves on the table: Treasure, Untap, Pass, rolls and upgrades */
-.btn-game {
-  background: var(--brass-fill);
-  border: 1px solid var(--brass-border);
-  color: var(--ivory);
-}
-
-.btn-game:hover:not(:disabled) {
-  background: var(--brass-fill-hover);
-  border-color: var(--brass-border-hover);
-}
-
-.btn-game:active:not(:disabled) {
-  background: var(--brass-fill-pressed);
-  border-color: var(--brass-border-pressed);
-}
-
-.btn-game:disabled {
-  background: color-mix(in srgb, var(--brass-fill) 55%, transparent);
-  border-color: color-mix(in srgb, var(--brass-border) 35%, transparent);
-  color: color-mix(in srgb, var(--ivory) 42%, transparent);
-  cursor: not-allowed;
 }
 
 /* An upgrade is waiting to be applied or revealed */
@@ -1057,19 +1036,23 @@ input:-webkit-autofill:focus {
   cursor: not-allowed;
 }
 
-/* The game actions on cards and in the sidebar keep their own sizes, so they take the raise without .btn. */
+/* Small buttons, such as the game actions on cards and in the sidebar, keep their own sizes by taking a colour class
+   without .btn, so the raise follows those colour classes too. */
 .btn,
+.btn-secondary,
 .btn-game {
   box-shadow: inset 0 1px 0 var(--btn-raise-edge), 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .btn:active:not(:disabled),
+.btn-secondary:active:not(:disabled),
 .btn-game:active:not(:disabled) {
   box-shadow: none;
   transform: translateY(1px);
 }
 
 .btn:disabled,
+.btn-secondary:disabled,
 .btn-game:disabled {
   box-shadow: none;
 }
