@@ -114,12 +114,14 @@ describe('Lobby: starting the game', () => {
 
   it('tells everyone why a start failed and lets the host start again', async () => {
     const socket = await openLobbyAs('host')
-    send(socket, { type: 'lobby_state', payload: lobby({ start_status: 'starting', can_start: false }) })
-    expect(button('Starting...').disabled).toBe(true)
+    send(socket, { type: 'lobby_state', payload: lobby() })
 
-    send(socket, {
-      type: 'lobby_state',
-      payload: lobby({ start_status: 'failed', start_error: 'Server is at game capacity. Please try again shortly.' }),
+    act(() => {
+      socket.serverMessage({ type: 'lobby_state', payload: lobby({ start_status: 'starting', can_start: false }) })
+      socket.serverMessage({
+        type: 'lobby_state',
+        payload: lobby({ start_status: 'failed', start_error: 'Server is at game capacity. Please try again shortly.' }),
+      })
     })
 
     expect(toasts).toEqual(['Server is at game capacity. Please try again shortly.'])

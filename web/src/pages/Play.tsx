@@ -365,10 +365,10 @@ export function Play() {
     setSoloPhase(phase);
   }, []);
 
-  const [soloStartRefused, setSoloStartRefused] = useState(false);
+  const [soloStartEnded, setSoloStartEnded] = useState(false);
   const handleServerError = useCallback((error: AppError) => {
     addToast(getAppErrorMessage(error, "play-connection", "Something went wrong."), "error");
-    if (soloPhaseRef.current === "navigating") setSoloStartRefused(true);
+    if (soloPhaseRef.current === "navigating") setSoloStartEnded(true);
   }, [addToast]);
 
   const { lobbyState, gameState, actions, connectionError } = useGame(
@@ -472,24 +472,18 @@ export function Play() {
     }
   }, [connectionError, pendingGameId, addToast, updateSoloPhase, resetWatcher]);
 
-  const soloStartError =
-    soloPhase === "navigating" &&
-    lobbyState?.game_id === pendingGameId &&
-    lobbyState.start_status === "failed"
-      ? lobbyState.start_error
-      : null;
+  // The server refused or failed the start, and either way said why.
   useEffect(() => {
-    if (!soloStartError && !soloStartRefused) return;
-    if (soloStartError) addToast(soloStartError, "error");
+    if (!soloStartEnded) return;
     if (pendingGameId) forgetSeatForGame(pendingGameId);
     startTransition(() => {
-      setSoloStartRefused(false);
+      setSoloStartEnded(false);
       setPendingGameId(null);
       setPendingSessionId(null);
       updateSoloPhase("idle");
       resetWatcher();
     });
-  }, [addToast, pendingGameId, resetWatcher, soloStartError, soloStartRefused, updateSoloPhase]);
+  }, [pendingGameId, resetWatcher, soloStartEnded, updateSoloPhase]);
 
   useEffect(() => {
     if (!cubeId) return;

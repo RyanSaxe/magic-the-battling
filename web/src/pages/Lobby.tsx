@@ -411,15 +411,6 @@ export function Lobby() {
     lobbyState?.play_mode,
   ]);
 
-  const previousStartStatusRef = useRef(lobbyState?.start_status);
-  useEffect(() => {
-    const status = lobbyState?.start_status;
-    if (previousStartStatusRef.current === "starting" && status === "failed" && lobbyState?.start_error) {
-      addToast(lobbyState.start_error, "error");
-    }
-    previousStartStatusRef.current = status;
-  }, [addToast, lobbyState?.start_error, lobbyState?.start_status]);
-
   useEffect(() => {
     const nextError = currentPlayer?.battler_error ?? null;
     if (!nextError || nextError === lastBattlerErrorRef.current) {
