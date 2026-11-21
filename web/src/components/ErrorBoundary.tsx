@@ -25,10 +25,10 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="min-h-screen bg-[var(--chrome)] flex items-center justify-center p-4">
           <div className="modal-chrome rounded-lg p-8 max-w-lg">
             <h1 className="text-2xl font-bold text-red-400 mb-4">Something went wrong</h1>
-            <p className="text-gray-300 mb-4">
+            <p className="text-[var(--ivory-muted)] mb-4">
               {this.state.error?.message || 'An unexpected error occurred'}
             </p>
-            <pre className="bg-[var(--chrome)] p-4 rounded text-sm text-gray-400 overflow-auto max-h-64">
+            <pre className="bg-[var(--chrome)] p-4 rounded text-sm text-[var(--ivory-muted)] overflow-auto max-h-64">
               {this.state.error?.stack}
             </pre>
             <button

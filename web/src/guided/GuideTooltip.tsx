@@ -83,7 +83,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
           <h2 className="text-[0.98rem] font-semibold leading-tight text-amber-50">
             {step.title}
           </h2>
-          <p className="mt-2 text-[0.92rem] leading-relaxed text-gray-100">
+          <p className="mt-2 text-[0.92rem] leading-relaxed text-[var(--ivory)]">
             {step.content.summary}
           </p>
           {step.content.detail && (

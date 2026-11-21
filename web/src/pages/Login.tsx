@@ -45,7 +45,7 @@ export function Login() {
         )}
 
         <div className="mb-4">
-          <label htmlFor="username" className="block text-gray-300 text-sm mb-1">Username</label>
+          <label htmlFor="username" className="block text-[var(--ivory-muted)] text-sm mb-1">Username</label>
           <input
             id="username"
             type="text"
@@ -58,7 +58,7 @@ export function Login() {
         </div>
 
         <div className="mb-6">
-          <label htmlFor="password" className="block text-gray-300 text-sm mb-1">Password</label>
+          <label htmlFor="password" className="block text-[var(--ivory-muted)] text-sm mb-1">Password</label>
           <input
             id="password"
             type="password"
@@ -77,7 +77,7 @@ export function Login() {
           {loading ? 'Logging in...' : 'Log In'}
         </button>
 
-        <p className="text-center text-gray-400 text-sm mt-4">
+        <p className="text-center text-[var(--ivory-muted)] text-sm mt-4">
           Don't have an account?{' '}
           <Link to={`/register${returnTo !== '/' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} className={LINK}>Create one</Link>
         </p>

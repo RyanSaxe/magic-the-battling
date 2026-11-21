@@ -42,8 +42,10 @@
   /* A switch's track while it's off */
   --walnut-track: #29231f;
 
-  /* Ivory label text on walnut */
+  /* Ivory label text on walnut, then quieter text, then the faintest, which is for disabled text and placeholders */
   --ivory: #f3ead9;
+  --ivory-muted: #b8aea3;
+  --ivory-faint: #94897f;
 
   /* Bright gold marker for something waiting on the player */
   --color-gold-bright: #f5d76e;

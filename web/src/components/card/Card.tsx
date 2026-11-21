@@ -238,7 +238,7 @@ export function Card({
       >
         {isLoading && (
           <div className="skeleton absolute inset-0 flex items-center justify-center">
-            <span className="text-gray-400 text-xs text-center px-2">{card.name}</span>
+            <span className="text-[var(--ivory-muted)] text-xs text-center px-2">{card.name}</span>
           </div>
         )}
         {showCopyBadge && (

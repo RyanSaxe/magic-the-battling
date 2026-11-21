@@ -298,14 +298,14 @@ function MenuItem({
     <button
       className={`
         w-full px-3 py-1.5 text-left text-sm flex items-center justify-between
-        menu-item ${disabled ? 'text-gray-500 cursor-not-allowed' : 'text-white'}
+        menu-item ${disabled ? 'text-[var(--ivory-faint)] cursor-not-allowed' : 'text-white'}
       `}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       aria-expanded={hasSubmenu ? open : undefined}
     >
       <span>{label}</span>
-      {hasSubmenu && <span className="text-gray-400">›</span>}
+      {hasSubmenu && <span className="text-[var(--ivory-muted)]">›</span>}
     </button>
   )
 }

@@ -92,7 +92,7 @@ function GuidedModeSwitch({
   return (
     <div className="flex items-center gap-1.5">
       <label className="flex items-center gap-1.5 cursor-pointer">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ivory-muted)]">
           Guided
         </span>
         <input
@@ -112,7 +112,7 @@ function GuidedModeSwitch({
       <div ref={guidedModeHelpRef} className="relative group shrink-0">
         <button
           type="button"
-          className="touch-area [--touch-area-left:-7px] text-gray-400 hover:text-gray-200"
+          className="touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]"
           aria-label="What guided mode does"
           aria-expanded={showGuidedModeHelp}
           onClick={() => setShowGuidedModeHelp((v) => !v)}
@@ -120,7 +120,7 @@ function GuidedModeSwitch({
           <InfoIcon size="sm" />
         </button>
         <span
-          className={`absolute w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-[60] ${
+          className={`absolute w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-[var(--ivory)] transition-opacity z-[60] ${
             popupAnchorX === "right"
               ? "right-0"
               : popupAnchorX === "left"
@@ -211,7 +211,7 @@ function VoiceChatSwitch({
       }`}
     >
       <label className={`flex items-center gap-1.5${isHost ? ' cursor-pointer' : ' cursor-default'}`}>
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ivory-muted)]">
           Voice
         </span>
         <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400 max-[389px]:hidden">
@@ -235,7 +235,7 @@ function VoiceChatSwitch({
       <div ref={voiceHelpRef} className="relative group shrink-0">
         <button
           type="button"
-          className="touch-area [--touch-area-left:-7px] text-gray-400 hover:text-gray-200"
+          className="touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]"
           aria-label="Voice chat info"
           aria-expanded={showVoiceHelp}
           onClick={() => setShowVoiceHelp((v) => !v)}
@@ -243,7 +243,7 @@ function VoiceChatSwitch({
           <InfoIcon size="sm" />
         </button>
         <span
-          className={`absolute w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-[60] ${
+          className={`absolute w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-[var(--ivory)] transition-opacity z-[60] ${
             popupAnchorX === "right"
               ? "right-0"
               : popupAnchorX === "left"
@@ -567,7 +567,7 @@ export function Lobby() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
-            <span className="text-sm text-gray-100">Reconnecting...</span>
+            <span className="text-sm text-[var(--ivory)]">Reconnecting...</span>
           </div>
         </div>
       )}
@@ -656,7 +656,7 @@ export function Lobby() {
                     </div>
                     <div className="border-t border-black/40 mt-2 pt-2 grid grid-cols-[0.9fr_1.85fr_0.7fr_0.8fr] text-left">
                       <div className="min-w-0 px-1.5 first:pl-0">
-                        <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                        <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--ivory-muted)]">
                           Mode
                         </div>
                         <div className="mt-0.5 truncate text-[11px] text-amber-400">
@@ -664,7 +664,7 @@ export function Lobby() {
                         </div>
                       </div>
                       <div className="min-w-0 border-l border-black/40 px-2">
-                        <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                        <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--ivory-muted)]">
                           {isConstructed ? "Deck" : "Cube"}
                         </div>
                         {summaryBattlerId ? (
@@ -678,13 +678,13 @@ export function Lobby() {
                             {summaryBattlerId}
                           </a>
                         ) : (
-                          <div className="mt-0.5 truncate text-[11px] text-gray-500">
+                          <div className="mt-0.5 truncate text-[11px] text-[var(--ivory-muted)]">
                             Missing
                           </div>
                         )}
                       </div>
                       <div className="min-w-0 border-l border-black/40 px-2">
-                        <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                        <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--ivory-muted)]">
                           Upgr.
                         </div>
                         <div className="mt-0.5 truncate text-[11px] text-amber-400">
@@ -692,13 +692,13 @@ export function Lobby() {
                         </div>
                       </div>
                       <div className="min-w-0 border-l border-black/40 pl-2 pr-0">
-                        <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-gray-500">
+                        <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--ivory-muted)]">
                           Browse
                         </div>
                         <button
                           onClick={() => openGuide({ docId: "__cards__" })}
                           disabled={!canBrowseCards}
-                          className="mt-0.5 block w-full truncate text-left text-[11px] text-amber-400 transition-colors hover:text-amber-300 disabled:text-gray-500 disabled:cursor-not-allowed"
+                          className="mt-0.5 block w-full truncate text-left text-[11px] text-amber-400 transition-colors hover:text-amber-300 disabled:text-[var(--ivory-faint)] disabled:cursor-not-allowed"
                         >
                           Cards
                         </button>
@@ -725,7 +725,7 @@ export function Lobby() {
                         {hasLoadedBattler ? (
                           <div
                             title={battlerIdInput}
-                            className="w-full h-[42px] border border-black/40 rounded px-3 py-2 text-base bg-black/20 text-gray-300 overflow-hidden text-ellipsis whitespace-nowrap select-none cursor-default"
+                            className="w-full h-[42px] border border-black/40 rounded px-3 py-2 text-base bg-black/20 text-[var(--ivory-muted)] overflow-hidden text-ellipsis whitespace-nowrap select-none cursor-default"
                           >
                             {battlerIdInput}
                           </div>
@@ -769,7 +769,7 @@ export function Lobby() {
                         }}
                         disabled={!canDecreasePlayerCap}
                         aria-label="Decrease player count"
-                        className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
+                        className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-[var(--ivory-faint)] disabled:hover:bg-black/40"
                       >
                         -
                       </button>
@@ -785,7 +785,7 @@ export function Lobby() {
                         }}
                         disabled={!canIncreasePlayerCap}
                         aria-label="Increase player count"
-                        className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-gray-600 disabled:hover:bg-black/40"
+                        className="flex h-6 w-6 items-center justify-center rounded border border-black/40 bg-black/40 text-sm text-white transition-colors hover:bg-black/20 disabled:cursor-not-allowed disabled:text-[var(--ivory-faint)] disabled:hover:bg-black/40"
                       >
                         +
                       </button>
@@ -794,7 +794,7 @@ export function Lobby() {
                       <button
                         onClick={() => actions.addPuppet()}
                         disabled={!canAddPuppet}
-                        className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 disabled:cursor-not-allowed transition-colors"
+                        className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-[var(--ivory-faint)] disabled:cursor-not-allowed transition-colors"
                       >
                         + Add Puppet
                       </button>
@@ -805,7 +805,7 @@ export function Lobby() {
                             tab: "why-are-my-opponents-cards-face-up",
                           })
                         }
-                        className="w-5 h-5 rounded-full bg-black/30 border border-black/40 text-gray-400 hover:bg-black/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
+                        className="w-5 h-5 rounded-full bg-black/30 border border-black/40 text-[var(--ivory-muted)] hover:bg-black/20 hover:text-white transition-all text-[10px] flex items-center justify-center"
                         title="What are Puppets?"
                       >
                         ?
@@ -823,7 +823,7 @@ export function Lobby() {
                             tab: "why-are-my-opponents-cards-face-up",
                           })
                         }
-                        className="text-gray-500 hover:text-gray-300 text-xs transition-colors"
+                        className="text-[var(--ivory-muted)] hover:text-[var(--ivory)] text-xs transition-colors"
                       >
                         What are Puppets?
                       </button>
@@ -842,15 +842,15 @@ export function Lobby() {
                       >
                         <span
                           className={`w-2 h-2 rounded-full shrink-0 ${
-                            player.is_ready ? "bg-green-500" : "bg-gray-500"
+                            player.is_ready ? "bg-green-500" : "bg-[var(--ivory-faint)]"
                           }${player.is_connected ? "" : " opacity-40"}`}
                         />
                         <div className="min-w-0 flex-1">
-                          <div className={`text-sm truncate ${player.is_connected ? "text-white" : "text-gray-400"}`}>
+                          <div className={`text-sm truncate ${player.is_connected ? "text-white" : "text-[var(--ivory-muted)]"}`}>
                             {player.name}
                           </div>
                           {!player.is_connected && (
-                            <div className="text-[10px] leading-3 uppercase tracking-[0.08em] text-gray-400">
+                            <div className="text-[10px] leading-3 uppercase tracking-[0.08em] text-[var(--ivory-muted)]">
                               Away
                             </div>
                           )}
@@ -884,7 +884,7 @@ export function Lobby() {
                         {isHost && !player.is_host && (
                           <button
                             onClick={() => actions.kickPlayer(player.player_id)}
-                            className="text-gray-500 hover:text-red-400 transition-colors shrink-0 text-xs"
+                            className="text-[var(--ivory-muted)] hover:text-red-400 transition-colors shrink-0 text-xs"
                             title="Remove player"
                           >
                             &times;
@@ -942,7 +942,7 @@ export function Lobby() {
                         {isHost && (
                           <button
                             onClick={() => actions.removePuppet()}
-                            className="text-gray-500 hover:text-red-400 transition-colors shrink-0 ml-auto text-xs"
+                            className="text-[var(--ivory-muted)] hover:text-red-400 transition-colors shrink-0 ml-auto text-xs"
                             title="Remove puppet"
                           >
                             &times;
@@ -958,7 +958,7 @@ export function Lobby() {
                       className="bg-black/20 border border-dashed border-black/35 px-3 py-2.5 rounded-lg flex items-center gap-2 min-w-0"
                     >
                       <span className="w-2 h-2 rounded-full shrink-0 bg-black/40" />
-                      <span className="text-gray-500 text-sm italic">
+                      <span className="text-[var(--ivory-muted)] text-sm italic">
                         required
                       </span>
                     </div>

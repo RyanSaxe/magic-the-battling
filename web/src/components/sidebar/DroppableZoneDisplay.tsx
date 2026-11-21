@@ -133,14 +133,14 @@ export function ZoneModal({
             {headerActions}
             <button
               onClick={handleClose}
-              className="text-gray-400 hover:text-white"
+              className="text-[var(--ivory-muted)] hover:text-white"
             >
               ✕
             </button>
           </div>
         </div>
         {cards.length === 0 ? (
-          <div className="text-gray-500 text-center py-4">No cards</div>
+          <div className="text-[var(--ivory-muted)] text-center py-4">No cards</div>
         ) : (
           <div className="flex flex-wrap gap-2">
             {cards.map((card) => (
@@ -170,7 +170,7 @@ export function DroppableZoneDisplay({
   validFromZones,
   isOpponent = false,
   canManipulateOpponent = false,
-  titleClassName = 'text-gray-400',
+  titleClassName = 'text-[var(--ivory-muted)]',
   hideCount = false,
   size = 'xs',
   upgradedCardIds,
@@ -208,7 +208,7 @@ export function DroppableZoneDisplay({
               className="border border-dashed border-[var(--stone-light)] rounded flex items-center justify-center"
               style={{ width: sizeStyles[size].width, height: sizeStyles[size].height }}
             >
-              <span className="text-gray-600 text-[10px]">Empty</span>
+              <span className="text-[var(--ivory-muted)] text-[10px]">Empty</span>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-0.5">
@@ -237,7 +237,7 @@ export function DroppableZoneDisplay({
                 )}
               </div>
               {remainingCount > 0 && (
-                <div className="text-[10px] text-gray-400">+{remainingCount} more</div>
+                <div className="text-[10px] text-[var(--ivory-muted)]">+{remainingCount} more</div>
               )}
             </div>
           )}

@@ -125,7 +125,7 @@ export function ActionMenu({
       >
         {card && (
           <>
-            <div className="px-3 py-1.5 text-xs text-gray-400 border-b gold-divider truncate">
+            <div className="px-3 py-1.5 text-xs text-[var(--ivory-muted)] border-b gold-divider truncate">
               {card.name}
             </div>
 
@@ -379,7 +379,7 @@ function MenuItem({
     <button
       className={`
         w-full px-3 py-1.5 text-left text-sm flex items-center justify-between
-        menu-item ${disabled ? 'text-gray-500 cursor-not-allowed' : 'text-white'}
+        menu-item ${disabled ? 'text-[var(--ivory-faint)] cursor-not-allowed' : 'text-white'}
       `}
       data-guide-target={guideTarget}
       onClick={disabled ? undefined : onClick}
@@ -387,7 +387,7 @@ function MenuItem({
       aria-expanded={hasSubmenu ? open : undefined}
     >
       <span>{label}</span>
-      {hasSubmenu && <span className="text-gray-400">›</span>}
+      {hasSubmenu && <span className="text-[var(--ivory-muted)]">›</span>}
     </button>
   )
 }

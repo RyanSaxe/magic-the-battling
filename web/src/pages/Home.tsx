@@ -56,7 +56,7 @@ export function Home() {
         {resumable && <ResumeGameStrip seat={resumable} />}
         <CardShowcase />
         {/* mt-10 rather than mt-6 offsets the column's top padding, so the showcase stays centered where it was. */}
-        <p className="text-gray-400 text-sm mt-10">
+        <p className="text-[var(--ivory-muted)] text-sm mt-10">
           <Link to="/login" className={LINK}>
             Log in
           </Link>

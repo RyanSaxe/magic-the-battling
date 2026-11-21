@@ -118,7 +118,7 @@ export function BasicLandSlot({
                       borderRadius: "var(--card-border-radius)",
                     }}
                   />
-                  <span className="text-[9px] text-gray-400">{name}</span>
+                  <span className="text-[9px] text-[var(--ivory-muted)]">{name}</span>
                 </button>
               ))}
             </div>

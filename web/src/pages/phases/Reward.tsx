@@ -37,7 +37,7 @@ function EmptyZoneTile({
 }) {
   return (
     <div
-      className="modal-chrome border gold-border rounded-lg flex items-center justify-center px-3 text-center text-xs text-gray-300 shadow-md"
+      className="modal-chrome border gold-border rounded-lg flex items-center justify-center px-3 text-center text-xs text-[var(--ivory-muted)] shadow-md"
       style={{ width: dimensions.width, height: dimensions.height }}
     >
       {label}
@@ -276,7 +276,7 @@ export function RewardPhase({
           )}
           <div
             data-guide-target="reward-progression"
-            className="mt-4 rounded-lg border border-amber-500/15 bg-black/25 px-3 py-2 text-center text-xs text-gray-300"
+            className="mt-4 rounded-lg border border-amber-500/15 bg-black/25 px-3 py-2 text-center text-xs text-[var(--ivory-muted)]"
           >
             <span className="text-amber-300 font-medium">Round progression:</span>{" "}
             the third round of each stage adds The Vanquisher, increases starting hand size by 1, and advances you to the next stage.

@@ -234,7 +234,7 @@ export function BattlefieldZone({
       className={`h-full flex-1 ${compact ? 'p-1' : 'p-4'}`}
     >
       {label && (
-        <div className="text-xs text-gray-400 mb-2 uppercase tracking-wide">
+        <div className="text-xs text-[var(--ivory-muted)] mb-2 uppercase tracking-wide">
           {label}
         </div>
       )}
@@ -247,7 +247,7 @@ export function BattlefieldZone({
           style={{ minHeight: minH }}
         >
           {permanents.length === 0 && lands.length === 0 ? (
-            <div className="text-gray-500 text-sm opacity-50">
+            <div className="text-[var(--ivory-muted)] text-sm opacity-50">
               {isOpponent ? "Opponent's battlefield" : "Empty battlefield"}
             </div>
           ) : (

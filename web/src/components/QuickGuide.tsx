@@ -326,7 +326,7 @@ function AccordionItem({ id, label, expanded, onToggle, labelClassName, children
       >
         <span className={`font-medium text-base flex-1 text-left ${labelClassName ?? 'text-white'}`}>{label}</span>
         <svg
-          className={`w-5 h-5 transition-transform transition-colors duration-[400ms] ${expanded ? 'rotate-90 text-amber-400' : 'text-gray-400'}`}
+          className={`w-5 h-5 transition-transform transition-colors duration-[400ms] ${expanded ? 'rotate-90 text-amber-400' : 'text-[var(--ivory-muted)]'}`}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -404,12 +404,12 @@ function PhaseControlsContent({ phase }: { phase: Phase }) {
       {controlsMarkdown ? (
         <DocRenderer content={controlsMarkdown} />
       ) : (
-        <p className="text-sm text-gray-400">Controls are not defined for this phase yet.</p>
+        <p className="text-sm text-[var(--ivory-muted)]">Controls are not defined for this phase yet.</p>
       )}
 
       {hotkeys.length > 0 && (
         <div>
-          <h2 className="text-[0.9375rem] font-semibold text-gray-200 tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
+          <h2 className="text-[0.9375rem] font-semibold text-[var(--ivory)] tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
             Keyboard Shortcuts
           </h2>
           <div className="space-y-1.5">
@@ -422,7 +422,7 @@ function PhaseControlsContent({ phase }: { phase: Phase }) {
 
       {hoverHotkeys.length > 0 && (
         <div>
-          <h2 className="text-[0.9375rem] font-semibold text-gray-200 tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
+          <h2 className="text-[0.9375rem] font-semibold text-[var(--ivory)] tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
             When Hovering a Card
           </h2>
           <div className="space-y-1.5">
@@ -617,7 +617,7 @@ export function QuickGuide({
                   className={`rounded-full px-3 py-1.5 text-[0.78rem] font-medium transition-colors ${
                     tab.id === activeTab
                       ? 'bg-amber-400/14 text-amber-200 ring-1 ring-amber-300/25'
-                      : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
+                      : 'text-[var(--ivory-muted)] hover:bg-white/5 hover:text-[var(--ivory)]'
                   }`}
                 >
                   {tab.label}
@@ -642,7 +642,7 @@ export function QuickGuide({
                     <DocRenderer content={buildPhaseGuideContent(quickOverviewDoc)} />
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400">Overview content not found.</p>
+                  <p className="text-sm text-[var(--ivory-muted)]">Overview content not found.</p>
                 )}
               </AccordionItem>
 
@@ -658,7 +658,7 @@ export function QuickGuide({
                     <DocRenderer content={gamePiecesDoc.parsed.body} />
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400">Game pieces content not found.</p>
+                  <p className="text-sm text-[var(--ivory-muted)]">Game pieces content not found.</p>
                 )}
               </AccordionItem>
 
@@ -678,7 +678,7 @@ export function QuickGuide({
                         <DocRenderer content={buildPhaseGuideContent(phaseDoc)} />
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-400">Rules are not defined for this phase yet.</p>
+                      <p className="text-sm text-[var(--ivory-muted)]">Rules are not defined for this phase yet.</p>
                     )}
                   </AccordionItem>
                 )
@@ -702,7 +702,7 @@ export function QuickGuide({
                     <DocRenderer content={controlsDoc.parsed.body} />
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400">Controls content not found.</p>
+                  <p className="text-sm text-[var(--ivory-muted)]">Controls content not found.</p>
                 )}
               </AccordionItem>
 
@@ -737,7 +737,7 @@ export function QuickGuide({
                     <DocRenderer content={tipsDoc.parsed.sections['global']} />
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400">Global tips are not defined yet.</p>
+                  <p className="text-sm text-[var(--ivory-muted)]">Global tips are not defined yet.</p>
                 )}
               </AccordionItem>
 
@@ -755,7 +755,7 @@ export function QuickGuide({
                       <DocRenderer content={tipsDoc.parsed.sections[phase]} />
                     </div>
                   ) : (
-                    <p className="text-sm text-gray-400">Tips are not defined for this phase yet.</p>
+                    <p className="text-sm text-[var(--ivory-muted)]">Tips are not defined for this phase yet.</p>
                   )}
                 </AccordionItem>
               ))}
@@ -773,7 +773,7 @@ export function QuickGuide({
                   className={`rounded-full px-3 py-1 text-sm transition-all ${
                     t.id === cardType
                       ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/60'
-                      : 'text-gray-400 hover:text-gray-200'
+                      : 'text-[var(--ivory-muted)] hover:text-[var(--ivory)]'
                   }`}
                 >
                   {t.label}
@@ -789,7 +789,7 @@ export function QuickGuide({
         )}
 
         {activeTab === 'browse' && !gameId && (
-          <div className="flex-1 flex items-center justify-center text-gray-500 text-center py-8 text-sm">
+          <div className="flex-1 flex items-center justify-center text-[var(--ivory-muted)] text-center py-8 text-sm">
             Join a game to browse cards.
           </div>
         )}
@@ -808,14 +808,14 @@ export function QuickGuide({
                     onToggle={() => toggleFaqSection(index)}
                     labelClassName="text-white font-semibold"
                   >
-                    <div className="text-sm sm:text-base text-gray-300">
+                    <div className="text-sm sm:text-base text-[var(--ivory-muted)]">
                       <DocRenderer content={entry.answer} />
                     </div>
                   </AccordionItem>
                 ))
               ) : (
                 <div className="px-4 py-3">
-                  <p className="text-sm text-gray-400">FAQ content not found.</p>
+                  <p className="text-sm text-[var(--ivory-muted)]">FAQ content not found.</p>
                 </div>
               )}
             </div>

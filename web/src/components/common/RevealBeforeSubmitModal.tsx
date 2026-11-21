@@ -67,7 +67,7 @@ export function RevealBeforeSubmitModal({
           <h2 className="text-white font-semibold text-lg">Unrevealed Upgrades</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl leading-none shrink-0 ml-4 p-1"
+            className="text-[var(--ivory-muted)] hover:text-white text-2xl leading-none shrink-0 ml-4 p-1"
           >
             &times;
           </button>

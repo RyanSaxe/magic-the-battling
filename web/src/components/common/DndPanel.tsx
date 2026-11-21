@@ -119,7 +119,7 @@ export function DndPanel({
         {hideTitle ? <div /> : <h3 className="text-white font-medium text-sm">{title}</h3>}
         <div className="flex items-center gap-2">
           {headerActions}
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-lg leading-none">
+          <button onClick={onClose} className="text-[var(--ivory-muted)] hover:text-white text-lg leading-none">
             &times;
           </button>
         </div>

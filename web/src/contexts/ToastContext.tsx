@@ -81,7 +81,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               </span>
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] uppercase tracking-widest text-amber-300/80 mb-0.5">{config.label}</div>
-                <p className="text-sm text-gray-100 leading-snug">{toast.message}</p>
+                <p className="text-sm text-[var(--ivory)] leading-snug">{toast.message}</p>
               </div>
               <button
                 onClick={() => removeToast(toast.id)}

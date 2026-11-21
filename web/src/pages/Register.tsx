@@ -51,7 +51,7 @@ export function Register() {
         )}
 
         <div className="mb-4">
-          <label htmlFor="username" className="block text-gray-300 text-sm mb-1">Username</label>
+          <label htmlFor="username" className="block text-[var(--ivory-muted)] text-sm mb-1">Username</label>
           <input
             id="username"
             type="text"
@@ -65,11 +65,11 @@ export function Register() {
             pattern="[a-zA-Z0-9_]+"
             title="Letters, numbers, and underscores only"
           />
-          <p className="text-gray-500 text-xs mt-1">3-30 characters: letters, numbers, underscores</p>
+          <p className="text-[var(--ivory-muted)] text-xs mt-1">3-30 characters: letters, numbers, underscores</p>
         </div>
 
         <div className="mb-4">
-          <label htmlFor="email" className="block text-gray-300 text-sm mb-1">Email</label>
+          <label htmlFor="email" className="block text-[var(--ivory-muted)] text-sm mb-1">Email</label>
           <input
             id="email"
             type="email"
@@ -81,7 +81,7 @@ export function Register() {
         </div>
 
         <div className="mb-4">
-          <label htmlFor="password" className="block text-gray-300 text-sm mb-1">Password</label>
+          <label htmlFor="password" className="block text-[var(--ivory-muted)] text-sm mb-1">Password</label>
           <input
             id="password"
             type="password"
@@ -91,11 +91,11 @@ export function Register() {
             required
             minLength={8}
           />
-          <p className="text-gray-500 text-xs mt-1">At least 8 characters</p>
+          <p className="text-[var(--ivory-muted)] text-xs mt-1">At least 8 characters</p>
         </div>
 
         <div className="mb-6">
-          <label htmlFor="confirm-password" className="block text-gray-300 text-sm mb-1">Confirm Password</label>
+          <label htmlFor="confirm-password" className="block text-[var(--ivory-muted)] text-sm mb-1">Confirm Password</label>
           <input
             id="confirm-password"
             type="password"
@@ -115,7 +115,7 @@ export function Register() {
           {loading ? 'Creating account...' : 'Create Account'}
         </button>
 
-        <p className="text-center text-gray-400 text-sm mt-4">
+        <p className="text-center text-[var(--ivory-muted)] text-sm mt-4">
           Already have an account?{' '}
           <Link to={`/login${returnTo !== '/' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} className={LINK}>Log in</Link>
         </p>

@@ -201,7 +201,7 @@ function UpgradesCheckbox({
         className="w-4 h-4 rounded bg-black/40 border-black/40"
       />
       <span className="text-white text-sm">Upgrades</span>
-      <span className="text-gray-500 text-xs">
+      <span className="text-[var(--ivory-muted)] text-xs">
         — upgrade a card every 3 rounds
       </span>
     </label>
@@ -225,7 +225,7 @@ function ConstructedCheckbox({
         className="w-4 h-4 rounded bg-black/40 border-black/40"
       />
       <span className="text-white text-sm">Constructed</span>
-      <span className="text-gray-500 text-xs">
+      <span className="text-[var(--ivory-muted)] text-xs">
         — bring your own deck
       </span>
     </label>
@@ -266,7 +266,7 @@ function GuidedModeField({
           aria-label="Guided mode"
         />
         <span
-          className={`text-xs font-medium uppercase tracking-wide ${enabled ? "text-amber-300" : "text-gray-500"
+          className={`text-xs font-medium uppercase tracking-wide ${enabled ? "text-amber-300" : "text-[var(--ivory-muted)]"
             }`}
         >
           {enabled ? "On" : "Off"}
@@ -281,7 +281,7 @@ function GuidedModeField({
       <div ref={guidedModeHelpRef} className="relative group shrink-0">
         <button
           type="button"
-          className="touch-area [--touch-area-left:-7px] text-gray-400 hover:text-gray-200"
+          className="touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]"
           aria-label="What guided mode does"
           aria-expanded={showGuidedModeHelp}
           onClick={() => setShowGuidedModeHelp((v) => !v)}
@@ -289,7 +289,7 @@ function GuidedModeField({
           <InfoIcon size="sm" />
         </button>
         <span
-          className={`absolute right-0 top-full mt-2 w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-50 ${showGuidedModeHelp
+          className={`absolute right-0 top-full mt-2 w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-[var(--ivory)] transition-opacity z-50 ${showGuidedModeHelp
             ? "opacity-100"
             : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
             }`}
@@ -305,7 +305,7 @@ function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="h-[42px] w-[42px] shrink-0 rounded-lg bg-white/20 btn-dark-border text-gray-300 hover:bg-white/30 hover:text-white transition-all flex items-center justify-center text-base"
+      className="btn-secondary h-[42px] w-[42px] shrink-0 rounded-lg flex items-center justify-center text-base"
       title="Advanced Options"
     >
       ⚙
@@ -590,7 +590,7 @@ export function Play() {
     >
       {icon}
       <span className="text-white font-medium text-sm">{label}</span>
-      <span className="ml-auto text-gray-500 text-xs">▶</span>
+      <span className="ml-auto text-[var(--ivory-muted)] text-xs">▶</span>
     </button>
   );
 
@@ -615,10 +615,10 @@ export function Play() {
             ))}
             <div className="mb-4">
               <div className="mb-1 flex items-center justify-between gap-3">
-                <label htmlFor="player-name" className="block text-gray-300 text-sm">
+                <label htmlFor="player-name" className="block text-[var(--ivory-muted)] text-sm">
                   Your Name
                 </label>
-                <span className="block text-gray-300 text-sm text-right shrink-0">
+                <span className="block text-[var(--ivory-muted)] text-sm text-right shrink-0">
                   Guided Mode
                 </span>
               </div>
@@ -660,7 +660,7 @@ export function Play() {
                       <h2 className="text-lg font-semibold text-white">Goldfish</h2>
                     </div>
                     <div className="flex-1 flex items-center justify-center">
-                      <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                      <p className="description-panel italic text-[var(--ivory)] text-base leading-relaxed px-4 py-3">
                         <span className="block text-amber-400/70">
                           Fight historically winning hands!
                         </span>
@@ -706,7 +706,7 @@ export function Play() {
                       </h2>
                     </div>
                     <div className="flex-1 flex items-center justify-center">
-                      <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                      <p className="description-panel italic text-[var(--ivory)] text-base leading-relaxed px-4 py-3">
                         <span className="block text-amber-400/70">
                           Draft an unbeatable hand!
                         </span>
@@ -764,7 +764,7 @@ export function Play() {
               className="w-4 h-4 rounded bg-black/40 border-black/40"
             />
             <span className="text-white text-sm">Open Spectating</span>
-            <span className="text-gray-500 text-xs">— let anyone watch</span>
+            <span className="text-[var(--ivory-muted)] text-xs">— let anyone watch</span>
           </label>
         </AdvancedOptionsModal>
       )}
@@ -781,7 +781,7 @@ export function Play() {
             setUseUpgrades={setUseUpgrades}
           />
           <div className={`${OPTION_BOX} p-3`}>
-            <label className="block text-gray-300 text-sm mb-2">
+            <label className="block text-[var(--ivory-muted)] text-sm mb-2">
               Opponents
             </label>
             <div className="flex gap-1.5">
@@ -791,7 +791,7 @@ export function Play() {
                   onClick={() => setOpponents(count)}
                   className={`px-3 py-1.5 rounded text-sm font-medium btn-dark-border transition-colors ${opponents === count
                     ? "bg-amber-500 text-black"
-                    : "bg-black/40 text-gray-300 hover:bg-black/30"
+                    : "bg-black/40 text-[var(--ivory-muted)] hover:bg-black/30"
                     }`}
                 >
                   {count}
@@ -819,14 +819,14 @@ export function Play() {
             <h2 className="text-xl font-bold text-white mb-4">
               Not enough puppet data
             </h2>
-            <p className="text-gray-300 mb-6">
+            <p className="text-[var(--ivory-muted)] mb-6">
               You requested {opponents} opponent{opponents > 1 && "s"}, but only{" "}
               {maxAvailablePuppets} {maxAvailablePuppets === 1 ? "is" : "are"}{" "}
               available for this cube.
             </p>
             {validRecoveryCounts.length > 0 ? (
               <>
-                <p className="text-gray-400 text-sm mb-3">Play with:</p>
+                <p className="text-[var(--ivory-muted)] text-sm mb-3">Play with:</p>
                 <RecoveryOpponentPicker
                   counts={validRecoveryCounts}
                   onSelect={(count) => {
@@ -839,7 +839,7 @@ export function Play() {
                 />
               </>
             ) : (
-              <p className="text-gray-400 text-sm mb-4">
+              <p className="text-[var(--ivory-muted)] text-sm mb-4">
                 No puppet data exists for this cube yet. Play with friends to
                 generate data.
               </p>
@@ -881,7 +881,7 @@ function RecoveryOpponentPicker({
           </button>
         ))}
       </div>
-      <span className="text-gray-500 text-xs">opponents</span>
+      <span className="text-[var(--ivory-muted)] text-xs">opponents</span>
       {selected !== null && (
         <button
           onClick={() => onSelect(selected)}

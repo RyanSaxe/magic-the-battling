@@ -37,7 +37,7 @@ export function DocRenderer({ content, className }: DocRendererProps) {
 
   const components: Components = {
     h2: ({ children }) => (
-      <h2 className="text-[0.9375rem] font-semibold text-gray-200 tracking-wide mt-5 mb-2 first:mt-0 border-b border-amber-400/15 pb-1">
+      <h2 className="text-[0.9375rem] font-semibold text-[var(--ivory)] tracking-wide mt-5 mb-2 first:mt-0 border-b border-amber-400/15 pb-1">
         {children}
       </h2>
     ),
@@ -47,21 +47,21 @@ export function DocRenderer({ content, className }: DocRendererProps) {
       </h3>
     ),
     p: ({ children }) => (
-      <p className="text-sm sm:text-[0.9375rem] text-gray-300 mb-3 leading-relaxed">{children}</p>
+      <p className="text-sm sm:text-[0.9375rem] text-[var(--ivory-muted)] mb-3 leading-relaxed">{children}</p>
     ),
     ul: ({ children }) => (
       <ul className="doc-list space-y-1.5 mb-3">{children}</ul>
     ),
     li: ({ children }) => (
-      <li className="doc-list-item flex gap-2 text-sm sm:text-[0.9375rem] text-gray-300 leading-relaxed">
+      <li className="doc-list-item flex gap-2 text-sm sm:text-[0.9375rem] text-[var(--ivory-muted)] leading-relaxed">
         <span>{children}</span>
       </li>
     ),
     table: ({ children }) => (
-      <table className="w-full text-sm text-gray-300 mb-3 [&_tr:nth-child(even)]:bg-white/3">{children}</table>
+      <table className="w-full text-sm text-[var(--ivory-muted)] mb-3 [&_tr:nth-child(even)]:bg-white/3">{children}</table>
     ),
     th: ({ children }) => (
-      <th className="text-left text-gray-400 font-medium pb-1 pr-3 border-b border-amber-400/15">{children}</th>
+      <th className="text-left text-[var(--ivory-muted)] font-medium pb-1 pr-3 border-b border-amber-400/15">{children}</th>
     ),
     td: ({ children }) => (
       <td className="pb-1 pr-3">{children}</td>
@@ -73,7 +73,7 @@ export function DocRenderer({ content, className }: DocRendererProps) {
       <hr className="border-t border-amber-400/20 my-4" />
     ),
     blockquote: ({ children }) => (
-      <blockquote className="border-l-3 border-amber-400/40 pl-4 italic text-gray-400 my-3">
+      <blockquote className="border-l-3 border-amber-400/40 pl-4 italic text-[var(--ivory-muted)] my-3">
         {children}
       </blockquote>
     ),
@@ -118,7 +118,7 @@ export function DocRenderer({ content, className }: DocRendererProps) {
               )}
               {hoverHotkeys.length > 0 && (
                 <div>
-                  <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+                  <h3 className="text-xs font-medium text-[var(--ivory-muted)] uppercase tracking-wide mb-2">
                     When Hovering a Card
                   </h3>
                   <div className="space-y-1.5">

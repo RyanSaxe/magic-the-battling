@@ -111,7 +111,7 @@ export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
           <h2 className="text-xl font-bold text-white">Share Game</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-xl leading-none"
+            className="text-[var(--ivory-muted)] hover:text-white text-xl leading-none"
           >
             &times;
           </button>
@@ -122,12 +122,12 @@ export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
             <button
               key={label}
               onClick={() => handlePlatformClick(getUrl)}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-lg bg-black/40 border border-black/50 text-gray-300 hover:bg-black/30 hover:border-black/70 hover:ring-1 hover:ring-amber-500/30 transition-colors ${
+              className={`flex flex-col items-center gap-1.5 p-3 rounded-lg bg-black/40 border border-black/50 text-[var(--ivory-muted)] hover:bg-black/30 hover:border-black/70 hover:ring-1 hover:ring-amber-500/30 transition-colors ${
                 mobileOnly ? 'sm:hidden' : ''
               } ${desktopOnly ? 'hidden sm:flex' : ''}`}
             >
-              <Icon className="text-2xl text-gray-100" />
-              <span className="text-xs text-gray-300">{label}</span>
+              <Icon className="text-2xl text-[var(--ivory)]" />
+              <span className="text-xs text-[var(--ivory-muted)]">{label}</span>
             </button>
           ))}
 
@@ -136,11 +136,11 @@ export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
             className={`flex flex-col items-center gap-1.5 p-3 rounded-lg transition-colors ${
               copied
                 ? 'bg-emerald-600/80 border border-emerald-400/30'
-                : 'bg-black/40 border border-black/50 text-gray-300 hover:bg-black/30 hover:border-black/70 hover:ring-1 hover:ring-amber-500/30'
+                : 'bg-black/40 border border-black/50 text-[var(--ivory-muted)] hover:bg-black/30 hover:border-black/70 hover:ring-1 hover:ring-amber-500/30'
             }`}
           >
-            <FaLink className="text-2xl text-gray-100" />
-            <span className="text-xs text-gray-300">
+            <FaLink className="text-2xl text-[var(--ivory)]" />
+            <span className="text-xs text-[var(--ivory-muted)]">
               {copied ? 'Copied!' : 'Copy Link'}
             </span>
           </button>

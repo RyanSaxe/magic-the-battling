@@ -116,7 +116,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
       <div className="flex-1 min-h-0 overflow-auto">
         {currentPack.length === 0 ? (
           <div className="text-center">
-            <div className="text-gray-400 text-sm">No pack available</div>
+            <div className="text-[var(--ivory-muted)] text-sm">No pack available</div>
           </div>
         ) : (
           <div style={{
@@ -147,7 +147,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
       <div className="flex-1 min-h-0 overflow-auto">
         {pool.length === 0 ? (
           <div className="flex items-center justify-center">
-            <div className="text-gray-500 text-sm text-center">
+            <div className="text-[var(--ivory-muted)] text-sm text-center">
               Swap cards from the pack to build your pool
             </div>
           </div>

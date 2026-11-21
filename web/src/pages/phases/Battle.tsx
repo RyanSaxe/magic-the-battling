@@ -244,7 +244,7 @@ export function BattlePhase({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="text-xl text-white mb-4">Waiting for the Fight</div>
-          <p className="text-gray-400">Waiting for opponent to finish building...</p>
+          <p className="text-[var(--ivory-muted)]">Waiting for opponent to finish building...</p>
         </div>
       </div>
     )
