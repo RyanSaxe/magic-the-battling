@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { PageFrame } from '../components/common/PageFrame'
 import { CubeTile } from '../components/dashboard/CubeTile'
 import { HomeHeader } from '../components/dashboard/HomeHeader'
+import { SearchBox } from '../components/dashboard/SearchBox'
 import { NoticeTile, SectionTitle } from '../components/dashboard/Section'
 import { discoverCubes, followCube, getFollowing, unfollowCube, type DiscoverResult } from '../api/client'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { countLabel, cubeTitle, formatWhen } from '../utils/accountFormat'
 import { unknownToAppError } from '../utils/appError'
 import {
@@ -17,18 +19,29 @@ import {
   withFollow,
   withFollowingPage,
   withoutFollow,
-  type FirstPageStatus,
   type Follows,
 } from './dashboardState'
 
-/** The cubes most played on Pitfight, to follow or play. */
+const SEARCH_DELAY_MS = 300
+
+/** A page of cubes, stamped with the search it was loaded for. */
+interface LoadedCubes {
+  search: string
+  results: DiscoverResult[]
+  hasMore: boolean
+  total: number
+}
+
+/** The cubes most played on Pitfight, searchable by name or CubeCobra id, to follow or play. */
 export function DashboardDiscover() {
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
   const { addToast } = useToast()
-  const [results, setResults] = useState<DiscoverResult[]>([])
-  const [hasMore, setHasMore] = useState(false)
-  const [status, setStatus] = useState<FirstPageStatus>('idle')
+  const [searchText, setSearchText] = useState('')
+  const search = useDebouncedValue(searchText.trim(), SEARCH_DELAY_MS)
+  const [loaded, setLoaded] = useState<LoadedCubes | null>(null)
+  const [failedSearch, setFailedSearch] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [follows, setFollows] = useState<Follows>(NO_FOLLOWS)
 
@@ -36,29 +49,48 @@ export function DashboardDiscover() {
     if (!authLoading && !user) navigate('/login?returnTo=/dashboard/discover', { replace: true })
   }, [authLoading, user, navigate])
 
-  const loadFirstPage = useCallback(async () => {
-    setStatus('loading')
-    try {
-      const [data, following] = await Promise.all([discoverCubes(0), getFollowing(0)])
-      setResults(data.results)
-      setHasMore(data.has_more)
-      setFollows(withDiscoverResults(withFollowingPage(NO_FOLLOWS, following, 0), data.results))
-      setStatus('loaded')
-    } catch {
-      setStatus('failed')
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    getFollowing(0)
+      .then((page) => {
+        if (!cancelled) setFollows((prev) => withFollowingPage(prev, page, 0))
+      })
+      .catch(() => {
+        // Without the first Following page, unfollowing still finds the follow by paging Following then.
+      })
+    return () => {
+      cancelled = true
     }
-  }, [])
+  }, [user])
 
   useEffect(() => {
-    if (user) loadFirstPage()
-  }, [user, loadFirstPage])
+    if (!user) return
+    let cancelled = false
+    discoverCubes(0, search)
+      .then((data) => {
+        if (cancelled) return
+        setLoaded({ search, results: data.results, hasMore: data.has_more, total: data.total })
+        setFollows((prev) => withDiscoverResults(prev, data.results))
+      })
+      .catch(() => {
+        if (!cancelled) setFailedSearch(search)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [user, search, attempt])
 
   const loadMore = async () => {
+    if (!loaded) return
     setLoadingMore(true)
     try {
-      const data = await discoverCubes(results.length)
-      setResults((prev) => [...prev, ...data.results])
-      setHasMore(data.has_more)
+      const data = await discoverCubes(loaded.results.length, loaded.search)
+      setLoaded((prev) =>
+        prev && prev.search === loaded.search
+          ? { ...prev, results: [...prev.results, ...data.results], hasMore: data.has_more }
+          : prev,
+      )
       setFollows((prev) => withDiscoverResults(prev, data.results))
     } catch {
       addToast('Failed to load cubes', 'error')
@@ -103,29 +135,56 @@ export function DashboardDiscover() {
 
   if (authLoading || !user) return null
 
+  const current = loaded?.search === search ? loaded : null
+  const failed = failedSearch === search && !current
+  // While a new search loads, the last list stays on screen, dimmed, instead of flashing away.
+  const shown = current ?? loaded
+
   return (
     <PageFrame header={<HomeHeader />} contentClassName="px-4">
       <div className="mx-auto flex w-full max-w-[1080px] min-[1600px]:max-w-[1400px] flex-col gap-3">
-        <div className="flex items-baseline justify-between gap-3 pt-2">
-          <SectionTitle>Discover</SectionTitle>
-          {status === 'loaded' && results.length > 0 && (
-            <span className="text-[12.5px] leading-5 tabular-nums text-gray-300">
-              <strong className="text-amber-50">{results.length}{hasMore ? '+' : ''}</strong> popular{' '}
-              {results.length === 1 ? 'cube' : 'cubes'}
-            </span>
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-2">
+          <div className="flex items-baseline gap-4">
+            <SectionTitle>Discover</SectionTitle>
+            {current && current.total > 0 && (
+              <span className="text-[12.5px] leading-5 tabular-nums text-gray-300">
+                <strong className="text-amber-50">{current.total}</strong>{' '}
+                {search ? (current.total === 1 ? 'matching cube' : 'matching cubes') : current.total === 1 ? 'popular cube' : 'popular cubes'}
+              </span>
+            )}
+          </div>
+          <SearchBox label="Search cube names and IDs" value={searchText} onChange={setSearchText} className="w-full sm:w-72" />
         </div>
-        {status === 'failed' ? (
-          <NoticeTile action={{ label: 'Retry', onClick: loadFirstPage }}>The cubes didn&apos;t load.</NoticeTile>
-        ) : status !== 'loaded' ? (
-          <NoticeTile>Loading...</NoticeTile>
-        ) : results.length === 0 ? (
-          <NoticeTile action={{ label: 'New Game', onClick: () => navigate('/play') }}>
-            No cube has a finished game yet.
+        {failed ? (
+          <NoticeTile
+            action={{
+              label: 'Retry',
+              onClick: () => {
+                setFailedSearch(null)
+                setAttempt((n) => n + 1)
+              },
+            }}
+          >
+            The cubes didn&apos;t load.
           </NoticeTile>
+        ) : !shown ? (
+          <NoticeTile>Loading...</NoticeTile>
+        ) : shown.results.length === 0 ? (
+          shown.search ? (
+            <NoticeTile action={{ label: 'Clear search', onClick: () => setSearchText('') }}>
+              No cubes match &ldquo;{shown.search}&rdquo;.
+            </NoticeTile>
+          ) : (
+            <NoticeTile action={{ label: 'New Game', onClick: () => navigate('/play') }}>
+              No cube has a finished game yet.
+            </NoticeTile>
+          )
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {results.map((result) => {
+          <div
+            aria-busy={!current}
+            className={`grid grid-cols-1 gap-3 transition-opacity sm:grid-cols-2 lg:grid-cols-3 ${current ? '' : 'opacity-60'}`}
+          >
+            {shown.results.map((result) => {
               const following = isFollowing(follows, result.cube_id)
               const href = `/cube/${encodeURIComponent(result.cube_id)}`
               return (
@@ -150,7 +209,7 @@ export function DashboardDiscover() {
             })}
           </div>
         )}
-        {hasMore && (
+        {current?.hasMore && (
           <button
             type="button"
             onClick={loadMore}

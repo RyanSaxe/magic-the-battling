@@ -72,7 +72,7 @@ const FOLLOWING: FollowedBattler[] = [
   },
 ]
 
-function gameSummary(index: number): GameSummary {
+export function gameSummary(index: number): GameSummary {
   return {
     game_id: `game-${index}`,
     created_at: '2026-01-02T00:00:00Z',
@@ -97,7 +97,7 @@ const SIGNED_IN_RESPONSES: Record<string, MockResponse> = {
   '/api/battlers': { json: { battlers: BATTLERS, has_more: false } },
   '/api/battlers/following': { json: { following: FOLLOWING, has_more: false } },
   '/api/battlers/my-games': { json: GAMES },
-  '/api/discover': { json: { results: [], has_more: false } },
+  '/api/discover': { json: { results: [], has_more: false, total: 0 } },
   '/api/battlers/1/games': { json: GAMES },
   '/api/battlers/cube/vintage-cube/games': { json: GAMES },
 }
@@ -245,6 +245,18 @@ export const PAGES: PageUnderTest[] = [
     path: '/dashboard',
     serve: serveSignedIn,
     primaryAction: (page) => page.getByRole('button', { name: 'New Game' }),
+  },
+  {
+    name: 'games',
+    path: '/dashboard/games',
+    serve: serveSignedIn,
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search cubes, presets, opponents' }),
+  },
+  {
+    name: 'discover',
+    path: '/dashboard/discover',
+    serve: serveSignedIn,
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search cube names and IDs' }),
   },
   {
     name: 'battler',
