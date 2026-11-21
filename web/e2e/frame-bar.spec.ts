@@ -55,6 +55,8 @@ function measureFrame(page: Page) {
     const header = document.querySelector('header')!
     const footer = document.querySelector('footer')!
     const main = document.querySelector('main')!
+    // A docked sidebar sits inside the felt's gold edge, so the felt ends where the sidebar does.
+    const felt = document.querySelector('.frame-sidebar') ?? main
     const barButtons = (bar: Element) => Array.from(bar.querySelectorAll('.btn')).filter(visible).map((button) => {
       const rect = button.getBoundingClientRect()
       return {
@@ -76,8 +78,8 @@ function measureFrame(page: Page) {
       footerHeight: footer.getBoundingClientRect().height,
       footerTop: footer.getBoundingClientRect().top,
       feltLeft: main.getBoundingClientRect().left,
+      feltRight: felt.getBoundingClientRect().right,
       headerInner: inner(header),
-      footerInner: inner(footer),
       topButtons: barButtons(header),
       bottomButtons: barButtons(footer),
       mainActionRight: lastVisibleRight(footer.querySelector('[data-bar-role="main"]')),
@@ -100,6 +102,7 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
         expect.soft(frame.footerHeight, 'bottom bar height').toBe(BAR_HEIGHT)
         expect.soft(frame.footerTop, 'bottom bar top edge').toBe(viewport.height - BAR_HEIGHT)
         expect.soft(frame.feltLeft, 'felt left edge').toBe(rail)
+        expect.soft(frame.feltRight, 'felt right edge').toBe(viewport.width - rail)
 
         for (const button of [...frame.topButtons, ...frame.bottomButtons]) {
           expect.soft(button.height, `"${button.label}" height`).toBe(BAR_BUTTON_HEIGHT)
@@ -117,8 +120,46 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
           expect.soft(rightmost, 'last top bar button sits at the right edge').toBeCloseTo(frame.headerInner.right, 0)
         }
         if (frame.mainActionRight !== null) {
-          expect.soft(frame.mainActionRight, 'main action sits at the right edge').toBeCloseTo(frame.footerInner.right, 0)
+          expect.soft(frame.mainActionRight, 'main action sits at the right edge, under the top bar\'s last button').toBeCloseTo(frame.headerInner.right, 0)
         }
+      })
+    }
+  })
+}
+
+const SUBMIT_POPOVERS = [
+  { state: GAME_PHASES.build, button: 'Submit Hand', popover: 'build-submit-popover', choice: 'Play' },
+  { state: GAME_PHASES.fight, button: 'Submit Result', popover: 'battle-submit-popover', choice: 'I Won' },
+]
+const MIN_POPOVER_GAP = 6
+
+for (const { name, viewport, isMobile } of SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    for (const { state, button, popover, choice } of SUBMIT_POPOVERS) {
+      // The choices open over the felt's corner, where they once sat flush with its gold edge or behind the sidebar.
+      test(`the choices over ${button} stay inside the felt's gold edge, in front of the sidebar`, async ({ page, baseURL }) => {
+        await serveGame(page, baseURL!, state)
+        await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+        await page.getByRole('button', { name: button }).click()
+        const choices = page.locator(`[data-guide-target="${popover}"]`)
+        await choices.getByRole('button', { name: choice }).waitFor()
+
+        const { popoverRight, feltInnerRight, popoverBottom, seamTop, choiceOnTop } = await page.evaluate(({ popover, choice }) => {
+          const box = document.querySelector(`[data-guide-target="${popover}"]`)!.getBoundingClientRect()
+          const felt = (document.querySelector('.frame-sidebar') ?? document.querySelector('main'))!.getBoundingClientRect()
+          const choiceButton = Array.from(document.querySelectorAll(`[data-guide-target="${popover}"] button`))
+            .find((element) => element.textContent?.trim() === choice)!
+          const choiceBox = choiceButton.getBoundingClientRect()
+          const topmost = document.elementFromPoint(choiceBox.left + choiceBox.width / 2, choiceBox.top + choiceBox.height / 2)
+          const seamTop = document.querySelector('footer')!.getBoundingClientRect().top - 2
+          return { popoverRight: box.right, feltInnerRight: felt.right - 2, popoverBottom: box.bottom, seamTop, choiceOnTop: !!topmost && choiceButton.contains(topmost) }
+        }, { popover, choice })
+
+        expect.soft(feltInnerRight - popoverRight, 'gap between the choices and the gold edge').toBeGreaterThanOrEqual(MIN_POPOVER_GAP)
+        expect.soft(seamTop - popoverBottom, 'gap between the choices and the bottom seam').toBeGreaterThanOrEqual(MIN_POPOVER_GAP)
+        expect.soft(choiceOnTop, `"${choice}" is in front of everything at its spot`).toBe(true)
       })
     }
   })

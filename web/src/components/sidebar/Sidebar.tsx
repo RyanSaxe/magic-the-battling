@@ -94,7 +94,7 @@ export function Sidebar({
         />
       )}
       {phaseContent ? (
-        <div className="flex flex-col flex-1 min-h-0 py-[2px]">
+        <div className={`flex flex-col flex-1 min-h-0 ${isMobile ? "py-[2px]" : ""}`}>
           <div className="overflow-y-auto overflow-x-hidden flex-1 min-h-0">
             {phaseContent}
           </div>
@@ -112,7 +112,7 @@ export function Sidebar({
       ) : (
         <div
           className={`relative z-50 px-3 overflow-auto flex-1 flex flex-col ${
-            isMobile && !hasOverlayPadding ? "py-3" : "py-0"
+            isMobile ? (hasOverlayPadding ? "py-0" : "py-3") : "pt-3"
           }`}
         >
           <PlayerList
