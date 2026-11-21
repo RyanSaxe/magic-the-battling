@@ -1,7 +1,8 @@
-import { useState, useCallback } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../../types'
 import { useFaceDown } from '../../contexts/faceDownState'
 import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../../utils/battleInteraction'
+import { clampMenuToViewport } from '../../utils/menuPosition'
 
 interface CardActionMenuProps {
   card: CardType
@@ -41,26 +42,29 @@ export function CardActionMenu({
   const isFaceDown = useFaceDown(card.id)
   const [submenu, setSubmenu] = useState<Submenu>('none')
 
-  const menuRef = useCallback((node: HTMLDivElement | null) => {
-    if (node) {
-      const rect = node.getBoundingClientRect()
-      const padding = 8
-      let x = position.x
-      let y = position.y
+  const menuRef = useRef<HTMLDivElement>(null)
 
-      if (position.x + rect.width > window.innerWidth) {
-        x = window.innerWidth - rect.width - padding
-      }
-      if (position.y + rect.height > window.innerHeight) {
-        y = window.innerHeight - rect.height - padding
-      }
-      x = Math.max(padding, x)
-      y = Math.max(padding, y)
+  // Opening a submenu makes the menu taller, so it is placed again whenever the submenu changes.
+  useLayoutEffect(() => {
+    const node = menuRef.current
+    if (!node) return
+    const rect = node.getBoundingClientRect()
+    const { x, y } = clampMenuToViewport(
+      position,
+      rect,
+      { width: window.innerWidth, height: window.innerHeight },
+    )
+    node.style.left = `${x}px`
+    node.style.top = `${y}px`
+  }, [position, submenu])
 
-      node.style.left = `${x}px`
-      node.style.top = `${y}px`
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
     }
-  }, [position])
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [onClose])
 
   const onBattlefield = zone === 'battlefield'
   const owner = isOpponent ? 'opponent' : 'player'
@@ -86,6 +90,8 @@ export function CardActionMenu({
     left: position.x,
     top: position.y,
     zIndex: 100,
+    maxHeight: 'calc(100vh - 16px)',
+    overflowY: 'auto',
   }
 
   return (

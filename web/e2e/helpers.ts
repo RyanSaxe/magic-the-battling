@@ -150,6 +150,7 @@ const SHARE_GAME: ShareGameResponse = {
     name,
     final_placement: index + 1,
     final_poison: index * 3,
+    final_treasures: null,
     is_puppet: index === 3,
     snapshots: SHARE_SNAPSHOTS,
   })),

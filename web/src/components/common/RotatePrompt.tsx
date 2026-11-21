@@ -1,6 +1,9 @@
 import { MdScreenRotation } from "react-icons/md";
+import { canHover } from "../../utils/inputMode";
 
 export function RotatePrompt() {
+  if (canHover) return null;
+
   return (
     <div className="rotate-prompt game-table fixed inset-0 z-[200] items-center justify-center p-4">
       <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-4 flex items-center gap-3">

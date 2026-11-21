@@ -917,6 +917,27 @@ input:-webkit-autofill:focus {
   touch-action: none;
 }
 
+/* An invisible tap area around a small control, 44px unless --touch-area-w/-h say otherwise.
+   --touch-area-left and --touch-area-top move it off centre, to keep it clear of a neighbour
+   or inside a clipping parent.
+   Only on touch screens (same query as utils/inputMode.ts), so mouse hover is unchanged.
+   z-index keeps later siblings from covering the area. */
+@media (hover: none) {
+  .touch-area {
+    position: relative;
+    z-index: 1;
+  }
+
+  .touch-area::before {
+    content: "";
+    position: absolute;
+    top: var(--touch-area-top, calc(50% - var(--touch-area-h, 44px) / 2));
+    left: var(--touch-area-left, calc(50% - var(--touch-area-w, 44px) / 2));
+    width: var(--touch-area-w, 44px);
+    height: var(--touch-area-h, 44px);
+  }
+}
+
 /* Hero page styles */
 .hero-title {
   font-family: 'Cinzel', serif;
@@ -1706,10 +1727,10 @@ input:-webkit-autofill:focus {
   display: none;
 }
 
-/* Phones in landscape leave too little height for the board. Tablets are taller than 500px in landscape, and
-   pointer: coarse keeps it off short desktop windows, which a width limit can't do without missing large phones
-   (932px and wider in landscape). */
-@media (orientation: landscape) and (max-height: 499px) and (pointer: coarse) {
+/* Phones in landscape leave too little height for the board. Tablets are taller than 500px in landscape.
+   RotatePrompt renders only on touch screens, which keeps it off short desktop windows; a width limit
+   couldn't do that without missing large phones (932px and wider in landscape). */
+@media (orientation: landscape) and (max-height: 499px) {
   .rotate-prompt {
     display: flex;
   }

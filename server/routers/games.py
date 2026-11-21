@@ -321,7 +321,7 @@ def join_game_by_code(request: JoinGameRequest, current_user: User | None = Depe
     if not pending:
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
-    if request.player_name in pending.player_names:
+    if pending.has_player_named(request.player_name):
         raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
     if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
         raise api_error(400, ErrorCode.LOBBY_FULL, "Lobby is full")
@@ -360,7 +360,7 @@ def join_game(game_id: str, request: JoinGameRequest, current_user: User | None 
     if pending.is_started:
         raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
 
-    if request.player_name in pending.player_names:
+    if pending.has_player_named(request.player_name):
         raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
     if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
         raise api_error(400, ErrorCode.LOBBY_FULL, "Lobby is full")
@@ -468,7 +468,7 @@ def get_game_cards(game_id: str, player_name: str | None = None):
 
 
 @router.post("/{game_id}/start", response_model=StartGameResponse)
-def start_game(game_id: str, db: Session = Depends(get_db)):  # noqa: B008
+def start_game(game_id: str, session_id: str | None = None, db: Session = Depends(get_db)):  # noqa: B008
     if ops_manager.blocks_new_games():
         raise _server_update_http_error("Server is updating. New games are temporarily blocked.")
 
@@ -476,11 +476,21 @@ def start_game(game_id: str, db: Session = Depends(get_db)):  # noqa: B008
     if not pending:
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
+    session = session_manager.get_session(session_id) if session_id else None
+    if not session:
+        raise api_error(401, ErrorCode.INVALID_SESSION, "Starting a game needs the host's session_id")
+    if session.player_id != pending.host_player_id:
+        raise api_error(403, ErrorCode.INVALID_REQUEST, "Only the host can start the game")
+
     if pending.is_started:
         raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
 
     if pending.target_player_count < 2:
         raise api_error(400, ErrorCode.INVALID_REQUEST, "Need at least 2 players to start")
+
+    can_start, reason = game_manager.can_start_game(game_id, session.player_id)
+    if not can_start:
+        raise api_error(400, ErrorCode.INVALID_REQUEST, reason or "Cannot start game")
 
     game = game_manager.start_game(game_id, db)
     if not game:
@@ -709,6 +719,34 @@ def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[Sha
     return snapshots
 
 
+def _final_treasures(history: PlayerGameHistory, snapshots: list[SharePlayerSnapshot]) -> int | None:
+    if history.final_poison is None:
+        return None
+    if history.is_puppet:
+        # Puppets replay builds from a past game, so battles never change their treasures.
+        return snapshots[-1].treasures if snapshots else 0
+    return cast(int, history.final_treasures)
+
+
+def build_share_player(history: PlayerGameHistory, db: Session) -> SharePlayerData:
+    is_puppet = bool(history.is_puppet)
+    snapshots = _build_puppet_snapshots(history, db) if is_puppet else _build_human_snapshots(history)
+
+    if history.final_poison is not None:
+        final_poison = cast(int, history.final_poison)
+    else:
+        final_poison = snapshots[-1].poison if snapshots else 0
+
+    return SharePlayerData(
+        name=str(history.player_name),
+        final_placement=cast(int, history.final_placement) if history.final_placement is not None else None,
+        final_poison=final_poison,
+        final_treasures=_final_treasures(history, snapshots),
+        is_puppet=is_puppet,
+        snapshots=snapshots,
+    )
+
+
 @router.get("/{game_id}/share/{player_name}", response_model=ShareGameResponse)
 def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)):  # noqa: B008
     game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
@@ -734,24 +772,7 @@ def get_share_game(game_id: str, player_name: str, db: Session = Depends(get_db)
     if not owner_exists:
         raise api_error(404, ErrorCode.PLAYER_NOT_IN_GAME, "Player not found in this game")
 
-    players: list[SharePlayerData] = []
-    for history in histories:
-        is_puppet = bool(history.is_puppet)
-        if is_puppet:
-            snapshots = _build_puppet_snapshots(history, db)
-        else:
-            snapshots = _build_human_snapshots(history)
-
-        final_poison = snapshots[-1].poison if snapshots else 0
-        players.append(
-            SharePlayerData(
-                name=str(history.player_name),
-                final_placement=cast(int, history.final_placement) if history.final_placement is not None else None,
-                final_poison=final_poison,
-                is_puppet=is_puppet,
-                snapshots=snapshots,
-            )
-        )
+    players = [build_share_player(history, db) for history in histories]
 
     created_at = game_record.created_at.isoformat() if game_record.created_at else ""
     cube_id = str(game_record.cube_id) if game_record.cube_id else config.get("cube_id")
