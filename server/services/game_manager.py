@@ -2102,8 +2102,13 @@ class GameManager:
             return "draft"
         return "unknown"
 
-    def _get_pairing_probabilities(self, game: Game, player: Player) -> dict[str, float]:
-        """Get pairing probabilities, with 100% for sudden death opponents."""
+    def _get_pairing_probabilities(self, game: Game, player: Player) -> dict[str, float] | None:
+        """Get pairing probabilities, with 100% for sudden death opponents.
+
+        None means the player has no next battle, so there are no odds to show.
+        """
+        if player.phase in ("eliminated", "winner", "game_over"):
+            return None
         if player.in_sudden_death:
             other_sd_player = self._find_sudden_death_opponent(game, player)
             if other_sd_player:
@@ -2142,7 +2147,7 @@ class GameManager:
         self,
         player: Player,
         viewer: Player,
-        probabilities: dict[str, float],
+        probabilities: dict[str, float] | None,
         most_recent_ghost_name: str | None = None,
     ) -> PlayerView:
         is_eliminated = player.phase == "eliminated"
@@ -2169,7 +2174,7 @@ class GameManager:
             chosen_basics=player.chosen_basics,
             most_recently_revealed_cards=cards_to_refs(player.most_recently_revealed_cards),
             last_result=self._get_last_result(player),
-            pairing_probability=probabilities.get(player.name, 0.0),
+            pairing_probability=None if probabilities is None else probabilities.get(player.name, 0.0),
             is_most_recent_ghost=player.name == most_recent_ghost_name,
             full_sideboard=cards_to_refs(player.sideboard) if is_eliminated else [],
             command_zone=cards_to_refs(player.command_zone),
@@ -2182,7 +2187,7 @@ class GameManager:
         self,
         fake: Puppet,
         viewer: Player,
-        probabilities: dict[str, float],
+        probabilities: dict[str, float] | None,
         most_recent_ghost_puppet_name: str | None = None,
     ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
@@ -2228,7 +2233,7 @@ class GameManager:
                 chosen_basics=snapshot.chosen_basics,
                 most_recently_revealed_cards=cards_to_refs(revealed_cards),
                 last_result=last_result,
-                pairing_probability=probabilities.get(fake.name, 0.0),
+                pairing_probability=None if probabilities is None else probabilities.get(fake.name, 0.0),
                 is_most_recent_ghost=fake.name == most_recent_ghost_puppet_name,
                 full_sideboard=cards_to_refs(snapshot.sideboard),
                 command_zone=cards_to_refs(snapshot.command_zone),
@@ -2255,7 +2260,7 @@ class GameManager:
             chosen_basics=[],
             most_recently_revealed_cards=[],
             last_result=last_result,
-            pairing_probability=probabilities.get(fake.name, 0.0),
+            pairing_probability=None if probabilities is None else probabilities.get(fake.name, 0.0),
             is_most_recent_ghost=fake.name == most_recent_ghost_puppet_name,
             full_sideboard=[],
             command_zone=[],

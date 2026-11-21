@@ -182,3 +182,47 @@ def test_init_db_adds_final_state_columns_to_an_existing_database(tmp_path, monk
         row = conn.execute(text("SELECT player_name, final_poison, final_treasures FROM player_game_history")).one()
     assert tuple(row) == ("Alice", None, None)
 
+
+def _odds_seen_by(game_id: str, viewer: str) -> dict[str, float | None]:
+    gm = ws_module.game_manager
+    player_id = gm.get_player_id_by_name(game_id, viewer)
+    assert player_id is not None
+    state = gm.get_game_state(game_id, player_id)
+    assert state is not None
+    return {p.name: p.pairing_probability for p in state.players if p.name != viewer}
+
+
+def test_eliminated_player_sees_no_next_opponent_odds(client):
+    game_id, game = _start_game(client, ["Alice", "Bob", "Carol", "Dave"])
+    gm = ws_module.game_manager
+    dave = next(p for p in game.players if p.name == "Dave")
+    dave.poison = 9
+
+    _ready_all(gm, game, game_id, game.players)
+    dave_opponent = next(
+        b.player if b.opponent.name == "Dave" else b.opponent
+        for b in game.active_battles
+        if "Dave" in (b.player.name, b.opponent.name)
+    )
+    for b in list(game.active_battles):
+        pair = [p for p in game.players if p.name in (b.player.name, b.opponent.name)]
+        _submit(gm, game, game_id, pair, dave_opponent.name if dave in pair else pair[0].name)
+    _finish_rewards(gm, game, game_id, game.players)
+
+    assert dave.phase == "eliminated"
+    assert set(_odds_seen_by(game_id, "Dave").values()) == {None}
+    assert None not in _odds_seen_by(game_id, "Alice").values()
+
+
+def test_no_next_opponent_odds_after_the_game_ends(client):
+    game_id, game = _start_game(client, ["Alice", "Bob"])
+    gm = ws_module.game_manager
+    alice, bob = game.players
+    bob.poison = 9
+
+    _ready_all(gm, game, game_id, [alice, bob])
+    _submit(gm, game, game_id, [alice, bob], "Alice")
+
+    assert alice.phase == "winner"
+    assert _odds_seen_by(game_id, "Alice") == {"Bob": None}
+    assert _odds_seen_by(game_id, "Bob") == {"Alice": None}

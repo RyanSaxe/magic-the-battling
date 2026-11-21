@@ -70,11 +70,7 @@ function ResultBadge({
   return <span className={`${baseClassName} text-red-300`}>L</span>;
 }
 
-function PairingProbability({ probability }: { probability: number | null }) {
-  if (probability === null) {
-    return <span className="text-[10px] text-gray-500">??%</span>;
-  }
-
+function PairingProbability({ probability }: { probability: number }) {
   return (
     <span className="text-[10px] text-cyan-300/90">
       {Math.round(probability * 100)}%
@@ -196,7 +192,7 @@ export function PlayerRow({
               You
             </span>
           )}
-          {showPairingProbability && (
+          {showPairingProbability && player.pairing_probability !== null && (
             <PairingProbability probability={player.pairing_probability} />
           )}
         </div>
