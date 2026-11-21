@@ -4,11 +4,20 @@ from typing import cast
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import OperationalError
 
 import server.db.database as db_module
 import server.routers.share_preview as share_preview_module
 import server.routers.ws as ws_module
-from mtb.models.game import Battle, BattleSnapshotData, Game, Player, StaticOpponent, restore_snapshot_data
+from mtb.models.game import (
+    Battle,
+    BattleSnapshotData,
+    Game,
+    Player,
+    Puppet,
+    StaticOpponent,
+    restore_snapshot_data,
+)
 from mtb.phases import reward
 from server.db.models import Base, BattleSnapshot, GameRecord, PlayerGameHistory
 from server.routers.share_preview import RATE_LIMIT_MAX, RATE_LIMIT_WINDOW, SlidingWindowRateLimiter
@@ -622,6 +631,60 @@ def test_a_puppet_from_a_game_with_sudden_death_plays_the_ordinary_build_of_that
 
     assert builds[2] != builds[None]
     assert puppet.snapshots["3_2"] == builds[None]
+
+
+def test_both_builds_of_a_sudden_death_fight_share_its_number_even_after_a_failed_save(
+    client, start_lobby, monkeypatch
+):
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob", "Carol", "Dave"])
+    gm = ws_module.game_manager
+    players = {p.name: p for p in game.players}
+    players["Dave"].poison = 9
+    _play_round(gm, game, game_id, lambda b: b.opponent.name if b.player.name == "Dave" else b.player.name)
+    players["Bob"].poison = 9
+    players["Carol"].poison = 9
+    _play_round(gm, game, game_id, _bob_and_carol_reach_lethal_while_alice_survives)
+    bob, carol = players["Bob"], players["Carol"]
+    record_snapshot = GameManager._record_snapshot
+    failed = []
+
+    def fail_bobs_first_sudden_death_build(self, db, game_id, player, battler_elo, **columns):
+        if player.name == "Bob" and columns.get("sudden_death_build") is not None and not failed:
+            failed.append(player.name)
+            raise OperationalError("INSERT", {}, Exception("database is locked"))
+        return record_snapshot(self, db, game_id, player, battler_elo, **columns)
+
+    monkeypatch.setattr(GameManager, "_record_snapshot", fail_bobs_first_sudden_death_build)
+    _ready_all(gm, game, game_id, [bob, carol])
+    _submit(gm, game, game_id, [bob, carol], "draw")
+    _ready_all(gm, game, game_id, [bob, carol])
+
+    builds = sorted((name, build) for name, _, _, build, _ in _sudden_death_rows(game_id) if build is not None)
+    assert failed == ["Bob"]
+    assert builds == [("Bob", 2), ("Carol", 1), ("Carol", 2)]
+
+
+def test_a_sudden_death_against_a_puppet_saves_the_players_build_and_starts_the_fight(client, start_lobby):
+    game_id, game = _start_game(client, start_lobby, ["Bob", "Carol"])
+    gm = ws_module.game_manager
+    _, carol = game.players
+    game.puppets.append(
+        Puppet(
+            name="Rook",
+            player_history_id=999,
+            snapshots={"3_1": StaticOpponent(name="Rook", hand=[])},
+            in_sudden_death=True,
+        )
+    )
+    carol.in_sudden_death = True
+    carol.poison = 9
+
+    _ready_all(gm, game, game_id, [carol])
+
+    assert [(b.player.name, b.opponent.name, b.is_sudden_death) for b in game.active_battles] == [
+        ("Carol", "Rook", True)
+    ]
+    assert ("Carol", 3, 1, 1, "Rook") in _sudden_death_rows(game_id)
 
 
 def test_a_sudden_death_build_that_cannot_be_saved_still_starts_the_fight(client, start_lobby):

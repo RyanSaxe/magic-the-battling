@@ -3120,29 +3120,26 @@ class GameManager:
             return
         # The share page is a record of the game, so a build that fails to save must never stop the fight.
         try:
+            # Both builds carry the fight's number, so one that failed to save earlier can't put them out of step.
+            fight_number = self._next_sudden_death_build(db, game_id, [player for player, _ in fighters])
             for player, opponent_name in fighters:
                 battler_elo = player.battler.elo if player.battler is not None else 1200.0
                 self._record_snapshot(
-                    db,
-                    game_id,
-                    player,
-                    battler_elo,
-                    opponent_name=opponent_name,
-                    sudden_death_build=self._next_sudden_death_build(db, game_id, player),
+                    db, game_id, player, battler_elo, opponent_name=opponent_name, sudden_death_build=fight_number
                 )
         except Exception:
             logger.exception("Could not save Sudden Death builds: game_id=%s", game_id)
             db.rollback()
 
-    def _next_sudden_death_build(self, db: Session, game_id: str, player: Player) -> int:
+    def _next_sudden_death_build(self, db: Session, game_id: str, fighters: list[Player]) -> int:
         previous = (
             db.query(func.max(BattleSnapshot.sudden_death_build))
             .join(PlayerGameHistory, BattleSnapshot.player_history_id == PlayerGameHistory.id)
             .filter(
                 PlayerGameHistory.game_id == game_id,
-                PlayerGameHistory.player_name == player.name,
-                BattleSnapshot.stage == player.stage,
-                BattleSnapshot.round == player.round,
+                PlayerGameHistory.player_name.in_([fighter.name for fighter in fighters]),
+                BattleSnapshot.stage == fighters[0].stage,
+                BattleSnapshot.round == fighters[0].round,
             )
             .scalar()
         )
