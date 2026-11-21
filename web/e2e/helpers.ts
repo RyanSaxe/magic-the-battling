@@ -262,7 +262,7 @@ export const PAGES: PageUnderTest[] = [
     name: 'battler',
     path: '/dashboard/list/1',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play', exact: true }),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play Preset' }),
   },
   {
     name: 'cube',

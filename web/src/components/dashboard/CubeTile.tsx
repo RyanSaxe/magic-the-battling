@@ -1,15 +1,9 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SurfaceCard } from '../common/SurfaceCard'
+import { BADGE_CLASSES, type CubeBadge } from './badges'
 import { MoreMenu, type MoreMenuItem } from './MoreMenu'
 
-export type CubeBadge = 'Cube' | 'Deck' | 'Following'
-
-const BADGE_CLASSES: Record<CubeBadge, string> = {
-  Cube: 'bg-amber-500/80 text-black',
-  Deck: 'bg-blue-600/80 text-white',
-  Following: 'bg-emerald-600/80 text-white',
-}
 
 export function Chip({ children }: { children: ReactNode }) {
   return (

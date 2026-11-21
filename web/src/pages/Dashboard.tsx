@@ -12,7 +12,7 @@ import { GameTile } from '../components/dashboard/GameTile'
 import { JoinCodeBox } from '../components/dashboard/JoinCodeBox'
 import { ResumeBanner } from '../components/dashboard/ResumeBanner'
 import { LoadMoreButton } from '../components/dashboard/ResultList'
-import { Count, NoticeTile, SectionCounts, SectionLink, SectionTitle, WinsCount } from '../components/dashboard/Section'
+import { Count, NoticeTile, PlayIcon, SectionCounts, SectionLink, SectionTitle, WinsCount } from '../components/dashboard/Section'
 import { SegmentedFilter } from '../components/dashboard/SegmentedFilter'
 import { deleteBattler, getBattlers, getFollowing, getMyGames, unfollowCube } from '../api/client'
 import { useResumableGames } from '../hooks/useResumableGames'
@@ -171,9 +171,7 @@ export function Dashboard() {
               onClick={() => navigate('/play')}
               className="btn btn-primary flex h-9 flex-1 items-center justify-center gap-2 !py-0 px-5 font-semibold sm:flex-none"
             >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M8 5v14l11-7z" />
-              </svg>
+              <PlayIcon />
               New Game
             </button>
             <JoinCodeBox playerName={user.username} className="hidden md:flex" />

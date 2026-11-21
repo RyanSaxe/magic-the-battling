@@ -394,12 +394,13 @@ export interface CubeGamesPage {
 
 export async function getBattlerGames(
   battlerId: number,
-  opts: { offset?: number; playMode?: string; useUpgrades?: boolean } = {},
+  opts: { offset?: number; playMode?: string; useUpgrades?: boolean; mineOnly?: boolean } = {},
 ): Promise<CubeGamesPage> {
   const params = new URLSearchParams()
   if (opts.offset) params.set('offset', String(opts.offset))
   if (opts.playMode != null) params.set('play_mode', opts.playMode)
   if (opts.useUpgrades != null) params.set('use_upgrades', String(opts.useUpgrades))
+  if (opts.mineOnly) params.set('mine_only', 'true')
   const qs = params.toString()
   const response = await fetch(`${API_BASE}/battlers/${battlerId}/games${qs ? `?${qs}` : ''}`, { credentials: 'include' })
   if (!response.ok) await throwResponseError(response, 'default', 'Failed to load games')

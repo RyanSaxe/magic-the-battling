@@ -1,13 +1,16 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
-import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
-import { CubeGameHistory } from '../components/CubeGameHistory'
+import { DetailHero } from '../components/dashboard/DetailHero'
+import { GameHistory, type LoadGames } from '../components/dashboard/GameHistory'
+import { HomeHeader } from '../components/dashboard/HomeHeader'
+import { Breadcrumb, PlayIcon } from '../components/dashboard/Section'
 import { getBattlers, getBattlerGames, updateBattler, deleteBattler } from '../api/client'
 import type { UserBattler, PlayMode } from '../types'
+import { countLabel, cubeTitle, modeLabel, winRate } from '../utils/accountFormat'
 import { unknownToAppError } from '../utils/appError'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
 
@@ -46,55 +49,91 @@ export function BattlerView() {
     return () => { cancelled = true }
   }, [user, listId, navigate, addToast])
 
-  const fetchGames = useCallback(async (_id: string, opts: { offset?: number; playMode?: string; useUpgrades?: boolean }) => {
-    if (!battler) throw new Error('No battler')
-    return getBattlerGames(battler.id, opts)
-  }, [battler])
-
-  const header = (
-    <AppHeader renderRight={({ compact }) => (
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => navigate('/dashboard')}
-          className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
-        >
-          Back
-        </button>
-        <UserMenuButton compact={compact} />
-      </div>
-    )} />
-  )
+  const battlerId = battler?.id
+  const loadGames = useCallback<LoadGames>((filters, offset) => {
+    if (battlerId === undefined) throw new Error('No battler')
+    return getBattlerGames(battlerId, {
+      offset,
+      playMode: filters.playMode ?? undefined,
+      useUpgrades: filters.useUpgrades ?? undefined,
+      mineOnly: filters.mineOnly,
+    })
+  }, [battlerId])
 
   if (authLoading || !user || loadingData || !battler) {
     return (
-      <PageFrame header={header} center contentClassName="items-center">
+      <PageFrame header={<HomeHeader />} center contentClassName="items-center">
         <p className="text-amber-200/70">Loading...</p>
       </PageFrame>
     )
   }
 
-  const cubeCobraUrl = `https://cubecobra.com/cube/overview/${encodeURIComponent(battler.cube_id)}`
+  const title = cubeTitle(battler)
+  const mode = modeLabel(battler.play_mode)
 
   return (
     <>
-      <PageFrame header={header} contentClassName="px-4">
-        <CubeGameHistory
-          cubeId={battler.cube_id}
-          cubeName={battler.cube_name ?? battler.display_name ?? null}
-          cubeImageUri={battler.cube_image_uri ?? null}
-          cubeCobraUrl={cubeCobraUrl}
-          defaultPlayMode={battler.play_mode}
-          defaultUpgrades={battler.use_upgrades}
-          loadGames={fetchGames}
-          actions={<>
-            <button onClick={() => setShowSettings(true)} className="btn btn-secondary py-1.5 px-3 text-sm">
-              Settings
-            </button>
-            <button onClick={() => navigate(battlerPlayUrl(battler))} className="btn btn-primary py-1.5 px-3 text-sm font-semibold">
-              Play
-            </button>
-          </>}
-        />
+      <PageFrame header={<HomeHeader />} contentClassName="px-4">
+        <div className="mx-auto flex w-full max-w-[1080px] min-[1600px]:max-w-[1400px] flex-col gap-3">
+          <Breadcrumb to="/dashboard" label="Cubes & Decks" current={title} />
+          <DetailHero
+            imageUri={battler.cube_image_uri}
+            badge={{ label: `Saved ${mode} Preset`, tone: mode }}
+            title={title}
+            links={<>
+              <span>
+                Source:{' '}
+                <a
+                  href={`https://cubecobra.com/cube/overview/${encodeURIComponent(battler.cube_id)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-400 hover:text-amber-300 transition-colors"
+                >
+                  {battler.cube_id} on CubeCobra ↗
+                </a>
+              </span>
+              <Link to={`/cube/${encodeURIComponent(battler.cube_id)}`} className="text-amber-400 hover:text-amber-300 transition-colors">
+                View Public Cube Page →
+              </Link>
+            </>}
+            chips={[
+              `Mode: ${mode === 'Deck' ? 'Deck (Constructed)' : 'Cube (Limited)'}`,
+              `Upgrades: ${battler.use_upgrades ? 'On' : 'Off'}`,
+              `Default Opponents: ${battler.puppet_count}`,
+              `Open Spectating: ${battler.auto_approve_spectators ? 'On' : 'Off'}`,
+            ]}
+            actions={<>
+              <button type="button" onClick={() => setShowSettings(true)} className="btn btn-secondary px-4 py-2 text-sm font-medium">
+                Edit Preset
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(battlerPlayUrl(battler))}
+                className="btn btn-primary flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold"
+              >
+                <PlayIcon />
+                Play Preset
+              </button>
+            </>}
+            stats={[
+              { label: 'Your Games', value: battler.my_game_count },
+              {
+                label: 'Your Wins',
+                value: battler.my_win_count,
+                detail: battler.my_game_count > 0 ? `(${winRate(battler.my_win_count, battler.my_game_count)})` : undefined,
+              },
+              { label: 'Avg Finish', value: battler.my_average_placement?.toFixed(1) ?? '—' },
+              { label: 'All Cube Games', value: battler.game_count, detail: countLabel(battler.human_player_count, 'player') },
+            ]}
+            caption={`Your games, wins and finish count your finished games on this cube in ${mode} mode with upgrades ${battler.use_upgrades ? 'on' : 'off'}.`}
+          />
+          <GameHistory
+            key={`${battler.play_mode}-${battler.use_upgrades}`}
+            scoped
+            loadGames={loadGames}
+            initialFilters={{ playMode: battler.play_mode, useUpgrades: battler.use_upgrades, mineOnly: true }}
+          />
+        </div>
       </PageFrame>
 
       {showSettings && (

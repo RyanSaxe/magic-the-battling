@@ -73,3 +73,24 @@ export function NoticeTile({
     </SurfaceCard>
   )
 }
+
+/** The way back to the list a page was opened from, and the page's own name. */
+export function Breadcrumb({ to, label, current }: { to: string; label: string; current: string }) {
+  return (
+    <nav aria-label="Breadcrumb" className="flex min-w-0 items-baseline gap-2 text-xs">
+      <Link to={to} className="shrink-0 text-amber-400 hover:text-amber-300 transition-colors">
+        ← {label}
+      </Link>
+      <span className="text-gray-500">/</span>
+      <span className="truncate text-gray-400">{current}</span>
+    </nav>
+  )
+}
+
+export function PlayIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  )
+}
