@@ -5,8 +5,8 @@ from typing import cast
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import case, distinct, func
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, case, distinct, func, or_
+from sqlalchemy.orm import Session, aliased
 
 from mtb.models.types import normalize_play_mode
 from server.db import database
@@ -19,6 +19,7 @@ from server.db.models import (
     User,
     UserBattler,
 )
+from server.db.search import contains_text
 from server.errors import ErrorCode, api_error
 from server.schemas.auth import (
     CubeSetup,
@@ -445,18 +446,54 @@ def list_battler_games(
     )
 
 
+def _my_game_matches(db: Session, user_id: str, search: str):
+    """Whether a game of the player's matches the search: its cube's name or id, the name of one of the
+    player's presets with the game's cube and settings, or the name of another player in the game."""
+    other_seat = aliased(PlayerGameHistory)
+    named_cube = (
+        db.query(CubeMetadata.cube_id)
+        .filter(CubeMetadata.cube_id == GameRecord.cube_id, contains_text(CubeMetadata.name, search))
+        .correlate(GameRecord)
+        .exists()
+    )
+    named_opponent = (
+        db.query(other_seat.id)
+        .filter(
+            other_seat.game_id == GameRecord.id,
+            other_seat.id != PlayerGameHistory.id,
+            contains_text(other_seat.player_name, search),
+        )
+        .correlate(GameRecord, PlayerGameHistory)
+        .exists()
+    )
+    named_presets = (
+        db.query(UserBattler)
+        .filter(UserBattler.user_id == user_id, contains_text(UserBattler.display_name, search))
+        .all()
+    )
+    preset_games = [
+        and_(GameRecord.cube_id == cube_id, _game_play_mode() == play_mode, _game_uses_upgrades() == use_upgrades)
+        for cube_id, play_mode, use_upgrades in {_preset_settings(preset) for preset in named_presets}
+    ]
+    return or_(contains_text(GameRecord.cube_id, search), named_cube, named_opponent, *preset_games)
+
+
 @router.get("/my-games")
 def list_my_games(
     offset: int = Query(default=0, ge=0),
+    q: str = Query(default="", max_length=100),
     user: User = Depends(get_current_user),
     db: Session = Depends(_get_db),
 ):
+    """The player's finished games, newest first, or with q, those it matches. The totals count the same games."""
     user_filter = [
         PlayerGameHistory.user_id == str(user.id),
         PlayerGameHistory.is_puppet.is_(False),
         PlayerGameHistory.final_placement.isnot(None),
         GameRecord.ended_at.isnot(None),
     ]
+    if search := q.strip():
+        user_filter.append(_my_game_matches(db, str(user.id), search))
     total_games = (
         db.query(func.count(PlayerGameHistory.id))
         .join(GameRecord, GameRecord.id == PlayerGameHistory.game_id)

@@ -1,4 +1,4 @@
-"""Saved presets, a cube's game list and its summary, as the dashboard and cube pages read them."""
+"""Saved presets, game lists, cube summaries and searches, as the dashboard and cube pages read them."""
 
 import json
 from dataclasses import dataclass
@@ -284,3 +284,97 @@ class TestCubeSummary:
 
         assert (summary["is_following"], summary["follow_id"]) == (True, follow["id"])
         assert (signed_out["is_following"], signed_out["follow_id"]) == (False, None)
+
+
+def _add_cube_name(cube_id: str, name: str) -> None:
+    db = database.SessionLocal()
+    try:
+        db.add(CubeMetadata(cube_id=cube_id, name=name))
+        db.commit()
+    finally:
+        db.close()
+
+
+def _discover(client, **params) -> dict:
+    response = client.get("/api/discover", params=params)
+    assert response.status_code == 200
+    return response.json()
+
+
+class TestCubeSearch:
+    def test_finds_cubes_by_name_or_id_ignoring_case(self, client, vintage_cube):
+        _add_cube_name("thepaupercube", "The Pauper Cube")
+        for day, cube_id in enumerate(("vintage", "thepaupercube", "legacy"), start=10):
+            _add_game(f"game-{cube_id}", cube_id=cube_id, played_on=_day(day), seats=[Seat("rook", 1)])
+
+        def found(q: str) -> list[str]:
+            return sorted(r["cube_id"] for r in _discover(client, q=q)["results"])
+
+        assert found("pauper") == ["thepaupercube"]
+        assert found("LEG") == ["legacy"]
+        assert found("cube") == ["thepaupercube", "vintage"]
+        assert found("  ") == ["legacy", "thepaupercube", "vintage"]
+
+    def test_pages_and_counts_only_the_matches(self, client):
+        for i in range(25):
+            _add_game(f"pod-game-{i}", cube_id=f"pod-{i}", played_on=_day(1 + i % 20), seats=[Seat("rook", 1)])
+        _add_game("other-game", cube_id="vintage", played_on=_day(1), seats=[Seat("rook", 1)])
+
+        first = _discover(client, q="pod")
+        rest = _discover(client, q="pod", offset=20)
+
+        assert (len(first["results"]), first["has_more"], first["total"]) == (20, True, 25)
+        assert (len(rest["results"]), rest["has_more"]) == (5, False)
+
+    def test_wildcards_in_the_search_match_only_themselves(self, client):
+        _add_game("underscore", cube_id="a_b", played_on=_day(1), seats=[Seat("rook", 1)])
+        _add_game("letter", cube_id="axb", played_on=_day(2), seats=[Seat("rook", 1)])
+
+        assert [r["cube_id"] for r in _discover(client, q="a_b")["results"]] == ["a_b"]
+        assert _discover(client, q="%")["results"] == []
+
+
+class TestGameSearch:
+    @pytest.fixture
+    def kestrels_games(self, client, vintage_cube, kestrel):
+        _add_game(
+            "limited",
+            cube_id="vintage",
+            played_on=_day(10),
+            seats=[Seat("kestrel", 1, kestrel), Seat("rook", 2)],
+        )
+        _add_game(
+            "constructed",
+            cube_id="vintage",
+            config={"play_mode": "constructed", "use_upgrades": True},
+            played_on=_day(11),
+            seats=[Seat("kestrel", 2, kestrel), Seat("wren", 1)],
+        )
+        _add_game(
+            "legacy",
+            cube_id="legacy",
+            played_on=_day(12),
+            seats=[Seat("kestrel", 1, kestrel), Seat("Puppet A", 2, is_puppet=True)],
+        )
+        _save_preset(client, display_name="Friday Vintage", play_mode="limited", use_upgrades=True)
+
+    def _search(self, client, q: str) -> tuple[list[str], int, int]:
+        data = client.get("/api/battlers/my-games", params={"q": q}).json()
+        return [g["game_id"] for g in data["games"]], data["total_games"], data["total_wins"]
+
+    def test_finds_games_by_another_players_name(self, client, kestrels_games):
+        assert self._search(client, "ROOK") == (["limited"], 1, 1)
+        assert self._search(client, "puppet a") == (["legacy"], 1, 1)
+
+    def test_does_not_match_the_players_own_name(self, client, kestrels_games):
+        assert self._search(client, "kestrel") == ([], 0, 0)
+
+    def test_finds_games_by_cube_name_or_id(self, client, kestrels_games):
+        assert self._search(client, "vintage cube") == (["constructed", "limited"], 2, 1)
+        assert self._search(client, "legacy") == (["legacy"], 1, 1)
+
+    def test_finds_the_games_a_preset_name_stands_for(self, client, kestrels_games):
+        assert self._search(client, "friday") == (["limited"], 1, 1)
+
+    def test_an_empty_search_lists_every_game(self, client, kestrels_games):
+        assert self._search(client, "") == (["legacy", "constructed", "limited"], 3, 2)

@@ -2,11 +2,12 @@
 import logging
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import distinct, func
+from sqlalchemy import distinct, func, or_
 from sqlalchemy.orm import Session
 
 from server.db import database
 from server.db.models import BattlerFollow, CubeMetadata, GameRecord, PlayerGameHistory, User
+from server.db.search import contains_text
 from server.services.auth import get_optional_user
 
 logger = logging.getLogger(__name__)
@@ -29,9 +30,11 @@ PAGE_SIZE = 20
 @router.get("")
 def browse_cubes(
     offset: int = Query(default=0, ge=0),
+    q: str = Query(default="", max_length=100),
     current_user: User | None = Depends(get_optional_user),
     db: Session = Depends(_get_db),
 ):
+    """The most played cubes, or with q, those whose name or CubeCobra id contains it."""
     base = (
         db.query(
             GameRecord.cube_id,
@@ -47,10 +50,14 @@ def browse_cubes(
             PlayerGameHistory.final_placement.isnot(None),
         )
         .group_by(GameRecord.cube_id)
-        .order_by(func.count(distinct(GameRecord.id)).desc())
     )
+    if search := q.strip():
+        base = base.outerjoin(CubeMetadata, CubeMetadata.cube_id == GameRecord.cube_id).filter(
+            or_(contains_text(GameRecord.cube_id, search), contains_text(CubeMetadata.name, search))
+        )
+    total = db.query(func.count()).select_from(base.subquery()).scalar() or 0
 
-    rows = base.offset(offset).limit(PAGE_SIZE + 1).all()
+    rows = base.order_by(func.count(distinct(GameRecord.id)).desc()).offset(offset).limit(PAGE_SIZE + 1).all()
     has_more = len(rows) > PAGE_SIZE
     rows = rows[:PAGE_SIZE]
 
@@ -79,4 +86,4 @@ def browse_cubes(
             }
         )
 
-    return {"results": results, "has_more": has_more}
+    return {"results": results, "has_more": has_more, "total": total}
