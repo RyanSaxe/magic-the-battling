@@ -1,6 +1,9 @@
+import asyncio
 import logging
 from collections import defaultdict
+from collections.abc import Coroutine
 from time import perf_counter
+from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -72,6 +75,9 @@ class ConnectionManager:
         self._connections: dict[str, dict[str, WebSocket]] = defaultdict(dict)
         self._pending_connections: dict[str, set[str]] = defaultdict(set)
         self._spectators: dict[str, dict[str, list[WebSocket]]] = defaultdict(lambda: defaultdict(list))
+        self._background_tasks: set[asyncio.Task] = set()
+        # Compressing a message yields, so without this an older list of requests could reach a player last.
+        self._spectate_requests_lock = asyncio.Lock()
 
     def reserve_connection(self, game_id: str, player_id: str):
         self._pending_connections[game_id].add(player_id)
@@ -174,6 +180,30 @@ class ConnectionManager:
             self._spectators[game_id][target_player_id] = [
                 ws for ws in self._spectators[game_id][target_player_id] if ws != websocket
             ]
+
+    async def send_spectate_requests(self, game_id: str, target_player_name: str) -> None:
+        """Send a player every request still waiting on their answer, oldest first."""
+        async with self._spectate_requests_lock:
+            target_player_id = game_manager.get_player_id_by_name(game_id, target_player_name)
+            if target_player_id is None:
+                return
+            requests = game_manager.pending_spectate_requests(game_id, target_player_name)
+            payload = {"requests": [{"request_id": r.request_id, "spectator_name": r.spectator_name} for r in requests]}
+            await self.send_to_player(game_id, target_player_id, {"type": "spectate_requests", "payload": payload})
+
+    def spectate_requests_changed(self, game_id: str, target_player_name: str) -> None:
+        self._run_soon(self.send_spectate_requests(game_id, target_player_name))
+
+    def _run_soon(self, work: Coroutine[Any, Any, None]) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # A manager used outside the server's event loop (rules tests) has no sockets to tell.
+            work.close()
+            return
+        task = loop.create_task(work)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
 
     async def send_to_player(self, game_id: str, player_id: str, message: dict):
         if game_id in self._connections and player_id in self._connections[game_id]:
@@ -343,12 +373,13 @@ async def _close_replaced_socket(websocket: WebSocket) -> None:
 
 connection_manager = ConnectionManager()
 game_manager.attach_connected_player_ids(connection_manager.get_connected_player_ids)
+game_manager.attach_spectate_listener(connection_manager)
 
 
 async def _handle_spectator_connection(
     websocket: WebSocket, game_id: str, session_id: str, spectate_player: str, request_id: str
 ) -> bool:
-    if not game_manager.is_spectator_approved(
+    if not game_manager.admit_spectator(
         request_id, session_id=session_id, game_id=game_id, target_player_name=spectate_player
     ):
         await _reject_websocket(
@@ -480,6 +511,11 @@ async def _send_initial_player_state(
                     "payload": bootstrap.model_dump(),
                 },
             )
+
+    # Each connection starts with no requests on the client, so only waiting ones need sending.
+    player_name = game_manager.get_player_name(player_id)
+    if player_name is not None and game_manager.pending_spectate_requests(game_id, player_name):
+        await connection_manager.send_spectate_requests(game_id, player_name)
 
     notice = ops_manager.notice_payload()
     if notice.get("mode") != "normal":

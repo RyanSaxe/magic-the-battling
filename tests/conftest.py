@@ -195,6 +195,7 @@ def _install_runtime_state(
 
     ws_module.connection_manager = connection_manager
     game_manager.attach_connected_player_ids(connection_manager.get_connected_player_ids)
+    game_manager.attach_spectate_listener(connection_manager)
     games_module.connection_manager = connection_manager
     ops_module.connection_manager = connection_manager
     monitoring_module.connection_manager = connection_manager

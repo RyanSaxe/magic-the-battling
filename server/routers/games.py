@@ -39,6 +39,7 @@ from server.services.ops_manager import ops_manager
 from server.services.seat_tokens import SeatClaimRefusal, SeatClaimRefusedError
 from server.services.session_manager import session_manager
 from server.services.share import build_share_data
+from server.services.spectate_requests import SpectateRequest, TooManySpectateRequestsError
 
 logger = logging.getLogger(__name__)
 
@@ -595,40 +596,33 @@ async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
         raise api_error(404, ErrorCode.SPECTATE_TARGET_NOT_FOUND, "Target player not found")
 
     try:
-        request_id = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
-    except ValueError as exc:
+        spectate_request = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
+    except TooManySpectateRequestsError as exc:
         raise api_error(429, ErrorCode.INVALID_REQUEST, str(exc)) from exc
 
-    auto_approve = (pending and pending.auto_approve_spectators) or (game and game.config.auto_approve_spectators)
-    if not auto_approve:
-        target_player_id = game_manager.get_player_id_by_name(game_id, target_name)
-        if target_player_id:
-            await connection_manager.send_to_player(
-                game_id,
-                target_player_id,
-                {
-                    "type": "spectate_request",
-                    "payload": {
-                        "request_id": request_id,
-                        "spectator_name": request.spectator_name,
-                    },
-                },
-            )
+    return SpectateRequestResponse(request_id=spectate_request.request_id)
 
-    return SpectateRequestResponse(request_id=request_id)
+
+def _spectate_status(spectate_request: SpectateRequest | None) -> SpectateRequestStatus:
+    if spectate_request is None:
+        raise api_error(404, ErrorCode.SPECTATE_REQUEST_NOT_FOUND, "Spectate request not found")
+    return SpectateRequestStatus(
+        status=spectate_request.status,
+        session_id=spectate_request.session_id,
+        player_id=spectate_request.player_id,
+    )
 
 
 @router.get("/{game_id}/spectate-request/{request_id}", response_model=SpectateRequestStatus)
 def get_spectate_request_status(game_id: str, request_id: str):
-    req = game_manager.get_spectate_request(request_id)
-    if not req or req.game_id != game_id:
-        raise api_error(404, ErrorCode.SPECTATE_REQUEST_NOT_FOUND, "Spectate request not found")
+    return _spectate_status(game_manager.get_spectate_request(game_id, request_id))
 
-    return SpectateRequestStatus(
-        status=req.status,
-        session_id=req.session_id,
-        player_id=req.player_id,
-    )
+
+@router.delete("/{game_id}/spectate-request/{request_id}", response_model=SpectateRequestStatus)
+async def cancel_spectate_request(game_id: str, request_id: str):
+    """Withdraw a request still waiting for an answer. Returns the request's status, which is cancelled unless the
+    request was already answered or had expired."""
+    return _spectate_status(game_manager.cancel_spectate_request(game_id, request_id))
 
 
 @router.get("/{game_id}/share/{player_name}", response_model=ShareGameResponse)
