@@ -29,10 +29,10 @@ def _lobby_player(client, game_id: str, name: str) -> dict:
 
 
 def test_a_failing_action_answers_with_an_error_and_keeps_the_socket(
-    client, game_with_players, ws_receive_json, monkeypatch
+    start_lobby, client, game_with_players, ws_receive_json, monkeypatch
 ):
     game_id = game_with_players["game_id"]
-    client.post(f"/api/games/{game_id}/start")
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
 
     with client.websocket_connect(_player_url(game_id, game_with_players["alice"])) as ws:
         assert ws_receive_json(ws)["type"] == "game_bootstrap"
@@ -46,10 +46,10 @@ def test_a_failing_action_answers_with_an_error_and_keeps_the_socket(
 
 
 def test_a_second_socket_for_the_same_session_replaces_the_first(
-    client, game_with_players, ws_receive_json, monkeypatch
+    start_lobby, client, game_with_players, ws_receive_json, monkeypatch
 ):
     game_id = game_with_players["game_id"]
-    client.post(f"/api/games/{game_id}/start")
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
     url = _player_url(game_id, game_with_players["alice"])
 
     with client.websocket_connect(url) as first:
@@ -83,13 +83,13 @@ def test_a_late_close_from_a_replaced_socket_keeps_the_lobby_player_ready(client
         assert alice["is_ready"] is True
 
 
-def test_a_session_from_another_game_cannot_play_a_same_named_seat(client, ws_receive_json):
+def test_a_session_from_another_game_cannot_play_a_same_named_seat(start_lobby, client, ws_receive_json):
     def started_game() -> dict:
         host = client.post(
             "/api/games", json={"player_name": "Tester", "cube_id": "test", "target_player_count": 2}
         ).json()
         client.post("/api/games/join", json={"join_code": host["join_code"], "player_name": "Friend"})
-        client.post(f"/api/games/{host['game_id']}/start")
+        assert start_lobby(host["game_id"], host["session_id"]).status_code == 200
         return host
 
     game_a, game_b = started_game(), started_game()

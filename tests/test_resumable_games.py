@@ -20,9 +20,9 @@ def test_lists_a_lobby_seat_only_with_its_token(client, game_with_players):
     assert wrong == []
 
 
-def test_lists_a_running_game_with_its_last_activity(client, game_with_players):
+def test_lists_a_running_game_with_its_last_activity(start_lobby, client, game_with_players):
     game_id = game_with_players["game_id"]
-    client.post(f"/api/games/{game_id}/start")
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
 
     [listed] = _resumable(client, (game_id, "Bob", game_with_players["bob"]["seat_token"]))
 
@@ -30,9 +30,9 @@ def test_lists_a_running_game_with_its_last_activity(client, game_with_players):
     assert listed["last_active_at"] is not None
 
 
-def test_lists_a_paused_game_without_loading_it(client, game_with_players):
+def test_lists_a_paused_game_without_loading_it(start_lobby, client, game_with_players):
     game_id = game_with_players["game_id"]
-    client.post(f"/api/games/{game_id}/start")
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
     game_manager = ws_module.game_manager
     game_manager.mark_game_dirty(game_id)
     game_manager.persist_dirty_games()
@@ -44,9 +44,9 @@ def test_lists_a_paused_game_without_loading_it(client, game_with_players):
     assert game_manager.get_game(game_id) is None
 
 
-def test_leaves_out_missing_games_and_finished_seats(client, game_with_players):
+def test_leaves_out_missing_games_and_finished_seats(start_lobby, client, game_with_players):
     game_id = game_with_players["game_id"]
-    client.post(f"/api/games/{game_id}/start")
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
     game = ws_module.game_manager.get_game(game_id)
     assert game is not None
     next(p for p in game.players if p.name == "Bob").phase = "eliminated"

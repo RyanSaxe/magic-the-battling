@@ -14,9 +14,9 @@ def _rejoin(client, game_id: str, name: str, seat_token: str | None = None):
     return client.post(f"/api/games/{game_id}/rejoin", json={"player_name": name, "seat_token": seat_token})
 
 
-def _started(client, game_with_players) -> str:
+def _started(start_lobby, game_with_players) -> str:
     game_id = game_with_players["game_id"]
-    assert client.post(f"/api/games/{game_id}/start").status_code == 200
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
     return game_id
 
 
@@ -31,8 +31,8 @@ def test_create_and_join_return_a_seat_token(game_with_players):
     assert game_with_players["alice"]["seat_token"] != game_with_players["bob"]["seat_token"]
 
 
-def test_knowing_the_game_id_and_a_name_is_not_enough_to_take_a_seat(client, game_with_players):
-    game_id = _started(client, game_with_players)
+def test_knowing_the_game_id_and_a_name_is_not_enough_to_take_a_seat(start_lobby, client, game_with_players):
+    game_id = _started(start_lobby, game_with_players)
     stranger = TestClient(app)
 
     missing = _rejoin(stranger, game_id, "Alice")
@@ -44,8 +44,8 @@ def test_knowing_the_game_id_and_a_name_is_not_enough_to_take_a_seat(client, gam
     assert _seat_owner_name(client, game_id, game_with_players["alice"]["session_id"]) == "Alice"
 
 
-def test_the_seat_token_takes_the_seat_back_and_keeps_working(client, game_with_players):
-    game_id = _started(client, game_with_players)
+def test_the_seat_token_takes_the_seat_back_and_keeps_working(start_lobby, client, game_with_players):
+    game_id = _started(start_lobby, game_with_players)
     seat_token = game_with_players["alice"]["seat_token"]
 
     reclaimed = _rejoin(client, game_id, "Alice", seat_token)
@@ -112,8 +112,8 @@ def test_an_unknown_game_answers_game_not_found(client):
     assert response.json()["code"] == "GAME_NOT_FOUND"
 
 
-def test_the_seat_token_survives_a_server_restart(client, game_with_players):
-    game_id = _started(client, game_with_players)
+def test_the_seat_token_survives_a_server_restart(start_lobby, client, game_with_players):
+    game_id = _started(start_lobby, game_with_players)
     game_manager = ws_module.game_manager
     game_manager.mark_game_dirty(game_id)
     game_manager.persist_dirty_games()
@@ -127,8 +127,8 @@ def test_the_seat_token_survives_a_server_restart(client, game_with_players):
     assert _seat_owner_name(client, game_id, reclaimed.json()["session_id"]) == "Alice"
 
 
-def test_a_seat_from_before_seat_tokens_is_claimed_once_by_name(client, game_with_players):
-    game_id = _started(client, game_with_players)
+def test_a_seat_from_before_seat_tokens_is_claimed_once_by_name(start_lobby, client, game_with_players):
+    game_id = _started(start_lobby, game_with_players)
     db = database.SessionLocal()
     try:
         db.query(GamePlayerRecord).filter(GamePlayerRecord.game_id == game_id).update({"seat_token_hash": None})
@@ -145,7 +145,7 @@ def test_a_seat_from_before_seat_tokens_is_claimed_once_by_name(client, game_wit
 
 
 @pytest.mark.parametrize("started", [False, True])
-def test_an_account_seat_needs_the_account_or_the_token(client, started):
+def test_an_account_seat_needs_the_account_or_the_token(start_lobby, client, started):
     client.post(
         "/api/auth/register",
         json={"username": "seat_owner", "password": "password123", "email": "seat_owner@test.com"},
@@ -156,7 +156,7 @@ def test_an_account_seat_needs_the_account_or_the_token(client, started):
     client.post("/api/games/join", json={"join_code": created["join_code"], "player_name": "Bob"})
     game_id = created["game_id"]
     if started:
-        client.post(f"/api/games/{game_id}/start")
+        assert start_lobby(game_id, created["session_id"]).status_code == 200
     logged_out = TestClient(app)
 
     without_login = _rejoin(logged_out, game_id, "seat_owner")
@@ -173,9 +173,9 @@ def test_an_account_seat_needs_the_account_or_the_token(client, started):
 
 @pytest.mark.parametrize("started", [False, True])
 def test_the_reclaimed_session_replaces_the_socket_that_held_the_seat(
-    client, game_with_players, ws_receive_json, started
+    start_lobby, client, game_with_players, ws_receive_json, started
 ):
-    game_id = _started(client, game_with_players) if started else game_with_players["game_id"]
+    game_id = _started(start_lobby, game_with_players) if started else game_with_players["game_id"]
     alice = game_with_players["alice"]
     expected = "game_bootstrap" if started else "lobby_state"
 
@@ -191,14 +191,16 @@ def test_the_reclaimed_session_replaces_the_socket_that_held_the_seat(
             assert closed.value.code == 4006
 
 
-def test_a_spectator_keeps_following_a_seat_that_was_taken_back(client, ws_receive_json, ws_receive_json_until):
+def test_a_spectator_keeps_following_a_seat_that_was_taken_back(
+    start_lobby, client, ws_receive_json, ws_receive_json_until
+):
     created = client.post(
         "/api/games",
         json={"player_name": "Alice", "cube_id": "test", "target_player_count": 2, "auto_approve_spectators": True},
     ).json()
     client.post("/api/games/join", json={"join_code": created["join_code"], "player_name": "Bob"})
     game_id = created["game_id"]
-    client.post(f"/api/games/{game_id}/start")
+    assert start_lobby(game_id, created["session_id"]).status_code == 200
     request_id = client.post(
         f"/api/games/{game_id}/spectate-request", json={"target_player_name": "Alice", "spectator_name": "Viewer"}
     ).json()["request_id"]
