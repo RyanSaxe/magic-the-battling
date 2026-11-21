@@ -50,7 +50,7 @@ const SIGNED_OUT_RESPONSES: Record<string, MockResponse> = {
 
 const USER: AuthUser = { user_id: 'user-1', username: 'tester' }
 
-function battler(id: number, cubeId: string, name: string): UserBattler {
+export function battler(id: number, cubeId: string, name: string): UserBattler {
   return {
     id,
     cube_id: cubeId,
@@ -69,6 +69,10 @@ function battler(id: number, cubeId: string, name: string): UserBattler {
     game_count: 12,
     human_player_count: 5,
     last_played: '2026-01-02T00:00:00Z',
+    my_game_count: 4,
+    my_win_count: 1,
+    my_average_placement: 2.25,
+    my_last_played: '2026-01-02T00:00:00Z',
   }
 }
 
@@ -88,7 +92,7 @@ const FOLLOWING: FollowedBattler[] = [
   },
 ]
 
-function gameSummary(index: number): GameSummary {
+export function gameSummary(index: number): GameSummary {
   return {
     game_id: `game-${index}`,
     created_at: '2026-01-02T00:00:00Z',
@@ -113,7 +117,7 @@ const SIGNED_IN_RESPONSES: Record<string, MockResponse> = {
   '/api/battlers': { json: { battlers: BATTLERS, has_more: false } },
   '/api/battlers/following': { json: { following: FOLLOWING, has_more: false } },
   '/api/battlers/my-games': { json: GAMES },
-  '/api/discover': { json: { results: [], has_more: false } },
+  '/api/discover': { json: { results: [], has_more: false, total: 0 } },
   '/api/battlers/1/games': { json: GAMES },
   '/api/battlers/cube/vintage-cube/games': { json: GAMES },
 }
@@ -155,6 +159,7 @@ function shareSnapshot(stage: number, round: number): SharePlayerSnapshot {
     treasures: 2,
     poison: round,
     vanguard: null,
+    visibility: 'full',
   }
 }
 
@@ -166,6 +171,7 @@ const SHARE_GAME: ShareGameResponse = {
   created_at: '2026-01-02T00:00:00Z',
   use_upgrades: true,
   cube_id: 'vintage-cube',
+  in_progress: false,
   players: ['Alice', 'Bob', 'Carol', 'Dave'].map((name, index) => ({
     name,
     final_placement: index + 1,
@@ -213,6 +219,37 @@ export async function serveShareGame(page: Page, baseURL: string) {
   await serveFromTable(page, baseURL, {
     ...SIGNED_OUT_RESPONSES,
     [`/api/games/${SHARE_GAME_ID}/share/Alice`]: { json: SHARE_GAME },
+  })
+}
+
+// Dave went out first and shares while the others play on, so their rounds show only poison and treasures.
+const SHARE_MID_GAME: ShareGameResponse = {
+  ...SHARE_GAME,
+  owner_name: 'Dave',
+  in_progress: true,
+  players: SHARE_GAME.players.map((player) => ({
+    ...player,
+    final_placement: player.name === 'Dave' ? 4 : null,
+    snapshots: player.name === 'Dave'
+      ? SHARE_SNAPSHOTS
+      : SHARE_SNAPSHOTS.map((snapshot) => ({ ...snapshot, basic_lands: [], visibility: 'hidden' as const })),
+  })),
+}
+
+export async function serveShareMidGame(page: Page, baseURL: string) {
+  await serveFromTable(page, baseURL, {
+    ...SIGNED_OUT_RESPONSES,
+    [`/api/games/${SHARE_GAME_ID}/share/Dave`]: { json: SHARE_MID_GAME },
+  })
+}
+
+export async function serveShareInProgress(page: Page, baseURL: string) {
+  await serveFromTable(page, baseURL, {
+    ...SIGNED_OUT_RESPONSES,
+    [`/api/games/${SHARE_GAME_ID}/share/Bob`]: {
+      status: 404,
+      json: { detail: 'This game is still being played', code: 'GAME_IN_PROGRESS' },
+    },
   })
 }
 
@@ -295,7 +332,19 @@ export const PAGES: PageUnderTest[] = [
     name: 'dashboard',
     path: '/dashboard',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('button', { name: '+ Add Cube' }),
+    primaryAction: (page) => page.getByRole('button', { name: 'New Game' }),
+  },
+  {
+    name: 'games',
+    path: '/dashboard/games',
+    serve: serveSignedIn,
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search games' }),
+  },
+  {
+    name: 'discover',
+    path: '/dashboard/discover',
+    serve: serveSignedIn,
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search cubes' }),
   },
   {
     name: 'battler',
@@ -321,6 +370,19 @@ export const PAGES: PageUnderTest[] = [
     serve: serveShareGame,
     primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
     fillsFelt: true,
+  },
+  {
+    name: 'share mid-game',
+    path: `/game/${SHARE_GAME_ID}/share/Dave`,
+    serve: serveShareMidGame,
+    primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
+    fillsFelt: true,
+  },
+  {
+    name: 'share in progress',
+    path: `/game/${SHARE_GAME_ID}/share/Bob`,
+    serve: serveShareInProgress,
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Home' }),
   },
 ]
 

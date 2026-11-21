@@ -4,6 +4,8 @@ import type { Card, ShareGameResponse, SharePlayerSnapshot } from '../types'
 import {
   buildGameSummaryData,
   buildSharePlayerViews,
+  getShareHiddenRoundBand,
+  getShareHiddenZones,
   getSharePlayerRowBadge,
 } from './share'
 
@@ -43,6 +45,7 @@ function makeSnapshot(
     treasures,
     poison,
     vanguard: null,
+    visibility: 'full',
   }
 }
 
@@ -52,6 +55,7 @@ function makeShareData(): ShareGameResponse {
     owner_name: 'Alice',
     created_at: '2026-03-11T00:00:00',
     use_upgrades: true,
+    in_progress: false,
     players: [
       {
         name: 'Alice',
@@ -158,5 +162,33 @@ describe('share rows after the final battle', () => {
     expect(summary?.selfPlayer).toMatchObject({ poison: 12, treasures: 6 })
     expect(summary?.selfPlayer.last_battle_result?.pre_battle_treasures).toBe(6)
     expect(summary?.players.find((p) => p.name === 'Bob')).toMatchObject({ poison: 12, treasures: 5 })
+  })
+})
+
+describe('share rounds hidden while the game goes on', () => {
+  it('hides every zone of another player and bands the round by whether they are still in', () => {
+    const data = makeShareData()
+    const hidden = { ...makeSnapshot(4, 2, 4, 2), visibility: 'hidden' as const }
+    const stillIn = { ...data.players[0], final_placement: null }
+
+    expect(getShareHiddenZones(hidden)).toEqual(['hand', 'sideboard', 'upgrades'])
+    expect(getShareHiddenRoundBand(stillIn, hidden)).toBe('Still Fighting')
+    expect(getShareHiddenRoundBand(data.players[1], hidden)).toBe('Game in Progress')
+  })
+
+  it('hides only the hand and upgrades of the sharer\'s last build, without a band', () => {
+    const data = makeShareData()
+    const lastBuild = { ...makeSnapshot(4, 3, 6, 3), visibility: 'hand_hidden' as const }
+
+    expect(getShareHiddenZones(lastBuild)).toEqual(['hand', 'upgrades'])
+    expect(getShareHiddenRoundBand(data.players[0], lastBuild)).toBeNull()
+  })
+
+  it('hides nothing in a round shown in full', () => {
+    const data = makeShareData()
+    const snapshot = data.players[0].snapshots[0]
+
+    expect(getShareHiddenZones(snapshot)).toEqual([])
+    expect(getShareHiddenRoundBand(data.players[0], snapshot)).toBeNull()
   })
 })

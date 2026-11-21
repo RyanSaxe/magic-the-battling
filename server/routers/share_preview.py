@@ -1,23 +1,25 @@
 import hashlib
-import json
 import logging
 import re
 import time
-from collections import defaultdict
+from collections import OrderedDict
+from collections.abc import Callable
 from html import escape
 from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from server.db import database
-from server.db.models import GameRecord, PlayerGameHistory
-from server.routers.games import build_share_player
+from server.db.models import GameRecord
+from server.errors import AppHTTPException
+from server.runtime_config import BEHIND_FLY_PROXY
 from server.schemas.api import ShareGameResponse
 from server.services.preview import cache_key as preview_cache_key
 from server.services.preview import preview_service
+from server.services.share import build_share_data
 
 logger = logging.getLogger(__name__)
 
@@ -28,8 +30,39 @@ VALID_NAME_RE = re.compile(r"^[^/]{1,64}$")
 
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX = 10
-_rate_limits: dict[str, list[float]] = defaultdict(list)
 PREVIEW_RENDER_VERSION = "preview-v4"
+
+
+class SlidingWindowRateLimiter:
+    def __init__(self, *, window_seconds: float, max_requests: int, clock: Callable[[], float] = time.monotonic):
+        self._window_seconds = window_seconds
+        self._max_requests = max_requests
+        self._clock = clock
+        # Ordered by each client's latest allowed request, so clients idle for a whole window sit at the front.
+        self._requests: OrderedDict[str, list[float]] = OrderedDict()
+
+    def allow(self, client: str) -> bool:
+        now = self._clock()
+        while self._requests:
+            oldest_client, oldest_times = next(iter(self._requests.items()))
+            if now - oldest_times[-1] < self._window_seconds:
+                break
+            del self._requests[oldest_client]
+
+        recent = [t for t in self._requests.get(client, []) if now - t < self._window_seconds]
+        if len(recent) >= self._max_requests:
+            self._requests[client] = recent
+            return False
+        recent.append(now)
+        self._requests[client] = recent
+        self._requests.move_to_end(client)
+        return True
+
+    def tracked_clients(self) -> int:
+        return len(self._requests)
+
+
+_preview_rate_limiter = SlidingWindowRateLimiter(window_seconds=RATE_LIMIT_WINDOW, max_requests=RATE_LIMIT_MAX)
 
 
 def _get_db():
@@ -40,58 +73,30 @@ def _get_db():
         db.close()
 
 
-def _check_rate_limit(client_ip: str) -> bool:
-    now = time.monotonic()
-    timestamps = _rate_limits[client_ip]
-    _rate_limits[client_ip] = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
-    if len(_rate_limits[client_ip]) >= RATE_LIMIT_MAX:
-        return False
-    _rate_limits[client_ip].append(now)
-    return True
+def _client_ip(request: Request) -> str:
+    # uvicorn trusts every X-Forwarded-For entry, and a client can send its own, so behind
+    # Fly use the address Fly's proxy saw instead.
+    if BEHIND_FLY_PROXY and (fly_client_ip := request.headers.get("fly-client-ip")):
+        return fly_client_ip
+    return request.client.host if request.client else "unknown"
 
 
 def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameResponse | None:
-    game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
-    if not game_record:
+    try:
+        share_data = build_share_data(db, game_id, player_name)
+    except AppHTTPException:
+        return None
+    # Mid-game the preview would show the sharer's last build without its hand, so previews wait for the game to end.
+    if share_data.in_progress:
         return None
 
     # Share pages are public for finished games; this flag is bookkeeping for
     # "someone actively shared this game", not an authorization gate.
-    config = json.loads(str(game_record.config_json)) if game_record.config_json else {}
-    use_upgrades = config.get("use_upgrades", True)
-
-    histories = (
-        db.query(PlayerGameHistory)
-        .options(joinedload(PlayerGameHistory.snapshots))
-        .filter(PlayerGameHistory.game_id == game_id)
-        .all()
+    db.query(GameRecord).filter(GameRecord.id == game_id, GameRecord.shared.isnot(True)).update(
+        {GameRecord.shared: True}
     )
-
-    if not histories:
-        return None
-
-    owner_exists = any(str(h.player_name) == player_name for h in histories)
-    if not owner_exists:
-        return None
-
-    if not game_record.shared:
-        game_record.shared = True  # ty: ignore[invalid-assignment]
-        db.commit()
-
-    players = [build_share_player(history, db) for history in histories]
-
-    created_at = game_record.created_at.isoformat() if game_record.created_at else ""
-
-    cube_id = str(game_record.cube_id) if game_record.cube_id else config.get("cube_id")
-
-    return ShareGameResponse(
-        game_id=game_id,
-        owner_name=player_name,
-        created_at=created_at,
-        use_upgrades=use_upgrades,
-        cube_id=cube_id,
-        players=players,
-    )
+    db.commit()
+    return share_data
 
 
 _STATIC_OG_RE = re.compile(r"\s*<meta\s+(?:property=\"og:|name=\"twitter:)[^>]*/?\s*>\s*")
@@ -183,8 +188,7 @@ async def preview_image(
     if not VALID_ID_RE.match(game_id) or not VALID_NAME_RE.match(player_name):
         return Response(status_code=400)
 
-    client_ip = request.client.host if request.client else "unknown"
-    if not _check_rate_limit(client_ip):
+    if not _preview_rate_limiter.allow(_client_ip(request)):
         return Response(status_code=429, headers={"Retry-After": "60"})
 
     share_data = _fetch_share_data(game_id, player_name, db)

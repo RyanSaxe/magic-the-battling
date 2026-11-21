@@ -1,10 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { CARD_ASPECT_RATIO, MIN_CARD_WIDTH } from './cardSizeUtils'
 import { computeBattleZones } from './useBattleCardSizes'
 
-const CARD_ASPECT_RATIO = 7 / 5
 const NUM_ROWS = 6
-
-const MIN_CARD_WIDTH = 40
 
 const defaults = {
   playerHandCount: 7,

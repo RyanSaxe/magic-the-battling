@@ -422,8 +422,13 @@ export async function getCubeGames(
   return response.json()
 }
 
-export async function getMyGames(offset = 0): Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }> {
-  const response = await fetch(`${API_BASE}/battlers/my-games?offset=${offset}`, { credentials: 'include' })
+export async function getMyGames(
+  offset = 0,
+  q = '',
+): Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }> {
+  const params = new URLSearchParams({ offset: String(offset) })
+  if (q) params.set('q', q)
+  const response = await fetch(`${API_BASE}/battlers/my-games?${params}`, { credentials: 'include' })
   if (!response.ok) await throwResponseError(response, 'default', 'Failed to load games')
   return response.json()
 }
@@ -467,8 +472,13 @@ export interface DiscoverResult {
   is_following: boolean
 }
 
-export async function discoverCubes(offset = 0): Promise<{ results: DiscoverResult[]; has_more: boolean }> {
-  const response = await fetch(`${API_BASE}/discover?offset=${offset}`, { credentials: 'include' })
+export async function discoverCubes(
+  offset = 0,
+  q = '',
+): Promise<{ results: DiscoverResult[]; has_more: boolean; total: number }> {
+  const params = new URLSearchParams({ offset: String(offset) })
+  if (q) params.set('q', q)
+  const response = await fetch(`${API_BASE}/discover?${params}`, { credentials: 'include' })
   if (!response.ok) await throwResponseError(response, 'default', 'Failed to load cubes')
   return response.json()
 }

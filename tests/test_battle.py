@@ -1,7 +1,14 @@
+import os
+import random
+import subprocess
+import sys
+from collections import Counter
+from pathlib import Path
+
 import pytest
 from conftest import setup_battle_ready
 
-from mtb.models.game import LastBattleResult, Puppet, StaticOpponent, create_game
+from mtb.models.game import Game, LastBattleResult, Player, Puppet, StaticOpponent, create_game
 from mtb.phases import battle
 from server.services.game_manager import GameManager
 
@@ -447,6 +454,20 @@ def test_end_battle_with_draw_returns_draw_result():
     assert bob.phase == "battle"
 
 
+def test_unpaired_puppets_deal_fibonacci_damage_without_upgrades(card_factory, monkeypatch):
+    game = create_game(["Alice"], num_players=1)
+    game.config.use_upgrades = False
+    stage_6_hand = [card_factory(f"c{i}") for i in range(6)]
+    bot1 = Puppet(name="Bot1", player_history_id=1, snapshots={"6_1": StaticOpponent(name="Bot1", hand=stage_6_hand)})
+    bot2 = Puppet(name="Bot2", player_history_id=2, snapshots={"6_1": StaticOpponent(name="Bot2", hand=stage_6_hand)})
+    game.puppets = [bot1, bot2]
+    monkeypatch.setattr(battle.random, "choices", lambda *_args, **_kwargs: ["bot1_wins"])
+
+    battle.resolve_unpaired_bot_battles(game, set(), 6, 1, game.config.num_rounds_per_stage)
+
+    assert bot2.poison == 3
+
+
 class TestPairingProbabilities:
     def test_get_pairing_probabilities_single_candidate(self):
         game = create_game(["Alice", "Bob"], num_players=2)
@@ -472,16 +493,16 @@ class TestPairingProbabilities:
         assert abs(total - 1.0) < 0.001
 
     def test_get_pairing_probabilities_prior_opponent_weighted_down(self):
-        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
-        alice, _bob, _charlie = game.players
+        game = create_game(["Alice", "Bob", "Charlie", "Diana"], num_players=4)
+        alice, bob, _charlie, _diana = game.players
         alice.last_opponent_name = "Bob"
+        bob.last_opponent_name = "Alice"
         for p in game.players:
             setup_battle_ready(p)
 
         probs = battle.get_pairing_probabilities(game, alice)
 
-        assert probs["Bob"] == pytest.approx(0.1)
-        assert probs["Charlie"] == pytest.approx(0.9)
+        assert probs == pytest.approx({"Bob": 0.1, "Charlie": 0.45, "Diana": 0.45})
 
     def test_get_pairing_probabilities_works_across_phases(self):
         game = create_game(["Alice", "Bob"], num_players=2)
@@ -640,60 +661,122 @@ class TestUnifiedPairingCandidates:
         assert companion.id in revealed_ids
 
 
-class TestViableCandidates:
-    def test_get_viable_candidates_returns_all_when_three_or_fewer(self):
-        game = create_game(["Alice", "Bob", "Charlie"], num_players=3)
-        alice, _bob, _charlie = game.players
-        for p in game.players:
-            setup_battle_ready(p)
+def _table_game(*, humans: int, puppets: int, ghost: str | None, history: bool) -> Game:
+    """A game whose next round seats ``humans`` players, ``puppets`` puppets and an optional ghost.
 
-        candidates = battle.get_all_pairing_candidates(game, alice)
-        viable = battle.get_viable_candidates(alice, candidates)
+    With ``history``, the seats in order were paired off last round.
+    """
+    game = create_game([f"H{i}" for i in range(humans)], num_players=humans)
+    for player in game.players:
+        setup_battle_ready(player)
+    for i in range(puppets):
+        snapshot = StaticOpponent(name=f"Bot{i}", hand=[], source_player_history_id=i + 1)
+        game.puppets.append(Puppet(name=f"Bot{i}", player_history_id=i + 1, snapshots={"3_1": snapshot}))
+    seat_names = [p.name for p in game.players] + [fp.name for fp in game.puppets]
+    if ghost == "human":
+        game.most_recent_ghost = StaticOpponent(name="Ghost", hand=[])
+        seat_names.append("Ghost")
+    elif ghost == "puppet":
+        snapshot = StaticOpponent(name="GhostBot", hand=[], source_player_history_id=99)
+        game.most_recent_ghost_puppet = Puppet(
+            name="GhostBot", player_history_id=99, is_eliminated=True, snapshots={"3_1": snapshot}
+        )
+        seat_names.append("GhostBot")
+    if history:
+        last_opponent = {}
+        for a, b in zip(seat_names[::2], seat_names[1::2], strict=True):
+            last_opponent[a], last_opponent[b] = b, a
+        for player in game.players:
+            player.last_opponent_name = last_opponent[player.name]
+    return game
 
-        assert len(viable) == 2
-        assert {c.name for c in viable} == {"Bob", "Charlie"}
 
-    def test_get_viable_candidates_samples_three_when_more_than_three(self):
-        game = create_game(["Alice", "Bob", "Charlie", "Diana", "Eve"], num_players=5)
-        for p in game.players:
-            setup_battle_ready(p)
+def _tables():
+    for live in range(2, 10):
+        for humans in sorted({live, 1, (live + 1) // 2}):
+            puppets = live - humans
+            ghost = None if live % 2 == 0 else "human" if humans % 2 else "puppet"
+            for history in (False, True):
+                parts = [f"{humans}h", f"{puppets}p", f"{ghost}-ghost" if ghost else "", "history" if history else ""]
+                yield pytest.param(humans, puppets, ghost, history, id="-".join(filter(None, parts)))
 
-        alice = game.players[0]
-        candidates = battle.get_all_pairing_candidates(game, alice)
-        viable = battle.get_viable_candidates(alice, candidates)
 
-        assert len(viable) == 3
-        for v in viable:
-            assert v.name != "Alice"
+class TestRoundTable:
+    @pytest.mark.parametrize(("humans", "puppets", "ghost", "history"), list(_tables()))
+    def test_every_player_sees_the_odds_the_guide_describes(self, humans, puppets, ghost, history):
+        game = _table_game(humans=humans, puppets=puppets, ghost=ghost, history=history)
+        seats = battle.get_round_table(game).seats
 
-    def test_get_viable_candidates_is_deterministic(self):
-        game = create_game(["Alice", "Bob", "Charlie", "Diana", "Eve"], num_players=5)
-        for p in game.players:
-            setup_battle_ready(p)
+        for player in game.players:
+            odds = battle.get_pairing_probabilities(game, player)
+            last_opponent = player.last_opponent_name
+            assert sum(odds.values()) == pytest.approx(1.0)
+            if len(seats) == 2:
+                assert list(odds.values()) == [1.0]
+            elif len(seats) == 4 and last_opponent is not None:
+                assert odds[last_opponent] == pytest.approx(0.1)
+                assert sorted(odds.values()) == pytest.approx([0.1, 0.45, 0.45])
+            elif len(seats) == 4:
+                assert sorted(odds.values()) == pytest.approx([1 / 3] * 3)
+            else:
+                assert len(odds) == 3
+                assert last_opponent not in odds
+                assert list(odds.values()) == pytest.approx([1 / 3] * 3)
 
-        alice = game.players[0]
-        candidates = battle.get_all_pairing_candidates(game, alice)
+    @pytest.mark.parametrize(("humans", "puppets", "ghost", "history"), list(_tables()))
+    def test_simulated_rounds_draw_each_opponent_at_the_shown_odds(self, humans, puppets, ghost, history):
+        game = _table_game(humans=humans, puppets=puppets, ghost=ghost, history=history)
+        table = battle.get_round_table(game)
+        rounds = 20_000
+        rng = random.Random(f"{humans}-{puppets}-{ghost}-{history}")
+        faced: dict[str, Counter[str]] = {player.name: Counter() for player in game.players}
 
-        viable1 = battle.get_viable_candidates(alice, candidates)
-        viable2 = battle.get_viable_candidates(alice, candidates)
+        for _ in range(rounds):
+            for player, opponent in table.draw_battles(rng):
+                faced[player.name][opponent.name] += 1
+                if isinstance(opponent, Player):
+                    faced[opponent.name][player.name] += 1
 
-        assert [c.name for c in viable1] == [c.name for c in viable2]
+        for player in game.players:
+            odds = battle.get_pairing_probabilities(game, player)
+            assert set(faced[player.name]) <= set(odds)
+            for name, odd in odds.items():
+                assert faced[player.name][name] / rounds == pytest.approx(odd, abs=0.015)
 
-    def test_get_viable_candidates_changes_with_round(self):
-        game = create_game(["Alice", "Bob", "Charlie", "Diana", "Eve"], num_players=5)
-        for p in game.players:
-            setup_battle_ready(p)
+    def test_four_seats_with_one_repeat_pair_give_the_other_pair_ten_percent_too(self):
+        game = create_game(["A", "B", "C", "D"], num_players=4)
+        a, b, c, _d = game.players
+        for player in game.players:
+            setup_battle_ready(player)
+        a.last_opponent_name, b.last_opponent_name = "B", "A"
 
-        alice = game.players[0]
-        candidates = battle.get_all_pairing_candidates(game, alice)
-        viable_round1 = battle.get_viable_candidates(alice, candidates)
+        assert battle.get_pairing_probabilities(game, a) == pytest.approx({"B": 0.1, "C": 0.45, "D": 0.45})
+        assert battle.get_pairing_probabilities(game, c) == pytest.approx({"D": 0.1, "A": 0.45, "B": 0.45})
 
-        alice.round = 2
-        viable_round2 = battle.get_viable_candidates(alice, candidates)
+    def test_round_table_is_the_same_after_a_restart(self):
+        script = """
+from mtb.models.game import create_game
+from mtb.phases import battle
 
-        names1 = {c.name for c in viable_round1}
-        names2 = {c.name for c in viable_round2}
-        assert names1 != names2 or names1 == names2
+game = create_game([f"P{i}" for i in range(8)], num_players=8)
+for player in game.players:
+    player.phase = "battle"
+print(battle.get_round_table(game).pairings)
+"""
+        repo_root = Path(__file__).resolve().parents[1]
+        tables = {
+            subprocess.run(
+                [sys.executable, "-c", script],
+                cwd=repo_root,
+                env={**os.environ, "PYTHONHASHSEED": hash_seed},
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout
+            for hash_seed in ("0", "1", "2")
+        }
+
+        assert len(tables) == 1
 
 
 class TestOpponentZoneManipulation:
@@ -1434,6 +1517,58 @@ class TestFaceDownScrubbing:
         result = manager.handle_battle_update_card_state(game, alice, "tap", opaque_id)
         assert result
         assert creature.id in b.opponent_zones.tapped_card_ids
+
+    def test_pvp_opponent_can_act_on_face_down_card_after_other_views_are_built(self, mock_cube_data, test_db):
+        manager = GameManager()
+        pending = manager.create_game("Alice", "pid-a", cube_id="test", target_player_count=2)
+        manager.join_game(pending.join_code, "Bob", "pid-b")
+        game_id = pending.game_id
+        game = manager.start_game(game_id, None)
+        assert game is not None
+        alice, bob = game.players
+        for p in (alice, bob):
+            p.hand, p.sideboard = p.sideboard[:3], p.sideboard[3:]
+            assert manager.handle_build_ready(game, p, ["Plains", "Island", "Swamp"], game_id, None) is None
+        b = game.active_battles[0]
+        bob_card = bob.hand[0]
+        assert manager.handle_battle_move(game, bob, bob_card.id, "hand", "battlefield")
+        assert manager.handle_battle_update_card_state(game, bob, "face_down", bob_card.id)
+
+        # broadcast_game_state builds every player's view in turn, then each spectator's
+        alice_view = manager.get_game_state(game_id, "pid-a")
+        manager.get_game_state(game_id, "pid-b")
+        manager.get_game_state(game_id, "pid-a")
+        assert alice_view is not None
+        assert alice_view.current_battle is not None
+        opaque_id = alice_view.current_battle.opponent_zones.face_down_card_ids[0]
+
+        assert manager.handle_battle_move(
+            game, alice, opaque_id, "battlefield", "graveyard", from_owner="opponent", to_owner="opponent"
+        )
+        bob_zones = b.player_zones if b.player.name == bob.name else b.opponent_zones
+        assert bob_card.id in {c.id for c in bob_zones.graveyard}
+
+    def test_pvp_shuffle_changes_the_ids_shown_for_the_shuffled_library(self, card_factory):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        face_down, first, second = card_factory("FaceDown"), card_factory("First"), card_factory("Second")
+        bob.hand = [face_down, first, second]
+
+        b = battle.start(game, alice, bob)
+        battle.move_zone(b, bob, face_down, "hand", "battlefield")
+        battle.update_card_state(b, bob, "face_down", face_down.id)
+        battle.move_zone(b, bob, first, "hand", "library")
+        battle.move_zone(b, bob, second, "hand", "library")
+
+        manager = GameManager()
+        ids_before = {c.id for c in manager._make_battle_view(b, alice, game).opponent_zones.library}
+        assert manager.handle_battle_update_card_state(game, bob, "shuffle_library", "")
+        ids_after = {c.id for c in manager._make_battle_view(b, alice, game).opponent_zones.library}
+
+        assert ids_before.isdisjoint(ids_after)
 
     def test_static_opponent_face_down_not_scrubbed(self, card_factory):
         """Against StaticOpponent, face-down cards should preserve real data."""

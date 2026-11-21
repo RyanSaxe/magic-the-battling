@@ -12,6 +12,8 @@ import { SummaryEmbed } from './pages/SummaryEmbed'
 import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { Dashboard } from './pages/Dashboard'
+import { DashboardDiscover } from './pages/DashboardDiscover'
+import { DashboardGames } from './pages/DashboardGames'
 import { BattlerView } from './pages/BattlerView'
 import { CubeView } from './pages/CubeView'
 import { NotFound } from './pages/NotFound'
@@ -28,6 +30,8 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard/games" element={<DashboardGames />} />
+              <Route path="/dashboard/discover" element={<DashboardDiscover />} />
               <Route path="/dashboard/list/:listId" element={<BattlerView />} />
               <Route path="/cube/:cubeId" element={<CubeView />} />
               <Route path="/play" element={<Play />} />

@@ -10,6 +10,7 @@ import { LayoutResetControl } from './LayoutResetControl'
 import { TreasureCard } from './TreasureCard'
 import { PoisonCard } from './PoisonCard'
 import { ZoneLayout } from './ZoneLayout'
+import { badgeCls } from './ZoneLabel'
 import { UpgradeGrid } from './UpgradeGrid'
 import { buildAppliedUpgradeMap, type UpgradeDisplayScope } from '../../utils/upgrades'
 import { getUpgradeZoneLayoutBounds } from '../../utils/upgradeGrid'
@@ -18,6 +19,18 @@ export interface DeckDisplayResizeState {
   constraints: ZoneConstraints | null
   setConstraints: (constraints: ZoneConstraints) => void
   clearConstraints: () => void
+}
+
+export type HiddenDeckZone = 'hand' | 'sideboard' | 'upgrades'
+
+const NARROW_HIDDEN_ZONE_WIDTH = 200
+
+function HiddenZonePill({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <span className={badgeCls}>{compact ? 'Hidden' : 'Hidden until game over'}</span>
+    </div>
+  )
 }
 
 interface DeckDisplayResetControl {
@@ -42,6 +55,7 @@ interface DeckDisplayProps {
   resizeState?: DeckDisplayResizeState
   resetControl?: DeckDisplayResetControl
   upgradeDisplayScope?: UpgradeDisplayScope
+  hiddenZones?: readonly HiddenDeckZone[]
 }
 
 export function DeckDisplay({
@@ -59,6 +73,7 @@ export function DeckDisplay({
   resizeState,
   resetControl,
   upgradeDisplayScope = 'all_applied',
+  hiddenZones = [],
 }: DeckDisplayProps) {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const localLayoutStateKey = layoutStateKey ?? '__default__'
@@ -78,15 +93,21 @@ export function DeckDisplay({
     }
   }, [])
 
+  const handHidden = hiddenZones.includes('hand')
+  const sideboardHidden = hiddenZones.includes('sideboard')
+  const upgradesHidden = hiddenZones.includes('upgrades')
+  // A hidden zone is laid out as if it held one card, so its size says nothing about what it holds.
+  const handCount = handHidden ? 1 : hand.length
+  const sideboardCount = sideboardHidden ? 1 : sideboard.length
   const battlefieldCount = basics.length + 2
-  const commandZoneCount = upgrades.length
+  const commandZoneCount = upgradesHidden ? 1 : upgrades.length
   const { upgradedCardIds, appliedUpgradesByCardId } = useMemo(
     () => buildAppliedUpgradeMap(upgrades, upgradeDisplayScope),
     [upgradeDisplayScope, upgrades],
   )
 
-  const hasHand = hand.length > 0
-  const hasSideboard = sideboard.length > 0
+  const hasHand = handCount > 0
+  const hasSideboard = sideboardCount > 0
   const hasUpgrades = commandZoneCount > 0
   const localConstraints =
     localConstraintState.key === localLayoutStateKey
@@ -106,9 +127,9 @@ export function DeckDisplay({
   const layoutConfig = useMemo(() => {
     return {
       zones: {
-        hand: { count: hasHand ? hand.length : 0 },
+        hand: { count: handCount },
         battlefield: { count: battlefieldCount, priority: 'fill' as const, maxRows: 1 },
-        sideboard: { count: sideboard.length },
+        sideboard: { count: sideboardCount },
         commandZone: {
           count: commandZoneCount,
           ...getUpgradeZoneLayoutBounds(commandZoneCount),
@@ -117,7 +138,7 @@ export function DeckDisplay({
       layout: { top: ['hand'], bottomLeft: ['battlefield', 'sideboard'], bottomRight: ['commandZone'] },
       ...ZONE_LAYOUT_PADDING,
     }
-  }, [battlefieldCount, commandZoneCount, hand.length, hasHand, sideboard.length])
+  }, [battlefieldCount, commandZoneCount, handCount, sideboardCount])
 
   const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
     useResizableLayout({
@@ -177,7 +198,7 @@ export function DeckDisplay({
         />
       ) : null}
       handLabel="Hand"
-      handContent={
+      handContent={handHidden ? <HiddenZonePill /> : (
         <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
           {hand.map((card) => (
             <Card
@@ -192,7 +213,7 @@ export function DeckDisplay({
             />
           ))}
         </CardGrid>
-      }
+      )}
       battlefieldLabel="Battlefield"
       battlefieldContent={
         <CardGrid columns={dims.battlefield.columns} cardWidth={bfDims.width}>
@@ -204,7 +225,7 @@ export function DeckDisplay({
         </CardGrid>
       }
       sideboardLabel="Sideboard"
-      sideboardContent={
+      sideboardContent={sideboardHidden ? <HiddenZonePill /> : (
         <CardGrid columns={dims.sideboard.columns} cardWidth={sideboardDims.width}>
           {sideboard.map((card) => (
             <Card
@@ -219,15 +240,17 @@ export function DeckDisplay({
             />
           ))}
         </CardGrid>
-      }
+      )}
       upgradesLabel="Upgrades"
-      upgradesContent={
+      upgradesContent={upgradesHidden ? (
+        <HiddenZonePill compact={zoneFrames.commandZone.outerWidth < NARROW_HIDDEN_ZONE_WIDTH} />
+      ) : (
         <UpgradeGrid
           upgrades={upgrades}
           fallbackDims={czDims}
           frame={zoneFrames.commandZone}
         />
-      }
+      )}
     />
   )
 }

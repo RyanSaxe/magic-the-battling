@@ -15,6 +15,9 @@ import { getSidebarPlayerOrder } from '../utils/playerPlacement'
 import { AppHeader } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
+import { BusyNotice, StatusNotice } from '../components/common/StatusNotice'
+import { NoticeFrame } from '../components/common/NoticeFrame'
+import { type AppError, unknownToAppError } from '../utils/appError'
 
 interface RoundOption {
   label: string
@@ -88,13 +91,21 @@ function RoundPopover({
   )
 }
 
+const NOT_FOUND_CODES = new Set(['GAME_NOT_FOUND', 'PLAYER_NOT_IN_GAME', 'SHARE_DATA_NOT_FOUND'])
+
+function shareErrorTitle(error: AppError): string {
+  if (error.code === 'GAME_IN_PROGRESS') return 'Game in progress'
+  if (NOT_FOUND_CODES.has(error.code)) return 'Game not found'
+  return "Couldn't load this game"
+}
+
 export function ShareGame() {
   const { gameId, playerName } = useParams<{ gameId: string; playerName: string }>()
   const navigate = useNavigate()
   const sizes = useViewportCardSizes()
   const shellMode = useGameShellMode()
   const [data, setData] = useState<ShareGameResponse | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<AppError | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedRound, setSelectedRound] = useState('')
   const [selectedPlayer, setSelectedPlayer] = useState('')
@@ -135,7 +146,7 @@ export function ShareGame() {
         const referenceSnapshots = ownerPlayer?.snapshots ?? res.players[0]?.snapshots ?? []
         setSelectedRound(getLatestRoundValue(referenceSnapshots))
       })
-      .catch((e) => setError(e.message))
+      .catch((e) => setError(unknownToAppError(e, 'share-game', 'Failed to load shared game')))
       .finally(() => setLoading(false))
   }, [gameId, playerName])
 
@@ -163,23 +174,26 @@ export function ShareGame() {
 
   if (loading) {
     return (
-      <div className="h-dvh flex items-center justify-center bg-gray-900 text-gray-400">
-        Loading game...
-      </div>
+      <NoticeFrame>
+        <BusyNotice label="Loading game..." />
+      </NoticeFrame>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="h-dvh flex flex-col items-center justify-center bg-gray-900 text-gray-400 gap-4">
-        <p>{error || 'Game not found'}</p>
-        <button
-          className="bg-amber-600 text-white px-4 py-2 rounded hover:bg-amber-500"
-          onClick={() => navigate('/')}
+      <NoticeFrame>
+        <StatusNotice
+          title={error ? shareErrorTitle(error) : 'Game not found'}
+          actions={
+            <button onClick={() => navigate('/')} className="btn btn-secondary flex-1 py-2">
+              Home
+            </button>
+          }
         >
-          Go Home
-        </button>
-      </div>
+          {error?.message ?? 'This game is no longer available to share.'}
+        </StatusNotice>
+      </NoticeFrame>
     )
   }
 
@@ -223,10 +237,11 @@ export function ShareGame() {
       )
     }
 
-    if (currentSnapshot) {
+    if (currentPlayerData && currentSnapshot) {
       return (
         <div className="flex-1 min-h-0 flex flex-col">
           <ShareRoundDetail
+            player={currentPlayerData}
             snapshot={currentSnapshot}
             useUpgrades={data.use_upgrades}
             enableResize
@@ -270,6 +285,8 @@ export function ShareGame() {
               isSelected={pv.name === selectedPlayer}
               variant="share"
               shareStatus={shareStatus}
+              // Mid-game a rank would read as a final standing that doesn't exist yet.
+              showPlacement={!data.in_progress || pv.placement > 0}
               onClick={() => {
                 setSelectedPlayer(pv.name)
                 if (usesOverlaySidebar) setSidebarOpen(false)

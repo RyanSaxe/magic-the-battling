@@ -1,6 +1,7 @@
 import hashlib
 import random
 from collections.abc import Callable
+from dataclasses import dataclass
 from importlib import import_module
 from typing import NamedTuple
 from uuid import uuid4
@@ -157,7 +158,7 @@ def get_available_fake_players(game: Game) -> list[Puppet]:
     return available
 
 
-def resolve_puppet_vs_puppet(bot1: Puppet, bot2: Puppet, stage: int, round_num: int) -> None:
+def resolve_puppet_vs_puppet(bot1: Puppet, bot2: Puppet, stage: int, round_num: int, *, use_upgrades: bool) -> None:
     """Auto-resolve puppet vs puppet battle with random outcome."""
     snap1 = bot1.get_opponent_for_round(stage, round_num)
     snap2 = bot2.get_opponent_for_round(stage, round_num)
@@ -166,8 +167,8 @@ def resolve_puppet_vs_puppet(bot1: Puppet, bot2: Puppet, stage: int, round_num: 
         return
 
     reward_phase = _reward_phase()
-    dmg1 = reward_phase.calculate_damage(snap1)
-    dmg2 = reward_phase.calculate_damage(snap2)
+    dmg1 = reward_phase.calculate_damage(snap1, use_upgrades=use_upgrades)
+    dmg2 = reward_phase.calculate_damage(snap2, use_upgrades=use_upgrades)
 
     outcome = random.choices(["bot1_wins", "bot2_wins", "draw"], weights=[45, 45, 10], k=1)[0]
     if outcome == "bot1_wins":
@@ -198,7 +199,7 @@ def resolve_unpaired_bot_battles(
     while len(unpaired_bots) >= 2:
         bot1 = unpaired_bots.pop(0)
         bot2 = unpaired_bots.pop(0)
-        resolve_puppet_vs_puppet(bot1, bot2, stage, round_num)
+        resolve_puppet_vs_puppet(bot1, bot2, stage, round_num, use_upgrades=game.config.use_upgrades)
 
     for fp in game.puppets:
         if not fp.is_eliminated and fp.name not in paired_bot_names:
@@ -214,99 +215,159 @@ def _advance_puppet_round(bot: Puppet, num_rounds_per_stage: int) -> None:
         bot.round += 1
 
 
-def get_viable_candidates(player: Player, all_candidates: list[PairingCandidate]) -> list[PairingCandidate]:
-    if len(all_candidates) <= 3:
-        return all_candidates
+# Stands in for the missing player at an odd table. Whoever is paired with it sits the round out.
+_BYE = "\0bye"
 
-    seed = hash((player.name, player.round, player.stage))
-    rng = random.Random(seed)
-    return rng.sample(all_candidates, 3)
+Pairing = tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class RoundTable:
+    """Everyone who plays the next round, and the pairings of the whole table that the round draws from.
+
+    Build shows each player the partners they have in these pairings, at these weights, and the round
+    starts by drawing one pairing with the same weights, so the odds Build shows are the real odds.
+    """
+
+    seats: dict[str, PairingCandidate]
+    pairings: tuple[Pairing, ...]
+    weights: tuple[float, ...]
+
+    def odds_for(self, name: str) -> dict[str, float]:
+        odds: dict[str, float] = {}
+        for pairing, weight in zip(self.pairings, self.weights, strict=True):
+            for a, b in pairing:
+                if name not in (a, b):
+                    continue
+                partner = b if a == name else a
+                if partner in self.seats:
+                    odds[partner] = odds.get(partner, 0.0) + weight
+        return odds
+
+    def draw_battles(self, rng: random.Random | None = None) -> list[tuple[Player, PairingCandidate]]:
+        """Draw one pairing and return the battles it gives the humans, the earlier seat first.
+
+        Pairs without a human are left to resolve_unpaired_bot_battles, as puppets always were.
+        """
+        choices = random.choices if rng is None else rng.choices
+        pairing = choices(self.pairings, weights=self.weights, k=1)[0]
+        seat_order = list(self.seats)
+        battles: list[tuple[Player, PairingCandidate]] = []
+        for a, b in pairing:
+            if a not in self.seats or b not in self.seats:
+                continue
+            first, second = sorted((a, b), key=seat_order.index)
+            player, opponent = self.seats[first], self.seats[second]
+            if isinstance(player, Player):
+                battles.append((player, opponent))
+            elif isinstance(opponent, Player):
+                battles.append((opponent, player))
+        return battles
+
+
+def get_round_table(game: Game) -> RoundTable:
+    """The next round's table: every live player, puppet and ghost, in the round the furthest player has reached."""
+    humans = get_live_players(game)
+    stage, round_num = max(((p.stage, p.round) for p in humans), default=(game.stage, game.round))
+
+    seats: dict[str, PairingCandidate] = {p.name: p for p in humans}
+    for puppet in game.puppets:
+        static_opp = None if puppet.is_eliminated else puppet.get_opponent_for_round(stage, round_num)
+        if static_opp:
+            seats[puppet.name] = static_opp
+    if game.most_recent_ghost is not None:
+        seats.setdefault(game.most_recent_ghost.name, game.most_recent_ghost)
+    if game.most_recent_ghost_puppet is not None:
+        static_opp = game.most_recent_ghost_puppet.get_opponent_for_round(stage, round_num)
+        if static_opp:
+            seats.setdefault(game.most_recent_ghost_puppet.name, static_opp)
+
+    last_round = {frozenset((p.name, p.last_opponent_name)) for p in humans if p.last_opponent_name in seats}
+    names = sorted(seats)
+    # hash() of a str changes with every process, so the pairings Build shows would change on restart.
+    rng = random.Random(hashlib.sha256(f"{stage}:{round_num}:{'|'.join(names)}".encode()).digest())
+    pairings = _choose_pairings(names, last_round, rng)
+    return RoundTable(seats=seats, pairings=pairings, weights=_pairing_weights(pairings, last_round))
+
+
+def _choose_pairings(names: list[str], last_round: set[frozenset[str]], rng: random.Random) -> tuple[Pairing, ...]:
+    """Three pairings of the table that share no pair, or every possible pairing at four seats or fewer.
+
+    From six seats up, none of the three repeats a pair from last round, so each player has three
+    different possible opponents and their last opponent isn't one of them.
+    """
+    seats = [*names, _BYE] if len(names) % 2 else list(names)
+    if not seats:
+        return ((),)
+    first_pairing = _extend_to_full_pairing(seats, last_round, rng)
+    factors = _one_factorization(first_pairing)
+    if len(seats) <= 4:
+        return tuple(factors)
+    return tuple(rng.sample(factors[1:], 3))
+
+
+def _extend_to_full_pairing(
+    seats: list[str], last_round: set[frozenset[str]], rng: random.Random
+) -> list[tuple[str, str]]:
+    pairs: list[tuple[str, str]] = []
+    paired: set[str] = set()
+    for a, b in sorted(sorted(pair) for pair in last_round):
+        if a not in paired and b not in paired:
+            pairs.append((a, b))
+            paired.update((a, b))
+    rest = [seat for seat in seats if seat not in paired]
+    rng.shuffle(rest)
+    pairs.extend(zip(rest[::2], rest[1::2], strict=True))
+    rng.shuffle(pairs)
+    return [(a, b) if rng.random() < 0.5 else (b, a) for a, b in pairs]
+
+
+def _one_factorization(first: list[tuple[str, str]]) -> list[Pairing]:
+    """Split every pair of seats into len(seats) - 1 edge-disjoint pairings, the first of which is ``first``.
+
+    This is the round-robin circle method: one seat sits at the hub and the rest rotate around it.
+    """
+    circle = 2 * len(first) - 1
+    hub, at_zero = first[0]
+    position = {0: at_zero}
+    for k, (a, b) in enumerate(first[1:], start=1):
+        position[-k % circle] = a
+        position[k] = b
+    return [
+        ((hub, position[r]), *((position[(r - k) % circle], position[(r + k) % circle]) for k in range(1, len(first))))
+        for r in range(circle)
+    ]
+
+
+def _pairing_weights(pairings: tuple[Pairing, ...], last_round: set[frozenset[str]]) -> tuple[float, ...]:
+    repeats = [any(frozenset(pair) in last_round for pair in pairing) for pairing in pairings]
+    repeat_count = sum(repeats)
+    if repeat_count in (0, len(pairings)):
+        return tuple(1 / len(pairings) for _ in pairings)
+    fresh_weight = (1 - REPEAT_OPPONENT_WEIGHT * repeat_count) / (len(pairings) - repeat_count)
+    return tuple(REPEAT_OPPONENT_WEIGHT if repeat else fresh_weight for repeat in repeats)
 
 
 def find_opponent(game: Game, player: Player) -> PairingCandidate | None:
+    """Draw an opponent for one player who is missing a battle, from the opponents Build showed them."""
     if not can_start_pairing(game, player.round, player.stage):
         return None
 
     if is_in_active_battle(game, player):
         return None
 
-    all_candidates = get_all_pairing_candidates(game, player)
-    if not all_candidates:
+    available = {candidate.name: candidate for candidate in get_all_pairing_candidates(game, player)}
+    odds = {name: odd for name, odd in get_round_table(game).odds_for(player.name).items() if name in available}
+    if not odds:
         return None
-
-    viable = get_viable_candidates(player, all_candidates)
-    return weighted_random_opponent(player, viable)
-
-
-def _compute_weights(player: Player, candidates: list[PairingCandidate]) -> list[float]:
-    if len(candidates) == 1:
-        return [1.0]
-
-    weights: list[float] = []
-    last_opponent = player.last_opponent_name
-    has_last_opponent = any(c.name == last_opponent for c in candidates)
-
-    for candidate in candidates:
-        if candidate.name == last_opponent:
-            weights.append(REPEAT_OPPONENT_WEIGHT)
-        elif has_last_opponent:
-            equal_share = (1.0 - REPEAT_OPPONENT_WEIGHT) / (len(candidates) - 1)
-            weights.append(equal_share)
-        else:
-            weights.append(1.0 / len(candidates))
-
-    return weights
-
-
-def weighted_random_opponent(player: Player, candidates: list[PairingCandidate]) -> PairingCandidate:
-    if len(candidates) == 1:
-        return candidates[0]
-
-    weights = _compute_weights(player, candidates)
-    return random.choices(candidates, weights=weights, k=1)[0]
-
-
-def get_potential_pairing_candidates(game: Game, player: Player) -> list[PairingCandidate]:
-    """Get candidates based on round/stage match only, ignoring phase requirements."""
-    candidates: list[PairingCandidate] = [
-        p
-        for p in game.players
-        if p.name != player.name and p.phase != "eliminated" and p.round == player.round and p.stage == player.stage
-    ]
-
-    for fp in game.puppets:
-        if fp.is_eliminated:
-            continue
-        static_opp = fp.get_opponent_for_round(player.stage, player.round)
-        if static_opp:
-            candidates.append(static_opp)
-
-    if game.most_recent_ghost is not None:
-        ghost = game.most_recent_ghost
-        if ghost.name != player.name:
-            candidates.append(ghost)
-
-    if game.most_recent_ghost_puppet is not None:
-        ghost_puppet = game.most_recent_ghost_puppet
-        static_opp = ghost_puppet.get_opponent_for_round(player.stage, player.round)
-        if static_opp:
-            candidates.append(static_opp)
-
-    return candidates
+    name = random.choices(list(odds), weights=list(odds.values()), k=1)[0]
+    return available[name]
 
 
 def get_pairing_probabilities(game: Game, player: Player) -> dict[str, float]:
     if is_in_active_battle(game, player):
         return {}
-
-    all_candidates = get_potential_pairing_candidates(game, player)
-    if not all_candidates:
-        return {}
-
-    viable = get_viable_candidates(player, all_candidates)
-    weights = _compute_weights(player, viable)
-
-    return {candidate.name: weight for candidate, weight in zip(viable, weights, strict=True)}
+    return get_round_table(game).odds_for(player.name)
 
 
 def pass_turn(battle: Battle, player: Player | StaticOpponent) -> bool:

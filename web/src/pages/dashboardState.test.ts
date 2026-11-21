@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { FollowedBattler } from '../types'
+import type { FollowedBattler, UserBattler } from '../types'
 import {
   NO_FOLLOWS,
   findFollow,
   followFor,
   isFollowing,
+  libraryEntries,
   visitLoadsFirstPage,
   withDiscoverResults,
   withFollow,
@@ -114,5 +115,18 @@ describe('findFollow', () => {
 
   it('finds nothing only when no Following page has the cube', async () => {
     expect(await findFollow(NO_FOLLOWS, 'unknown', serverFollowing(twentyOne))).toBeUndefined()
+  })
+})
+
+describe('libraryEntries', () => {
+  it('lists saved cubes and decks before followed cubes', () => {
+    const preset = (id: number) => ({ id, cube_id: `cube-${id}` }) as UserBattler
+    const entries = libraryEntries([preset(1), preset(2)], [followed(7, 'auto')])
+
+    expect(entries.map((e) => (e.kind === 'saved' ? `saved ${e.preset.id}` : `following ${e.follow.id}`))).toEqual([
+      'saved 1',
+      'saved 2',
+      'following 7',
+    ])
   })
 })

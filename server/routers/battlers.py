@@ -5,9 +5,10 @@ from typing import cast
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import distinct, func, or_
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, case, distinct, func, or_
+from sqlalchemy.orm import Session, aliased
 
+from mtb.models.types import normalize_play_mode
 from server.db import database
 from server.db.models import (
     BattlerFollow,
@@ -18,15 +19,18 @@ from server.db.models import (
     User,
     UserBattler,
 )
+from server.db.search import card_in_players_fights, contains_text
 from server.errors import ErrorCode, api_error
 from server.schemas.auth import (
+    CubeSetup,
+    CubeSummaryResponse,
     FollowedBattlerResponse,
     GameSummaryResponse,
     UserBattlerCreate,
     UserBattlerResponse,
     UserBattlerUpdate,
 )
-from server.services.auth import get_current_user
+from server.services.auth import get_current_user, get_optional_user
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +58,89 @@ def _battler_to_response(b: UserBattler) -> UserBattlerResponse:
         position=cast(int, b.position),
         created_at=str(b.created_at.isoformat()) if b.created_at else "",
     )
+
+
+def _game_play_mode():
+    """A game's play mode, counting games saved before Constructed existed as Limited."""
+    extracted = func.json_extract(GameRecord.config_json, "$.play_mode")
+    return case((extracted == "constructed", "constructed"), else_="limited")
+
+
+def _game_uses_upgrades():
+    """Whether a game used upgrades, counting games saved before the setting existed as using them."""
+    return func.coalesce(func.json_extract(GameRecord.config_json, "$.use_upgrades"), True)
+
+
+PresetSettings = tuple[str, str, bool]
+
+
+def _preset_settings(battler: UserBattler) -> PresetSettings:
+    return (str(battler.cube_id), normalize_play_mode(cast(str, battler.play_mode)), bool(battler.use_upgrades))
+
+
+def _my_stats_by_settings(db: Session, user_id: str, cube_ids: set[str]) -> dict[PresetSettings, dict]:
+    """The player's finished games on each cube, split by play mode and upgrades setting."""
+    if not cube_ids:
+        return {}
+    play_mode = _game_play_mode().label("play_mode")
+    uses_upgrades = _game_uses_upgrades().label("uses_upgrades")
+    rows = (
+        db.query(
+            GameRecord.cube_id,
+            play_mode,
+            uses_upgrades,
+            func.count(PlayerGameHistory.id),
+            func.sum(case((PlayerGameHistory.final_placement == 1, 1), else_=0)),
+            func.avg(PlayerGameHistory.final_placement),
+            func.max(GameRecord.created_at),
+        )
+        .join(PlayerGameHistory, PlayerGameHistory.game_id == GameRecord.id)
+        .filter(
+            GameRecord.cube_id.in_(cube_ids),
+            GameRecord.ended_at.isnot(None),
+            PlayerGameHistory.user_id == user_id,
+            PlayerGameHistory.is_puppet.is_(False),
+            PlayerGameHistory.final_placement.isnot(None),
+        )
+        .group_by(GameRecord.cube_id, play_mode, uses_upgrades)
+        .all()
+    )
+    return {
+        (str(r[0]), str(r[1]), bool(r[2])): {
+            "my_game_count": r[3],
+            "my_win_count": r[4],
+            "my_average_placement": float(r[5]),
+            "my_last_played": r[6].isoformat() if r[6] else None,
+        }
+        for r in rows
+    }
+
+
+def _cube_metadata_map(db: Session, cube_ids: set[str]) -> dict[str, CubeMetadata]:
+    if not cube_ids:
+        return {}
+    return {str(m.cube_id): m for m in db.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids))}
+
+
+def _battler_responses(db: Session, user_id: str, battlers: list[UserBattler]) -> list[UserBattlerResponse]:
+    cube_ids = {str(b.cube_id) for b in battlers}
+    cube_stats = _cube_stats_for_ids(db, cube_ids)
+    my_stats = _my_stats_by_settings(db, user_id, cube_ids)
+    metadata_map = _cube_metadata_map(db, cube_ids)
+
+    results = []
+    for b in battlers:
+        meta = metadata_map.get(str(b.cube_id))
+        resp = _battler_to_response(b).model_copy(
+            update={
+                "cube_name": str(meta.name) if meta and meta.name else None,
+                "cube_image_uri": str(meta.image_uri) if meta and meta.image_uri else None,
+                **cube_stats.get(str(b.cube_id), {}),
+                **my_stats.get(_preset_settings(b), {}),
+            }
+        )
+        results.append(resp)
+    return results
 
 
 def _cube_stats_for_ids(db: Session, cube_ids: set[str]) -> dict[str, dict]:
@@ -108,26 +195,7 @@ def list_battlers(
     )
     has_more = len(battlers) > BATTLERS_PAGE_SIZE
     battlers = battlers[:BATTLERS_PAGE_SIZE]
-
-    cube_ids = {str(b.cube_id) for b in battlers}
-    stats_map = _cube_stats_for_ids(db, cube_ids)
-    metadata_rows = db.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids)).all() if cube_ids else []
-    metadata_map = {str(m.cube_id): m for m in metadata_rows}
-
-    results = []
-    for b in battlers:
-        cid = str(b.cube_id)
-        meta = metadata_map.get(cid)
-        stats = stats_map.get(cid, {})
-        resp = _battler_to_response(b)
-        resp.cube_name = str(meta.name) if meta and meta.name else None
-        resp.cube_image_uri = str(meta.image_uri) if meta and meta.image_uri else None
-        resp.game_count = stats.get("game_count", 0)
-        resp.human_player_count = stats.get("human_player_count", 0)
-        resp.last_played = stats.get("last_played")
-        results.append(resp)
-
-    return {"battlers": results, "has_more": has_more}
+    return {"battlers": _battler_responses(db, str(user.id), battlers), "has_more": has_more}
 
 
 @router.post("")
@@ -154,11 +222,7 @@ def create_battler(
     db.commit()
     db.refresh(battler)
     database.save_cube_metadata(request.cube_id)
-    resp = _battler_to_response(battler)
-    meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == request.cube_id).first()
-    if meta:
-        resp.cube_name = str(meta.name) if meta.name else None
-        resp.cube_image_uri = str(meta.image_uri) if meta.image_uri else None
+    [resp] = _battler_responses(db, str(user.id), [battler])
     return resp
 
 
@@ -178,7 +242,8 @@ def update_battler(
         setattr(battler, field, value)
     db.commit()
     db.refresh(battler)
-    return _battler_to_response(battler)
+    [resp] = _battler_responses(db, str(user.id), [battler])
+    return resp
 
 
 @router.delete("/{battler_id}")
@@ -206,41 +271,54 @@ def _load_cube_metadata(db: Session, cube_id: str) -> CubeMetadata | None:
     return meta
 
 
+def _has_placed_seat(db: Session, player_user_id: str | None = None):
+    """Whether a human finished the game with a placement, or, given player_user_id, whether that player did."""
+    seat_filter = [
+        PlayerGameHistory.game_id == GameRecord.id,
+        PlayerGameHistory.is_puppet.is_(False),
+        PlayerGameHistory.final_placement.isnot(None),
+    ]
+    if player_user_id is not None:
+        seat_filter.append(PlayerGameHistory.user_id == player_user_id)
+    return db.query(PlayerGameHistory.id).filter(*seat_filter).correlate(GameRecord).exists()
+
+
+def _popular_setup(db: Session, cube_id: str) -> CubeSetup | None:
+    """The cube's most played mode and upgrades setting, the more recent one on a tie."""
+    play_mode = _game_play_mode().label("play_mode")
+    uses_upgrades = _game_uses_upgrades().label("uses_upgrades")
+    row = (
+        db.query(play_mode, uses_upgrades)
+        .filter(GameRecord.cube_id == cube_id, GameRecord.ended_at.isnot(None), _has_placed_seat(db))
+        .group_by(play_mode, uses_upgrades)
+        .order_by(func.count(GameRecord.id).desc(), func.max(GameRecord.created_at).desc())
+        .first()
+    )
+    if row is None:
+        return None
+    return CubeSetup(play_mode=row[0], use_upgrades=bool(row[1]))
+
+
 def _query_cube_games(
     db: Session,
     cube_id: str,
+    *,
     play_mode: str | None,
     use_upgrades: bool | None,
     offset: int,
+    player_user_id: str | None = None,
 ) -> dict:
+    """A page of a cube's finished games. With player_user_id, only that player's games, each shown by their seat."""
     base_filter = [
         GameRecord.cube_id == cube_id,
         GameRecord.ended_at.isnot(None),
     ]
     if play_mode is not None:
-        extracted = func.json_extract(GameRecord.config_json, "$.play_mode")
-        if play_mode == "limited":
-            base_filter.append(or_(extracted == play_mode, extracted.is_(None)))
-        else:
-            base_filter.append(extracted == play_mode)
+        base_filter.append(_game_play_mode() == play_mode)
     if use_upgrades is not None:
-        extracted = func.json_extract(GameRecord.config_json, "$.use_upgrades")
-        if use_upgrades is True:
-            base_filter.append(or_(extracted == use_upgrades, extracted.is_(None)))
-        else:
-            base_filter.append(extracted == use_upgrades)
+        base_filter.append(_game_uses_upgrades() == use_upgrades)
 
-    has_placed_human = (
-        db.query(PlayerGameHistory.id)
-        .filter(
-            PlayerGameHistory.game_id == GameRecord.id,
-            PlayerGameHistory.is_puppet.is_(False),
-            PlayerGameHistory.final_placement.isnot(None),
-        )
-        .correlate(GameRecord)
-        .exists()
-    )
-    query = db.query(GameRecord).filter(*base_filter, has_placed_human)
+    query = db.query(GameRecord).filter(*base_filter, _has_placed_seat(db, player_user_id))
 
     total_games = query.count()
 
@@ -257,6 +335,8 @@ def _query_cube_games(
         histories = db.query(PlayerGameHistory).filter(PlayerGameHistory.game_id == game.id).all()
         humans = [h for h in histories if not h.is_puppet]
         placed_humans = [h for h in humans if h.final_placement is not None]
+        if player_user_id is not None:
+            placed_humans = [h for h in placed_humans if h.user_id == player_user_id]
         if not placed_humans:
             continue
 
@@ -312,7 +392,32 @@ def list_cube_games(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(_get_db),
 ):
-    return _query_cube_games(db, cube_id, play_mode, use_upgrades, offset)
+    return _query_cube_games(db, cube_id, play_mode=play_mode, use_upgrades=use_upgrades, offset=offset)
+
+
+@router.get("/cube/{cube_id}")
+def get_cube_summary(
+    cube_id: str,
+    current_user: User | None = Depends(get_optional_user),
+    db: Session = Depends(_get_db),
+) -> CubeSummaryResponse:
+    meta = _load_cube_metadata(db, cube_id)
+    follow = None
+    if current_user is not None:
+        follow = (
+            db.query(BattlerFollow)
+            .filter(BattlerFollow.user_id == current_user.id, BattlerFollow.cube_id == cube_id)
+            .first()
+        )
+    return CubeSummaryResponse(
+        cube_id=cube_id,
+        cube_name=str(meta.name) if meta and meta.name else None,
+        cube_image_uri=str(meta.image_uri) if meta and meta.image_uri else None,
+        **_cube_stats_for_ids(db, {cube_id}).get(cube_id, {}),
+        popular_setup=_popular_setup(db, cube_id),
+        is_following=follow is not None,
+        follow_id=cast(int, follow.id) if follow else None,
+    )
 
 
 @router.get("/{battler_id}/games")
@@ -321,6 +426,7 @@ def list_battler_games(
     *,
     play_mode: str | None = Query(default=None),
     use_upgrades: bool | None = Query(default=None),
+    mine_only: bool = Query(default=False),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: Session = Depends(_get_db),
@@ -329,21 +435,72 @@ def list_battler_games(
     if not battler:
         raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, "Battler not found")
 
-    return _query_cube_games(db, str(battler.cube_id), play_mode, use_upgrades, offset)
+    player_user_id = str(user.id) if mine_only else None
+    return _query_cube_games(
+        db,
+        str(battler.cube_id),
+        play_mode=play_mode,
+        use_upgrades=use_upgrades,
+        offset=offset,
+        player_user_id=player_user_id,
+    )
+
+
+def _my_game_matches(db: Session, user_id: str, search: str):
+    """Whether a game of the player's matches the search: its cube's name or id, the name of one of the
+    player's presets with the game's cube and settings, the name of another player in the game, or a card
+    the player had in a fight."""
+    other_seat = aliased(PlayerGameHistory)
+    named_cube = (
+        db.query(CubeMetadata.cube_id)
+        .filter(CubeMetadata.cube_id == GameRecord.cube_id, contains_text(CubeMetadata.name, search))
+        .correlate(GameRecord)
+        .exists()
+    )
+    named_opponent = (
+        db.query(other_seat.id)
+        .filter(
+            other_seat.game_id == GameRecord.id,
+            other_seat.id != PlayerGameHistory.id,
+            contains_text(other_seat.player_name, search),
+        )
+        .correlate(GameRecord, PlayerGameHistory)
+        .exists()
+    )
+    named_presets = (
+        db.query(UserBattler)
+        .filter(UserBattler.user_id == user_id, contains_text(UserBattler.display_name, search))
+        .all()
+    )
+    preset_games = [
+        and_(GameRecord.cube_id == cube_id, _game_play_mode() == play_mode, _game_uses_upgrades() == use_upgrades)
+        for cube_id, play_mode, use_upgrades in {_preset_settings(preset) for preset in named_presets}
+    ]
+    return or_(
+        contains_text(GameRecord.cube_id, search),
+        named_cube,
+        named_opponent,
+        card_in_players_fights(search),
+        *preset_games,
+    )
 
 
 @router.get("/my-games")
 def list_my_games(
     offset: int = Query(default=0, ge=0),
+    q: str = Query(default="", max_length=100),
     user: User = Depends(get_current_user),
     db: Session = Depends(_get_db),
 ):
+    """The player's finished games, newest first, or with q, those it matches. The totals count the same games."""
     user_filter = [
         PlayerGameHistory.user_id == str(user.id),
         PlayerGameHistory.is_puppet.is_(False),
         PlayerGameHistory.final_placement.isnot(None),
         GameRecord.ended_at.isnot(None),
     ]
+    if search := q.strip():
+        user_filter.append(_my_game_matches(db, str(user.id), search))
     total_games = (
         db.query(func.count(PlayerGameHistory.id))
         .join(GameRecord, GameRecord.id == PlayerGameHistory.game_id)
