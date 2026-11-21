@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import cast
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
@@ -7,7 +8,7 @@ from sqlalchemy import create_engine, inspect, text
 import server.db.database as db_module
 import server.routers.share_preview as share_preview_module
 import server.routers.ws as ws_module
-from mtb.models.game import Battle, BattleSnapshotData, Game, Player
+from mtb.models.game import Battle, BattleSnapshotData, Game, Player, StaticOpponent, restore_snapshot_data
 from mtb.phases import reward
 from server.db.models import Base, BattleSnapshot, GameRecord, PlayerGameHistory
 from server.routers.share_preview import RATE_LIMIT_MAX, RATE_LIMIT_WINDOW, SlidingWindowRateLimiter
@@ -601,6 +602,26 @@ def test_mid_game_share_hides_the_sudden_death_builds_of_the_other_fighter(sudde
     assert (3, 3, None) not in _round_keys(bob)
     assert all(s["visibility"] == "hidden" for s in bob["snapshots"])
     assert all(s["hand"] == [] for s in bob["snapshots"])
+
+
+def test_a_puppet_from_a_game_with_sudden_death_plays_the_ordinary_build_of_that_round(sudden_death_game):
+    gm = ws_module.game_manager
+    db = db_module.SessionLocal()
+    try:
+        history = db.query(PlayerGameHistory).filter_by(game_id=sudden_death_game["game_id"], player_name="Bob").one()
+        builds = {
+            snapshot.sudden_death_build: StaticOpponent.from_snapshot(
+                restore_snapshot_data(snapshot.full_state_json), "Bob", cast(int, history.id)
+            )
+            for snapshot in history.snapshots
+            if (snapshot.stage, snapshot.round) == (3, 2)
+        }
+        puppet = gm._load_fake_player(db, history, set())
+    finally:
+        db.close()
+
+    assert builds[2] != builds[None]
+    assert puppet.snapshots["3_2"] == builds[None]
 
 
 def test_a_sudden_death_build_that_cannot_be_saved_still_starts_the_fight(client, start_lobby):

@@ -1631,6 +1631,9 @@ class GameManager:
         bot_name = self._ensure_unique_name(player_name, existing_names)
 
         for snapshot in history.snapshots:
+            # A puppet replays a past run one round at a time, so it keeps each round's ordinary build.
+            if snapshot.sudden_death_build is not None:
+                continue
             key = f"{snapshot.stage}_{snapshot.round}"
             snapshot_data = restore_snapshot_data(snapshot.full_state_json)
             static_opp = StaticOpponent.from_snapshot(snapshot_data, bot_name, history_id)
