@@ -75,6 +75,7 @@
   /* Shared shell spacing */
   --frame-rail-width: 40px;
   --frame-rail-edge: calc(var(--frame-rail-width) + 1px);
+  --frame-bar-height: 42px;
   --sidebar-width: 16rem;
   --sidebar-lane-nudge: 10px;
   --surface-gutter: 12px;

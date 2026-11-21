@@ -2564,12 +2564,12 @@ function GameContent() {
         {!isSpectator && (
           <div ref={actionBarRef} className="shrink-0 relative frame-chrome z-40">
             <div
-              className={`flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 ${actionBarPaddingClass} timeline-actions`}
+              className={`h-[var(--frame-bar-height)] flex items-center justify-between gap-1.5 sm:gap-2 ${actionBarPaddingClass} timeline-actions`}
               data-guide-target="phase-action-bar"
             >
               {isEndPhase && gameId && !displayBattleResolution ? (
                 <>
-                  <div className="flex items-center gap-1.5 sm:gap-2 py-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <button
                       className="btn bg-slate-700 hover:bg-slate-600 text-white"
                       onClick={() =>
