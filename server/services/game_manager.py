@@ -2695,8 +2695,7 @@ class GameManager:
             if player.in_sudden_death:
                 return self._handle_sudden_death_build_ready(game, player, game_id, db)
 
-            if build.all_ready(game):
-                self._start_all_battles(game, game_id, db)
+            self._start_round_if_ready(game, game_id, db)
             return None
         except ValueError as e:
             return str(e)
@@ -2761,6 +2760,10 @@ class GameManager:
                 # Clear to prevent double-returning
                 player.hand = []
                 player.sideboard = []
+
+    def _start_round_if_ready(self, game: Game, game_id: str | None, db: Session | None) -> None:
+        if build.all_ready(game):
+            self._start_all_battles(game, game_id, db)
 
     def _start_all_battles(self, game: Game, game_id: str | None = None, db: Session | None = None) -> None:
         # Clean up draft state before battles
@@ -3163,9 +3166,7 @@ class GameManager:
             if is_game_over:
                 self.complete_game(game_id or "", winner, db)
                 return "game_over"
-            # A surviving human may have readied while this fight ran; nobody else will start their round.
-            if build.all_ready(game):
-                self._start_all_battles(game, game_id, db)
+            self._start_round_if_ready(game, game_id, db)
             return None
 
         self._eliminate_dead_puppets(game, game_id, db)
@@ -4227,6 +4228,13 @@ class GameManager:
         return None
 
     def _check_sudden_death_ready(self, game: Game, game_id: str | None, db: Session | None) -> str | None:
+        result = self._eliminate_or_start_sudden_death(game, game_id, db)
+        if result is None:
+            # Everyone else may have readied while waiting on a player this just eliminated.
+            self._start_round_if_ready(game, game_id, db)
+        return result
+
+    def _eliminate_or_start_sudden_death(self, game: Game, game_id: str | None, db: Session | None) -> str | None:
         """Check if sudden death should trigger and set it up."""
         if not would_be_dead_ready_for_elimination(game):
             return None

@@ -837,6 +837,32 @@ class TestBotSpecificScenarios:
         )
 
 
+class TestRoundStartAfterElimination:
+    def test_round_starts_when_the_last_player_it_waited_for_is_eliminated(self, reset_singletons, mock_cube_data):
+        game, manager, _ = create_test_game(3, 1)
+        a, b, c = game.players
+        puppet = game.puppets[0]
+
+        for p in (a, b):
+            p.phase = "build"
+            p.stage, p.round = 3, 2
+            p.hand = [Card(name=f"{p.name}{i}", image_url="x", id=f"{p.name}{i}", type_line="Creature") for i in "123"]
+            p.build_ready = True
+
+        setup_participant_for_battle(c, stage=3, round_num=1)
+        setup_participant_for_battle(puppet, stage=3, round_num=1)
+        c.poison = 9
+        static_puppet = puppet.get_opponent_for_round(3, 1)
+        assert static_puppet is not None
+        battle.start(game, c, static_puppet)
+
+        manager.handle_battle_submit_result(game, c, static_puppet.name, "test-game", None)
+
+        assert c.phase == "eliminated"
+        assert (a.phase, b.phase) == ("battle", "battle")
+        assert game.active_battles
+
+
 class TestBotEliminations:
     """Tests for bot elimination logic."""
 
