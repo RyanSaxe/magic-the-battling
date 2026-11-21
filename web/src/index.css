@@ -80,6 +80,10 @@
   --frame-rail-edge: calc(var(--frame-rail-width) + 1px);
   --frame-bar-height: 42px;
   --sidebar-width: 16rem;
+  /* Docked inside the felt's gold edge, the sidebar is narrower, so with the right rail back the board loses 28px. */
+  --frame-sidebar-width: 242px;
+  /* From the board's gold edge to the screen's right edge: the docked sidebar, its 2px edge and the rail. */
+  --frame-dock-width: calc(var(--frame-sidebar-width) + 2px + var(--frame-rail-width));
   --sidebar-lane-nudge: 10px;
   --surface-gutter: 12px;
   --bar-mobile-inline: 6px;
@@ -175,6 +179,12 @@ input:-webkit-autofill:focus {
     inset 0 -4px 0 0 rgba(0, 0, 0, 0.24),
     inset 0 8px 20px -4px rgba(0, 0, 0, 0.38),
     inset 0 -8px 20px -8px rgba(0, 0, 0, 0.4);
+}
+
+/* A docked sidebar sits inside the felt's gold edge, which the board's own edge closes on its left. */
+.frame-sidebar {
+  --sidebar-width: var(--frame-sidebar-width);
+  padding: 2px 2px 2px 0;
 }
 
 .modal-chrome {

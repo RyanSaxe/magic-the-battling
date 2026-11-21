@@ -326,7 +326,7 @@ export function ShareGame() {
         scroll={false}
         aside={usesOverlaySidebar ? undefined : (
           <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto flex-1 pt-3">
               {renderSidebarContent()}
             </div>
           </aside>

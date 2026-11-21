@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
 import { NoticeFrame } from "../components/common/NoticeFrame";
+import { FrameSidebar } from "../components/common/PageFrame";
 import { GuideButton, HomeButton } from "../components/common/AppHeader";
 import { BottomBar, BrandMark, TopBar } from "../components/common/FrameBar";
 import { BusyNotice, StatusNotice } from "../components/common/StatusNotice";
@@ -875,7 +876,6 @@ function GameContent() {
   const [actionBarRef, actionBarHeight] = useElementHeight();
   const usesOverlaySidebar = shellMode !== "big";
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
-  const isSmallShell = shellMode === "small";
   const actionBarPaddingClass = shellMode === "big" ? "bar-pad-main" : undefined;
 
   const { addToast } = useToast();
@@ -2410,20 +2410,17 @@ function GameContent() {
                   </div>
                 </>
               ) : (
-                <Sidebar
-                  players={gameState.players}
-                  currentPlayer={self_player}
-                  phaseContent={renderPhaseContent()}
-                  useUpgrades={gameState.use_upgrades}
-                  renderMicToggle={renderMicToggle}
-                />
+                <FrameSidebar>
+                  <Sidebar
+                    players={gameState.players}
+                    currentPlayer={self_player}
+                    phaseContent={renderPhaseContent()}
+                    useUpgrades={gameState.use_upgrades}
+                    renderMicToggle={renderMicToggle}
+                  />
+                </FrameSidebar>
               )}
-              {shellMode === "mobile" && (
-                <div className="w-[4px] shrink-0 frame-chrome" />
-              )}
-              {isSmallShell && (
-                <div className="w-10 shrink-0 frame-chrome" />
-              )}
+              <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
             </div>
             {activeDndPanel === 'sideboard' && current_battle && (
               <div onClick={(e) => handlePanelClickToMove(e, 'sideboard', 'player')}>
@@ -2666,20 +2663,17 @@ function GameContent() {
                 </div>
               </>
             ) : (
-              <Sidebar
-                players={gameState.players}
-                currentPlayer={self_player}
-                phaseContent={renderPhaseContent()}
-                useUpgrades={gameState.use_upgrades}
-                renderMicToggle={renderMicToggle}
-              />
+              <FrameSidebar>
+                <Sidebar
+                  players={gameState.players}
+                  currentPlayer={self_player}
+                  phaseContent={renderPhaseContent()}
+                  useUpgrades={gameState.use_upgrades}
+                  renderMicToggle={renderMicToggle}
+                />
+              </FrameSidebar>
             )}
-            {shellMode === "mobile" && (
-              <div className="w-[4px] shrink-0 frame-chrome" />
-            )}
-            {isSmallShell && (
-              <div className="w-10 shrink-0 frame-chrome" />
-            )}
+            <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
           </div>
         )}
         {/* Bottom Action Bar */}
