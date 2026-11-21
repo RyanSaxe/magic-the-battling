@@ -1,17 +1,18 @@
-import { useState, useRef, useCallback, useEffect, useContext } from "react";
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaHouse } from "react-icons/fa6";
 import type { Phase } from "../constants/phases";
 import type { RulesPanelTarget } from "./RulesPanel";
 import { PhasePopover } from "./PhasePopover";
 import { GuideStateContext } from "../guided/guideState";
+import { useContentOverflows } from "../hooks/useContentOverflows";
 
 const PHASES: Phase[] = ["draft", "build", "battle", "reward"];
 
 const PHASE_TIMELINE_LABELS: Record<Phase, string> = {
   draft: "draft",
   build: "build",
-  battle: "battle",
+  battle: "fight",
   reward: "advance",
 };
 
@@ -105,7 +106,16 @@ export function PhaseTimeline({
   const autoCloseTimerRef = useRef<number | null>(null);
   const closeAnimationTimerRef = useRef<number | null>(null);
   const popoverPhaseRef = useRef<Phase | null>(null);
+  const stepsRowRef = useRef<HTMLDivElement | null>(null);
+  const stepsRef = useRef<HTMLDivElement | null>(null);
+  const stepsOverflow = useContentOverflows(stepsRowRef, stepsRef);
   const phaseButtonRefs = useRef<Record<Phase, HTMLButtonElement | null>>({
+    draft: null,
+    build: null,
+    battle: null,
+    reward: null,
+  });
+  const phaseStepRefs = useRef<Record<Phase, HTMLDivElement | null>>({
     draft: null,
     build: null,
     battle: null,
@@ -115,6 +125,15 @@ export function PhaseTimeline({
   useEffect(() => {
     popoverPhaseRef.current = popoverPhase;
   }, [popoverPhase]);
+
+  useLayoutEffect(() => {
+    const row = stepsRowRef.current;
+    const step = isGamePhase(currentPhase) ? phaseStepRefs.current[currentPhase] : null;
+    if (!stepsOverflow || !row || !step) return;
+    const fadeWidth = parseFloat(getComputedStyle(row).scrollPaddingRight);
+    const stepEnd = step.getBoundingClientRect().right - row.getBoundingClientRect().left + row.scrollLeft;
+    row.scrollLeft = Math.max(0, stepEnd + fadeWidth - row.clientWidth);
+  }, [currentPhase, stepsOverflow]);
 
   const clearAutoCloseTimer = useCallback(() => {
     if (autoCloseTimerRef.current !== null) {
@@ -248,64 +267,68 @@ export function PhaseTimeline({
   return (
     <header className={`frame-chrome ${headerCls}`}>
       <div className="flex items-center">
-        <div className="flex items-center gap-1 sm:gap-1.5 flex-1 justify-start min-w-0">
-          <span
-            className="text-xs sm:text-sm text-gray-300 font-mono"
-            data-guide-target="timeline-stage-round"
-          >
-            {stage}-{round}
-          </span>
+        <div ref={stepsRowRef} className={`flex items-center flex-1 min-w-0 ${stepsOverflow ? "phase-timeline-scroll" : ""}`}>
+          <div ref={stepsRef} className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <span
+              className="text-xs sm:text-sm text-gray-300 font-mono"
+              data-guide-target="timeline-stage-round"
+            >
+              {stage}-{round}
+            </span>
 
-          {PHASES.map((phase, index) => {
-            const currentIndex = isEnd ? PHASES.length : PHASES.indexOf(currentPhase as Phase);
-            const isActive = !isEnd && index === currentIndex;
-            const isCompleted = index < currentIndex;
-            const isUpcoming = !isEnd && index > currentIndex;
-            const isEndReward = isEnd && phase === "reward";
-            const phaseButton = (
-              <button
-                ref={(el) => { phaseButtonRefs.current[phase] = el; }}
-                disabled={welcomeGuideActive || isEnd}
-                onClick={() => handlePhaseClick(phase)}
-                data-guide-target={`timeline-phase-${phase}`}
-                className={`text-xs sm:text-sm font-medium capitalize transition-colors
-                  ${!isEnd ? "cursor-pointer" : "cursor-default"}
-                  ${isActive || isEndReward ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
-                  ${isCompleted && !isEndReward ? "text-gray-500 line-through decoration-gray-600" : ""}
-                  ${isUpcoming ? "text-gray-500" : ""}
-                  ${welcomeGuideActive || isEnd ? "hover:brightness-100" : "hover:brightness-125"}
-                `}
-              >
-                {isEndReward ? (title ?? END_STATE_LABELS[currentPhase as EndState]) : PHASE_TIMELINE_LABELS[phase]}
-              </button>
-            );
+            {PHASES.map((phase, index) => {
+              const currentIndex = isEnd ? PHASES.length : PHASES.indexOf(currentPhase as Phase);
+              const isActive = !isEnd && index === currentIndex;
+              const isCompleted = index < currentIndex;
+              const isUpcoming = !isEnd && index > currentIndex;
+              const isEndReward = isEnd && phase === "reward";
+              const phaseButton = (
+                <button
+                  ref={(el) => { phaseButtonRefs.current[phase] = el; }}
+                  disabled={welcomeGuideActive || isEnd}
+                  onClick={() => handlePhaseClick(phase)}
+                  data-guide-target={`timeline-phase-${phase}`}
+                  className={`text-xs sm:text-sm font-medium capitalize transition-colors
+                    ${!isEnd ? "cursor-pointer" : "cursor-default"}
+                    ${isActive || isEndReward ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
+                    ${isCompleted && !isEndReward ? "text-gray-500 line-through decoration-gray-600" : ""}
+                    ${isUpcoming ? "text-gray-500" : ""}
+                    ${welcomeGuideActive || isEnd ? "hover:brightness-100" : "hover:brightness-125"}
+                  `}
+                >
+                  {isEndReward ? (title ?? END_STATE_LABELS[currentPhase as EndState]) : PHASE_TIMELINE_LABELS[phase]}
+                </button>
+              );
 
-            if (phase === "reward") {
-              return (
-                <div key={phase} className="flex items-center gap-1 sm:gap-1.5">
-                  <span className="text-gray-600 text-xs">→</span>
-                  <div
-                    className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
-                    data-guide-target="timeline-next-stage-round"
-                  >
-                    {phaseButton}
-                    {!isEnd && (
-                      <span className="text-xs sm:text-sm text-gray-500">
-                        to <span className="font-mono">{nextStage}-{nextRound}</span>
-                      </span>
-                    )}
+              const stepRef = (el: HTMLDivElement | null) => { phaseStepRefs.current[phase] = el; };
+
+              if (phase === "reward") {
+                return (
+                  <div key={phase} ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
+                    <span className="text-gray-600 text-xs">→</span>
+                    <div
+                      className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
+                      data-guide-target="timeline-next-stage-round"
+                    >
+                      {phaseButton}
+                      {!isEnd && (
+                        <span className="text-xs sm:text-sm text-gray-500">
+                          to <span className="font-mono">{nextStage}-{nextRound}</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
+                );
+              }
+
+              return (
+                <div key={phase} ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
+                  <span className="text-gray-600 text-xs">→</span>
+                  {phaseButton}
                 </div>
               );
-            }
-
-            return (
-              <div key={phase} className="flex items-center gap-1 sm:gap-1.5">
-                <span className="text-gray-600 text-xs">→</span>
-                {phaseButton}
-              </div>
-            );
-          })}
+            })}
+          </div>
         </div>
 
         <div className={`flex items-center gap-1.5 shrink-0 timeline-actions ${resolvedRightActionsClassName}`}>

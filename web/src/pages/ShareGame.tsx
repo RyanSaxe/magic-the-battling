@@ -12,6 +12,8 @@ import { CardPreviewContext, CardPreviewModal } from '../components/card'
 import { PLAYER_ROW_STACK_CLASS, PlayerRow } from '../components/PlayerList'
 import { useHotkeys } from '../hooks/useHotkeys'
 import { getSidebarPlayerOrder } from '../utils/playerPlacement'
+import { AppHeader } from '../components/common/AppHeader'
+import { PageFrame } from '../components/common/PageFrame'
 
 interface RoundOption {
   label: string
@@ -104,12 +106,6 @@ export function ShareGame() {
   const [bottomBarRef] = useElementHeight()
   const usesOverlaySidebar = shellMode !== 'big'
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen
-  const isSmallShell = shellMode === 'small'
-  const usesCompactHeader = shellMode === 'mobile'
-  const headerChromeClassName =
-    shellMode === 'big'
-      ? 'shrink-0 py-3 frame-chrome bar-pad-left'
-      : 'shrink-0 py-3 frame-chrome bar-pad-both'
   const bottomBarPaddingClass =
     shellMode === 'small' ? 'bar-pad-both' : 'bar-pad-main'
   const setPreviewCard = useCallback((card: CardType | null, appliedUpgrades?: CardType[]) => {
@@ -286,168 +282,114 @@ export function ShareGame() {
 
   return (
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
-    <div className="h-dvh flex flex-col bg-gray-900 text-white overflow-hidden">
-      {/* Header */}
-      <header ref={headerRef} className={headerChromeClassName}>
-        {!usesCompactHeader ? (
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-baseline">
-              <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-                Crucible
-              </h1>
-              <span className="hero-sep mx-2.5">—</span>
-              <span className="hero-subtitle text-base font-normal tracking-widest">
-                an MtG format
-              </span>
-            </div>
-            <p className="hero-tagline">
-              Inspired by Roguelikes and Autobattlers
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {data.cube_id && (
-              <a
-                href={`https://cubecobra.com/cube/overview/${encodeURIComponent(data.cube_id)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-amber-400 hover:text-amber-300 transition-colors mr-1"
-              >
-                CubeCobra
-              </a>
-            )}
-            <button
-              onClick={() => navigate('/')}
-              className="btn btn-secondary py-2 px-4"
-            >
-              Home
-            </button>
-          </div>
-        </div>
-        ) : (
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-baseline whitespace-nowrap">
-                <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
-                  Crucible
-                </h1>
-                <span className="hero-sep mx-1 text-xs">—</span>
-                <span className="hero-subtitle text-[11px] font-normal tracking-wider">
-                  an MtG format
-                </span>
-              </div>
-              <p className="hero-tagline !text-[9px] !tracking-[0.04em]">
-                Inspired by Roguelikes and Autobattlers
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
+      <PageFrame
+        header={<AppHeader
+          ref={headerRef}
+          padClassName={shellMode === 'big' ? 'bar-pad-left' : 'bar-pad-both'}
+          renderRight={({ compact }) => (
+            <>
+              {!compact && data.cube_id && (
+                <a
+                  href={`https://cubecobra.com/cube/overview/${encodeURIComponent(data.cube_id)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-amber-400 hover:text-amber-300 transition-colors mr-1"
+                >
+                  CubeCobra
+                </a>
+              )}
               <button
                 onClick={() => navigate('/')}
-                className="btn btn-secondary py-1.5 px-3 text-sm"
+                className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
               >
                 Home
               </button>
-            </div>
-          </div>
-        )}
-      </header>
-
-      {/* Main + Sidebar */}
-      <div className="flex-1 flex min-h-0 game-surface">
-        {shellMode === 'mobile' && (
-          <div className="w-[4px] shrink-0 frame-chrome" />
-        )}
-        <main className="flex-1 flex flex-col min-h-0 min-w-0 p-[2px] zone-divider-bg">
-          <div className="zone-pack flex-1 min-h-0 flex flex-col">
-            {renderContent()}
-          </div>
-        </main>
-
-        {usesOverlaySidebar ? (
-          <>
-            {overlaySidebarOpen && (
-              <div
-                className="fixed inset-0 bg-black/50 z-40"
-                onClick={() => setSidebarOpen(false)}
-              />
-            )}
-            <div
-              className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${
-                overlaySidebarOpen ? 'translate-x-0' : 'translate-x-full'
-              }`}
-            >
-              <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
-                <div className="px-3 py-2 text-sm font-medium text-gray-400">
-                  Players
-                </div>
-                <div className="overflow-y-auto flex-1">
-                  {renderSidebarContent()}
-                </div>
-              </aside>
-            </div>
-          </>
-        ) : (
+            </>
+          )}
+        />}
+        scroll={false}
+        aside={usesOverlaySidebar ? undefined : (
           <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
             <div className="overflow-y-auto flex-1">
               {renderSidebarContent()}
             </div>
           </aside>
         )}
-        {shellMode === 'mobile' && (
-          <div className="w-[4px] shrink-0 frame-chrome" />
-        )}
-        {isSmallShell && (
-          <div className="w-10 shrink-0 frame-chrome" />
-        )}
-      </div>
-
-      {/* Bottom Bar */}
-      <div ref={bottomBarRef} className="shrink-0 frame-chrome">
-        <div className={`flex items-center justify-between py-1.5 sm:py-2 ${bottomBarPaddingClass} timeline-actions`}>
-          <div className="relative">
-            <button
-              className="btn btn-secondary text-sm py-1.5 px-3"
-              disabled={roundOptions.length === 0}
-              onClick={() => setRoundPopoverOpen((o) => !o)}
-            >
-              {currentRoundLabel}
-            </button>
-            {roundPopoverOpen && roundOptions.length > 0 && (
-              <RoundPopover
-                options={roundOptions}
-                selectedRound={effectiveSelectedRound}
-                onSelect={setSelectedRound}
-                onClose={handleCloseRoundPopover}
-              />
-            )}
+        footer={
+          <div ref={bottomBarRef} className="shrink-0 frame-chrome">
+            <div className={`flex items-center justify-between py-1.5 sm:py-2 ${bottomBarPaddingClass} timeline-actions`}>
+              <div className="relative">
+                <button
+                  className="btn btn-secondary text-sm py-1.5 px-3"
+                  disabled={roundOptions.length === 0}
+                  onClick={() => setRoundPopoverOpen((o) => !o)}
+                >
+                  {currentRoundLabel}
+                </button>
+                {roundPopoverOpen && roundOptions.length > 0 && (
+                  <RoundPopover
+                    options={roundOptions}
+                    selectedRound={effectiveSelectedRound}
+                    onSelect={setSelectedRound}
+                    onClose={handleCloseRoundPopover}
+                  />
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="btn btn-secondary text-sm py-1.5 disabled:opacity-30"
+                  disabled={!hasPrev}
+                  onClick={() => hasPrev && setSelectedRound(roundOptions[currentIndex - 1].value)}
+                >
+                  Prev
+                </button>
+                <button
+                  className="btn btn-secondary text-sm py-1.5 disabled:opacity-30"
+                  disabled={!hasNext}
+                  onClick={() => hasNext && setSelectedRound(roundOptions[currentIndex + 1].value)}
+                >
+                  Next
+                </button>
+                {usesOverlaySidebar && (
+                  <button
+                    onClick={() => setSidebarOpen((o) => !o)}
+                    className="btn btn-secondary py-1.5 px-2 text-sm"
+                    aria-label="Players"
+                  >
+                    ☰
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              className="btn btn-secondary text-sm py-1.5 disabled:opacity-30"
-              disabled={!hasPrev}
-              onClick={() => hasPrev && setSelectedRound(roundOptions[currentIndex - 1].value)}
-            >
-              Prev
-            </button>
-            <button
-              className="btn btn-secondary text-sm py-1.5 disabled:opacity-30"
-              disabled={!hasNext}
-              onClick={() => hasNext && setSelectedRound(roundOptions[currentIndex + 1].value)}
-            >
-              Next
-            </button>
-            {usesOverlaySidebar && (
-              <button
-                onClick={() => setSidebarOpen((o) => !o)}
-                className="btn btn-secondary py-1.5 px-2 text-sm"
-                aria-label="Players"
-              >
-                ☰
-              </button>
-            )}
+        }
+      >
+        {renderContent()}
+      </PageFrame>
+      {usesOverlaySidebar && (
+        <>
+          {overlaySidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/50 z-40"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+          <div
+            className={`fixed inset-y-0 right-0 z-50 w-[var(--sidebar-width)] border-l border-[var(--gold-border-opaque)] transition-transform duration-300 ${
+              overlaySidebarOpen ? 'translate-x-0' : 'translate-x-full'
+            }`}
+          >
+            <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
+              <div className="px-3 py-2 text-sm font-medium text-gray-400">
+                Players
+              </div>
+              <div className="overflow-y-auto flex-1">
+                {renderSidebarContent()}
+              </div>
+            </aside>
           </div>
-        </div>
-      </div>
+        </>
+      )}
       {previewCard && (
         <CardPreviewModal
           card={previewCard}
@@ -455,7 +397,6 @@ export function ShareGame() {
           onClose={() => setPreviewCard(null)}
         />
       )}
-    </div>
     </CardPreviewContext.Provider>
   )
 }

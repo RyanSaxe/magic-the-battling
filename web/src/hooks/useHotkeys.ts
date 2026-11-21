@@ -2,6 +2,10 @@ import { useEffect, useRef } from 'react'
 
 type HotkeyMap = Record<string, () => void>
 
+export function hotkeyFor(key: string): string {
+  return key === 'Enter' ? 'Enter' : key.toLowerCase()
+}
+
 export function useHotkeys(hotkeys: HotkeyMap, enabled = true) {
   const hotkeysRef = useRef(hotkeys)
 
@@ -20,8 +24,7 @@ export function useHotkeys(hotkeys: HotkeyMap, enabled = true) {
         return
       }
 
-      const key = e.key === 'Enter' ? 'Enter' : e.key.toLowerCase()
-      const action = hotkeysRef.current[key]
+      const action = hotkeysRef.current[hotkeyFor(e.key)]
       if (action) {
         e.preventDefault()
         action()
