@@ -244,3 +244,43 @@ class TestMyGamesFilter:
 
         assert [g["game_id"] for g in limited_with_upgrades["games"]] == ["old-format"]
         assert limited_with_upgrades["total_games"] == preset["my_game_count"] == 1
+
+
+class TestCubeSummary:
+    def test_summarizes_a_cube_whatever_the_filters(self, client, vintage_cube):
+        constructed = {"play_mode": "constructed", "use_upgrades": False}
+        _add_game(
+            "a", cube_id="vintage", config=constructed, played_on=_day(10), seats=[Seat("rook", 1), Seat("wren", 2)]
+        )
+        _add_game("b", cube_id="vintage", config=constructed, played_on=_day(11), seats=[Seat("rook", 1)])
+        _add_game("c", cube_id="vintage", played_on=_day(12), seats=[Seat("kestrel", 1)])
+        _add_game("unfinished", cube_id="vintage", played_on=_day(13), ended=False, seats=[Seat("rook", 1)])
+
+        summary = client.get("/api/battlers/cube/vintage").json()
+
+        assert summary == {
+            "cube_id": "vintage",
+            "cube_name": "Vintage Cube",
+            "cube_image_uri": "https://img/vintage",
+            "game_count": 3,
+            "human_player_count": 3,
+            "last_played": _day(12).replace(tzinfo=None).isoformat(),
+            "popular_setup": {"play_mode": "constructed", "use_upgrades": False},
+            "is_following": False,
+            "follow_id": None,
+        }
+
+    def test_a_cube_with_no_games_has_no_popular_setup(self, client, vintage_cube):
+        summary = client.get("/api/battlers/cube/vintage").json()
+
+        assert (summary["cube_name"], summary["game_count"], summary["popular_setup"]) == ("Vintage Cube", 0, None)
+
+    def test_tells_a_follower_which_follow_to_remove(self, client, vintage_cube, kestrel):
+        follow = client.post("/api/battlers/follow", json={"cube_id": "vintage"}).json()
+
+        summary = client.get("/api/battlers/cube/vintage").json()
+        client.post("/api/auth/logout")
+        signed_out = client.get("/api/battlers/cube/vintage").json()
+
+        assert (summary["is_following"], summary["follow_id"]) == (True, follow["id"])
+        assert (signed_out["is_following"], signed_out["follow_id"]) == (False, None)

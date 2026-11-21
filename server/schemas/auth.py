@@ -124,6 +124,23 @@ class GameSummaryResponse(BaseModel):
     hand_scryfall_ids: list[str] = []
 
 
+class CubeSetup(BaseModel):
+    play_mode: PlayMode
+    use_upgrades: bool
+
+
+class CubeSummaryResponse(BaseModel):
+    cube_id: str
+    cube_name: str | None = None
+    cube_image_uri: str | None = None
+    game_count: int = 0
+    human_player_count: int = 0
+    last_played: str | None = None
+    popular_setup: CubeSetup | None = None
+    is_following: bool = False
+    follow_id: int | None = None
+
+
 class FollowedBattlerResponse(BaseModel):
     id: int
     cube_id: str

@@ -21,13 +21,15 @@ from server.db.models import (
 )
 from server.errors import ErrorCode, api_error
 from server.schemas.auth import (
+    CubeSetup,
+    CubeSummaryResponse,
     FollowedBattlerResponse,
     GameSummaryResponse,
     UserBattlerCreate,
     UserBattlerResponse,
     UserBattlerUpdate,
 )
-from server.services.auth import get_current_user
+from server.services.auth import get_current_user, get_optional_user
 
 logger = logging.getLogger(__name__)
 
@@ -280,6 +282,22 @@ def _has_placed_seat(db: Session, player_user_id: str | None = None):
     return db.query(PlayerGameHistory.id).filter(*seat_filter).correlate(GameRecord).exists()
 
 
+def _popular_setup(db: Session, cube_id: str) -> CubeSetup | None:
+    """The cube's most played mode and upgrades setting, the more recent one on a tie."""
+    play_mode = _game_play_mode().label("play_mode")
+    uses_upgrades = _game_uses_upgrades().label("uses_upgrades")
+    row = (
+        db.query(play_mode, uses_upgrades)
+        .filter(GameRecord.cube_id == cube_id, GameRecord.ended_at.isnot(None), _has_placed_seat(db))
+        .group_by(play_mode, uses_upgrades)
+        .order_by(func.count(GameRecord.id).desc(), func.max(GameRecord.created_at).desc())
+        .first()
+    )
+    if row is None:
+        return None
+    return CubeSetup(play_mode=row[0], use_upgrades=bool(row[1]))
+
+
 def _query_cube_games(
     db: Session,
     cube_id: str,
@@ -374,6 +392,31 @@ def list_cube_games(
     db: Session = Depends(_get_db),
 ):
     return _query_cube_games(db, cube_id, play_mode=play_mode, use_upgrades=use_upgrades, offset=offset)
+
+
+@router.get("/cube/{cube_id}")
+def get_cube_summary(
+    cube_id: str,
+    current_user: User | None = Depends(get_optional_user),
+    db: Session = Depends(_get_db),
+) -> CubeSummaryResponse:
+    meta = _load_cube_metadata(db, cube_id)
+    follow = None
+    if current_user is not None:
+        follow = (
+            db.query(BattlerFollow)
+            .filter(BattlerFollow.user_id == current_user.id, BattlerFollow.cube_id == cube_id)
+            .first()
+        )
+    return CubeSummaryResponse(
+        cube_id=cube_id,
+        cube_name=str(meta.name) if meta and meta.name else None,
+        cube_image_uri=str(meta.image_uri) if meta and meta.image_uri else None,
+        **_cube_stats_for_ids(db, {cube_id}).get(cube_id, {}),
+        popular_setup=_popular_setup(db, cube_id),
+        is_following=follow is not None,
+        follow_id=cast(int, follow.id) if follow else None,
+    )
 
 
 @router.get("/{battler_id}/games")
