@@ -15,6 +15,7 @@ export default defineConfig({
       name: 'iPhone 15, short viewport',
       use: { ...devices['iPhone 15'], viewport: { width: 393, height: 560 } },
     },
+    { name: 'iPhone 15 landscape', use: { ...devices['iPhone 15 landscape'] } },
   ],
   webServer: {
     command: `npx vite build && npx vite preview --port ${port} --strictPort`,
