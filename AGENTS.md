@@ -81,8 +81,9 @@ the README, the docs in `web/src/docs/` and anything else players can read.
 
 ## Rules for the code
 
-- Run Python with `uv run`, add packages with `uv add`, and run ruff and ty
-  with `uvx`, not `uv run`.
+- Run Python with `uv run` and add packages with `uv add`. Run ruff and ty
+  with `uv run` too, which uses the versions pinned in `pyproject.toml`.
+  `uvx` ignores the pin.
 - Ask before adding a Python or npm dependency.
 - Write a comment only to say why the code does something unexpected. Names
   and structure say what it does.
@@ -95,15 +96,16 @@ the README, the docs in `web/src/docs/` and anything else players can read.
 ## Checks
 
 ```sh
-uvx ruff check . && uvx ruff format --check . && uvx ty check
+uv run ruff check . && uv run ruff format --check . && uv run ty check
 uv run pytest
 (cd web && npm run lint && npm run typecheck && npm run build && npm test)
 ```
 
-The commit hook in `.pre-commit-config.yaml` runs ruff, ty, ESLint and the web
-type check. Install it once per clone with `uvx pre-commit install`. CI runs
-the same checks, pytest with coverage, the web build and a load test on every
-pull request. CI does not run `npm test`, so run it yourself.
+The commit hook in `.pre-commit-config.yaml` runs ruff and ty with `uv run`,
+then ESLint and the web type check. pre-commit itself isn't a project
+dependency, so install the hook once per clone with `uvx pre-commit install`.
+CI runs the same checks, pytest with coverage, the web build and a load test on
+every pull request. CI does not run `npm test`, so run it yourself.
 
 ## Branches, deploys and releases
 
