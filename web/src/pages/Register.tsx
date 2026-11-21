@@ -49,12 +49,7 @@ export function Register() {
       center="always"
       contentClassName="items-center px-4"
     >
-      <SurfaceCard
-        as="form"
-        onSubmit={handleSubmit}
-        width="sm"
-        padding={6}
-      >
+      <SurfaceCard as="form" onSubmit={handleSubmit}>
         <h2 className="text-xl font-bold text-white mb-5">Create Account</h2>
 
         {error && (

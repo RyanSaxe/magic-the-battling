@@ -60,12 +60,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
-      <SurfaceCard
-        width="sm"
-        padding={5}
-        className="relative"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <SurfaceCard className="relative" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
           <h2 className="text-white font-semibold">Join Game</h2>
           <button

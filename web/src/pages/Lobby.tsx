@@ -527,8 +527,8 @@ export function Lobby() {
   if (!session) {
     return (
       <>
-        <PageFrame header={header} center="except-short-wide" contentClassName="items-center">
-          <SurfaceCard width="md-viewport" padding={5} raised={false}>
+        <PageFrame header={header} center="except-short-wide" contentClassName="items-center px-4">
+          <SurfaceCard>
             <h2 className="text-lg font-semibold text-amber-200">
               Unable to Reconnect
             </h2>
@@ -569,9 +569,9 @@ export function Lobby() {
   if (!lobbyState) {
     return (
       <>
-        <PageFrame header={header} center="except-short-wide" contentClassName="items-center">
+        <PageFrame header={header} center="except-short-wide" contentClassName="items-center px-4">
           {connectionError && !invalidSession ? (
-            <SurfaceCard width="md-viewport" padding={5} raised={false}>
+            <SurfaceCard>
               <h2 className="text-lg font-semibold text-amber-200">
                 {connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Lobby Unavailable"}
               </h2>
@@ -640,7 +640,7 @@ export function Lobby() {
         contentClassName="px-4 sm:items-center"
         hints
       >
-        <SurfaceCard width="md" padding={4} className="overflow-visible sm:flex-none">
+        <SurfaceCard className="overflow-visible">
           {lobbyState &&
             (() => {
               const isHost = currentPlayer?.is_host ?? false;
