@@ -92,7 +92,7 @@ export function Dashboard() {
     <>
       <PageFrame
         header={<AppHeader renderRight={({ compact }) => <UserMenuButton compact={compact} />} />}
-        contentClassName="px-4 py-4"
+        contentClassName="px-4"
       >
         <div className="flex justify-center mb-4">
           <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">

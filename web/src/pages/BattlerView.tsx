@@ -76,7 +76,7 @@ export function BattlerView() {
 
   return (
     <>
-      <PageFrame header={header} contentClassName="px-4 py-4">
+      <PageFrame header={header} contentClassName="px-4">
         <CubeGameHistory
           cubeId={battler.cube_id}
           cubeName={battler.cube_name ?? battler.display_name ?? null}

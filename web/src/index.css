@@ -323,14 +323,6 @@ input:-webkit-autofill:focus {
   }
 }
 
-@media (width >= 640px) and (height <= 820px) {
-  .page-center-except-short-wide,
-  .page-center-tall-wide {
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-  }
-}
-
 .zone-divider-line--horizontal {
   background:
     linear-gradient(

@@ -601,7 +601,7 @@ export function Play() {
           </button>
         )} />}
         center="tall-wide"
-        contentClassName="px-4 py-4 sm:py-2 sm:items-center"
+        contentClassName="px-4 sm:items-center"
         hints
       >
         <section className="w-full max-w-md mx-auto modal-chrome border gold-border rounded-lg overflow-hidden grow shrink-0 flex flex-col sm:flex-none felt-raised-panel">
