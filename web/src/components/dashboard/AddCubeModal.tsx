@@ -69,7 +69,7 @@ export function AddCubeModal({
               type="text"
               value={cubeId}
               onChange={(e) => setCubeId(e.target.value)}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
               placeholder="e.g. auto"
               autoFocus
               required
@@ -82,7 +82,7 @@ export function AddCubeModal({
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
               placeholder="My Draft Cube"
             />
           </div>
@@ -92,7 +92,7 @@ export function AddCubeModal({
               type="checkbox"
               checked={playMode === 'constructed'}
               onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
-              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+              className="w-4 h-4 rounded bg-black/40 border-black/40"
             />
             <span className="text-white text-sm">Constructed</span>
             <span className="text-amber-200/45 text-xs">— bring your own deck</span>
@@ -103,7 +103,7 @@ export function AddCubeModal({
               type="checkbox"
               checked={useUpgrades}
               onChange={(e) => setUseUpgrades(e.target.checked)}
-              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+              className="w-4 h-4 rounded bg-black/40 border-black/40"
             />
             <span className="text-white text-sm">Upgrades</span>
             <span className="text-amber-200/45 text-xs">— upgrade a card every 3 rounds</span>

@@ -3,7 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { getShareGame } from '../api/client'
 import type { ShareGameResponse, SharePlayerSnapshot, Card as CardType } from '../types'
 import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
-import { buildSharePlayerViews, getSharePlayerRowBadge } from '../utils/share'
+import {
+  buildSharePlayerViews,
+  getSharePlayerRowBadge,
+  getShareRoundLabel,
+  getShareRoundValue,
+  parseShareRoundValue,
+} from '../utils/share'
 import { useViewportCardSizes } from '../hooks/useViewportCardSizes'
 import { useGameShellMode } from '../hooks/useGameShellMode'
 import { useElementHeight } from '../hooks/useElementHeight'
@@ -22,19 +28,21 @@ import { type AppError, unknownToAppError } from '../utils/appError'
 
 interface RoundOption {
   label: string
+  shortLabel: string
   value: string
 }
 
 function buildRoundOptions(rounds: SharePlayerSnapshot[]): RoundOption[] {
   return rounds.map((snap) => ({
-    label: `Stage ${snap.stage} - Round ${snap.round}`,
-    value: `${snap.stage}_${snap.round}`,
+    label: getShareRoundLabel(snap),
+    shortLabel: getShareRoundLabel(snap, true),
+    value: getShareRoundValue(snap),
   }))
 }
 
 function getLatestRoundValue(rounds: SharePlayerSnapshot[]): string {
   const latest = rounds[rounds.length - 1]
-  return latest ? `${latest.stage}_${latest.round}` : ''
+  return latest ? getShareRoundValue(latest) : ''
 }
 
 function RoundPopover({
@@ -70,7 +78,7 @@ function RoundPopover({
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-4 left-2 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 min-w-[180px] max-h-[300px] overflow-y-auto"
+      className="absolute bottom-full mb-4 left-2 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 w-max min-w-[180px] max-h-[300px] overflow-y-auto"
     >
       {options.map((opt) => (
         <button
@@ -153,7 +161,7 @@ export function ShareGame() {
   const referenceSnapshots = ownerPlayer?.snapshots ?? data?.players[0]?.snapshots ?? []
   const latestRoundValue = getLatestRoundValue(referenceSnapshots)
   const selectedRoundExists = referenceSnapshots.some(
-    (snapshot) => `${snapshot.stage}_${snapshot.round}` === selectedRound,
+    (snapshot) => getShareRoundValue(snapshot) === selectedRound,
   )
   const effectiveSelectedRound = selectedRoundExists ? selectedRound : latestRoundValue
   const playerViews = buildSharePlayerViews(data, effectiveSelectedRound)
@@ -201,14 +209,16 @@ export function ShareGame() {
 
   const currentPlayerData = data.players.find((p) => p.name === selectedPlayer)
   const currentSnapshot = currentPlayerData
-    ? currentPlayerData.snapshots.find((s) => `${s.stage}_${s.round}` === effectiveSelectedRound)
+    ? currentPlayerData.snapshots.find((s) => getShareRoundValue(s) === effectiveSelectedRound)
     : null
   const currentIndex = roundOptions.findIndex((o) => o.value === effectiveSelectedRound)
   const hasPrev = currentIndex > 0
   const hasNext = currentIndex < roundOptions.length - 1
-  const currentRoundLabel = roundOptions.find((o) => o.value === effectiveSelectedRound)?.label ?? 'No rounds'
+  const currentRoundOption = roundOptions.find((o) => o.value === effectiveSelectedRound)
+  const currentRoundLabel =
+    (shellMode === 'mobile' ? currentRoundOption?.shortLabel : currentRoundOption?.label) ?? 'No rounds'
   const roundLayoutStateKey = currentSnapshot
-    ? `round:${selectedPlayer}:${currentSnapshot.stage}:${currentSnapshot.round}`
+    ? `round:${selectedPlayer}:${getShareRoundValue(currentSnapshot)}`
     : null
   const roundResizeState = roundLayoutStateKey
     ? {
@@ -253,13 +263,14 @@ export function ShareGame() {
       )
     }
 
+    const absentMessage = parseShareRoundValue(effectiveSelectedRound)?.sudden_death_build
+      ? 'This player did not fight in this Sudden Death.'
+      : 'This player was not in the game during this round.'
     return (
       <div className="flex-1 flex items-center justify-center px-4">
         <SurfaceCard>
           <p className="text-sm text-gray-200 leading-snug">
-            {currentPlayerData
-              ? 'This player was not in the game during this round.'
-              : 'Select a player to view their deck.'}
+            {currentPlayerData ? absentMessage : 'Select a player to view their deck.'}
           </p>
         </SurfaceCard>
       </div>

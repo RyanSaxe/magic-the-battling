@@ -1,8 +1,8 @@
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { MIN_CARD_WIDTH } from '../src/hooks/cardSizeUtils'
 import type { ZoneConstraints } from '../src/hooks/computeConstrainedLayout'
 import { boardSizeBand } from '../src/hooks/usePersistedConstraints'
-import { serveGame } from './helpers'
+import { expect, serveGame, test } from './helpers'
 import { GAME_ID, type ScreenState } from './gameStates'
 
 /**

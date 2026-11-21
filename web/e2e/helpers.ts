@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { expect, test as base, type Locator, type Page, type Route } from '@playwright/test'
+import { expect, test as base, type Locator, type Page, type Route, type WebSocketRoute } from '@playwright/test'
 import type {
   AuthUser,
   FollowedBattler,
@@ -14,6 +14,9 @@ import { GAME_ID, PLAYER_NAME, gameBootstrap, type ScreenState } from './gameSta
 
 type MockResponse = { status?: number; json: unknown }
 
+/** Set LAYOUT_CARD_ART=real to load real card images from Scryfall, for screenshots; runs stay offline otherwise. */
+const SHOW_REAL_CARD_ART = process.env.LAYOUT_CARD_ART === 'real'
+
 const isLoopback = (ipAddress: string) => ipAddress.startsWith('127.') || ipAddress === '::1' || ipAddress === '[::1]'
 
 /** Fails a test when any response came from a server other than this machine, so the tests never depend on the network. */
@@ -24,6 +27,8 @@ export const test = base.extend<{ stayOffline: void }>({
       outsideResponses.push(response.serverAddr().then((address) => (address && !isLoopback(address.ipAddress) ? response.url() : null)))
     })
     await use()
+    // Real card art is fetched on purpose, for screenshots taken on a developer's machine.
+    if (SHOW_REAL_CARD_ART) return
     const reachedNetwork = (await Promise.all(outsideResponses)).filter((url) => url !== null)
     expect(reachedNetwork, 'responses from servers outside this machine').toEqual([])
   }, { auto: true }],
@@ -149,6 +154,8 @@ const LOBBY_STATE: LobbyState = {
   ],
   can_start: true,
   is_started: false,
+  start_status: 'open',
+  start_error: null,
   target_player_count: 4,
   puppet_count: 1,
   cube_loading_status: 'ready',
@@ -160,7 +167,7 @@ const LOBBY_STATE: LobbyState = {
   play_mode: 'limited',
 }
 
-function shareSnapshot(stage: number, round: number): SharePlayerSnapshot {
+function shareSnapshot(stage: number, round: number, suddenDeathBuild: number | null = null): SharePlayerSnapshot {
   return {
     stage,
     round,
@@ -173,6 +180,7 @@ function shareSnapshot(stage: number, round: number): SharePlayerSnapshot {
     poison: round,
     vanguard: null,
     visibility: 'full',
+    sudden_death_build: suddenDeathBuild,
   }
 }
 
@@ -256,6 +264,24 @@ export async function serveShareMidGame(page: Page, baseURL: string) {
   })
 }
 
+// Alice and Bob reached lethal in 3-3, drew their first Sudden Death and fought a second, so the page opens on its rebuild.
+const SHARE_SUDDEN_DEATH: ShareGameResponse = {
+  ...SHARE_GAME,
+  players: SHARE_GAME.players.map((player) => ({
+    ...player,
+    snapshots: ['Alice', 'Bob'].includes(player.name)
+      ? [...SHARE_SNAPSHOTS, shareSnapshot(3, 3, 1), shareSnapshot(3, 3, 2)]
+      : SHARE_SNAPSHOTS,
+  })),
+}
+
+export async function serveShareSuddenDeath(page: Page, baseURL: string) {
+  await serveFromTable(page, baseURL, {
+    ...SIGNED_OUT_RESPONSES,
+    [`/api/games/${SHARE_GAME_ID}/share/Alice`]: { json: SHARE_SUDDEN_DEATH },
+  })
+}
+
 export async function serveShareInProgress(page: Page, baseURL: string) {
   await serveFromTable(page, baseURL, {
     ...SIGNED_OUT_RESPONSES,
@@ -287,17 +313,26 @@ const CARD_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
   <rect x="40" y="70" width="408" height="300" rx="6" fill="#55534d"/>
 </svg>`
 
-/** Set LAYOUT_CARD_ART=real to load real card images from Scryfall, for screenshots; runs stay offline otherwise. */
-const SHOW_REAL_CARD_ART = process.env.LAYOUT_CARD_ART === 'real'
-
 /** A player's Guided Mode progress in a game: the guides they have seen and the one left open at a step. */
 export interface GuideProgress {
   seen: string[]
   active_guide?: { id: string; step: number }
 }
 
-/** Opens a game whose server sends `screen` as its state, with Guided Mode on from `guideProgress` when given. */
-export async function serveGame(page: Page, baseURL: string, screen: ScreenState, guideProgress?: GuideProgress) {
+export interface ServeGameOptions {
+  /** Turns Guided Mode on with this progress. */
+  guideProgress?: GuideProgress
+  /** Receives the game socket, to read the client's actions and send more state. */
+  onSocket?: (ws: WebSocketRoute) => void
+}
+
+/** Opens a game whose server sends `screen` as its state. */
+export async function serveGame(
+  page: Page,
+  baseURL: string,
+  screen: ScreenState,
+  { guideProgress, onSocket }: ServeGameOptions = {},
+) {
   await serveWithoutBackend(page, baseURL)
   await page.route(/^https:\/\/(cards|backs)\.scryfall\.io\//, (route) =>
     SHOW_REAL_CARD_ART ? route.continue() : route.fulfill({ body: CARD_PLACEHOLDER_SVG, contentType: 'image/svg+xml' }))
@@ -314,6 +349,7 @@ export async function serveGame(page: Page, baseURL: string, screen: ScreenState
   }, { session: LOBBY_SESSION, progressKey: `${GAME_ID}::${PLAYER_NAME}`, guideProgress })
   await page.routeWebSocket(/\/ws\//, (ws) => {
     ws.send(JSON.stringify({ type: 'game_bootstrap', payload: gameBootstrap(screen) }))
+    onSocket?.(ws)
   })
 }
 
@@ -399,6 +435,13 @@ export const PAGES: PageUnderTest[] = [
     name: 'share mid-game',
     path: `/game/${SHARE_GAME_ID}/share/Dave`,
     serve: serveShareMidGame,
+    primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
+    fillsFelt: true,
+  },
+  {
+    name: 'share Sudden Death',
+    path: `/game/${SHARE_GAME_ID}/share/Alice`,
+    serve: serveShareSuddenDeath,
     primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
     fillsFelt: true,
   },

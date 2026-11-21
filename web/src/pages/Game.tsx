@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useReducer, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
@@ -63,7 +63,13 @@ import {
   getRevealedAppliedUpgrades,
   getUnrevealedAppliedUpgrades,
 } from "../utils/upgrades";
-import type { Phase } from "../constants/phases";
+import {
+  BATTLE_SUBMIT_BUTTON_LABEL,
+  BUILD_SUBMIT_BUTTON_LABEL,
+  DRAFT_DONE_BUTTON_LABEL,
+  REWARD_CONTINUE_BUTTON_LABEL,
+  type Phase,
+} from "../constants/phases";
 import type {
   GuideRequest,
   GuidedGuideId,
@@ -80,6 +86,12 @@ import {
   shouldBlockGuidesForBattleResolution,
   type VisibleGuideStep,
 } from "./gameGuideState";
+import {
+  initialPhaseActionState,
+  isPhaseActionPending,
+  reducePhaseAction,
+  type PhaseAction,
+} from "./pendingPhaseAction";
 import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
 import {
   canUseBattleFaceDownAction,
@@ -515,7 +527,7 @@ function PlayerSelectionModal({
                 type="text"
                 value={spectatorName}
                 onChange={(e) => setSpectatorName(e.target.value)}
-                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
                 placeholder="Enter your name"
               />
             </div>
@@ -878,13 +890,14 @@ function GameContent() {
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
 
   const { addToast } = useToast();
-  const buildReadyPendingRef = useRef(false);
-  const [buildReadyPending, setBuildReadyPending] = useState(false);
+  const [phaseActionState, dispatchPhaseAction] = useReducer(
+    reducePhaseAction,
+    { phase: null, buildReady: false, connected: false },
+    initialPhaseActionState,
+  );
+  const pendingPhaseAction = phaseActionState.pending;
   const handleServerError = useCallback((error: AppError) => {
-    if (buildReadyPendingRef.current) {
-      buildReadyPendingRef.current = false;
-      setBuildReadyPending(false);
-    }
+    dispatchPhaseAction({ type: "failed" });
     addToast(getAppErrorMessage(error, "game-action", "That action could not be completed."), "error");
   }, [addToast]);
 
@@ -969,24 +982,21 @@ function GameContent() {
     rememberPlayerForGame(gameId, playerName);
   }, [gameId, gameState?.self_player.name, isSpectator]);
 
+  const selfBuildReady = gameState?.self_player.build_ready ?? false;
   useEffect(() => {
-    const selfPlayer = gameState?.self_player;
-    if (!selfPlayer) {
-      buildReadyPendingRef.current = false;
-      queueMicrotask(() => setBuildReadyPending(false));
-      return;
-    }
-    if (selfPlayer.phase !== "build" || !selfPlayer.build_ready) {
-      buildReadyPendingRef.current = false;
-      queueMicrotask(() => setBuildReadyPending(false));
-    }
-  }, [
-    gameId,
-    session?.playerId,
-    gameState?.self_player,
-    gameState?.self_player.phase,
-    gameState?.self_player.build_ready,
-  ]);
+    dispatchPhaseAction({
+      type: "server_state",
+      server: { phase: selfPhase ?? null, buildReady: selfBuildReady, connected: isConnected },
+    });
+  }, [selfPhase, selfBuildReady, isConnected]);
+
+  const sendPhaseAction = useCallback((action: PhaseAction, send: () => void) => {
+    if (pendingPhaseAction) return false;
+    dispatchPhaseAction({ type: "sent", action });
+    send();
+    return true;
+  }, [pendingPhaseAction]);
+  const buildReadyPending = isPhaseActionPending(pendingPhaseAction, "build_ready");
 
   // Lifted state from Build phase
   type UpgradesModalOpenMode = 'auto' | 'view' | 'reveal';
@@ -1305,19 +1315,18 @@ function GameContent() {
   const handleBuildReadySubmit = useCallback((
     playDrawPreference: "play" | "draw",
   ) => {
-    if (buildReadyPendingRef.current || !gameState || gameState.self_player.phase !== "build") {
+    if (!gameState || gameState.self_player.phase !== "build") {
       return;
     }
-    buildReadyPendingRef.current = true;
-    setBuildReadyPending(true);
-    requestGuideCompletion("build_play_draw", "play-draw");
-    closeGameplayOverlays();
-    actions.buildReady(
+    const sent = sendPhaseAction("build_ready", () => actions.buildReady(
       selectedBasics,
       playDrawPreference,
       handSlotsRef.current.filter((id): id is string => id !== null),
-    );
-  }, [actions, closeGameplayOverlays, gameState, requestGuideCompletion, selectedBasics]);
+    ));
+    if (!sent) return;
+    requestGuideCompletion("build_play_draw", "play-draw");
+    closeGameplayOverlays();
+  }, [actions, closeGameplayOverlays, gameState, requestGuideCompletion, selectedBasics, sendPhaseAction]);
 
   const openBuildSubmitPopover = useCallback(() => {
     if (showSubmitHandPopover || buildReadyPending) {
@@ -1423,11 +1432,21 @@ function GameContent() {
   }, [actions, pendingBattleResult]);
 
   const handleContinue = useCallback(() => {
+    if (!sendPhaseAction("reward_done", () => actions.rewardDone(selectedUpgradeId ?? undefined))) return;
     requestGuideCompletion("reward", "continue");
-    actions.rewardDone(selectedUpgradeId ?? undefined);
-    setSelectedUpgradeId(null);
-    setSelectedPoolCardId(null);
-  }, [actions, requestGuideCompletion, selectedUpgradeId]);
+  }, [actions, requestGuideCompletion, selectedUpgradeId, sendPhaseAction]);
+
+  const handleGoToBuild = useCallback(() => {
+    sendPhaseAction("draft_done", actions.draftDone);
+  }, [actions, sendPhaseAction]);
+
+  useEffect(() => {
+    if (selfPhase === "reward") return;
+    queueMicrotask(() => {
+      setSelectedUpgradeId(null);
+      setSelectedPoolCardId(null);
+    });
+  }, [selfPhase]);
 
   const hasPendingBattleResolution =
     !!battleResolutionId &&
@@ -1495,7 +1514,7 @@ function GameContent() {
           actions.draftRoll();
         }
       };
-      map['Enter'] = () => actions.draftDone();
+      map['Enter'] = handleGoToBuild;
       map['u'] = () => {
         if (sp.upgrades.length > 0) openUpgradesModal(undefined, 'view');
       };
@@ -1884,13 +1903,13 @@ function GameContent() {
               self_player.treasures <= 0 ||
               (self_player.current_pack?.length ?? 0) === 0
             }
-            className="btn bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-game"
             data-guide-target="draft-roll"
           >
             Roll for 1💰
           </button>
           {self_player.upgrades.length > 0 && (
-            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn btn-secondary">
               View Upgrades
             </button>
           )}
@@ -1898,11 +1917,12 @@ function GameContent() {
       );
       right = (
         <button
-          onClick={actions.draftDone}
+          onClick={handleGoToBuild}
+          disabled={isPhaseActionPending(pendingPhaseAction, "draft_done")}
           className="btn btn-primary"
           data-guide-target="draft-continue"
         >
-          Go to Build
+          {DRAFT_DONE_BUTTON_LABEL}
         </button>
       );
     } else if (actionBarPhase === "build") {
@@ -1911,13 +1931,13 @@ function GameContent() {
           hasPendingBuildUpgrades ? (
             <button
               onClick={() => openUpgradesModal(undefined, 'auto')}
-              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              className="btn btn-game btn-pending"
               data-guide-target="build-apply-upgrade"
             >
               Apply Upgrade
             </button>
           ) : (
-            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn btn-secondary">
               View Upgrades
             </button>
           )
@@ -1927,7 +1947,7 @@ function GameContent() {
             <span className="text-amber-400 text-sm">Waiting...</span>
             <button
               onClick={actions.buildUnready}
-              className="btn bg-gray-600 hover:bg-gray-500 text-white"
+              className="btn btn-secondary"
             >
               Change
             </button>
@@ -1938,7 +1958,7 @@ function GameContent() {
           hasPendingBuildUpgrades ? (
             <button
               onClick={() => openUpgradesModal(undefined, 'auto')}
-              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              className="btn btn-game btn-pending"
               data-guide-target="build-apply-upgrade"
             >
               Apply Upgrade
@@ -1946,7 +1966,7 @@ function GameContent() {
           ) : (
             <button
               onClick={() => openUpgradesModal(undefined, 'view')}
-              className="btn bg-gray-600 hover:bg-gray-500 text-white"
+              className="btn btn-secondary"
             >
               View Upgrades
             </button>
@@ -1960,7 +1980,7 @@ function GameContent() {
               className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               data-guide-target="build-submit"
             >
-              {buildReadyPending ? "Submitting..." : "Submit Hand"}
+              {buildReadyPending ? "Submitting..." : BUILD_SUBMIT_BUTTON_LABEL}
             </button>
             {showSubmitHandPopover && canReady && (
               <SubmitPopover
@@ -1968,12 +1988,12 @@ function GameContent() {
                   {
                     label: "Play",
                     onClick: () => handleBuildReadySubmit('play'),
-                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                    className: "btn btn-success text-sm py-1.5",
                   },
                   {
                     label: "Draw",
                     onClick: () => handleBuildReadySubmit('draw'),
-                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                    className: "btn btn-success text-sm py-1.5",
                   },
                 ]}
                 onClose={() => setShowSubmitHandPopover(false)}
@@ -1996,7 +2016,7 @@ function GameContent() {
           {hasUnrevealedBattleUpgrades && (
             <button
               onClick={() => openBattleRevealUpgradesModal()}
-              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              className="btn btn-game btn-pending"
               data-guide-target="battle-reveal-upgrade"
             >
               Reveal Upgrade
@@ -2027,7 +2047,7 @@ function GameContent() {
             </span>
             <button
               onClick={() => setIsChangingResult(true)}
-              className="btn bg-gray-600 hover:bg-gray-500 text-white"
+              className="btn btn-secondary"
             >
               Change
             </button>
@@ -2039,7 +2059,7 @@ function GameContent() {
             {isChangingResult && (
               <button
                 onClick={() => { setIsChangingResult(false); setShowSubmitResultPopover(false); }}
-                className="text-gray-400 text-sm hover:text-white"
+                className="btn btn-secondary"
               >
                 Cancel
               </button>
@@ -2049,7 +2069,7 @@ function GameContent() {
               className="btn btn-primary"
               data-guide-target="battle-submit"
             >
-              Submit Result
+              {BATTLE_SUBMIT_BUTTON_LABEL}
             </button>
             {showSubmitResultPopover && (
               <SubmitPopover
@@ -2059,14 +2079,14 @@ function GameContent() {
                     onClick: () => {
                       handleBattleResultSubmit(self_player.name);
                     },
-                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                    className: "btn btn-success text-sm py-1.5",
                   },
                   {
                     label: "Draw",
                     onClick: () => {
                       handleBattleResultSubmit("draw");
                     },
-                    className: "btn btn-danger text-sm py-1.5",
+                    className: "btn btn-secondary text-sm py-1.5",
                   },
                   {
                     label: "I Lost",
@@ -2090,11 +2110,11 @@ function GameContent() {
         ? selectedUpgradeId
           ? "Claim & Continue"
           : "Select Upgrade"
-        : "Continue";
+        : REWARD_CONTINUE_BUTTON_LABEL;
       right = (
         <button
           onClick={handleContinue}
-          disabled={!canContinue}
+          disabled={!canContinue || isPhaseActionPending(pendingPhaseAction, "reward_done")}
           className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           data-guide-target="reward-continue"
         >
@@ -2688,7 +2708,7 @@ function GameContent() {
               secondary={endOfGame ? (
                 <>
                   <button
-                    className="btn bg-slate-700 hover:bg-slate-600 text-white"
+                    className="btn btn-secondary"
                     onClick={() =>
                       window.open(shareUrl, "_blank", "noopener,noreferrer")
                     }
@@ -2696,7 +2716,7 @@ function GameContent() {
                     Review
                   </button>
                   <button
-                    className="btn bg-purple-600 hover:bg-purple-500 text-white"
+                    className="btn btn-secondary"
                     onClick={openShareModal}
                   >
                     Share Game
