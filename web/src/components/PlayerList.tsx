@@ -9,7 +9,8 @@ import {
   SkullIcon,
 } from "./icons";
 import { useContextStrip } from "../contexts";
-import { PlacementBadge } from "./sidebar/PlacementBadge";
+import { PlacementTag, Tag } from "./common/Tag";
+import { getSidebarPlacementRank } from "../utils/playerPlacement";
 import { getSidebarPlayerOrder } from "../utils/playerPlacement";
 import { getPlayerPhaseStatusLabel } from "../utils/format";
 
@@ -32,47 +33,42 @@ function ResultBadge({
   inSuddenDeath: boolean;
   shareStatus?: ShareResultStatus;
 }) {
-  const baseClassName = "inline-flex h-4 min-w-[1.25rem] shrink-0 items-center justify-center rounded-[3px] border border-[color:rgba(212,175,55,0.22)] bg-black/18 px-1 text-[10px] font-bold leading-none";
-  const shareBadgeClassName = `${baseClassName} min-w-[3.75rem] whitespace-nowrap px-1.5 text-[9px] font-semibold`;
+  const resultClassName = "min-w-[1.25rem]";
 
   if (shareStatus === "viewing") {
-    return <span className={`${shareBadgeClassName} text-cyan-200`}>Viewing</span>;
+    return <Tag tone="gold" small quiet dot>Viewing</Tag>;
   }
 
   if (shareStatus === "alive") {
-    return <span className={`${shareBadgeClassName} text-emerald-200`}>Alive</span>;
+    return <Tag tone="emerald" small quiet dot>Alive</Tag>;
   }
 
   if (shareStatus === "dead") {
-    return <span className={`${shareBadgeClassName} text-red-200`}>Dead</span>;
+    return <Tag tone="crimson" small quiet dot>Dead</Tag>;
   }
 
   if (inSuddenDeath) {
-    return (
-      <span className={`${baseClassName} min-w-[1.5rem] text-[9px] text-red-300`} title="Sudden Death">
-        SD
-      </span>
-    );
+    return <Tag tone="crimson" small quiet title="Sudden Death" className={resultClassName}>SD</Tag>;
   }
 
   if (result === null) {
-    return <span className={`${baseClassName} font-semibold text-gray-500`}>-</span>;
+    return <Tag tone="stone" small quiet className={resultClassName}>-</Tag>;
   }
 
   if (result === "win") {
-    return <span className={`${baseClassName} text-emerald-300`}>W</span>;
+    return <Tag tone="emerald" small quiet className={resultClassName}>W</Tag>;
   }
 
   if (result === "draw") {
-    return <span className={`${baseClassName} text-amber-200`}>D</span>;
+    return <Tag tone="gold" small quiet className={resultClassName}>D</Tag>;
   }
 
-  return <span className={`${baseClassName} text-red-300`}>L</span>;
+  return <Tag tone="crimson" small quiet className={resultClassName}>L</Tag>;
 }
 
 function PairingProbability({ probability }: { probability: number }) {
   return (
-    <span className="text-[10px] text-cyan-300/90">
+    <span className="text-[10px] text-[var(--ivory-muted)]">
       {Math.round(probability * 100)}%
     </span>
   );
@@ -151,16 +147,11 @@ export function PlayerRow({
       data-guide-player-row={player.name}
       onClick={onClick}
     >
-      {showPlacement && (
-        <PlacementBadge
-          player={player}
-          players={players}
-          variant="corner"
-          className="pointer-events-none absolute left-0 top-0 z-10"
-        />
-      )}
       <div className="min-w-0 self-end">
         <div className="flex items-center gap-1.5">
+          {showPlacement && (
+            <PlacementTag rank={getSidebarPlacementRank(player, players)} total={players.length} />
+          )}
           {showLeadingMicToggle ? micToggle : null}
           <span className="block truncate text-sm font-medium text-amber-50">
             {player.name}
@@ -192,9 +183,7 @@ export function PlayerRow({
             <MoneyBagIcon size="sm" /> {player.treasures}
           </span>
           {variant !== "share" && isSelf && (
-            <span className="text-[10px] font-medium uppercase tracking-[0.08em] text-cyan-300/90">
-              You
-            </span>
+            <Tag tone="gold" small>You</Tag>
           )}
           {showPairingProbability && player.pairing_probability !== null && (
             <PairingProbability probability={player.pairing_probability} />

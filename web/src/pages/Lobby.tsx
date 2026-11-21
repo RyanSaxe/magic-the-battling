@@ -22,6 +22,7 @@ import {
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
 import { DIALOG_BACKDROP, LINK, TEXT_INPUT } from "../components/common/styles";
+import { Tag } from "../components/common/Tag";
 
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 
@@ -214,9 +215,9 @@ function VoiceChatSwitch({
         <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ivory-muted)]">
           Voice
         </span>
-        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400 max-[389px]:hidden">
+        <Tag tone="gold" small className="max-[389px]:hidden">
           Beta
-        </span>
+        </Tag>
         <input
           type="checkbox"
           checked={enabled}

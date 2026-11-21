@@ -2,24 +2,12 @@ import type { CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { GameSummary } from '../../types'
 import { cubeTitle, formatWhen, gameMeta, modeLabel, seatsLabel, upgradesLabel } from '../../utils/accountFormat'
-import { getOrdinal, getPlacementBadgeColor } from '../../utils/format'
 import { SurfaceCard } from '../common/SurfaceCard'
+import { PlacementTag } from '../common/Tag'
 import { Chip } from './CubeTile'
 
 const MAX_HAND_CARDS = 7
 const HAND_OVERLAP_PX = 8
-
-export function PlacementBadge({ placement, playerCount }: { placement: number; playerCount: number }) {
-  const { bg, text } = getPlacementBadgeColor(placement, playerCount)
-  return (
-    <span
-      className="inline-flex h-[22px] min-w-[38px] shrink-0 items-center justify-center rounded-full px-2 text-[11px] leading-4 font-extrabold uppercase tracking-[0.04em] tabular-nums"
-      style={{ backgroundColor: bg, color: text }}
-    >
-      {getOrdinal(placement)}
-    </span>
-  )
-}
 
 type CardImageSize = 'small' | 'normal'
 
@@ -93,7 +81,7 @@ export function GameTile({ game, className, style }: GameTileProps) {
           <p className="truncate text-[11px] leading-4 text-amber-100/60">{gameMeta(game)}</p>
         </div>
         {game.best_human_placement !== null && (
-          <PlacementBadge placement={game.best_human_placement} playerCount={game.player_count} />
+          <PlacementTag rank={game.best_human_placement} total={game.player_count} />
         )}
       </div>
       <HandFan scryfallIds={game.hand_scryfall_ids} />
@@ -115,7 +103,7 @@ export function RecapCard({ game }: { game: GameSummary }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           {game.best_human_placement !== null && (
-            <PlacementBadge placement={game.best_human_placement} playerCount={game.player_count} />
+            <PlacementTag rank={game.best_human_placement} total={game.player_count} />
           )}
           <div className="min-w-0">
             <h3 className="truncate text-sm font-semibold text-amber-50">

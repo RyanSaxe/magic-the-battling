@@ -50,7 +50,7 @@ export function DetailHero({ imageUri, badge, title, links, chips, actions, play
         <div className="absolute inset-0 bg-gradient-to-r from-[color:var(--art-fade)] via-transparent to-transparent" />
         <div className="relative flex flex-col gap-4 p-4 sm:p-5 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
-            <CubeBadge tone={badge.tone} className="inline-block">
+            <CubeBadge tone={badge.tone}>
               {badge.label}
             </CubeBadge>
             <h1 className="mt-2 font-['Cinzel',serif] text-2xl font-bold leading-tight text-amber-50 drop-shadow-md">{title}</h1>
