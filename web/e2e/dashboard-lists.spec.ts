@@ -165,6 +165,24 @@ test.describe('on a phone held upright', () => {
   })
 })
 
+test('a preset or cube already removed elsewhere leaves the dashboard without an error', async ({ page, baseURL }) => {
+  await serveSignedIn(page, baseURL!)
+  const gone = { status: 404, json: { detail: 'Not found', code: 'BATTLER_NOT_FOUND' } }
+  await page.route('**/api/battlers/2', (route) => (route.request().method() === 'DELETE' ? route.fulfill(gone) : route.fallback()))
+  await page.route('**/api/battlers/follow/7', (route) => route.fulfill({ ...gone, json: { ...gone.json, code: 'FOLLOW_NOT_FOUND' } }))
+  page.on('dialog', (dialog) => dialog.accept())
+  await page.goto('/dashboard')
+
+  await page.getByRole('button', { name: 'More for Pauper Cube' }).click()
+  await page.getByRole('menuitem', { name: 'Delete' }).click()
+  await page.getByRole('button', { name: 'More for Peasant Cube' }).click()
+  await page.getByRole('menuitem', { name: 'Unfollow' }).click()
+
+  await expect(page.getByRole('button', { name: 'More for Pauper Cube' })).toBeHidden()
+  await expect(page.getByRole('button', { name: 'More for Peasant Cube' })).toBeHidden()
+  await expect(page.getByText(/Failed to/)).toHaveCount(0)
+})
+
 test('Follow in Discover can’t be chosen again while its request runs', async ({ page, baseURL }) => {
   const follow = heldResponse()
   await serveSignedIn(page, baseURL!)

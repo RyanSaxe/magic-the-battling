@@ -388,7 +388,8 @@ export async function deleteBattler(id: number): Promise<void> {
     method: 'DELETE',
     credentials: 'include',
   })
-  if (!response.ok) await throwResponseError(response, 'delete-battler', 'Failed to delete battler')
+  // A preset already deleted, such as from another tab, is gone, which is what the caller asked for.
+  if (!response.ok && response.status !== 404) await throwResponseError(response, 'delete-battler', 'Failed to delete battler')
 }
 
 export interface CubeGamesPage {
@@ -471,7 +472,8 @@ export async function unfollowCube(followId: number): Promise<void> {
     method: 'DELETE',
     credentials: 'include',
   })
-  if (!response.ok) await throwResponseError(response, 'unfollow-cube', 'Failed to unfollow')
+  // A follow already removed, such as from another tab, is gone, which is what the caller asked for.
+  if (!response.ok && response.status !== 404) await throwResponseError(response, 'unfollow-cube', 'Failed to unfollow')
 }
 
 // ── Discover ────────────────────────────────────────────────────────
