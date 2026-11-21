@@ -20,8 +20,16 @@ export function comparePlayersForSidebar(
   return a.name.localeCompare(b.name);
 }
 
+export function suddenDeathDecidesGame(players: PlayerView[]): boolean {
+  return !players.some((player) => !player.in_sudden_death && player.placement === 0);
+}
+
 export function getSidebarPlayerOrder(players: PlayerView[]): PlayerView[] {
   return [...players].sort(comparePlayersForSidebar);
+}
+
+function isTiedOnPoison(a: PlayerView, b: PlayerView): boolean {
+  return a.placement === 0 && b.placement === 0 && a.poison === b.poison;
 }
 
 export function getSidebarPlacementRank(
@@ -29,7 +37,8 @@ export function getSidebarPlacementRank(
   players: PlayerView[],
 ): number {
   const index = getSidebarPlayerOrder(players).findIndex(
-    (candidate) => candidate.name === player.name,
+    (candidate) =>
+      candidate.name === player.name || isTiedOnPoison(candidate, player),
   );
 
   return index >= 0 ? index + 1 : players.length;

@@ -158,7 +158,7 @@ function getOverviewRows({
 
   if (showPairingChance) {
     rows.splice(1, 0, {
-      label: "Likelihood to battle",
+      label: "Likelihood to fight",
       value: getLikelihoodValue(player.pairing_probability) ?? "-",
     });
   }
@@ -471,12 +471,12 @@ export function PlayerDetailPanel({
 
   const seenContent = (
     <AdaptiveCardSection
-      title="Seen in Battle"
+      title="Seen in Fight"
       cards={player.most_recently_revealed_cards}
       companionIds={companionIds}
       upgradedCardIds={upgradedCardIds}
       appliedUpgradesByCardId={appliedUpgradesByCardId}
-      emptyText="Nothing was revealed in battle yet."
+      emptyText="Nothing was revealed in a fight yet."
       guideTarget="sidebar-seen-in-battle"
       maxWidth={104}
       minColumns={isMobile ? 1 : 2}
@@ -510,7 +510,7 @@ export function PlayerDetailPanel({
         <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
           <DetailTabButton
             isActive={activeTab === "seen"}
-            label="Seen in Battle"
+            label="Seen in Fight"
             onClick={() => onTabChange("seen")}
           />
           <DetailTabButton

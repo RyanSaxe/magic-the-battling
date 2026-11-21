@@ -10,13 +10,23 @@ Build the best hand you can with the pool you have!
 
 - Select 3 basic lands to start untapped on the battlefield in the upcoming [battle phase](doc:battle).
 - Your hand size is always equal to the current stage, which you can see in the upper left corner.
-- Your opponent will be randomly be chosen from three other players at your table. If you faced one of them in the previous battle, your odds of facing versus that player is only 10%.
+- Your opponent will be randomly be chosen from three other players at your table. If you faced one of them in the previous fight, your odds of facing versus that player is only 10%.
 - Once you apply an upgrade, that action can never be undone. Choose carefully.
 
 ## Controls
 
+:::pointer
 - Click a card in your hand and pool to swap them.
 - Click a basic land in order to change it.
 - Once you are ready, click submit in the bottom right. Then, you must select whether your hand would prefer to play or draw.
 - To view or apply any [upgrades](doc:game-pieces#upgrades), click the button on the bottom left.
 - If you have a companion in your pool, there will be a button to select them as a companion from your sideboard. Clicking that same button will deselect the companion. Note that the game does not verify if that selection is legal, so remember to deselect when you change your hand.
+:::
+
+:::touch
+- Tap a card in your hand and pool to swap them.
+- Tap a basic land in order to change it.
+- Once you are ready, tap submit in the bottom right. Then, you must select whether your hand would prefer to play or draw.
+- To view or apply any [upgrades](doc:game-pieces#upgrades), tap the button on the bottom left.
+- If you have a companion in your pool, there will be a button to select them as a companion from your sideboard. Tapping that same button will deselect the companion. Note that the game does not verify if that selection is legal, so remember to deselect when you change your hand.
+:::

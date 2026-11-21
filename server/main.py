@@ -65,7 +65,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    title="Crucible",
+    title="Pitfight",
     description="Real-time multiplayer Magic: The Gathering draft format",
     version="0.1.0",
 )
@@ -217,6 +217,10 @@ if static_dir.exists():
     @app.get("/icon-512.png")
     async def icon_512():
         return FileResponse(static_dir / "icon-512.png", media_type="image/png")
+
+    @app.get("/icon-512-maskable.png")
+    async def icon_512_maskable():
+        return FileResponse(static_dir / "icon-512-maskable.png", media_type="image/png")
 
     @app.get("/apple-touch-icon.png")
     async def apple_touch_icon():

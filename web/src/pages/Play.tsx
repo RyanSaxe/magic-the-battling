@@ -7,8 +7,8 @@ import { useToast } from "../contexts";
 import { useAuth } from "../contexts/authState";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { InfoIcon } from "../components/icons/InfoIcon";
-import { HintsBanner } from "../components/common/HintsBanner";
-import { CubeCobraPrimerLink } from "../components/common/CubeCobraPrimerLink";
+import { AppHeader } from "../components/common/AppHeader";
+import { PageFrame } from "../components/common/PageFrame";
 import { getLegendaryName } from "../utils/prefetchName";
 import {
   getDefaultNewPlayerPreference,
@@ -16,7 +16,6 @@ import {
   setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
-import { FaDiscord } from "react-icons/fa6";
 import type { LobbyState, PlayMode } from "../types";
 import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
 
@@ -290,7 +289,7 @@ function GuidedModeField({
       <div ref={guidedModeHelpRef} className="relative group shrink-0">
         <button
           type="button"
-          className="text-gray-400 hover:text-gray-200"
+          className="touch-area [--touch-area-left:-7px] text-gray-400 hover:text-gray-200"
           aria-label="What guided mode does"
           aria-expanded={showGuidedModeHelp}
           onClick={() => setShowGuidedModeHelp((v) => !v)}
@@ -477,7 +476,8 @@ export function Play() {
   }, []);
 
   const handleCreateLobby = async () => {
-    if (!playerName.trim()) {
+    const name = playerName.trim();
+    if (!name) {
       addToast("Please enter your name", "error");
       return;
     }
@@ -489,7 +489,7 @@ export function Play() {
     lastLobbyErrorRef.current = null;
     setFriendsLoading(true);
     try {
-      const response = await createGame(playerName, {
+      const response = await createGame(name, {
         cubeId: submittedCubeId || "auto",
         useUpgrades,
         autoApproveSpectators,
@@ -497,7 +497,7 @@ export function Play() {
         playMode,
       });
       saveSession(response.session_id, response.player_id);
-      rememberPlayerForGame(response.game_id, playerName.trim());
+      rememberPlayerForGame(response.game_id, name);
       setNewPlayerPreferenceForGame(
         response.game_id,
         isGuidedMode,
@@ -513,7 +513,8 @@ export function Play() {
 
   const handleStartSolo = async (opponentOverride?: OpponentCount) => {
     const count = opponentOverride ?? opponents;
-    if (!playerName.trim()) {
+    const name = playerName.trim();
+    if (!name) {
       addToast("Please enter your name", "error");
       return;
     }
@@ -527,7 +528,7 @@ export function Play() {
     resetWatcher();
     try {
       const targetCount = count + 1;
-      const response = await createGame(playerName, {
+      const response = await createGame(name, {
         cubeId: submittedCubeId || "auto",
         useUpgrades,
         targetPlayerCount: targetCount,
@@ -536,7 +537,7 @@ export function Play() {
         playMode,
       });
       saveSession(response.session_id, response.player_id);
-      rememberPlayerForGame(response.game_id, playerName.trim());
+      rememberPlayerForGame(response.game_id, name);
       setNewPlayerPreferenceForGame(
         response.game_id,
         isGuidedMode,
@@ -591,214 +592,151 @@ export function Play() {
   );
 
   return (
-    <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <header className="shrink-0 py-3 frame-chrome bar-pad-both">
-        <div className="hidden sm:flex items-center justify-between">
-          <div>
-            <div className="flex items-baseline">
-              <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-                Crucible
-              </h1>
-              <span className="hero-sep mx-2.5">—</span>
-              <span className="hero-subtitle text-base font-normal tracking-widest">
-                an MtG format
-              </span>
-            </div>
-            <p className="hero-tagline">
-              Inspired by Roguelikes and Autobattlers
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => navigate("/")}
-              className="btn btn-secondary py-2 px-4"
-            >
-              Home
-            </button>
-          </div>
-        </div>
-        <div className="sm:hidden">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-baseline whitespace-nowrap">
-                <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
-                  Crucible
-                </h1>
-                <span className="hero-sep mx-1 text-xs">—</span>
-                <span className="hero-subtitle text-[11px] font-normal tracking-wider">
-                  an MtG format
+    <>
+      <PageFrame
+        header={<AppHeader renderRight={({ compact }) => (
+          <button
+            onClick={() => navigate("/")}
+            className={`btn btn-secondary ${compact ? "py-1.5 px-3 text-sm" : "py-2 px-4"}`}
+          >
+            Home
+          </button>
+        )} />}
+        center="tall-wide"
+        contentClassName="px-4 sm:items-center"
+        hints
+      >
+        <section className="w-full max-w-md mx-auto modal-chrome border gold-border rounded-lg overflow-hidden grow shrink-0 flex flex-col sm:flex-none felt-raised-panel">
+          <div className="p-4 sm:p-5 flex-1 min-h-0 flex flex-col sm:flex-none">
+            <div className="mb-4">
+              <div className="mb-1 flex items-center justify-between gap-3">
+                <label htmlFor="player-name" className="block text-gray-300 text-sm">
+                  Your Name
+                </label>
+                <span className="block text-gray-300 text-sm text-right shrink-0">
+                  Guided Mode
                 </span>
               </div>
-              <p className="hero-tagline !text-[9px] !tracking-[0.04em]">
-                Inspired by Roguelikes and Autobattlers
-              </p>
-            </div>
-            <button
-              onClick={() => navigate("/")}
-              className="btn btn-secondary py-1.5 px-3 text-sm shrink-0"
-            >
-              Home
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-
-        <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
-          <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col px-4 py-4 sm:py-2 sm:items-center sm:justify-center overflow-auto">
-            <section className="w-full max-w-md mx-auto modal-chrome border gold-border rounded-lg overflow-hidden flex-1 min-h-0 flex flex-col sm:flex-none felt-raised-panel">
-              <div className="p-4 sm:p-5 flex-1 min-h-0 flex flex-col sm:flex-none">
-                <div className="mb-4">
-                  <div className="mb-1 flex items-center justify-between gap-3">
-                    <label htmlFor="player-name" className="block text-gray-300 text-sm">
-                      Your Name
-                    </label>
-                    <span className="block text-gray-300 text-sm text-right shrink-0">
-                      Guided Mode
-                    </span>
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 sm:gap-3">
+                {user ? (
+                  <div className="w-full h-[42px] bg-black/20 border border-black/30 text-amber-100 rounded px-3 py-2 text-base flex items-center">
+                    {playerName}
                   </div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 sm:gap-3">
-                    {user ? (
-                      <div className="w-full h-[42px] bg-black/20 border border-black/30 text-amber-100 rounded px-3 py-2 text-base flex items-center">
-                        {playerName}
-                      </div>
-                    ) : (
-                      <input
-                        id="player-name"
-                        type="text"
-                        value={nameLoading ? "" : playerName}
-                        onChange={(e) => setPlayerName(e.target.value)}
-                        onKeyDown={(e) =>
-                          e.key === "Enter" && nameValid && handleCreateLobby()
-                        }
-                        disabled={nameLoading}
-                        placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-                        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
-                      />
-                    )}
-                    <GuidedModeField enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
-                  </div>
-                </div>
-
-                {/* Single active-mode card for all breakpoints */}
-                <div className="w-full max-w-md mx-auto flex-1 min-h-0 sm:flex-none flex flex-col gap-3">
-                  {activeMode === "solo" ? (
-                    <>
-                      {inactiveCard(
-                        "friends",
-                        <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
-                        "Play with Friends",
-                      )}
-                      <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col flex-1 min-h-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <GoldfishIcon className="w-8 h-8 text-amber-400" />
-                          <h2 className="text-lg font-semibold text-white">Goldfish</h2>
-                        </div>
-                        <div className="flex-1 flex items-center justify-center">
-                          <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                            <span className="block text-amber-400/70">
-                              Battle historically winning hands!
-                            </span>
-                            <span className="block">
-                              Their cards are face up in battle. You can move them around to simulate the game and decide who would have won.
-                            </span>
-                          </p>
-                        </div>
-                        <div className="mt-auto flex gap-2 pt-4">
-                          <button
-                            onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
-                            disabled={soloLoading ? false : !nameValid}
-                            className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-                          >
-                            {soloLoading ? (
-                              <>
-                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                </svg>
-                                Loading...
-                              </>
-                            ) : (
-                              "Start Game"
-                            )}
-                          </button>
-                          <GearButton onClick={() => setShowSoloAdvanced(true)} />
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {inactiveCard(
-                        "solo",
-                        <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
-                        "Goldfish",
-                      )}
-                      <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col flex-1 min-h-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          <FriendsIcon className="w-8 h-8 text-amber-400" />
-                          <h2 className="text-lg font-semibold text-white">
-                            Play with Friends
-                          </h2>
-                        </div>
-                        <div className="flex-1 flex items-center justify-center">
-                          <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
-                            <span className="block text-amber-400/70">
-                              Draft an unbeatable hand!
-                            </span>
-                            <span className="block">
-                              See who is the best drafter. Everybody starts with trash, and it's up to you to turn it into treasure!
-                            </span>
-                          </p>
-                        </div>
-                        <div className="mt-auto flex gap-2 pt-4">
-                          <button
-                            onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
-                            disabled={friendsLoading ? false : !nameValid}
-                            className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-                          >
-                            {friendsLoading ? (
-                              <>
-                                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                </svg>
-                                Loading...
-                              </>
-                            ) : (
-                              "Create Lobby"
-                            )}
-                          </button>
-                          <GearButton onClick={() => setShowFriendsAdvanced(true)} />
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
+                ) : (
+                  <input
+                    id="player-name"
+                    type="text"
+                    value={nameLoading ? "" : playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && nameValid && handleCreateLobby()
+                    }
+                    disabled={nameLoading}
+                    placeholder={nameLoading ? "Generating name..." : "Enter your name"}
+                    className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+                  />
+                )}
+                <GuidedModeField enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
               </div>
-            </section>
+            </div>
+
+            {/* Single active-mode card for all breakpoints */}
+            <div className="w-full max-w-md mx-auto flex-1 min-h-0 sm:flex-none flex flex-col gap-3">
+              {activeMode === "solo" ? (
+                <>
+                  {inactiveCard(
+                    "friends",
+                    <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
+                    "Play with Friends",
+                  )}
+                  <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col flex-1 min-h-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <GoldfishIcon className="w-8 h-8 text-amber-400" />
+                      <h2 className="text-lg font-semibold text-white">Goldfish</h2>
+                    </div>
+                    <div className="flex-1 flex items-center justify-center">
+                      <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                        <span className="block text-amber-400/70">
+                          Fight historically winning hands!
+                        </span>
+                        <span className="block">
+                          Their cards are face up in the fight. You can move them around to simulate the game and decide who would have won.
+                        </span>
+                      </p>
+                    </div>
+                    <div className="mt-auto flex gap-2 pt-4">
+                      <button
+                        onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
+                        disabled={soloLoading ? false : !nameValid}
+                        className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                      >
+                        {soloLoading ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Loading...
+                          </>
+                        ) : (
+                          "Start Game"
+                        )}
+                      </button>
+                      <GearButton onClick={() => setShowSoloAdvanced(true)} />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {inactiveCard(
+                    "solo",
+                    <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
+                    "Goldfish",
+                  )}
+                  <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col flex-1 min-h-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <FriendsIcon className="w-8 h-8 text-amber-400" />
+                      <h2 className="text-lg font-semibold text-white">
+                        Play with Friends
+                      </h2>
+                    </div>
+                    <div className="flex-1 flex items-center justify-center">
+                      <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                        <span className="block text-amber-400/70">
+                          Draft an unbeatable hand!
+                        </span>
+                        <span className="block">
+                          See who is the best drafter. Everybody starts with trash, and it's up to you to turn it into treasure!
+                        </span>
+                      </p>
+                    </div>
+                    <div className="mt-auto flex gap-2 pt-4">
+                      <button
+                        onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
+                        disabled={friendsLoading ? false : !nameValid}
+                        className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                      >
+                        {friendsLoading ? (
+                          <>
+                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                            </svg>
+                            Loading...
+                          </>
+                        ) : (
+                          "Create Lobby"
+                        )}
+                      </button>
+                      <GearButton onClick={() => setShowFriendsAdvanced(true)} />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-          <HintsBanner variant="rail" />
-        </main>
-
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-      </div>
-
-      <footer className="shrink-0 frame-chrome bar-pad-both py-2">
-        <div className="flex items-center justify-between">
-          <a
-            href="https://discord.gg/2NAjcWXNKn"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-[#6974F4] hover:text-[#7983F5] transition-colors"
-          >
-            <FaDiscord className="w-4 h-4" />
-            Join Discord
-          </a>
-          <CubeCobraPrimerLink />
-        </div>
-      </footer>
+        </section>
+      </PageFrame>
 
       {showFriendsAdvanced && (
         <AdvancedOptionsModal
@@ -907,7 +845,7 @@ export function Play() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
