@@ -75,7 +75,11 @@ import {
   shouldBlockGuidesForBattleResolution,
   type VisibleGuideStep,
 } from "./gameGuideState";
-import { canUseBattleFaceDownAction, canUseBattleFlipAction } from "../utils/battleInteraction";
+import {
+  canUseBattleFaceDownAction,
+  canUseBattleFlipAction,
+  hasBattleResultConflict,
+} from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
 
 interface SpectatorConfig {
@@ -1867,8 +1871,11 @@ function GameContent() {
       );
 
       if (mySubmission && !isChangingResult) {
-        const resultsConflict =
-          opponentSubmission && mySubmission !== opponentSubmission;
+        const resultsConflict = hasBattleResultConflict({
+          mySubmission,
+          opponentSubmission,
+          isResolved: displayBattleResolution,
+        });
         right = (
           <div className="flex items-center gap-1.5 sm:gap-2">
             <span
