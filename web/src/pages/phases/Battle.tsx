@@ -6,6 +6,7 @@ import { CompactZoneDisplay } from '../../components/zones/CompactZoneDisplay'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
 import { ZoneDivider } from '../../components/common/ZoneDivider'
 import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
+import { battleBoardMetrics } from './phaseLayouts'
 import { buildAppliedUpgradeMap, buildHiddenAppliedUpgradeMap } from '../../utils/upgrades'
 import { canInteractWithBattleZone } from '../../utils/battleInteraction'
 
@@ -193,12 +194,13 @@ export function BattlePhase({
   const opponentLandCount = countTopLevel(opponentBf, opponentAttachments, isLandOrTreasure) + 1
   const opponentNonlandCount = countTopLevel(opponentBf, opponentAttachments, (c) => !isLandOrTreasure(c))
 
-  const HAND_PADDING = 16
-  const BF_PADDING = 20
-  const MID_DIVIDER_HEIGHT = 2
-  const suddenDeathHeight = battle?.is_sudden_death ? 70 : 0
-  const fixedHeight = (2 * HAND_PADDING) + (2 * BF_PADDING) + suddenDeathHeight + MID_DIVIDER_HEIGHT
-  const zoneColumnWidth = isMobile ? 64 : 96
+  const {
+    handPadding,
+    battlefieldPadding,
+    midDividerHeight,
+    fixedHeight,
+    zoneColumnWidth,
+  } = battleBoardMetrics({ isMobile, isSuddenDeath: !!battle?.is_sudden_death })
 
   const [containerRef, sizes] = useBattleCardSizes({
     playerHandCount,
@@ -212,8 +214,8 @@ export function BattlePhase({
   })
 
   const { rowHeight } = sizes
-  const handHeight = rowHeight + HAND_PADDING
-  const bfHeight = 2 * rowHeight + BF_PADDING
+  const handHeight = rowHeight + handPadding
+  const bfHeight = 2 * rowHeight + battlefieldPadding
   const opponentMidZoneHeight = Math.floor(bfHeight / 2)
   const opponentBottomZoneHeight = bfHeight - opponentMidZoneHeight
   const playerTopZoneHeight = Math.floor(bfHeight / 2)
@@ -222,12 +224,12 @@ export function BattlePhase({
   useLayoutEffect(() => {
     onLayoutMetricsChange?.({
       topSectionHeight: handHeight + opponentMidZoneHeight,
-      middleLaneHeight: opponentBottomZoneHeight + MID_DIVIDER_HEIGHT + playerTopZoneHeight,
+      middleLaneHeight: opponentBottomZoneHeight + midDividerHeight + playerTopZoneHeight,
     })
   }, [
     handHeight,
     onLayoutMetricsChange,
-    MID_DIVIDER_HEIGHT,
+    midDividerHeight,
     opponentBottomZoneHeight,
     opponentMidZoneHeight,
     playerTopZoneHeight,
