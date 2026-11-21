@@ -21,6 +21,7 @@ import {
 import type { UserBattler, FollowedBattler, GameSummary, PlayMode } from '../types'
 import { unknownToAppError } from '../utils/appError'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
+import { visitLoadsFirstPage, type FirstPageStatus } from './dashboardState'
 
 type Tab = 'battlers' | 'following' | 'games' | 'discover'
 
@@ -49,16 +50,16 @@ export function Dashboard() {
   const [myGames, setMyGames] = useState<GameSummary[]>([])
   const [myGamesHasMore, setMyGamesHasMore] = useState(false)
   const [myGamesOffset, setMyGamesOffset] = useState(0)
-  const [myGamesLoading, setMyGamesLoading] = useState(false)
-  const [myGamesLoaded, setMyGamesLoaded] = useState(false)
+  const [myGamesStatus, setMyGamesStatus] = useState<FirstPageStatus>('idle')
+  const [myGamesLoadingMore, setMyGamesLoadingMore] = useState(false)
   const [myGamesTotalGames, setMyGamesTotalGames] = useState(0)
   const [myGamesTotalWins, setMyGamesTotalWins] = useState(0)
 
   const [discoverResults, setDiscoverResults] = useState<DiscoverResult[]>([])
-  const [discoverLoading, setDiscoverLoading] = useState(false)
+  const [discoverStatus, setDiscoverStatus] = useState<FirstPageStatus>('idle')
+  const [discoverLoadingMore, setDiscoverLoadingMore] = useState(false)
   const [discoverHasMore, setDiscoverHasMore] = useState(false)
   const [discoverOffset, setDiscoverOffset] = useState(0)
-  const [discoverLoaded, setDiscoverLoaded] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -86,6 +87,41 @@ export function Dashboard() {
 
   useEffect(() => { refresh() }, [refresh])
 
+  const loadMyGames = async () => {
+    setMyGamesStatus('loading')
+    try {
+      const data = await getMyGames(0)
+      setMyGames(data.games)
+      setMyGamesHasMore(data.has_more)
+      setMyGamesOffset(data.games.length)
+      setMyGamesTotalGames(data.total_games)
+      setMyGamesTotalWins(data.total_wins)
+      setMyGamesStatus('loaded')
+    } catch {
+      setMyGamesStatus('failed')
+    }
+  }
+
+  const loadDiscover = async () => {
+    setDiscoverStatus('loading')
+    try {
+      const data = await discoverCubes(0)
+      setDiscoverResults(data.results)
+      setDiscoverHasMore(data.has_more)
+      setDiscoverOffset(data.results.length)
+      setDiscoverStatus('loaded')
+    } catch {
+      setDiscoverStatus('failed')
+    }
+  }
+
+  // Loading on the tab click rather than in an effect keeps re-renders from sending requests.
+  const selectTab = (t: Tab) => {
+    setTab(t)
+    if (t === 'games' && visitLoadsFirstPage(myGamesStatus)) loadMyGames()
+    if (t === 'discover' && visitLoadsFirstPage(discoverStatus)) loadDiscover()
+  }
+
   if (authLoading || !user) return null
 
   return (
@@ -102,7 +138,7 @@ export function Dashboard() {
                 {(['battlers', 'following', 'games', 'discover'] as Tab[]).map((t) => (
                   <button
                     key={t}
-                    onClick={() => setTab(t)}
+                    onClick={() => selectTab(t)}
                     className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                       tab === t
                         ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'
@@ -170,34 +206,19 @@ export function Dashboard() {
                     addToast('Failed to load more', 'error')
                   }
                 }}
-                onSwitchToDiscover={() => setTab('discover')}
+                onSwitchToDiscover={() => selectTab('discover')}
               />
             ) : tab === 'games' ? (
               <MyGamesGrid
                 games={myGames}
                 hasMore={myGamesHasMore}
-                loading={myGamesLoading}
-                loaded={myGamesLoaded}
+                status={myGamesStatus}
+                loadingMore={myGamesLoadingMore}
                 totalGames={myGamesTotalGames}
                 totalWins={myGamesTotalWins}
-                onLoadInitial={async () => {
-                  setMyGamesLoading(true)
-                  try {
-                    const data = await getMyGames(0)
-                    setMyGames(data.games)
-                    setMyGamesHasMore(data.has_more)
-                    setMyGamesOffset(data.games.length)
-                    setMyGamesTotalGames(data.total_games)
-                    setMyGamesTotalWins(data.total_wins)
-                    setMyGamesLoaded(true)
-                  } catch {
-                    addToast('Failed to load games', 'error')
-                  } finally {
-                    setMyGamesLoading(false)
-                  }
-                }}
+                onRetry={loadMyGames}
                 onLoadMore={async () => {
-                  setMyGamesLoading(true)
+                  setMyGamesLoadingMore(true)
                   try {
                     const data = await getMyGames(myGamesOffset)
                     setMyGames((prev) => [...prev, ...data.games])
@@ -206,7 +227,7 @@ export function Dashboard() {
                   } catch {
                     addToast('Failed to load games', 'error')
                   } finally {
-                    setMyGamesLoading(false)
+                    setMyGamesLoadingMore(false)
                   }
                 }}
                 onView={(g) => navigate(`/game/${g.game_id}/share/${encodeURIComponent(g.best_human_name)}`)}
@@ -215,25 +236,12 @@ export function Dashboard() {
             ) : (
               <DiscoverGrid
                 results={discoverResults}
-                loading={discoverLoading}
+                status={discoverStatus}
+                loadingMore={discoverLoadingMore}
                 hasMore={discoverHasMore}
-                loaded={discoverLoaded}
-                onLoadInitial={async () => {
-                  setDiscoverLoading(true)
-                  try {
-                    const data = await discoverCubes(0)
-                    setDiscoverResults(data.results)
-                    setDiscoverHasMore(data.has_more)
-                    setDiscoverOffset(data.results.length)
-                    setDiscoverLoaded(true)
-                  } catch {
-                    addToast('Failed to load cubes', 'error')
-                  } finally {
-                    setDiscoverLoading(false)
-                  }
-                }}
+                onRetry={loadDiscover}
                 onLoadMore={async () => {
-                  setDiscoverLoading(true)
+                  setDiscoverLoadingMore(true)
                   try {
                     const data = await discoverCubes(discoverOffset)
                     setDiscoverResults((prev) => [...prev, ...data.results])
@@ -242,7 +250,7 @@ export function Dashboard() {
                   } catch {
                     addToast('Failed to load cubes', 'error')
                   } finally {
-                    setDiscoverLoading(false)
+                    setDiscoverLoadingMore(false)
                   }
                 }}
                 onPlay={(cubeId) => navigate(`/play?cubeId=${encodeURIComponent(cubeId)}`)}
@@ -595,6 +603,19 @@ function AddBattlerModal({
   )
 }
 
+function LoadFailedPanel({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center">
+      <div className="felt-raised-panel modal-chrome rounded-lg p-8 text-center max-w-sm">
+        <p className="text-gray-300">{message}</p>
+        <button onClick={onRetry} className="btn btn-primary py-2 px-6 font-semibold mt-4">
+          Retry
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function formatDate(iso: string | null): string {
   if (!iso) return 'Never'
   try {
@@ -617,31 +638,31 @@ function scryfallSmall(id: string): string {
 function MyGamesGrid({
   games,
   hasMore,
-  loading,
-  loaded,
+  status,
+  loadingMore,
   totalGames,
   totalWins,
-  onLoadInitial,
+  onRetry,
   onLoadMore,
   onView,
   onPlayGame,
 }: {
   games: GameSummary[]
   hasMore: boolean
-  loading: boolean
-  loaded: boolean
+  status: FirstPageStatus
+  loadingMore: boolean
   totalGames: number
   totalWins: number
-  onLoadInitial: () => void
+  onRetry: () => void
   onLoadMore: () => void
   onView: (g: GameSummary) => void
   onPlayGame: () => void
 }) {
-  useEffect(() => {
-    if (!loaded) onLoadInitial()
-  }, [loaded, onLoadInitial])
+  if (status === 'failed') {
+    return <LoadFailedPanel message="Failed to load games" onRetry={onRetry} />
+  }
 
-  if (!loaded && loading) {
+  if (status !== 'loaded') {
     return (
       <div className="flex-1 flex items-center justify-center">
         <p className="text-amber-200/70">Loading...</p>
@@ -708,10 +729,10 @@ function MyGamesGrid({
       {hasMore && (
         <button
           onClick={onLoadMore}
-          disabled={loading}
+          disabled={loadingMore}
           className="btn btn-secondary py-2 px-6 mx-auto mt-4 block disabled:opacity-50"
         >
-          {loading ? 'Loading...' : 'Load More'}
+          {loadingMore ? 'Loading...' : 'Load More'}
         </button>
       )}
     </div>
@@ -720,10 +741,10 @@ function MyGamesGrid({
 
 function DiscoverGrid({
   results,
-  loading,
+  status,
+  loadingMore,
   hasMore,
-  loaded,
-  onLoadInitial,
+  onRetry,
   onLoadMore,
   onPlay,
   onView,
@@ -732,10 +753,10 @@ function DiscoverGrid({
   onPlayGame,
 }: {
   results: DiscoverResult[]
-  loading: boolean
+  status: FirstPageStatus
+  loadingMore: boolean
   hasMore: boolean
-  loaded: boolean
-  onLoadInitial: () => void
+  onRetry: () => void
   onLoadMore: () => void
   onPlay: (cubeId: string) => void
   onView: (cubeId: string) => void
@@ -743,11 +764,11 @@ function DiscoverGrid({
   onUnfollow: (cubeId: string) => void
   onPlayGame: () => void
 }) {
-  useEffect(() => {
-    if (!loaded) onLoadInitial()
-  }, [loaded, onLoadInitial])
+  if (status === 'failed') {
+    return <LoadFailedPanel message="Failed to load cubes" onRetry={onRetry} />
+  }
 
-  if (!loaded && loading) {
+  if (status !== 'loaded') {
     return (
       <div className="flex-1 flex items-center justify-center">
         <p className="text-amber-200/70">Loading...</p>
@@ -804,10 +825,10 @@ function DiscoverGrid({
       {hasMore && (
         <button
           onClick={onLoadMore}
-          disabled={loading}
+          disabled={loadingMore}
           className="btn btn-secondary py-2 px-6 mx-auto mt-4 disabled:opacity-50"
         >
-          {loading ? 'Loading...' : 'Load More'}
+          {loadingMore ? 'Loading...' : 'Load More'}
         </button>
       )}
     </div>
