@@ -152,7 +152,7 @@ export interface Counts {
   opponentNonlands?: number
 }
 
-export type GamePhase = 'draft' | 'build' | 'battle' | 'reward'
+export type GamePhase = 'draft' | 'build' | 'battle' | 'reward' | 'eliminated' | 'game_over'
 
 export interface ScreenState {
   phase: GamePhase
@@ -197,6 +197,10 @@ export function gameBootstrap({ phase, counts, stageEnd = false, suddenDeath = f
   const handSize = counts.handSize ?? 4
   const hand = cards('hand', Math.min(counts.hand ?? 0, handSize))
   const sideboard = cards('pool', counts.sideboard ?? 0, 'spell', 3)
+  // The game goes on without an eliminated player, so the others are still building and can be watched.
+  const othersPhase: Phase = phase === 'eliminated' ? 'build' : phase
+  const placements: Record<string, number> =
+    phase === 'game_over' ? { Alice: 2, Bob: 1, Carol: 3, Dave: 4 } : phase === 'eliminated' ? { Alice: 4 } : {}
   const self: CompactSelfPlayerView = {
     ...playerView(PLAYER_NAME, phase, {
       hand_size: handSize,
@@ -205,6 +209,7 @@ export function gameBootstrap({ phase, counts, stageEnd = false, suddenDeath = f
       upgrades: cards('upgrade', counts.upgrades ?? 0, 'upgrade'),
       is_stage_increasing: stageEnd,
       in_sudden_death: suddenDeath,
+      placement: placements[PLAYER_NAME] ?? 0,
     }),
     hand,
     sideboard,
@@ -230,9 +235,9 @@ export function gameBootstrap({ phase, counts, stageEnd = false, suddenDeath = f
     starting_life: 20,
     players: [
       self,
-      playerView(OPPONENT_NAME, phase, { placement: 0 }),
-      playerView('Carol', phase),
-      playerView('Dave', phase, { is_puppet: true }),
+      playerView(OPPONENT_NAME, othersPhase, { placement: placements[OPPONENT_NAME] ?? 0 }),
+      playerView('Carol', othersPhase, { placement: placements.Carol ?? 0 }),
+      playerView('Dave', othersPhase, { is_puppet: true, placement: placements.Dave ?? 0 }),
     ],
     self_player: self,
     available_upgrades: phase === 'reward' && stageEnd ? cards('offer', counts.rewardUpgrades ?? 3, 'upgrade') : [],

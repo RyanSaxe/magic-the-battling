@@ -7,10 +7,12 @@ from pydantic_core import PydanticCustomError
 from mtb.models.cards import Card
 from mtb.models.game import BattleResolution
 from mtb.models.types import BuildSource, CardDestination, Phase, PlayMode, ZoneName, normalize_play_mode
+from server.services.spectate_requests import SpectateStatus
 
 LastResult = Literal["win", "loss", "draw"]
 CubeLoadingStatus = Literal["loading", "ready", "error"]
 BattlerLoadingStatus = Literal["missing", "loading", "ready", "error"]
+LobbyStartStatus = Literal["open", "starting", "started", "failed"]
 
 MAX_PLAYER_NAME_LENGTH = 32
 
@@ -280,6 +282,8 @@ class LobbyStateResponse(BaseModel):
     players: list[LobbyPlayer]
     can_start: bool
     is_started: bool
+    start_status: LobbyStartStatus = "open"
+    start_error: str | None = None
     target_player_count: int = 4
     puppet_count: int = 0
     cube_loading_status: CubeLoadingStatus = "loading"
@@ -382,7 +386,7 @@ class SpectateRequestResponse(BaseModel):
 
 
 class SpectateRequestStatus(BaseModel):
-    status: Literal["pending", "approved", "denied"]
+    status: SpectateStatus
     session_id: str | None = None
     player_id: str | None = None
 
@@ -408,6 +412,7 @@ class SharePlayerSnapshot(BaseModel):
     poison: int
     vanguard: Card | None = None
     visibility: ShareSnapshotVisibility = "full"
+    sudden_death_build: int | None = None
 
 
 class SharePlayerData(BaseModel):

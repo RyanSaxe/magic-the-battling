@@ -1,13 +1,23 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import cast
 
 import pytest
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import OperationalError
 
 import server.db.database as db_module
 import server.routers.share_preview as share_preview_module
 import server.routers.ws as ws_module
-from mtb.models.game import Battle, BattleSnapshotData, Game, Player
+from mtb.models.game import (
+    Battle,
+    BattleSnapshotData,
+    Game,
+    Player,
+    Puppet,
+    StaticOpponent,
+    restore_snapshot_data,
+)
 from mtb.phases import reward
 from server.db.models import Base, BattleSnapshot, GameRecord, PlayerGameHistory
 from server.routers.share_preview import RATE_LIMIT_MAX, RATE_LIMIT_WINDOW, SlidingWindowRateLimiter
@@ -231,11 +241,12 @@ def test_init_db_adds_final_state_columns_to_an_existing_database(tmp_path, monk
     assert tuple(row) == ("Alice", None, None)
 
 
-def test_init_db_adds_the_opponent_column_to_battle_snapshots_of_an_existing_database(tmp_path, monkeypatch):
+def test_init_db_adds_the_opponent_and_sudden_death_columns_to_an_existing_database(tmp_path, monkeypatch):
     engine = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
     Base.metadata.create_all(bind=engine)
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE battle_snapshots DROP COLUMN opponent_name"))
+        conn.execute(text("ALTER TABLE battle_snapshots DROP COLUMN sudden_death_build"))
         conn.execute(
             text(
                 "INSERT INTO battle_snapshots (player_history_id, stage, round, hand_json, basic_lands_json, "
@@ -247,10 +258,11 @@ def test_init_db_adds_the_opponent_column_to_battle_snapshots_of_an_existing_dat
     db_module.init_db()
     db_module.init_db()
 
-    assert "opponent_name" in {c["name"] for c in inspect(engine).get_columns("battle_snapshots")}
+    columns = {c["name"] for c in inspect(engine).get_columns("battle_snapshots")}
+    assert {"opponent_name", "sudden_death_build"} <= columns
     with engine.connect() as conn:
-        row = conn.execute(text("SELECT treasures, opponent_name FROM battle_snapshots")).one()
-    assert tuple(row) == (2, None)
+        row = conn.execute(text("SELECT treasures, opponent_name, sudden_death_build FROM battle_snapshots")).one()
+    assert tuple(row) == (2, None, None)
 
 
 def _recorded_opponents(game_id: str, stage: int, round_num: int) -> dict[str, str | None]:
@@ -482,3 +494,281 @@ def test_share_shows_every_player_in_full_once_the_game_ends(dave_shares_mid_gam
     assert after["in_progress"] is False
     assert all(s["visibility"] == "full" for p in after["players"] for s in p["snapshots"])
     assert _player(after, "Alice")["final_placement"] == 1
+
+
+def _bob_and_carol_reach_lethal_while_alice_survives(b: Battle) -> str:
+    names = {b.player.name, b.opponent.name}
+    if names == {"Bob", "Carol"}:
+        return "draw"
+    if "Alice" in names:
+        return "Alice"
+    return b.opponent.name
+
+
+def _sudden_death_rows(game_id: str) -> list[tuple[str, int, int, int | None, str | None]]:
+    db = db_module.SessionLocal()
+    try:
+        rows = (
+            db.query(
+                PlayerGameHistory.player_name,
+                BattleSnapshot.stage,
+                BattleSnapshot.round,
+                BattleSnapshot.sudden_death_build,
+                BattleSnapshot.opponent_name,
+            )
+            .join(BattleSnapshot, BattleSnapshot.player_history_id == PlayerGameHistory.id)
+            .filter(PlayerGameHistory.game_id == game_id, PlayerGameHistory.player_name.in_(["Bob", "Carol"]))
+            .order_by(BattleSnapshot.id)
+            .all()
+        )
+        return [tuple(row) for row in rows]
+    finally:
+        db.close()
+
+
+@pytest.fixture
+def sudden_death_game(client, start_lobby, monkeypatch):
+    """Dave goes out in 3-1. In 3-2 Bob and Carol reach lethal while Alice survives, so they fight in Sudden
+    Death: the first fight is a draw, then Bob beats Carol. Carol shares mid-game, then Alice wins the game."""
+    monkeypatch.setattr(
+        share_preview_module,
+        "_preview_rate_limiter",
+        SlidingWindowRateLimiter(window_seconds=RATE_LIMIT_WINDOW, max_requests=RATE_LIMIT_MAX),
+    )
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob", "Carol", "Dave"])
+    gm = ws_module.game_manager
+    players = {p.name: p for p in game.players}
+    players["Dave"].poison = 9
+    _play_round(gm, game, game_id, lambda b: b.opponent.name if b.player.name == "Dave" else b.player.name)
+    players["Bob"].poison = 9
+    players["Carol"].poison = 9
+    _play_round(gm, game, game_id, _bob_and_carol_reach_lethal_while_alice_survives)
+    bob, carol = players["Bob"], players["Carol"]
+    assert bob.in_sudden_death
+    assert carol.in_sudden_death
+
+    _ready_all(gm, game, game_id, [bob, carol])
+    _submit(gm, game, game_id, [bob, carol], "draw")
+    _ready_all(gm, game, game_id, [bob, carol])
+    _submit(gm, game, game_id, [bob, carol], "Bob")
+    assert carol.phase == "eliminated"
+
+    mid_game = client.get(f"/api/games/{game_id}/share/Carol")
+    assert mid_game.status_code == 200, mid_game.text
+    _play_until_alice_wins(gm, game, game_id)
+    after = client.get(f"/api/games/{game_id}/share/Carol")
+    assert after.status_code == 200, after.text
+
+    return {"game_id": game_id, "mid_game": mid_game.json(), "after": after.json()}
+
+
+def _round_keys(player: dict) -> list[tuple[int, int, int | None]]:
+    return [(s["stage"], s["round"], s["sudden_death_build"]) for s in player["snapshots"]]
+
+
+def _rounds_from(player: dict, first: tuple[int, int, int | None], count: int) -> list[tuple[int, int, int | None]]:
+    keys = _round_keys(player)
+    start = keys.index(first)
+    return keys[start : start + count]
+
+
+def test_each_sudden_death_build_is_saved_with_its_number_and_opponent(sudden_death_game):
+    rows = [row for row in _sudden_death_rows(sudden_death_game["game_id"]) if row[1:3] == (3, 2)]
+
+    assert sorted((name, build) for name, _, _, build, _ in rows if build is None) == [("Bob", None), ("Carol", None)]
+    assert sorted((name, build, opponent) for name, _, _, build, opponent in rows if build is not None) == [
+        ("Bob", 1, "Carol"),
+        ("Bob", 2, "Carol"),
+        ("Carol", 1, "Bob"),
+        ("Carol", 2, "Bob"),
+    ]
+
+
+def test_share_lists_each_sudden_death_build_after_the_ordinary_round(sudden_death_game):
+    after = sudden_death_game["after"]
+
+    for name in ("Bob", "Carol"):
+        player = _player(after, name)
+        assert _rounds_from(player, (3, 2, None), 3) == [(3, 2, None), (3, 2, 1), (3, 2, 2)]
+        start = _round_keys(player).index((3, 2, None))
+        assert all(s["hand"] for s in player["snapshots"][start : start + 3])
+
+
+def test_mid_game_share_hides_the_sudden_death_build_its_sharer_went_out_with(sudden_death_game):
+    carol = _player(sudden_death_game["mid_game"], "Carol")
+    last_build, first_sudden_death_build = carol["snapshots"][-1], carol["snapshots"][-2]
+
+    assert _round_keys(carol)[-3:] == [(3, 2, None), (3, 2, 1), (3, 2, 2)]
+    assert (last_build["visibility"], last_build["hand"]) == ("hand_hidden", [])
+    assert first_sudden_death_build["visibility"] == "full"
+    assert first_sudden_death_build["hand"]
+
+
+def test_mid_game_share_hides_the_sudden_death_builds_of_the_other_fighter(sudden_death_game):
+    bob = _player(sudden_death_game["mid_game"], "Bob")
+
+    assert _rounds_from(bob, (3, 2, None), 3) == [(3, 2, None), (3, 2, 1), (3, 2, 2)]
+    assert (3, 3, None) not in _round_keys(bob)
+    assert all(s["visibility"] == "hidden" for s in bob["snapshots"])
+    assert all(s["hand"] == [] for s in bob["snapshots"])
+
+
+def test_a_puppet_from_a_game_with_sudden_death_plays_the_ordinary_build_of_that_round(sudden_death_game):
+    gm = ws_module.game_manager
+    db = db_module.SessionLocal()
+    try:
+        history = db.query(PlayerGameHistory).filter_by(game_id=sudden_death_game["game_id"], player_name="Bob").one()
+        builds = {
+            snapshot.sudden_death_build: StaticOpponent.from_snapshot(
+                restore_snapshot_data(snapshot.full_state_json), "Bob", cast(int, history.id)
+            )
+            for snapshot in history.snapshots
+            if (snapshot.stage, snapshot.round) == (3, 2)
+        }
+        puppet = gm._load_fake_player(db, history, set())
+    finally:
+        db.close()
+
+    assert builds[2] != builds[None]
+    assert puppet.snapshots["3_2"] == builds[None]
+
+
+def _add_build(
+    db, history: PlayerGameHistory, stage: int, round_number: int, *, treasures: int, poison: int, **columns
+) -> None:
+    snapshot_data = BattleSnapshotData(
+        hand=[], vanguard=None, basic_lands=BASICS, applied_upgrades=[], treasures=treasures, poison=poison
+    )
+    db.add(
+        BattleSnapshot(
+            player_history_id=history.id,
+            stage=stage,
+            round=round_number,
+            hand_json="[]",
+            basic_lands_json="[]",
+            applied_upgrades_json="[]",
+            treasures=treasures,
+            poison=poison,
+            full_state_json=snapshot_data.model_dump_json(),
+            **columns,
+        )
+    )
+
+
+def test_share_shows_a_puppet_in_each_sudden_death_it_fought_with_its_ordinary_build(client):
+    """Ava wins a Goldfish game in Sudden Death against Rook, a puppet replaying a past player who once rebuilt for
+    a Sudden Death of their own."""
+    db = db_module.SessionLocal()
+    try:
+        db.add(GameRecord(id="past-game", ended_at=datetime.now(UTC)))
+        db.add(GameRecord(id="goldfish", ended_at=datetime.now(UTC)))
+        past_rook = PlayerGameHistory(
+            game_id="past-game", player_name="Rook", battler_elo=1200, max_stage=4, max_round=2
+        )
+        ava = PlayerGameHistory(
+            game_id="goldfish", player_name="Ava", battler_elo=1200, max_stage=4, max_round=2, final_placement=1
+        )
+        db.add_all([past_rook, ava])
+        db.flush()
+        rook = PlayerGameHistory(
+            game_id="goldfish",
+            player_name="Rook",
+            battler_elo=1200,
+            max_stage=4,
+            max_round=2,
+            is_puppet=True,
+            source_history_id=past_rook.id,
+            poison_history_json='{"4_2": 8}',
+            final_placement=2,
+            final_poison=10,
+        )
+        db.add(rook)
+        _add_build(db, past_rook, 4, 2, treasures=2, poison=8)
+        _add_build(db, past_rook, 4, 2, treasures=77, poison=9, sudden_death_build=1)
+        _add_build(db, ava, 4, 2, treasures=3, poison=8, opponent_name="Rook")
+        _add_build(db, ava, 4, 2, treasures=3, poison=9, opponent_name="Rook", sudden_death_build=1)
+        _add_build(db, ava, 4, 2, treasures=3, poison=9, opponent_name="Rook", sudden_death_build=2)
+        db.commit()
+    finally:
+        db.close()
+
+    rook_rows = _share_rows(client, "goldfish", "Ava")["Rook"]["snapshots"]
+
+    assert [(s["sudden_death_build"], s["poison"], s["treasures"]) for s in rook_rows] == [
+        (None, 8, 2),
+        (1, 9, 2),
+        (2, 9, 2),
+    ]
+
+
+def test_both_builds_of_a_sudden_death_fight_share_its_number_even_after_a_failed_save(
+    client, start_lobby, monkeypatch
+):
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob", "Carol", "Dave"])
+    gm = ws_module.game_manager
+    players = {p.name: p for p in game.players}
+    players["Dave"].poison = 9
+    _play_round(gm, game, game_id, lambda b: b.opponent.name if b.player.name == "Dave" else b.player.name)
+    players["Bob"].poison = 9
+    players["Carol"].poison = 9
+    _play_round(gm, game, game_id, _bob_and_carol_reach_lethal_while_alice_survives)
+    bob, carol = players["Bob"], players["Carol"]
+    record_snapshot = GameManager._record_snapshot
+    failed = []
+
+    def fail_bobs_first_sudden_death_build(self, db, game_id, player, battler_elo, **columns):
+        if player.name == "Bob" and columns.get("sudden_death_build") is not None and not failed:
+            failed.append(player.name)
+            raise OperationalError("INSERT", {}, Exception("database is locked"))
+        return record_snapshot(self, db, game_id, player, battler_elo, **columns)
+
+    monkeypatch.setattr(GameManager, "_record_snapshot", fail_bobs_first_sudden_death_build)
+    _ready_all(gm, game, game_id, [bob, carol])
+    _submit(gm, game, game_id, [bob, carol], "draw")
+    _ready_all(gm, game, game_id, [bob, carol])
+
+    builds = sorted((name, build) for name, _, _, build, _ in _sudden_death_rows(game_id) if build is not None)
+    assert failed == ["Bob"]
+    assert builds == [("Bob", 2), ("Carol", 1), ("Carol", 2)]
+
+
+def test_a_sudden_death_against_a_puppet_saves_the_players_build_and_starts_the_fight(client, start_lobby):
+    game_id, game = _start_game(client, start_lobby, ["Bob", "Carol"])
+    gm = ws_module.game_manager
+    _, carol = game.players
+    game.puppets.append(
+        Puppet(
+            name="Rook",
+            player_history_id=999,
+            snapshots={"3_1": StaticOpponent(name="Rook", hand=[])},
+            in_sudden_death=True,
+        )
+    )
+    carol.in_sudden_death = True
+    carol.poison = 9
+
+    _ready_all(gm, game, game_id, [carol])
+
+    assert [(b.player.name, b.opponent.name, b.is_sudden_death) for b in game.active_battles] == [
+        ("Carol", "Rook", True)
+    ]
+    assert ("Carol", 3, 1, 1, "Rook") in _sudden_death_rows(game_id)
+
+
+def test_a_sudden_death_build_that_cannot_be_saved_still_starts_the_fight(client, start_lobby):
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob"])
+    gm = ws_module.game_manager
+    alice, bob = game.players
+    alice.poison = 9
+    bob.poison = 9
+    _ready_all(gm, game, game_id, [alice, bob])
+    _submit(gm, game, game_id, [alice, bob], "draw")
+    _finish_rewards(gm, game, game_id, [alice, bob])
+    assert alice.in_sudden_death
+    with db_module.engine.begin() as conn:
+        conn.execute(text("DROP TABLE battle_snapshots"))
+
+    _ready_all(gm, game, game_id, [alice, bob])
+
+    assert [p.phase for p in (alice, bob)] == ["battle", "battle"]
+    assert [b.is_sudden_death for b in game.active_battles] == [True]

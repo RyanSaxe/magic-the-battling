@@ -76,7 +76,7 @@ function LifeCounter({
           onChange={(e) => setInputValue(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="w-10 h-6 text-center text-white text-sm rounded border border-[var(--gold-border)] focus:outline-none focus:border-amber-500" style={{ background: 'var(--chrome)' }}
+          className="w-10 h-6 text-center text-white text-sm rounded border border-[var(--gold-border)] focus:outline-none focus:border-[var(--color-gold)]" style={{ background: 'var(--chrome)' }}
           autoFocus
         />
       ) : (
@@ -188,7 +188,7 @@ function ActionButtonsRow({
       {onCreateTreasure && (
         <button
           onClick={onCreateTreasure}
-          className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+          className="btn-game flex-1 px-3 py-1.5 text-xs rounded font-medium"
         >
           Treasure
         </button>
@@ -196,7 +196,7 @@ function ActionButtonsRow({
       {onUntapAll && (
         <button
           onClick={onUntapAll}
-          className="flex-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+          className="btn-game flex-1 px-3 py-1.5 text-xs rounded font-medium"
         >
           Untap
         </button>
@@ -205,11 +205,7 @@ function ActionButtonsRow({
         <button
           onClick={onPassTurn}
           disabled={passDisabled}
-          className={`flex-1 px-3 py-1.5 text-xs rounded text-white font-medium transition-colors ${
-            !passDisabled
-              ? "bg-indigo-600 hover:bg-indigo-500"
-              : "bg-indigo-600/35 text-white/60 cursor-not-allowed"
-          }`}
+          className="btn-game flex-1 px-3 py-1.5 text-xs rounded font-medium transition-colors"
         >
           Pass
         </button>

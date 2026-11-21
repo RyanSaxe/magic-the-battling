@@ -6,6 +6,7 @@ const FINAL_CLOSE_CODES: Record<number, { code: AppErrorCode; detail: string }> 
   4004: { code: 'GAME_NOT_FOUND', detail: 'Game not found' },
   4005: { code: 'KICKED', detail: 'Kicked by host' },
   4006: { code: 'SEAT_MOVED', detail: 'Seat opened elsewhere' },
+  4007: { code: 'SPECTATE_TARGET_NOT_FOUND', detail: 'Target player not found' },
 }
 
 /** The error a close code ends the connection with, or null when the client should reconnect. */

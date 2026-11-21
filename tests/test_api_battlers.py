@@ -79,6 +79,30 @@ def _add_game(
         db.close()
 
 
+def _add_builds(game_id: str, player_name: str, builds: list[tuple[int | None, str]]) -> None:
+    """Saves one 3-1 build per (sudden_death_build, card) pair, in the order given."""
+    db = database.SessionLocal()
+    try:
+        history = db.query(PlayerGameHistory).filter_by(game_id=game_id, player_name=player_name).one()
+        for sudden_death_build, card in builds:
+            db.add(
+                BattleSnapshot(
+                    player_history_id=history.id,
+                    stage=3,
+                    round=1,
+                    sudden_death_build=sudden_death_build,
+                    hand_json=json.dumps([{"scryfall_id": card}]),
+                    basic_lands_json="[]",
+                    applied_upgrades_json="[]",
+                    treasures=0,
+                    full_state_json=json.dumps({"data": {}, "card_registry": {card: {"name": card}}}),
+                )
+            )
+        db.commit()
+    finally:
+        db.close()
+
+
 def _day(day: int) -> datetime:
     return datetime(2026, 11, day, 12, tzinfo=UTC)
 
@@ -204,6 +228,44 @@ class TestPresetStats:
         assert updated["cube_name"] == "Vintage Cube"
 
 
+class TestOnePreset:
+    def test_opens_any_of_your_presets_as_the_list_shows_it(self, client, vintage_cube, kestrel):
+        presets = [_save_preset(client, display_name=f"Preset {n}") for n in range(1, 22)]
+        second_page = client.get("/api/battlers", params={"offset": 20}).json()["battlers"]
+
+        response = client.get(f"/api/battlers/{presets[20]['id']}")
+
+        assert response.status_code == 200
+        assert response.json() == second_page[0]
+
+    def test_another_players_preset_is_not_found(self, client, vintage_cube, kestrel):
+        preset = _save_preset(client)
+        client.post("/api/auth/logout")
+        client.post(
+            "/api/auth/register",
+            json={"username": "rook", "password": "password123", "email": "rook@test.com"},
+        )
+
+        response = client.get(f"/api/battlers/{preset['id']}")
+
+        assert (response.status_code, response.json()["code"]) == (404, "BATTLER_NOT_FOUND")
+
+    def test_a_missing_preset_is_not_found(self, client, kestrel):
+        response = client.get("/api/battlers/999")
+
+        assert (response.status_code, response.json()["code"]) == (404, "BATTLER_NOT_FOUND")
+
+    def test_leaves_following_and_my_games_to_their_own_routes(self, client, kestrel):
+        assert client.get("/api/battlers/following").status_code == 200
+        assert client.get("/api/battlers/my-games").status_code == 200
+
+    def test_needs_a_signed_in_player(self, client, vintage_cube, kestrel):
+        preset = _save_preset(client)
+        client.post("/api/auth/logout")
+
+        assert client.get(f"/api/battlers/{preset['id']}").status_code == 401
+
+
 class TestMyGamesFilter:
     def test_mine_only_lists_just_your_games_shown_by_your_seat(self, client, vintage_cube, kestrel):
         _add_game(
@@ -232,6 +294,18 @@ class TestMyGamesFilter:
         assert mine["total_games"] == 2
         assert [g["game_id"] for g in everyone["games"]] == ["with-a-puppet", "rooks-solo", "shared"]
         assert everyone["games"][2]["best_human_name"] == "rook"
+
+    def test_a_game_decided_in_sudden_death_shows_the_last_sudden_death_hand(self, client, vintage_cube, kestrel):
+        _add_game("sudden-death", cube_id="vintage", played_on=_day(10), seats=[Seat("kestrel", 1, kestrel)])
+        # Saved out of order, so only the lists' own ordering can put the last Sudden Death build first.
+        _add_builds("sudden-death", "kestrel", [(2, "second-rebuild"), (None, "ordinary"), (1, "first-rebuild")])
+        preset = _save_preset(client)
+
+        cube_games = client.get(f"/api/battlers/{preset['id']}/games").json()["games"]
+        my_games = client.get("/api/battlers/my-games").json()["games"]
+
+        assert [g["hand_scryfall_ids"] for g in cube_games] == [["second-rebuild"]]
+        assert [g["hand_scryfall_ids"] for g in my_games] == [["second-rebuild"]]
 
     def test_mine_only_combines_with_the_mode_and_upgrades_filters(self, client, vintage_cube, kestrel):
         _add_game("old-format", cube_id="vintage", config={}, played_on=_day(10), seats=[Seat("kestrel", 1, kestrel)])

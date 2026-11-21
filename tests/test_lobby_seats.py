@@ -1,6 +1,7 @@
 """Removing a seat from a lobby, by the host or after its player stays away, leaves nothing of it behind."""
 
 import server.routers.ws as ws_module
+from server.services.game_manager import BattlerFailed
 
 
 def test_a_removed_player_takes_their_deck_error_with_them(client):
@@ -12,7 +13,7 @@ def test_a_removed_player_takes_their_deck_error_with_them(client):
     game_id = created["game_id"]
     pending = ws_module.game_manager.get_pending_game(game_id)
     assert pending is not None
-    pending.player_battlers[bob["player_id"]].battler_error = "Deck not found"
+    pending.player_battlers[bob["player_id"]] = BattlerFailed("bob-deck", "Deck not found")
     assert client.get(f"/api/games/{game_id}/lobby").json()["cube_loading_error"] == "Deck not found"
 
     ws_module.game_manager.remove_player_from_pending(game_id, bob["player_id"])
