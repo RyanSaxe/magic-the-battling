@@ -255,12 +255,10 @@ export function PhaseTimeline({
                 disabled={welcomeGuideActive || isEnd}
                 onClick={() => handlePhaseClick(phase)}
                 data-guide-target={`timeline-phase-${phase}`}
-                className={`text-xs sm:text-sm font-medium capitalize transition-colors
-                  ${!isEnd ? "cursor-pointer" : "cursor-default"}
-                  ${isActive || isEndReward ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
+                className={`phase-step text-xs sm:text-sm font-medium capitalize transition-colors
+                  ${isActive || isEndReward ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : "phase-step-idle"}
                   ${isCompleted && !isEndReward ? "text-gray-500 line-through decoration-gray-600" : ""}
                   ${isUpcoming ? "text-gray-500" : ""}
-                  ${welcomeGuideActive || isEnd ? "hover:brightness-100" : "hover:brightness-125"}
                 `}
               >
                 {isEndReward
