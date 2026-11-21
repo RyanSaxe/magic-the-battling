@@ -8,6 +8,7 @@ import type {
   SharePlayerSnapshot,
   UserBattler,
 } from '../src/types'
+import { gameBootstrap, type ScreenState } from './gameStates'
 
 type MockResponse = { status?: number; json: unknown }
 
@@ -198,6 +199,31 @@ export async function serveLobby(page: Page, baseURL: string, mode: LobbyMode = 
   }, LOBBY_SESSION)
   await page.routeWebSocket(/\/ws\//, (ws) => {
     if (mode === 'connected') ws.send(JSON.stringify({ type: 'lobby_state', payload: LOBBY_STATE }))
+  })
+}
+
+// A plain card-shaped frame, so an offline run doesn't look like a broken image or a logo.
+const CARD_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 680">
+  <rect x="6" y="6" width="476" height="668" rx="28" fill="#3b3a36" stroke="#8a7a52" stroke-width="12"/>
+  <rect x="40" y="70" width="408" height="300" rx="6" fill="#55534d"/>
+</svg>`
+
+/** Set LAYOUT_CARD_ART=real to load real card images from Scryfall, for screenshots; runs stay offline otherwise. */
+const SHOW_REAL_CARD_ART = process.env.LAYOUT_CARD_ART === 'real'
+
+/** Opens a game whose server sends `screen` as its state. */
+export async function serveGame(page: Page, baseURL: string, screen: ScreenState) {
+  await serveWithoutBackend(page, baseURL)
+  await page.route(/^https:\/\/(cards|backs)\.scryfall\.io\//, (route) =>
+    SHOW_REAL_CARD_ART ? route.continue() : route.fulfill({ body: CARD_PLACEHOLDER_SVG, contentType: 'image/svg+xml' }))
+  await page.addInitScript((session) => {
+    sessionStorage.setItem('mtb_session', session.sessionId)
+    sessionStorage.setItem('mtb_player', session.playerId)
+    // Guided Mode is on for new players and opens panels over the board, so play as a returning player.
+    localStorage.setItem('mtb_guided_mode_preference', '0')
+  }, LOBBY_SESSION)
+  await page.routeWebSocket(/\/ws\//, (ws) => {
+    ws.send(JSON.stringify({ type: 'game_bootstrap', payload: gameBootstrap(screen) }))
   })
 }
 
