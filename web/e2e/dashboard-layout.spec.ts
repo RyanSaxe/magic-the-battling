@@ -52,3 +52,21 @@ for (const { name, viewport } of SCREENS) {
     })
   })
 }
+
+test.describe('390×844 phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true })
+
+  test('a switch shows Cubes & Decks or Recent Games, one at a time', async ({ page, baseURL }) => {
+    await openPage(page, baseURL!, dashboard)
+    const libraryHeader = page.getByTestId('library-header')
+    const recentHeader = page.getByTestId('recent-header')
+
+    await expect(page.getByRole('radio', { name: 'Cubes & Decks' })).toBeChecked()
+    await expect(libraryHeader).toBeVisible()
+    await expect(recentHeader).toBeHidden()
+
+    await page.getByRole('radio', { name: 'Recent Games' }).click()
+    await expect(recentHeader).toBeVisible()
+    await expect(libraryHeader).toBeHidden()
+  })
+})
