@@ -17,15 +17,8 @@ export default defineConfig({
       use: { ...devices['iPhone 15'], viewport: { width: 393, height: 560 } },
     },
     { name: 'iPhone 15 landscape', testIgnore: 'game-layout.spec.ts', use: { ...devices['iPhone 15 landscape'] } },
-    // Each screen in the game layout spec sets its own viewport, so it runs once. A game sometimes crashes
-    // on load with React error #185, an update loop through useCardLayout; until that is fixed, CI retries
-    // such a screen and reports it as flaky rather than failing at random.
-    {
-      name: 'game layout',
-      testMatch: 'game-layout.spec.ts',
-      retries: process.env.CI ? 2 : 0,
-      use: { ...devices['Desktop Safari'] },
-    },
+    // Each screen in the game layout spec sets its own viewport, so it runs once.
+    { name: 'game layout', testMatch: 'game-layout.spec.ts', use: { ...devices['Desktop Safari'] } },
   ],
   webServer: {
     command: `npx vite build && npx vite preview --port ${port} --strictPort`,
