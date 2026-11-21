@@ -33,11 +33,12 @@ export function AppHeader({ renderRight }: AppHeaderProps) {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-baseline whitespace-nowrap">
-              <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
+              <h1 className="hero-title text-lg font-bold tracking-wide leading-tight shrink-0">
                 Crucible
               </h1>
-              <span className="hero-sep mx-1 text-xs">—</span>
-              <span className="hero-subtitle text-[11px] font-normal tracking-wider">
+              <span className="hero-sep ml-1 text-xs shrink-0">—</span>
+              {/* The gap after the dash is padding, not margin, so truncating keeps the first letter's overhang. */}
+              <span className="hero-subtitle pl-1 text-[11px] font-normal tracking-wider min-w-0 truncate">
                 an MtG format
               </span>
             </div>
