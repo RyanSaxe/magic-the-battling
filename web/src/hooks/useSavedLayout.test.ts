@@ -226,6 +226,21 @@ describe("useSavedLayout", () => {
     expect(result.current.constraints).toBeNull();
   });
 
+  it("reads storage once for a phase, round and band, not on every render", () => {
+    const storage = createStorageMock();
+    const getItem = vi.spyOn(storage, "getItem");
+    vi.stubGlobal("localStorage", storage);
+    const { rerender } = renderHook(({ round }) => useSavedLayout({ ...location, round }, laptop), {
+      initialProps: { round: 2 },
+    });
+    rerender({ round: 2 });
+    rerender({ round: 2 });
+    expect(getItem).toHaveBeenCalledTimes(1);
+
+    rerender({ round: 3 });
+    expect(getItem).toHaveBeenCalledTimes(2);
+  });
+
   it("uses the automatic layout until the board has been measured", () => {
     const { result } = renderHook(() => useSavedLayout(location, null));
     act(() => result.current.setConstraints({ topFraction: 0.3 }));
