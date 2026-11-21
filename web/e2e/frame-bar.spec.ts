@@ -126,3 +126,39 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
     }
   })
 }
+
+const SUBMIT_POPOVERS = [
+  { state: GAME_PHASES.build, button: 'Submit Hand', popover: 'build-submit-popover', choice: 'Play' },
+  { state: GAME_PHASES.fight, button: 'Submit Result', popover: 'battle-submit-popover', choice: 'I Won' },
+]
+const MIN_POPOVER_GAP = 6
+
+for (const { name, viewport, isMobile } of SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    for (const { state, button, popover, choice } of SUBMIT_POPOVERS) {
+      // The choices open over the felt's corner, where they once sat flush with its gold edge or behind the sidebar.
+      test(`the choices over ${button} stay inside the felt's gold edge, in front of the sidebar`, async ({ page, baseURL }) => {
+        await serveGame(page, baseURL!, state)
+        await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+        await page.getByRole('button', { name: button }).click()
+        const choices = page.locator(`[data-guide-target="${popover}"]`)
+        await choices.getByRole('button', { name: choice }).waitFor()
+
+        const { popoverRight, feltInnerRight, choiceOnTop } = await page.evaluate(({ popover, choice }) => {
+          const box = document.querySelector(`[data-guide-target="${popover}"]`)!.getBoundingClientRect()
+          const felt = (document.querySelector('.frame-sidebar') ?? document.querySelector('main'))!.getBoundingClientRect()
+          const choiceButton = Array.from(document.querySelectorAll(`[data-guide-target="${popover}"] button`))
+            .find((element) => element.textContent?.trim() === choice)!
+          const choiceBox = choiceButton.getBoundingClientRect()
+          const topmost = document.elementFromPoint(choiceBox.left + choiceBox.width / 2, choiceBox.top + choiceBox.height / 2)
+          return { popoverRight: box.right, feltInnerRight: felt.right - 2, choiceOnTop: !!topmost && choiceButton.contains(topmost) }
+        }, { popover, choice })
+
+        expect.soft(feltInnerRight - popoverRight, 'gap between the choices and the gold edge').toBeGreaterThanOrEqual(MIN_POPOVER_GAP)
+        expect.soft(choiceOnTop, `"${choice}" is in front of everything at its spot`).toBe(true)
+      })
+    }
+  })
+}
