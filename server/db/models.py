@@ -101,6 +101,19 @@ class ActiveGameSnapshot(Base):
     updated_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
+class QuarantinedGameSnapshot(Base):
+    """An active game snapshot the server could not restore, kept so a later fix can bring the game back."""
+
+    __tablename__ = "quarantined_game_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(String, nullable=False, index=True)
+    state_json = Column(Text, nullable=False)
+    last_human_activity_at = Column(DateTime, nullable=False)
+    error = Column(Text, nullable=False)
+    quarantined_at = Column(DateTime, default=_utc_now, nullable=False)
+
+
 class User(Base):
     __tablename__ = "users"
 
