@@ -444,27 +444,28 @@ test.describe('a saved layout', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
   test('stays with the board size band it was saved in', async ({ page, baseURL }) => {
-    const handHeight = async () => {
-      await waitForStableLayout(page)
-      return Math.round((await page.locator('main .zone-hand').boundingBox())!.height)
-    }
+    const handHeight = async () => Math.round((await page.locator('main .zone-hand').boundingBox())!.height)
     await openScreen(page, baseURL!, { name: 'build', viewport: { width: 1280, height: 800 }, state: TYPICAL.build })
     const automaticOnLaptop = await handHeight()
 
+    // A load measures the board at once, so the drag starts from the desktop's own layout.
     await page.setViewportSize({ width: 1920, height: 1080 })
+    await reloadStyled(page)
     const automaticOnDesktop = await handHeight()
     const divider = (await page.locator('main .zone-divider-line > div[style*="resize"]').first().boundingBox())!
     await page.mouse.move(divider.x + divider.width / 2, divider.y + divider.height / 2)
     await page.mouse.down()
     await page.mouse.move(divider.x + divider.width / 2, divider.y + divider.height / 2 + 80, { steps: 4 })
     await page.mouse.up()
+    await waitForStableLayout(page)
     const savedOnDesktop = await handHeight()
     expect(savedOnDesktop).toBeGreaterThan(automaticOnDesktop + 60)
 
+    // After a resize the zones keep their old sizes until the game has measured the board again.
     await page.setViewportSize({ width: 1280, height: 800 })
-    expect(await handHeight()).toBe(automaticOnLaptop)
+    await expect.poll(handHeight).toBe(automaticOnLaptop)
 
     await page.setViewportSize({ width: 1920, height: 1080 })
-    expect(await handHeight()).toBe(savedOnDesktop)
+    await expect.poll(handHeight).toBe(savedOnDesktop)
   })
 })
