@@ -15,7 +15,7 @@ from server.observability import (
 from server.runtime_config import MAX_WS_CONNECTIONS
 from server.services.game_manager import game_manager
 from server.services.ops_manager import ops_manager
-from server.services.session_manager import session_manager
+from server.services.session_manager import Session, session_manager
 
 logger = logging.getLogger(__name__)
 obs_logger = logging.getLogger(OBSERVABILITY_LOGGER_NAME)
@@ -405,7 +405,8 @@ def _resolve_pending_or_game(game_id: str):
     return pending, game
 
 
-async def _connect_player_to_game(websocket: WebSocket, game_id: str, player_id: str):
+async def _connect_player_to_game(websocket: WebSocket, game_id: str, session: Session):
+    player_id = session.player_id
     pending, game = _resolve_pending_or_game(game_id)
     if not pending and not game:
         connection_manager.disconnect(game_id, player_id, websocket)
@@ -414,6 +415,15 @@ async def _connect_player_to_game(websocket: WebSocket, game_id: str, player_id:
             code=4004,
             reason="Game not found",
             error_code=ErrorCode.GAME_NOT_FOUND,
+        )
+        return None
+
+    if session.game_id != game_id:
+        await _reject_websocket(
+            websocket,
+            code=4001,
+            reason="Session belongs to another game",
+            error_code=ErrorCode.INVALID_SESSION,
         )
         return None
 
@@ -496,7 +506,7 @@ async def websocket_endpoint(
         return
 
     player_id = session.player_id
-    connection_result = await _connect_player_to_game(websocket, game_id, player_id)
+    connection_result = await _connect_player_to_game(websocket, game_id, session)
     if connection_result is None:
         return
     pending, game = connection_result

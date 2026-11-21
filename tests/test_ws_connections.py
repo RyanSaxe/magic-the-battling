@@ -81,3 +81,23 @@ def test_a_late_close_from_a_replaced_socket_keeps_the_lobby_player_ready(client
 
         alice = _lobby_player(client, game_id, "Alice")
         assert alice["is_ready"] is True
+
+
+def test_a_session_from_another_game_cannot_play_a_same_named_seat(client, ws_receive_json):
+    def started_game() -> dict:
+        host = client.post(
+            "/api/games", json={"player_name": "Tester", "cube_id": "test", "target_player_count": 2}
+        ).json()
+        client.post("/api/games/join", json={"join_code": host["join_code"], "player_name": "Friend"})
+        client.post(f"/api/games/{host['game_id']}/start")
+        return host
+
+    game_a, game_b = started_game(), started_game()
+
+    bootstrap = client.get(f"/api/games/{game_a['game_id']}", params={"session_id": game_b["session_id"]})
+    assert bootstrap.status_code == 404
+    with client.websocket_connect(_player_url(game_a["game_id"], game_b)) as ws:
+        assert ws_receive_json(ws)["payload"]["code"] == "INVALID_SESSION"
+        with pytest.raises(WebSocketDisconnect) as closed:
+            ws_receive_json(ws)
+    assert closed.value.code == 4001

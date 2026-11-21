@@ -1663,6 +1663,8 @@ class GameManager:
         player_name = self._player_id_to_name.get(player_id)
         if not player_name:
             return None
+        if self._active_games.get(self._player_to_game.get(player_id, "")) is not game:
+            return None
         for player in game.players:
             if player.name == player_name:
                 return player
