@@ -11,7 +11,7 @@ from server.schemas.api import ShareGameResponse, SharePlayerData, SharePlayerSn
 
 def _build_human_snapshots(history: PlayerGameHistory) -> list[SharePlayerSnapshot]:
     snapshots: list[SharePlayerSnapshot] = []
-    sorted_snaps = sorted(history.snapshots, key=lambda s: (s.stage, s.round))
+    sorted_snaps = sorted(history.snapshots, key=lambda s: (s.stage, s.round, s.sudden_death_build or 0))
     for snap in sorted_snaps:
         snapshot_data = restore_snapshot_data(snap.full_state_json)
         poison = snap.poison if snap.poison is not None else snapshot_data.poison
@@ -28,6 +28,7 @@ def _build_human_snapshots(history: PlayerGameHistory) -> list[SharePlayerSnapsh
                 treasures=snapshot_data.treasures,
                 poison=poison,
                 vanguard=snapshot_data.vanguard,
+                sudden_death_build=cast(int | None, snap.sudden_death_build),
             )
         )
     return snapshots
@@ -51,7 +52,9 @@ def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[Sha
     raw = str(history.poison_history_json) if history.poison_history_json else ""
     poison_map: dict[str, int] = json.loads(raw) if raw else {}
 
-    sorted_snaps = sorted(source.snapshots, key=lambda s: (s.stage, s.round))
+    # A puppet replays each round's ordinary build, as _load_fake_player does in the game.
+    ordinary_snaps = [snap for snap in source.snapshots if snap.sudden_death_build is None]
+    sorted_snaps = sorted(ordinary_snaps, key=lambda s: (s.stage, s.round))
     if not sorted_snaps:
         return []
 
@@ -90,6 +93,32 @@ def _build_puppet_snapshots(history: PlayerGameHistory, db: Session) -> list[Sha
     return snapshots
 
 
+def _add_puppet_sudden_death_fights(
+    snapshots: list[SharePlayerSnapshot], puppet_name: str, histories: list[PlayerGameHistory]
+) -> list[SharePlayerSnapshot]:
+    """Adds an entry for each Sudden Death a puppet fought, from the builds its human opponent saved.
+
+    A puppet never rebuilds, so it fights each Sudden Death with its build of that round, at the poison
+    both fighters were reset to.
+    """
+    builds_by_round = {(snapshot.stage, snapshot.round): snapshot for snapshot in snapshots}
+    fights = [
+        snap
+        for history in histories
+        if not history.is_puppet
+        for snap in history.snapshots
+        if snap.sudden_death_build is not None and snap.opponent_name == puppet_name
+    ]
+    sudden_death_builds = [
+        builds_by_round[(fight.stage, fight.round)].model_copy(
+            update={"sudden_death_build": fight.sudden_death_build, "poison": fight.poison}
+        )
+        for fight in fights
+        if (fight.stage, fight.round) in builds_by_round
+    ]
+    return sorted([*snapshots, *sudden_death_builds], key=_round_of)
+
+
 def _final_treasures(history: PlayerGameHistory, snapshots: list[SharePlayerSnapshot]) -> int | None:
     if history.final_poison is None:
         return None
@@ -99,9 +128,13 @@ def _final_treasures(history: PlayerGameHistory, snapshots: list[SharePlayerSnap
     return cast(int, history.final_treasures)
 
 
-def _build_share_player(history: PlayerGameHistory, db: Session) -> SharePlayerData:
+def _build_share_player(history: PlayerGameHistory, histories: list[PlayerGameHistory], db: Session) -> SharePlayerData:
     is_puppet = bool(history.is_puppet)
-    snapshots = _build_puppet_snapshots(history, db) if is_puppet else _build_human_snapshots(history)
+    snapshots = (
+        _add_puppet_sudden_death_fights(_build_puppet_snapshots(history, db), str(history.player_name), histories)
+        if is_puppet
+        else _build_human_snapshots(history)
+    )
 
     if history.final_poison is not None:
         final_poison = cast(int, history.final_poison)
@@ -118,8 +151,12 @@ def _build_share_player(history: PlayerGameHistory, db: Session) -> SharePlayerD
     )
 
 
-def _round_of(snapshot: SharePlayerSnapshot) -> tuple[int, int]:
-    return snapshot.stage, snapshot.round
+# A Sudden Death build comes after the ordinary build of its round, so it is part of what makes a round distinct.
+ShareRound = tuple[int, int, int]
+
+
+def _round_of(snapshot: SharePlayerSnapshot) -> ShareRound:
+    return snapshot.stage, snapshot.round, snapshot.sudden_death_build or 0
 
 
 def _poison_and_treasures_only(snapshot: SharePlayerSnapshot) -> SharePlayerSnapshot:
@@ -136,10 +173,11 @@ def _poison_and_treasures_only(snapshot: SharePlayerSnapshot) -> SharePlayerSnap
         poison=snapshot.poison,
         vanguard=None,
         visibility="hidden",
+        sudden_death_build=snapshot.sudden_death_build,
     )
 
 
-def _sharer_mid_game(sharer: SharePlayerData, last_round: tuple[int, int] | None) -> SharePlayerData:
+def _sharer_mid_game(sharer: SharePlayerData, last_round: ShareRound | None) -> SharePlayerData:
     # The sharer's last build is the ghost a remaining player may still fight, and its
     # applied upgrades name the hand cards they target.
     snapshots = [
@@ -152,7 +190,7 @@ def _sharer_mid_game(sharer: SharePlayerData, last_round: tuple[int, int] | None
 
 
 def _other_player_mid_game(
-    player: SharePlayerData, sharer_rounds: set[tuple[int, int]], sharer_last_round: tuple[int, int] | None
+    player: SharePlayerData, sharer_rounds: set[ShareRound], sharer_last_round: ShareRound | None
 ) -> SharePlayerData:
     snapshots = [_poison_and_treasures_only(s) for s in player.snapshots if _round_of(s) in sharer_rounds]
     out_by_sharers_last_round = (
@@ -212,7 +250,7 @@ def build_share_data(db: Session, game_id: str, player_name: str) -> ShareGameRe
     if sharer_history is None:
         raise api_error(404, ErrorCode.PLAYER_NOT_IN_GAME, "Player not found in this game")
 
-    players = [_build_share_player(history, db) for history in histories]
+    players = [_build_share_player(history, histories, db) for history in histories]
     if in_progress:
         players = _mid_game_players(players, player_name)
 

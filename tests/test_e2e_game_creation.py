@@ -23,7 +23,9 @@ def test_build_battler_with_separate_upgrades_cube(monkeypatch, card_factory, up
         assert upgrade.is_upgrade
 
 
-def test_game_manager_loads_upgrades_with_defaults(reset_singletons, mock_cube_data, card_factory, upgrade_factory):
+def test_game_manager_loads_upgrades_with_defaults(
+    reset_singletons, mock_cube_data, card_factory, upgrade_factory, start_game_now
+):
     """Verify game_manager loads upgrades when use_upgrades=True."""
     from server.services.game_manager import game_manager  # noqa: PLC0415
 
@@ -32,10 +34,11 @@ def test_game_manager_loads_upgrades_with_defaults(reset_singletons, mock_cube_d
         player_id="alice-id",
         cube_id="auto",
         use_upgrades=True,
+        target_player_count=2,
     )
 
     game_manager.join_game(pending.join_code, "Bob", "bob-id")
-    game = game_manager.start_game(pending.game_id)
+    game = start_game_now(game_manager, pending.game_id)
 
     assert game is not None
     assert len(game.available_upgrades) > 0, "Game should have upgrades loaded"
@@ -43,7 +46,9 @@ def test_game_manager_loads_upgrades_with_defaults(reset_singletons, mock_cube_d
         assert upgrade.is_upgrade
 
 
-def test_game_manager_no_upgrades_when_disabled(reset_singletons, mock_cube_data, card_factory, upgrade_factory):
+def test_game_manager_no_upgrades_when_disabled(
+    reset_singletons, mock_cube_data, card_factory, upgrade_factory, start_game_now
+):
     """Verify game_manager does not load upgrades when use_upgrades=False."""
     from server.services.game_manager import game_manager  # noqa: PLC0415
 
@@ -52,10 +57,11 @@ def test_game_manager_no_upgrades_when_disabled(reset_singletons, mock_cube_data
         player_id="alice-id",
         cube_id="auto",
         use_upgrades=False,
+        target_player_count=2,
     )
 
     game_manager.join_game(pending.join_code, "Bob", "bob-id")
-    game = game_manager.start_game(pending.game_id)
+    game = start_game_now(game_manager, pending.game_id)
 
     assert game is not None
     assert len(game.available_upgrades) == 0, "Game should not have upgrades"

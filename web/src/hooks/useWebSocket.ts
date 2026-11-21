@@ -151,6 +151,8 @@ export function useWebSocket(
 
       const messageQueue: MessageEvent[] = []
       let processing = false
+      // Followed message by message rather than through rendered state, which can skip "starting" entirely.
+      let lobbyStartStatus: LobbyState['start_status'] | null = null
 
       async function processQueue() {
         if (processing) return
@@ -184,7 +186,19 @@ export function useWebSocket(
               const hydrated = hydrateGameState(payload, catalog)
               update((s) => ({ ...s, gameState: hydrated, lobbyState: null }))
             } else if (message.type === 'lobby_state') {
-              update((s) => ({ ...s, lobbyState: message.payload }))
+              const lobby = message.payload as LobbyState
+              if (lobbyStartStatus === 'starting' && lobby.start_status === 'failed') {
+                onServerErrorRef.current?.(
+                  createAppError({
+                    code: 'USER_MESSAGE',
+                    detail: lobby.start_error,
+                    context: 'default',
+                    fallbackMessage: 'The game could not start.',
+                  }),
+                )
+              }
+              lobbyStartStatus = lobby.start_status
+              update((s) => ({ ...s, lobbyState: lobby }))
             } else if (message.type === 'error') {
               onServerErrorRef.current?.(
                 wsPayloadToAppError(message.payload, 'default', 'That action could not be completed.'),

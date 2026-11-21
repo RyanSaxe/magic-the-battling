@@ -3,6 +3,7 @@ export type PlayMode = 'limited' | 'constructed'
 export type LastResult = 'win' | 'loss' | 'draw'
 export type CubeLoadingStatus = 'loading' | 'ready' | 'error'
 export type BattlerLoadingStatus = 'missing' | 'loading' | 'ready' | 'error'
+export type LobbyStartStatus = 'open' | 'starting' | 'started' | 'failed'
 export type ZoneName = 'battlefield' | 'graveyard' | 'exile' | 'hand' | 'sideboard' | 'upgrades' | 'command_zone' | 'library'
 export type CardStateAction =
   | 'tap'
@@ -343,6 +344,8 @@ export interface LobbyState {
   players: LobbyPlayer[]
   can_start: boolean
   is_started: boolean
+  start_status: LobbyStartStatus
+  start_error: string | null
   target_player_count: number
   puppet_count: number
   cube_loading_status: CubeLoadingStatus
@@ -448,6 +451,7 @@ export interface SharePlayerSnapshot {
   poison: number
   vanguard: Card | null
   visibility: ShareSnapshotVisibility
+  sudden_death_build: number | null
 }
 
 export interface SharePlayerData {

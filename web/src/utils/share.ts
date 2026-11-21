@@ -21,15 +21,18 @@ export function getShareHiddenZones(snapshot: SharePlayerSnapshot): ShareHiddenZ
   return HIDDEN_ZONES[snapshot.visibility]
 }
 
-/** The band under a round the server hid while the game goes on, or null when the round shows in full. */
-export function getShareHiddenRoundBand(player: SharePlayerData, snapshot: SharePlayerSnapshot): string | null {
-  if (snapshot.visibility !== 'hidden') return null
-  return player.final_placement === null ? 'Still Fighting' : 'Game in Progress'
+/** The band under a round: why the server hid it while the game goes on, else whether it was a Sudden Death build. */
+export function getShareRoundBand(player: SharePlayerData, snapshot: SharePlayerSnapshot): string | null {
+  if (snapshot.visibility === 'hidden') {
+    return player.final_placement === null ? 'Still Fighting' : 'Game in Progress'
+  }
+  return snapshot.sudden_death_build === null ? null : 'Sudden Death'
 }
 
 interface ShareRoundPosition {
   stage: number
   round: number
+  sudden_death_build: number | null
 }
 
 function compareShareRounds(
@@ -37,16 +40,34 @@ function compareShareRounds(
   b: ShareRoundPosition,
 ): number {
   if (a.stage !== b.stage) return a.stage - b.stage
-  return a.round - b.round
+  if (a.round !== b.round) return a.round - b.round
+  return (a.sudden_death_build ?? 0) - (b.sudden_death_build ?? 0)
+}
+
+export function getShareRoundValue(position: ShareRoundPosition): string {
+  const value = `${position.stage}_${position.round}`
+  return position.sudden_death_build === null ? value : `${value}_${position.sudden_death_build}`
+}
+
+/** A round's name. Short names a Sudden Death build's round as 5-1, so the name fits a phone's round chip. */
+export function getShareRoundLabel(position: ShareRoundPosition, short = false): string {
+  const label = `Stage ${position.stage} - Round ${position.round}`
+  if (position.sudden_death_build === null) return label
+  const round = short ? `${position.stage}-${position.round}` : label
+  return position.sudden_death_build === 1
+    ? `${round} · Sudden Death`
+    : `${round} · Sudden Death ${position.sudden_death_build}`
 }
 
 export function parseShareRoundValue(selectedRound: string): ShareRoundPosition | null {
-  const [stagePart, roundPart] = selectedRound.split('_')
+  const [stagePart, roundPart, suddenDeathPart] = selectedRound.split('_')
   const stage = Number(stagePart)
   const round = Number(roundPart)
+  const suddenDeathBuild = suddenDeathPart === undefined ? null : Number(suddenDeathPart)
   if (!Number.isInteger(stage) || !Number.isInteger(round)) return null
+  if (suddenDeathBuild !== null && !Number.isInteger(suddenDeathBuild)) return null
 
-  return { stage, round }
+  return { stage, round, sudden_death_build: suddenDeathBuild }
 }
 
 function getLatestShareSnapshot(player: SharePlayerData): SharePlayerSnapshot | null {
@@ -67,7 +88,9 @@ function getShareFinalStateForRound(
   return { poison: player.final_poison, treasures: player.final_treasures }
 }
 
-function hasExactShareSnapshotForRound(
+// A Sudden Death entry counts everyone who played its round, because a player who survived that round stays in the
+// game while the two at lethal fight it out.
+function playedShareRound(
   player: SharePlayerData,
   selectedRound: string,
 ): boolean {
@@ -106,7 +129,7 @@ export function getSharePlayerRowBadge(
   if (getShareFinalStateForRound(player, selectedRound)) {
     return player.final_placement === 1 ? 'alive' : 'dead'
   }
-  return hasExactShareSnapshotForRound(player, selectedRound) ? 'alive' : 'dead'
+  return playedShareRound(player, selectedRound) ? 'alive' : 'dead'
 }
 
 export function buildSharePlayerViews(
