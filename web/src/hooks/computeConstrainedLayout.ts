@@ -1,4 +1,4 @@
-import { bestFit, CARD_ASPECT_RATIO, type ZoneDims } from "./cardSizeUtils";
+import { bestFit, CARD_ASPECT_RATIO, MIN_CARD_WIDTH, type ZoneDims } from "./cardSizeUtils";
 import {
   computeLayout,
   DEFAULT_PASS_2_MAX_CARD_WIDTH,
@@ -231,7 +231,7 @@ export function resolveConstraints(
 }
 
 /** Room a zone keeps under a saved layout: one row of the narrowest cards allowed. */
-export const MIN_ZONE_CARD = { width: 40, height: 56 };
+export const MIN_ZONE_CARD = { width: MIN_CARD_WIDTH, height: Math.round(MIN_CARD_WIDTH * CARD_ASPECT_RATIO) };
 
 function clampBetween(value: number, low: number, high: number): number {
   // When the board can't give every zone its minimum, split what there is in proportion.

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { MIN_CARD_WIDTH } from '../src/hooks/cardSizeUtils'
 import type { ZoneConstraints } from '../src/hooks/computeConstrainedLayout'
 import { boardSizeBand } from '../src/hooks/usePersistedConstraints'
 import { serveGame } from './helpers'
@@ -30,8 +31,6 @@ interface Screen {
   /** Checks that fail on this screen today, each with what fails. */
   knownFailures?: Partial<Record<Check, string>>
 }
-
-const MIN_CARD_WIDTH = 40
 
 const TYPICAL: Record<string, ScreenState> = {
   draft: { phase: 'draft', counts: { pack: 5, sideboard: 10, upgrades: 2 } },

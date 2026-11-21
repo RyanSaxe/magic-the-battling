@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import type { ZoneDims } from "../hooks/cardSizeUtils";
+import { MIN_CARD_WIDTH, type ZoneDims } from "../hooks/cardSizeUtils";
 import {
   MIN_ZONE_CARD,
   clampSavedConstraints,
@@ -19,13 +19,6 @@ import {
   type Viewport,
   type ZoneCase,
 } from "./cases";
-
-/**
- * The narrowest card any card grid in the app asks for (DndPanelLayout's
- * PANEL_MIN_WIDTH). The zone engine and the battle board declare no minimum of
- * their own beyond 1px.
- */
-export const MIN_CARD_WIDTH = 40;
 
 export type CheckId =
   | "card-outside-zone"
