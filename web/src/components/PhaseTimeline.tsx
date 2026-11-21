@@ -14,11 +14,13 @@ const PHASE_TIMELINE_LABELS: Record<Phase, string> = {
   reward: "advance",
 };
 
+// The current step reads as "you are here": a walnut tag with a gold rim, crimson in the Fight.
+const STEP_HERE = "bg-[#352c25] text-[var(--gold-pale)] ring-1 ring-[var(--color-gold)]";
 const PHASE_ACTIVE_STYLE: Record<Phase, string> = {
-  draft: "bg-purple-500/30 text-purple-300 ring-1 ring-purple-400/60",
-  build: "bg-blue-500/30 text-blue-300 ring-1 ring-blue-400/60",
-  battle: "bg-red-500/30 text-red-300 ring-1 ring-red-400/60",
-  reward: "bg-amber-500/30 text-amber-300 ring-1 ring-amber-400/60",
+  draft: STEP_HERE,
+  build: STEP_HERE,
+  battle: "bg-[#441f1e] text-[#fecaca] ring-1 ring-[#d9534f]",
+  reward: STEP_HERE,
 };
 const GUIDED_POPOVER_AUTO_CLOSE_MS = 10_000;
 const PHASE_POPOVER_FADE_OUT_MS = 220;
@@ -237,7 +239,7 @@ export function PhaseTimeline({
       <div ref={stepsRowRef} className={`flex items-center flex-1 min-w-0 ${stepsOverflow ? "phase-timeline-scroll" : ""}`}>
         <div ref={stepsRef} className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <span
-            className="text-xs sm:text-sm text-gray-300 font-mono"
+            className="text-xs sm:text-sm text-[#e2d8cb] font-mono"
             data-guide-target="timeline-stage-round"
           >
             {stage}-{round}
@@ -257,9 +259,9 @@ export function PhaseTimeline({
                 data-guide-target={`timeline-phase-${phase}`}
                 className={`text-xs sm:text-sm font-medium capitalize transition-colors
                   ${!isEnd ? "cursor-pointer" : "cursor-default"}
-                  ${isActive || isEndReward ? `rounded-full px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
-                  ${isCompleted && !isEndReward ? "text-gray-500 line-through decoration-gray-600" : ""}
-                  ${isUpcoming ? "text-gray-500" : ""}
+                  ${isActive || isEndReward ? `rounded-[4px] px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
+                  ${isCompleted && !isEndReward ? "text-[var(--ivory-faint)] line-through decoration-[var(--gold-border-opaque)]" : ""}
+                  ${isUpcoming ? "text-[var(--ivory-faint)]" : ""}
                   ${welcomeGuideActive || isEnd ? "hover:brightness-100" : "hover:brightness-125"}
                 `}
               >
@@ -276,14 +278,14 @@ export function PhaseTimeline({
             if (phase === "reward") {
               return (
                 <div key={phase} ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
-                  <span className="text-gray-600 text-xs">→</span>
+                  <span className="text-[var(--gold-border-opaque)] text-xs">→</span>
                   <div
                     className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
                     data-guide-target="timeline-next-stage-round"
                   >
                     {phaseButton}
                     {!isEnd && !endsInWinner && (
-                      <span className="text-xs sm:text-sm text-gray-500">
+                      <span className="text-xs sm:text-sm text-[var(--ivory-faint)]">
                         to <span className="font-mono">{nextStage}-{nextRound}</span>
                       </span>
                     )}
@@ -294,7 +296,7 @@ export function PhaseTimeline({
 
             return (
               <div key={phase} ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
-                <span className="text-gray-600 text-xs">→</span>
+                <span className="text-[var(--gold-border-opaque)] text-xs">→</span>
                 {phaseButton}
               </div>
             );

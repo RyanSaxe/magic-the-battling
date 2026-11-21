@@ -50,6 +50,11 @@ for (const { name, viewport } of SCREENS) {
       expect(Math.abs(library.y - recent.y)).toBeLessThanOrEqual(1)
       expect(Math.abs(library.height - recent.height)).toBeLessThanOrEqual(1)
     })
+
+    test("the phone's switch between Cubes & Decks and Recent Games is hidden", async ({ page, baseURL }) => {
+      await openPage(page, baseURL!, dashboard)
+      await expect(page.getByRole('radio', { name: 'Recent Games' })).toBeHidden()
+    })
   })
 }
 

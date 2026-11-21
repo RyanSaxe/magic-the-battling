@@ -5,7 +5,7 @@ export interface SegmentOption<T extends string> {
   label: string
 }
 
-/** Buttons for one choice among a few, each always visible, such as All, Saved and Following. */
+/** Buttons for one choice among a few, each always visible, such as All, Saved and Following. The chosen one is raised. */
 export function SegmentedFilter<T extends string>({
   label,
   options,
@@ -26,7 +26,7 @@ export function SegmentedFilter<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className={`inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1 ${className ?? ''}`}
+      className={`segmented-track ${className ?? ''}`}
     >
       {options.map((option) => (
         <button
@@ -35,12 +35,8 @@ export function SegmentedFilter<T extends string>({
           role="radio"
           aria-checked={option.value === value}
           onClick={() => onChange(option.value)}
-          className={`flex-1 rounded-full px-3 py-1 whitespace-nowrap transition-colors ${
+          className={`segmented-option flex-1 px-3 py-1 whitespace-nowrap transition-colors ${
             variant === 'heading' ? SECTION_TITLE_TYPE : 'text-xs font-medium'
-          } ${
-            option.value === value
-              ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'
-              : 'border border-transparent bg-black/10 text-amber-100/60 hover:text-amber-100'
           }`}
         >
           {option.label}
