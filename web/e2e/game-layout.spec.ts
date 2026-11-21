@@ -10,6 +10,16 @@ import { GAME_ID, type ScreenState } from './gameStates'
  * checks fail. CI runs SAMPLE; `LAYOUT_SWEEP=full npm run test:e2e -- game-layout`
  * runs every phase at every viewport. A screen fails when its failing checks
  * differ from the ones listed for it, so a fix or a regression both show up.
+ *
+ * `LAYOUT_COMPARE=1` also compares each screen's board, zone and card positions
+ * and its pixels with a baseline in e2e/layout-baseline/, which git ignores. To
+ * show what a change moves, record the baseline on the build before it, then run
+ * the same sweep on the change:
+ *
+ *   LAYOUT_SWEEP=full LAYOUT_COMPARE=1 npm run test:e2e -- game-layout --update-snapshots
+ *   LAYOUT_SWEEP=full LAYOUT_COMPARE=1 npm run test:e2e -- game-layout
+ *
+ * Each screen that differs fails, with expected, actual and diff images in the report.
  */
 
 type Check =
@@ -111,6 +121,7 @@ const FULL: Screen[] = FULL_VIEWPORTS.flatMap(([width, height]) =>
 )
 
 const SCREENS = process.env.LAYOUT_SWEEP === 'full' ? FULL : SAMPLE
+const COMPARE = process.env.LAYOUT_COMPARE === '1'
 
 interface Box {
   x: number
@@ -246,6 +257,22 @@ function measureBoard({ zoneSelector, minCardWidth }: { zoneSelector: string; mi
   }
 
   return { board, zones, dividers, failures }
+}
+
+/** Where the board, its zones and dividers, and every card sit, to the hundredth of a pixel. */
+async function positions(page: Page, measurement: BoardMeasurement) {
+  const round = (box: Box) => [box.x, box.y, box.width, box.height].map((value) => Math.round(value * 100) / 100)
+  const cards: Box[] = await page.locator('main .card').evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect()
+      return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+    }))
+  return {
+    board: round(measurement.board),
+    zones: measurement.zones.map((zone) => [zone.name, ...round(zone.box)]),
+    dividers: measurement.dividers.map(round),
+    cards: cards.map(round),
+  }
 }
 
 async function openScreen(page: Page, baseURL: string, screen: Screen) {
@@ -391,6 +418,11 @@ for (const screen of SCREENS) {
       await openScreen(page, baseURL!, screen)
       const measurement = await measure(page)
       const failures = { ...measurement.failures }
+      if (COMPARE) {
+        // Soft, so a screen that moved still runs its layout checks below.
+        expect.soft(JSON.stringify(await positions(page, measurement), null, 1)).toMatchSnapshot(`${screen.name}.json`)
+        await expect.soft(page).toHaveScreenshot(`${screen.name}.png`)
+      }
 
       if (screen.saved) {
         // A saved divider gives way only to keep a zone one row of 40px cards tall: 56px plus 32px of padding.
