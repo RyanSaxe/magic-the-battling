@@ -49,6 +49,10 @@ function battler(id: number, cubeId: string, name: string): UserBattler {
     game_count: 12,
     human_player_count: 5,
     last_played: '2026-01-02T00:00:00Z',
+    my_game_count: 4,
+    my_win_count: 1,
+    my_average_placement: 2.25,
+    my_last_played: '2026-01-02T00:00:00Z',
   }
 }
 
@@ -240,7 +244,7 @@ export const PAGES: PageUnderTest[] = [
     name: 'dashboard',
     path: '/dashboard',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('button', { name: '+ Add Cube' }),
+    primaryAction: (page) => page.getByRole('button', { name: 'New Game' }),
   },
   {
     name: 'battler',

@@ -489,6 +489,11 @@ export interface UserBattler {
   game_count: number
   human_player_count: number
   last_played?: string | null
+  /** The signed-in player's finished games on this cube with this preset's mode and upgrades setting. */
+  my_game_count: number
+  my_win_count: number
+  my_average_placement: number | null
+  my_last_played: string | null
 }
 
 export interface GameSummary {
