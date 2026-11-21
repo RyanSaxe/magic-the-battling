@@ -304,6 +304,7 @@ def list_cube_games(
 @router.get("/{battler_id}/games")
 def list_battler_games(
     battler_id: int,
+    *,
     play_mode: str | None = Query(default=None),
     use_upgrades: bool | None = Query(default=None),
     offset: int = Query(default=0, ge=0),

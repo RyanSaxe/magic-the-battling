@@ -1,10 +1,11 @@
 import random
-from typing import Any
+from typing import TYPE_CHECKING, Any, Required, Unpack
 
 from pydantic import BaseModel, Field, PrivateAttr, computed_field, model_serializer, model_validator
 
 from mtb.models.card_registry import (
     CardData,
+    CardDataInput,
     derive_scryfall_id,
     get_card_data,
     register_card_data,
@@ -20,6 +21,16 @@ CONSTRUCTED_BANNED_CARD_NAMES: set[str] = set()
 LIMITED_BANNED_CARD_NAMES: set[str] = set()
 
 
+if TYPE_CHECKING:
+
+    class CardArguments(CardDataInput, total=False):
+        id: Required[str]
+        scryfall_id: str
+        upgrade_target: "Card | None"
+        is_revealed: bool
+        original_owner: str | None
+
+
 class Card(BaseModel):
     model_config = {"extra": "ignore"}
 
@@ -31,6 +42,11 @@ class Card(BaseModel):
 
     _card_data: CardData | None = PrivateAttr(default=None)
     _tokens_cache: tuple["Card", ...] | None = PrivateAttr(default=None)
+
+    if TYPE_CHECKING:
+        # Card also takes card data, which _register_and_derive moves into the registry before Pydantic
+        # drops it as extra, so the constructor accepts more than the model's own fields.
+        def __init__(self, **arguments: Unpack["CardArguments"]) -> None: ...
 
     @model_validator(mode="before")
     @classmethod
