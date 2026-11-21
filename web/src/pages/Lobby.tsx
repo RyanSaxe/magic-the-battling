@@ -832,7 +832,7 @@ export function Lobby() {
                       <button
                         onClick={() => actions.addPuppet()}
                         disabled={!canAddPuppet}
-                        className="text-sm text-cyan-400 hover:text-cyan-300 disabled:text-[var(--ivory-faint)] disabled:cursor-not-allowed transition-colors"
+                        className={`text-sm ${LINK} disabled:text-[var(--ivory-faint)] disabled:cursor-not-allowed transition-colors`}
                       >
                         + Add Puppet
                       </button>
@@ -943,7 +943,7 @@ export function Lobby() {
                           isSearching
                             ? "border-amber-600/50"
                             : botAvailable
-                              ? "border-cyan-700"
+                              ? "border-[var(--ivory-faint)]"
                               : "border-red-700/50"
                         }`}
                       >
@@ -969,11 +969,11 @@ export function Lobby() {
                           </svg>
                         ) : (
                           <span
-                            className={`w-2 h-2 rounded-full shrink-0 ${botAvailable ? "bg-cyan-600" : "bg-red-700/50"}`}
+                            className={`w-2 h-2 rounded-full shrink-0 ${botAvailable ? "bg-[var(--ivory-muted)]" : "bg-red-700/50"}`}
                           />
                         )}
                         <span
-                          className={`text-sm italic ${isSearching ? "text-amber-400" : botAvailable ? "text-cyan-500" : "text-red-400/70"}`}
+                          className={`text-sm italic ${isSearching ? "text-amber-400" : botAvailable ? "text-[var(--ivory-soft)]" : "text-red-400/70"}`}
                         >
                           Puppet {slot.puppetIndex + 1}
                         </span>
