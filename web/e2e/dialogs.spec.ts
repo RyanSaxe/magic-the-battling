@@ -49,3 +49,18 @@ for (const dialogUnderTest of DIALOGS) {
     expect.soft(await isOnScreenAndOnTop(close), 'close button stays on screen after scrolling').toBe(true)
   })
 }
+
+test('a dialog takes keyboard focus when it opens and gives it back when it closes', async ({ page, baseURL }) => {
+  await serveSignedIn(page, baseURL!)
+  await page.goto('/dashboard/list/1')
+  const opener = page.getByRole('button', { name: 'Edit Preset' })
+  await opener.focus()
+  await page.keyboard.press('Enter')
+
+  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  await expect(dialog.getByRole('textbox').first()).toBeFocused()
+
+  await dialog.getByRole('button', { name: 'Close Settings' }).click()
+  await expect(dialog).toBeHidden()
+  await expect(opener).toBeFocused()
+})
