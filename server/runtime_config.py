@@ -96,6 +96,9 @@ SPECTATE_REQUEST_TTL_MINUTES = _env_int("MTB_SPECTATE_REQUEST_TTL_MINUTES", 30, 
 
 STALE_GAME_CLEANUP_HOURS = _env_int("MTB_STALE_GAME_CLEANUP_HOURS", 48, min_value=1)
 
+# Fly sets FLY_APP_NAME on every Machine, and its proxy sets Fly-Client-IP on each request it forwards.
+BEHIND_FLY_PROXY = bool(_env_str("FLY_APP_NAME"))
+
 OPS_API_TOKEN = os.getenv("MTB_OPS_TOKEN", "")
 RESTORE_ACTIVE_GAME_SNAPSHOTS = _env_bool("MTB_RESTORE_ACTIVE_GAME_SNAPSHOTS", True)
 

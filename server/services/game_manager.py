@@ -67,6 +67,7 @@ from mtb.phases.elimination import (
 from server.db.models import (
     ActiveGameSnapshot,
     BattleSnapshot,
+    CubeMetadata,
     GamePlayerRecord,
     GameRecord,
     PlayerGameHistory,
@@ -234,6 +235,92 @@ class GameStartQueueFullError(RuntimeError):
 class SeatClaim:
     player_id: str
     seat_token: str
+
+
+@dataclass(frozen=True)
+class _RunningSeat:
+    """Where a seat stands in a started game, read from the live game or from its snapshot."""
+
+    config: Config
+    player_count: int
+    stage: int
+    round: int
+    poison: int
+    phase: str
+
+
+def _running_seat_in_game(game: Game, player_name: str) -> _RunningSeat | None:
+    player = next((p for p in game.players if p.name == player_name), None)
+    if player is None:
+        return None
+    return _RunningSeat(
+        config=game.config,
+        player_count=len(game.players) + len(game.puppets),
+        stage=player.stage,
+        round=player.round,
+        poison=player.poison,
+        phase=player.phase,
+    )
+
+
+def _running_seat_in_snapshot(
+    config: dict[str, Any], players: list[dict[str, Any]], puppet_count: int, player_name: str
+) -> _RunningSeat | None:
+    player = next((p for p in players if p.get("name") == player_name), None)
+    if player is None:
+        return None
+    return _RunningSeat(
+        config=Config.model_validate(config),
+        player_count=len(players) + puppet_count,
+        stage=player["stage"],
+        round=player["round"],
+        poison=player["poison"],
+        phase=player["phase"],
+    )
+
+
+def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame) -> ResumableGame:
+    return ResumableGame(
+        game_id=seat.game_id,
+        player_name=seat.player_name,
+        kind="lobby",
+        cube_id=pending.cube_id,
+        play_mode=pending.play_mode,
+        use_upgrades=pending.use_upgrades,
+        player_count=len(pending.player_names) + pending.puppet_count,
+    )
+
+
+def _resumable_game_seat(seat: ResumableSeat, running: _RunningSeat, last_active_at: datetime | None) -> ResumableGame:
+    return ResumableGame(
+        game_id=seat.game_id,
+        player_name=seat.player_name,
+        kind="game",
+        last_active_at=last_active_at,
+        cube_id=running.config.cube_id,
+        play_mode=running.config.play_mode,
+        use_upgrades=running.config.use_upgrades,
+        player_count=running.player_count,
+        stage=running.stage,
+        round=running.round,
+        poison=running.poison,
+    )
+
+
+def _with_cube_metadata(session: Session, games: list[ResumableGame]) -> list[ResumableGame]:
+    cube_ids = {game.cube_id for game in games}
+    metadata = {
+        cast(str, row.cube_id): row for row in session.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids))
+    }
+    return [
+        game.model_copy(
+            update={
+                "cube_name": cast(str | None, meta.name) if (meta := metadata.get(game.cube_id)) else None,
+                "cube_image_uri": cast(str | None, meta.image_uri) if meta else None,
+            }
+        )
+        for game in games
+    ]
 
 
 def _transfer_card_state(card_id: str, from_zones: Zones, to_zones: Zones) -> None:
@@ -1277,6 +1364,7 @@ class GameManager:
         self._active_games.pop(game_id, None)
         self._pending_games.pop(game_id, None)
         self._clear_runtime_player_mappings_for_game(game_id)
+        self._drop_spectate_requests_for_game(game_id)
 
         self._cancel_host_handoff(game_id)
         abandoned_cleanup = self._abandoned_cleanup_tasks.pop(game_id, None)
@@ -1292,7 +1380,7 @@ class GameManager:
         self._finished_games.discard(game_id)
         if not preserve_snapshot:
             self.delete_snapshot(game_id)
-        self._close_game_record(game_id)
+            self._close_game_record(game_id)
 
     def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool, play_mode: PlayMode) -> Battler:
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
@@ -1774,44 +1862,53 @@ class GameManager:
                     GamePlayerRecord.is_puppet.is_(False),
                 )
             }
-            snapshot_activity = {
-                cast(str, game_id): cast(datetime, activity)
-                for game_id, activity in session.query(
-                    ActiveGameSnapshot.game_id, ActiveGameSnapshot.last_human_activity_at
+            # json_extract keeps the snapshot's card registry out of Python; only the seats are parsed.
+            snapshots = {
+                cast(str, row.game_id): row
+                for row in session.query(
+                    ActiveGameSnapshot.game_id,
+                    ActiveGameSnapshot.last_human_activity_at,
+                    func.json_extract(ActiveGameSnapshot.state_json, "$.data.config").label("config_json"),
+                    func.json_extract(ActiveGameSnapshot.state_json, "$.data.players").label("players_json"),
+                    func.coalesce(
+                        func.json_array_length(ActiveGameSnapshot.state_json, "$.data.puppets"),
+                        func.json_array_length(ActiveGameSnapshot.state_json, "$.data.fake_players"),
+                        0,
+                    ).label("puppet_count"),
                 ).filter(ActiveGameSnapshot.game_id.in_(stored_game_ids))
             }
+
+            resumable: list[ResumableGame] = []
+            for seat in seats:
+                pending = self._pending_games.get(seat.game_id)
+                if pending is not None and not pending.is_started:
+                    if seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name)):
+                        resumable.append(_resumable_lobby_seat(seat, pending))
+                    continue
+
+                if not seat_token_matches(seat.seat_token, stored_hashes.get((seat.game_id, seat.player_name))):
+                    continue
+                game = self._active_games.get(seat.game_id)
+                if game is not None:
+                    running = _running_seat_in_game(game, seat.player_name)
+                    last_active_at = self._last_human_activity.get(seat.game_id)
+                elif (snapshot := snapshots.get(seat.game_id)) is not None:
+                    running = _running_seat_in_snapshot(
+                        json.loads(snapshot.config_json),
+                        json.loads(snapshot.players_json),
+                        snapshot.puppet_count,
+                        seat.player_name,
+                    )
+                    last_active_at = _utc_or_default(snapshot.last_human_activity_at, datetime.now(UTC))
+                else:
+                    continue
+                if running is None or running.phase in FINISHED_PLAYER_PHASES:
+                    continue
+                resumable.append(_resumable_game_seat(seat, running, last_active_at))
+
+            return _with_cube_metadata(session, resumable)
         finally:
             session.close()
-
-        resumable: list[ResumableGame] = []
-        for seat in seats:
-            pending = self._pending_games.get(seat.game_id)
-            if pending is not None and not pending.is_started:
-                if seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name)):
-                    resumable.append(ResumableGame(game_id=seat.game_id, player_name=seat.player_name, kind="lobby"))
-                continue
-
-            if not seat_token_matches(seat.seat_token, stored_hashes.get((seat.game_id, seat.player_name))):
-                continue
-            game = self._active_games.get(seat.game_id)
-            if game is not None:
-                player = next((p for p in game.players if p.name == seat.player_name), None)
-                if player is None or player.phase in FINISHED_PLAYER_PHASES:
-                    continue
-                last_active_at = self._last_human_activity.get(seat.game_id)
-            elif seat.game_id in snapshot_activity:
-                last_active_at = _utc_or_default(snapshot_activity[seat.game_id], datetime.now(UTC))
-            else:
-                continue
-            resumable.append(
-                ResumableGame(
-                    game_id=seat.game_id,
-                    player_name=seat.player_name,
-                    kind="game",
-                    last_active_at=last_active_at,
-                )
-            )
-        return resumable
 
     def issue_lobby_seat_token(self, game_id: str, player_name: str) -> str:
         """Give the named lobby seat a fresh token, replacing any earlier one."""
@@ -2129,36 +2226,58 @@ class GameManager:
 
         game = self.get_game(game_id)
         if game and game.config.auto_approve_spectators:
-            self.approve_spectate_request(request_id)
+            self._approve_spectate_request(req)
 
         return request_id
 
     def get_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
         return self._spectate_requests.get(request_id)
 
-    def approve_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
+    def respond_to_spectate_request(self, request_id: str, *, game_id: str, responder_id: str, allowed: bool) -> bool:
+        """Approve or deny a pending request; only the player it asks to watch may answer it."""
         req = self._spectate_requests.get(request_id)
-        if req and req.status == "pending":
-            req.status = "approved"
-            session = session_manager.create_session(req.game_id)
-            req.session_id = session.session_id
-            req.player_id = session.player_id
-        return req
-
-    def deny_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
-        req = self._spectate_requests.get(request_id)
-        if req and req.status == "pending":
+        if req is None or req.status != "pending" or req.game_id != game_id:
+            return False
+        if self.get_player_id_by_name(game_id, req.target_player_name) != responder_id:
+            return False
+        if allowed:
+            self._approve_spectate_request(req)
+        else:
             req.status = "denied"
-        return req
+        return True
+
+    def _approve_spectate_request(self, req: PendingSpectateRequest) -> None:
+        req.status = "approved"
+        session = session_manager.create_session(req.game_id)
+        req.session_id = session.session_id
+        req.player_id = session.player_id
+
+    def is_spectator_approved(self, request_id: str, *, session_id: str, game_id: str, target_player_name: str) -> bool:
+        req = self._spectate_requests.get(request_id)
+        return (
+            req is not None
+            and req.status == "approved"
+            and req.session_id == session_id
+            and req.game_id == game_id
+            and req.target_player_name == target_player_name
+        )
 
     def cleanup_expired_spectate_requests(self) -> int:
+        """Expire unanswered and denied requests; approved ones last as long as their game is loaded."""
         expiry = datetime.now(UTC) - timedelta(minutes=SPECTATE_REQUEST_TTL_MINUTES)
-        removed = 0
+        expired = [
+            request_id
+            for request_id, req in self._spectate_requests.items()
+            if req.status != "approved" and req.created_at < expiry
+        ]
+        for request_id in expired:
+            del self._spectate_requests[request_id]
+        return len(expired)
+
+    def _drop_spectate_requests_for_game(self, game_id: str) -> None:
         for request_id, req in list(self._spectate_requests.items()):
-            if req.created_at < expiry or req.status in {"approved", "denied"}:
-                self._spectate_requests.pop(request_id, None)
-                removed += 1
-        return removed
+            if req.game_id == game_id:
+                del self._spectate_requests[request_id]
 
     def _get_pending_target_elo(self, pending: PendingGame) -> float | None:
         if pending.play_mode == "limited":

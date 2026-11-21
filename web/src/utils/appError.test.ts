@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getAppErrorMessage, unknownToAppError, wsPayloadToAppError } from './appError'
+import { getAppErrorMessage, responseToAppError, unknownToAppError, wsPayloadToAppError } from './appError'
 
 describe('appError', () => {
   it('maps spectate target failures separately from missing games', () => {
@@ -13,6 +13,17 @@ describe('appError', () => {
     expect(getAppErrorMessage(error, 'game-connection', 'Fallback message')).toBe(
       'That player is no longer available to spectate.',
     )
+  })
+
+  it('tells share viewers when a game is still being played', async () => {
+    const response = new Response(
+      JSON.stringify({ detail: 'This game is still being played', code: 'GAME_IN_PROGRESS' }),
+      { status: 404, headers: { 'Content-Type': 'application/json' } },
+    )
+
+    const error = await responseToAppError(response, 'share-game', 'Failed to load shared game')
+
+    expect(error.message).toBe('This game is still being played. Its review opens when the game ends.')
   })
 
   it('uses create-game specific copy for server updates', () => {
