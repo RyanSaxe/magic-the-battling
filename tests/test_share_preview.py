@@ -31,13 +31,13 @@ _HTML_WITH_STATIC_OG = """\
 <html><head>
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://www.cruciblemtg.com/" />
-    <meta property="og:title" content="Crucible" />
+    <meta property="og:title" content="Pitfight" />
     <meta property="og:description" content="A Magic: The Gathering format" />
     <meta property="og:image" content="https://www.cruciblemtg.com/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Crucible" />
+    <meta name="twitter:title" content="Pitfight" />
     <meta name="twitter:description" content="A Magic: The Gathering format" />
     <meta name="twitter:image" content="https://www.cruciblemtg.com/og-image.png" />
 </head></html>"""
@@ -67,7 +67,7 @@ class TestBuildOgHtml:
     def test_static_og_tags_stripped(self):
         html = _build_og_html(_HTML_WITH_STATIC_OG, "g1", "Alice", _make_share_data(), "https://example.com")
         assert "og-image.png" not in html
-        assert 'content="Crucible"' not in html
+        assert 'content="Pitfight"' not in html
         assert "A Magic: The Gathering format" not in html
         assert 'content="https://www.cruciblemtg.com/"' not in html
 

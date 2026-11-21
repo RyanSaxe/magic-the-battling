@@ -12,7 +12,7 @@ const PHASES: Phase[] = ["draft", "build", "battle", "reward"];
 const PHASE_TIMELINE_LABELS: Record<Phase, string> = {
   draft: "draft",
   build: "build",
-  battle: "battle",
+  battle: "fight",
   reward: "advance",
 };
 

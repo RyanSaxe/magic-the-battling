@@ -1,29 +1,35 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, TypedDict
+
+if TYPE_CHECKING:
+    from mtb.models.cards import Card
 
 _HEX8_RE = re.compile(r"^[0-9a-f]{8}$")
 
-CARD_DATA_FIELDS = frozenset(
-    {
-        "name",
-        "image_url",
-        "type_line",
-        "flip_image_url",
-        "png_url",
-        "flip_png_url",
-        "elo",
-        "oracle_text",
-        "colors",
-        "keywords",
-        "cmc",
-        "life_modifier",
-        "hand_modifier",
-        "token_scryfall_ids",
-        "tokens",
-    }
-)
+
+class CardDataInput(TypedDict, total=False):
+    name: str
+    image_url: str
+    type_line: str
+    flip_image_url: str | None
+    png_url: str | None
+    flip_png_url: str | None
+    elo: float
+    oracle_text: str | None
+    colors: Sequence[str]
+    keywords: Sequence[str]
+    cmc: float
+    life_modifier: int | None
+    hand_modifier: int | None
+    token_scryfall_ids: Sequence[str]
+    tokens: Sequence[Card | dict[str, Any] | str]
+
+
+CARD_DATA_FIELDS = frozenset(CardDataInput.__annotations__)
 
 
 @dataclass(frozen=True, slots=True)

@@ -37,6 +37,14 @@ function computeReconnectDelayMs(attempt: number): number {
   return Math.floor(Math.random() * capped)
 }
 
+// StrictMode mounts, cleans up and remounts in one go in development. Starting the connection a
+// task later lets that cleanup cancel it before a socket exists, instead of closing a socket
+// mid-handshake, which browsers log as a failed connection.
+export function connectAfterCurrentTask(connect: () => void): () => void {
+  const timeout = setTimeout(connect, 0)
+  return () => clearTimeout(timeout)
+}
+
 export interface VoiceSignalPayload {
   signal_type: string
   data: unknown
@@ -269,9 +277,10 @@ export function useWebSocket(
       ws.onerror = () => {}
     }
 
-    connect()
+    const cancelConnect = connectAfterCurrentTask(connect)
 
     return () => {
+      cancelConnect()
       isClosingRef.current = true
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)

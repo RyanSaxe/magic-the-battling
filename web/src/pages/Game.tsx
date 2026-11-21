@@ -76,6 +76,7 @@ import {
   shouldBlockGuidesForBattleResolution,
   type VisibleGuideStep,
 } from "./gameGuideState";
+import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
 import { canUseBattleFaceDownAction, canUseBattleFlipAction } from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
 
@@ -381,7 +382,7 @@ function PlayerSelectionModal({
                     />
                     <span className="text-white">{player.name}</span>
                     <span className="text-gray-500 text-sm">
-                      ({player.phase})
+                      ({player.phase === "battle" ? "fight" : player.phase})
                     </span>
                   </div>
                   <div className="flex gap-2">
@@ -1058,6 +1059,36 @@ function GameContent() {
     queueMicrotask(() => setHoveredCard(null));
   }, [selfPhase]);
 
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    const trackPointer = (event: MouseEvent) => {
+      pointerRef.current = { x: event.clientX, y: event.clientY };
+    };
+    const forgetPointer = () => {
+      pointerRef.current = null;
+    };
+    window.addEventListener("mousemove", trackPointer);
+    document.documentElement.addEventListener("mouseleave", forgetPointer);
+    return () => {
+      window.removeEventListener("mousemove", trackPointer);
+      document.documentElement.removeEventListener("mouseleave", forgetPointer);
+    };
+  }, []);
+
+  const currentBattle = gameState?.current_battle;
+  useEffect(() => {
+    const pointer = pointerRef.current;
+    if (!currentBattle || !pointer) return;
+    // A card that slides under a resting pointer gets no mouseenter, so after
+    // each battle update the hover is re-read from what the pointer is on.
+    const cardId = document
+      .elementFromPoint(pointer.x, pointer.y)
+      ?.closest("[data-guide-card-id]")
+      ?.getAttribute("data-guide-card-id");
+    const card = cardId ? findBattleCard(currentBattle, cardId) : null;
+    queueMicrotask(() => setHoveredCard(card));
+  }, [currentBattle]);
+
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
     phase: gameState?.self_player?.phase ?? "draft",
@@ -1365,15 +1396,20 @@ function GameContent() {
   );
   const hotkeyMap: Record<string, () => void> = (() => {
     const currentPhaseId = gameState?.self_player.phase;
-    const map: Record<string, () => void> = {
-      '?': () => {
+    const map = buildPanelHotkeys({
+      guideOpen: rulesPanelOpen,
+      sidebarDrawerOpen: overlaySidebarOpen,
+      gameplayHotkeysDisabled,
+      openGuide: () => {
         openRulesPanel(
           currentPhaseId && ['draft', 'build', 'battle', 'reward'].includes(currentPhaseId)
             ? { docId: currentPhaseId, tab: 'controls' }
             : undefined,
         );
       },
-    };
+      closeGuide: () => setRulesPanelOpen(false),
+      closeSidebarDrawer: () => setSidebarOpen(false),
+    });
     if (!gameState || isSpectator || gameplayHotkeysDisabled) return map;
 
     const { self_player: sp, current_battle: cb } = gameState;
@@ -1471,17 +1507,13 @@ function GameContent() {
               }
             }
           };
-          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile', l: 'library' } as const;
-          for (const [key, toZone] of Object.entries(moveZones)) {
-            map[key] = () => {
-              if (toZone !== hoveredCard.zone) {
-                const zoneCards = ownerZones[hoveredCard.zone];
-                const idx = zoneCards.findIndex(c => c.id === hoveredCard.id);
-                actions.battleMove(hoveredCard.id, hoveredCard.zone, toZone as ZoneName, hoveredCard.owner, hoveredCard.owner);
-                const nextCard = zoneCards[idx + 1] ?? zoneCards[idx - 1] ?? null;
-                setHoveredCard(nextCard ? { id: nextCard.id, zone: hoveredCard.zone, owner: hoveredCard.owner } : null);
-              }
-            };
+          const moveHotkeys = buildCardMoveHotkeys({
+            hoveredCard,
+            moveCard: (card, toZone) => actions.battleMove(card.id, card.zone, toZone, card.owner, card.owner),
+            clearHoveredCard: () => setHoveredCard(null),
+          });
+          for (const [key, action] of Object.entries(moveHotkeys)) {
+            map[key] = action;
           }
           map['u'] = () => {
             if (!cb) return;
@@ -1537,7 +1569,7 @@ function GameContent() {
     return map;
   })();
 
-  useHotkeys(hotkeyMap, !gameplayHotkeysDisabled);
+  useHotkeys(hotkeyMap);
 
   const guideContext = useMemo<GuidedWalkthroughContext | null>(() => {
     if (!gameState) return null;
@@ -1661,8 +1693,8 @@ function GameContent() {
     ? `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(self_player.name)}`
     : '';
   const shareText = isWinner
-    ? 'Just won a game of Crucible! Check out the game:'
-    : `Just finished ${getOrdinal(selfPlacement)} in Crucible! Check out the game:`;
+    ? 'Just won a game of Pitfight! Check out the game:'
+    : `Just finished ${getOrdinal(selfPlacement)} in Pitfight! Check out the game:`;
 
   const maxHandSize = self_player.hand_size;
   const handFull = self_player.hand.length === maxHandSize;
@@ -2459,7 +2491,7 @@ function GameContent() {
                       You Have Been Eliminated
                     </h2>
                     <p className="text-gray-300 mb-6">
-                      Waiting until all battles are complete to determine if you
+                      Waiting until all fights are complete to determine if you
                       will compete in sudden death to stay alive.
                     </p>
                     <div className="bg-black/40 rounded-lg p-4 text-left">
@@ -2476,7 +2508,7 @@ function GameContent() {
                           randomly)
                         </li>
                         <li>Other eliminated players are out immediately</li>
-                        <li>Poison resets to 9 for the sudden death battle</li>
+                        <li>Poison resets to 9 for the sudden death fight</li>
                         <li>Winner survives, loser is eliminated</li>
                       </ul>
                     </div>
@@ -2533,12 +2565,12 @@ function GameContent() {
         {!isSpectator && (
           <div ref={actionBarRef} className="shrink-0 relative frame-chrome z-40">
             <div
-              className={`flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 ${actionBarPaddingClass} timeline-actions`}
+              className={`h-[var(--frame-bar-height)] flex items-center justify-between gap-1.5 sm:gap-2 ${actionBarPaddingClass} timeline-actions`}
               data-guide-target="phase-action-bar"
             >
               {isEndPhase && gameId && !displayBattleResolution ? (
                 <>
-                  <div className="flex items-center gap-1.5 sm:gap-2 py-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <button
                       className="btn bg-slate-700 hover:bg-slate-600 text-white"
                       onClick={() =>
