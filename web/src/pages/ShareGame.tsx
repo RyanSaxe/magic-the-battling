@@ -212,8 +212,8 @@ export function ShareGame() {
   const renderContent = () => {
     if (roundOptions.length === 0) {
       return (
-        <div className="flex-1 flex items-center justify-center">
-          <SurfaceCard width="md-viewport" padding={5} raised={false}>
+        <div className="flex-1 flex items-center justify-center px-4">
+          <SurfaceCard>
             <h2 className="text-lg font-semibold text-amber-200">No Round Data</h2>
             <p className="text-sm text-gray-200 mt-2 leading-snug">
               No round data is available for this game.
@@ -240,8 +240,8 @@ export function ShareGame() {
     }
 
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <SurfaceCard width="md-viewport" padding={5} raised={false}>
+      <div className="flex-1 flex items-center justify-center px-4">
+        <SurfaceCard>
           <p className="text-sm text-gray-200 leading-snug">
             {currentPlayerData
               ? 'This player was not in the game during this round.'

@@ -67,7 +67,7 @@ export function BattlerView() {
 
   if (authLoading || !user || loadingData || !battler) {
     return (
-      <PageFrame header={header} center="always" contentClassName="items-center">
+      <PageFrame header={header} center contentClassName="items-center">
         <p className="text-amber-200/70">Loading...</p>
       </PageFrame>
     )
@@ -156,7 +156,7 @@ function SettingsModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <SurfaceCard width="sm" padding={5} className="relative">
+      <SurfaceCard className="relative">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
           <h3 className="text-white font-semibold">Settings</h3>
           <button
