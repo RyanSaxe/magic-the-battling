@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import type { ZoneConstraints } from '../src/hooks/computeConstrainedLayout'
+import { boardSizeBand } from '../src/hooks/usePersistedConstraints'
 import { serveGame } from './helpers'
 import { GAME_ID, type ScreenState } from './gameStates'
 
@@ -235,14 +236,19 @@ async function openScreen(page: Page, baseURL: string, screen: Screen) {
 
 /** Puts back the layout the screen starts from, saved or not, and reloads the game. */
 async function restoreSavedLayout(page: Page, screen: Screen) {
-  await page.evaluate(({ phase, saved }) => {
+  // The game saves a layout for the size band of the board, measured the way useCardLayout measures it.
+  const board = await page.locator('main .zone-divider-bg > div, .battle-layout').first().evaluate((element) => ({
+    width: Math.floor(element.clientWidth / 4) * 4,
+    height: Math.floor(element.clientHeight / 4) * 4,
+  }))
+  await page.evaluate(({ phase, saved, band }) => {
     const key = `mtb_zone_constraints:v2:phase:${phase}`
     if (!saved) return localStorage.removeItem(key)
     localStorage.setItem(key, JSON.stringify({
-      version: 2,
-      entries: [{ stage: 4, round: 2, mode: 'constraints', constraints: saved }],
+      version: 3,
+      bands: { [band]: [{ stage: 4, round: 2, mode: 'constraints', constraints: saved }] },
     }))
-  }, { phase: screen.state.phase, saved: screen.saved ?? null })
+  }, { phase: screen.state.phase, saved: screen.saved ?? null, band: boardSizeBand(board) })
   await reloadStyled(page)
 }
 
@@ -401,5 +407,34 @@ test.describe('a stylesheet that arrives after the game renders', () => {
     await expect(crashed).toHaveCount(0)
     await waitForStableLayout(page)
     expect((await measure(page)).failures).toEqual({})
+  })
+})
+
+test.describe('a saved layout', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  test('stays with the board size band it was saved in', async ({ page, baseURL }) => {
+    const handHeight = async () => {
+      await waitForStableLayout(page)
+      return Math.round((await page.locator('main .zone-hand').boundingBox())!.height)
+    }
+    await openScreen(page, baseURL!, { name: 'build', viewport: { width: 1280, height: 800 }, state: TYPICAL.build })
+    const automaticOnLaptop = await handHeight()
+
+    await page.setViewportSize({ width: 1920, height: 1080 })
+    const automaticOnDesktop = await handHeight()
+    const divider = (await page.locator('main .zone-divider-line > div[style*="resize"]').first().boundingBox())!
+    await page.mouse.move(divider.x + divider.width / 2, divider.y + divider.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(divider.x + divider.width / 2, divider.y + divider.height / 2 + 80, { steps: 4 })
+    await page.mouse.up()
+    const savedOnDesktop = await handHeight()
+    expect(savedOnDesktop).toBeGreaterThan(automaticOnDesktop + 60)
+
+    await page.setViewportSize({ width: 1280, height: 800 })
+    expect(await handHeight()).toBe(automaticOnLaptop)
+
+    await page.setViewportSize({ width: 1920, height: 1080 })
+    expect(await handHeight()).toBe(savedOnDesktop)
   })
 })
