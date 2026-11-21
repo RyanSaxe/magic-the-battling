@@ -1,21 +1,17 @@
 import type { FollowedBattler, UserBattler } from '../types'
 
-export type FirstPageStatus = 'idle' | 'loading' | 'loaded' | 'failed'
-
-export function visitLoadsFirstPage(status: FirstPageStatus): boolean {
-  return status === 'idle' || status === 'failed'
-}
-
-/** The user's follows, shared by the Following and Discover tabs. */
+/** The user's follows, as Discover shows them. */
 export interface Follows {
   /** Newest first, in the order GET /battlers/following pages them. */
   records: FollowedBattler[]
   hasMore: boolean
   /** Cubes Discover reports as followed whose record is on a Following page not loaded yet. */
   unloadedCubeIds: ReadonlySet<string>
+  /** Cubes whose follow or unfollow request is running. */
+  pendingCubeIds: ReadonlySet<string>
 }
 
-export const NO_FOLLOWS: Follows = { records: [], hasMore: false, unloadedCubeIds: new Set() }
+export const NO_FOLLOWS: Follows = { records: [], hasMore: false, unloadedCubeIds: new Set(), pendingCubeIds: new Set() }
 
 export interface FollowingPage {
   following: FollowedBattler[]
@@ -26,6 +22,7 @@ export interface FollowingPage {
 export function withFollowingPage(follows: Follows, page: FollowingPage, offset: number): Follows {
   const pageCubeIds = new Set(page.following.map((f) => f.cube_id))
   return {
+    ...follows,
     records: [...follows.records.slice(0, offset), ...page.following],
     hasMore: page.has_more,
     unloadedCubeIds: new Set([...follows.unloadedCubeIds].filter((id) => !pageCubeIds.has(id))),
@@ -49,10 +46,23 @@ export function withFollow(follows: Follows, record: FollowedBattler): Follows {
 
 export function withoutFollow(follows: Follows, cubeId: string): Follows {
   return {
-    ...follows,
+    ...withFollowSettled(follows, cubeId),
     records: follows.records.filter((f) => f.cube_id !== cubeId),
     unloadedCubeIds: new Set([...follows.unloadedCubeIds].filter((id) => id !== cubeId)),
   }
+}
+
+export function withFollowPending(follows: Follows, cubeId: string): Follows {
+  return { ...follows, pendingCubeIds: new Set([...follows.pendingCubeIds, cubeId]) }
+}
+
+/** Ends a cube's follow or unfollow request, leaving the cube as it was when that request failed. */
+export function withFollowSettled(follows: Follows, cubeId: string): Follows {
+  return { ...follows, pendingCubeIds: new Set([...follows.pendingCubeIds].filter((id) => id !== cubeId)) }
+}
+
+export function isFollowPending(follows: Follows, cubeId: string): boolean {
+  return follows.pendingCubeIds.has(cubeId)
 }
 
 export function followFor(follows: Follows, cubeId: string): FollowedBattler | undefined {
@@ -85,14 +95,132 @@ export function isFollowing(follows: Follows, cubeId: string): boolean {
   return follows.unloadedCubeIds.has(cubeId) || followFor(follows, cubeId) !== undefined
 }
 
+/** The player's saved and followed cubes, as the dashboard has loaded them. */
+export interface Library {
+  /** In the order GET /battlers pages them. */
+  presets: UserBattler[]
+  presetsHaveMore: boolean
+  /** Presets saved here while more remain to load. The server lists them last, so they wait here until their page loads. */
+  addedPresets: UserBattler[]
+  /** Newest first, in the order GET /battlers/following pages them. */
+  follows: FollowedBattler[]
+  followsHaveMore: boolean
+  loadingMore: boolean
+  /** The cards whose delete or unfollow request is running, by libraryEntryKey. */
+  removing: ReadonlySet<string>
+}
+
+export interface SavedPage {
+  battlers: UserBattler[]
+  has_more: boolean
+}
+
+export function loadedLibrary(saved: SavedPage, following: FollowingPage): Library {
+  return {
+    presets: saved.battlers,
+    presetsHaveMore: saved.has_more,
+    addedPresets: [],
+    follows: following.following,
+    followsHaveMore: following.has_more,
+    loadingMore: false,
+    removing: new Set(),
+  }
+}
+
+export type LibraryPageRequest = { list: 'saved'; offset: number } | { list: 'following'; offset: number }
+
+export type LibraryPage = { list: 'saved'; page: SavedPage } | { list: 'following'; page: FollowingPage }
+
+export function libraryHasMore(library: Library): boolean {
+  return library.presetsHaveMore || library.followsHaveMore
+}
+
+/**
+ * The page Load more asks for next, or null when there is none or a request is running.
+ * Pages and removals take turns, so a page's offset still counts the records shown when it arrives.
+ */
+export function nextLibraryPage(library: Library): LibraryPageRequest | null {
+  if (library.loadingMore || library.removing.size > 0) return null
+  if (library.presetsHaveMore) return { list: 'saved', offset: library.presets.length }
+  if (library.followsHaveMore) return { list: 'following', offset: library.follows.length }
+  return null
+}
+
+export function withLibraryPageRequested(library: Library): Library {
+  return { ...library, loadingMore: true }
+}
+
+export function withLibraryPage(library: Library, loaded: LibraryPage): Library {
+  if (loaded.list === 'following') {
+    return {
+      ...library,
+      follows: [...library.follows, ...loaded.page.following],
+      followsHaveMore: loaded.page.has_more,
+      loadingMore: false,
+    }
+  }
+  const pageIds = new Set(loaded.page.battlers.map((preset) => preset.id))
+  const stillAdded = library.addedPresets.filter((preset) => !pageIds.has(preset.id))
+  const presets = [...library.presets, ...loaded.page.battlers]
+  return {
+    ...library,
+    presets: loaded.page.has_more ? presets : [...presets, ...stillAdded],
+    presetsHaveMore: loaded.page.has_more,
+    addedPresets: loaded.page.has_more ? stillAdded : [],
+    loadingMore: false,
+  }
+}
+
+export function withLibraryPageFailed(library: Library): Library {
+  return { ...library, loadingMore: false }
+}
+
+export function withAddedPreset(library: Library, preset: UserBattler): Library {
+  // A slow save can return after Load more has already brought in the page that holds it.
+  if ([...library.presets, ...library.addedPresets].some((shown) => shown.id === preset.id)) return library
+  return library.presetsHaveMore
+    ? { ...library, addedPresets: [...library.addedPresets, preset] }
+    : { ...library, presets: [...library.presets, preset] }
+}
+
 export type LibraryEntry =
   | { kind: 'saved'; preset: UserBattler }
   | { kind: 'following'; follow: FollowedBattler }
 
+export function libraryEntryKey(entry: LibraryEntry): string {
+  return entry.kind === 'saved' ? `saved-${entry.preset.id}` : `following-${entry.follow.id}`
+}
+
 /** Saved cubes and decks first, in the player's order, then followed cubes, newest first. */
-export function libraryEntries(presets: UserBattler[], follows: FollowedBattler[]): LibraryEntry[] {
+export function libraryEntries(library: Library): LibraryEntry[] {
   return [
-    ...presets.map((preset) => ({ kind: 'saved' as const, preset })),
-    ...follows.map((follow) => ({ kind: 'following' as const, follow })),
+    ...[...library.presets, ...library.addedPresets].map((preset) => ({ kind: 'saved' as const, preset })),
+    ...library.follows.map((follow) => ({ kind: 'following' as const, follow })),
   ]
+}
+
+export function canRemove(library: Library, entry: LibraryEntry): boolean {
+  return !library.loadingMore && !library.removing.has(libraryEntryKey(entry))
+}
+
+export function withRemovalStarted(library: Library, entry: LibraryEntry): Library {
+  return { ...library, removing: new Set([...library.removing, libraryEntryKey(entry)]) }
+}
+
+function removingWithout(library: Library, entry: LibraryEntry): ReadonlySet<string> {
+  const key = libraryEntryKey(entry)
+  return new Set([...library.removing].filter((removing) => removing !== key))
+}
+
+export function withRemovalFailed(library: Library, entry: LibraryEntry): Library {
+  return { ...library, removing: removingWithout(library, entry) }
+}
+
+export function withRemoved(library: Library, entry: LibraryEntry): Library {
+  const removing = removingWithout(library, entry)
+  if (entry.kind === 'following') {
+    return { ...library, removing, follows: library.follows.filter((follow) => follow.id !== entry.follow.id) }
+  }
+  const kept = (preset: UserBattler) => preset.id !== entry.preset.id
+  return { ...library, removing, presets: library.presets.filter(kept), addedPresets: library.addedPresets.filter(kept) }
 }

@@ -13,9 +13,12 @@ import { unknownToAppError } from '../utils/appError'
 import {
   NO_FOLLOWS,
   findFollow,
+  isFollowPending,
   isFollowing,
   withDiscoverResults,
   withFollow,
+  withFollowPending,
+  withFollowSettled,
   withFollowingPage,
   withoutFollow,
   type Follows,
@@ -105,6 +108,7 @@ export function DashboardDiscover() {
   }
 
   const follow = async (result: DiscoverResult) => {
+    setFollows((prev) => withFollowPending(prev, result.cube_id))
     try {
       const record = await followCube(result.cube_id)
       // POST /follow returns the follow without cube stats, and Discover already has them.
@@ -117,17 +121,20 @@ export function DashboardDiscover() {
         }),
       )
     } catch (err) {
+      setFollows((prev) => withFollowSettled(prev, result.cube_id))
       addToast(unknownToAppError(err, 'follow-cube', 'Failed to follow').message, 'error')
     }
   }
 
   const unfollow = async (cubeId: string) => {
+    setFollows((prev) => withFollowPending(prev, cubeId))
     try {
       const record = await findFollow(follows, cubeId, loadFollowingPage)
       // A cube on no Following page is no longer followed, so there is nothing to delete.
       if (record) await unfollowCube(record.id)
       setFollows((prev) => withoutFollow(prev, cubeId))
     } catch {
+      setFollows((prev) => withFollowSettled(prev, cubeId))
       addToast('Failed to unfollow', 'error')
     }
   }
@@ -189,6 +196,7 @@ export function DashboardDiscover() {
         <ResultGrid busy={!current}>
           {shown.results.map((result) => {
             const following = isFollowing(follows, result.cube_id)
+            const pending = isFollowPending(follows, result.cube_id)
             const href = `/cube/${encodeURIComponent(result.cube_id)}`
             return (
               <CubeTile
@@ -204,8 +212,8 @@ export function DashboardDiscover() {
                 menuItems={[
                   { label: 'View', onSelect: () => navigate(href) },
                   following
-                    ? { label: 'Unfollow', onSelect: () => unfollow(result.cube_id), danger: true }
-                    : { label: 'Follow', onSelect: () => follow(result) },
+                    ? { label: 'Unfollow', onSelect: () => unfollow(result.cube_id), danger: true, disabled: pending }
+                    : { label: 'Follow', onSelect: () => follow(result), disabled: pending },
                 ]}
               />
             )
