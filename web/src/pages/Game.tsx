@@ -1660,8 +1660,8 @@ function GameContent() {
     ? `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(self_player.name)}`
     : '';
   const shareText = isWinner
-    ? 'Just won a game of Crucible! Check out the game:'
-    : `Just finished ${getOrdinal(selfPlacement)} in Crucible! Check out the game:`;
+    ? 'Just won a game of Pitfight! Check out the game:'
+    : `Just finished ${getOrdinal(selfPlacement)} in Pitfight! Check out the game:`;
 
   const maxHandSize = self_player.hand_size;
   const handFull = self_player.hand.length === maxHandSize;

@@ -53,7 +53,7 @@ for (const pageUnderTest of PAGES) {
     for (const button of headerButtons) {
       expect.soft(await isOnTopAtItsCenter(button), `nothing covers header button "${await nameOf(button)}"`).toBe(true)
     }
-    const titleParts = [banner.getByRole('heading', { name: 'Crucible' }), banner.getByText('an MtG format').filter({ visible: true })]
+    const titleParts = [banner.getByRole('heading', { name: 'Pitfight' }), banner.getByText('an MtG format').filter({ visible: true })]
     for (const part of titleParts) {
       const partBox = await boxOf(part)
       for (const button of headerButtons) {

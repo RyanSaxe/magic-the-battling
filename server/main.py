@@ -65,7 +65,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     lifespan=lifespan,
-    title="Crucible",
+    title="Pitfight",
     description="Real-time multiplayer Magic: The Gathering draft format",
     version="0.1.0",
 )

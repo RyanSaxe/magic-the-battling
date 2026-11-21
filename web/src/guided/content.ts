@@ -78,7 +78,7 @@ function buildWelcomeGuide(): GuideDefinition {
     steps: [
       {
         id: "intro",
-        title: "Playing Crucible",
+        title: "Playing Pitfight",
         placement: "center",
         cardPlacement: "center",
         positionTargetId: "game-content",
