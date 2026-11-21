@@ -2147,6 +2147,7 @@ class GameManager:
         visible_upgrades = (
             player.upgrades if player.name == viewer.name else self._public_visible_upgrades(player.upgrades)
         )
+        visible_basics = player.chosen_basics if player.name == viewer.name or player.phase != "build" else []
         return PlayerView(
             name=player.name,
             treasures=player.treasures,
@@ -2164,7 +2165,7 @@ class GameManager:
             is_stage_increasing=reward.is_stage_increasing(player),
             upgrades=cards_to_refs(visible_upgrades),
             vanguard=card_to_ref(player.vanguard),
-            chosen_basics=player.chosen_basics,
+            chosen_basics=visible_basics,
             most_recently_revealed_cards=cards_to_refs(player.most_recently_revealed_cards),
             last_result=self._get_last_result(player),
             pairing_probability=probabilities.get(player.name, 0.0),
