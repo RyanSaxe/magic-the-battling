@@ -26,6 +26,8 @@ from server.schemas.api import (
     JoinGameResponse,
     LobbyStateResponse,
     RejoinGameRequest,
+    ResumableRequest,
+    ResumableResponse,
     ShareGameResponse,
     SharePlayerData,
     SharePlayerSnapshot,
@@ -293,6 +295,12 @@ async def create_game(
 
 class WarmCubeRequest(BaseModel):
     cube_id: str
+
+
+@router.post("/resumable", response_model=ResumableResponse)
+def find_resumable_games(request: ResumableRequest):
+    """List the lobbies and games the caller can return to, given the seat tokens their browser holds."""
+    return ResumableResponse(games=game_manager.find_resumable_seats(request.seats))
 
 
 @router.post("/cubes/warm")

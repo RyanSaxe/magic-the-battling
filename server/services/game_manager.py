@@ -87,6 +87,8 @@ from server.schemas.api import (
     LobbyPlayer,
     LobbyStateResponse,
     PlayerView,
+    ResumableGame,
+    ResumableSeat,
     RevealAnimationView,
     SelfPlayerView,
 )
@@ -104,12 +106,14 @@ from server.services.seat_tokens import (
     hash_seat_token,
     new_seat_token,
     seat_claim_refusal,
+    seat_token_matches,
 )
 from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
 
 HOST_HANDOFF_GRACE_SECONDS = 60.0
+FINISHED_PLAYER_PHASES = frozenset({"eliminated", "winner", "game_over"})
 
 
 def _current_task() -> asyncio.Task | None:
@@ -1719,6 +1723,57 @@ class GameManager:
         if player_id and is_player_connected:
             return not is_player_connected(game_id, player_id)
         return True
+
+    def find_resumable_seats(self, seats: list[ResumableSeat]) -> list[ResumableGame]:
+        """The seats a browser can still return to, given the tokens it holds. Never restores a snapshot."""
+        stored_game_ids = [seat.game_id for seat in seats if seat.game_id not in self._pending_games]
+        session = db.SessionLocal()
+        try:
+            stored_hashes = {
+                (cast(str, row.game_id), cast(str, row.player_name)): cast(str | None, row.seat_token_hash)
+                for row in session.query(GamePlayerRecord).filter(
+                    GamePlayerRecord.game_id.in_(stored_game_ids),
+                    GamePlayerRecord.is_puppet.is_(False),
+                )
+            }
+            snapshot_activity = {
+                cast(str, game_id): cast(datetime, activity)
+                for game_id, activity in session.query(
+                    ActiveGameSnapshot.game_id, ActiveGameSnapshot.last_human_activity_at
+                ).filter(ActiveGameSnapshot.game_id.in_(stored_game_ids))
+            }
+        finally:
+            session.close()
+
+        resumable: list[ResumableGame] = []
+        for seat in seats:
+            pending = self._pending_games.get(seat.game_id)
+            if pending is not None and not pending.is_started:
+                if seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name)):
+                    resumable.append(ResumableGame(game_id=seat.game_id, player_name=seat.player_name, kind="lobby"))
+                continue
+
+            if not seat_token_matches(seat.seat_token, stored_hashes.get((seat.game_id, seat.player_name))):
+                continue
+            game = self._active_games.get(seat.game_id)
+            if game is not None:
+                player = next((p for p in game.players if p.name == seat.player_name), None)
+                if player is None or player.phase in FINISHED_PLAYER_PHASES:
+                    continue
+                last_active_at = self._last_human_activity.get(seat.game_id)
+            elif seat.game_id in snapshot_activity:
+                last_active_at = _utc_or_default(snapshot_activity[seat.game_id], datetime.now(UTC))
+            else:
+                continue
+            resumable.append(
+                ResumableGame(
+                    game_id=seat.game_id,
+                    player_name=seat.player_name,
+                    kind="game",
+                    last_active_at=last_active_at,
+                )
+            )
+        return resumable
 
     def issue_lobby_seat_token(self, game_id: str, player_name: str) -> str:
         """Give the named lobby seat a fresh token, replacing any earlier one."""
