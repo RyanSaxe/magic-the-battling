@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 export interface MoreMenuItem {
   label: string
@@ -7,10 +7,35 @@ export interface MoreMenuItem {
   disabled?: boolean
 }
 
+/** The part of the screen a scrolling ancestor shows, or the window when nothing scrolls. */
+function visibleArea(element: HTMLElement): { top: number; bottom: number } {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    if (['auto', 'scroll', 'hidden'].includes(getComputedStyle(node).overflowY)) return node.getBoundingClientRect()
+  }
+  return { top: 0, bottom: window.innerHeight }
+}
+
 /** A ⋯ button that opens a short list of a card's less common actions. */
 export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[] }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // A card near the bottom of the felt would open its menu past the felt's edge, behind the bottom bar.
+  useLayoutEffect(() => {
+    const menu = menuRef.current
+    const button = ref.current
+    if (!open || !menu || !button) return
+    const visible = visibleArea(button)
+    const below = menu.getBoundingClientRect()
+    const roomAbove = button.getBoundingClientRect().top - visible.top
+    if (below.bottom > visible.bottom && below.height <= roomAbove) {
+      menu.style.top = 'auto'
+      menu.style.bottom = '100%'
+      menu.style.marginTop = '0'
+      menu.style.marginBottom = '0.25rem'
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -42,6 +67,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
       </button>
       {open && (
         <div
+          ref={menuRef}
           role="menu"
           className="absolute right-0 top-full mt-1 z-50 modal-chrome border gold-border rounded-lg shadow-2xl py-1 min-w-[140px]"
         >
