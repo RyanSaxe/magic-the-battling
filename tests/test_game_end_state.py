@@ -231,6 +231,70 @@ def test_init_db_adds_final_state_columns_to_an_existing_database(tmp_path, monk
     assert tuple(row) == ("Alice", None, None)
 
 
+def test_init_db_adds_the_opponent_column_to_battle_snapshots_of_an_existing_database(tmp_path, monkeypatch):
+    engine = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
+    Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE battle_snapshots DROP COLUMN opponent_name"))
+        conn.execute(
+            text(
+                "INSERT INTO battle_snapshots (player_history_id, stage, round, hand_json, basic_lands_json, "
+                "applied_upgrades_json, treasures, full_state_json) VALUES (1, 3, 1, '[]', '[]', '[]', 2, '{}')"
+            )
+        )
+    monkeypatch.setattr(db_module, "engine", engine)
+
+    db_module.init_db()
+    db_module.init_db()
+
+    assert "opponent_name" in {c["name"] for c in inspect(engine).get_columns("battle_snapshots")}
+    with engine.connect() as conn:
+        row = conn.execute(text("SELECT treasures, opponent_name FROM battle_snapshots")).one()
+    assert tuple(row) == (2, None)
+
+
+def _recorded_opponents(game_id: str, stage: int, round_num: int) -> dict[str, str | None]:
+    db = db_module.SessionLocal()
+    try:
+        rows = (
+            db.query(PlayerGameHistory.player_name, BattleSnapshot.opponent_name)
+            .join(BattleSnapshot, BattleSnapshot.player_history_id == PlayerGameHistory.id)
+            .filter(
+                PlayerGameHistory.game_id == game_id, BattleSnapshot.stage == stage, BattleSnapshot.round == round_num
+            )
+            .all()
+        )
+        return {str(name): opponent for name, opponent in rows}
+    finally:
+        db.close()
+
+
+def test_each_fight_records_who_each_player_faced(client, start_lobby):
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob", "Carol", "Dave"])
+    gm = ws_module.game_manager
+
+    _ready_all(gm, game, game_id, game.players)
+
+    faced = {b.player.name: b.opponent.name for b in game.active_battles}
+    faced |= {opponent: name for name, opponent in faced.items()}
+    assert _recorded_opponents(game_id, 3, 1) == faced
+
+
+def test_a_fight_against_a_ghost_records_the_ghost(client, start_lobby):
+    game_id, game = _start_game(client, start_lobby, ["Alice", "Bob", "Carol", "Dave"])
+    gm = ws_module.game_manager
+    next(p for p in game.players if p.name == "Dave").poison = 9
+    _play_round(gm, game, game_id, lambda b: b.opponent.name if b.player.name == "Dave" else b.player.name)
+
+    for p in game.players:
+        if p.phase == "draft":
+            gm.handle_draft_done(game, p)
+    _ready_all(gm, game, game_id, [p for p in game.players if p.phase == "build"])
+
+    ghost_fight = next(b for b in game.active_battles if b.opponent.name == "Dave")
+    assert _recorded_opponents(game_id, 3, 2)[ghost_fight.player.name] == "Dave"
+
+
 def _odds_seen_by(game_id: str, viewer: str) -> dict[str, float | None]:
     gm = ws_module.game_manager
     player_id = gm.get_player_id_by_name(game_id, viewer)

@@ -85,6 +85,8 @@ class BattleSnapshot(Base):
     treasures = Column(Integer, nullable=False)
     poison = Column(Integer, nullable=True)
     play_draw_preference = Column(String, nullable=True)
+    # Who this build faced in the round; older rows, recorded before pairings were kept, hold NULL.
+    opponent_name = Column(String, nullable=True)
 
     full_state_json = Column(Text, nullable=False)
 
