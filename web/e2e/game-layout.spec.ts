@@ -251,7 +251,19 @@ function measureBoard({ zoneSelector, minCardWidth }: { zoneSelector: string; mi
 async function openScreen(page: Page, baseURL: string, screen: Screen) {
   await serveGame(page, baseURL, screen.state)
   await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+  // Only a first load fetches the stylesheet; a reload takes it from the cache. WebKit can render the game
+  // before a fetched stylesheet applies, so the game must survive that before the reload below.
+  await expectGameShown(page)
+  await waitForStableLayout(page)
+  await expectGameShown(page)
   await restoreSavedLayout(page, screen)
+}
+
+/** Waits until the game shows a card, and fails if it crashed instead. */
+async function expectGameShown(page: Page) {
+  const crashed = page.getByRole('heading', { name: 'Something went wrong' })
+  await expect(page.locator('main .card').first().or(crashed)).toBeVisible()
+  if (await crashed.isVisible()) throw new Error(`the game crashed: ${await page.locator('p').first().innerText()}`)
 }
 
 /** Puts back the layout the screen starts from, saved or not, and reloads the game. */
@@ -280,9 +292,7 @@ async function reloadStyled(page: Page) {
     await page.reload({ waitUntil: 'domcontentloaded' })
     // The header's Cinzel title sets the header's height, and with it the board's.
     await page.evaluate(() => document.fonts.load('16px Cinzel'))
-    const crashed = page.getByRole('heading', { name: 'Something went wrong' })
-    await expect(page.locator('main .card').first().or(crashed)).toBeVisible()
-    if (await crashed.isVisible()) throw new Error(`the game crashed: ${await page.locator('p').first().innerText()}`)
+    await expectGameShown(page)
     if (await page.evaluate(() => document.styleSheets.length > 0)) break
     if (attempt === 3) throw new Error('the page loaded without its stylesheet three times')
   }
@@ -438,6 +448,26 @@ test.describe('a stylesheet that arrives after the game renders', () => {
     await waitForStableLayout(page)
     expect((await measure(page)).failures).toEqual({})
   })
+})
+
+// On a slow network the game's script can run before its stylesheet has loaded, and WebKit then measures an
+// unstyled board on the first load. A reload takes the stylesheet from the cache, so only a first load shows it.
+test.describe('the first load over a slow network', () => {
+  for (const viewport of [{ width: 393, height: 852 }, { width: 1280, height: 800 }]) {
+    test(`shows Draft without crashing at ${viewport.width}x${viewport.height}`, async ({ page, baseURL }) => {
+      await page.setViewportSize(viewport)
+      await serveGame(page, baseURL!, { phase: 'draft', counts: { pack: 5, sideboard: 10 } })
+      await page.route(/\/assets\/.*\.css$/, async (route) => {
+        const response = await route.fetch()
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        await route.fulfill({ response })
+      })
+      await page.goto(`/game/${GAME_ID}/play`)
+      await expectGameShown(page)
+      await waitForStableLayout(page)
+      await expectGameShown(page)
+    })
+  }
 })
 
 test.describe('a saved layout', () => {
