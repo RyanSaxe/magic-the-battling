@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import subprocess
 import sys
@@ -126,6 +127,19 @@ def test_apply_db_maintenance_creates_bak_and_rewrites_original_db(tmp_path):
 
     assert '"card_registry"' in state_json
     assert '"card_registry"' in full_state_json
+
+
+def test_inspect_db_maintenance_counts_a_current_snapshot_that_does_not_restore_as_failed(tmp_path):
+    db_path = tmp_path / "snapshots.db"
+    _init_snapshot_tables(db_path)
+    unrestorable = json.dumps({"data": {"players": "renamed-field"}, "card_registry": {}})
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute("INSERT INTO active_game_snapshots (game_id, state_json) VALUES (?, ?)", ("g1", unrestorable))
+
+    result = inspect_db_maintenance(db_path)
+
+    assert result.total_failed == 1
+    assert result.snapshot_storage.active_game_snapshots.already_current == 0
 
 
 def test_backup_copies_the_database_and_leaves_the_live_file_in_place(tmp_path):

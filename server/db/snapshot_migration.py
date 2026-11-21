@@ -107,13 +107,9 @@ def _migrate_active_game_snapshots(conn: sqlite3.Connection, *, apply: bool) -> 
 
     for row in rows:
         raw_json = str(row["state_json"])
-        if _is_current_wrapped_payload(raw_json):
-            result.already_current += 1
-            continue
-
         try:
             game = restore_game_from_snapshot(raw_json)
-            new_json = game.snapshot_dump_json()
+            new_json = raw_json if _is_current_wrapped_payload(raw_json) else game.snapshot_dump_json()
         except Exception:
             result.failed += 1
             continue
