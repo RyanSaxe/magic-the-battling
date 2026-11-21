@@ -1,8 +1,12 @@
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 from server.db.maintenance import apply_db_maintenance, inspect_db_maintenance
 from server.db.snapshot_migration import backup_db
+
+MAINTAIN_DB_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "maintain_db.py"
 
 
 def _init_snapshot_tables(db_path: Path) -> None:
@@ -140,3 +144,17 @@ def test_backup_copies_the_database_and_leaves_the_live_file_in_place(tmp_path):
     for path in (db_path, backup_path):
         with sqlite3.connect(str(path)) as conn:
             assert conn.execute("SELECT id FROM users").fetchall() == [("u1",)]
+
+
+def test_maintain_db_has_nothing_to_do_on_a_fresh_volume(tmp_path):
+    db_path = tmp_path / "mtb.db"
+
+    result = subprocess.run(
+        [sys.executable, str(MAINTAIN_DB_SCRIPT), "--apply", "--db-path", str(db_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not db_path.exists()
