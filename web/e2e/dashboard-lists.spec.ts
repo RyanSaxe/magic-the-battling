@@ -13,10 +13,13 @@ interface Holds {
   save?: Promise<void>
   /** Answers Load more only once this settles, with the page as it was when asked for. */
   morePage?: Promise<void>
+  /** Answers the dashboard's first page only once this settles, with the page as it was when asked for. */
+  firstPage?: Promise<void>
 }
 
 /** Serves the player's saved presets from a list, paged as the server pages them, with a new one saved last. */
 async function servePresets(page: Page, presets: UserBattler[], holds: Holds = {}) {
+  let firstPageHeld = false
   await page.route(
     (url) => url.pathname === '/api/battlers',
     async (route) => {
@@ -31,6 +34,10 @@ async function servePresets(page: Page, presets: UserBattler[], holds: Holds = {
       const offset = Number(new URL(request.url()).searchParams.get('offset') ?? 0)
       const json = { battlers: presets.slice(offset, offset + PAGE_SIZE), has_more: offset + PAGE_SIZE < presets.length }
       if (offset > 0) await holds.morePage
+      if (offset === 0 && !firstPageHeld) {
+        firstPageHeld = true
+        await holds.firstPage
+      }
       return route.fulfill({ json })
     },
   )
@@ -144,6 +151,19 @@ test.describe('on a phone held upright', () => {
     await expect(page.getByRole('button', { name: 'Load more' })).toBeHidden()
 
     expect(await presetTitles(page)).toEqual(PRESETS_1_TO_22)
+  })
+
+  test('a preset saved while the dashboard first loads still shows', async ({ page, baseURL }) => {
+    const firstPage = heldResponse()
+    await serveSignedIn(page, baseURL!)
+    await servePresets(page, presetsNamed(3), { firstPage: firstPage.released })
+    await page.goto('/dashboard')
+
+    await addPreset(page, 'cube-4', 'Preset 4')
+    firstPage.release()
+
+    await expect(page.getByRole('link', { name: 'Preset 4', exact: true })).toBeVisible()
+    expect(await presetTitles(page)).toEqual(['Preset 1', 'Preset 2', 'Preset 3', 'Preset 4'])
   })
 
   test('a preset whose page lands before its slow save returns shows once', async ({ page, baseURL }) => {

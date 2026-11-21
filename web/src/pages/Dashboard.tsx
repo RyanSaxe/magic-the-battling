@@ -283,7 +283,9 @@ export function Dashboard() {
         <AddCubeModal
           onClose={() => setShowAddModal(false)}
           onCreated={(preset) => {
-            updateLibrary((current) => withAddedPreset(current, preset))
+            if (library) updateLibrary((current) => withAddedPreset(current, preset))
+            // A first load still running may have read the presets before this one was saved.
+            else libraryLoad.retry()
             setShowAddModal(false)
           }}
           addToast={addToast}
