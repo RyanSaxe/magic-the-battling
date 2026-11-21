@@ -5,10 +5,16 @@ import server.services.game_manager as gm_module
 from server.db.models import ActiveGameSnapshot
 
 
-def _started_game(game_manager, db) -> str:
+async def _started_game(game_manager, db) -> str:
     pending = game_manager.create_game("Alice", "pid-alice", cube_id="test", target_player_count=2)
     game_manager.join_game(pending.join_code, "Bob", "pid-bob")
-    assert game_manager.start_game(pending.game_id, db) is not None
+    for player_id in pending.player_ids:
+        game_manager.set_player_ready(pending.game_id, player_id, True)
+
+    async def no_broadcast() -> None:
+        pass
+
+    await game_manager.start_lobby(pending.game_id, "pid-alice", db, on_change=no_broadcast)
     return pending.game_id
 
 
@@ -18,7 +24,7 @@ def test_a_game_resumed_after_eviction_outlives_its_abandoned_cleanup(mock_cube_
     async def scenario() -> tuple[bool, bool]:
         db = db_module.SessionLocal()
         try:
-            game_id = _started_game(game_manager, db)
+            game_id = await _started_game(game_manager, db)
             game_manager.schedule_abandoned_cleanup(game_id, delay=0.2)
             game_manager.mark_game_dirty(game_id, human_activity=False)
             game_manager.persist_dirty_games()
@@ -45,7 +51,7 @@ def test_the_scheduled_cleanup_still_removes_a_finished_game(mock_cube_data, tes
     async def scenario() -> bool:
         db = db_module.SessionLocal()
         try:
-            game_id = _started_game(game_manager, db)
+            game_id = await _started_game(game_manager, db)
             game_manager.schedule_abandoned_cleanup(game_id, delay=0.05)
             await asyncio.sleep(0.2)
             return game_manager.get_game(game_id) is None
@@ -62,7 +68,7 @@ def test_a_reconnect_after_game_over_keeps_the_post_game_cleanup(mock_cube_data,
     async def scenario() -> bool:
         db = db_module.SessionLocal()
         try:
-            game_id = _started_game(game_manager, db)
+            game_id = await _started_game(game_manager, db)
             game = game_manager.get_game(game_id)
             assert game is not None
             game_manager.complete_game(game_id, game.players[0], db)
@@ -82,7 +88,7 @@ def test_a_finished_game_unloaded_before_its_cleanup_is_still_retired(mock_cube_
     async def scenario() -> bool:
         db = db_module.SessionLocal()
         try:
-            game_id = _started_game(game_manager, db)
+            game_id = await _started_game(game_manager, db)
             game = game_manager.get_game(game_id)
             assert game is not None
             game_manager.complete_game(game_id, game.players[0], db)

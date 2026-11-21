@@ -6,11 +6,13 @@ from time import monotonic
 from typing import Any
 
 import pytest
+import starlette
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import close_all_sessions, sessionmaker
 from sqlalchemy.pool import StaticPool
 from starlette.testclient import WebSocketTestSession
+from starlette.types import Message
 
 import server.db.database as db_module
 import server.main as main_module
@@ -30,6 +32,34 @@ from server.services.game_manager import GameManager
 from server.services.session_manager import SessionManager
 
 WS_MESSAGE_TIMEOUT_SECONDS = 1.0
+
+
+# Starlette 0.41's WebSocketTestSession.send decides on the test thread whether the app is waiting for a message,
+# racing the app's check-then-wait on the event loop, so a message can sit unread until the next send. Waking the
+# app from the event loop puts the wake after that check. Starlette 1.x passes messages through anyio streams
+# instead, so upgrading to it removes the race and this patch.
+if not {"_receive_queue", "_queue_event"} <= set(WebSocketTestSession._asgi_receive.__code__.co_names):
+    raise RuntimeError(
+        f"Starlette {starlette.__version__}'s WebSocketTestSession no longer waits on _receive_queue and "
+        "_queue_event, which the WebSocket wake-up patch in tests/conftest.py relies on. If it now uses anyio "
+        "streams, delete that patch and its test in tests/test_api_websocket.py."
+    )
+
+
+async def _wake_websocket_receiver(session: WebSocketTestSession) -> None:
+    event = getattr(session, "_queue_event", None)
+    if event is not None:
+        event.set()
+
+
+def _send_and_wake_from_the_event_loop(session: WebSocketTestSession, message: Message) -> None:
+    session._receive_queue.put(message)
+    session.portal.start_task_soon(_wake_websocket_receiver, session)
+
+
+@pytest.fixture(autouse=True)
+def _never_lose_a_websocket_wakeup(monkeypatch):
+    monkeypatch.setattr(WebSocketTestSession, "send", _send_and_wake_from_the_event_loop)
 
 
 @pytest.fixture(autouse=True)
@@ -62,8 +92,8 @@ def _cleanup_game_manager(game_manager: GameManager) -> None:
         _cancel_task(pending._loading_task)
         pending._loading_task = None
         for player_battler in pending.player_battlers.values():
-            _cancel_task(player_battler._loading_task)
-            player_battler._loading_task = None
+            if isinstance(player_battler, gm_module.BattlerLoading):
+                _cancel_task(player_battler.task)
 
     for task in list(game_manager._post_game_cleanup_tasks.values()):
         _cancel_task(task)
@@ -320,6 +350,25 @@ def game_with_players(client):
         "alice": {"session_id": d1["session_id"], "player_id": d1["player_id"], "seat_token": d1["seat_token"]},
         "bob": {"session_id": d2["session_id"], "player_id": d2["player_id"], "seat_token": d2["seat_token"]},
     }
+
+
+async def _no_broadcast() -> None:
+    pass
+
+
+@pytest.fixture
+def start_game_now():
+    """Ready every player in a lobby, then start it through GameManager as its host."""
+
+    def _start(manager: GameManager, game_id: str, db=None):
+        pending = manager.get_pending_game(game_id)
+        assert pending is not None
+        for player_id in pending.player_ids:
+            ready, error = manager.set_player_ready(game_id, player_id, True)
+            assert ready, error
+        return asyncio.run(manager.start_lobby(game_id, pending.host_player_id, db, on_change=_no_broadcast))
+
+    return _start
 
 
 @pytest.fixture

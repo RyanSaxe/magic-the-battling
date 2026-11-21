@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { joinGame } from '../../api/client'
 import { useAuth } from '../../contexts/authState'
 import { unknownToAppError } from '../../utils/appError'
-import { findRememberedSeatByJoinCode, rememberPlayerForGame } from '../../utils/deviceIdentity'
-import { saveTabSession } from '../../utils/tabSession'
+import { joinLobbyByCode } from '../../utils/joinLobby'
 import { SurfaceCard } from '../common/SurfaceCard'
 
 interface JoinGameModalProps {
@@ -41,21 +39,11 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
       return
     }
 
-    // This browser already holds that seat: the lobby page takes it back with the seat token.
-    const heldSeat = findRememberedSeatByJoinCode(code)
-    if (heldSeat && heldSeat.name === name) {
-      navigate(`/game/${heldSeat.gameId}/lobby`)
-      return
-    }
-
     setLoading(true)
     setError('')
 
     try {
-      const response = await joinGame(code, name)
-      saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id })
-      rememberPlayerForGame(response.game_id, name, { seatToken: response.seat_token, joinCode: code.toUpperCase() })
-      navigate(`/game/${response.game_id}/lobby`)
+      navigate(await joinLobbyByCode(code, name))
     } catch (err) {
       setError(unknownToAppError(err, 'join-game', 'Failed to join game').message)
     } finally {
@@ -73,7 +61,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
           <h2 className="text-white font-semibold">Join Game</h2>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-gray-300 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-amber-100/70 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
             aria-label="Close join game modal"
           >
             ✕
@@ -94,7 +82,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
               value={playerName}
               onChange={(e) => !user && setManualName(e.target.value)}
               disabled={!!user}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] disabled:opacity-50"
               placeholder="Enter your name"
               autoFocus={!user}
             />
@@ -107,7 +95,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 uppercase font-mono"
+              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] uppercase font-mono"
               placeholder="ABC123"
             />
           </div>

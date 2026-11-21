@@ -2,74 +2,40 @@ import { useState, useRef, useEffect, type ReactNode, type Ref } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/authState'
 import { JoinGameModal } from '../home/JoinGameModal'
+import { BarLabel, BrandLockup, TopBar } from './FrameBar'
 
 interface AppHeaderProps {
-  renderRight: (opts: { compact: boolean }) => ReactNode
+  helpers?: ReactNode
+  home?: ReactNode
+  primary?: ReactNode
+  account?: ReactNode
   ref?: Ref<HTMLElement>
-  padClassName?: string
 }
 
-export function AppHeader({ renderRight, ref, padClassName = 'bar-pad-both' }: AppHeaderProps) {
-  return (
-    <header ref={ref} className={`shrink-0 py-3 frame-chrome ${padClassName}`}>
-      <div className="hidden sm:flex items-center justify-between">
-        <div>
-          <div className="flex items-baseline">
-            <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-              Pitfight
-            </h1>
-            <span className="hero-sep mx-2.5">—</span>
-            <span className="hero-subtitle text-base font-normal tracking-widest">
-              an MtG format
-            </span>
-          </div>
-          <p className="hero-tagline">
-            Inspired by Roguelikes and Autobattlers
-          </p>
-        </div>
-        <div className="flex gap-2 items-center">
-          {renderRight({ compact: false })}
-        </div>
-      </div>
-      <div className="sm:hidden">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-baseline whitespace-nowrap">
-              <h1 className="hero-title text-lg font-bold tracking-wide leading-tight shrink-0">
-                Pitfight
-              </h1>
-              <span className="hero-sep ml-1 text-xs shrink-0">—</span>
-              {/* The gap after the dash is padding, not margin, so truncating keeps the first letter's overhang. */}
-              <span className="hero-subtitle pl-1 text-[11px] font-normal tracking-wider min-w-0 truncate">
-                an MtG format
-              </span>
-            </div>
-            <p className="hero-tagline !text-[9px] !tracking-[0.04em]">
-              Inspired by Roguelikes and Autobattlers
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {renderRight({ compact: true })}
-          </div>
-        </div>
-      </div>
-    </header>
-  )
+/** The top bar on pages outside a game: the brand lockup, then the page's buttons by role. */
+export function AppHeader(props: AppHeaderProps) {
+  return <TopBar lead={<BrandLockup />} {...props} />
 }
 
-export function AuthHeaderButton({ compact }: { compact: boolean }) {
-  const navigate = useNavigate()
+export function GuideButton({ onClick, className = '' }: { onClick: () => void; className?: string }) {
   return (
-    <button
-      onClick={() => navigate('/login')}
-      className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
-    >
-      Log in
+    <button onClick={onClick} className={`btn btn-secondary btn-icon-phone ${className}`} title="Guide" data-guide-target="guide-button">
+      <BarLabel desktop="Guide" phone="?" />
     </button>
   )
 }
 
-export function UserMenuButton({ compact }: { compact: boolean }) {
+export function HomeButton({ to = '/', className = '' }: { to?: string; className?: string }) {
+  const navigate = useNavigate()
+  return (
+    <button onClick={() => navigate(to)} className={`btn btn-secondary ${className}`}>
+      Home
+    </button>
+  )
+}
+
+/** The account menu: the username on desktop, ☰ on phones. */
+export function UserMenuButton() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
@@ -85,19 +51,17 @@ export function UserMenuButton({ compact }: { compact: boolean }) {
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const btnClass = compact
-    ? 'py-1.5 px-2 text-sm'
-    : 'py-2 px-3'
-
   return (
     <>
       <div ref={ref} className="relative">
         <button
           onClick={() => setOpen(!open)}
-          className={`btn btn-secondary ${btnClass} flex items-center justify-center`}
+          className="btn btn-secondary btn-icon-phone inline-flex items-center justify-center gap-1"
           aria-label="Menu"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <span className="hidden sm:inline max-w-[12rem] truncate">{user?.username}</span>
+          <span className="hidden sm:inline text-[10px]" aria-hidden="true">▾</span>
+          <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
@@ -111,6 +75,18 @@ export function UserMenuButton({ compact }: { compact: boolean }) {
               className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
             >
               Dashboard
+            </button>
+            <button
+              onClick={() => { setOpen(false); navigate('/dashboard/games') }}
+              className="sm:hidden w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+            >
+              Games
+            </button>
+            <button
+              onClick={() => { setOpen(false); navigate('/dashboard/discover') }}
+              className="sm:hidden w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+            >
+              Discover
             </button>
             <button
               onClick={() => { setOpen(false); navigate('/play') }}

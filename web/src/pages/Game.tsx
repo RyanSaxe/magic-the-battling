@@ -1,8 +1,10 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, type ReactNode } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, useReducer, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
 import { NoticeFrame } from "../components/common/NoticeFrame";
+import { GuideButton, HomeButton } from "../components/common/AppHeader";
+import { BottomBar, BrandMark, TopBar } from "../components/common/FrameBar";
 import { BusyNotice, StatusNotice } from "../components/common/StatusNotice";
 import { useGame } from "../hooks/useGame";
 import { useVoiceChat } from "../hooks/useVoiceChat";
@@ -60,7 +62,13 @@ import {
   getRevealedAppliedUpgrades,
   getUnrevealedAppliedUpgrades,
 } from "../utils/upgrades";
-import type { Phase } from "../constants/phases";
+import {
+  BATTLE_SUBMIT_BUTTON_LABEL,
+  BUILD_SUBMIT_BUTTON_LABEL,
+  DRAFT_DONE_BUTTON_LABEL,
+  REWARD_CONTINUE_BUTTON_LABEL,
+  type Phase,
+} from "../constants/phases";
 import type {
   GuideRequest,
   GuidedGuideId,
@@ -77,6 +85,12 @@ import {
   shouldBlockGuidesForBattleResolution,
   type VisibleGuideStep,
 } from "./gameGuideState";
+import {
+  initialPhaseActionState,
+  isPhaseActionPending,
+  reducePhaseAction,
+  type PhaseAction,
+} from "./pendingPhaseAction";
 import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
 import {
   canUseBattleFaceDownAction,
@@ -512,7 +526,7 @@ function PlayerSelectionModal({
                 type="text"
                 value={spectatorName}
                 onChange={(e) => setSpectatorName(e.target.value)}
-                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
                 placeholder="Enter your name"
               />
             </div>
@@ -874,21 +888,17 @@ function GameContent() {
   const usesOverlaySidebar = shellMode !== "big";
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
   const isSmallShell = shellMode === "small";
-  const phaseTimelineHeaderClassName =
-    shellMode === "small" ? "py-1.5 bar-pad-both" : "py-1.5 bar-pad-left";
-  const phaseTimelineRightActionsClassName =
-    shellMode === "small" ? "" : "sm:-translate-x-2";
-  const actionBarPaddingClass =
-    shellMode === "small" ? "bar-pad-both" : "bar-pad-main";
+  const actionBarPaddingClass = shellMode === "big" ? "bar-pad-main" : undefined;
 
   const { addToast } = useToast();
-  const buildReadyPendingRef = useRef(false);
-  const [buildReadyPending, setBuildReadyPending] = useState(false);
+  const [phaseActionState, dispatchPhaseAction] = useReducer(
+    reducePhaseAction,
+    { phase: null, buildReady: false, connected: false },
+    initialPhaseActionState,
+  );
+  const pendingPhaseAction = phaseActionState.pending;
   const handleServerError = useCallback((error: AppError) => {
-    if (buildReadyPendingRef.current) {
-      buildReadyPendingRef.current = false;
-      setBuildReadyPending(false);
-    }
+    dispatchPhaseAction({ type: "failed" });
     addToast(getAppErrorMessage(error, "game-action", "That action could not be completed."), "error");
   }, [addToast]);
 
@@ -973,24 +983,21 @@ function GameContent() {
     rememberPlayerForGame(gameId, playerName);
   }, [gameId, gameState?.self_player.name, isSpectator]);
 
+  const selfBuildReady = gameState?.self_player.build_ready ?? false;
   useEffect(() => {
-    const selfPlayer = gameState?.self_player;
-    if (!selfPlayer) {
-      buildReadyPendingRef.current = false;
-      queueMicrotask(() => setBuildReadyPending(false));
-      return;
-    }
-    if (selfPlayer.phase !== "build" || !selfPlayer.build_ready) {
-      buildReadyPendingRef.current = false;
-      queueMicrotask(() => setBuildReadyPending(false));
-    }
-  }, [
-    gameId,
-    session?.playerId,
-    gameState?.self_player,
-    gameState?.self_player.phase,
-    gameState?.self_player.build_ready,
-  ]);
+    dispatchPhaseAction({
+      type: "server_state",
+      server: { phase: selfPhase ?? null, buildReady: selfBuildReady, connected: isConnected },
+    });
+  }, [selfPhase, selfBuildReady, isConnected]);
+
+  const sendPhaseAction = useCallback((action: PhaseAction, send: () => void) => {
+    if (pendingPhaseAction) return false;
+    dispatchPhaseAction({ type: "sent", action });
+    send();
+    return true;
+  }, [pendingPhaseAction]);
+  const buildReadyPending = isPhaseActionPending(pendingPhaseAction, "build_ready");
 
   // Lifted state from Build phase
   type UpgradesModalOpenMode = 'auto' | 'view' | 'reveal';
@@ -1309,19 +1316,18 @@ function GameContent() {
   const handleBuildReadySubmit = useCallback((
     playDrawPreference: "play" | "draw",
   ) => {
-    if (buildReadyPendingRef.current || !gameState || gameState.self_player.phase !== "build") {
+    if (!gameState || gameState.self_player.phase !== "build") {
       return;
     }
-    buildReadyPendingRef.current = true;
-    setBuildReadyPending(true);
-    requestGuideCompletion("build_play_draw", "play-draw");
-    closeGameplayOverlays();
-    actions.buildReady(
+    const sent = sendPhaseAction("build_ready", () => actions.buildReady(
       selectedBasics,
       playDrawPreference,
       handSlotsRef.current.filter((id): id is string => id !== null),
-    );
-  }, [actions, closeGameplayOverlays, gameState, requestGuideCompletion, selectedBasics]);
+    ));
+    if (!sent) return;
+    requestGuideCompletion("build_play_draw", "play-draw");
+    closeGameplayOverlays();
+  }, [actions, closeGameplayOverlays, gameState, requestGuideCompletion, selectedBasics, sendPhaseAction]);
 
   const openBuildSubmitPopover = useCallback(() => {
     if (showSubmitHandPopover || buildReadyPending) {
@@ -1427,11 +1433,21 @@ function GameContent() {
   }, [actions, pendingBattleResult]);
 
   const handleContinue = useCallback(() => {
+    if (!sendPhaseAction("reward_done", () => actions.rewardDone(selectedUpgradeId ?? undefined))) return;
     requestGuideCompletion("reward", "continue");
-    actions.rewardDone(selectedUpgradeId ?? undefined);
-    setSelectedUpgradeId(null);
-    setSelectedPoolCardId(null);
-  }, [actions, requestGuideCompletion, selectedUpgradeId]);
+  }, [actions, requestGuideCompletion, selectedUpgradeId, sendPhaseAction]);
+
+  const handleGoToBuild = useCallback(() => {
+    sendPhaseAction("draft_done", actions.draftDone);
+  }, [actions, sendPhaseAction]);
+
+  useEffect(() => {
+    if (selfPhase === "reward") return;
+    queueMicrotask(() => {
+      setSelectedUpgradeId(null);
+      setSelectedPoolCardId(null);
+    });
+  }, [selfPhase]);
 
   const hasPendingBattleResolution =
     !!battleResolutionId &&
@@ -1499,7 +1515,7 @@ function GameContent() {
           actions.draftRoll();
         }
       };
-      map['Enter'] = () => actions.draftDone();
+      map['Enter'] = handleGoToBuild;
       map['u'] = () => {
         if (sp.upgrades.length > 0) openUpgradesModal(undefined, 'view');
       };
@@ -1855,7 +1871,7 @@ function GameContent() {
     openUpgradesModal(undefined, "reveal", initialRevealIds);
   };
 
-  const renderActionButtons = (): ReactNode => {
+  const renderActionButtons = (): { left: ReactNode; right: ReactNode } | null => {
     if (isSpectator) {
       return null;
     }
@@ -1888,13 +1904,13 @@ function GameContent() {
               self_player.treasures <= 0 ||
               (self_player.current_pack?.length ?? 0) === 0
             }
-            className="btn bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-game"
             data-guide-target="draft-roll"
           >
             Roll for 1💰
           </button>
           {self_player.upgrades.length > 0 && (
-            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn btn-secondary">
               View Upgrades
             </button>
           )}
@@ -1902,11 +1918,12 @@ function GameContent() {
       );
       right = (
         <button
-          onClick={actions.draftDone}
+          onClick={handleGoToBuild}
+          disabled={isPhaseActionPending(pendingPhaseAction, "draft_done")}
           className="btn btn-primary"
           data-guide-target="draft-continue"
         >
-          Go to Build
+          {DRAFT_DONE_BUTTON_LABEL}
         </button>
       );
     } else if (actionBarPhase === "build") {
@@ -1915,13 +1932,13 @@ function GameContent() {
           hasPendingBuildUpgrades ? (
             <button
               onClick={() => openUpgradesModal(undefined, 'auto')}
-              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              className="btn btn-game btn-pending"
               data-guide-target="build-apply-upgrade"
             >
               Apply Upgrade
             </button>
           ) : (
-            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn btn-secondary">
               View Upgrades
             </button>
           )
@@ -1931,7 +1948,7 @@ function GameContent() {
             <span className="text-amber-400 text-sm">Waiting...</span>
             <button
               onClick={actions.buildUnready}
-              className="btn bg-gray-600 hover:bg-gray-500 text-white"
+              className="btn btn-secondary"
             >
               Change
             </button>
@@ -1942,7 +1959,7 @@ function GameContent() {
           hasPendingBuildUpgrades ? (
             <button
               onClick={() => openUpgradesModal(undefined, 'auto')}
-              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              className="btn btn-game btn-pending"
               data-guide-target="build-apply-upgrade"
             >
               Apply Upgrade
@@ -1950,7 +1967,7 @@ function GameContent() {
           ) : (
             <button
               onClick={() => openUpgradesModal(undefined, 'view')}
-              className="btn bg-gray-600 hover:bg-gray-500 text-white"
+              className="btn btn-secondary"
             >
               View Upgrades
             </button>
@@ -1964,7 +1981,7 @@ function GameContent() {
               className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               data-guide-target="build-submit"
             >
-              {buildReadyPending ? "Submitting..." : "Submit Hand"}
+              {buildReadyPending ? "Submitting..." : BUILD_SUBMIT_BUTTON_LABEL}
             </button>
             {showSubmitHandPopover && canReady && (
               <SubmitPopover
@@ -1972,12 +1989,12 @@ function GameContent() {
                   {
                     label: "Play",
                     onClick: () => handleBuildReadySubmit('play'),
-                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                    className: "btn btn-success text-sm py-1.5",
                   },
                   {
                     label: "Draw",
                     onClick: () => handleBuildReadySubmit('draw'),
-                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                    className: "btn btn-success text-sm py-1.5",
                   },
                 ]}
                 onClose={() => setShowSubmitHandPopover(false)}
@@ -2000,7 +2017,7 @@ function GameContent() {
           {hasUnrevealedBattleUpgrades && (
             <button
               onClick={() => openBattleRevealUpgradesModal()}
-              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              className="btn btn-game btn-pending"
               data-guide-target="battle-reveal-upgrade"
             >
               Reveal Upgrade
@@ -2031,7 +2048,7 @@ function GameContent() {
             </span>
             <button
               onClick={() => setIsChangingResult(true)}
-              className="btn bg-gray-600 hover:bg-gray-500 text-white"
+              className="btn btn-secondary"
             >
               Change
             </button>
@@ -2043,7 +2060,7 @@ function GameContent() {
             {isChangingResult && (
               <button
                 onClick={() => { setIsChangingResult(false); setShowSubmitResultPopover(false); }}
-                className="text-gray-400 text-sm hover:text-white"
+                className="btn btn-secondary"
               >
                 Cancel
               </button>
@@ -2053,7 +2070,7 @@ function GameContent() {
               className="btn btn-primary"
               data-guide-target="battle-submit"
             >
-              Submit Result
+              {BATTLE_SUBMIT_BUTTON_LABEL}
             </button>
             {showSubmitResultPopover && (
               <SubmitPopover
@@ -2063,14 +2080,14 @@ function GameContent() {
                     onClick: () => {
                       handleBattleResultSubmit(self_player.name);
                     },
-                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                    className: "btn btn-success text-sm py-1.5",
                   },
                   {
                     label: "Draw",
                     onClick: () => {
                       handleBattleResultSubmit("draw");
                     },
-                    className: "btn btn-danger text-sm py-1.5",
+                    className: "btn btn-secondary text-sm py-1.5",
                   },
                   {
                     label: "I Lost",
@@ -2094,11 +2111,11 @@ function GameContent() {
         ? selectedUpgradeId
           ? "Claim & Continue"
           : "Select Upgrade"
-        : "Continue";
+        : REWARD_CONTINUE_BUTTON_LABEL;
       right = (
         <button
           onClick={handleContinue}
-          disabled={!canContinue}
+          disabled={!canContinue || isPhaseActionPending(pendingPhaseAction, "reward_done")}
           className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           data-guide-target="reward-continue"
         >
@@ -2111,12 +2128,7 @@ function GameContent() {
 
     if (!left && !right) return null;
 
-    return (
-      <>
-        <div className="flex items-center gap-1.5 sm:gap-2">{left}</div>
-        <div className="flex items-center gap-1.5 sm:gap-2">{right}</div>
-      </>
-    );
+    return { left, right };
   };
 
   const handleCreateTreasure = () => {
@@ -2271,28 +2283,35 @@ function GameContent() {
         >
         {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
         <div ref={phaseTimelineRef} className="relative">
-          <PhaseTimeline
-            currentPhase={timelinePhase}
-            stage={self_player.stage}
-            round={self_player.round}
-            nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
-            nextRound={isStageIncreasing ? 1 : self_player.round + 1}
-            inSuddenDeath={self_player.in_sudden_death}
-            suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
-            useUpgrades={gameState.use_upgrades}
-            headerClassName={phaseTimelineHeaderClassName}
-            rightActionsClassName={phaseTimelineRightActionsClassName}
-            onOpenRules={openRulesPanel}
-            hamburger={usesOverlaySidebar ? (
+          <TopBar
+            lead={
+              <>
+                <BrandMark className="hidden sm:block mr-2" />
+                <PhaseTimeline
+                  currentPhase={timelinePhase}
+                  stage={self_player.stage}
+                  round={self_player.round}
+                  nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
+                  nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+                  inSuddenDeath={self_player.in_sudden_death}
+                  suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
+                  useUpgrades={gameState.use_upgrades}
+                  onOpenRules={openRulesPanel}
+                  title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
+                />
+              </>
+            }
+            helpers={<GuideButton onClick={() => openRulesPanel()} className={isEndPhase ? "hidden sm:inline-block" : ""} />}
+            home={<HomeButton className={isEndPhase ? "" : "hidden sm:inline-block"} />}
+            account={usesOverlaySidebar ? (
               <button
                 onClick={() => setSidebarOpen((o) => !o)}
-                className="btn btn-secondary text-xs sm:text-sm"
+                className="btn btn-secondary btn-icon"
                 data-guide-target="sidebar-toggle"
               >
                 ☰
               </button>
             ) : undefined}
-            title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
           />
         </div>
 
@@ -2684,36 +2703,37 @@ function GameContent() {
           </div>
         )}
         {/* Bottom Action Bar */}
-        {!isSpectator && (
-          <div ref={actionBarRef} className="shrink-0 relative frame-chrome z-40">
-            <div
-              className={`h-[var(--frame-bar-height)] flex items-center justify-between gap-1.5 sm:gap-2 ${actionBarPaddingClass} timeline-actions`}
-              data-guide-target="phase-action-bar"
-            >
-              {isEndPhase && gameId && !displayBattleResolution ? (
+        {!isSpectator && (() => {
+          const endOfGame = isEndPhase && gameId && !displayBattleResolution;
+          const groups = endOfGame ? null : renderActionButtons();
+          return (
+            <BottomBar
+              ref={actionBarRef}
+              className="relative z-40"
+              padClassName={actionBarPaddingClass}
+              guideTarget="phase-action-bar"
+              secondary={endOfGame ? (
                 <>
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <button
-                      className="btn bg-slate-700 hover:bg-slate-600 text-white"
-                      onClick={() =>
-                        window.open(shareUrl, "_blank", "noopener,noreferrer")
-                      }
-                    >
-                      Review
-                    </button>
-                    <button
-                      className="btn bg-purple-600 hover:bg-purple-500 text-white"
-                      onClick={openShareModal}
-                    >
-                      Share Game
-                    </button>
-                  </div>
-                  <div />
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() =>
+                      window.open(shareUrl, "_blank", "noopener,noreferrer")
+                    }
+                  >
+                    Review
+                  </button>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={openShareModal}
+                  >
+                    Share Game
+                  </button>
                 </>
-              ) : renderActionButtons()}
-            </div>
-          </div>
-        )}
+              ) : groups?.left}
+              main={groups?.right}
+            />
+          );
+        })()}
         {!isSpectator && (
           <GameGuideLayer
             rootRef={guideRootRef}

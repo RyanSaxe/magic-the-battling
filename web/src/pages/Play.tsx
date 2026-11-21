@@ -6,7 +6,8 @@ import { useToast } from "../contexts";
 import { useAuth } from "../contexts/authState";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { InfoIcon } from "../components/icons/InfoIcon";
-import { AppHeader } from "../components/common/AppHeader";
+import { AppHeader, HomeButton } from "../components/common/AppHeader";
+import { JoinGameModal } from "../components/home/JoinGameModal";
 import { PageFrame } from "../components/common/PageFrame";
 import { ResumeGameCard } from "../components/ResumeGame";
 import { useResumableGames } from "../hooks/useResumableGames";
@@ -190,7 +191,7 @@ function CubeIdInput({
         type="text"
         value={cubeId}
         onChange={(e) => setCubeId(e.target.value)}
-        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
         placeholder="auto"
       />
     </div>
@@ -210,7 +211,7 @@ function UpgradesCheckbox({
         type="checkbox"
         checked={useUpgrades}
         onChange={(e) => setUseUpgrades(e.target.checked)}
-        className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+        className="w-4 h-4 rounded bg-black/40 border-black/40"
       />
       <span className="text-white text-sm">Upgrades</span>
       <span className="text-gray-500 text-xs">
@@ -234,7 +235,7 @@ function ConstructedCheckbox({
         type="checkbox"
         checked={isConstructed}
         onChange={(e) => setPlayMode(e.target.checked ? "constructed" : "limited")}
-        className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+        className="w-4 h-4 rounded bg-black/40 border-black/40"
       />
       <span className="text-white text-sm">Constructed</span>
       <span className="text-gray-500 text-xs">
@@ -335,6 +336,7 @@ export function Play() {
   const [randomName, setRandomName, nameLoading] = useRandomMtgName();
   const playerName = user ? user.username : randomName;
   const setPlayerName = user ? () => {} : setRandomName;
+  const [showJoinModal, setShowJoinModal] = useState(false);
   const [showFriendsAdvanced, setShowFriendsAdvanced] = useState(false);
   const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
   const [cubeId, setCubeId] = useState(() => searchParams.get("cubeId") || "auto");
@@ -365,8 +367,10 @@ export function Play() {
     setSoloPhase(phase);
   }, []);
 
+  const [soloStartEnded, setSoloStartEnded] = useState(false);
   const handleServerError = useCallback((error: AppError) => {
     addToast(getAppErrorMessage(error, "play-connection", "Something went wrong."), "error");
+    if (soloPhaseRef.current === "navigating") setSoloStartEnded(true);
   }, [addToast]);
 
   const { lobbyState, gameState, actions, connectionError } = useGame(
@@ -469,6 +473,19 @@ export function Play() {
       });
     }
   }, [connectionError, pendingGameId, addToast, updateSoloPhase, resetWatcher]);
+
+  // The server refused or failed the start, and either way said why.
+  useEffect(() => {
+    if (!soloStartEnded) return;
+    if (pendingGameId) forgetSeatForGame(pendingGameId);
+    startTransition(() => {
+      setSoloStartEnded(false);
+      setPendingGameId(null);
+      setPendingSessionId(null);
+      updateSoloPhase("idle");
+      resetWatcher();
+    });
+  }, [pendingGameId, resetWatcher, soloStartEnded, updateSoloPhase]);
 
   useEffect(() => {
     if (!cubeId) return;
@@ -608,16 +625,15 @@ export function Play() {
   return (
     <>
       <PageFrame
-        header={<AppHeader renderRight={({ compact }) => (
-          <button
-            onClick={() => navigate("/")}
-            className={`btn btn-secondary ${compact ? "py-1.5 px-3 text-sm" : "py-2 px-4"}`}
-          >
-            Home
-          </button>
-        )} />}
+        header={<AppHeader
+          helpers={
+            <button onClick={() => setShowJoinModal(true)} className="btn btn-secondary hidden sm:inline-block">
+              Join Game
+            </button>
+          }
+          home={<HomeButton />}
+        />}
         center
-        contentClassName="px-4"
         hints
       >
         <SurfaceCard as="section" className="overflow-hidden flex flex-col">
@@ -650,7 +666,7 @@ export function Play() {
                     }
                     disabled={nameLoading}
                     placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-                    className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+                    className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] disabled:opacity-50"
                   />
                 )}
                 <GuidedModeField enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
@@ -755,6 +771,8 @@ export function Play() {
         </SurfaceCard>
       </PageFrame>
 
+      {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
+
       {showFriendsAdvanced && (
         <AdvancedOptionsModal
           title="Friends Options"
@@ -771,7 +789,7 @@ export function Play() {
               type="checkbox"
               checked={autoApproveSpectators}
               onChange={(e) => setAutoApproveSpectators(e.target.checked)}
-              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+              className="w-4 h-4 rounded bg-black/40 border-black/40"
             />
             <span className="text-white text-sm">Open Spectating</span>
             <span className="text-gray-500 text-xs">— let anyone watch</span>
