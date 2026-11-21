@@ -9,6 +9,8 @@ export type AppErrorCode =
   | 'SPECTATE_REQUEST_NOT_FOUND'
   | 'PLAYER_NOT_IN_GAME'
   | 'PLAYER_ALREADY_CONNECTED'
+  | 'SEAT_CLAIM_REQUIRED'
+  | 'SEAT_MOVED'
   | 'PLAYER_NAME_TAKEN'
   | 'INVALID_JOIN_CODE'
   | 'LOBBY_FULL'
@@ -85,6 +87,8 @@ const KNOWN_CODES = new Set<AppErrorCode>([
   'SPECTATE_REQUEST_NOT_FOUND',
   'PLAYER_NOT_IN_GAME',
   'PLAYER_ALREADY_CONNECTED',
+  'SEAT_CLAIM_REQUIRED',
+  'SEAT_MOVED',
   'PLAYER_NAME_TAKEN',
   'INVALID_JOIN_CODE',
   'LOBBY_FULL',
@@ -197,6 +201,10 @@ export function getAppErrorMessage(
         return 'Your player slot is no longer available in this game.'
       case 'PLAYER_ALREADY_CONNECTED':
         return 'That player is already connected from another window or device.'
+      case 'SEAT_CLAIM_REQUIRED':
+        return 'That seat can only be taken back from the browser that joined with it.'
+      case 'SEAT_MOVED':
+        return 'This game is now open in another tab or window.'
       case 'INVALID_JOIN_CODE':
         return 'That join code is not valid.'
       case 'LOBBY_FULL':

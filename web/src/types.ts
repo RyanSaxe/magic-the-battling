@@ -330,6 +330,7 @@ export interface LobbyPlayer {
   name: string
   is_ready: boolean
   is_host: boolean
+  is_connected: boolean
   battler_id: string | null
   battler_status: BattlerLoadingStatus | null
   battler_error: string | null
@@ -358,12 +359,14 @@ export interface CreateGameResponse {
   join_code: string
   session_id: string
   player_id: string
+  seat_token: string
 }
 
 export interface JoinGameResponse {
   game_id: string
   session_id: string
   player_id: string
+  seat_token: string
 }
 
 export interface WebSocketMessage {
@@ -376,6 +379,19 @@ export interface GameStatusPlayer {
   is_connected: boolean
   is_puppet: boolean
   phase: string
+}
+
+export interface ResumableSeat {
+  game_id: string
+  player_name: string
+  seat_token: string
+}
+
+export interface ResumableGame {
+  game_id: string
+  player_name: string
+  kind: 'lobby' | 'game'
+  last_active_at: string | null
 }
 
 export interface GameStatusResponse {
