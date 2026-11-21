@@ -20,13 +20,13 @@ jobs:
         run: uv sync --group dev
 
       - name: Run ruff linting
-        run: uvx ruff check .
+        run: uv run ruff check .
 
       - name: Run ruff format check
-        run: uvx ruff format --check .
+        run: uv run ruff format --check .
 
       - name: Run ty type check
-        run: uvx ty check
+        run: uv run ty check
 
   test:
     runs-on: ubuntu-latest
