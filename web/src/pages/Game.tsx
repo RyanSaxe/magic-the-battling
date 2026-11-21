@@ -954,7 +954,6 @@ function GameContent() {
   const [battleSelectedCard, setBattleSelectedCard] = useState<BattleSelectedCard | null>(null);
   const [isChangingResult, setIsChangingResult] = useState(false);
   const actionMenuOpen = openSurface?.kind === "actions";
-  const zonePanelOpen = openSurface?.kind === "zone";
   const showSubmitHandPopover = openSurface?.kind === "submitHand";
   const showSubmitResultPopover = openSurface?.kind === "submitResult";
   const closeSurface = useCallback((kind: GameSurfaceKind) => dispatchSurface({ type: "close", kind }), []);
@@ -1309,11 +1308,11 @@ function GameContent() {
   const battleSubmitGuideActive = isSubmitPopoverGuideStepActive(visibleGuideStep, "battle");
 
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
+  // A zone panel sits beside the board rather than over it, so the Fight's hotkeys keep working while one is open.
   const modalOpen =
     rulesPanelOpen ||
     showUpgradesModal ||
     actionMenuOpen ||
-    zonePanelOpen ||
     shareOpen ||
     state.previewCard !== null ||
     hasPendingBattleResolution ||

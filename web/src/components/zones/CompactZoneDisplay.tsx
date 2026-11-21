@@ -12,6 +12,8 @@ const LABEL_HEIGHT = 18
 
 interface CompactZoneDisplayProps {
   title: string
+  /** The open panel's title, when the pile's label doesn't say whose it is. */
+  panelTitle?: string
   zone: ZoneName
   cards: CardType[]
   height: number
@@ -39,6 +41,7 @@ interface CompactZoneDisplayProps {
 
 export function CompactZoneDisplay({
   title,
+  panelTitle = title,
   zone,
   cards,
   height,
@@ -164,7 +167,7 @@ export function CompactZoneDisplay({
 
       <ZoneModal
         open={showModal}
-        title={title}
+        title={panelTitle}
         zone={zone}
         cards={cards}
         allowZoneInteraction={allowZoneInteraction}

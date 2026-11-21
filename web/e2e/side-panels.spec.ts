@@ -162,6 +162,25 @@ test.describe('one panel at a time', () => {
     await expect(yourSideboard).toHaveCount(0)
   })
 
+  test('the zone hotkeys switch between panels and close the open one', async ({ page, baseURL }) => {
+    await openGame(page, baseURL!, FIGHT)
+
+    await page.keyboard.press('s')
+    await expect(sidePanel(page, 'Your Sideboard')).toBeVisible()
+    await page.keyboard.press('g')
+    await expect(sidePanel(page, 'Graveyard')).toBeVisible()
+    await expect(sidePanel(page, 'Your Sideboard')).toHaveCount(0)
+    await page.keyboard.press('g')
+    await expect(sidePanel(page, 'Graveyard')).toHaveCount(0)
+  })
+
+  test("the opponent's piles open under the opponent's name", async ({ page, baseURL }) => {
+    await openGame(page, baseURL!, FIGHT)
+
+    await page.locator('.battle-side-column-opponent .battle-side-cell').filter({ hasText: 'Library' }).click()
+    await expect(sidePanel(page, "Bob's Library")).toBeVisible()
+  })
+
   test.describe('below 1120px', () => {
     test.use({ viewport: { width: 1024, height: 768 } })
 
