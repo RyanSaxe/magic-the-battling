@@ -55,6 +55,8 @@ function measureFrame(page: Page) {
     const header = document.querySelector('header')!
     const footer = document.querySelector('footer')!
     const main = document.querySelector('main')!
+    // A docked sidebar sits inside the felt's gold edge, so the felt ends where the sidebar does.
+    const felt = document.querySelector('.frame-sidebar') ?? main
     const barButtons = (bar: Element) => Array.from(bar.querySelectorAll('.btn')).filter(visible).map((button) => {
       const rect = button.getBoundingClientRect()
       return {
@@ -76,8 +78,8 @@ function measureFrame(page: Page) {
       footerHeight: footer.getBoundingClientRect().height,
       footerTop: footer.getBoundingClientRect().top,
       feltLeft: main.getBoundingClientRect().left,
+      feltRight: felt.getBoundingClientRect().right,
       headerInner: inner(header),
-      footerInner: inner(footer),
       topButtons: barButtons(header),
       bottomButtons: barButtons(footer),
       mainActionRight: lastVisibleRight(footer.querySelector('[data-bar-role="main"]')),
@@ -100,6 +102,7 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
         expect.soft(frame.footerHeight, 'bottom bar height').toBe(BAR_HEIGHT)
         expect.soft(frame.footerTop, 'bottom bar top edge').toBe(viewport.height - BAR_HEIGHT)
         expect.soft(frame.feltLeft, 'felt left edge').toBe(rail)
+        expect.soft(frame.feltRight, 'felt right edge').toBe(viewport.width - rail)
 
         for (const button of [...frame.topButtons, ...frame.bottomButtons]) {
           expect.soft(button.height, `"${button.label}" height`).toBe(BAR_BUTTON_HEIGHT)
@@ -117,7 +120,7 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
           expect.soft(rightmost, 'last top bar button sits at the right edge').toBeCloseTo(frame.headerInner.right, 0)
         }
         if (frame.mainActionRight !== null) {
-          expect.soft(frame.mainActionRight, 'main action sits at the right edge').toBeCloseTo(frame.footerInner.right, 0)
+          expect.soft(frame.mainActionRight, 'main action sits at the right edge, under the top bar\'s last button').toBeCloseTo(frame.headerInner.right, 0)
         }
       })
     }
