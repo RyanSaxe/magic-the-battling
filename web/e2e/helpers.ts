@@ -10,7 +10,7 @@ import type {
   SharePlayerSnapshot,
   UserBattler,
 } from '../src/types'
-import { gameBootstrap, type ScreenState } from './gameStates'
+import { GAME_ID, PLAYER_NAME, gameBootstrap, type ScreenState } from './gameStates'
 
 type MockResponse = { status?: number; json: unknown }
 
@@ -290,22 +290,40 @@ const CARD_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
 /** Set LAYOUT_CARD_ART=real to load real card images from Scryfall, for screenshots; runs stay offline otherwise. */
 const SHOW_REAL_CARD_ART = process.env.LAYOUT_CARD_ART === 'real'
 
-/** Opens a game whose server sends `screen` as its state. `onSocket` can read the client's actions and send more state. */
+/** A player's Guided Mode progress in a game: the guides they have seen and the one left open at a step. */
+export interface GuideProgress {
+  seen: string[]
+  active_guide?: { id: string; step: number }
+}
+
+export interface ServeGameOptions {
+  /** Turns Guided Mode on with this progress. */
+  guideProgress?: GuideProgress
+  /** Receives the game socket, to read the client's actions and send more state. */
+  onSocket?: (ws: WebSocketRoute) => void
+}
+
+/** Opens a game whose server sends `screen` as its state. */
 export async function serveGame(
   page: Page,
   baseURL: string,
   screen: ScreenState,
-  onSocket?: (ws: WebSocketRoute) => void,
+  { guideProgress, onSocket }: ServeGameOptions = {},
 ) {
   await serveWithoutBackend(page, baseURL)
   await page.route(/^https:\/\/(cards|backs)\.scryfall\.io\//, (route) =>
     SHOW_REAL_CARD_ART ? route.continue() : route.fulfill({ body: CARD_PLACEHOLDER_SVG, contentType: 'image/svg+xml' }))
-  await page.addInitScript((session) => {
+  await page.addInitScript(({ session, progressKey, guideProgress }) => {
     sessionStorage.setItem('mtb_session', session.sessionId)
     sessionStorage.setItem('mtb_player', session.playerId)
-    // Guided Mode is on for new players and opens panels over the board, so play as a returning player.
-    localStorage.setItem('mtb_guided_mode_preference', '0')
-  }, LOBBY_SESSION)
+    if (guideProgress) {
+      localStorage.setItem('mtb_guided_mode_preference', '1')
+      localStorage.setItem('mtb_guided_progress', JSON.stringify({ [progressKey]: guideProgress }))
+    } else {
+      // Guided Mode is on for new players and opens panels over the board, so play as a returning player.
+      localStorage.setItem('mtb_guided_mode_preference', '0')
+    }
+  }, { session: LOBBY_SESSION, progressKey: `${GAME_ID}::${PLAYER_NAME}`, guideProgress })
   await page.routeWebSocket(/\/ws\//, (ws) => {
     ws.send(JSON.stringify({ type: 'game_bootstrap', payload: gameBootstrap(screen) }))
     onSocket?.(ws)

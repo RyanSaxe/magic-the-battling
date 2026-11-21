@@ -8,9 +8,11 @@ const REWARD: ScreenState = { phase: 'reward', counts: { sideboard: 8 } }
 async function openGame(page: Page, baseURL: string, screen: ScreenState) {
   const actions: string[] = []
   let socket: WebSocketRoute | null = null
-  await serveGame(page, baseURL, screen, (ws) => {
-    socket = ws
-    ws.onMessage((message) => actions.push(JSON.parse(String(message)).action))
+  await serveGame(page, baseURL, screen, {
+    onSocket: (ws) => {
+      socket = ws
+      ws.onMessage((message) => actions.push(JSON.parse(String(message)).action))
+    },
   })
   await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
   return {
