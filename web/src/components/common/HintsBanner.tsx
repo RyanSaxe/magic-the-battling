@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { GAME_HINTS } from "../../constants/hints";
+import { hintsFor, type HintPlace } from "../../constants/hints";
 import { textForInput } from "../../utils/inputMode";
 
 const CYCLE_INTERVAL = 8000;
@@ -8,9 +8,10 @@ const SWAP_PAUSE = 80;
 
 type HintsBannerVariant = "default" | "dark" | "rail";
 
-export function HintsBanner({ variant = "default" }: { variant?: HintsBannerVariant } = {}) {
+export function HintsBanner({ place, variant = "default" }: { place: HintPlace; variant?: HintsBannerVariant }) {
+  const hints = hintsFor(place);
   const [index, setIndex] = useState(
-    () => Math.floor(Math.random() * GAME_HINTS.length),
+    () => Math.floor(Math.random() * hints.length),
   );
   const [visible, setVisible] = useState(true);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,9 +45,9 @@ export function HintsBanner({ variant = "default" }: { variant?: HintsBannerVari
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      goTo((index + 1) % GAME_HINTS.length);
+      goTo((index + 1) % hints.length);
     }, CYCLE_INTERVAL);
-  }, [index, goTo]);
+  }, [index, goTo, hints.length]);
 
   useEffect(() => {
     resetTimer();
@@ -64,12 +65,12 @@ export function HintsBanner({ variant = "default" }: { variant?: HintsBannerVari
 
   const prev = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    goTo((index - 1 + GAME_HINTS.length) % GAME_HINTS.length);
+    goTo((index - 1 + hints.length) % hints.length);
   };
 
   const next = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    goTo((index + 1) % GAME_HINTS.length);
+    goTo((index + 1) % hints.length);
   };
 
   const wrapperClass = variant === "dark"
@@ -100,7 +101,7 @@ export function HintsBanner({ variant = "default" }: { variant?: HintsBannerVari
       <p
         className={`flex-1 text-center leading-tight ${tipTextClass} ${visible ? "hint-fade-in" : "hint-fade-out"}`}
       >
-        {textForInput(GAME_HINTS[index])}
+        {textForInput(hints[index])}
       </p>
       <button
         onClick={next}

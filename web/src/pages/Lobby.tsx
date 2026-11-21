@@ -586,7 +586,7 @@ export function Lobby() {
       <PageFrame
         header={header}
         center
-        hints
+        hints="game"
       >
         <SurfaceCard className="overflow-visible">
           {lobbyState &&

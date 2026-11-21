@@ -3,6 +3,7 @@ import { FaDiscord } from 'react-icons/fa6'
 import { CubeCobraPrimerLink } from './CubeCobraPrimerLink'
 import { BottomBar } from './FrameBar'
 import { HintsBanner } from './HintsBanner'
+import type { HintPlace } from '../../constants/hints'
 
 interface PageFrameProps {
   header: ReactNode
@@ -11,7 +12,7 @@ interface PageFrameProps {
   contentClassName?: string
   /** Center content that fits in the column. Content taller than the column starts at the top and scrolls. */
   center?: boolean
-  hints?: boolean
+  hints?: HintPlace
   /** False for content that sizes itself to the column and may overhang its edges. */
   scroll?: boolean
   /** The page's sidebar, docked inside the felt's gold edge. */
@@ -29,7 +30,7 @@ export function PageFrame({
   children,
   contentClassName = '',
   center = false,
-  hints = false,
+  hints,
   scroll = true,
   aside,
   footer,
@@ -47,7 +48,7 @@ export function PageFrame({
           <div className={`zone-pack flex-1 min-w-0 min-h-0 flex flex-col ${scrollClass} ${centerClass} ${contentClassName}`}>
             {children}
           </div>
-          {hints && <HintsBanner variant="rail" />}
+          {hints && <HintsBanner place={hints} variant="rail" />}
         </main>
 
         {aside && <FrameSidebar>{aside}</FrameSidebar>}
