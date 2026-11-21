@@ -7,6 +7,8 @@ import type { Components } from 'react-markdown'
 import { useDocNav } from '../contexts/DocNavContext'
 import { PHASE_HOTKEYS } from '../constants/hotkeys'
 import { HotkeyRow } from './HotkeyRow'
+import { selectInputBlocks } from '../docs/parse'
+import { canHover } from '../utils/inputMode'
 
 function urlTransform(url: string) {
   if (url.startsWith('doc:') || url.startsWith('docs:')) return url
@@ -95,7 +97,7 @@ export function DocRenderer({ content, className }: DocRendererProps) {
     },
   }
 
-  const segments = content.split(HOTKEY_RE)
+  const segments = selectInputBlocks(content, canHover).split(HOTKEY_RE)
 
   return (
     <div className={className}>

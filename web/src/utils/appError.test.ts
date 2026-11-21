@@ -27,6 +27,18 @@ describe('appError', () => {
     )
   })
 
+  it('says a join code was not found instead of blaming a server restart', () => {
+    const error = wsPayloadToAppError(
+      { code: 'GAME_NOT_FOUND', detail: 'Game not found' },
+      'default',
+      'Fallback message',
+    )
+
+    expect(getAppErrorMessage(error, 'join-game', 'Fallback message')).toBe(
+      'No game found with that join code. Check the code and try again.',
+    )
+  })
+
   it('preserves user-facing details for user-message errors', () => {
     const error = unknownToAppError(
       new Error('Battler is still loading'),

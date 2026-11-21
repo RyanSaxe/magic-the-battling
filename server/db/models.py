@@ -56,6 +56,8 @@ class PlayerGameHistory(Base):
     max_stage = Column(Integer, nullable=False)
     max_round = Column(Integer, nullable=False)
     final_placement = Column(Integer, nullable=True)
+    final_poison = Column(Integer, nullable=True)
+    final_treasures = Column(Integer, nullable=True)
     is_puppet = Column(Boolean, default=False)
     source_history_id = Column(Integer, ForeignKey("player_game_history.id"), nullable=True)
     poison_history_json = Column(Text, nullable=True)
@@ -97,6 +99,19 @@ class ActiveGameSnapshot(Base):
     state_json = Column(Text, nullable=False)
     last_human_activity_at = Column(DateTime, default=_utc_now, nullable=False)
     updated_at = Column(DateTime, default=_utc_now, nullable=False)
+
+
+class QuarantinedGameSnapshot(Base):
+    """An active game snapshot the server could not restore, kept so a later fix can bring the game back."""
+
+    __tablename__ = "quarantined_game_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    game_id = Column(String, nullable=False, index=True)
+    state_json = Column(Text, nullable=False)
+    last_human_activity_at = Column(DateTime, nullable=False)
+    error = Column(Text, nullable=False)
+    quarantined_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class User(Base):

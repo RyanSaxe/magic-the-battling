@@ -7,7 +7,7 @@ from conftest import setup_battle_ready
 
 import server.db.database as db
 from mtb.models.cards import Battler, Card
-from mtb.models.game import Game, Puppet, StaticOpponent, create_game, set_battler
+from mtb.models.game import Game, Player, Puppet, StaticOpponent, create_game, set_battler
 from mtb.phases import battle, reward
 from server.db.models import ActiveGameSnapshot, GameRecord, PlayerGameHistory
 from server.routers.ws import ConnectionManager
@@ -617,10 +617,13 @@ class TestPersistPlacementOnElimination:
         mock_db_session.query.return_value = mock_query
         mock_query.filter.return_value = mock_query
         mock_query.first.return_value = history
+        alice = Player(name="Alice", placement=3, poison=11, treasures=5)
 
-        game_manager._persist_player_placement(mock_db_session, "game1", "Alice", 3)
+        game_manager._persist_player_placement(mock_db_session, "game1", alice)
 
         assert history.final_placement == 3
+        assert history.final_poison == 11
+        assert history.final_treasures == 5
         mock_db_session.commit.assert_called_once()
 
     def test_persist_player_placement_noop_for_missing_history(self, game_manager, mock_db_session):
@@ -629,7 +632,7 @@ class TestPersistPlacementOnElimination:
         mock_query.filter.return_value = mock_query
         mock_query.first.return_value = None
 
-        game_manager._persist_player_placement(mock_db_session, "game1", "Alice", 3)
+        game_manager._persist_player_placement(mock_db_session, "game1", Player(name="Alice", placement=3))
 
         mock_db_session.commit.assert_not_called()
 

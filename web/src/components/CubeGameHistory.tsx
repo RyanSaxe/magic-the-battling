@@ -5,6 +5,7 @@ import { PuppetIcon } from './icons/PuppetIcon'
 import { useToast } from '../contexts'
 import { LabeledDivider } from './common/LabeledDivider'
 import { InfoCard } from './common/InfoCard'
+import type { CubeGamesPage } from '../api/client'
 import type { GameSummary } from '../types'
 
 function ordinal(n: number): string {
@@ -29,7 +30,7 @@ interface CubeGameHistoryProps {
   defaultPlayMode: string | null
   defaultUpgrades: boolean | null
   actions: ReactNode
-  loadGames: (cubeId: string, opts: { offset?: number; playMode?: string; useUpgrades?: boolean }) => Promise<{ games: GameSummary[]; has_more: boolean; total_games: number }>
+  loadGames: (cubeId: string, opts: { offset?: number; playMode?: string; useUpgrades?: boolean }) => Promise<CubeGamesPage>
   onMetadata?: (name: string | null, imageUri: string | null) => void
 }
 
@@ -66,9 +67,7 @@ export function CubeGameHistory({
       })
       if (offset === 0) {
         setGames(data.games)
-        if (data.games.length > 0 && onMetadata) {
-          onMetadata(data.games[0].cube_name ?? null, data.games[0].cube_image_uri ?? null)
-        }
+        onMetadata?.(data.cube_name, data.cube_image_uri)
       } else {
         setGames((prev) => [...prev, ...data.games])
       }

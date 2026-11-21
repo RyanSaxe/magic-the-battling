@@ -1,6 +1,7 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AfterValidator, BaseModel, Field, field_validator
+from pydantic_core import PydanticCustomError
 
 from mtb.models.cards import Card
 from mtb.models.game import BattleResolution
@@ -10,9 +11,28 @@ LastResult = Literal["win", "loss", "draw"]
 CubeLoadingStatus = Literal["loading", "ready", "error"]
 BattlerLoadingStatus = Literal["missing", "loading", "ready", "error"]
 
+MAX_PLAYER_NAME_LENGTH = 32
+
+
+def _validate_player_name(value: str) -> str:
+    # PydanticCustomError keeps the message free of pydantic's "Value error, " prefix, since clients show it as is.
+    name = value.strip()
+    if not name:
+        raise PydanticCustomError("player_name_blank", "Player name is required.")
+    if len(name) > MAX_PLAYER_NAME_LENGTH:
+        raise PydanticCustomError(
+            "player_name_too_long",
+            "Player name must be {max_length} characters or fewer.",
+            {"max_length": MAX_PLAYER_NAME_LENGTH},
+        )
+    return name
+
+
+PlayerName = Annotated[str, AfterValidator(_validate_player_name)]
+
 
 class CreateGameRequest(BaseModel):
-    player_name: str
+    player_name: PlayerName
     cube_id: str = "auto"
     use_upgrades: bool = True
     use_vanguards: bool = False
@@ -37,7 +57,12 @@ class CreateGameResponse(BaseModel):
 
 class JoinGameRequest(BaseModel):
     join_code: str
-    player_name: str
+    player_name: PlayerName
+
+    @field_validator("join_code")
+    @classmethod
+    def _strip_join_code(cls, value: str) -> str:
+        return value.strip()
 
 
 class RejoinGameRequest(BaseModel):
@@ -354,6 +379,7 @@ class SharePlayerData(BaseModel):
     name: str
     final_placement: int | None
     final_poison: int
+    final_treasures: int | None = None
     is_puppet: bool
     snapshots: list[SharePlayerSnapshot]
 

@@ -88,24 +88,34 @@ jobs:
       - name: Build
         run: npm run build
 
-  web-changes:
+  changes:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
     outputs:
       web: ${{ steps.filter.outputs.web }}
+      image: ${{ steps.filter.outputs.image }}
     steps:
-      - name: Check for frontend changes
+      - name: Check which parts the pull request changes
         id: filter
         uses: dorny/paths-filter@v4
         with:
           filters: |
             web:
               - 'web/**'
+            image:
+              - 'server/**'
+              - 'mtb/**'
+              - 'scripts/**'
+              - 'Dockerfile'
+              - 'fly*.toml'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'tests/fixtures/active_game_snapshots/**'
 
   e2e-frontend:
-    needs: web-changes
-    if: needs.web-changes.outputs.web == 'true'
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -144,3 +154,16 @@ jobs:
 
       - name: Run Playwright tests
         run: npm run test:e2e
+
+  image-boot:
+    needs: changes
+    if: needs.changes.outputs.image == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the server image
+        run: docker build --tag mtb:boot-check .
+
+      - name: Boot the image on an empty volume and on the snapshot fixtures
+        run: python3 scripts/check_image_boot.py mtb:boot-check

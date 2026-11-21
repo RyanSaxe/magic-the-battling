@@ -45,3 +45,19 @@ export function canUseBattleFlipAction(
   if (owner === "player" || canManipulateOpponent) return true;
   return !isFaceDown;
 }
+
+interface BattleResultConflictOptions {
+  mySubmission: string | undefined;
+  opponentSubmission: string | undefined;
+  isResolved: boolean;
+}
+
+// The end-of-battle overlay shows the battle as last seen, whose submissions can predate the change that settled them.
+export function hasBattleResultConflict({
+  mySubmission,
+  opponentSubmission,
+  isResolved,
+}: BattleResultConflictOptions): boolean {
+  if (isResolved) return false;
+  return !!mySubmission && !!opponentSubmission && mySubmission !== opponentSubmission;
+}
