@@ -60,6 +60,23 @@ def swap_card(
         player.command_zone.clear()
 
 
+def set_basics(game: Game, player: Player, basics: list[str]) -> None:
+    if player.phase != "build":
+        raise ValueError("Player is not in build phase")
+
+    if player.build_ready:
+        raise ValueError("Cannot change basic lands while ready")
+
+    if len(basics) > game.config.num_basics:
+        raise ValueError(f"Cannot choose more than {game.config.num_basics} basic lands")
+
+    for basic in basics:
+        if basic not in VALID_BASICS:
+            raise ValueError(f"Invalid basic land: {basic}")
+
+    player.chosen_basics = list(basics)
+
+
 def set_ready(
     game: Game,
     player: Player,
