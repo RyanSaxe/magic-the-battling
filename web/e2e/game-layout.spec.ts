@@ -375,7 +375,12 @@ for (const screen of SCREENS) {
     const isPhone = Math.min(screen.viewport.width, screen.viewport.height) <= 430
     test.use({ viewport: screen.viewport, isMobile: isPhone, hasTouch: isPhone })
 
+    // Below 640px wide the phases turn their dividers off.
+    const hasDividers = screen.state.phase !== 'battle' && screen.viewport.width >= 640
+
     test('lays out the board', async ({ page, baseURL }, testInfo) => {
+      // Each divider is grabbed after a reload, so on a busy CI runner these screens can pass the default 30s.
+      test.slow(hasDividers)
       await openScreen(page, baseURL!, screen)
       const measurement = await measure(page)
       const failures = { ...measurement.failures }
@@ -391,8 +396,7 @@ for (const screen of SCREENS) {
       }
 
       await testInfo.attach('screen.png', { body: await page.screenshot(), contentType: 'image/png' })
-      // Below 640px wide the phases turn their dividers off.
-      if (screen.state.phase !== 'battle' && screen.viewport.width >= 640) {
+      if (hasDividers) {
         const moved = await grabEachDivider(page, screen)
         if (moved.length > 0) failures['grab-moves-layout'] = moved
       }
