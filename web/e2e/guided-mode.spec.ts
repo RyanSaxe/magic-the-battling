@@ -11,8 +11,7 @@ test('the board takes a tap while a closed guide fades out', async ({ page, base
   // Linux can go seconds between frames while a game first renders.
   test.slow()
   await serveGame(page, baseURL!, { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 } }, {
-    seen: ['welcome'],
-    active_guide: { id: 'build', step: 4 },
+    guideProgress: { seen: ['welcome'], active_guide: { id: 'build', step: 4 } },
   })
   await page.goto(`/game/${GAME_ID}/play`)
 

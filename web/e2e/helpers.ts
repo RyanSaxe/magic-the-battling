@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { expect, test as base, type Locator, type Page, type Route } from '@playwright/test'
+import { expect, test as base, type Locator, type Page, type Route, type WebSocketRoute } from '@playwright/test'
 import type {
   AuthUser,
   FollowedBattler,
@@ -298,8 +298,20 @@ export interface GuideProgress {
   active_guide?: { id: string; step: number }
 }
 
-/** Opens a game whose server sends `screen` as its state, with Guided Mode on from `guideProgress` when given. */
-export async function serveGame(page: Page, baseURL: string, screen: ScreenState, guideProgress?: GuideProgress) {
+export interface ServeGameOptions {
+  /** Turns Guided Mode on with this progress. */
+  guideProgress?: GuideProgress
+  /** Receives the game socket, to read the client's actions and send more state. */
+  onSocket?: (ws: WebSocketRoute) => void
+}
+
+/** Opens a game whose server sends `screen` as its state. */
+export async function serveGame(
+  page: Page,
+  baseURL: string,
+  screen: ScreenState,
+  { guideProgress, onSocket }: ServeGameOptions = {},
+) {
   await serveWithoutBackend(page, baseURL)
   await page.route(/^https:\/\/(cards|backs)\.scryfall\.io\//, (route) =>
     SHOW_REAL_CARD_ART ? route.continue() : route.fulfill({ body: CARD_PLACEHOLDER_SVG, contentType: 'image/svg+xml' }))
@@ -316,6 +328,7 @@ export async function serveGame(page: Page, baseURL: string, screen: ScreenState
   }, { session: LOBBY_SESSION, progressKey: `${GAME_ID}::${PLAYER_NAME}`, guideProgress })
   await page.routeWebSocket(/\/ws\//, (ws) => {
     ws.send(JSON.stringify({ type: 'game_bootstrap', payload: gameBootstrap(screen) }))
+    onSocket?.(ws)
   })
 }
 
