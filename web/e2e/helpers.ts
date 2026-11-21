@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { expect, test as base, type Locator, type Page, type Route } from '@playwright/test'
+import { expect, test as base, type Locator, type Page, type Route, type WebSocketRoute } from '@playwright/test'
 import type {
   AuthUser,
   FollowedBattler,
@@ -273,8 +273,13 @@ const CARD_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
 /** Set LAYOUT_CARD_ART=real to load real card images from Scryfall, for screenshots; runs stay offline otherwise. */
 const SHOW_REAL_CARD_ART = process.env.LAYOUT_CARD_ART === 'real'
 
-/** Opens a game whose server sends `screen` as its state. */
-export async function serveGame(page: Page, baseURL: string, screen: ScreenState) {
+/** Opens a game whose server sends `screen` as its state. `onSocket` can read the client's actions and send more state. */
+export async function serveGame(
+  page: Page,
+  baseURL: string,
+  screen: ScreenState,
+  onSocket?: (ws: WebSocketRoute) => void,
+) {
   await serveWithoutBackend(page, baseURL)
   await page.route(/^https:\/\/(cards|backs)\.scryfall\.io\//, (route) =>
     SHOW_REAL_CARD_ART ? route.continue() : route.fulfill({ body: CARD_PLACEHOLDER_SVG, contentType: 'image/svg+xml' }))
@@ -286,6 +291,7 @@ export async function serveGame(page: Page, baseURL: string, screen: ScreenState
   }, LOBBY_SESSION)
   await page.routeWebSocket(/\/ws\//, (ws) => {
     ws.send(JSON.stringify({ type: 'game_bootstrap', payload: gameBootstrap(screen) }))
+    onSocket?.(ws)
   })
 }
 
