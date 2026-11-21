@@ -365,8 +365,10 @@ export function Play() {
     setSoloPhase(phase);
   }, []);
 
+  const [soloStartRefused, setSoloStartRefused] = useState(false);
   const handleServerError = useCallback((error: AppError) => {
     addToast(getAppErrorMessage(error, "play-connection", "Something went wrong."), "error");
+    if (soloPhaseRef.current === "navigating") setSoloStartRefused(true);
   }, [addToast]);
 
   const { lobbyState, gameState, actions, connectionError } = useGame(
@@ -469,6 +471,25 @@ export function Play() {
       });
     }
   }, [connectionError, pendingGameId, addToast, updateSoloPhase, resetWatcher]);
+
+  const soloStartError =
+    soloPhase === "navigating" &&
+    lobbyState?.game_id === pendingGameId &&
+    lobbyState.start_status === "failed"
+      ? lobbyState.start_error
+      : null;
+  useEffect(() => {
+    if (!soloStartError && !soloStartRefused) return;
+    if (soloStartError) addToast(soloStartError, "error");
+    if (pendingGameId) forgetSeatForGame(pendingGameId);
+    startTransition(() => {
+      setSoloStartRefused(false);
+      setPendingGameId(null);
+      setPendingSessionId(null);
+      updateSoloPhase("idle");
+      resetWatcher();
+    });
+  }, [addToast, pendingGameId, resetWatcher, soloStartError, soloStartRefused, updateSoloPhase]);
 
   useEffect(() => {
     if (!cubeId) return;
