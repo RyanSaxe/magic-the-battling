@@ -3,8 +3,10 @@ import {
   getDefaultNewPlayerPreference,
   getGlobalGuidedModePreference,
   getNewPlayerPreferenceForGame,
+  getSeatTokenForGame,
   markPlayedBefore,
   pickAutoReconnectPlayer,
+  rememberPlayerForGame,
   resolveNewPlayerPreferenceForGame,
   setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
@@ -100,5 +102,43 @@ describe("new player preference", () => {
     markPlayedBefore();
     expect(getNewPlayerPreferenceForGame("missing")).toBeNull();
     expect(resolveNewPlayerPreferenceForGame("missing")).toBe(true);
+  });
+});
+
+describe("seat tokens", () => {
+  beforeEach(() => {
+    vi.stubGlobal("window", { localStorage: createStorageMock() });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the seat token when the game is remembered again without one", () => {
+    rememberPlayerForGame("game-1", "Alice", "token-1");
+    rememberPlayerForGame("game-1", "Alice");
+
+    expect(getSeatTokenForGame("game-1", "Alice")).toBe("token-1");
+  });
+
+  it("replaces the seat token when a reclaim issues a new one", () => {
+    rememberPlayerForGame("game-1", "Alice", "token-1");
+    rememberPlayerForGame("game-1", "Alice", "token-2");
+
+    expect(getSeatTokenForGame("game-1", "Alice")).toBe("token-2");
+  });
+
+  it("only offers the token for the seat it belongs to", () => {
+    rememberPlayerForGame("game-1", "Alice", "token-1");
+
+    expect(getSeatTokenForGame("game-1", "Bob")).toBeNull();
+    expect(getSeatTokenForGame("game-2", "Alice")).toBeNull();
+  });
+
+  it("drops the token when the browser takes a different seat in the game", () => {
+    rememberPlayerForGame("game-1", "Alice", "token-1");
+    rememberPlayerForGame("game-1", "Bob");
+
+    expect(getSeatTokenForGame("game-1", "Bob")).toBeNull();
   });
 });

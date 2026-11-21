@@ -7,8 +7,9 @@ import type {
   LobbyState,
   ServerNoticeStatus,
 } from '../types'
-import { type AppError, createAppError, wsPayloadToAppError } from '../utils/appError'
+import { type AppError, wsPayloadToAppError } from '../utils/appError'
 import { hydrateGameState } from '../utils/catalogHydration'
+import { connectionErrorForCloseCode } from '../utils/connectionClose'
 
 interface SpectateRequest {
   request_id: string
@@ -230,40 +231,10 @@ export function useWebSocket(
           return
         }
 
-        if (event.code === 4001) {
+        const closeError = connectionErrorForCloseCode(event.code, event.reason)
+        if (closeError) {
           isClosingRef.current = true
-          applyConnectionError(
-            createAppError({
-              code: 'INVALID_SESSION',
-              detail: event.reason || 'Invalid session',
-              context: 'default',
-              fallbackMessage: 'The connection could not be established.',
-            }),
-          )
-          return
-        }
-        if (event.code === 4004) {
-          isClosingRef.current = true
-          applyConnectionError(
-            createAppError({
-              code: 'GAME_NOT_FOUND',
-              detail: event.reason || 'Game not found',
-              context: 'default',
-              fallbackMessage: 'The connection could not be established.',
-            }),
-          )
-          return
-        }
-        if (event.code === 1013) {
-          isClosingRef.current = true
-          applyConnectionError(
-            createAppError({
-              code: 'WS_CAPACITY',
-              detail: event.reason || 'Server is at websocket capacity',
-              context: 'default',
-              fallbackMessage: 'The connection could not be established.',
-            }),
-          )
+          applyConnectionError(closeError)
           return
         }
 

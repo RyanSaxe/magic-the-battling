@@ -358,12 +358,14 @@ export interface CreateGameResponse {
   join_code: string
   session_id: string
   player_id: string
+  seat_token: string
 }
 
 export interface JoinGameResponse {
   game_id: string
   session_id: string
   player_id: string
+  seat_token: string
 }
 
 export interface WebSocketMessage {

@@ -9,6 +9,7 @@ const MAX_TRACKED_GAMES = 100;
 interface TrackedPlayerEntry {
   name: string;
   seen_at: number;
+  seat_token?: string;
 }
 
 interface NewPlayerPreferenceEntry {
@@ -43,9 +44,11 @@ function readTrackedPlayerMap(): TrackedPlayerMap {
       if (!value || typeof value !== "object") continue;
       const name = (value as { name?: unknown }).name;
       const seenAt = (value as { seen_at?: unknown }).seen_at;
+      const seatToken = (value as { seat_token?: unknown }).seat_token;
       if (typeof name !== "string" || !name) continue;
       if (typeof seenAt !== "number") continue;
       result[gameId] = { name, seen_at: seenAt };
+      if (typeof seatToken === "string" && seatToken) result[gameId].seat_token = seatToken;
     }
     return result;
   } catch {
@@ -139,14 +142,19 @@ export function getOrCreateDeviceId(): string {
   return next;
 }
 
-export function rememberPlayerForGame(gameId: string, playerName: string): void {
+/** Remember this browser's seat in a game. Without a new seat token, the seat keeps the one it has. */
+export function rememberPlayerForGame(gameId: string, playerName: string, seatToken?: string): void {
   if (!gameId || !playerName) return;
   getOrCreateDeviceId();
 
   const map = readTrackedPlayerMap();
+  const previous = map[gameId];
+  const keptToken = previous?.name === playerName ? previous.seat_token : undefined;
+  const token = seatToken ?? keptToken;
   map[gameId] = {
     name: playerName,
     seen_at: Date.now(),
+    ...(token ? { seat_token: token } : {}),
   };
   writeTrackedPlayerMap(pruneTrackedPlayerMap(map));
 }
@@ -155,6 +163,12 @@ export function getRememberedPlayerForGame(gameId: string): string | null {
   if (!gameId) return null;
   const map = readTrackedPlayerMap();
   return map[gameId]?.name ?? null;
+}
+
+export function getSeatTokenForGame(gameId: string, playerName: string): string | null {
+  if (!gameId) return null;
+  const entry = readTrackedPlayerMap()[gameId];
+  return entry?.name === playerName ? (entry.seat_token ?? null) : null;
 }
 
 export function hasPlayedBefore(): boolean {

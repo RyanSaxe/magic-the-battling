@@ -498,7 +498,7 @@ export function Play() {
         playMode,
       });
       saveSession(response.session_id, response.player_id);
-      rememberPlayerForGame(response.game_id, name);
+      rememberPlayerForGame(response.game_id, name, response.seat_token);
       setNewPlayerPreferenceForGame(
         response.game_id,
         isGuidedMode,
@@ -538,7 +538,7 @@ export function Play() {
         playMode,
       });
       saveSession(response.session_id, response.player_id);
-      rememberPlayerForGame(response.game_id, name);
+      rememberPlayerForGame(response.game_id, name, response.seat_token);
       setNewPlayerPreferenceForGame(
         response.game_id,
         isGuidedMode,

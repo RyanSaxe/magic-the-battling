@@ -68,6 +68,7 @@ import type {
 import {
   getRememberedPlayerForGame,
   pickAutoReconnectPlayer,
+  getSeatTokenForGame,
   rememberPlayerForGame,
 } from "../utils/deviceIdentity";
 import {
@@ -220,8 +221,8 @@ function PlayerSelectionModal({
       }
 
       try {
-        const response = await rejoinGame(gameId, playerName);
-        rememberPlayerForGame(gameId, playerName.trim());
+        const response = await rejoinGame(gameId, playerName, getSeatTokenForGame(gameId, playerName));
+        rememberPlayerForGame(gameId, playerName.trim(), response.seat_token);
         onSessionCreated(response.session_id, response.player_id);
       } catch (err) {
         if (!options?.silent) {

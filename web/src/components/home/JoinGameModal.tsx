@@ -48,7 +48,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
     try {
       const response = await joinGame(code, name)
       saveSession(response.session_id, response.player_id)
-      rememberPlayerForGame(response.game_id, name)
+      rememberPlayerForGame(response.game_id, name, response.seat_token)
       navigate(`/game/${response.game_id}/lobby`)
     } catch (err) {
       setError(unknownToAppError(err, 'join-game', 'Failed to join game').message)
