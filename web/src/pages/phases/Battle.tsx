@@ -109,7 +109,7 @@ function ZoneActionMenu({
             onDraw()
             onClose()
           }}
-          className="w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10 transition-colors"
+          className="menu-item w-full px-3 py-1.5 text-left text-sm text-white transition-colors"
         >
           Draw
         </button>
@@ -119,7 +119,7 @@ function ZoneActionMenu({
             onShuffle()
             onClose()
           }}
-          className="w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10 transition-colors"
+          className="menu-item w-full px-3 py-1.5 text-left text-sm text-white transition-colors"
         >
           Shuffle
         </button>
@@ -240,7 +240,7 @@ export function BattlePhase({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="text-xl text-white mb-4">Waiting for the Fight</div>
-          <p className="text-gray-400">Waiting for opponent to finish building...</p>
+          <p className="text-[var(--ivory-muted)]">Waiting for opponent to finish building...</p>
         </div>
       </div>
     )

@@ -3,18 +3,20 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { PageFrame } from '../components/common/PageFrame'
-import { SurfaceCard } from '../components/common/SurfaceCard'
 import { DashboardFrame } from '../components/dashboard/DashboardFrame'
 import { DefaultOpponentsField } from '../components/dashboard/DefaultOpponentsField'
 import { DetailHero, HeroLink } from '../components/dashboard/DetailHero'
 import { GameHistory, type LoadGames } from '../components/dashboard/GameHistory'
 import { HomeHeader } from '../components/dashboard/HomeHeader'
-import { Breadcrumb } from '../components/dashboard/Section'
-import { getBattlers, getBattlerGames, updateBattler, deleteBattler } from '../api/client'
+import { Breadcrumb, NoticeTile } from '../components/dashboard/Section'
+import { getBattler, getBattlerGames, updateBattler, deleteBattler } from '../api/client'
+import { useFirstLoad } from '../hooks/useFirstLoad'
 import type { UserBattler, PlayMode } from '../types'
 import { countLabel, cubeTitle, modeLabel, winRate } from '../utils/accountFormat'
-import { unknownToAppError } from '../utils/appError'
+import { AppError, unknownToAppError } from '../utils/appError'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
+import { OPTION_BOX, TEXT_INPUT } from '../components/common/styles'
+import { Dialog } from '../components/common/Dialog'
 
 export function BattlerView() {
   const { listId } = useParams<{ listId: string }>()
@@ -23,9 +25,21 @@ export function BattlerView() {
   const { user, loading: authLoading } = useAuth()
   const { addToast } = useToast()
 
-  const [battler, setBattler] = useState<UserBattler | null>(null)
-  const [loadingData, setLoadingData] = useState(true)
   const [showSettings, setShowSettings] = useState(false)
+  const presetId = Number(listId)
+  // Resolves to null when the player has no such preset, which sends them back to the dashboard.
+  const loadPreset = useCallback(async () => {
+    if (!Number.isInteger(presetId)) return null
+    try {
+      return await getBattler(presetId)
+    } catch (err) {
+      if (err instanceof AppError && err.status === 404) return null
+      throw err
+    }
+  }, [presetId])
+  const presetLoad = useFirstLoad(loadPreset, !!user)
+  const battler = presetLoad.state.status === 'loaded' ? presetLoad.state.value : null
+  const missing = presetLoad.state.status === 'loaded' && battler === null
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -34,22 +48,8 @@ export function BattlerView() {
   }, [authLoading, user, navigate, location.pathname])
 
   useEffect(() => {
-    if (!user || !listId) return
-    let cancelled = false
-    getBattlers()
-      .then(({ battlers }) => {
-        if (cancelled) return
-        const b = battlers.find((x) => x.id === Number(listId))
-        if (!b) {
-          navigate('/dashboard', { replace: true })
-          return
-        }
-        setBattler(b)
-      })
-      .catch(() => { if (!cancelled) addToast('Failed to load data', 'error') })
-      .finally(() => { if (!cancelled) setLoadingData(false) })
-    return () => { cancelled = true }
-  }, [user, listId, navigate, addToast])
+    if (missing) navigate('/dashboard', { replace: true })
+  }, [missing, navigate])
 
   const battlerId = battler?.id
   const loadGames = useCallback<LoadGames>((filters, offset) => {
@@ -62,7 +62,15 @@ export function BattlerView() {
     })
   }, [battlerId])
 
-  if (authLoading || !user || loadingData || !battler) {
+  if (presetLoad.state.status === 'failed') {
+    return (
+      <PageFrame header={<HomeHeader newGame />} center contentClassName="items-center">
+        <NoticeTile action={{ label: 'Retry', onClick: presetLoad.retry }}>This preset didn&apos;t load.</NoticeTile>
+      </PageFrame>
+    )
+  }
+
+  if (authLoading || !user || !battler) {
     return (
       <PageFrame header={<HomeHeader newGame />} center contentClassName="items-center">
         <p className="text-amber-200/70">Loading...</p>
@@ -90,11 +98,11 @@ export function BattlerView() {
             </span>
             <HeroLink to={`/cube/${encodeURIComponent(battler.cube_id)}`}>View Public Cube Page →</HeroLink>
           </>}
-          chips={[
-            `Mode: ${mode === 'Deck' ? 'Deck (Constructed)' : 'Cube (Limited)'}`,
-            `Upgrades: ${battler.use_upgrades ? 'On' : 'Off'}`,
-            `Default Opponents: ${battler.puppet_count}`,
-            `Open Spectating: ${battler.auto_approve_spectators ? 'On' : 'Off'}`,
+          details={[
+            { label: 'Mode', value: mode === 'Deck' ? 'Deck (Constructed)' : 'Cube (Limited)' },
+            { label: 'Upgrades', value: battler.use_upgrades ? 'On' : 'Off' },
+            { label: 'Default Opponents', value: String(battler.puppet_count) },
+            { label: 'Open Spectating', value: battler.auto_approve_spectators ? 'On' : 'Off' },
           ]}
           actions={[{ label: 'Edit Preset', onClick: () => setShowSettings(true) }]}
           play={{ label: 'Play Preset', onClick: () => navigate(battlerPlayUrl(battler)) }}
@@ -125,7 +133,7 @@ export function BattlerView() {
           onSave={async (updates) => {
             try {
               const updated = await updateBattler(battler.id, updates)
-              setBattler(updated)
+              presetLoad.update({ status: 'loaded', value: updated })
               setShowSettings(false)
             } catch (err) {
               addToast(unknownToAppError(err, 'update-battler', 'Failed to save').message, 'error')
@@ -175,73 +183,61 @@ function SettingsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <SurfaceCard className="relative">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
-          <h3 className="text-white font-semibold">Settings</h3>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-amber-100/70 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
-          >
-            ✕
-          </button>
+    <Dialog title="Settings" onClose={onClose}>
+
+      <div className="space-y-3">
+        <div>
+          <label className="block text-white text-sm mb-1">Display Name</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            className={TEXT_INPUT}
+            placeholder={battler.cube_id}
+          />
         </div>
 
-        <div className="space-y-3">
-          <div>
-            <label className="block text-white text-sm mb-1">Display Name</label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
-              placeholder={battler.cube_id}
-            />
-          </div>
+        <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
+          <input
+            type="checkbox"
+            checked={playMode === 'constructed'}
+            onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
+            className="w-4 h-4 rounded bg-black/40 border-black/40"
+          />
+          <span className="text-white text-sm">Constructed</span>
+          <span className="text-amber-200/45 text-xs">— bring your own deck</span>
+        </label>
 
-          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={playMode === 'constructed'}
-              onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
-              className="w-4 h-4 rounded bg-black/40 border-black/40"
-            />
-            <span className="text-white text-sm">Constructed</span>
-            <span className="text-amber-200/45 text-xs">— bring your own deck</span>
-          </label>
+        <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
+          <input
+            type="checkbox"
+            checked={useUpgrades}
+            onChange={(e) => setUseUpgrades(e.target.checked)}
+            className="w-4 h-4 rounded bg-black/40 border-black/40"
+          />
+          <span className="text-white text-sm">Upgrades</span>
+        </label>
 
-          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useUpgrades}
-              onChange={(e) => setUseUpgrades(e.target.checked)}
-              className="w-4 h-4 rounded bg-black/40 border-black/40"
-            />
-            <span className="text-white text-sm">Upgrades</span>
-          </label>
+        <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />
+      </div>
 
-          <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />
-        </div>
-
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn btn-primary flex-1 py-2 font-semibold disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-          <button
-            onClick={() => {
-              if (window.confirm(`Delete "${battler.display_name || battler.cube_id}"?`)) onDelete()
-            }}
-            className="btn btn-secondary btn-destructive py-2 px-4"
-          >
-            Delete
-          </button>
-        </div>
-      </SurfaceCard>
-    </div>
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="btn btn-primary flex-1 py-2 font-semibold disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+        <button
+          onClick={() => {
+            if (window.confirm(`Delete "${battler.display_name || battler.cube_id}"?`)) onDelete()
+          }}
+          className="btn btn-secondary btn-destructive py-2 px-4"
+        >
+          Delete
+        </button>
+      </div>
+    </Dialog>
   )
 }

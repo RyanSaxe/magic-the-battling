@@ -1,5 +1,6 @@
 import { forwardRef, type CSSProperties } from "react";
 import type { GuideStepDefinition } from "./types";
+import { POPOVER_CHROME } from "../components/common/styles";
 
 interface GuideTooltipProps {
   step: GuideStepDefinition;
@@ -42,7 +43,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       <div
         ref={ref}
         data-guided-tooltip="true"
-        className={`guided-tooltip absolute z-[82] w-[min(17.5rem,calc(100%-1rem))] sm:w-[min(22rem,calc(100%-2rem))] max-h-[calc(100%-1rem)] overflow-hidden rounded-xl border modal-chrome felt-raised-panel gold-border shadow-[0_18px_42px_rgba(0,0,0,0.58),0_6px_18px_rgba(0,0,0,0.3)] ${
+        className={`guided-tooltip absolute z-[82] w-[min(17.5rem,calc(100%-1rem))] sm:w-[min(22rem,calc(100%-2rem))] max-h-[calc(100%-1rem)] overflow-hidden ${POPOVER_CHROME} ${
           interactive ? "pointer-events-auto" : "pointer-events-none"
         }`}
         style={{
@@ -82,7 +83,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
           <h2 className="text-[0.98rem] font-semibold leading-tight text-amber-50">
             {step.title}
           </h2>
-          <p className="mt-2 text-[0.92rem] leading-relaxed text-gray-100">
+          <p className="mt-2 text-[0.92rem] leading-relaxed text-[var(--ivory)]">
             {step.content.summary}
           </p>
           {step.content.detail && (
@@ -100,8 +101,8 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
             </div>
           )}
           {step.content.gallery && step.content.gallery.length > 0 && (
-            <div className="mt-4 rounded-xl border border-sky-300/15 bg-black/20 p-3">
-              <div className="text-[0.68rem] uppercase tracking-[0.18em] text-sky-100/80">
+            <div className="mt-4 rounded-xl border gold-divider bg-black/20 p-3">
+              <div className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--ivory-soft)]">
                 Cards shown here
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
@@ -110,7 +111,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
                     key={`${media.imageUrl}:${media.alt}`}
                     src={media.imageUrl}
                     alt={media.alt}
-                    className="w-full rounded-md border border-sky-300/15 shadow-sm"
+                    className="w-full rounded-md border gold-divider shadow-sm"
                   />
                 ))}
               </div>

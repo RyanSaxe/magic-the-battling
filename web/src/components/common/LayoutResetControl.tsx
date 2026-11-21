@@ -64,18 +64,18 @@ export function LayoutResetControl({
               Reset {phaseLabel}
             </div>
             {isInherited && originStage != null && originRound != null && (
-              <div className="mt-2 text-xs text-gray-300">
+              <div className="mt-2 text-xs text-[var(--ivory-muted)]">
                 Current layout is inherited from Stage {originStage}, Round {originRound}.
               </div>
             )}
-            <div className="mt-2 text-xs leading-snug text-gray-200">
+            <div className="mt-2 text-xs leading-snug text-[var(--ivory)]">
               {message ??
                 `This resets Stage ${currentStage}, Round ${currentRound} and all future ${phaseLabel.toLowerCase()} layouts on this device.`}
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">
               <button
                 type="button"
-                className="text-xs text-gray-400 hover:text-white"
+                className="text-xs text-[var(--ivory-muted)] hover:text-white"
                 onClick={() => setConfirmOpen(false)}
               >
                 Cancel

@@ -2,12 +2,13 @@ import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { getPhaseReferenceLabel, getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
 import type { Phase } from '../constants/phases'
+import { POPOVER_CHROME } from './common/styles'
 
 const PHASE_TITLE_COLOR: Record<Phase, string> = {
-  draft: 'text-purple-300',
-  build: 'text-blue-300',
-  battle: 'text-red-300',
-  reward: 'text-amber-300',
+  draft: 'text-[var(--gold-pale)]',
+  build: 'text-[var(--gold-pale)]',
+  battle: 'text-[#fecaca]',
+  reward: 'text-[var(--gold-pale)]',
 }
 
 interface PhasePopoverProps {
@@ -90,7 +91,7 @@ export function PhasePopover({
         position: 'fixed',
         visibility: 'hidden',
       }}
-      className={`modal-chrome border gold-border rounded-lg shadow-xl z-[84] felt-raised-panel min-w-[16rem] w-max max-w-[calc(100vw-1rem)] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      className={`${POPOVER_CHROME} z-[84] min-w-[16rem] w-max max-w-[calc(100vw-1rem)] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
     >
       <div
         ref={arrowRef}
@@ -120,7 +121,7 @@ export function PhasePopover({
       <div className="p-3">
         <div className="bg-black/35 rounded-lg border border-black/40 px-3 py-2">
           {getPhaseSummaryRows(phase, useUpgrades).map((row, index) => (
-            <p key={`${phase}-${index}`} className="text-xs text-gray-300 mb-1.5 last:mb-0 leading-5">
+            <p key={`${phase}-${index}`} className="text-xs text-[var(--ivory-muted)] mb-1.5 last:mb-0 leading-5">
               <span className="text-amber-400/90 mr-1.5">{index + 1}.</span>
               {row}
             </p>
@@ -128,7 +129,7 @@ export function PhasePopover({
         </div>
 
         <div className="mt-2 bg-black/35 rounded-lg border border-black/40 px-3 py-2">
-          <p className="text-[11px] text-gray-400 leading-[1.4]">
+          <p className="text-[11px] text-[var(--ivory-muted)] leading-[1.4]">
             <span className="text-amber-400/90 font-semibold text-[10px] uppercase tracking-wide mr-1.5">Tip</span>
             {getPhaseTip(phase)}
           </p>

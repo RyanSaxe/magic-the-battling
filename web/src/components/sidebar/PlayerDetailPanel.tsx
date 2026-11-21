@@ -14,6 +14,7 @@ import {
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
 import { getPlayerPhaseStatusLabel } from "../../utils/format";
+import { SegmentedFilter, type SegmentOption } from "../dashboard/SegmentedFilter";
 import { buildAppliedUpgradeMap, getAppliedUpgrades, getUpgradeDisplayScope, getUnappliedUpgrades } from "../../utils/upgrades";
 
 interface PlayerDetailPanelProps {
@@ -121,7 +122,7 @@ function OverviewInfoTable({
             index > 0 ? "border-t border-[color:rgba(212,175,55,0.12)]" : ""
           }`}
         >
-          <dt className="text-[11px] font-medium text-gray-400">
+          <dt className="text-[11px] font-medium text-[var(--ivory-muted)]">
             {row.label}
           </dt>
           <dd className="min-w-0 text-right text-sm text-amber-50">
@@ -175,11 +176,11 @@ function SectionHeading({
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[10px] uppercase tracking-[0.14em] text-gray-400">
+      <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--ivory-muted)]">
         {title}
       </span>
       {count !== undefined && (
-        <span className="text-[10px] text-gray-500">
+        <span className="text-[10px] text-[var(--ivory-muted)]">
           {countLabel(count)}
         </span>
       )}
@@ -315,7 +316,7 @@ function AdaptiveCardSection({
         data-guide-target={guideTarget}
       >
         {cards.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[color:rgba(212,175,55,0.25)] bg-black/10 px-4 text-center text-sm text-gray-500">
+          <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[color:rgba(212,175,55,0.25)] bg-black/10 px-4 text-center text-sm text-[var(--ivory-muted)]">
             {emptyText}
           </div>
         ) : (
@@ -353,29 +354,10 @@ function AdaptiveCardSection({
   );
 }
 
-function DetailTabButton({
-  isActive,
-  label,
-  onClick,
-}: {
-  isActive: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-        isActive
-          ? "border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]"
-          : "border border-transparent bg-black/10 text-gray-400 hover:text-gray-200"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
+const DETAIL_TABS: SegmentOption<RevealedPlayerTab>[] = [
+  { value: "seen", label: "Seen in Fight" },
+  { value: "overview", label: "Overview" },
+];
 
 export function PlayerDetailPanel({
   player,
@@ -492,14 +474,14 @@ export function PlayerDetailPanel({
             <button
               type="button"
               onClick={onClose}
-              className="shrink-0 text-sm text-gray-400 hover:text-white"
+              className="shrink-0 text-sm text-[var(--ivory-muted)] hover:text-white"
             >
               &larr; Back
             </button>
           )}
           <div className="min-w-0 flex-1">
             <div className="truncate text-base font-medium text-amber-50">
-              <span className="text-gray-300">scouting </span>
+              <span className="text-[var(--ivory-muted)]">scouting </span>
               <span className="text-[var(--color-gold)]">{player.name}</span>
             </div>
           </div>
@@ -507,18 +489,12 @@ export function PlayerDetailPanel({
       </div>
 
       <div className="flex justify-center px-4 pb-3 pt-3">
-        <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
-          <DetailTabButton
-            isActive={activeTab === "seen"}
-            label="Seen in Fight"
-            onClick={() => onTabChange("seen")}
-          />
-          <DetailTabButton
-            isActive={activeTab === "overview"}
-            label="Overview"
-            onClick={() => onTabChange("overview")}
-          />
-        </div>
+        <SegmentedFilter
+          label="Scouting view"
+          options={DETAIL_TABS}
+          value={activeTab}
+          onChange={onTabChange}
+        />
       </div>
 
       <div className="flex flex-col flex-1 min-h-0 px-4 pb-4">

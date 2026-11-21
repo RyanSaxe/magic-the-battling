@@ -1,4 +1,5 @@
 import { COMPACT_BANNER_HEIGHT, GAME_BANNER_HEIGHT } from './bannerSizes'
+import { POPOVER_CHROME } from './styles'
 
 type BannerTone = 'gold' | 'sudden-death'
 
@@ -47,7 +48,7 @@ export function Banner({ title, tone = 'gold', size = 'game', note, info }: Bann
         {info && (
           <span className="relative group cursor-help">
             <span className="text-xs text-[var(--color-gold-dark)]">ⓘ</span>
-            <span className="absolute right-0 top-full mt-2 w-64 p-2 modal-chrome border gold-border rounded-lg felt-raised-panel text-xs text-left whitespace-normal leading-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+            <span className={`absolute right-0 top-full mt-2 w-64 p-2 ${POPOVER_CHROME} text-xs text-left whitespace-normal leading-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50`}>
               {info}
             </span>
           </span>

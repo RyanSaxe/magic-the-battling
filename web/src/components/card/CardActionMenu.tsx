@@ -140,6 +140,7 @@ export function CardActionMenu({
             <MenuItem
               label="Add Counter"
               hasSubmenu
+              open={submenu === 'addCounter'}
               onClick={() => setSubmenu(submenu === 'addCounter' ? 'none' : 'addCounter')}
             />
             {submenu === 'addCounter' && (
@@ -168,6 +169,7 @@ export function CardActionMenu({
                 <MenuItem
                   label="Remove Counter"
                   hasSubmenu
+                  open={submenu === 'removeCounter'}
                   onClick={() => setSubmenu(submenu === 'removeCounter' ? 'none' : 'removeCounter')}
                 />
                 {submenu === 'removeCounter' && (
@@ -193,6 +195,7 @@ export function CardActionMenu({
             <MenuItem
               label="Spawn Token"
               hasSubmenu
+              open={submenu === 'spawnToken'}
               onClick={() => setSubmenu(submenu === 'spawnToken' ? 'none' : 'spawnToken')}
             />
             {submenu === 'spawnToken' && (
@@ -232,6 +235,7 @@ export function CardActionMenu({
             <MenuItem
               label="Attach To"
               hasSubmenu
+              open={submenu === 'attachTo'}
               onClick={() => setSubmenu(submenu === 'attachTo' ? 'none' : 'attachTo')}
             />
             {submenu === 'attachTo' && (
@@ -260,6 +264,7 @@ export function CardActionMenu({
         <MenuItem
           label="Move To"
           hasSubmenu
+          open={submenu === 'moveTo'}
           onClick={() => setSubmenu(submenu === 'moveTo' ? 'none' : 'moveTo')}
         />
         {submenu === 'moveTo' && (
@@ -280,24 +285,27 @@ function MenuItem({
   label,
   onClick,
   hasSubmenu,
+  open,
   disabled,
 }: {
   label: string
   onClick: () => void
   hasSubmenu?: boolean
+  open?: boolean
   disabled?: boolean
 }) {
   return (
     <button
       className={`
         w-full px-3 py-1.5 text-left text-sm flex items-center justify-between
-        ${disabled ? 'text-gray-500 cursor-not-allowed' : 'text-white hover:bg-gray-700'}
+        menu-item ${disabled ? 'text-[var(--ivory-faint)] cursor-not-allowed' : 'text-white'}
       `}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
+      aria-expanded={hasSubmenu ? open : undefined}
     >
       <span>{label}</span>
-      {hasSubmenu && <span className="text-gray-400">›</span>}
+      {hasSubmenu && <span className="text-[var(--ivory-muted)]">›</span>}
     </button>
   )
 }
@@ -309,7 +317,7 @@ function MenuDivider() {
 function Submenu({ children, maxHeight }: { children: React.ReactNode; maxHeight?: number }) {
   return (
     <div
-      className="ml-2 pl-2 border-l gold-divider"
+      className="menu-submenu"
       style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}
     >
       {children}

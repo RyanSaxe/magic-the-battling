@@ -23,6 +23,9 @@ import {
 } from "../utils/deviceIdentity";
 import type { LobbyState, PlayMode } from "../types";
 import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
+import { DIALOG_BACKDROP, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
+import { Dialog } from "../components/common/Dialog";
+import { DefaultOpponentsField } from "../components/dashboard/DefaultOpponentsField";
 
 type SoloPhase =
   | "idle"
@@ -150,30 +153,15 @@ function AdvancedOptionsModal({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+    <Dialog title={title} onClose={onClose}>
+      <div className="space-y-3">{children}</div>
+      <button
         onClick={onClose}
-      />
-      <SurfaceCard className="relative">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
-          <h3 className="text-white font-semibold">{title}</h3>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-gray-300 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
-          >
-            ✕
-          </button>
-        </div>
-        <div className="space-y-3">{children}</div>
-        <button
-          onClick={onClose}
-          className="btn btn-primary play-action-btn w-full py-2 mt-4"
-        >
-          Done
-        </button>
-      </SurfaceCard>
-    </div>
+        className="btn btn-primary play-action-btn w-full py-2 mt-4"
+      >
+        Done
+      </button>
+    </Dialog>
   );
 }
 
@@ -191,7 +179,7 @@ function CubeIdInput({
         type="text"
         value={cubeId}
         onChange={(e) => setCubeId(e.target.value)}
-        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+        className={TEXT_INPUT}
         placeholder="auto"
       />
     </div>
@@ -206,7 +194,7 @@ function UpgradesCheckbox({
   setUseUpgrades: (v: boolean) => void;
 }) {
   return (
-    <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
+    <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
       <input
         type="checkbox"
         checked={useUpgrades}
@@ -214,7 +202,7 @@ function UpgradesCheckbox({
         className="w-4 h-4 rounded bg-black/40 border-black/40"
       />
       <span className="text-white text-sm">Upgrades</span>
-      <span className="text-gray-500 text-xs">
+      <span className="text-[var(--ivory-muted)] text-xs">
         — upgrade a card every 3 rounds
       </span>
     </label>
@@ -230,7 +218,7 @@ function ConstructedCheckbox({
 }) {
   const isConstructed = playMode === "constructed";
   return (
-    <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
+    <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
       <input
         type="checkbox"
         checked={isConstructed}
@@ -238,7 +226,7 @@ function ConstructedCheckbox({
         className="w-4 h-4 rounded bg-black/40 border-black/40"
       />
       <span className="text-white text-sm">Constructed</span>
-      <span className="text-gray-500 text-xs">
+      <span className="text-[var(--ivory-muted)] text-xs">
         — bring your own deck
       </span>
     </label>
@@ -279,12 +267,12 @@ function GuidedModeField({
           aria-label="Guided mode"
         />
         <span
-          className={`text-xs font-medium uppercase tracking-wide ${enabled ? "text-amber-300" : "text-gray-500"
+          className={`text-xs font-medium uppercase tracking-wide ${enabled ? "text-amber-300" : "text-[var(--ivory-muted)]"
             }`}
         >
           {enabled ? "On" : "Off"}
         </span>
-        <span className="relative inline-flex h-5 w-10 items-center rounded-full transition-colors bg-gray-700 peer-checked:bg-amber-500">
+        <span className="switch-track relative inline-flex h-5 w-10 items-center rounded-full transition-colors">
           <span
             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? "translate-x-5" : "translate-x-1"
               }`}
@@ -294,7 +282,7 @@ function GuidedModeField({
       <div ref={guidedModeHelpRef} className="relative group shrink-0">
         <button
           type="button"
-          className="touch-area [--touch-area-left:-7px] text-gray-400 hover:text-gray-200"
+          className="touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]"
           aria-label="What guided mode does"
           aria-expanded={showGuidedModeHelp}
           onClick={() => setShowGuidedModeHelp((v) => !v)}
@@ -302,7 +290,7 @@ function GuidedModeField({
           <InfoIcon size="sm" />
         </button>
         <span
-          className={`absolute right-0 top-full mt-2 w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-gray-100 transition-opacity z-50 ${showGuidedModeHelp
+          className={`absolute right-0 top-full mt-2 w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-[var(--ivory)] transition-opacity z-50 ${showGuidedModeHelp
             ? "opacity-100"
             : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
             }`}
@@ -318,7 +306,7 @@ function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="h-[42px] w-[42px] shrink-0 rounded-lg bg-white/20 btn-dark-border text-gray-300 hover:bg-white/30 hover:text-white transition-all flex items-center justify-center text-base"
+      className="btn-secondary h-[42px] w-[42px] shrink-0 rounded-lg flex items-center justify-center text-base"
       title="Advanced Options"
     >
       ⚙
@@ -618,7 +606,7 @@ export function Play() {
     >
       {icon}
       <span className="text-white font-medium text-sm">{label}</span>
-      <span className="ml-auto text-gray-500 text-xs">▶</span>
+      <span className="ml-auto text-[var(--ivory-muted)] text-xs">▶</span>
     </button>
   );
 
@@ -643,10 +631,10 @@ export function Play() {
             ))}
             <div className="mb-4">
               <div className="mb-1 flex items-center justify-between gap-3">
-                <label htmlFor="player-name" className="block text-gray-300 text-sm">
+                <label htmlFor="player-name" className="block text-[var(--ivory-muted)] text-sm">
                   Your Name
                 </label>
-                <span className="block text-gray-300 text-sm text-right shrink-0">
+                <span className="block text-[var(--ivory-muted)] text-sm text-right shrink-0">
                   Guided Mode
                 </span>
               </div>
@@ -666,7 +654,7 @@ export function Play() {
                     }
                     disabled={nameLoading}
                     placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-                    className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] disabled:opacity-50"
+                    className={`${TEXT_INPUT} disabled:opacity-50`}
                   />
                 )}
                 <GuidedModeField enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
@@ -688,7 +676,7 @@ export function Play() {
                       <h2 className="text-lg font-semibold text-white">Goldfish</h2>
                     </div>
                     <div className="flex-1 flex items-center justify-center">
-                      <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                      <p className="description-panel italic text-[var(--ivory)] text-base leading-relaxed px-4 py-3">
                         <span className="block text-amber-400/70">
                           Fight historically winning hands!
                         </span>
@@ -734,7 +722,7 @@ export function Play() {
                       </h2>
                     </div>
                     <div className="flex-1 flex items-center justify-center">
-                      <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
+                      <p className="description-panel italic text-[var(--ivory)] text-base leading-relaxed px-4 py-3">
                         <span className="block text-amber-400/70">
                           Draft an unbeatable hand!
                         </span>
@@ -784,7 +772,7 @@ export function Play() {
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
           />
-          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
+          <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
             <input
               type="checkbox"
               checked={autoApproveSpectators}
@@ -792,7 +780,7 @@ export function Play() {
               className="w-4 h-4 rounded bg-black/40 border-black/40"
             />
             <span className="text-white text-sm">Open Spectating</span>
-            <span className="text-gray-500 text-xs">— let anyone watch</span>
+            <span className="text-[var(--ivory-muted)] text-xs">— let anyone watch</span>
           </label>
         </AdvancedOptionsModal>
       )}
@@ -808,25 +796,7 @@ export function Play() {
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
           />
-          <div className="bg-black/35 border border-black/40 rounded-lg p-3">
-            <label className="block text-gray-300 text-sm mb-2">
-              Opponents
-            </label>
-            <div className="flex gap-1.5">
-              {OPPONENT_OPTIONS.map((count) => (
-                <button
-                  key={count}
-                  onClick={() => setOpponents(count)}
-                  className={`px-3 py-1.5 rounded text-sm font-medium btn-dark-border transition-colors ${opponents === count
-                    ? "bg-amber-500 text-black"
-                    : "bg-black/40 text-gray-300 hover:bg-black/30"
-                    }`}
-                >
-                  {count}
-                </button>
-              ))}
-            </div>
-          </div>
+          <DefaultOpponentsField label="Opponents" value={opponents} onChange={setOpponents} />
         </AdvancedOptionsModal>
       )}
 
@@ -840,21 +810,21 @@ export function Play() {
       {soloPhase === "not-enough-puppets" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className={`absolute inset-0 ${DIALOG_BACKDROP}`}
             onClick={handleCancelSolo}
           />
           <SurfaceCard className="relative text-center">
             <h2 className="text-xl font-bold text-white mb-4">
               Not enough puppet data
             </h2>
-            <p className="text-gray-300 mb-6">
+            <p className="text-[var(--ivory-muted)] mb-6">
               You requested {opponents} opponent{opponents > 1 && "s"}, but only{" "}
               {maxAvailablePuppets} {maxAvailablePuppets === 1 ? "is" : "are"}{" "}
               available for this cube.
             </p>
             {validRecoveryCounts.length > 0 ? (
               <>
-                <p className="text-gray-400 text-sm mb-3">Play with:</p>
+                <p className="text-[var(--ivory-muted)] text-sm mb-3">Play with:</p>
                 <RecoveryOpponentPicker
                   counts={validRecoveryCounts}
                   onSelect={(count) => {
@@ -867,7 +837,7 @@ export function Play() {
                 />
               </>
             ) : (
-              <p className="text-gray-400 text-sm mb-4">
+              <p className="text-[var(--ivory-muted)] text-sm mb-4">
                 No puppet data exists for this cube yet. Play with friends to
                 generate data.
               </p>
@@ -900,16 +870,13 @@ function RecoveryOpponentPicker({
           <button
             key={n}
             onClick={() => setSelected(n)}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${selected === n
-              ? "bg-amber-500 text-black"
-              : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-              }`}
+            className={`btn ${selected === n ? "btn-primary" : "btn-secondary"} text-sm font-medium`}
           >
             {n}
           </button>
         ))}
       </div>
-      <span className="text-gray-500 text-xs">opponents</span>
+      <span className="text-[var(--ivory-muted)] text-xs">opponents</span>
       {selected !== null && (
         <button
           onClick={() => onSelect(selected)}

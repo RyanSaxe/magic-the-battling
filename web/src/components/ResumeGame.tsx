@@ -33,7 +33,7 @@ export function ResumeGameCard({ seat }: { seat: ResumableSeat }) {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate text-sm font-medium text-white">as {seat.playerName}</div>
-          <div className="text-xs text-gray-400">{seatDetail(seat)}</div>
+          <div className="text-xs text-[var(--ivory-muted)]">{seatDetail(seat)}</div>
         </div>
         <button onClick={() => navigate(seatPath(seat))} className="btn btn-primary shrink-0 px-4 py-1.5 text-sm">
           {seat.kind === 'game' ? 'Resume' : 'Return'}
@@ -50,7 +50,7 @@ export function ResumeGameStrip({ seat }: { seat: ResumableSeat }) {
   return (
     <div className="mb-4 flex w-full max-w-[30rem] shrink-0 items-center gap-2.5 rounded-lg border gold-border bg-black/35 py-1.5 pl-3 pr-1.5">
       <StatusDot kind={seat.kind} />
-      <span className="min-w-0 flex-1 truncate text-[13px] text-gray-200">
+      <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--ivory)]">
         {seat.kind === 'game' ? 'Game in progress' : 'Lobby waiting'} as{' '}
         <b className="font-semibold text-white">{seat.playerName}</b>
         <span className="hidden sm:inline">{since}</span>

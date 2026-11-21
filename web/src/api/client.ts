@@ -351,6 +351,12 @@ export async function getBattlers(offset = 0): Promise<{ battlers: UserBattler[]
   return response.json()
 }
 
+export async function getBattler(id: number): Promise<UserBattler> {
+  const response = await fetch(`${API_BASE}/battlers/${id}`, { credentials: 'include' })
+  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load battler')
+  return response.json()
+}
+
 export interface CreateBattlerRequest {
   cube_id: string
   display_name?: string
@@ -390,7 +396,8 @@ export async function deleteBattler(id: number): Promise<void> {
     method: 'DELETE',
     credentials: 'include',
   })
-  if (!response.ok) await throwResponseError(response, 'delete-battler', 'Failed to delete battler')
+  // A preset already deleted, such as from another tab, is gone, which is what the caller asked for.
+  if (!response.ok && response.status !== 404) await throwResponseError(response, 'delete-battler', 'Failed to delete battler')
 }
 
 export interface CubeGamesPage {
@@ -473,7 +480,8 @@ export async function unfollowCube(followId: number): Promise<void> {
     method: 'DELETE',
     credentials: 'include',
   })
-  if (!response.ok) await throwResponseError(response, 'unfollow-cube', 'Failed to unfollow')
+  // A follow already removed, such as from another tab, is gone, which is what the caller asked for.
+  if (!response.ok && response.status !== 404) await throwResponseError(response, 'unfollow-cube', 'Failed to unfollow')
 }
 
 // ── Discover ────────────────────────────────────────────────────────

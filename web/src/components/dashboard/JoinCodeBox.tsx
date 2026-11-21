@@ -27,7 +27,7 @@ export function JoinCodeBox({ playerName, className }: { playerName: string; cla
   return (
     <form
       onSubmit={submit}
-      className={`flex h-9 items-center rounded-md border border-black/40 bg-black/40 pl-2.5 pr-0.5 ${className ?? ''}`}
+      className={`flex h-9 items-center rounded-md border border-black/40 bg-black/40 pl-2.5 pr-0.5 focus-within:ring-2 focus-within:ring-[var(--color-gold-bright)] ${className ?? ''}`}
     >
       <input
         type="text"

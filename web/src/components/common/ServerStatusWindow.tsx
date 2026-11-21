@@ -531,15 +531,15 @@ export function ServerStatusWindow({
 
   const body = (
     <>
-      <p className="text-sm text-gray-100 leading-snug">{displayMessage || fallbackMessage}</p>
+      <p className="text-sm text-[var(--ivory)] leading-snug">{displayMessage || fallbackMessage}</p>
       {isDraining ? (
-        <p className="mt-1 text-xs text-gray-300 leading-snug">
+        <p className="mt-1 text-xs text-[var(--ivory-muted)] leading-snug">
           {inGame
             ? "New games are paused temporarily. Your current game can continue and reconnect automatically if needed."
             : "New games are paused temporarily. Active games may continue and reconnect automatically."}
         </p>
       ) : (
-        <p className="mt-1 text-xs text-gray-300 leading-snug">
+        <p className="mt-1 text-xs text-[var(--ivory-muted)] leading-snug">
           {inGame
             ? "Keep this tab open and we'll reconnect automatically when service returns."
             : "Please wait a few minutes and retry once maintenance is complete."}

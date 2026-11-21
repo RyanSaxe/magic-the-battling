@@ -76,7 +76,7 @@ function LifeCounter({
           onChange={(e) => setInputValue(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="w-10 h-6 text-center text-white text-sm rounded border border-[var(--gold-border)] focus:outline-none focus:border-[var(--color-gold)]" style={{ background: 'var(--chrome)' }}
+          className="w-10 h-6 text-center text-white text-sm rounded border border-[var(--gold-border)] focus:outline-none focus:border-[var(--color-gold-bright)]" style={{ background: 'var(--chrome)' }}
           autoFocus
         />
       ) : (
@@ -259,7 +259,7 @@ function ControlsPanel({
       <div className="relative z-10 flex min-h-0 flex-col items-center justify-center gap-2 px-3 py-2">
         <div className="text-center">
           <div className="flex items-center justify-center gap-1.5 mb-1">
-            <span className="text-xs text-gray-400 uppercase truncate">
+            <span className="text-xs text-[var(--ivory-muted)] uppercase truncate">
               {opponentName}
             </span>
             {voiceChat && voiceChat.state.peers.some((p) => p.name === opponentName) && (
@@ -297,7 +297,7 @@ function ControlsPanel({
             <LifeCounter life={yourLife} onChange={onYourLifeChange} />
           </div>
           <div className="flex items-center justify-center gap-1.5 mt-1">
-            <span className="text-xs text-gray-400 uppercase truncate">
+            <span className="text-xs text-[var(--ivory-muted)] uppercase truncate">
               {playerName}
             </span>
             {voiceChat && voiceChat.state.peers.length > 0 && (

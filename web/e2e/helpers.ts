@@ -142,6 +142,7 @@ const SIGNED_IN_RESPONSES: Record<string, MockResponse> = {
   '/api/battlers/following': { json: { following: FOLLOWING, has_more: false } },
   '/api/battlers/my-games': { json: GAMES },
   '/api/discover': { json: { results: [], has_more: false, total: 0 } },
+  '/api/battlers/1': { json: BATTLERS[0] },
   '/api/battlers/1/games': { json: GAMES },
   '/api/battlers/cube/vintage-cube/games': { json: GAMES },
   '/api/battlers/cube/vintage-cube': {
