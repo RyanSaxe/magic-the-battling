@@ -356,10 +356,18 @@ export async function deleteBattler(id: number): Promise<void> {
   if (!response.ok) await throwResponseError(response, 'delete-battler', 'Failed to delete battler')
 }
 
+export interface CubeGamesPage {
+  games: GameSummary[]
+  has_more: boolean
+  total_games: number
+  cube_name: string | null
+  cube_image_uri: string | null
+}
+
 export async function getBattlerGames(
   battlerId: number,
   opts: { offset?: number; playMode?: string; useUpgrades?: boolean } = {},
-): Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }> {
+): Promise<CubeGamesPage> {
   const params = new URLSearchParams()
   if (opts.offset) params.set('offset', String(opts.offset))
   if (opts.playMode != null) params.set('play_mode', opts.playMode)
@@ -373,7 +381,7 @@ export async function getBattlerGames(
 export async function getCubeGames(
   cubeId: string,
   opts: { offset?: number; playMode?: string; useUpgrades?: boolean } = {},
-): Promise<{ games: GameSummary[]; has_more: boolean; total_games: number; total_wins: number }> {
+): Promise<CubeGamesPage> {
   const params = new URLSearchParams()
   if (opts.offset) params.set('offset', String(opts.offset))
   if (opts.playMode != null) params.set('play_mode', opts.playMode)

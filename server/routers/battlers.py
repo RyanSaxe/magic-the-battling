@@ -198,6 +198,14 @@ def delete_battler(
 GAMES_PAGE_SIZE = 20
 
 
+def _load_cube_metadata(db: Session, cube_id: str) -> CubeMetadata | None:
+    meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first()
+    if meta is None:
+        database.save_cube_metadata(cube_id)
+        meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first()
+    return meta
+
+
 def _query_cube_games(
     db: Session,
     cube_id: str,
@@ -240,7 +248,7 @@ def _query_cube_games(
     has_more = len(games) > GAMES_PAGE_SIZE
     games = games[:GAMES_PAGE_SIZE]
 
-    meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first()
+    meta = _load_cube_metadata(db, cube_id)
     cube_name = str(meta.name) if meta and meta.name else None
     cube_image_uri = str(meta.image_uri) if meta and meta.image_uri else None
 
@@ -287,7 +295,13 @@ def _query_cube_games(
             )
         )
 
-    return {"games": results, "has_more": has_more, "total_games": total_games}
+    return {
+        "games": results,
+        "has_more": has_more,
+        "total_games": total_games,
+        "cube_name": cube_name,
+        "cube_image_uri": cube_image_uri,
+    }
 
 
 @router.get("/cube/{cube_id}/games")
