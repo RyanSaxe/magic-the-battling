@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
@@ -15,11 +15,29 @@ import { LoadMoreButton } from '../components/dashboard/ResultList'
 import { Count, NoticeTile, PlayIcon, SectionCounts, SectionLink, SectionTitle, WinsCount } from '../components/dashboard/Section'
 import { SegmentedFilter } from '../components/dashboard/SegmentedFilter'
 import { deleteBattler, getBattlers, getFollowing, getMyGames, unfollowCube } from '../api/client'
+import { useFirstLoad } from '../hooks/useFirstLoad'
 import { useResumableGames } from '../hooks/useResumableGames'
-import type { FollowedBattler, GameSummary, UserBattler } from '../types'
+import type { GameSummary } from '../types'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
 import { countLabel, cubeTitle, formatWhen, upgradesLabel } from '../utils/accountFormat'
-import { libraryEntries, type FirstPageStatus, type LibraryEntry } from './dashboardState'
+import {
+  canRemove,
+  libraryEntries,
+  libraryEntryKey,
+  libraryHasMore,
+  loadedLibrary,
+  nextLibraryPage,
+  withAddedPreset,
+  withLibraryPage,
+  withLibraryPageFailed,
+  withLibraryPageRequested,
+  withRemovalFailed,
+  withRemovalStarted,
+  withRemoved,
+  type Library,
+  type LibraryEntry,
+  type LibraryPage,
+} from './dashboardState'
 
 const RECENT_GAME_COUNT = 3
 
@@ -38,17 +56,20 @@ function gridCell(row: number, column: number): CSSProperties {
 
 const GRID_CELL = 'xl:[grid-row:var(--grid-row)] xl:[grid-column:var(--grid-column)]'
 
-interface Library {
-  presets: UserBattler[]
-  presetsHaveMore: boolean
-  follows: FollowedBattler[]
-  followsHaveMore: boolean
-}
-
 interface MyGames {
   games: GameSummary[]
   totalGames: number
   totalWins: number
+}
+
+async function loadLibrary(): Promise<Library> {
+  const [saved, following] = await Promise.all([getBattlers(), getFollowing()])
+  return loadedLibrary(saved, following)
+}
+
+async function loadMyGames(): Promise<MyGames> {
+  const data = await getMyGames(0)
+  return { games: data.games, totalGames: data.total_games, totalWins: data.total_wins }
 }
 
 export function Dashboard() {
@@ -57,12 +78,9 @@ export function Dashboard() {
   const { addToast } = useToast()
   const [resumable] = useResumableGames(1)
 
-  const [library, setLibrary] = useState<Library | null>(null)
-  const [libraryStatus, setLibraryStatus] = useState<FirstPageStatus>('idle')
+  const libraryLoad = useFirstLoad(loadLibrary, !!user)
+  const myGamesLoad = useFirstLoad(loadMyGames, !!user)
   const [phoneSection, setPhoneSection] = useState<BoardSection>('library')
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [myGames, setMyGames] = useState<MyGames | null>(null)
-  const [myGamesStatus, setMyGamesStatus] = useState<FirstPageStatus>('idle')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
 
@@ -70,81 +88,46 @@ export function Dashboard() {
     if (!authLoading && !user) navigate('/login?returnTo=/dashboard', { replace: true })
   }, [authLoading, user, navigate])
 
-  const loadLibrary = useCallback(async () => {
-    setLibraryStatus('loading')
-    try {
-      const [saved, following] = await Promise.all([getBattlers(), getFollowing()])
-      setLibrary({
-        presets: saved.battlers,
-        presetsHaveMore: saved.has_more,
-        follows: following.following,
-        followsHaveMore: following.has_more,
-      })
-      setLibraryStatus('loaded')
-    } catch {
-      setLibraryStatus('failed')
-    }
-  }, [])
+  const library = libraryLoad.state.status === 'loaded' ? libraryLoad.state.value : null
+  const myGames = myGamesLoad.state.status === 'loaded' ? myGamesLoad.state.value : null
 
-  const loadMyGames = useCallback(async () => {
-    setMyGamesStatus('loading')
-    try {
-      const data = await getMyGames(0)
-      setMyGames({ games: data.games, totalGames: data.total_games, totalWins: data.total_wins })
-      setMyGamesStatus('loaded')
-    } catch {
-      setMyGamesStatus('failed')
-    }
-  }, [])
-
-  useEffect(() => {
-    if (!user) return
-    loadLibrary()
-    loadMyGames()
-  }, [user, loadLibrary, loadMyGames])
+  const updateLibrary = (change: (library: Library) => Library) =>
+    libraryLoad.update((prev) => (prev.status === 'loaded' ? { ...prev, value: change(prev.value) } : prev))
 
   const loadMoreLibrary = async () => {
-    if (!library) return
-    setLoadingMore(true)
+    const next = library && nextLibraryPage(library)
+    if (!next) return
+    updateLibrary(withLibraryPageRequested)
     try {
-      if (library.presetsHaveMore) {
-        const page = await getBattlers(library.presets.length)
-        setLibrary({ ...library, presets: [...library.presets, ...page.battlers], presetsHaveMore: page.has_more })
-      } else {
-        const page = await getFollowing(library.follows.length)
-        setLibrary({ ...library, follows: [...library.follows, ...page.following], followsHaveMore: page.has_more })
-      }
+      const page: LibraryPage =
+        next.list === 'saved'
+          ? { list: 'saved', page: await getBattlers(next.offset) }
+          : { list: 'following', page: await getFollowing(next.offset) }
+      updateLibrary((current) => withLibraryPage(current, page))
     } catch {
+      updateLibrary(withLibraryPageFailed)
       addToast('Failed to load more', 'error')
-    } finally {
-      setLoadingMore(false)
     }
   }
 
-  const removePreset = async (preset: UserBattler) => {
-    if (!window.confirm(`Delete "${cubeTitle(preset)}"?`)) return
+  const remove = async (entry: LibraryEntry) => {
+    if (!library || !canRemove(library, entry)) return
+    if (entry.kind === 'saved' && !window.confirm(`Delete "${cubeTitle(entry.preset)}"?`)) return
+    updateLibrary((current) => withRemovalStarted(current, entry))
     try {
-      await deleteBattler(preset.id)
-      setLibrary((prev) => prev && { ...prev, presets: prev.presets.filter((p) => p.id !== preset.id) })
+      await (entry.kind === 'saved' ? deleteBattler(entry.preset.id) : unfollowCube(entry.follow.id))
+      updateLibrary((current) => withRemoved(current, entry))
     } catch {
-      addToast('Failed to delete', 'error')
-    }
-  }
-
-  const unfollow = async (follow: FollowedBattler) => {
-    try {
-      await unfollowCube(follow.id)
-      setLibrary((prev) => prev && { ...prev, follows: prev.follows.filter((f) => f.id !== follow.id) })
-    } catch {
-      addToast('Failed to unfollow', 'error')
+      updateLibrary((current) => withRemovalFailed(current, entry))
+      addToast(entry.kind === 'saved' ? 'Failed to delete' : 'Failed to unfollow', 'error')
     }
   }
 
   if (authLoading || !user) return null
 
-  const entries = library ? libraryEntries(library.presets, library.follows) : []
-  const libraryHasMore = !!library && (library.presetsHaveMore || library.followsHaveMore)
-  const allCount = library ? `${library.presets.length + library.follows.length}${libraryHasMore ? '+' : ''}` : ''
+  const entries = library ? libraryEntries(library) : []
+  const hasMore = !!library && libraryHasMore(library)
+  const allCount = library ? `${entries.length}${hasMore ? '+' : ''}` : ''
   const libraryRows = Math.max(1, Math.ceil(entries.length / 2))
   const recentGames = myGames?.games.slice(0, RECENT_GAME_COUNT) ?? []
   // Equal flexible rows: each row of cards is as tall as the tallest card on the board, in either column.
@@ -231,8 +214,8 @@ export function Dashboard() {
             </div>
           </div>
 
-          {libraryStatus === 'failed' ? (
-            <NoticeTile style={gridCell(2, 1)} className={libraryNotice} action={{ label: 'Retry', onClick: loadLibrary }}>
+          {libraryLoad.state.status === 'failed' ? (
+            <NoticeTile style={gridCell(2, 1)} className={libraryNotice} action={{ label: 'Retry', onClick: libraryLoad.retry }}>
               Your cubes and decks didn&apos;t load.
             </NoticeTile>
           ) : !library ? (
@@ -250,19 +233,20 @@ export function Dashboard() {
           ) : (
             entries.map((entry, index) => (
               <LibraryTile
-                key={entry.kind === 'saved' ? `saved-${entry.preset.id}` : `following-${entry.follow.id}`}
+                key={libraryEntryKey(entry)}
                 entry={entry}
                 style={gridCell(2 + Math.floor(index / 2), 1 + (index % 2))}
                 className={libraryCell}
-                onDelete={removePreset}
-                onUnfollow={unfollow}
+                removable={canRemove(library, entry)}
+                onRemove={remove}
               />
             ))
           )}
 
-          {libraryHasMore && (
+          {library && hasMore && (
             <LoadMoreButton
-              loading={loadingMore}
+              loading={library.loadingMore}
+              disabled={!nextLibraryPage(library)}
               onClick={loadMoreLibrary}
               style={gridCell(2 + libraryRows, 1)}
               className={`${libraryNotice} justify-self-center`}
@@ -282,8 +266,8 @@ export function Dashboard() {
               <SectionLink to="/dashboard/games">All games →</SectionLink>
             </div>
 
-            {myGamesStatus === 'failed' ? (
-              <NoticeTile action={{ label: 'Retry', onClick: loadMyGames }}>Your games didn&apos;t load.</NoticeTile>
+            {myGamesLoad.state.status === 'failed' ? (
+              <NoticeTile action={{ label: 'Retry', onClick: myGamesLoad.retry }}>Your games didn&apos;t load.</NoticeTile>
             ) : !myGames ? (
               <NoticeTile>Loading...</NoticeTile>
             ) : recentGames.length === 0 ? (
@@ -299,7 +283,7 @@ export function Dashboard() {
         <AddCubeModal
           onClose={() => setShowAddModal(false)}
           onCreated={(preset) => {
-            setLibrary((prev) => prev && { ...prev, presets: [...prev.presets, preset] })
+            updateLibrary((current) => withAddedPreset(current, preset))
             setShowAddModal(false)
           }}
           addToast={addToast}
@@ -314,14 +298,15 @@ function LibraryTile({
   entry,
   style,
   className,
-  onDelete,
-  onUnfollow,
+  removable,
+  onRemove,
 }: {
   entry: LibraryEntry
   style: CSSProperties
   className: string
-  onDelete: (preset: UserBattler) => void
-  onUnfollow: (follow: FollowedBattler) => void
+  /** False while this card's delete or unfollow, or a page of the library, is loading. */
+  removable: boolean
+  onRemove: (entry: LibraryEntry) => void
 }) {
   const navigate = useNavigate()
 
@@ -349,7 +334,7 @@ function LibraryTile({
         onPlay={() => navigate(battlerPlayUrl(preset))}
         menuItems={[
           { label: 'View', onSelect: () => navigate(href) },
-          { label: 'Delete', onSelect: () => onDelete(preset), danger: true },
+          { label: 'Delete', onSelect: () => onRemove(entry), danger: true, disabled: !removable },
         ]}
         style={style}
         className={className}
@@ -371,7 +356,7 @@ function LibraryTile({
       onPlay={() => navigate(`/play?cubeId=${encodeURIComponent(follow.cube_id)}`)}
       menuItems={[
         { label: 'View', onSelect: () => navigate(href) },
-        { label: 'Unfollow', onSelect: () => onUnfollow(follow), danger: true },
+        { label: 'Unfollow', onSelect: () => onRemove(entry), danger: true, disabled: !removable },
       ]}
       style={style}
       className={className}

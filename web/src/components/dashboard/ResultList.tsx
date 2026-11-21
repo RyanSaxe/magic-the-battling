@@ -37,11 +37,14 @@ export function ResultGrid({ busy, children }: { busy: boolean; children: ReactN
 
 export function LoadMoreButton({
   loading,
+  disabled = false,
   onClick,
   className = 'self-center',
   style,
 }: {
   loading: boolean
+  /** Holds the button back without saying it is loading, such as while a card's removal runs. */
+  disabled?: boolean
   onClick: () => void
   /** Where the button sits in its list. */
   className?: string
@@ -51,7 +54,7 @@ export function LoadMoreButton({
     <button
       type="button"
       onClick={onClick}
-      disabled={loading}
+      disabled={loading || disabled}
       style={style}
       className={`btn btn-secondary px-6 py-2 disabled:opacity-50 ${className}`}
     >
