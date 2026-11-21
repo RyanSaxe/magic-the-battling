@@ -83,7 +83,6 @@
   --sidebar-lane-nudge: 10px;
   --surface-gutter: 12px;
   --bar-mobile-inline: 6px;
-  --bar-top-right-desktop: 6px;
   --bar-bottom-left-desktop: calc(var(--frame-rail-edge) - 4px);
   --bar-bottom-right-desktop: calc(var(--sidebar-width) + var(--surface-gutter) - var(--sidebar-lane-nudge) - 4px);
 }
@@ -158,16 +157,6 @@ input:-webkit-autofill:focus {
   padding-right: var(--bar-mobile-inline);
 }
 
-.bar-pad-both {
-  padding-left: var(--surface-gutter);
-  padding-right: var(--surface-gutter);
-}
-
-.bar-pad-left {
-  padding-left: var(--bar-mobile-inline);
-  padding-right: var(--bar-mobile-inline);
-}
-
 .bar-pad-main {
   padding-left: var(--bar-mobile-inline);
   padding-right: var(--bar-mobile-inline);
@@ -206,16 +195,6 @@ input:-webkit-autofill:focus {
   .frame-bar-pad {
     padding-left: var(--frame-rail-edge);
     padding-right: var(--frame-rail-edge);
-  }
-
-  .bar-pad-both {
-    padding-left: var(--frame-rail-edge);
-    padding-right: var(--frame-rail-edge);
-  }
-
-  .bar-pad-left {
-    padding-left: var(--frame-rail-edge);
-    padding-right: var(--bar-top-right-desktop);
   }
 
   .bar-pad-main {
@@ -846,13 +825,6 @@ input:-webkit-autofill:focus {
     width: 30px;
     padding: 0;
   }
-}
-
-.timeline-actions .btn {
-  min-height: 30px;
-  padding: 0 10px;
-  line-height: 1;
-  font-size: 13px;
 }
 
 /* Applied only while the timeline steps don't fit beside the header buttons, so they scroll instead of running
