@@ -18,6 +18,7 @@ type Check =
   | 'zones-off-board'
   | 'sidebar-seams-off-board'
   | 'divider-off-saved-layout'
+  | 'saved-layout-squeezes-zone'
   | 'grab-moves-layout'
 
 interface Screen {
@@ -57,6 +58,12 @@ const SAMPLE: Screen[] = [
     viewport: { width: 1440, height: 900 },
     state: TYPICAL['build-with-upgrades'],
     saved: { topFraction: 0.3, bottomLeftSplit: 0.3 },
+  },
+  {
+    name: 'build 1024x768 with a layout that leaves the lower zones no room',
+    viewport: { width: 1024, height: 768 },
+    state: TYPICAL.build,
+    saved: { topFraction: 0.9 },
   },
   {
     name: 'reward-stage-end 1280x800',
@@ -363,12 +370,22 @@ for (const screen of SCREENS) {
       const failures = { ...measurement.failures }
 
       if (screen.saved) {
+        // A saved divider gives way only to keep a zone one row of 40px cards tall: 56px plus 32px of padding.
+        const oneRowZone = 88
+        const heights = measurement.zones.map((zone) => Math.round(zone.box.height))
         const fractions = await dividerFractions(page)
         for (const key of ['topFraction', 'bottomLeftSplit'] as const) {
           const want = screen.saved[key]
           if (want === undefined) continue
           const offPx = Math.abs(fractions[key] - want) * fractions.space[key]
-          if (offPx > 1) (failures['divider-off-saved-layout'] ??= []).push(`${key} ${want} sits ${Math.round(offPx)}px away`)
+          if (offPx > 1 && !heights.includes(oneRowZone)) {
+            (failures['divider-off-saved-layout'] ??= []).push(`${key} ${want} sits ${Math.round(offPx)}px away`)
+          }
+        }
+        for (const zone of measurement.zones) {
+          if (zone.box.height < oneRowZone - 0.5) {
+            (failures['saved-layout-squeezes-zone'] ??= []).push(`${zone.name} is ${Math.round(zone.box.height)}px tall`)
+          }
         }
       }
 
