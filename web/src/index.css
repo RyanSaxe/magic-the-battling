@@ -781,6 +781,28 @@ input:-webkit-autofill:focus {
   font-size: 13px;
 }
 
+/* Applied only while the timeline steps don't fit beside the header buttons, so they scroll instead of running
+   under them. scroll-padding marks the faded strip as covered, so focus and the current-step scroll avoid it. */
+.phase-timeline-scroll {
+  --timeline-fade: 28px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-padding-right: var(--timeline-fade);
+  /* A scroll container clips overflow on both axes, which would cut the active step's 1px ring. */
+  padding-block: 1px;
+  mask-image: linear-gradient(to right, #000 calc(100% - var(--timeline-fade)), transparent);
+}
+
+.phase-timeline-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Lets the last step scroll clear of the fade. */
+.phase-timeline-scroll::after {
+  content: "";
+  flex: 0 0 var(--timeline-fade);
+}
+
 @keyframes fade-hint {
   0% {
     opacity: 0;
