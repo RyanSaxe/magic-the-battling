@@ -3,6 +3,7 @@ import path from 'node:path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { configDefaults } from 'vitest/config'
 
 function parsePort(raw: string | undefined, fallback: number): number {
   if (!raw) return fallback
@@ -41,5 +42,8 @@ export default defineConfig({
         ws: true,
       },
     },
+  },
+  test: {
+    exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 })
