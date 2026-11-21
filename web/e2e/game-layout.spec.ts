@@ -499,3 +499,38 @@ test.describe('a saved layout', () => {
     await expect.poll(handHeight).toBe(savedOnDesktop)
   })
 })
+
+test.describe('the player cards', () => {
+  const longName = 'Maximilian Vanderbergh'
+  const screen: ScreenState = {
+    phase: 'build',
+    counts: { hand: 3, handSize: 4, sideboard: 6 },
+    opponents: [{ name: longName, last_result: 'draw', pairing_probability: 0.4 }],
+  }
+
+  // The docked sidebar's cards are the narrowest, and on a phone the cards are in a drawer.
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    test(`keep a long name's last result whole on its line at ${viewport.width}x${viewport.height}`, async ({ page, baseURL }) => {
+      await page.setViewportSize(viewport)
+      await serveGame(page, baseURL!, screen)
+      await page.goto(`/game/${GAME_ID}/play`)
+      await expectGameShown(page)
+      const drawerToggle = page.locator('[data-guide-target="sidebar-toggle"]')
+      if (await drawerToggle.isVisible()) await drawerToggle.click()
+
+      const card = page.locator(`[data-guide-player-row="${longName}"]`)
+      const name = card.getByText(longName, { exact: true })
+      const result = card.getByText('Drew', { exact: true })
+      await expect(result).toBeVisible()
+      const cardBox = (await card.boundingBox())!
+      const nameBox = (await name.boundingBox())!
+      const resultBox = (await result.boundingBox())!
+
+      expect(await name.evaluate((element) => element.scrollWidth > element.clientWidth), 'the name is cut short').toBe(true)
+      expect(await result.evaluate((element) => element.scrollWidth <= element.clientWidth), 'the result is whole').toBe(true)
+      expect(resultBox.x).toBeGreaterThanOrEqual(nameBox.x + nameBox.width)
+      expect(resultBox.x + resultBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width)
+      expect(Math.abs(resultBox.y + resultBox.height / 2 - (nameBox.y + nameBox.height / 2))).toBeLessThan(3)
+    })
+  }
+})

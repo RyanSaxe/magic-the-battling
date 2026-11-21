@@ -39,8 +39,9 @@
   --stone: #4e443d;
   --stone-light: #5e534b;
 
-  /* Ivory label text on walnut */
+  /* Ivory label text on walnut, then quieter text */
   --ivory: #f3ead9;
+  --ivory-muted: #b8aea3;
 
   /* Bright gold marker for something waiting on the player */
   --color-gold-bright: #f5d76e;
@@ -1863,18 +1864,218 @@ input:-webkit-autofill:focus {
   }
 }
 
-/* Player row — carved/etched into walnut surface */
-.player-row-etched {
-  background: var(--chrome-modal);
-  border: 1px solid var(--gold-border);
-  box-shadow:
-    inset 0 2px 6px rgba(0, 0, 0, 0.3),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+/* A player's card in the game sidebar, the phone drawer and the share page: raised walnut with a gold edge, and the
+   rank down its left edge. The edge turns solid gold for the player being viewed, your own rank column is gold, and
+   the card goes flat and dark once its player is out. */
+.player-card {
+  --player-card-rank-width: 2.25rem;
+  --player-card-win: #86efac;
+  --player-card-loss: #f2b4aa;
+  position: relative;
 }
-.player-row-etched:hover {
+
+.player-card-button {
+  display: grid;
+  grid-template-columns: var(--player-card-rank-width) minmax(0, 1fr);
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--gold-border);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #453a36 0%, var(--chrome-modal) 100%);
   box-shadow:
-    inset 0 2px 8px rgba(0, 0, 0, 0.4),
-    inset 0 -2px 8px rgba(0, 0, 0, 0.25);
+    0 1px 0 rgba(255, 236, 181, 0.12),
+    0 2px 0 rgba(0, 0, 0, 0.42),
+    0 3px 0 rgba(0, 0, 0, 0.24),
+    0 6px 14px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 236, 181, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.44);
+  color: var(--ivory);
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: left;
+  transition: border-color var(--transition-fast);
+}
+
+.player-card-button:hover {
+  border-color: rgba(212, 175, 55, 0.75);
+}
+
+.player-card-button:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+}
+
+.player-card.is-unranked .player-card-button {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.player-card.is-out .player-card-button {
+  border-color: rgba(212, 175, 55, 0.22);
+  background: #2a2320;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+/* After the out rule, so a viewed player who is out keeps the gold edge */
+.player-card .player-card-button[aria-pressed="true"] {
+  border-color: var(--color-gold);
+  box-shadow:
+    0 0 0 1px var(--color-gold),
+    0 2px 0 rgba(0, 0, 0, 0.42),
+    0 6px 14px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 236, 181, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.44);
+}
+
+.player-card-rank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-right: 1px solid var(--gold-border);
+  background: linear-gradient(180deg, #3a302c 0%, #2e2623 100%);
+}
+
+.player-card-rank-number {
+  font-family: 'Cinzel', serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.player-card-rank-suffix {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ivory-muted);
+}
+
+.player-card-rank.is-last .player-card-rank-number,
+.player-card-rank.is-last .player-card-rank-suffix {
+  color: var(--player-card-loss);
+}
+
+.player-card.is-out .player-card-rank {
+  border-right-color: rgba(212, 175, 55, 0.22);
+  background: #241e1b;
+}
+
+.player-card.is-self .player-card-rank {
+  border-right-color: var(--color-gold);
+  background: linear-gradient(180deg, #4a3a18 0%, #3a2c12 100%);
+}
+
+.player-card.is-self .player-card-rank-number {
+  color: var(--color-gold-bright);
+}
+
+.player-card.is-self .player-card-rank-suffix {
+  color: var(--color-gold);
+}
+
+.player-card-body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 9px 9px 9px 10px;
+}
+
+.player-card-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Room at the start of the name line for the control that sits over it */
+.player-card.has-control .player-card-line:first-child {
+  padding-left: 24px;
+}
+
+.player-card-control {
+  position: absolute;
+  top: 7px;
+  left: calc(var(--player-card-rank-width) + 11px);
+  display: flex;
+}
+
+.player-card.is-unranked .player-card-control {
+  left: 11px;
+}
+
+.player-card-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.player-card-result {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.player-card-result-win {
+  color: var(--player-card-win);
+}
+
+.player-card-result-loss {
+  color: var(--player-card-loss);
+}
+
+.player-card-result-draw {
+  color: var(--ivory-muted);
+}
+
+/* Poison and treasure keep one width, so the label after them starts at the same place on every card */
+.player-card-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 32px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.player-card-stat svg {
+  width: 14px;
+  height: 14px;
+}
+
+.player-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ivory-muted);
+}
+
+.player-card-label-out {
+  color: var(--player-card-loss);
+}
+
+.player-card-label-viewing {
+  color: var(--ivory);
+}
+
+.player-card-outlook {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.player-card.is-out .player-card-name,
+.player-card.is-out .player-card-stat,
+.player-card.is-out .player-card-outlook {
+  color: var(--ivory-muted);
 }
 
 .rotate-prompt {
