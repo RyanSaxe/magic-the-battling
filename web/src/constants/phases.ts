@@ -1,5 +1,10 @@
 export type Phase = "draft" | "build" | "battle" | "reward"
 export const PHASES: Phase[] = ['draft', 'build', 'battle', 'reward']
+const SUDDEN_DEATH_PHASES: Phase[] = ['build', 'battle']
+
+export function getTimelinePhases(inSuddenDeath: boolean): Phase[] {
+  return inSuddenDeath ? SUDDEN_DEATH_PHASES : PHASES
+}
 
 interface PhaseSummaryRow {
   text: string

@@ -2131,6 +2131,7 @@ function GameContent() {
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+            inSuddenDeath={self_player.in_sudden_death}
             useUpgrades={gameState.use_upgrades}
             headerClassName={phaseTimelineHeaderClassName}
             rightActionsClassName={phaseTimelineRightActionsClassName}
