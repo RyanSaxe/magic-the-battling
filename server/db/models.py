@@ -42,6 +42,7 @@ class GamePlayerRecord(Base):
     placement = Column(Integer, nullable=True)
     is_puppet = Column(Boolean, default=False)
     user_id = Column(String, nullable=True)
+    seat_token_hash = Column(String, nullable=True)
 
     game = relationship("GameRecord", back_populates="players")
 
