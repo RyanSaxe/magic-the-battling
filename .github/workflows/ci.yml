@@ -20,13 +20,13 @@ jobs:
         run: uv sync --group dev
 
       - name: Run ruff linting
-        run: uvx ruff check .
+        run: uv run ruff check .
 
       - name: Run ruff format check
-        run: uvx ruff format --check .
+        run: uv run ruff format --check .
 
       - name: Run ty type check
-        run: uvx ty check
+        run: uv run ty check
 
   test:
     runs-on: ubuntu-latest
@@ -87,3 +87,60 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  web-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+    steps:
+      - name: Check for frontend changes
+        id: filter
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            web:
+              - 'web/**'
+
+  e2e-frontend:
+    needs: web-changes
+    if: needs.web-changes.outputs.web == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}-webkit
+
+      - name: Install WebKit
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps webkit
+
+      - name: Install WebKit system dependencies
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps webkit
+
+      - name: Run Playwright tests
+        run: npm run test:e2e

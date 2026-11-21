@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FaDiscord, FaUser } from 'react-icons/fa6'
+import { FaUser } from 'react-icons/fa6'
 import { PuppetIcon } from '../components/icons/PuppetIcon'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
-import { CubeCobraPrimerLink } from '../components/common/CubeCobraPrimerLink'
+import { PageFrame } from '../components/common/PageFrame'
 import { InfoCard } from '../components/common/InfoCard'
 import {
   getBattlers,
@@ -165,153 +165,131 @@ export function Dashboard() {
   if (authLoading || !user) return null
 
   return (
-    <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <AppHeader renderRight={({ compact }) => <UserMenuButton compact={compact} />} />
-
-      <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-
-        <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
-          <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col px-4 py-4">
-            <div className="flex justify-center mb-4">
-              <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
-                {(['battlers', 'following', 'games', 'discover'] as Tab[]).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => selectTab(t)}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-                      tab === t
-                        ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'
-                        : 'border border-transparent bg-black/10 text-gray-400 hover:text-gray-200'
-                    }`}
-                  >
-                    {TAB_LABELS[t]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {loadingData ? (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-gray-500">Loading...</p>
-              </div>
-            ) : tab === 'battlers' ? (
-              <BattlersGrid
-                battlers={battlers}
-                hasMore={battlersHasMore}
-                onPlay={(b) => navigate(battlerPlayUrl(b))}
-                onView={(b) => navigate(`/dashboard/list/${b.id}`)}
-                onDelete={async (b) => {
-                  if (!window.confirm(`Delete "${b.display_name || b.cube_id}"?`)) return
-                  try {
-                    await deleteBattler(b.id)
-                    setBattlers((prev) => prev.filter((x) => x.id !== b.id))
-                  } catch {
-                    addToast('Failed to delete', 'error')
-                  }
-                }}
-                onAdd={() => setShowAddModal(true)}
-                onLoadMore={async () => {
-                  try {
-                    const data = await getBattlers(battlersOffset)
-                    setBattlers((prev) => [...prev, ...data.battlers])
-                    setBattlersHasMore(data.has_more)
-                    setBattlersOffset((prev) => prev + data.battlers.length)
-                  } catch {
-                    addToast('Failed to load more', 'error')
-                  }
-                }}
-              />
-            ) : tab === 'following' ? (
-              <FollowingGrid
-                following={follows.records}
-                hasMore={follows.hasMore}
-                onPlay={(f) => navigate(`/play?cubeId=${encodeURIComponent(f.cube_id)}`)}
-                onView={(f) => navigate(`/cube/${encodeURIComponent(f.cube_id)}`)}
-                onUnfollow={(f) => unfollow(f.cube_id)}
-                onLoadMore={async () => {
-                  try {
-                    await loadFollowingPage(follows.records.length)
-                  } catch {
-                    addToast('Failed to load more', 'error')
-                  }
-                }}
-                onSwitchToDiscover={() => selectTab('discover')}
-              />
-            ) : tab === 'games' ? (
-              <MyGamesGrid
-                games={myGames}
-                hasMore={myGamesHasMore}
-                status={myGamesStatus}
-                loadingMore={myGamesLoadingMore}
-                totalGames={myGamesTotalGames}
-                totalWins={myGamesTotalWins}
-                onRetry={loadMyGames}
-                onLoadMore={async () => {
-                  setMyGamesLoadingMore(true)
-                  try {
-                    const data = await getMyGames(myGamesOffset)
-                    setMyGames((prev) => [...prev, ...data.games])
-                    setMyGamesHasMore(data.has_more)
-                    setMyGamesOffset((prev) => prev + data.games.length)
-                  } catch {
-                    addToast('Failed to load games', 'error')
-                  } finally {
-                    setMyGamesLoadingMore(false)
-                  }
-                }}
-                onView={(g) => navigate(`/game/${g.game_id}/share/${encodeURIComponent(g.best_human_name)}`)}
-                onPlayGame={() => navigate('/play')}
-              />
-            ) : (
-              <DiscoverGrid
-                results={discoverResults}
-                status={discoverStatus}
-                loadingMore={discoverLoadingMore}
-                hasMore={discoverHasMore}
-                onRetry={loadDiscover}
-                onLoadMore={async () => {
-                  setDiscoverLoadingMore(true)
-                  try {
-                    const data = await discoverCubes(discoverOffset)
-                    setDiscoverResults((prev) => [...prev, ...data.results])
-                    setDiscoverHasMore(data.has_more)
-                    setDiscoverOffset((prev) => prev + data.results.length)
-                    setFollows((prev) => withDiscoverResults(prev, data.results))
-                  } catch {
-                    addToast('Failed to load cubes', 'error')
-                  } finally {
-                    setDiscoverLoadingMore(false)
-                  }
-                }}
-                onPlay={(cubeId) => navigate(`/play?cubeId=${encodeURIComponent(cubeId)}`)}
-                onView={(cubeId) => navigate(`/cube/${encodeURIComponent(cubeId)}`)}
-                isFollowing={(cubeId) => isFollowing(follows, cubeId)}
-                onFollow={follow}
-                onUnfollow={unfollow}
-                onPlayGame={() => navigate('/play')}
-              />
-            )}
+    <>
+      <PageFrame
+        header={<AppHeader renderRight={({ compact }) => <UserMenuButton compact={compact} />} />}
+        contentClassName="px-4"
+      >
+        <div className="flex justify-center mb-4">
+          <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
+            {(['battlers', 'following', 'games', 'discover'] as Tab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => selectTab(t)}
+                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                  tab === t
+                    ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'
+                    : 'border border-transparent bg-black/10 text-gray-400 hover:text-gray-200'
+                }`}
+              >
+                {TAB_LABELS[t]}
+              </button>
+            ))}
           </div>
-        </main>
-
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-      </div>
-
-      <footer className="shrink-0 frame-chrome bar-pad-both py-2">
-        <div className="flex items-center justify-between">
-          <a
-            href="https://discord.gg/2NAjcWXNKn"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-[#6974F4] hover:text-[#7983F5] transition-colors"
-          >
-            <FaDiscord className="w-4 h-4" />
-            Join Discord
-          </a>
-          <CubeCobraPrimerLink />
         </div>
-      </footer>
+
+        {loadingData ? (
+          <div className="flex-1 flex items-center justify-center">
+            <p className="text-gray-500">Loading...</p>
+          </div>
+        ) : tab === 'battlers' ? (
+          <BattlersGrid
+            battlers={battlers}
+            hasMore={battlersHasMore}
+            onPlay={(b) => navigate(battlerPlayUrl(b))}
+            onView={(b) => navigate(`/dashboard/list/${b.id}`)}
+            onDelete={async (b) => {
+              if (!window.confirm(`Delete "${b.display_name || b.cube_id}"?`)) return
+              try {
+                await deleteBattler(b.id)
+                setBattlers((prev) => prev.filter((x) => x.id !== b.id))
+              } catch {
+                addToast('Failed to delete', 'error')
+              }
+            }}
+            onAdd={() => setShowAddModal(true)}
+            onLoadMore={async () => {
+              try {
+                const data = await getBattlers(battlersOffset)
+                setBattlers((prev) => [...prev, ...data.battlers])
+                setBattlersHasMore(data.has_more)
+                setBattlersOffset((prev) => prev + data.battlers.length)
+              } catch {
+                addToast('Failed to load more', 'error')
+              }
+            }}
+          />
+        ) : tab === 'following' ? (
+          <FollowingGrid
+            following={follows.records}
+            hasMore={follows.hasMore}
+            onPlay={(f) => navigate(`/play?cubeId=${encodeURIComponent(f.cube_id)}`)}
+            onView={(f) => navigate(`/cube/${encodeURIComponent(f.cube_id)}`)}
+            onUnfollow={(f) => unfollow(f.cube_id)}
+            onLoadMore={async () => {
+              try {
+                await loadFollowingPage(follows.records.length)
+              } catch {
+                addToast('Failed to load more', 'error')
+              }
+            }}
+            onSwitchToDiscover={() => selectTab('discover')}
+          />
+        ) : tab === 'games' ? (
+          <MyGamesGrid
+            games={myGames}
+            hasMore={myGamesHasMore}
+            status={myGamesStatus}
+            loadingMore={myGamesLoadingMore}
+            totalGames={myGamesTotalGames}
+            totalWins={myGamesTotalWins}
+            onRetry={loadMyGames}
+            onLoadMore={async () => {
+              setMyGamesLoadingMore(true)
+              try {
+                const data = await getMyGames(myGamesOffset)
+                setMyGames((prev) => [...prev, ...data.games])
+                setMyGamesHasMore(data.has_more)
+                setMyGamesOffset((prev) => prev + data.games.length)
+              } catch {
+                addToast('Failed to load games', 'error')
+              } finally {
+                setMyGamesLoadingMore(false)
+              }
+            }}
+            onView={(g) => navigate(`/game/${g.game_id}/share/${encodeURIComponent(g.best_human_name)}`)}
+            onPlayGame={() => navigate('/play')}
+          />
+        ) : (
+          <DiscoverGrid
+            results={discoverResults}
+            status={discoverStatus}
+            loadingMore={discoverLoadingMore}
+            hasMore={discoverHasMore}
+            onRetry={loadDiscover}
+            onLoadMore={async () => {
+              setDiscoverLoadingMore(true)
+              try {
+                const data = await discoverCubes(discoverOffset)
+                setDiscoverResults((prev) => [...prev, ...data.results])
+                setDiscoverHasMore(data.has_more)
+                setDiscoverOffset((prev) => prev + data.results.length)
+                setFollows((prev) => withDiscoverResults(prev, data.results))
+              } catch {
+                addToast('Failed to load cubes', 'error')
+              } finally {
+                setDiscoverLoadingMore(false)
+              }
+            }}
+            onPlay={(cubeId) => navigate(`/play?cubeId=${encodeURIComponent(cubeId)}`)}
+            onView={(cubeId) => navigate(`/cube/${encodeURIComponent(cubeId)}`)}
+            isFollowing={(cubeId) => isFollowing(follows, cubeId)}
+            onFollow={follow}
+            onUnfollow={unfollow}
+            onPlayGame={() => navigate('/play')}
+          />
+        )}
+      </PageFrame>
 
       {showAddModal && (
         <AddBattlerModal
@@ -323,7 +301,7 @@ export function Dashboard() {
           addToast={addToast}
         />
       )}
-    </div>
+    </>
   )
 }
 

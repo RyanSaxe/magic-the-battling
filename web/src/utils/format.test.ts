@@ -11,7 +11,11 @@ describe("getPlayerPhaseStatusLabel", () => {
     expect(getPlayerPhaseStatusLabel("reward", false)).toBe("end")
   })
 
+  it("shows fight instead of battle", () => {
+    expect(getPlayerPhaseStatusLabel("battle", false)).toBe("fight")
+  })
+
   it("falls back to the raw phase for other states", () => {
-    expect(getPlayerPhaseStatusLabel("battle", false)).toBe("battle")
+    expect(getPlayerPhaseStatusLabel("draft", false)).toBe("draft")
   })
 })
