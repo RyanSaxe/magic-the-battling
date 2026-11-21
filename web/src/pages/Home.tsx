@@ -4,6 +4,8 @@ import { CardShowcase } from "../components/home/CardShowcase";
 import { JoinGameModal } from "../components/home/JoinGameModal";
 import { AppHeader } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
+import { ResumeGameStrip } from "../components/ResumeGame";
+import { useResumableGames } from "../hooks/useResumableGames";
 import { useAuth } from "../contexts/authState";
 import { prefetchLegendaryName } from "../utils/prefetchName";
 
@@ -21,6 +23,8 @@ export function Home() {
       navigate("/dashboard", { replace: true });
     }
   }, [loading, user, navigate]);
+
+  const [resumable] = useResumableGames(1);
 
   if (loading || user) return null;
 
@@ -46,6 +50,7 @@ export function Home() {
         center="always"
         contentClassName="items-center px-4 pb-6"
       >
+        {resumable && <ResumeGameStrip seat={resumable} />}
         <CardShowcase />
         {/* mt-10 rather than mt-6 offsets the column's top padding, so the showcase stays centered where it was. */}
         <p className="text-gray-400 text-sm mt-10">

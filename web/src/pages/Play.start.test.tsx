@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../test/fakeWebSocket'
 import { installMemoryLocalStorage } from '../test/memoryStorage'
+import { getRememberedSeat } from '../utils/deviceIdentity'
 import { Play } from './Play'
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
@@ -86,5 +87,27 @@ describe('Play: starting a Goldfish game', () => {
     expect(secondSocket.url).toContain('/ws/game-2')
     expect(secondSocket.readyState).not.toBe(FakeWebSocket.CLOSED)
     expect(toasts).toHaveLength(1)
+  })
+
+  it('does not offer a failed start for resuming', async () => {
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+
+    await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
+    await settle()
+    expect(getRememberedSeat('game-1')).not.toBeNull()
+    const socket = FakeWebSocket.latest()
+    act(() => {
+      socket.serverOpen()
+      socket.serverMessage({ type: 'connection_error', payload: { code: 'WS_CAPACITY', message: 'busy' } })
+      socket.serverClose(1013)
+    })
+    await settle()
+
+    expect(getRememberedSeat('game-1')).toBeNull()
   })
 })

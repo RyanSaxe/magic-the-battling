@@ -381,6 +381,19 @@ export interface GameStatusPlayer {
   phase: string
 }
 
+export interface ResumableSeat {
+  game_id: string
+  player_name: string
+  seat_token: string
+}
+
+export interface ResumableGame {
+  game_id: string
+  player_name: string
+  kind: 'lobby' | 'game'
+  last_active_at: string | null
+}
+
 export interface GameStatusResponse {
   game_id: string
   phase: string
