@@ -455,6 +455,8 @@ export function GuidedWalkthrough({
 
   const showIdlePulse = animPhase === "idle";
   const buttonsDisabled = animPhase !== "idle" || !isCurrentStepDisplayed;
+  // A closed guide stays mounted while it fades out, and the board under it must keep taking taps.
+  const takesTaps = requestActive && animPhase !== "exiting";
 
   if (!step) return null;
 
@@ -483,7 +485,7 @@ export function GuidedWalkthrough({
 
       <GuideOverlay
         clipPath={displayState?.layout.clipPath ?? "none"}
-        allowInteraction={false}
+        allowInteraction={!takesTaps}
         overlayOpacity={overlayOpacity}
         overlayTransition={overlayAnimation ? undefined : overlayTransition}
         overlayAnimation={overlayAnimation}
@@ -498,7 +500,7 @@ export function GuidedWalkthrough({
             }`}
             style={spotlightStyle}
           />
-          {!displayState.step.allowTargetInteraction && (
+          {takesTaps && !displayState.step.allowTargetInteraction && (
             <div
               className="absolute pointer-events-auto"
               style={{
