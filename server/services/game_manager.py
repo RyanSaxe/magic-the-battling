@@ -1873,22 +1873,26 @@ class GameManager:
         pending = self._pending_games.get(game_id)
         if not pending or pending.is_started or player_id not in pending.player_ids:
             return False
+        self._remove_lobby_seat(pending, player_id)
+        return True
 
-        idx = pending.player_ids.index(player_id)
-        pending.seat_token_hashes.pop(pending.player_names.pop(idx), None)
-        pending.player_ids.pop(idx)
+    def _remove_lobby_seat(self, pending: PendingGame, player_id: str) -> None:
+        """The one way a seat leaves a lobby, whether the host removed it or its player stayed away."""
+        index = pending.player_ids.index(player_id)
+        pending.seat_token_hashes.pop(pending.player_names.pop(index), None)
+        pending.player_ids.pop(index)
         pending.player_ready.pop(player_id, None)
-
+        pending.player_user_ids.pop(player_id, None)
+        player_battler = pending.player_battlers.pop(player_id, None)
+        if player_battler and player_battler._loading_task and not player_battler._loading_task.done():
+            player_battler._loading_task.cancel()
         self._player_to_game.pop(player_id, None)
         self._player_id_to_name.pop(player_id, None)
 
         if not pending.player_ids:
-            self._cancel_host_handoff(game_id)
-            del self._pending_games[game_id]
+            self._cleanup_game(pending.game_id)
         elif player_id == pending.host_player_id:
             self._pass_host_after_removal(pending)
-
-        return True
 
     def schedule_pending_disconnect(
         self,
@@ -2060,15 +2064,7 @@ class GameManager:
             return False
         if target_player_id not in pending.player_ids:
             return False
-        idx = pending.player_ids.index(target_player_id)
-        pending.seat_token_hashes.pop(pending.player_names.pop(idx), None)
-        pending.player_ids.pop(idx)
-        pending.player_ready.pop(target_player_id, None)
-        player_battler = pending.player_battlers.pop(target_player_id, None)
-        if player_battler and player_battler._loading_task and not player_battler._loading_task.done():
-            player_battler._loading_task.cancel()
-        self._player_to_game.pop(target_player_id, None)
-        self._player_id_to_name.pop(target_player_id, None)
+        self._remove_lobby_seat(pending, target_player_id)
         return True
 
     def holds_seat(self, game_id: str, player_id: str) -> bool:
