@@ -3,6 +3,9 @@ import type {
   CardCatalogEntry,
   CreateGameResponse,
   JoinGameResponse,
+  LobbyState,
+  ResumableGame,
+  ResumableSeat,
   GameStatusResponse,
   SpectateRequestStatus,
   ShareGameResponse,
@@ -167,6 +170,27 @@ export async function rejoinGame(
     await throwResponseError(response, 'rejoin-game', 'Failed to rejoin game')
   }
   return response.json()
+}
+
+export async function getLobby(gameId: string): Promise<LobbyState> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/lobby`)
+  if (!response.ok) {
+    await throwResponseError(response, 'game-status', 'Failed to load the lobby')
+  }
+  return response.json()
+}
+
+export async function getResumableGames(seats: ResumableSeat[]): Promise<ResumableGame[]> {
+  const response = await fetch(`${API_BASE}/games/resumable`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ seats }),
+  })
+  if (!response.ok) {
+    await throwResponseError(response, 'game-status', 'Failed to check for games in progress')
+  }
+  const data: { games: ResumableGame[] } = await response.json()
+  return data.games
 }
 
 export async function getGameStatus(gameId: string): Promise<GameStatusResponse> {

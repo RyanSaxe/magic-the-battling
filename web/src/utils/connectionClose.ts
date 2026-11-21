@@ -4,6 +4,7 @@ const FINAL_CLOSE_CODES: Record<number, { code: AppErrorCode; detail: string }> 
   1013: { code: 'WS_CAPACITY', detail: 'Server is at websocket capacity' },
   4001: { code: 'INVALID_SESSION', detail: 'Invalid session' },
   4004: { code: 'GAME_NOT_FOUND', detail: 'Game not found' },
+  4005: { code: 'KICKED', detail: 'Kicked by host' },
   4006: { code: 'SEAT_MOVED', detail: 'Seat opened elsewhere' },
 }
 

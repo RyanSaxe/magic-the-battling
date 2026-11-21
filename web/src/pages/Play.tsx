@@ -1,7 +1,6 @@
 import { startTransition, useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { createGame, warmCubeCache } from "../api/client";
-import { useSession } from "../hooks/useSession";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
 import { useAuth } from "../contexts/authState";
@@ -9,9 +8,13 @@ import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { InfoIcon } from "../components/icons/InfoIcon";
 import { AppHeader } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
+import { ResumeGameCard } from "../components/ResumeGame";
+import { useResumableGames } from "../hooks/useResumableGames";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { getLegendaryName } from "../utils/prefetchName";
+import { saveTabSession } from "../utils/tabSession";
 import {
+  forgetSeatForGame,
   getDefaultNewPlayerPreference,
   rememberPlayerForGame,
   setGlobalGuidedModePreference,
@@ -325,8 +328,8 @@ function GearButton({ onClick }: { onClick: () => void }) {
 export function Play() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { saveSession } = useSession();
   const { addToast } = useToast();
+  const resumableGames = useResumableGames(3);
 
   const { user } = useAuth();
   const [randomName, setRandomName, nameLoading] = useRandomMtgName();
@@ -428,6 +431,7 @@ export function Play() {
         setMaxAvailablePuppets(null);
         resetWatcher();
       }
+      if (pendingGameId) forgetSeatForGame(pendingGameId);
       setPendingGameId(null);
       setPendingSessionId(null);
     });
@@ -455,6 +459,7 @@ export function Play() {
         getAppErrorMessage(connectionError, "play-connection", "That game is no longer available. Please start a new one."),
         "error",
       );
+      forgetSeatForGame(pendingGameId);
       startTransition(() => {
         setPendingGameId(null);
         setPendingSessionId(null);
@@ -497,8 +502,11 @@ export function Play() {
         guidedModeDefault: isGuidedMode,
         playMode,
       });
-      saveSession(response.session_id, response.player_id);
-      rememberPlayerForGame(response.game_id, name, response.seat_token);
+      saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
+      rememberPlayerForGame(response.game_id, name, {
+        seatToken: response.seat_token,
+        joinCode: response.join_code,
+      });
       setNewPlayerPreferenceForGame(
         response.game_id,
         isGuidedMode,
@@ -537,8 +545,11 @@ export function Play() {
         guidedModeDefault: isGuidedMode,
         playMode,
       });
-      saveSession(response.session_id, response.player_id);
-      rememberPlayerForGame(response.game_id, name, response.seat_token);
+      saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
+      rememberPlayerForGame(response.game_id, name, {
+        seatToken: response.seat_token,
+        joinCode: response.join_code,
+      });
       setNewPlayerPreferenceForGame(
         response.game_id,
         isGuidedMode,
@@ -553,6 +564,7 @@ export function Play() {
   };
 
   const handleCancelFriends = () => {
+    if (pendingGameId) forgetSeatForGame(pendingGameId);
     setFriendsLoading(false);
     setPendingGameId(null);
     setPendingSessionId(null);
@@ -560,6 +572,7 @@ export function Play() {
   };
 
   const handleCancelSolo = () => {
+    if (pendingGameId) forgetSeatForGame(pendingGameId);
     updateSoloPhase("idle");
     setPendingGameId(null);
     setPendingSessionId(null);
@@ -609,6 +622,9 @@ export function Play() {
       >
         <SurfaceCard as="section" className="overflow-hidden flex flex-col">
           <div className="flex flex-col">
+            {resumableGames.map((seat) => (
+              <ResumeGameCard key={seat.gameId} seat={seat} />
+            ))}
             <div className="mb-4">
               <div className="mb-1 flex items-center justify-between gap-3">
                 <label htmlFor="player-name" className="block text-gray-300 text-sm">
@@ -824,6 +840,7 @@ export function Play() {
                 <RecoveryOpponentPicker
                   counts={validRecoveryCounts}
                   onSelect={(count) => {
+                    if (pendingGameId) forgetSeatForGame(pendingGameId);
                     updateSoloPhase("idle");
                     setPendingGameId(null);
                     setPendingSessionId(null);

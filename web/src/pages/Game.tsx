@@ -1,11 +1,14 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, type ReactNode } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { useSession } from "../hooks/useSession";
+import { useGameSeat } from "../hooks/useGameSeat";
+import { useAuth } from "../contexts/authState";
+import { AppHeader } from "../components/common/AppHeader";
+import { PageFrame } from "../components/common/PageFrame";
+import { BusyNotice, StatusNotice } from "../components/common/StatusNotice";
 import { useGame } from "../hooks/useGame";
 import { useVoiceChat } from "../hooks/useVoiceChat";
 import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import {
-  rejoinGame,
   getGameStatus,
   createSpectateRequest,
   getSpectateRequestStatus,
@@ -47,7 +50,6 @@ import { DndPanel } from "../components/common/DndPanel";
 import { SubmitPopover } from "../components/common/SubmitPopover";
 import { ZoneDivider } from "../components/common/ZoneDivider";
 import { useHotkeys } from "../hooks/useHotkeys";
-import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import {
   comparePlayersForSidebar,
   getSidebarPlayerOrder,
@@ -66,9 +68,7 @@ import type {
   GuidedWalkthroughContext,
 } from "../guided/types";
 import {
-  getRememberedPlayerForGame,
-  pickAutoReconnectPlayer,
-  getSeatTokenForGame,
+  getRememberedSeat,
   rememberPlayerForGame,
 } from "../utils/deviceIdentity";
 import {
@@ -150,59 +150,142 @@ function selectDraftGuideOpponent(
   return { name: best.name, revealedCount: best.most_recently_revealed_cards.length };
 }
 
+// A seat lost for these reasons has no way back from this tab, so the page offers to watch instead.
+const SEAT_GONE_CODES = new Set(["INVALID_SESSION", "PLAYER_NOT_IN_GAME"]);
+
+function GameNoticeFrame({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
+  const header = (
+    <AppHeader
+      renderRight={({ compact }) => (
+        <button
+          onClick={() => navigate("/")}
+          className={`btn btn-secondary ${compact ? "py-1.5 px-3 text-sm" : "py-2 px-4"}`}
+        >
+          Home
+        </button>
+      )}
+    />
+  );
+  return (
+    <PageFrame header={header} center contentClassName="items-center px-4">
+      {children}
+    </PageFrame>
+  );
+}
+
+function GameGoneNotice({ gameId }: { gameId: string }) {
+  const navigate = useNavigate();
+  const remembered = getRememberedSeat(gameId);
+  const newGame = (
+    <button onClick={() => navigate("/play")} className="btn btn-secondary flex-1 py-2">
+      New Game
+    </button>
+  );
+  const home = (
+    <button onClick={() => navigate("/")} className="btn btn-secondary flex-1 py-2">
+      Home
+    </button>
+  );
+  if (remembered) {
+    return (
+      <StatusNotice
+        title="This game has ended"
+        actions={
+          <>
+            <button
+              onClick={() => navigate(`/game/${gameId}/share/${encodeURIComponent(remembered.name)}`)}
+              className="btn btn-primary w-full py-2"
+            >
+              See Results
+            </button>
+            {newGame}
+            {home}
+          </>
+        }
+      >
+        Your final results as {remembered.name} are on the game&apos;s share page.
+      </StatusNotice>
+    );
+  }
+  return (
+    <StatusNotice
+      title="Game not found"
+      actions={
+        <>
+          <button onClick={() => navigate("/play")} className="btn btn-primary flex-1 py-2">
+            New Game
+          </button>
+          {home}
+        </>
+      }
+    >
+      This game has ended or the link is wrong. Check the link, or start a new game.
+    </StatusNotice>
+  );
+}
+
 function PlayerSelectionModal({
   gameId,
-  onSessionCreated,
+  reconnectRefused,
+  onSpectating,
+  onReconnect,
   spectateOnly = false,
 }: {
   gameId: string;
-  onSessionCreated: (
-    sessionId: string,
-    playerId: string,
-    spectatorConfig?: SpectatorConfig
-  ) => void;
+  reconnectRefused?: AppError;
+  onSpectating: (sessionId: string, config: SpectatorConfig) => void;
+  onReconnect: (playerName: string) => void;
   spectateOnly?: boolean;
 }) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [status, setStatus] = useState<GameStatusResponse | null>(null);
+  const [statusError, setStatusError] = useState<AppError | null>(null);
+  const [statusAttempt, setStatusAttempt] = useState(0);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [spectatorName, setSpectatorName] = useState("");
   const [requestStatus, setRequestStatus] = useState<
     "idle" | "waiting" | "denied"
   >("idle");
   const [error, setError] = useState("");
-  const [rejoinName, setRejoinName] = useState("");
-  const [rejoinLoading, setRejoinLoading] = useState(false);
+  const shownError =
+    error || (reconnectRefused ? getAppErrorMessage(reconnectRefused, "rejoin-game", "Could not reconnect.") : "");
   const pollingRef = useRef<number | null>(null);
-  const autoReconnectAttemptedRef = useRef(false);
-
-  const consecutiveErrorsRef = useRef(0);
 
   useEffect(() => {
     let interval: number | null = null;
+    let failures = 0;
+    let cancelled = false;
+    const stopPolling = () => {
+      if (interval != null) clearInterval(interval);
+      interval = null;
+    };
 
     const fetchStatus = () => {
       getGameStatus(gameId)
         .then((data) => {
-          consecutiveErrorsRef.current = 0;
-          setStatus(data);
+          failures = 0;
+          if (!cancelled) setStatus(data);
         })
-        .catch(() => {
-          consecutiveErrorsRef.current += 1;
-          if (consecutiveErrorsRef.current >= 3 && interval != null) {
-            clearInterval(interval);
-            interval = null;
+        .catch((err) => {
+          const statusFailure = unknownToAppError(err, "game-status", "Failed to load the game");
+          failures += 1;
+          if (statusFailure.code === "GAME_NOT_FOUND" || failures >= 3) {
+            stopPolling();
+            if (!cancelled) setStatusError(statusFailure);
           }
         });
     };
 
     fetchStatus();
-    interval = setInterval(fetchStatus, 3000);
+    interval = window.setInterval(fetchStatus, 3000);
 
     return () => {
-      if (interval != null) clearInterval(interval);
+      cancelled = true;
+      stopPolling();
     };
-  }, [gameId]);
+  }, [gameId, statusAttempt]);
 
   useEffect(() => {
     return () => {
@@ -211,44 +294,6 @@ function PlayerSelectionModal({
       }
     };
   }, []);
-
-  const handleReconnect = useCallback(
-    async (playerName: string, options?: { silent?: boolean }) => {
-      setRejoinName(playerName);
-      setRejoinLoading(true);
-      if (!options?.silent) {
-        setError("");
-      }
-
-      try {
-        const response = await rejoinGame(gameId, playerName, getSeatTokenForGame(gameId, playerName));
-        rememberPlayerForGame(gameId, playerName.trim(), response.seat_token);
-        onSessionCreated(response.session_id, response.player_id);
-      } catch (err) {
-        if (!options?.silent) {
-          setError(unknownToAppError(err, "rejoin-game", "Failed to reconnect").message);
-        }
-      } finally {
-        setRejoinLoading(false);
-      }
-    },
-    [gameId, onSessionCreated],
-  );
-
-  useEffect(() => {
-    if (spectateOnly || rejoinLoading || requestStatus !== "idle" || selectedPlayer !== null || !status) {
-      return;
-    }
-
-    const rememberedPlayer = getRememberedPlayerForGame(gameId);
-    const autoPlayer = pickAutoReconnectPlayer(rememberedPlayer, status.players);
-    if (!autoPlayer || autoReconnectAttemptedRef.current) {
-      return;
-    }
-
-    autoReconnectAttemptedRef.current = true;
-    void handleReconnect(autoPlayer, { silent: true });
-  }, [spectateOnly, gameId, handleReconnect, rejoinLoading, requestStatus, selectedPlayer, status]);
 
   const handleWatchRequest = async () => {
     if (!selectedPlayer || !spectatorName.trim()) {
@@ -274,8 +319,8 @@ function PlayerSelectionModal({
     const poll = async () => {
       try {
         const result = await getSpectateRequestStatus(gameId, requestId);
-        if (result.status === "approved" && result.session_id && result.player_id) {
-          onSessionCreated(result.session_id, result.player_id, {
+        if (result.status === "approved" && result.session_id) {
+          onSpectating(result.session_id, {
             spectatePlayer: playerName,
             requestId,
           });
@@ -307,11 +352,47 @@ function PlayerSelectionModal({
     }
   };
 
+  if (statusError?.code === "GAME_NOT_FOUND") {
+    return (
+      <GameNoticeFrame>
+        <GameGoneNotice gameId={gameId} />
+      </GameNoticeFrame>
+    );
+  }
+
+  if (statusError) {
+    return (
+      <GameNoticeFrame>
+        <StatusNotice
+          title="Can't reach the server"
+          actions={
+            <>
+              <button
+                onClick={() => {
+                  setStatusError(null);
+                  setStatusAttempt((attempt) => attempt + 1);
+                }}
+                className="btn btn-primary flex-1 py-2"
+              >
+                Try again
+              </button>
+              <button onClick={() => navigate("/")} className="btn btn-secondary flex-1 py-2">
+                Home
+              </button>
+            </>
+          }
+        >
+          {getAppErrorMessage(statusError, "game-status", "The game could not be loaded. Check your connection.")}
+        </StatusNotice>
+      </GameNoticeFrame>
+    );
+  }
+
   if (!status) {
     return (
-      <div className="game-table flex items-center justify-center p-4">
-        <div className="text-white">Loading game info...</div>
-      </div>
+      <GameNoticeFrame>
+        <BusyNotice label="Loading game..." />
+      </GameNoticeFrame>
     );
   }
 
@@ -323,17 +404,19 @@ function PlayerSelectionModal({
       p.phase !== "winner" &&
       p.phase !== "game_over"
   );
+  const accountSeatName =
+    !spectateOnly && user && humanPlayers.some((p) => p.name === user.username) ? user.username : null;
 
   return (
-    <div className="game-table flex items-center justify-center p-4">
+    <GameNoticeFrame>
       <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-lg">
         <h1 className="text-2xl font-bold text-white text-center mb-6">
           Join Game
         </h1>
 
-        {error && (
+        {shownError && (
           <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
-            {error}
+            {shownError}
           </div>
         )}
 
@@ -375,8 +458,20 @@ function PlayerSelectionModal({
 
         {requestStatus === "idle" && !selectedPlayer && (
           <>
+            {!spectateOnly && !accountSeatName && (
+              <div className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 mb-4 text-[13px] leading-snug text-gray-300">
+                To take your seat back, open this link in the browser you joined from. If you played with an account,{" "}
+                <button
+                  onClick={() => navigate(`/login?returnTo=${encodeURIComponent(`/game/${gameId}/play`)}`)}
+                  className="text-amber-400 hover:text-amber-300 underline"
+                >
+                  log in
+                </button>
+                .
+              </div>
+            )}
             <p className="text-gray-400 text-center mb-4">
-              {spectateOnly ? "Select a player to watch" : "Select a player to reconnect or watch"}
+              {accountSeatName ? "Reconnect to your seat or watch a player" : "Select a player to watch"}
             </p>
             <div className="space-y-3 mb-6">
               {humanPlayers.map((player) => (
@@ -392,19 +487,16 @@ function PlayerSelectionModal({
                     />
                     <span className="text-white">{player.name}</span>
                     <span className="text-gray-500 text-sm">
-                      ({player.phase === "battle" ? "fight" : player.phase})
+                      ({player.phase})
                     </span>
                   </div>
                   <div className="flex gap-2">
-                    {!spectateOnly && !player.is_connected ? (
+                    {player.name === accountSeatName ? (
                       <button
-                        onClick={() => handleReconnect(player.name)}
-                        disabled={rejoinLoading}
+                        onClick={() => onReconnect(player.name)}
                         className="btn btn-primary text-sm py-1 px-3"
                       >
-                        {rejoinLoading && rejoinName === player.name
-                          ? "..."
-                          : "Connect"}
+                        Reconnect
                       </button>
                     ) : watchablePlayers.some((p) => p.name === player.name) ? (
                       <button
@@ -464,7 +556,7 @@ function PlayerSelectionModal({
           </div>
         )}
       </div>
-    </div>
+    </GameNoticeFrame>
   );
 }
 
@@ -782,10 +874,15 @@ function GameGuideLayer({
 }
 
 function GameContent() {
-  const { gameId } = useParams<{ gameId: string }>();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const { session, saveSession, clearSession } = useSession();
+  const { gameId = "" } = useParams<{ gameId: string }>();
+  const [searchParams] = useSearchParams();
+  const isSpectateMode = searchParams.get("spectate") === "true";
+  const { seat, claim, connectionOpened, connectionEnded, takeBack } = useGameSeat(gameId, {
+    claimAutomatically: !isSpectateMode,
+  });
+  const session = seat.kind === "held" ? seat.session : null;
 
+  const [spectatorSessionId, setSpectatorSessionId] = useState<string | null>(null);
   const [spectatorConfig, setSpectatorConfig] = useState<SpectatorConfig | null>(null);
   const [spectatingPlayer, setSpectatingPlayer] = useState<string | null>(null);
 
@@ -806,7 +903,6 @@ function GameContent() {
   const actionBarPaddingClass =
     shellMode === "small" ? "bar-pad-both" : "bar-pad-main";
 
-  const isSpectateMode = searchParams.get("spectate") === "true";
   const { addToast } = useToast();
   const buildReadyPendingRef = useRef(false);
   const [buildReadyPending, setBuildReadyPending] = useState(false);
@@ -824,9 +920,9 @@ function GameContent() {
   }, []);
 
   const navigate = useNavigate();
-  const { gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, connectionError, invalidSession } = useGame(
-    gameId ?? null,
-    isSpectateMode ? null : session?.sessionId ?? null,
+  const { status, gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, connectionError } = useGame(
+    gameId || null,
+    spectatorConfig ? spectatorSessionId : isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
     handleServerError,
     handleVoiceSignal,
@@ -882,21 +978,14 @@ function GameContent() {
   const { state, setPreviewCard, setRevealedPlayerName } = useContextStrip();
 
   const isSpectator = !!spectatorConfig;
-  const wasInvalidSessionRef = useRef(false);
   const guideRootRef = useRef<HTMLDivElement>(null);
   const selfPhase = gameState?.self_player.phase;
 
   useEffect(() => {
-    const shouldClear = shouldClearSessionOnInvalidEvent(
-      invalidSession,
-      wasInvalidSessionRef.current,
-      !!session,
-    );
-    wasInvalidSessionRef.current = invalidSession;
-    if (shouldClear) {
-      clearSession();
-    }
-  }, [invalidSession, session, clearSession]);
+    if (!session || isSpectator) return;
+    if (status.kind === "open") connectionOpened(session.sessionId);
+    if (status.kind === "ended") connectionEnded(session.sessionId, status.error);
+  }, [status, session, isSpectator, connectionOpened, connectionEnded]);
 
   useEffect(() => {
     const playerName = gameState?.self_player.name;
@@ -1115,25 +1204,18 @@ function GameContent() {
     actions.battleUpdateLife("opponent", life);
   };
 
-  const handleSessionCreated = (
-    sessionId: string,
-    playerId: string,
-    config?: SpectatorConfig
-  ) => {
-    saveSession(sessionId, playerId);
-    if (config) {
-      setSpectatorConfig(config);
-      setSpectatingPlayer(config.spectatePlayer);
-    }
-    if (isSpectateMode) {
-      setSearchParams({});
-    }
+  const handleSpectating = (sessionId: string, config: SpectatorConfig) => {
+    setSpectatorSessionId(sessionId);
+    setSpectatorConfig(config);
+    setSpectatingPlayer(config.spectatePlayer);
   };
 
   const handleSpectateNewTab = () => {
     const url = new URL(window.location.href);
     url.searchParams.set("spectate", "true");
-    window.open(url.toString(), '_blank');
+    // noopener keeps the player's per-tab session out of the watching tab, and ?spectate=true stays in its URL,
+    // so reloading that tab can never take the player's seat.
+    window.open(url.toString(), "_blank", "noopener");
   };
 
   const closeGameplayOverlays = useCallback((except: OverlayKey | null = null) => {
@@ -1612,48 +1694,95 @@ function GameContent() {
     showSubmitHandPopover, showSubmitResultPopover,
   ]);
 
-  if (!session || isSpectateMode) {
-    return (
-      <PlayerSelectionModal
-        gameId={gameId!}
-        onSessionCreated={handleSessionCreated}
-        spectateOnly={isSpectateMode}
-      />
-    );
+  if (!isSpectator) {
+    if (seat.kind === "claiming") {
+      return (
+        <GameNoticeFrame>
+          <BusyNotice label="Reconnecting to your seat..." />
+        </GameNoticeFrame>
+      );
+    }
+    if (seat.kind === "lost" && seat.error.code === "SEAT_MOVED") {
+      return (
+        <GameNoticeFrame>
+          <StatusNotice
+            title="Open in another tab"
+            actions={
+              <>
+                <button onClick={takeBack} className="btn btn-primary flex-1 py-2">
+                  Play here
+                </button>
+                <button onClick={() => navigate("/")} className="btn btn-secondary flex-1 py-2">
+                  Home
+                </button>
+              </>
+            }
+          >
+            This game is now open in another tab or window. Only one can play your seat at a time.
+          </StatusNotice>
+        </GameNoticeFrame>
+      );
+    }
+    if (seat.kind === "lost" && seat.error.code === "GAME_NOT_FOUND") {
+      return (
+        <GameNoticeFrame>
+          <GameGoneNotice gameId={gameId} />
+        </GameNoticeFrame>
+      );
+    }
+    if (seat.kind === "lost" && !SEAT_GONE_CODES.has(seat.error.code)) {
+      return (
+        <GameNoticeFrame>
+          <StatusNotice
+            title="Game Unavailable"
+            actions={
+              <>
+                <button onClick={takeBack} className="btn btn-primary flex-1 py-2">
+                  Try again
+                </button>
+                <button onClick={() => navigate("/")} className="btn btn-secondary flex-1 py-2">
+                  Home
+                </button>
+              </>
+            }
+          >
+            {getAppErrorMessage(seat.error, "game-connection", "This game is not available right now.")}
+          </StatusNotice>
+        </GameNoticeFrame>
+      );
+    }
+    if (seat.kind !== "held" || isSpectateMode) {
+      return (
+        <PlayerSelectionModal
+          gameId={gameId}
+          reconnectRefused={seat.kind === "none" ? seat.refused : undefined}
+          onSpectating={handleSpectating}
+          onReconnect={(playerName) => void claim(playerName)}
+          spectateOnly={isSpectateMode}
+        />
+      );
+    }
   }
 
-  if (connectionError && !invalidSession) {
-    const title = connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Game Unavailable";
-    const message = getAppErrorMessage(
-      connectionError,
-      "game-connection",
-      "This game is no longer available. It may have ended or been cleared during a server restart.",
-    );
+  if (isSpectator && connectionError) {
     return (
-      <div className="game-table flex items-center justify-center">
-        <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
-          <h2 className="text-lg font-semibold text-amber-200">
-            {title}
-          </h2>
-          <p className="text-sm text-gray-200 mt-2 leading-snug">
-            {message}
-          </p>
-          <div className="mt-4 flex gap-2">
-            <button
-              onClick={() => navigate("/play")}
-              className="btn btn-primary flex-1 py-2"
-            >
-              New Game
-            </button>
-            <button
-              onClick={() => navigate("/")}
-              className="btn btn-secondary flex-1 py-2"
-            >
-              Home
-            </button>
-          </div>
-        </div>
-      </div>
+      <GameNoticeFrame>
+        <StatusNotice
+          title={connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Game Unavailable"}
+          actions={
+            <>
+              <button onClick={() => navigate("/play")} className="btn btn-primary flex-1 py-2">
+                New Game
+              </button>
+              <button onClick={() => navigate("/")} className="btn btn-secondary flex-1 py-2">
+                Home
+              </button>
+            </>
+          }
+        >
+          {getAppErrorMessage(connectionError, "game-connection", "This game is not available right now.")}
+        </StatusNotice>
+      </GameNoticeFrame>
     );
   }
 
