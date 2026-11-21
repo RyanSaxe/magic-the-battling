@@ -47,10 +47,14 @@ export function gameMeta(game: GameSummary, now: number = Date.now()): string {
   return [modeLabel(game.play_mode), seats, formatWhen(game.created_at, now)].join(' · ')
 }
 
+/** "38%", rounded; 0% before the first game. */
+export function winRate(wins: number, games: number): string {
+  return `${games > 0 ? Math.round((wins / games) * 100) : 0}%`
+}
+
 /** "9 wins (38%)". */
 export function winsLabel(wins: number, games: number): string {
-  const rate = games > 0 ? Math.round((wins / games) * 100) : 0
-  return `${countLabel(wins, 'win')} (${rate}%)`
+  return `${countLabel(wins, 'win')} (${winRate(wins, games)})`
 }
 
 /** "In progress · Stage 2, Round 4" or "Lobby waiting · Code ABCD". */

@@ -15,6 +15,7 @@ import type {
   UserBattler,
   GameSummary,
   FollowedBattler,
+  CubeSummary,
 } from '../types'
 import { AppError, responseToAppError } from '../utils/appError'
 import { getOrCreateDeviceId } from '../utils/deviceIdentity'
@@ -394,15 +395,22 @@ export interface CubeGamesPage {
 
 export async function getBattlerGames(
   battlerId: number,
-  opts: { offset?: number; playMode?: string; useUpgrades?: boolean } = {},
+  opts: { offset?: number; playMode?: string; useUpgrades?: boolean; mineOnly?: boolean } = {},
 ): Promise<CubeGamesPage> {
   const params = new URLSearchParams()
   if (opts.offset) params.set('offset', String(opts.offset))
   if (opts.playMode != null) params.set('play_mode', opts.playMode)
   if (opts.useUpgrades != null) params.set('use_upgrades', String(opts.useUpgrades))
+  if (opts.mineOnly) params.set('mine_only', 'true')
   const qs = params.toString()
   const response = await fetch(`${API_BASE}/battlers/${battlerId}/games${qs ? `?${qs}` : ''}`, { credentials: 'include' })
   if (!response.ok) await throwResponseError(response, 'default', 'Failed to load games')
+  return response.json()
+}
+
+export async function getCubeSummary(cubeId: string): Promise<CubeSummary> {
+  const response = await fetch(`${API_BASE}/battlers/cube/${encodeURIComponent(cubeId)}`, { credentials: 'include' })
+  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load the cube')
   return response.json()
 }
 
