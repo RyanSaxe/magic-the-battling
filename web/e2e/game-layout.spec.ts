@@ -16,6 +16,7 @@ type Check =
   | 'cards-differ-in-zone'
   | 'zones-off-board'
   | 'sidebar-seams-off-board'
+  | 'text-cut-off'
   | 'divider-off-saved-layout'
   | 'grab-moves-layout'
 
@@ -73,11 +74,11 @@ const SAMPLE: Screen[] = [
     name: 'battle-sudden-death 1280x800',
     viewport: { width: 1280, height: 800 },
     state: TYPICAL['battle-sudden-death'],
-    knownFailures: {
-      'zones-off-board': 'the banner is taller than the room the rows leave for it',
-      'card-outside-zone': 'the bottom of the hand row is cut off',
-      'sidebar-seams-off-board': 'the sidebar seams ignore the banner',
-    },
+  },
+  {
+    name: 'battle-sudden-death 375x667',
+    viewport: { width: 375, height: 667 },
+    state: TYPICAL['battle-sudden-death'],
   },
   {
     name: 'battle 1024x500',
@@ -209,6 +210,19 @@ function measureBoard({ zoneSelector, minCardWidth }: { zoneSelector: string; mi
       const end = axis.start + axis.length
       if (end - cursor > 0.5) fail('zones-off-board', `${px(end - cursor)}px of board uncovered at the ${axis.name === 'y' ? 'bottom' : 'right'}`)
       if (cursor - end > 0.5) fail('zones-off-board', `zones run ${px(cursor - end)}px past the board ${axis.name === 'y' ? 'bottom' : 'right'}`)
+    }
+  }
+
+  const suddenDeathBar = battle?.querySelector(':scope > .frame-chrome')
+  if (suddenDeathBar) {
+    const bar = suddenDeathBar.getBoundingClientRect()
+    const words = Array.from(suddenDeathBar.children)
+      .filter((child) => getComputedStyle(child).position !== 'absolute')
+      .map((child) => child.getBoundingClientRect())
+    const left = Math.min(...words.map((word) => word.left))
+    const right = Math.max(...words.map((word) => word.right))
+    if (left < bar.left - 0.5 || right > bar.right + 0.5) {
+      fail('text-cut-off', `the Sudden Death bar's text spans ${px(right - left)}px of its ${px(bar.width)}px`)
     }
   }
 
