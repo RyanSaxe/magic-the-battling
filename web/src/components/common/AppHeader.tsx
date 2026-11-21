@@ -1,15 +1,17 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { useState, useRef, useEffect, type ReactNode, type Ref } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/authState'
 import { JoinGameModal } from '../home/JoinGameModal'
 
 interface AppHeaderProps {
   renderRight: (opts: { compact: boolean }) => ReactNode
+  ref?: Ref<HTMLElement>
+  padClassName?: string
 }
 
-export function AppHeader({ renderRight }: AppHeaderProps) {
+export function AppHeader({ renderRight, ref, padClassName = 'bar-pad-both' }: AppHeaderProps) {
   return (
-    <header className="shrink-0 py-3 frame-chrome bar-pad-both">
+    <header ref={ref} className={`shrink-0 py-3 frame-chrome ${padClassName}`}>
       <div className="hidden sm:flex items-center justify-between">
         <div>
           <div className="flex items-baseline">
