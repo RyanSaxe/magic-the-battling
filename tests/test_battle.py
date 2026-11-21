@@ -1435,6 +1435,58 @@ class TestFaceDownScrubbing:
         assert result
         assert creature.id in b.opponent_zones.tapped_card_ids
 
+    def test_pvp_opponent_can_act_on_face_down_card_after_other_views_are_built(self, mock_cube_data, test_db):
+        manager = GameManager()
+        pending = manager.create_game("Alice", "pid-a", cube_id="test", target_player_count=2)
+        manager.join_game(pending.join_code, "Bob", "pid-b")
+        game_id = pending.game_id
+        game = manager.start_game(game_id, None)
+        assert game is not None
+        alice, bob = game.players
+        for p in (alice, bob):
+            p.hand, p.sideboard = p.sideboard[:3], p.sideboard[3:]
+            assert manager.handle_build_ready(game, p, ["Plains", "Island", "Swamp"], game_id, None) is None
+        b = game.active_battles[0]
+        bob_card = bob.hand[0]
+        assert manager.handle_battle_move(game, bob, bob_card.id, "hand", "battlefield")
+        assert manager.handle_battle_update_card_state(game, bob, "face_down", bob_card.id)
+
+        # broadcast_game_state builds every player's view in turn, then each spectator's
+        alice_view = manager.get_game_state(game_id, "pid-a")
+        manager.get_game_state(game_id, "pid-b")
+        manager.get_game_state(game_id, "pid-a")
+        assert alice_view is not None
+        assert alice_view.current_battle is not None
+        opaque_id = alice_view.current_battle.opponent_zones.face_down_card_ids[0]
+
+        assert manager.handle_battle_move(
+            game, alice, opaque_id, "battlefield", "graveyard", from_owner="opponent", to_owner="opponent"
+        )
+        bob_zones = b.player_zones if b.player.name == bob.name else b.opponent_zones
+        assert bob_card.id in {c.id for c in bob_zones.graveyard}
+
+    def test_pvp_shuffle_changes_the_ids_shown_for_the_shuffled_library(self, card_factory):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        face_down, first, second = card_factory("FaceDown"), card_factory("First"), card_factory("Second")
+        bob.hand = [face_down, first, second]
+
+        b = battle.start(game, alice, bob)
+        battle.move_zone(b, bob, face_down, "hand", "battlefield")
+        battle.update_card_state(b, bob, "face_down", face_down.id)
+        battle.move_zone(b, bob, first, "hand", "library")
+        battle.move_zone(b, bob, second, "hand", "library")
+
+        manager = GameManager()
+        ids_before = {c.id for c in manager._make_battle_view(b, alice, game).opponent_zones.library}
+        assert manager.handle_battle_update_card_state(game, bob, "shuffle_library", "")
+        ids_after = {c.id for c in manager._make_battle_view(b, alice, game).opponent_zones.library}
+
+        assert ids_before.isdisjoint(ids_after)
+
     def test_static_opponent_face_down_not_scrubbed(self, card_factory):
         """Against StaticOpponent, face-down cards should preserve real data."""
         game = create_game(["Alice"], num_players=1)
