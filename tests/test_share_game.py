@@ -18,6 +18,7 @@ def _make_source_snapshot(stage: int, round_num: int, treasures: int) -> MagicMo
     snapshot = MagicMock()
     snapshot.stage = stage
     snapshot.round = round_num
+    snapshot.sudden_death_build = None
     snapshot.full_state_json = BattleSnapshotData(
         hand=[],
         vanguard=None,

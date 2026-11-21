@@ -167,7 +167,7 @@ const LOBBY_STATE: LobbyState = {
   play_mode: 'limited',
 }
 
-function shareSnapshot(stage: number, round: number): SharePlayerSnapshot {
+function shareSnapshot(stage: number, round: number, suddenDeathBuild: number | null = null): SharePlayerSnapshot {
   return {
     stage,
     round,
@@ -180,6 +180,7 @@ function shareSnapshot(stage: number, round: number): SharePlayerSnapshot {
     poison: round,
     vanguard: null,
     visibility: 'full',
+    sudden_death_build: suddenDeathBuild,
   }
 }
 
@@ -260,6 +261,24 @@ export async function serveShareMidGame(page: Page, baseURL: string) {
   await serveFromTable(page, baseURL, {
     ...SIGNED_OUT_RESPONSES,
     [`/api/games/${SHARE_GAME_ID}/share/Dave`]: { json: SHARE_MID_GAME },
+  })
+}
+
+// Alice and Bob reached lethal in 3-3, drew their first Sudden Death and fought a second, so the page opens on its rebuild.
+const SHARE_SUDDEN_DEATH: ShareGameResponse = {
+  ...SHARE_GAME,
+  players: SHARE_GAME.players.map((player) => ({
+    ...player,
+    snapshots: ['Alice', 'Bob'].includes(player.name)
+      ? [...SHARE_SNAPSHOTS, shareSnapshot(3, 3, 1), shareSnapshot(3, 3, 2)]
+      : SHARE_SNAPSHOTS,
+  })),
+}
+
+export async function serveShareSuddenDeath(page: Page, baseURL: string) {
+  await serveFromTable(page, baseURL, {
+    ...SIGNED_OUT_RESPONSES,
+    [`/api/games/${SHARE_GAME_ID}/share/Alice`]: { json: SHARE_SUDDEN_DEATH },
   })
 }
 
@@ -416,6 +435,13 @@ export const PAGES: PageUnderTest[] = [
     name: 'share mid-game',
     path: `/game/${SHARE_GAME_ID}/share/Dave`,
     serve: serveShareMidGame,
+    primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
+    fillsFelt: true,
+  },
+  {
+    name: 'share Sudden Death',
+    path: `/game/${SHARE_GAME_ID}/share/Alice`,
+    serve: serveShareSuddenDeath,
     primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
     fillsFelt: true,
   },

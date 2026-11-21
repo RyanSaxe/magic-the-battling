@@ -87,6 +87,9 @@ class BattleSnapshot(Base):
     play_draw_preference = Column(String, nullable=True)
     # Who this build faced in the round; older rows, recorded before pairings were kept, hold NULL.
     opponent_name = Column(String, nullable=True)
+    # Sudden Death rebuilds share their round with the fight that sent players to it: 1 for the first, 2 after a
+    # drawn one. NULL marks an ordinary build, including every build saved before Sudden Death builds were kept.
+    sudden_death_build = Column(Integer, nullable=True)
 
     full_state_json = Column(Text, nullable=False)
 
