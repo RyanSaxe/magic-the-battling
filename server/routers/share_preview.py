@@ -1,5 +1,4 @@
 import hashlib
-import json
 import logging
 import re
 import time
@@ -10,14 +9,15 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from server.db import database
-from server.db.models import GameRecord, PlayerGameHistory
-from server.routers.games import build_share_player
+from server.db.models import GameRecord
+from server.errors import AppHTTPException
 from server.schemas.api import ShareGameResponse
 from server.services.preview import cache_key as preview_cache_key
 from server.services.preview import preview_service
+from server.services.share import build_share_data
 
 logger = logging.getLogger(__name__)
 
@@ -51,47 +51,18 @@ def _check_rate_limit(client_ip: str) -> bool:
 
 
 def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameResponse | None:
-    game_record = db.query(GameRecord).filter(GameRecord.id == game_id).first()
-    if not game_record:
+    try:
+        share_data = build_share_data(db, game_id, player_name)
+    except AppHTTPException:
         return None
 
     # Share pages are public for finished games; this flag is bookkeeping for
     # "someone actively shared this game", not an authorization gate.
-    config = json.loads(str(game_record.config_json)) if game_record.config_json else {}
-    use_upgrades = config.get("use_upgrades", True)
-
-    histories = (
-        db.query(PlayerGameHistory)
-        .options(joinedload(PlayerGameHistory.snapshots))
-        .filter(PlayerGameHistory.game_id == game_id)
-        .all()
+    db.query(GameRecord).filter(GameRecord.id == game_id, GameRecord.shared.isnot(True)).update(
+        {GameRecord.shared: True}
     )
-
-    if not histories:
-        return None
-
-    owner_exists = any(str(h.player_name) == player_name for h in histories)
-    if not owner_exists:
-        return None
-
-    if not game_record.shared:
-        game_record.shared = True  # ty: ignore[invalid-assignment]
-        db.commit()
-
-    players = [build_share_player(history, db) for history in histories]
-
-    created_at = game_record.created_at.isoformat() if game_record.created_at else ""
-
-    cube_id = str(game_record.cube_id) if game_record.cube_id else config.get("cube_id")
-
-    return ShareGameResponse(
-        game_id=game_id,
-        owner_name=player_name,
-        created_at=created_at,
-        use_upgrades=use_upgrades,
-        cube_id=cube_id,
-        players=players,
-    )
+    db.commit()
+    return share_data
 
 
 _STATIC_OG_RE = re.compile(r"\s*<meta\s+(?:property=\"og:|name=\"twitter:)[^>]*/?\s*>\s*")

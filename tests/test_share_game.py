@@ -7,7 +7,7 @@ import pytest
 from mtb.models.game import BattleSnapshotData
 from server.db import database
 from server.db.models import CubeMetadata, GameRecord, PlayerGameHistory
-from server.routers.games import _build_puppet_snapshots
+from server.services.share import _build_puppet_snapshots
 
 
 def _make_source_snapshot(stage: int, round_num: int, treasures: int) -> MagicMock:
