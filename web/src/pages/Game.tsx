@@ -381,7 +381,7 @@ function PlayerSelectionModal({
                     />
                     <span className="text-white">{player.name}</span>
                     <span className="text-gray-500 text-sm">
-                      ({player.phase})
+                      ({player.phase === "battle" ? "fight" : player.phase})
                     </span>
                   </div>
                   <div className="flex gap-2">
@@ -1692,8 +1692,8 @@ function GameContent() {
     ? `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(self_player.name)}`
     : '';
   const shareText = isWinner
-    ? 'Just won a game of Crucible! Check out the game:'
-    : `Just finished ${getOrdinal(selfPlacement)} in Crucible! Check out the game:`;
+    ? 'Just won a game of Pitfight! Check out the game:'
+    : `Just finished ${getOrdinal(selfPlacement)} in Pitfight! Check out the game:`;
 
   const maxHandSize = self_player.hand_size;
   const handFull = self_player.hand.length === maxHandSize;
@@ -2490,7 +2490,7 @@ function GameContent() {
                       You Have Been Eliminated
                     </h2>
                     <p className="text-gray-300 mb-6">
-                      Waiting until all battles are complete to determine if you
+                      Waiting until all fights are complete to determine if you
                       will compete in sudden death to stay alive.
                     </p>
                     <div className="bg-black/40 rounded-lg p-4 text-left">
@@ -2507,7 +2507,7 @@ function GameContent() {
                           randomly)
                         </li>
                         <li>Other eliminated players are out immediately</li>
-                        <li>Poison resets to 9 for the sudden death battle</li>
+                        <li>Poison resets to 9 for the sudden death fight</li>
                         <li>Winner survives, loser is eliminated</li>
                       </ul>
                     </div>

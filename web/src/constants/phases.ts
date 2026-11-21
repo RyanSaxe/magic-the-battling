@@ -9,7 +9,7 @@ interface PhaseSummaryRow {
 const PHASE_DISPLAY_NAMES: Record<Phase, string> = {
   draft: 'Draft',
   build: 'Build',
-  battle: 'Battle',
+  battle: 'Fight',
   reward: 'Round Wrap-Up',
 }
 

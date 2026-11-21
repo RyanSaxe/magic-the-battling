@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
-import { FaDiscord } from 'react-icons/fa6'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
-import { CubeCobraPrimerLink } from '../components/common/CubeCobraPrimerLink'
+import { PageFrame } from '../components/common/PageFrame'
 import { CubeGameHistory } from '../components/CubeGameHistory'
 import { getBattlers, getBattlerGames, updateBattler, deleteBattler } from '../api/client'
 import type { UserBattler, PlayMode } from '../types'
@@ -51,95 +50,51 @@ export function BattlerView() {
     return getBattlerGames(battler.id, opts)
   }, [battler])
 
+  const header = (
+    <AppHeader renderRight={({ compact }) => (
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
+        >
+          Back
+        </button>
+        <UserMenuButton compact={compact} />
+      </div>
+    )} />
+  )
+
   if (authLoading || !user || loadingData || !battler) {
     return (
-      <div className="game-table h-dvh flex flex-col overflow-hidden">
-        <AppHeader renderRight={({ compact }) => (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
-            >
-              Back
-            </button>
-            <UserMenuButton compact={compact} />
-          </div>
-        )} />
-        <div className="flex-1 flex min-h-0 game-surface">
-          <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-          <main className="flex-1 min-h-0 p-[2px] zone-divider-bg">
-            <div className="zone-pack h-full min-h-0 flex items-center justify-center">
-              <p className="text-amber-200/70">Loading...</p>
-            </div>
-          </main>
-          <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-        </div>
-        <footer className="shrink-0 frame-chrome bar-pad-both py-2">
-          <div className="flex items-center justify-between">
-            <a href="https://discord.gg/2NAjcWXNKn" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-[#6974F4] hover:text-[#7983F5] transition-colors">
-              <FaDiscord className="w-4 h-4" />
-              Join Discord
-            </a>
-            <CubeCobraPrimerLink />
-          </div>
-        </footer>
-      </div>
+      <PageFrame header={header} center="always" contentClassName="items-center">
+        <p className="text-amber-200/70">Loading...</p>
+      </PageFrame>
     )
   }
 
   const cubeCobraUrl = `https://cubecobra.com/cube/overview/${encodeURIComponent(battler.cube_id)}`
 
   return (
-    <div className="game-table h-dvh flex flex-col overflow-hidden">
-      <AppHeader renderRight={({ compact }) => (
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate('/dashboard')}
-            className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
-          >
-            Back
-          </button>
-          <UserMenuButton compact={compact} />
-        </div>
-      )} />
-
-      <div className="flex-1 flex min-h-0 game-surface">
-        <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
-
-        <main className="flex-1 min-w-0 min-h-0 p-[2px] zone-divider-bg flex flex-col">
-          <div className="zone-pack shell-scroll-col flex-1 min-w-0 min-h-0 flex flex-col px-4 py-4 overflow-auto">
-            <CubeGameHistory
-              cubeId={battler.cube_id}
-              cubeName={battler.cube_name ?? battler.display_name ?? null}
-              cubeImageUri={battler.cube_image_uri ?? null}
-              cubeCobraUrl={cubeCobraUrl}
-              defaultPlayMode={battler.play_mode}
-              defaultUpgrades={battler.use_upgrades}
-              loadGames={fetchGames}
-              actions={<>
-                <button onClick={() => setShowSettings(true)} className="btn btn-secondary py-1.5 px-3 text-sm">
-                  Settings
-                </button>
-                <button onClick={() => navigate(battlerPlayUrl(battler))} className="btn btn-primary py-1.5 px-3 text-sm font-semibold">
-                  Play
-                </button>
-              </>}
-            />
-          </div>
-        </main>
-
-        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-      </div>
-
-      <footer className="shrink-0 frame-chrome bar-pad-both py-2">
-        <div className="flex items-center justify-between">
-          <a href="https://discord.gg/2NAjcWXNKn" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 text-sm text-[#6974F4] hover:text-[#7983F5] transition-colors">
-            <FaDiscord className="w-4 h-4" />
-            Join Discord
-          </a>
-          <CubeCobraPrimerLink />
-        </div>
-      </footer>
+    <>
+      <PageFrame header={header} contentClassName="px-4">
+        <CubeGameHistory
+          cubeId={battler.cube_id}
+          cubeName={battler.cube_name ?? battler.display_name ?? null}
+          cubeImageUri={battler.cube_image_uri ?? null}
+          cubeCobraUrl={cubeCobraUrl}
+          defaultPlayMode={battler.play_mode}
+          defaultUpgrades={battler.use_upgrades}
+          loadGames={fetchGames}
+          actions={<>
+            <button onClick={() => setShowSettings(true)} className="btn btn-secondary py-1.5 px-3 text-sm">
+              Settings
+            </button>
+            <button onClick={() => navigate(battlerPlayUrl(battler))} className="btn btn-primary py-1.5 px-3 text-sm font-semibold">
+              Play
+            </button>
+          </>}
+        />
+      </PageFrame>
 
       {showSettings && (
         <SettingsModal
@@ -164,7 +119,7 @@ export function BattlerView() {
           }}
         />
       )}
-    </div>
+    </>
   )
 }
 
