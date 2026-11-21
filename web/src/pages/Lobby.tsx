@@ -21,7 +21,7 @@ import {
   setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
-import { LINK, TEXT_INPUT } from "../components/common/styles";
+import { DIALOG_BACKDROP, LINK, TEXT_INPUT } from "../components/common/styles";
 
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 
@@ -561,7 +561,7 @@ export function Lobby() {
   return (
     <>
       {!isConnected && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+        <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
           <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
             <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />

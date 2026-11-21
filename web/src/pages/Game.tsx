@@ -98,7 +98,7 @@ import {
   hasBattleResultConflict,
 } from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
-import { LINK, OPTION_BOX } from "../components/common/styles";
+import { DIALOG_BACKDROP, LINK, OPTION_BOX } from "../components/common/styles";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -563,7 +563,7 @@ function SpectateRequestModal({
   onRespond: (requestId: string, allowed: boolean) => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+    <div className={`fixed inset-0 ${DIALOG_BACKDROP} flex items-center justify-center z-50`}>
       <div className="modal-chrome border gold-border rounded-lg p-6 w-full max-w-sm mx-4">
         <h2 className="text-xl text-white mb-4">Spectate Request</h2>
         <p className="text-gray-300 mb-6">
@@ -2240,7 +2240,7 @@ function GameContent() {
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
       <div className="game-table h-dvh overflow-hidden flex flex-col">
         {!isConnected && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+          <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
             <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
               <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />

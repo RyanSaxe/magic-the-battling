@@ -1,5 +1,6 @@
 import { forwardRef, type CSSProperties } from "react";
 import type { GuideStepDefinition } from "./types";
+import { POPOVER_CHROME } from "../components/common/styles";
 
 interface GuideTooltipProps {
   step: GuideStepDefinition;
@@ -42,7 +43,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
       <div
         ref={ref}
         data-guided-tooltip="true"
-        className={`guided-tooltip absolute z-[82] w-[min(17.5rem,calc(100%-1rem))] sm:w-[min(22rem,calc(100%-2rem))] max-h-[calc(100%-1rem)] overflow-hidden rounded-xl border modal-chrome felt-raised-panel gold-border shadow-[0_18px_42px_rgba(0,0,0,0.58),0_6px_18px_rgba(0,0,0,0.3)] ${
+        className={`guided-tooltip absolute z-[82] w-[min(17.5rem,calc(100%-1rem))] sm:w-[min(22rem,calc(100%-2rem))] max-h-[calc(100%-1rem)] overflow-hidden ${POPOVER_CHROME} ${
           interactive ? "pointer-events-auto" : "pointer-events-none"
         }`}
         style={{

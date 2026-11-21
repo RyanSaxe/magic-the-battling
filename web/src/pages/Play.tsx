@@ -23,7 +23,7 @@ import {
 } from "../utils/deviceIdentity";
 import type { LobbyState, PlayMode } from "../types";
 import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
-import { DIALOG_BACKDROP, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
+import { DIALOG_BACKDROP, DIALOG_CLOSE_BUTTON, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
 
 type SoloPhase =
   | "idle"
@@ -161,7 +161,7 @@ function AdvancedOptionsModal({
           <h3 className="text-white font-semibold">{title}</h3>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-gray-300 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            className={DIALOG_CLOSE_BUTTON}
           >
             ✕
           </button>

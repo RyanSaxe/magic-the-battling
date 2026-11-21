@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, type ReactNode } from 'react'
 import { ToastContext, type Toast, type ToastVariant } from './toastState'
+import { POPOVER_CHROME } from '../components/common/styles'
 
 const MAX_TOASTS = 5
 const TOAST_DURATION = 5000
@@ -73,7 +74,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <div
               key={toast.id}
-              className="pointer-events-auto animate-toast-fade modal-chrome border gold-border rounded-lg shadow-xl px-3 py-2.5 max-w-md w-[min(94vw,32rem)] flex items-center gap-2.5"
+              className={`pointer-events-auto animate-toast-fade ${POPOVER_CHROME} px-3 py-2.5 max-w-md w-[min(94vw,32rem)] flex items-center gap-2.5`}
             >
               <span className={`inline-flex items-center justify-center rounded-full h-7 w-7 shrink-0 ${config.badgeColor} ${config.iconColor}`}>
                 {config.icon}
