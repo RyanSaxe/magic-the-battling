@@ -14,6 +14,7 @@ import { PageFrame } from "../components/common/PageFrame";
 import { BusyNotice } from "../components/common/StatusNotice";
 import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
 import { SurfaceCard } from "../components/common/SurfaceCard";
+import { SpectateRequestModal } from "../components/SpectateRequestModal";
 import { type AppError, getAppErrorMessage } from "../utils/appError";
 import type { LobbyState } from "../types";
 import {
@@ -290,6 +291,7 @@ export function Lobby() {
     isConnected,
     actions,
     send,
+    spectateRequests,
   } = useGame(
     gameId || null,
     session?.sessionId ?? null,
@@ -1045,6 +1047,9 @@ export function Lobby() {
             })()}
         </SurfaceCard>
       </PageFrame>
+      {spectateRequests[0] && (
+        <SpectateRequestModal request={spectateRequests[0]} onRespond={actions.spectateResponse} />
+      )}
       {showRulesPanel && (
         <RulesPanel
           onClose={() => setShowRulesPanel(false)}

@@ -632,6 +632,20 @@ def list_following(
     return {"following": results, "has_more": has_more}
 
 
+# Declared after the other GET routes, since "/my-games" and "/following" would match this path first.
+@router.get("/{battler_id}")
+def get_battler(
+    battler_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(_get_db),
+):
+    battler = db.query(UserBattler).filter(UserBattler.id == battler_id, UserBattler.user_id == user.id).first()
+    if not battler:
+        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, "Battler not found")
+    [resp] = _battler_responses(db, str(user.id), [battler])
+    return resp
+
+
 class FollowCubeRequest(BaseModel):
     cube_id: str
     display_name: str | None = None

@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
-from typing import Any, ClassVar, Literal, cast
+from typing import Any, ClassVar, Protocol, cast
 from uuid import UUID, uuid4
 
 from httpx import HTTPStatusError, RequestError
@@ -121,6 +121,7 @@ from server.services.seat_tokens import (
     token_after_claim,
 )
 from server.services.session_manager import session_manager
+from server.services.spectate_requests import SpectateRequest, SpectateRequests, SpectatorSession
 
 logger = logging.getLogger(__name__)
 
@@ -180,16 +181,25 @@ def _remap_id_dict[T](d: dict[str, T], reverse_map: dict[str, str]) -> dict[str,
     return {reverse_map.get(k, k): v for k, v in d.items()}
 
 
-@dataclass
-class PendingSpectateRequest:
-    request_id: str
-    game_id: str
-    target_player_name: str
-    spectator_name: str
-    status: Literal["pending", "approved", "denied"] = "pending"
-    session_id: str | None = None
-    player_id: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+class SpectateListener(Protocol):
+    """Hears when a player's spectate requests change, and when a game's spectators lose their game."""
+
+    def spectate_requests_changed(self, game_id: str, target_player_name: str) -> None: ...
+
+    def game_dropped(self, game_id: str) -> None: ...
+
+
+class _NoSpectateListener:
+    def spectate_requests_changed(self, game_id: str, target_player_name: str) -> None:
+        pass
+
+    def game_dropped(self, game_id: str) -> None:
+        pass
+
+
+def _start_spectator_session(game_id: str) -> SpectatorSession:
+    session = session_manager.create_session(game_id)
+    return SpectatorSession(session_id=session.session_id, player_id=session.player_id)
 
 
 @dataclass(frozen=True)
@@ -408,12 +418,17 @@ class GameManager:
         self._abandoned_cleanup_tasks: dict[str, asyncio.Task] = {}
         self._pending_disconnect_tasks: dict[str, asyncio.Task] = {}
         self._host_handoff_tasks: dict[str, asyncio.Task] = {}
-        self._spectate_requests: dict[str, PendingSpectateRequest] = {}
+        self._spectate_requests = SpectateRequests(
+            ttl=timedelta(minutes=SPECTATE_REQUEST_TTL_MINUTES),
+            max_total=MAX_SPECTATE_REQUESTS_TOTAL,
+            start_session=_start_spectator_session,
+        )
         self._dirty_games: set[str] = set()
         self._finished_games: set[str] = set()
         self._last_human_activity: dict[str, datetime] = {}
         # The server attaches ConnectionManager's view; a manager used on its own (rules tests) has no sockets.
         self._connected_player_ids: Callable[[str], Collection[str]] = lambda _game_id: ()
+        self._spectate_listener: SpectateListener = _NoSpectateListener()
         self._snapshot_task: asyncio.Task | None = None
         self._action_locks: dict[str, asyncio.Lock] = {}
         self._game_start_slots = asyncio.Semaphore(MAX_GAME_STARTS_IN_FLIGHT)
@@ -437,6 +452,9 @@ class GameManager:
 
     def attach_connected_player_ids(self, connected_player_ids: Callable[[str], Collection[str]]) -> None:
         self._connected_player_ids = connected_player_ids
+
+    def attach_spectate_listener(self, listener: SpectateListener) -> None:
+        self._spectate_listener = listener
 
     def note_human_activity(self, game_id: str) -> None:
         self._last_human_activity[game_id] = datetime.now(UTC)
@@ -1391,7 +1409,8 @@ class GameManager:
         self._active_games.pop(game_id, None)
         self._pending_games.pop(game_id, None)
         self._clear_runtime_player_mappings_for_game(game_id)
-        self._drop_spectate_requests_for_game(game_id)
+        self._spectate_requests.drop_game(game_id)
+        self._spectate_listener.game_dropped(game_id)
 
         self._cancel_host_handoff(game_id)
         abandoned_cleanup = self._abandoned_cleanup_tasks.pop(game_id, None)
@@ -2233,75 +2252,69 @@ class GameManager:
                 return player_id
         return None
 
-    def create_spectate_request(self, game_id: str, target_player_name: str, spectator_name: str) -> str:
+    def get_player_name(self, player_id: str) -> str | None:
+        return self._player_id_to_name.get(player_id)
+
+    def create_spectate_request(self, game_id: str, target_player_name: str, spectator_name: str) -> SpectateRequest:
+        """Ask to watch a player. Open Spectating approves it at once; otherwise it waits for the player's answer.
+
+        Raises TooManySpectateRequestsError when the server holds too many requests."""
         self.cleanup_expired_spectate_requests()
-        if len(self._spectate_requests) >= MAX_SPECTATE_REQUESTS_TOTAL:
-            msg = "Too many spectate requests queued"
-            raise ValueError(msg)
-
-        request_id = secrets.token_urlsafe(8)
-        req = PendingSpectateRequest(
-            request_id=request_id,
-            game_id=game_id,
-            target_player_name=target_player_name,
-            spectator_name=spectator_name,
+        request = self._spectate_requests.create(
+            game_id,
+            target_player_name,
+            spectator_name,
+            approve=self._auto_approves_spectators(game_id),
         )
-        self._spectate_requests[request_id] = req
+        if request.status == "pending":
+            self._spectate_listener.spectate_requests_changed(game_id, target_player_name)
+        return request
 
-        game = self.get_game(game_id)
-        if game and game.config.auto_approve_spectators:
-            self._approve_spectate_request(req)
+    def _auto_approves_spectators(self, game_id: str) -> bool:
+        pending = self._pending_games.get(game_id)
+        if pending is not None:
+            return pending.auto_approve_spectators
+        game = self._active_games.get(game_id)
+        return game is not None and game.config.auto_approve_spectators
 
-        return request_id
+    def get_spectate_request(self, game_id: str, request_id: str) -> SpectateRequest | None:
+        request = self._spectate_requests.get(request_id)
+        return request if request is not None and request.game_id == game_id else None
 
-    def get_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
-        return self._spectate_requests.get(request_id)
+    def pending_spectate_requests(self, game_id: str, target_player_name: str) -> list[SpectateRequest]:
+        return self._spectate_requests.pending_for(game_id, target_player_name)
 
     def respond_to_spectate_request(self, request_id: str, *, game_id: str, responder_id: str, allowed: bool) -> bool:
-        """Approve or deny a pending request; only the player it asks to watch may answer it."""
-        req = self._spectate_requests.get(request_id)
-        if req is None or req.status != "pending" or req.game_id != game_id:
-            return False
-        if self.get_player_id_by_name(game_id, req.target_player_name) != responder_id:
-            return False
-        if allowed:
-            self._approve_spectate_request(req)
-        else:
-            req.status = "denied"
-        return True
+        """Approve or deny a pending request; only the player it asks to watch may answer it.
 
-    def _approve_spectate_request(self, req: PendingSpectateRequest) -> None:
-        req.status = "approved"
-        session = session_manager.create_session(req.game_id)
-        req.session_id = session.session_id
-        req.player_id = session.player_id
+        The responder's requests are sent again either way, since they answered from what their screen showed."""
+        responder_name = self.get_player_name(responder_id)
+        request = self.get_spectate_request(game_id, request_id)
+        answered = (
+            request is not None
+            and self.get_player_id_by_name(game_id, request.target_player_name) == responder_id
+            and self._spectate_requests.answer(request, allowed=allowed)
+        )
+        if responder_name is not None:
+            self._spectate_listener.spectate_requests_changed(game_id, responder_name)
+        return answered
 
-    def is_spectator_approved(self, request_id: str, *, session_id: str, game_id: str, target_player_name: str) -> bool:
-        req = self._spectate_requests.get(request_id)
-        return (
-            req is not None
-            and req.status == "approved"
-            and req.session_id == session_id
-            and req.game_id == game_id
-            and req.target_player_name == target_player_name
+    def cancel_spectate_request(self, game_id: str, request_id: str) -> SpectateRequest | None:
+        """Withdraw a request that is still pending. Returns the request, in whatever status it has now."""
+        request = self.get_spectate_request(game_id, request_id)
+        if request is not None and self._spectate_requests.cancel(request):
+            self._spectate_listener.spectate_requests_changed(game_id, request.target_player_name)
+        return request
+
+    def admit_spectator(self, request_id: str, *, session_id: str, game_id: str, target_player_name: str) -> bool:
+        return self._spectate_requests.admit(
+            request_id, session_id=session_id, game_id=game_id, target_player_name=target_player_name
         )
 
-    def cleanup_expired_spectate_requests(self) -> int:
-        """Expire unanswered and denied requests; approved ones last as long as their game is loaded."""
-        expiry = datetime.now(UTC) - timedelta(minutes=SPECTATE_REQUEST_TTL_MINUTES)
-        expired = [
-            request_id
-            for request_id, req in self._spectate_requests.items()
-            if req.status != "approved" and req.created_at < expiry
-        ]
-        for request_id in expired:
-            del self._spectate_requests[request_id]
-        return len(expired)
-
-    def _drop_spectate_requests_for_game(self, game_id: str) -> None:
-        for request_id, req in list(self._spectate_requests.items()):
-            if req.game_id == game_id:
-                del self._spectate_requests[request_id]
+    def cleanup_expired_spectate_requests(self, now: datetime | None = None) -> None:
+        expired = self._spectate_requests.expire(now or datetime.now(UTC))
+        for game_id, target_player_name in {(r.game_id, r.target_player_name) for r in expired}:
+            self._spectate_listener.spectate_requests_changed(game_id, target_player_name)
 
     def _get_pending_target_elo(self, pending: PendingGame) -> float | None:
         if pending.play_mode == "limited":
