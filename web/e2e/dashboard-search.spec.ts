@@ -12,8 +12,11 @@ const CUBES = [cube('auto', 'Crucible'), cube('vintage', 'Vintage Cube'), cube('
 
 test.use({ viewport: { width: 1280, height: 800 }, isMobile: false })
 
+const SEARCH_DELAY_MS = 300
+
 test('Discover searches once typing stops, counts the matches and says when none match', async ({ page, baseURL }) => {
   const searches: string[] = []
+  await page.clock.install()
   await openPage(page, baseURL!, {
     ...discover,
     serve: async (p, url) => {
@@ -29,11 +32,17 @@ test('Discover searches once typing stops, counts the matches and says when none
   const search = discover.primaryAction(page)
   await expect(page.getByText('3 popular cubes')).toBeVisible()
 
-  await search.pressSequentially('pauper', { delay: 40 })
+  // With the clock paused, the search can only wait for typing to stop, however slowly the keys arrive.
+  await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 1000)
+  await search.pressSequentially('pauper')
+  await page.clock.runFor(SEARCH_DELAY_MS - 1)
+  expect(searches).toEqual([''])
+  await page.clock.runFor(1)
   await expect(page.getByText('1 matching cube')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'The Pauper Cube' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Crucible' })).toHaveCount(0)
   expect(searches).toEqual(['', 'pauper'])
+  await page.clock.resume()
 
   await search.fill('zzz')
   await expect(page.getByText('No cubes match “zzz”.')).toBeVisible()
