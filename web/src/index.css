@@ -293,24 +293,33 @@ input:-webkit-autofill:focus {
   background-color: var(--seam-stroke);
 }
 
-.shell-scroll-row,
-.shell-scroll-col {
-  overflow-y: auto;
-  overflow-x: hidden;
-  overscroll-behavior: contain;
+/* Page content centers with auto margins rather than justify-content: center,
+   so content taller than its column starts at the top and can be scrolled to. */
+.page-center > :first-child {
+  margin-top: auto;
 }
 
-@media (min-width: 640px) and (max-height: 820px) {
-  .shell-scroll-row {
-    align-items: flex-start;
-    padding-top: 1rem;
-    padding-bottom: 1rem;
+.page-center > :last-child {
+  margin-bottom: auto;
+}
+
+@media (width < 640px), (height > 820px) {
+  .page-center-except-short-wide > :first-child {
+    margin-top: auto;
   }
 
-  .shell-scroll-col {
-    justify-content: flex-start;
-    padding-top: 1rem;
-    padding-bottom: 1rem;
+  .page-center-except-short-wide > :last-child {
+    margin-bottom: auto;
+  }
+}
+
+@media (width >= 640px) and (height > 820px) {
+  .page-center-tall-wide > :first-child {
+    margin-top: auto;
+  }
+
+  .page-center-tall-wide > :last-child {
+    margin-bottom: auto;
   }
 }
 

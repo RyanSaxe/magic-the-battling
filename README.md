@@ -1,6 +1,6 @@
-# Crucible
+# Pitfight
 
-An online application for playing [Crucible](https://cubecobra.com/cube/overview/auto), a Magic: The Gathering format that combines drafting with elimination-style battles.
+An online application for playing [Pitfight](https://cubecobra.com/cube/overview/auto), a Magic: The Gathering format that combines drafting with elimination-style fights.
 
 ## Community
 

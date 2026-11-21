@@ -78,14 +78,14 @@ function buildWelcomeGuide(): GuideDefinition {
     steps: [
       {
         id: "intro",
-        title: "Playing Crucible",
+        title: "Playing Pitfight",
         placement: "center",
         cardPlacement: "center",
         positionTargetId: "game-content",
         primaryActionLabel: "Game Phases",
         content: {
-          summary: "Like an autobattler, players alternate between drafting cards and battling with them until only one player remains.",
-          detail: "Unlike an autobattler, battles are mini-games of Magic you play out manually vs. your opponent.",
+          summary: "Like an autobattler, players alternate between drafting cards and fighting with them until only one player remains.",
+          detail: "Unlike an autobattler, fights are mini-games of Magic you play out manually vs. your opponent.",
         },
       },
       {
@@ -108,7 +108,7 @@ function buildWelcomeGuide(): GuideDefinition {
         primaryActionLabel: "Next",
         content: {
           summary: "You are dealt a pack of 5 cards and may swap any number of cards between that pack and your pool.",
-          detail: "The game starts in Build on Stage 3, Round 1 so you can learn Build and Battle before making draft picks.",
+          detail: "The game starts in Build on Stage 3, Round 1 so you can learn Build and Fight before making draft picks.",
         },
       },
       {
@@ -119,12 +119,12 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Choose your exact starting hand and 3 basic lands to battle with.",
+          summary: "Choose your exact starting hand and 3 basic lands to fight with.",
         },
       },
       {
         id: "battle",
-        title: "Battle your Opponent in Magic",
+        title: "Fight your Opponent in Magic",
         targetId: "timeline-phase-battle",
         placement: "bottom",
         cardPlacement: "bottom-center",
@@ -141,8 +141,8 @@ function buildWelcomeGuide(): GuideDefinition {
         cardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "After each battle, get a Treasure token, some extra loot, and then advance to the next round.",
-          detail: "After the last battle of a stage, the extra loot is very special and powerful.",
+          summary: "After each fight, get a Treasure token, some extra loot, and then advance to the next round.",
+          detail: "After the last fight of a stage, the extra loot is very special and powerful.",
         },
       },
       {
@@ -177,7 +177,7 @@ function buildBuildGuide(): GuideDefinition {
         positionTargetId: "game-content",
         primaryActionLabel: "Next",
         content: {
-          summary: "Build the best starting hand you can from your pool. You begin battle with 3 basic lands of your choice already untapped on the battlefield.",
+          summary: "Build the best starting hand you can from your pool. You begin the fight with 3 basic lands of your choice already untapped on the battlefield.",
         },
       },
       {
@@ -218,7 +218,7 @@ function buildBuildGuide(): GuideDefinition {
         mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "Your hand must be filled to the current hand size, and this exact hand becomes your opening hand in battle.",
+          summary: "Your hand must be filled to the current hand size, and this exact hand becomes your opening hand in the fight.",
           detail: "The game starts with 3 cards in hand, and your hand size increases by 1 after every 3 rounds.",
         },
       },
@@ -267,14 +267,14 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
   const steps: GuideStepDefinition[] = [
     {
       id: "intro",
-      title: "Battle Phase",
+      title: "Fight Phase",
       placement: "center",
       cardPlacement: "center",
       positionTargetId: "game-content",
       primaryActionLabel: "Next",
       content: {
-        summary: "Battle is a short game of Magic with 10 life and empty libraries.",
-        detail: "You play it out manually against your opponent. You keep any treasures still on your battlefield after battle, up to five.",
+        summary: "Fight is a short game of Magic with 10 life and empty libraries.",
+        detail: "You play it out manually against your opponent. You keep any treasures still on your battlefield after the fight, up to five.",
       },
     },
     {
@@ -343,15 +343,15 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
     placement: "top",
     cardPlacement: "top-center",
     mobileCardPlacement: "top-center",
-    primaryActionLabel: "Ready to Battle",
+    primaryActionLabel: "Ready to Fight",
     content: {
-      summary: "Whenever the battle is over, click this button to submit the result.",
+      summary: "Whenever the fight is over, click this button to submit the result.",
     },
   });
 
   return {
     id: "battle",
-    label: "Battle",
+    label: "Fight",
     phase: "battle",
     steps,
   };
@@ -367,7 +367,7 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       positionTargetId: "game-content",
       primaryActionLabel: "Next",
       content: {
-        summary: "After each battle, everyone gets +1 treasure and a random card as loot.",
+        summary: "After each fight, everyone gets +1 treasure and a random card as loot.",
         detail: "At the end of a stage, the loot is different and more powerful.",
       },
     },
@@ -532,8 +532,8 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         },
         content: {
           summary: ctx.draftGuideOpponentRevealedCount > 0
-            ? "This panel shows the most recent cards that opponent has revealed in battle."
-            : "This panel is where revealed cards will appear after an opponent has shown cards in battle.",
+            ? "This panel shows the most recent cards that opponent has revealed in a fight."
+            : "This panel is where revealed cards will appear after an opponent has shown cards in a fight.",
           detail: ctx.draftGuideOpponentRevealedCount > 0
             ? "Use those cards to infer what they are building, then adjust your picks, rolls, and later build decisions."
             : "When this area is populated, use it as scouting information. What opponents have shown can change the value of cards and help you set up positive matchups.",
@@ -593,7 +593,7 @@ function buildTreasureProducerHint(ctx: GuidedWalkthroughContext): GuideDefiniti
         mobileCardPlacement: isBuild ? "top-center" : "bottom-center",
         primaryActionLabel: "Got it",
         content: {
-          summary: "Treasure-producing cards are worth extra attention because they help both in battle and in future drafts.",
+          summary: "Treasure-producing cards are worth extra attention because they help both in fights and in future drafts.",
           detail: isBuild
             ? "If you can start this card early, it may be something you can turn into an advantage."
             : "Even a modest treasure producer can be worth prioritizing because economy carries across phases.",
@@ -619,8 +619,8 @@ function buildTreasureCapHint(ctx: GuidedWalkthroughContext): GuideDefinition {
         mobileCardPlacement: "bottom-center",
         primaryActionLabel: "Got it",
         content: {
-          summary: "After battle, you keep at most 5 treasure that remain on your battlefield.",
-          detail: "You're already above the amount you can carry out of battle. Spending one on a roll now is often better than letting that value go to waste later.",
+          summary: "After a fight, you keep at most 5 treasure that remain on your battlefield.",
+          detail: "You're already above the amount you can carry out of a fight. Spending one on a roll now is often better than letting that value go to waste later.",
         },
       },
     ],
@@ -631,12 +631,12 @@ function buildBattleResultSubmitGuide(ctx: GuidedWalkthroughContext): GuideDefin
   const isPuppet = !!ctx.currentBattle?.can_manipulate_opponent;
   return {
     id: "battle_result_submit",
-    label: "Battle",
+    label: "Fight",
     phase: "battle",
     steps: [
       {
         id: "result-submit",
-        title: "Submit The Battle Result",
+        title: "Submit The Fight Result",
         targetId: "battle-submit-popover",
         positionTargetId: "battle-battlefield",
         placement: "top",
@@ -645,10 +645,10 @@ function buildBattleResultSubmitGuide(ctx: GuidedWalkthroughContext): GuideDefin
         allowTargetInteraction: true,
         content: {
           summary: isPuppet
-            ? "Choose who won this puppet battle based on how you think it would play out."
+            ? "Choose who won this puppet fight based on how you think it would play out."
             : "Choose who won, then wait for your opponent to submit their result too.",
           detail: isPuppet
-            ? "Since this is a puppet battle, the result is applied immediately."
+            ? "Since this is a puppet fight, the result is applied immediately."
             : "Both players must agree on the result before the game moves on — if results conflict, you will both be asked to resubmit.",
         },
       },
@@ -683,7 +683,7 @@ function buildUnappliedUpgradeHint(): GuideDefinition {
 function buildBattleRevealUpgradeHint(): GuideDefinition {
   return {
     id: "hint_battle_unrevealed_upgrade",
-    label: "Battle Tip",
+    label: "Fight Tip",
     phase: "battle",
     steps: [
       {

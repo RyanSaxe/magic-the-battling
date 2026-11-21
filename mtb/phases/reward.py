@@ -133,6 +133,7 @@ def _award_rewards(
     game: Game,
     player: Player,
     opponent_name: str,
+    *,
     winner_name: str | None,
     is_draw: bool,
     poison_dealt: int,
@@ -294,6 +295,7 @@ def start_rewards_single(
     game: Game,
     player: Player,
     opponent_name: str,
+    *,
     won: bool,
     poison_dealt: int,
     poison_taken: int,
@@ -323,6 +325,7 @@ def start_vs_static_rewards_only(
     game: Game,
     player: Player,
     opponent: StaticOpponent,
+    *,
     player_won: bool,
     is_draw: bool,
     poison_dealt: int,
@@ -363,7 +366,7 @@ def start_vs_static_rewards_only(
 
 
 def set_last_battle_result_no_rewards(
-    player: Player, opponent_name: str, winner_name: str | None, is_draw: bool, poison_dealt: int, poison_taken: int
+    player: Player, opponent_name: str, *, winner_name: str | None, is_draw: bool, poison_dealt: int, poison_taken: int
 ) -> None:
     """Set last_battle_result for a player who won't get rewards (lethal/finale)."""
     player.last_battle_result = LastBattleResult(
