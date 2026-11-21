@@ -150,6 +150,8 @@ export interface Counts {
   opponentHand?: number
   opponentLands?: number
   opponentNonlands?: number
+  graveyard?: number
+  exile?: number
 }
 
 export type GamePhase = 'draft' | 'build' | 'battle' | 'reward' | 'eliminated' | 'game_over'
@@ -166,6 +168,9 @@ function battleView(counts: Counts, suddenDeath: boolean): CompactBattleView {
   yours.hand = cards('battle-hand', counts.hand ?? 0)
   yours.battlefield = [...cards('your-land', counts.lands ?? 0, 'land'), ...cards('your-creature', counts.nonlands ?? 0)]
   yours.library = cards('your-library', 20)
+  yours.sideboard = cards('battle-sideboard', counts.sideboard ?? 0, 'spell', 4)
+  yours.graveyard = cards('your-graveyard', counts.graveyard ?? 0, 'spell', 10)
+  yours.exile = cards('your-exile', counts.exile ?? 0, 'spell', 12)
   const theirs = emptyZones()
   theirs.battlefield = [
     ...cards('their-land', counts.opponentLands ?? counts.lands ?? 0, 'land', 1),
