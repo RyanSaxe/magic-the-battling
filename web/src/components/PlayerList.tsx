@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import type { LastResult, Phase, PlayerView } from "../types";
+import type { Phase, PlayerView } from "../types";
 import { MoneyBagIcon, PoisonIcon } from "./icons";
 import { useContextStrip } from "../contexts";
-import { getOrdinal } from "../utils/format";
+import { getLastResultWord, getOrdinal } from "../utils/format";
 import { getSidebarPlacementRank, getSidebarPlayerOrder } from "../utils/playerPlacement";
 
 interface PlayerListProps {
@@ -17,8 +17,6 @@ type ShareResultStatus = "viewing" | "alive" | "dead";
 
 /** Alive, fighting on as the Ghost (the most recently eliminated player), or out of the game. */
 type Standing = "alive" | "ghost" | "out";
-
-const RESULT_WORDS: Record<LastResult, string> = { win: "Won", loss: "Lost", draw: "Drew" };
 
 const ACTIVITY_WORDS: Partial<Record<Phase, string>> = {
   draft: "Drafting",
@@ -132,7 +130,7 @@ export function PlayerRow({
             <span className="player-card-name">{player.name}</span>
             {player.last_result && (
               <span className={`player-card-result player-card-result-${player.last_result}`} title="Last fight">
-                {RESULT_WORDS[player.last_result]}
+                {getLastResultWord(player.last_result)}
               </span>
             )}
           </span>

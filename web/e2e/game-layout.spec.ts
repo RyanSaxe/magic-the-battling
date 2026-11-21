@@ -533,4 +533,18 @@ test.describe('the player cards', () => {
       expect(Math.abs(resultBox.y + resultBox.height / 2 - (nameBox.y + nameBox.height / 2))).toBeLessThan(3)
     })
   }
+
+  test('name the last fight the same way as the scouting Overview', async ({ page, baseURL }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await serveGame(page, baseURL!, { ...screen, opponents: [{ name: 'Bob', last_result: 'loss' }] })
+    await page.goto(`/game/${GAME_ID}/play`)
+    await expectGameShown(page)
+
+    const card = page.locator('[data-guide-player-row="Bob"]')
+    await expect(card.getByTitle('Last fight')).toHaveText('Lost')
+    await card.getByRole('button').click()
+    await page.getByRole('button', { name: 'Overview' }).click()
+    const lastResult = page.locator('dl > div', { has: page.getByText('Last result', { exact: true }) }).locator('dd')
+    await expect(lastResult).toHaveText('Lost')
+  })
 })
