@@ -60,7 +60,13 @@ import {
   getRevealedAppliedUpgrades,
   getUnrevealedAppliedUpgrades,
 } from "../utils/upgrades";
-import { DRAFT_DONE_BUTTON_LABEL, type Phase } from "../constants/phases";
+import {
+  BATTLE_SUBMIT_BUTTON_LABEL,
+  BUILD_SUBMIT_BUTTON_LABEL,
+  DRAFT_DONE_BUTTON_LABEL,
+  REWARD_CONTINUE_BUTTON_LABEL,
+  type Phase,
+} from "../constants/phases";
 import type {
   GuideRequest,
   GuidedGuideId,
@@ -1964,7 +1970,7 @@ function GameContent() {
               className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               data-guide-target="build-submit"
             >
-              {buildReadyPending ? "Submitting..." : "Submit Hand"}
+              {buildReadyPending ? "Submitting..." : BUILD_SUBMIT_BUTTON_LABEL}
             </button>
             {showSubmitHandPopover && canReady && (
               <SubmitPopover
@@ -2053,7 +2059,7 @@ function GameContent() {
               className="btn btn-primary"
               data-guide-target="battle-submit"
             >
-              Submit Result
+              {BATTLE_SUBMIT_BUTTON_LABEL}
             </button>
             {showSubmitResultPopover && (
               <SubmitPopover
@@ -2094,7 +2100,7 @@ function GameContent() {
         ? selectedUpgradeId
           ? "Claim & Continue"
           : "Select Upgrade"
-        : "Continue";
+        : REWARD_CONTINUE_BUTTON_LABEL;
       right = (
         <button
           onClick={handleContinue}

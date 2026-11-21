@@ -6,7 +6,12 @@ import type {
   GuidedWalkthroughContext,
 } from "./types";
 import { textForInput } from "../utils/inputMode";
-import { DRAFT_DONE_BUTTON_LABEL } from "../constants/phases";
+import {
+  BATTLE_SUBMIT_BUTTON_LABEL,
+  BUILD_SUBMIT_BUTTON_LABEL,
+  DRAFT_DONE_BUTTON_LABEL,
+  REWARD_CONTINUE_BUTTON_LABEL,
+} from "../constants/phases";
 
 const CONDITIONAL_GUIDE_PRIORITY: ConditionalGuideId[] = [
   "hint_treasure_producer",
@@ -234,7 +239,10 @@ function buildBuildGuide(): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Ready to Build",
         content: {
-          summary: "Whenever you're ready, click this button to lock in your build.",
+          summary: textForInput({
+            text: `Whenever you're ready, click ${BUILD_SUBMIT_BUTTON_LABEL} to lock in your build.`,
+            touch: `Whenever you're ready, tap ${BUILD_SUBMIT_BUTTON_LABEL} to lock in your build.`,
+          }),
         },
       },
     ],
@@ -350,7 +358,10 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
     mobileCardPlacement: "top-center",
     primaryActionLabel: "Ready to Fight",
     content: {
-      summary: "Whenever the fight is over, click this button to submit the result.",
+      summary: textForInput({
+        text: `Whenever the fight is over, click ${BATTLE_SUBMIT_BUTTON_LABEL} to choose who won.`,
+        touch: `Whenever the fight is over, tap ${BATTLE_SUBMIT_BUTTON_LABEL} to choose who won.`,
+      }),
     },
   });
 
@@ -401,7 +412,11 @@ function buildRewardGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       primaryActionLabel: "Ready to Draft",
       allowTargetInteraction: true,
       content: {
-        summary: "Whenever you're ready, click this button to start the draft phase of the next round.",
+        // Only a stage end offers an upgrade, and this step skips stage ends, so the button reads Continue.
+        summary: textForInput({
+          text: `Whenever you're ready, click ${REWARD_CONTINUE_BUTTON_LABEL} to start the draft phase of the next round.`,
+          touch: `Whenever you're ready, tap ${REWARD_CONTINUE_BUTTON_LABEL} to start the draft phase of the next round.`,
+        }),
       },
     });
   }
