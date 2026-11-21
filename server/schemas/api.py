@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, Field, field_validator
@@ -53,6 +54,7 @@ class CreateGameResponse(BaseModel):
     join_code: str
     session_id: str
     player_id: str
+    seat_token: str
 
 
 class JoinGameRequest(BaseModel):
@@ -67,12 +69,35 @@ class JoinGameRequest(BaseModel):
 
 class RejoinGameRequest(BaseModel):
     player_name: str
+    seat_token: str | None = None
 
 
 class JoinGameResponse(BaseModel):
     game_id: str
     session_id: str
     player_id: str
+    seat_token: str
+
+
+class ResumableSeat(BaseModel):
+    game_id: str
+    player_name: str
+    seat_token: str
+
+
+class ResumableRequest(BaseModel):
+    seats: list[ResumableSeat] = Field(max_length=10)
+
+
+class ResumableGame(BaseModel):
+    game_id: str
+    player_name: str
+    kind: Literal["lobby", "game"]
+    last_active_at: datetime | None = None
+
+
+class ResumableResponse(BaseModel):
+    games: list[ResumableGame]
 
 
 class StartGameResponse(BaseModel):
@@ -233,6 +258,7 @@ class LobbyPlayer(BaseModel):
     name: str
     is_ready: bool = False
     is_host: bool = False
+    is_connected: bool = False
     battler_id: str | None = None
     battler_status: BattlerLoadingStatus | None = None
     battler_error: str | None = None

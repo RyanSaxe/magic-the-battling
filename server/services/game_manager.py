@@ -4,7 +4,7 @@ import json
 import logging
 import random
 import secrets
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Collection, Coroutine
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -95,6 +95,8 @@ from server.schemas.api import (
     LobbyPlayer,
     LobbyStateResponse,
     PlayerView,
+    ResumableGame,
+    ResumableSeat,
     RevealAnimationView,
     SelfPlayerView,
 )
@@ -106,9 +108,30 @@ from server.services.game_serialization import (
     last_battle_result_to_view,
     zones_to_view,
 )
+from server.services.seat_tokens import (
+    SeatClaimRefusal,
+    SeatClaimRefusedError,
+    hash_seat_token,
+    new_seat_token,
+    seat_claim_refusal,
+    seat_token_matches,
+    token_after_claim,
+)
 from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
+
+HOST_HANDOFF_GRACE_SECONDS = 60.0
+POST_GAME_CLEANUP_SECONDS = 300.0
+ABANDONED_CLEANUP_SECONDS = 86400.0
+FINISHED_PLAYER_PHASES = frozenset({"eliminated", "winner", "game_over"})
+
+
+def _current_task() -> asyncio.Task | None:
+    try:
+        return asyncio.current_task()
+    except RuntimeError:
+        return None
 
 
 def _utc_or_default(value: datetime | None, default: datetime) -> datetime:
@@ -193,6 +216,8 @@ class PendingGame:
     battler_loading: bool = False
     battler_error: str | None = None
     player_user_ids: dict[str, str] = field(default_factory=dict)
+    seat_token_hashes: dict[str, str] = field(default_factory=dict)
+    host_away_since: datetime | None = None
     _loading_task: asyncio.Task | None = field(default=None, repr=False)
 
     def has_player_named(self, name: str) -> bool:
@@ -203,6 +228,12 @@ class PendingGame:
 
 class GameStartQueueFullError(RuntimeError):
     pass
+
+
+@dataclass(frozen=True)
+class SeatClaim:
+    player_id: str
+    seat_token: str
 
 
 def _transfer_card_state(card_id: str, from_zones: Zones, to_zones: Zones) -> None:
@@ -228,13 +259,16 @@ class GameManager:
         self._player_to_game: dict[str, str] = {}
         self._player_id_to_name: dict[str, str] = {}
         self._join_code_to_game: dict[str, str] = {}
-        self._cleanup_tasks: dict[str, asyncio.Task] = {}
+        self._post_game_cleanup_tasks: dict[str, asyncio.Task] = {}
+        self._abandoned_cleanup_tasks: dict[str, asyncio.Task] = {}
         self._pending_disconnect_tasks: dict[str, asyncio.Task] = {}
+        self._host_handoff_tasks: dict[str, asyncio.Task] = {}
         self._spectate_requests: dict[str, PendingSpectateRequest] = {}
         self._dirty_games: set[str] = set()
         self._finished_games: set[str] = set()
         self._last_human_activity: dict[str, datetime] = {}
-        self._connected_humans: dict[str, int] = {}
+        # The server attaches ConnectionManager's view; a manager used on its own (rules tests) has no sockets.
+        self._connected_player_ids: Callable[[str], Collection[str]] = lambda _game_id: ()
         self._snapshot_task: asyncio.Task | None = None
         self._action_locks: dict[str, asyncio.Lock] = {}
         self._game_start_slots = asyncio.Semaphore(MAX_GAME_STARTS_IN_FLIGHT)
@@ -256,12 +290,10 @@ class GameManager:
             if human_activity:
                 self._last_human_activity[game_id] = datetime.now(UTC)
 
-    def update_connected_humans(self, game_id: str, delta: int) -> None:
-        next_count = self._connected_humans.get(game_id, 0) + delta
-        if next_count <= 0:
-            self._connected_humans.pop(game_id, None)
-            return
-        self._connected_humans[game_id] = next_count
+    def attach_connected_player_ids(self, connected_player_ids: Callable[[str], Collection[str]]) -> None:
+        self._connected_player_ids = connected_player_ids
+
+    def note_human_activity(self, game_id: str) -> None:
         self._last_human_activity[game_id] = datetime.now(UTC)
 
     def loaded_games_count(self) -> int:
@@ -271,7 +303,7 @@ class GameManager:
         hot_cutoff = datetime.now(UTC) - timedelta(minutes=HOT_ACTION_WINDOW_MINUTES)
         hot = 0
         for game_id in self._active_games:
-            connected = self._connected_humans.get(game_id, 0) > 0
+            connected = bool(self._connected_player_ids(game_id))
             last_human = _utc_or_default(
                 self._last_human_activity.get(game_id),
                 datetime.min.replace(tzinfo=UTC),
@@ -503,9 +535,11 @@ class GameManager:
         game_id: str,
         player_pairs: list[tuple[str, str]],
         player_user_ids: dict[str, str] | None = None,
+        seat_token_hashes: dict[str, str] | None = None,
     ) -> None:
         # Keep one active player_id mapping per human name for deterministic reconnect behavior.
         user_ids = player_user_ids or {}
+        token_hashes = seat_token_hashes or {}
         for player_id, player_name in player_pairs:
             existing_rows = (
                 db_session.query(GamePlayerRecord)
@@ -518,6 +552,7 @@ class GameManager:
             )
             existing_user_id = next((cast(str, row.user_id) for row in existing_rows if row.user_id), None)
             resolved_user_id = user_ids.get(player_id) or existing_user_id
+            existing_hash = next((cast(str, row.seat_token_hash) for row in existing_rows if row.seat_token_hash), None)
 
             for row in existing_rows:
                 db_session.delete(row)
@@ -529,6 +564,7 @@ class GameManager:
                     player_name=player_name,
                     is_puppet=False,
                     user_id=resolved_user_id,
+                    seat_token_hash=token_hashes.get(player_name) or existing_hash,
                 )
             )
 
@@ -574,7 +610,6 @@ class GameManager:
                 logger.warning("No human player mappings restored for game_id=%s", game_id)
             last_activity = cast(datetime | None, row.last_human_activity_at)
             self._last_human_activity[game_id] = _utc_or_default(last_activity, datetime.now(UTC))
-            self._connected_humans[game_id] = 0
             self._dirty_games.discard(game_id)
             logger.info("Restored active game from snapshot: game_id=%s", game_id)
             return True
@@ -611,7 +646,6 @@ class GameManager:
                     self.mark_game_dirty(snapshot_game_id, human_activity=False)
                 self._restore_human_player_mappings(session, snapshot_game_id, game)
                 self._last_human_activity[snapshot_game_id] = _utc_or_default(last_activity, datetime.now(UTC))
-                self._connected_humans[snapshot_game_id] = 0
                 restored += 1
             session.commit()
         finally:
@@ -651,20 +685,30 @@ class GameManager:
     def cleanup_stale_game_records(self, max_age_hours: int = STALE_GAME_CLEANUP_HOURS) -> int:
         cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
         session = db.SessionLocal()
+        loaded_ids = list(self._active_games)
         try:
             stale = (
                 session.query(GameRecord)
                 .outerjoin(ActiveGameSnapshot, ActiveGameSnapshot.game_id == GameRecord.id)
                 .filter(
                     GameRecord.ended_at.is_(None),
+                    GameRecord.id.not_in(loaded_ids),
                     func.coalesce(ActiveGameSnapshot.last_human_activity_at, GameRecord.created_at) < cutoff,
                 )
                 .all()
             )
-            if not stale:
+            # A paused game expires by its last human activity, even when an older eviction stamped ended_at.
+            stale_snapshot_ids = [
+                game_id
+                for (game_id,) in session.query(ActiveGameSnapshot.game_id).filter(
+                    ActiveGameSnapshot.last_human_activity_at < cutoff,
+                    ActiveGameSnapshot.game_id.not_in(loaded_ids),
+                )
+            ]
+            stale_ids = {cast(str, record.id) for record in stale} | set(stale_snapshot_ids)
+            if not stale_ids:
                 return 0
 
-            stale_ids = [record.id for record in stale]
             now = datetime.now(UTC)
             for record in stale:
                 record.ended_at = now  # ty: ignore[invalid-assignment]
@@ -673,7 +717,7 @@ class GameManager:
                 synchronize_session=False
             )
             session.commit()
-            logger.info("Closed %d stale game records older than %dh", len(stale_ids), max_age_hours)
+            logger.info("Retired %d stale games older than %dh", len(stale_ids), max_age_hours)
             return len(stale_ids)
         except Exception:
             logger.exception("Error cleaning up stale game records")
@@ -686,7 +730,7 @@ class GameManager:
         cutoff = datetime.now(UTC) - timedelta(minutes=IDLE_EVICT_MINUTES)
         candidates: list[str] = []
         for game_id in self._active_games:
-            if self._connected_humans.get(game_id, 0) > 0:
+            if self._connected_player_ids(game_id):
                 continue
             last_human = _utc_or_default(
                 self._last_human_activity.get(game_id),
@@ -713,16 +757,21 @@ class GameManager:
         active_before = len(self._active_games)
         pending_before = len(self._pending_games)
         spectate_before = len(self._spectate_requests)
-        cleanup_before = len(self._cleanup_tasks)
+        cleanup_before = len(self._post_game_cleanup_tasks) + len(self._abandoned_cleanup_tasks)
         pending_disconnect_before = len(self._pending_disconnect_tasks)
 
-        for task in list(self._cleanup_tasks.values()):
-            task.cancel()
-        self._cleanup_tasks.clear()
+        for tasks in (self._post_game_cleanup_tasks, self._abandoned_cleanup_tasks):
+            for task in list(tasks.values()):
+                task.cancel()
+            tasks.clear()
 
         for task in list(self._pending_disconnect_tasks.values()):
             task.cancel()
         self._pending_disconnect_tasks.clear()
+
+        for task in list(self._host_handoff_tasks.values()):
+            task.cancel()
+        self._host_handoff_tasks.clear()
 
         game_ids = list(set(self._active_games.keys()) | set(self._pending_games.keys()))
         for game_id in game_ids:
@@ -968,6 +1017,7 @@ class GameManager:
                 game_id,
                 list(zip(pending.player_ids, pending.player_names, strict=False)),
                 player_user_ids=pending.player_user_ids,
+                seat_token_hashes=pending.seat_token_hashes,
             )
             db.commit()
 
@@ -992,7 +1042,6 @@ class GameManager:
         self._active_games[game_id] = game
         self._pending_games.pop(game_id, None)
         self._last_human_activity[game_id] = datetime.now(UTC)
-        self._connected_humans[game_id] = 0
         self.mark_game_dirty(game_id)
 
         return game
@@ -1074,6 +1123,7 @@ class GameManager:
                         game_id,
                         list(zip(pending.player_ids, pending.player_names, strict=False)),
                         player_user_ids=pending.player_user_ids,
+                        seat_token_hashes=pending.seat_token_hashes,
                     )
                     db.commit()
 
@@ -1098,7 +1148,6 @@ class GameManager:
                 self._active_games[game_id] = game
                 self._pending_games.pop(game_id, None)
                 self._last_human_activity[game_id] = datetime.now(UTC)
-                self._connected_humans[game_id] = 0
                 self.mark_game_dirty(game_id)
                 return game
         except GameStartQueueFullError:
@@ -1151,7 +1200,7 @@ class GameManager:
             self._persist_final_placements(db, game_id, game)
 
         self.delete_snapshot(game_id)
-        self._schedule_cleanup(game_id)
+        self._schedule_cleanup(self._post_game_cleanup_tasks, game_id, POST_GAME_CLEANUP_SECONDS)
 
     def _persist_player_placement(self, db: Session | None, game_id: str | None, participant: Player | Puppet) -> None:
         if not db or not game_id:
@@ -1187,10 +1236,9 @@ class GameManager:
             history.final_treasures = participant.treasures if isinstance(participant, Player) else None  # ty: ignore[invalid-assignment]
         return history is not None
 
-    def _schedule_cleanup(self, game_id: str, delay: float = 300.0) -> None:
-        """Schedule async cleanup after delay seconds (default 5 min)."""
-        if game_id in self._cleanup_tasks:
-            self._cleanup_tasks[game_id].cancel()
+    def _schedule_cleanup(self, tasks: dict[str, asyncio.Task], game_id: str, delay: float) -> None:
+        if existing := tasks.pop(game_id, None):
+            existing.cancel()
 
         async def cleanup_after_delay():
             await asyncio.sleep(delay)
@@ -1201,17 +1249,16 @@ class GameManager:
         except RuntimeError:
             return
 
-        task = loop.create_task(cleanup_after_delay())
-        self._cleanup_tasks[game_id] = task
+        tasks[game_id] = loop.create_task(cleanup_after_delay())
 
-    def schedule_abandoned_cleanup(self, game_id: str, delay: float = 86400.0) -> None:
+    def schedule_abandoned_cleanup(self, game_id: str, delay: float = ABANDONED_CLEANUP_SECONDS) -> None:
         """Schedule cleanup for abandoned game (default 24 hours)."""
         logger.info("Scheduling abandoned game cleanup for game_id=%s in %.0f seconds", game_id, delay)
-        self._schedule_cleanup(game_id, delay)
+        self._schedule_cleanup(self._abandoned_cleanup_tasks, game_id, delay)
 
     def cancel_abandoned_cleanup(self, game_id: str) -> None:
-        """Cancel scheduled cleanup when a player reconnects."""
-        if task := self._cleanup_tasks.pop(game_id, None):
+        """Cancel the abandoned-game cleanup when a player reconnects. A finished game's cleanup still runs."""
+        if task := self._abandoned_cleanup_tasks.pop(game_id, None):
             task.cancel()
             logger.info("Cancelled abandoned game cleanup for game_id=%s", game_id)
 
@@ -1231,8 +1278,15 @@ class GameManager:
         self._pending_games.pop(game_id, None)
         self._clear_runtime_player_mappings_for_game(game_id)
 
-        self._cleanup_tasks.pop(game_id, None)
-        self._connected_humans.pop(game_id, None)
+        self._cancel_host_handoff(game_id)
+        abandoned_cleanup = self._abandoned_cleanup_tasks.pop(game_id, None)
+        # Unloading only frees memory, so a finished game's post-game cleanup stays scheduled and still retires it.
+        post_game_cleanup = None if preserve_snapshot else self._post_game_cleanup_tasks.pop(game_id, None)
+        running = _current_task()
+        for cleanup_task in (abandoned_cleanup, post_game_cleanup):
+            # The scheduled cleanup itself ends up here, and must not cancel itself mid-run.
+            if cleanup_task is not None and cleanup_task is not running:
+                cleanup_task.cancel()
         self._last_human_activity.pop(game_id, None)
         self._action_locks.pop(game_id, None)
         self._finished_games.discard(game_id)
@@ -1680,6 +1734,8 @@ class GameManager:
         player_name = self._player_id_to_name.get(player_id)
         if not player_name:
             return None
+        if self._active_games.get(self._player_to_game.get(player_id, "")) is not game:
+            return None
         for player in game.players:
             if player.name == player_name:
                 return player
@@ -1706,50 +1762,173 @@ class GameManager:
             return not is_player_connected(game_id, player_id)
         return True
 
-    def rejoin_game(self, game_id: str, player_name: str, player_id: str) -> bool:
-        if game_id not in self._active_games:
-            self.restore_game_from_snapshot(game_id)
-
-        game = self._active_games.get(game_id)
-        if not game or not any(p.name == player_name for p in game.players):
-            return False
-
-        old_player_ids = [
-            pid
-            for pid, name in self._player_id_to_name.items()
-            if name == player_name and self._player_to_game.get(pid) == game_id
-        ]
-        for old_pid in old_player_ids:
-            self._player_id_to_name.pop(old_pid, None)
-            self._player_to_game.pop(old_pid, None)
-
-        self._player_to_game[player_id] = game_id
-        self._player_id_to_name[player_id] = player_name
+    def find_resumable_seats(self, seats: list[ResumableSeat]) -> list[ResumableGame]:
+        """The seats a browser can still return to, given the tokens it holds. Never restores a snapshot."""
+        stored_game_ids = [seat.game_id for seat in seats if seat.game_id not in self._pending_games]
         session = db.SessionLocal()
         try:
-            self._persist_human_player_mappings(session, game_id, [(player_id, player_name)])
+            stored_hashes = {
+                (cast(str, row.game_id), cast(str, row.player_name)): cast(str | None, row.seat_token_hash)
+                for row in session.query(GamePlayerRecord).filter(
+                    GamePlayerRecord.game_id.in_(stored_game_ids),
+                    GamePlayerRecord.is_puppet.is_(False),
+                )
+            }
+            snapshot_activity = {
+                cast(str, game_id): cast(datetime, activity)
+                for game_id, activity in session.query(
+                    ActiveGameSnapshot.game_id, ActiveGameSnapshot.last_human_activity_at
+                ).filter(ActiveGameSnapshot.game_id.in_(stored_game_ids))
+            }
+        finally:
+            session.close()
+
+        resumable: list[ResumableGame] = []
+        for seat in seats:
+            pending = self._pending_games.get(seat.game_id)
+            if pending is not None and not pending.is_started:
+                if seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name)):
+                    resumable.append(ResumableGame(game_id=seat.game_id, player_name=seat.player_name, kind="lobby"))
+                continue
+
+            if not seat_token_matches(seat.seat_token, stored_hashes.get((seat.game_id, seat.player_name))):
+                continue
+            game = self._active_games.get(seat.game_id)
+            if game is not None:
+                player = next((p for p in game.players if p.name == seat.player_name), None)
+                if player is None or player.phase in FINISHED_PLAYER_PHASES:
+                    continue
+                last_active_at = self._last_human_activity.get(seat.game_id)
+            elif seat.game_id in snapshot_activity:
+                last_active_at = _utc_or_default(snapshot_activity[seat.game_id], datetime.now(UTC))
+            else:
+                continue
+            resumable.append(
+                ResumableGame(
+                    game_id=seat.game_id,
+                    player_name=seat.player_name,
+                    kind="game",
+                    last_active_at=last_active_at,
+                )
+            )
+        return resumable
+
+    def issue_lobby_seat_token(self, game_id: str, player_name: str) -> str:
+        """Give the named lobby seat a fresh token, replacing any earlier one."""
+        pending = self._pending_games[game_id]
+        seat_token = new_seat_token()
+        pending.seat_token_hashes[player_name] = hash_seat_token(seat_token)
+        return seat_token
+
+    def reclaim_seat(
+        self,
+        game_id: str,
+        player_name: str,
+        *,
+        seat_token: str | None,
+        user_id: str | None,
+    ) -> SeatClaim:
+        """Give the named seat back to a caller who owns it: its player id, and the seat token to keep.
+
+        The player id stays the same, so spectators and lobby state keep following the seat; the newest socket
+        for it replaces the older one. Raises SeatClaimRefusedError when the game or seat is gone, or the caller
+        does not own the seat."""
+        pending = self._pending_games.get(game_id)
+        if pending is not None and not pending.is_started:
+            return self._reclaim_lobby_seat(pending, player_name, seat_token=seat_token, user_id=user_id)
+
+        if game_id not in self._active_games:
+            self.restore_game_from_snapshot(game_id)
+        game = self._active_games.get(game_id)
+        if game is None:
+            raise SeatClaimRefusedError(SeatClaimRefusal.GAME_NOT_FOUND)
+        if not any(p.name == player_name for p in game.players):
+            raise SeatClaimRefusedError(SeatClaimRefusal.SEAT_NOT_FOUND)
+
+        session = db.SessionLocal()
+        try:
+            record = (
+                session.query(GamePlayerRecord)
+                .filter(
+                    GamePlayerRecord.game_id == game_id,
+                    GamePlayerRecord.player_name == player_name,
+                    GamePlayerRecord.is_puppet.is_(False),
+                )
+                .first()
+            )
+            stored_hash = cast(str | None, record.seat_token_hash) if record else None
+            refusal = seat_claim_refusal(
+                stored_hash=stored_hash,
+                owner_user_id=cast(str | None, record.user_id) if record else None,
+                seat_token=seat_token,
+                user_id=user_id,
+            )
+            if refusal is not None:
+                raise SeatClaimRefusedError(refusal)
+
+            player_id = self.get_player_id_by_name(game_id, player_name) or secrets.token_urlsafe(8)
+            self._player_to_game[player_id] = game_id
+            self._player_id_to_name[player_id] = player_name
+            claimed_token = token_after_claim(seat_token, stored_hash)
+            self._persist_human_player_mappings(
+                session,
+                game_id,
+                [(player_id, player_name)],
+                seat_token_hashes={player_name: hash_seat_token(claimed_token)},
+            )
             session.commit()
         finally:
             session.close()
-        return True
+        return SeatClaim(player_id=player_id, seat_token=claimed_token)
+
+    def _reclaim_lobby_seat(
+        self,
+        pending: PendingGame,
+        player_name: str,
+        *,
+        seat_token: str | None,
+        user_id: str | None,
+    ) -> SeatClaim:
+        if player_name not in pending.player_names:
+            raise SeatClaimRefusedError(SeatClaimRefusal.SEAT_NOT_FOUND)
+        player_id = pending.player_ids[pending.player_names.index(player_name)]
+        stored_hash = pending.seat_token_hashes.get(player_name)
+        refusal = seat_claim_refusal(
+            stored_hash=stored_hash,
+            owner_user_id=pending.player_user_ids.get(player_id),
+            seat_token=seat_token,
+            user_id=user_id,
+        )
+        if refusal is not None:
+            raise SeatClaimRefusedError(refusal)
+        claimed_token = token_after_claim(seat_token, stored_hash)
+        pending.seat_token_hashes[player_name] = hash_seat_token(claimed_token)
+        return SeatClaim(player_id=player_id, seat_token=claimed_token)
 
     def remove_player_from_pending(self, game_id: str, player_id: str) -> bool:
         pending = self._pending_games.get(game_id)
         if not pending or pending.is_started or player_id not in pending.player_ids:
             return False
+        self._remove_lobby_seat(pending, player_id)
+        return True
 
-        idx = pending.player_ids.index(player_id)
-        pending.player_names.pop(idx)
-        pending.player_ids.pop(idx)
+    def _remove_lobby_seat(self, pending: PendingGame, player_id: str) -> None:
+        """The one way a seat leaves a lobby, whether the host removed it or its player stayed away."""
+        index = pending.player_ids.index(player_id)
+        pending.seat_token_hashes.pop(pending.player_names.pop(index), None)
+        pending.player_ids.pop(index)
         pending.player_ready.pop(player_id, None)
-
+        pending.player_user_ids.pop(player_id, None)
+        player_battler = pending.player_battlers.pop(player_id, None)
+        if player_battler and player_battler._loading_task and not player_battler._loading_task.done():
+            player_battler._loading_task.cancel()
         self._player_to_game.pop(player_id, None)
         self._player_id_to_name.pop(player_id, None)
 
         if not pending.player_ids:
-            del self._pending_games[game_id]
-
-        return True
+            self._cleanup_game(pending.game_id)
+        elif player_id == pending.host_player_id:
+            self._pass_host_after_removal(pending)
 
     def schedule_pending_disconnect(
         self,
@@ -1782,6 +1961,76 @@ class GameManager:
     def cancel_pending_disconnect(self, game_id: str, player_id: str) -> None:
         key = f"{game_id}:{player_id}"
         if task := self._pending_disconnect_tasks.pop(key, None):
+            task.cancel()
+
+    # The lobby host is the one piece of lobby state that changes on its own. These methods are the only place
+    # host_player_id changes after creation: the creator hosts while present and for a grace period after
+    # leaving, then the role passes for good to the earliest-joined player who is connected.
+
+    def note_lobby_player_present(self, game_id: str, player_id: str) -> None:
+        pending = self._pending_games.get(game_id)
+        if pending is None or pending.is_started:
+            return
+        if player_id == pending.host_player_id:
+            pending.host_away_since = None
+            self._cancel_host_handoff(game_id)
+            return
+        away_since = pending.host_away_since
+        if away_since is not None and datetime.now(UTC) - away_since >= timedelta(seconds=HOST_HANDOFF_GRACE_SECONDS):
+            self._hand_off_host(pending)
+
+    def note_lobby_player_away(
+        self,
+        game_id: str,
+        player_id: str,
+        on_host_change: Callable[[], Coroutine[Any, Any, None]],
+    ) -> None:
+        pending = self._pending_games.get(game_id)
+        if pending is None or pending.is_started or player_id != pending.host_player_id:
+            return
+        pending.host_away_since = datetime.now(UTC)
+        self._cancel_host_handoff(game_id)
+
+        async def hand_off_after_grace() -> None:
+            await asyncio.sleep(HOST_HANDOFF_GRACE_SECONDS)
+            self._host_handoff_tasks.pop(game_id, None)
+            if pending.host_away_since is not None and self._hand_off_host(pending):
+                await on_host_change()
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        self._host_handoff_tasks[game_id] = loop.create_task(hand_off_after_grace())
+
+    def _hand_off_host(self, pending: PendingGame) -> bool:
+        connected = self._connected_player_ids(pending.game_id)
+        successor = next(
+            (pid for pid in pending.player_ids if pid in connected and pid != pending.host_player_id),
+            None,
+        )
+        if successor is None:
+            return False
+        pending.host_player_id = successor
+        pending.host_away_since = None
+        self._cancel_host_handoff(pending.game_id)
+        return True
+
+    def _pass_host_after_removal(self, pending: PendingGame) -> None:
+        connected = self._connected_player_ids(pending.game_id)
+        successor = next((pid for pid in pending.player_ids if pid in connected), None)
+        if successor is not None:
+            pending.host_player_id = successor
+            pending.host_away_since = None
+            self._cancel_host_handoff(pending.game_id)
+            return
+        # Nobody is here to take over: the next in line holds the role while away, and the first player to
+        # connect can take it at once, since the removed host has been gone longer than the grace period.
+        pending.host_player_id = pending.player_ids[0]
+        pending.host_away_since = datetime.now(UTC) - timedelta(seconds=HOST_HANDOFF_GRACE_SECONDS)
+
+    def _cancel_host_handoff(self, game_id: str) -> None:
+        if task := self._host_handoff_tasks.pop(game_id, None):
             task.cancel()
 
     def add_puppet(self, game_id: str, player_id: str) -> bool:
@@ -1851,16 +2100,11 @@ class GameManager:
             return False
         if target_player_id not in pending.player_ids:
             return False
-        idx = pending.player_ids.index(target_player_id)
-        pending.player_names.pop(idx)
-        pending.player_ids.pop(idx)
-        pending.player_ready.pop(target_player_id, None)
-        player_battler = pending.player_battlers.pop(target_player_id, None)
-        if player_battler and player_battler._loading_task and not player_battler._loading_task.done():
-            player_battler._loading_task.cancel()
-        self._player_to_game.pop(target_player_id, None)
-        self._player_id_to_name.pop(target_player_id, None)
+        self._remove_lobby_seat(pending, target_player_id)
         return True
+
+    def holds_seat(self, game_id: str, player_id: str) -> bool:
+        return self._player_to_game.get(player_id) == game_id
 
     def get_player_id_by_name(self, game_id: str, player_name: str) -> str | None:
         for player_id, name in self._player_id_to_name.items():
@@ -1976,6 +2220,7 @@ class GameManager:
         if not pending:
             return None
 
+        connected = self._connected_player_ids(game_id)
         players = []
         for i, name in enumerate(pending.player_names):
             player_id = pending.player_ids[i]
@@ -1986,6 +2231,7 @@ class GameManager:
                     name=name,
                     is_ready=pending.player_ready.get(player_id, False),
                     is_host=player_id == pending.host_player_id,
+                    is_connected=player_id in connected,
                     battler_id=player_battler.battler_id if player_battler else None,
                     battler_status=(
                         self._get_pending_player_battler_status(player_battler)

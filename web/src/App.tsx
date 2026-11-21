@@ -14,6 +14,7 @@ import { Register } from './pages/Register'
 import { Dashboard } from './pages/Dashboard'
 import { BattlerView } from './pages/BattlerView'
 import { CubeView } from './pages/CubeView'
+import { NotFound } from './pages/NotFound'
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
               <Route path="/game/:gameId/play" element={<Game />} />
               <Route path="/game/:gameId/share/:playerName/embed" element={<SummaryEmbed />} />
               <Route path="/game/:gameId/share/:playerName" element={<ShareGame />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
         </BrowserRouter>

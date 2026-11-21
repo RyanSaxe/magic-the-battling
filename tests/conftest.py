@@ -65,9 +65,13 @@ def _cleanup_game_manager(game_manager: GameManager) -> None:
             _cancel_task(player_battler._loading_task)
             player_battler._loading_task = None
 
-    for task in list(game_manager._cleanup_tasks.values()):
+    for task in list(game_manager._post_game_cleanup_tasks.values()):
+        _cancel_task(task)
+    for task in list(game_manager._abandoned_cleanup_tasks.values()):
         _cancel_task(task)
     for task in list(game_manager._pending_disconnect_tasks.values()):
+        _cancel_task(task)
+    for task in list(game_manager._host_handoff_tasks.values()):
         _cancel_task(task)
 
     game_manager._pending_games.clear()
@@ -75,12 +79,13 @@ def _cleanup_game_manager(game_manager: GameManager) -> None:
     game_manager._player_to_game.clear()
     game_manager._player_id_to_name.clear()
     game_manager._join_code_to_game.clear()
-    game_manager._cleanup_tasks.clear()
+    game_manager._post_game_cleanup_tasks.clear()
+    game_manager._abandoned_cleanup_tasks.clear()
     game_manager._pending_disconnect_tasks.clear()
+    game_manager._host_handoff_tasks.clear()
     game_manager._spectate_requests.clear()
     game_manager._dirty_games.clear()
     game_manager._last_human_activity.clear()
-    game_manager._connected_humans.clear()
     game_manager._action_locks.clear()
     game_manager._game_starts_in_flight = 0
     game_manager._game_start_waiters = 0
@@ -159,6 +164,7 @@ def _install_runtime_state(
     monitoring_module.game_manager = game_manager
 
     ws_module.connection_manager = connection_manager
+    game_manager.attach_connected_player_ids(connection_manager.get_connected_player_ids)
     games_module.connection_manager = connection_manager
     ops_module.connection_manager = connection_manager
     monitoring_module.connection_manager = connection_manager
@@ -311,8 +317,8 @@ def game_with_players(client):
     return {
         "game_id": d1["game_id"],
         "join_code": d1["join_code"],
-        "alice": {"session_id": d1["session_id"], "player_id": d1["player_id"]},
-        "bob": {"session_id": d2["session_id"], "player_id": d2["player_id"]},
+        "alice": {"session_id": d1["session_id"], "player_id": d1["player_id"], "seat_token": d1["seat_token"]},
+        "bob": {"session_id": d2["session_id"], "player_id": d2["player_id"], "seat_token": d2["seat_token"]},
     }
 
 

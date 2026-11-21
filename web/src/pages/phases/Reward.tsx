@@ -8,13 +8,10 @@ import {
   THE_VANQUISHER_IMAGE,
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
-import {
-  ZONE_LAYOUT_PADDING,
-  type CardLayoutConfig,
-} from "../../hooks/useCardLayout";
 import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
 import { useResizableLayout } from "../../hooks/useResizableLayout";
 import type { GameState, Card as CardType } from "../../types";
+import { rewardLayoutConfig } from "./phaseLayouts";
 import { rewardZoneStyles } from "./rewardZoneStyles";
 
 interface RewardPhaseProps {
@@ -147,28 +144,16 @@ export function RewardPhase({
   });
 
   const activeConstraints = hasUpgradeSection ? constraints : null;
-  const rewardLayoutConfig = {
-    zones: {
-      rewards: {
-        count: rewardsCount,
-        maxCardWidth: 300,
-        priority: "fill",
-        maxRows: 1,
-      },
-      upgrades: {
-        count: hasUpgradeSection ? available_upgrades.length : 0,
-        maxCardWidth: 200,
-      },
-      pool: { count: poolCount, maxCardWidth: 180 },
-    },
-    layout: { top: ["rewards"], bottomLeft: ["upgrades", "pool"] },
-    ...ZONE_LAYOUT_PADDING,
-    maxTopFraction: hasUpgradeSection ? 0.2 : undefined,
-  } satisfies CardLayoutConfig;
+  const layoutConfig = rewardLayoutConfig({
+    rewardCount: rewardsCount,
+    hasUpgradeSection,
+    upgradeCount: available_upgrades.length,
+    poolCount,
+  });
 
   const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
     useResizableLayout({
-      layoutConfig: rewardLayoutConfig,
+      layoutConfig,
       constraints: activeConstraints,
       onConstraintsChange: setConstraints,
       onConstraintsClear: clearConstraints,

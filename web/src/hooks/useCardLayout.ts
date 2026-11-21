@@ -981,6 +981,50 @@ function framesEqual(a: ZoneFrameResult, b: ZoneFrameResult): boolean {
   return true;
 }
 
+export interface ContainerLayout {
+  containerSize: ContainerSize;
+  dims: CardLayoutResult;
+  frames: ZoneFrameResult;
+}
+
+/**
+ * The layout useCardLayout renders for a measured content box. The box is
+ * rounded down to a multiple of 4px before anything is sized from it.
+ */
+export function layoutForContainer(
+  width: number,
+  height: number,
+  config: CardLayoutConfig,
+): ContainerLayout {
+  const w = Math.floor(width / 4) * 4;
+  const h = Math.floor(height / 4) * 4;
+  // Three-pass model:
+  //   1. computeLayout — uses maxCardWidth and similar guardrails to find a
+  //      balanced allocation that no zone can cannibalize.
+  //   2. computeConstrainedLayoutState — treats the derived frames as fixed
+  //      and grows each zone's cards to fill its frame (subject to a 500px
+  //      sanity ceiling so big screens don't get absurd card sizes).
+  //   3. redistributeSlack — when a zone underfills its frame (capped by
+  //      aspect ratio, not height), shrink its frame and grow a neighbor's
+  //      via fraction adjustments. Iterates until convergence.
+  // User-supplied constraints (divider drag) skip both pass 1 and pass 3 so
+  // the user's explicit fractions are honored without bouncing.
+  const state = config.constraints
+    ? computeConstrainedLayoutState(w, h, config, config.constraints)
+    : computeConstrainedLayoutState(
+        w,
+        h,
+        config,
+        redistributeSlack(
+          deriveConstraintsFromLayout(computeLayout(w, h, config), config, h, w),
+          config,
+          w,
+          h,
+        ).constraints,
+      );
+  return { containerSize: { width: w, height: h }, ...state };
+}
+
 export function useCardLayout(
   config: CardLayoutConfig,
 ): [
@@ -1009,47 +1053,19 @@ export function useCardLayout(
   const observerRef = useRef<ResizeObserver | null>(null);
   const elementRef = useRef<HTMLElement | null>(null);
 
-  // Three-pass model:
-  //   1. computeLayout — uses maxCardWidth and similar guardrails to find a
-  //      balanced allocation that no zone can cannibalize.
-  //   2. computeConstrainedLayoutState — treats the derived frames as fixed
-  //      and grows each zone's cards to fill its frame (subject to a 500px
-  //      sanity ceiling so big screens don't get absurd card sizes).
-  //   3. redistributeSlack — when a zone underfills its frame (capped by
-  //      aspect ratio, not height), shrink its frame and grow a neighbor's
-  //      via fraction adjustments. Iterates until convergence.
-  // User-supplied constraints (divider drag) skip both pass 1 and pass 3 so
-  // the user's explicit fractions are honored without bouncing.
-  const compute = useCallback(
-    (w: number, h: number) => {
-      const cfg = configRef.current;
-      if (cfg.constraints) {
-        return computeConstrainedLayoutState(w, h, cfg, cfg.constraints);
-      }
-      const initial = deriveConstraintsFromLayout(
-        computeLayout(w, h, cfg),
-        cfg,
-        h,
-        w,
-      );
-      const { constraints } = redistributeSlack(initial, cfg, w, h);
-      return computeConstrainedLayoutState(w, h, cfg, constraints);
-    },
-    [],
-  );
-
   const update = useCallback(
     (w: number, h: number) => {
-      const qW = Math.floor(w / 4) * 4;
-      const qH = Math.floor(h / 4) * 4;
+      const next = layoutForContainer(w, h, configRef.current);
       setContainerSize((prev) =>
-        prev.width === qW && prev.height === qH ? prev : { width: qW, height: qH },
+        prev.width === next.containerSize.width &&
+        prev.height === next.containerSize.height
+          ? prev
+          : next.containerSize,
       );
-      const next = compute(qW, qH);
       setDims((prev) => (dimsEqual(prev, next.dims) ? prev : next.dims));
       setZoneFrames((prev) => (framesEqual(prev, next.frames) ? prev : next.frames));
     },
-    [compute],
+    [],
   );
 
   const refCallback = useCallback(
