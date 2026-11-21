@@ -59,6 +59,11 @@ class JoinGameRequest(BaseModel):
     join_code: str
     player_name: PlayerName
 
+    @field_validator("join_code")
+    @classmethod
+    def _strip_join_code(cls, value: str) -> str:
+        return value.strip()
+
 
 class RejoinGameRequest(BaseModel):
     player_name: str

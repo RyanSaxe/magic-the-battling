@@ -71,6 +71,17 @@ class TestJoinGame:
         assert "session_id" in data
         assert "player_id" in data
 
+    def test_join_code_with_surrounding_spaces_joins(self, client):
+        create = client.post("/api/games", json={"player_name": "Alice", "cube_id": "test"})
+        join_code = create.json()["join_code"]
+
+        response = client.post(
+            "/api/games/join",
+            json={"join_code": f" {join_code.lower()} ", "player_name": "Bob"},
+        )
+
+        assert response.status_code == 200
+
     def test_names_are_stored_trimmed_with_their_casing(self, client):
         create = client.post("/api/games", json={"player_name": "  Alice ", "cube_id": "test"})
         game_id = create.json()["game_id"]
