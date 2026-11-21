@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from server.services.game_manager import GameManager
+from server.services.game_manager import GameManager, LobbyStage
 
 
 @pytest.fixture
@@ -67,7 +67,7 @@ class TestSchedulePendingDisconnect:
         run_async(_test())
 
     def test_noop_for_started_game(self, gm, pending_game):
-        pending_game.is_started = True
+        pending_game.stage = LobbyStage.STARTED
 
         async def _test():
             gm.schedule_pending_disconnect(pending_game.game_id, "pid_bob", delay=0.05)

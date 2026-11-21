@@ -229,6 +229,14 @@ export async function getSpectateRequestStatus(
   return response.json()
 }
 
+export async function cancelSpectateRequest(gameId: string, requestId: string): Promise<SpectateRequestStatus> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/spectate-request/${requestId}`, { method: 'DELETE' })
+  if (!response.ok) {
+    await throwResponseError(response, 'spectate-status', 'Failed to cancel the spectate request')
+  }
+  return response.json()
+}
+
 export interface GameCardsResponse {
   cards: Card[]
   upgrades: Card[]

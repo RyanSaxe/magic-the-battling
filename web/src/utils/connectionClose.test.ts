@@ -10,6 +10,7 @@ describe('connectionErrorForCloseCode', () => {
     [4001, 'INVALID_SESSION'],
     [4004, 'GAME_NOT_FOUND'],
     [4005, 'KICKED'],
+    [4007, 'SPECTATE_TARGET_NOT_FOUND'],
     [1013, 'WS_CAPACITY'],
   ])('ends the connection on close code %i', (closeCode, errorCode) => {
     expect(connectionErrorForCloseCode(closeCode, '')?.code).toBe(errorCode)

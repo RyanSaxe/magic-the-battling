@@ -1518,12 +1518,14 @@ class TestFaceDownScrubbing:
         assert result
         assert creature.id in b.opponent_zones.tapped_card_ids
 
-    def test_pvp_opponent_can_act_on_face_down_card_after_other_views_are_built(self, mock_cube_data, test_db):
+    def test_pvp_opponent_can_act_on_face_down_card_after_other_views_are_built(
+        self, mock_cube_data, test_db, start_game_now
+    ):
         manager = GameManager()
         pending = manager.create_game("Alice", "pid-a", cube_id="test", target_player_count=2)
         manager.join_game(pending.join_code, "Bob", "pid-b")
         game_id = pending.game_id
-        game = manager.start_game(game_id, None)
+        game = start_game_now(manager, game_id)
         assert game is not None
         alice, bob = game.players
         for p in (alice, bob):

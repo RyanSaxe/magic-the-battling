@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../test/fakeWebSocket'
@@ -47,6 +47,43 @@ async function settle() {
   })
 }
 
+async function startGoldfishUntilTheStartIsSent() {
+  render(
+    <MemoryRouter>
+      <Play />
+    </MemoryRouter>,
+  )
+  await settle()
+  await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
+  await settle()
+  const socket = FakeWebSocket.latest()
+  const lobby = {
+    game_id: 'game-1',
+    join_code: 'ABC123',
+    cube_id: 'auto',
+    players: [{ player_id: 'player-1', name: 'Tester', is_ready: false, is_host: true, is_connected: true }],
+    can_start: false,
+    is_started: false,
+    start_status: 'open',
+    start_error: null,
+    target_player_count: 8,
+    puppet_count: 7,
+    cube_loading_status: 'ready',
+    cube_loading_error: null,
+    available_puppet_count: 7,
+    play_mode: 'limited',
+  }
+  act(() => {
+    socket.serverOpen()
+    socket.serverMessage({ type: 'lobby_state', payload: lobby })
+  })
+  await settle()
+  act(() => socket.serverMessage({ type: 'lobby_state', payload: { ...lobby, can_start: true } }))
+  await settle()
+  expect(socket.sent.map((data) => JSON.parse(data).action)).toContain('start_game')
+  return { socket, lobby }
+}
+
 describe('Play: starting a Goldfish game', () => {
   beforeEach(() => {
     installMemoryLocalStorage()
@@ -57,6 +94,7 @@ describe('Play: starting a Goldfish game', () => {
   })
 
   afterEach(() => {
+    cleanup()
     vi.unstubAllGlobals()
   })
 
@@ -87,6 +125,39 @@ describe('Play: starting a Goldfish game', () => {
     expect(secondSocket.url).toContain('/ws/game-2')
     expect(secondSocket.readyState).not.toBe(FakeWebSocket.CLOSED)
     expect(toasts).toHaveLength(1)
+  })
+
+  it('comes back to Start Game with the reason when the game fails to start', async () => {
+    const { socket, lobby } = await startGoldfishUntilTheStartIsSent()
+
+    act(() => {
+      socket.serverMessage({ type: 'lobby_state', payload: { ...lobby, start_status: 'starting' } })
+      socket.serverMessage({
+        type: 'lobby_state',
+        payload: { ...lobby, can_start: true, start_status: 'failed', start_error: 'Server is at game capacity.' },
+      })
+    })
+    await settle()
+
+    expect(toasts).toEqual(['Server is at game capacity.'])
+    expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy()
+    expect(getRememberedSeat('game-1')).toBeNull()
+  })
+
+  it('comes back to Start Game with the reason when the server refuses the start', async () => {
+    const { socket } = await startGoldfishUntilTheStartIsSent()
+
+    act(() => {
+      socket.serverMessage({
+        type: 'error',
+        payload: { code: 'SERVER_UPDATING', detail: 'Server is updating.', message: 'Server is updating.' },
+      })
+    })
+    await settle()
+
+    expect(toasts).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy()
+    expect(getRememberedSeat('game-1')).toBeNull()
   })
 
   it('does not offer a failed start for resuming', async () => {

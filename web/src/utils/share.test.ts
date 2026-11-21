@@ -4,9 +4,11 @@ import type { Card, ShareGameResponse, SharePlayerSnapshot } from '../types'
 import {
   buildGameSummaryData,
   buildSharePlayerViews,
-  getShareHiddenRoundBand,
   getShareHiddenZones,
   getSharePlayerRowBadge,
+  getShareRoundBand,
+  getShareRoundLabel,
+  getShareRoundValue,
 } from './share'
 
 function makeCard(id: string): Card {
@@ -46,6 +48,7 @@ function makeSnapshot(
     poison,
     vanguard: null,
     visibility: 'full',
+    sudden_death_build: null,
   }
 }
 
@@ -172,8 +175,8 @@ describe('share rounds hidden while the game goes on', () => {
     const stillIn = { ...data.players[0], final_placement: null }
 
     expect(getShareHiddenZones(hidden)).toEqual(['hand', 'sideboard', 'upgrades'])
-    expect(getShareHiddenRoundBand(stillIn, hidden)).toBe('Still Fighting')
-    expect(getShareHiddenRoundBand(data.players[1], hidden)).toBe('Game in Progress')
+    expect(getShareRoundBand(stillIn, hidden)).toBe('Still Fighting')
+    expect(getShareRoundBand(data.players[1], hidden)).toBe('Game in Progress')
   })
 
   it('hides only the hand and upgrades of the sharer\'s last build, without a band', () => {
@@ -181,7 +184,7 @@ describe('share rounds hidden while the game goes on', () => {
     const lastBuild = { ...makeSnapshot(4, 3, 6, 3), visibility: 'hand_hidden' as const }
 
     expect(getShareHiddenZones(lastBuild)).toEqual(['hand', 'upgrades'])
-    expect(getShareHiddenRoundBand(data.players[0], lastBuild)).toBeNull()
+    expect(getShareRoundBand(data.players[0], lastBuild)).toBeNull()
   })
 
   it('hides nothing in a round shown in full', () => {
@@ -189,6 +192,100 @@ describe('share rounds hidden while the game goes on', () => {
     const snapshot = data.players[0].snapshots[0]
 
     expect(getShareHiddenZones(snapshot)).toEqual([])
-    expect(getShareHiddenRoundBand(data.players[0], snapshot)).toBeNull()
+    expect(getShareRoundBand(data.players[0], snapshot)).toBeNull()
+  })
+})
+
+function makeSuddenDeathSnapshot(
+  stage: number,
+  round: number,
+  suddenDeathBuild: number,
+  treasures: number,
+): SharePlayerSnapshot {
+  return { ...makeSnapshot(stage, round, 9, treasures), sudden_death_build: suddenDeathBuild }
+}
+
+// In 4-2 Bob and Carol reach lethal while Alice survives. Their first Sudden Death is a draw, Bob wins the second,
+// and Alice beats Bob in 4-3.
+function makeSuddenDeathShareData(): ShareGameResponse {
+  const fightersRounds = [makeSnapshot(4, 2, 8, 2), makeSuddenDeathSnapshot(4, 2, 1, 3), makeSuddenDeathSnapshot(4, 2, 2, 4)]
+  return {
+    ...makeShareData(),
+    owner_name: 'Carol',
+    players: [
+      {
+        name: 'Alice',
+        final_placement: 1,
+        final_poison: 4,
+        final_treasures: 3,
+        is_puppet: false,
+        snapshots: [makeSnapshot(4, 2, 4, 2), makeSnapshot(4, 3, 4, 3)],
+      },
+      {
+        name: 'Bob',
+        final_placement: 2,
+        final_poison: 10,
+        final_treasures: 5,
+        is_puppet: false,
+        snapshots: [...fightersRounds, makeSnapshot(4, 3, 9, 5)],
+      },
+      {
+        name: 'Carol',
+        final_placement: 3,
+        final_poison: 10,
+        final_treasures: 4,
+        is_puppet: false,
+        snapshots: fightersRounds,
+      },
+    ],
+  }
+}
+
+describe('share rounds with a Sudden Death', () => {
+  it('lists each Sudden Death build as its own round after the round it shares', () => {
+    const carol = makeSuddenDeathShareData().players[2]
+
+    expect(carol.snapshots.map((snapshot) => getShareRoundLabel(snapshot))).toEqual([
+      'Stage 4 - Round 2',
+      'Stage 4 - Round 2 · Sudden Death',
+      'Stage 4 - Round 2 · Sudden Death 2',
+    ])
+    expect(carol.snapshots.map((snapshot) => getShareRoundLabel(snapshot, true))).toEqual([
+      'Stage 4 - Round 2',
+      '4-2 · Sudden Death',
+      '4-2 · Sudden Death 2',
+    ])
+    expect(new Set(carol.snapshots.map(getShareRoundValue)).size).toBe(3)
+  })
+
+  it('shows each fighter\'s Sudden Death build and the survivor\'s build from that round', () => {
+    const data = makeSuddenDeathShareData()
+    const firstSuddenDeath = getShareRoundValue(data.players[2].snapshots[1])
+
+    const players = buildSharePlayerViews(data, firstSuddenDeath)
+
+    expect(players.find((p) => p.name === 'Bob')).toMatchObject({ poison: 9, treasures: 3 })
+    expect(players.find((p) => p.name === 'Alice')).toMatchObject({ stage: 4, round: 2, poison: 4, treasures: 2 })
+  })
+
+  it('keeps the survivor alive while the fighters play it out, and marks the loser dead in the last one', () => {
+    const data = makeSuddenDeathShareData()
+    const [alice, bob, carol] = data.players
+    const [, firstSuddenDeath, secondSuddenDeath] = carol.snapshots.map(getShareRoundValue)
+
+    expect(getSharePlayerRowBadge(alice, 'Carol', firstSuddenDeath)).toBe('alive')
+    expect(getSharePlayerRowBadge(carol, 'Bob', firstSuddenDeath)).toBe('alive')
+    expect(getSharePlayerRowBadge(carol, 'Bob', secondSuddenDeath)).toBe('dead')
+    expect(getSharePlayerRowBadge(bob, 'Carol', secondSuddenDeath)).toBe('alive')
+  })
+
+  it('bands a Sudden Death build, unless the round is hidden while the game goes on', () => {
+    const carol = makeSuddenDeathShareData().players[2]
+    const build = carol.snapshots[2]
+
+    expect(getShareRoundBand(carol, build)).toBe('Sudden Death')
+    expect(getShareRoundBand(carol, { ...build, visibility: 'hand_hidden' })).toBe('Sudden Death')
+    expect(getShareRoundBand(carol, { ...build, visibility: 'hidden' })).toBe('Game in Progress')
+    expect(getShareRoundBand(carol, carol.snapshots[0])).toBeNull()
   })
 })
