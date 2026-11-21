@@ -162,7 +162,7 @@ export function useResizableLayout({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allZoneIdsKey]);
 
-  const [containerRef, dims, containerSize, zoneFrames] = useCardLayout({
+  const [containerRef, dims, containerSize, zoneFrames, renderedConstraints] = useCardLayout({
     ...layoutConfig,
     constraints,
   });
@@ -189,10 +189,10 @@ export function useResizableLayout({
   const dividerCallbacks = useZoneDividers({
     containerHeight: containerSize.height,
     containerWidth: containerSize.width,
-    currentLayout: dims,
     layoutConfig,
     allowHorizontalResize,
     measureInitialConstraints,
+    renderedConstraints,
     constraints,
     onConstraintsChange,
     onConstraintsClear,
