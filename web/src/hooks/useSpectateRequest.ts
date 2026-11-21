@@ -10,6 +10,7 @@ import { clearTabSpectate, readTabSpectate, saveTabSpectate } from '../utils/tab
  * - waiting: the player has not answered yet.
  * - watching: the player allowed it, or the game lets anyone watch, and the tab connects as a spectator.
  * - denied, expired: the request ended without approval.
+ * - ended: the server closed the spectator's connection for good, for the reason in `error`.
  *
  * Waiting and watching survive a reload of the tab. Leaving the page within the app, such as through Home, ends
  * them, so the tab can go back to choosing, or to its own seat.
@@ -21,6 +22,7 @@ export type SpectateState =
   | { kind: 'watching'; target: string; requestId: string; sessionId: string }
   | { kind: 'denied'; target: string }
   | { kind: 'expired'; target: string }
+  | { kind: 'ended'; target: string; error: AppError }
 
 export const SPECTATE_POLL_INTERVAL_MS = 1000
 
@@ -111,12 +113,20 @@ export function useSpectateRequest(gameId: string) {
 
   /** Go back to choosing a player after a request ended. */
   const dismiss = useCallback(() => {
-    if (state.kind === 'denied' || state.kind === 'expired') {
+    if (state.kind === 'denied' || state.kind === 'expired' || state.kind === 'ended') {
       setState({ kind: 'choosing' })
     }
   }, [state.kind, setState])
 
-  return { state, request, cancel, dismiss }
+  /** React to the server ending the spectator's connection, which no reload can bring back. */
+  const connectionEnded = useCallback(
+    (error: AppError) => {
+      if (state.kind === 'watching') setState({ kind: 'ended', target: state.target, error })
+    },
+    [state, setState],
+  )
+
+  return { state, request, cancel, dismiss, connectionEnded }
 }
 
 export type SpectateRequestControls = ReturnType<typeof useSpectateRequest>

@@ -829,7 +829,7 @@ function GameContent() {
   }, []);
 
   const navigate = useNavigate();
-  const { status, gameState, isConnected, send, actions, spectateRequests, serverNotice, connectionError } = useGame(
+  const { status, gameState, isConnected, send, actions, spectateRequests, serverNotice } = useGame(
     gameId || null,
     watching ? watching.sessionId : isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
@@ -895,6 +895,11 @@ function GameContent() {
     if (status.kind === "open") connectionOpened(session.sessionId);
     if (status.kind === "ended") connectionEnded(session.sessionId, status.error);
   }, [status, session, isSpectator, connectionOpened, connectionEnded]);
+
+  const spectatorConnectionEnded = spectate.connectionEnded;
+  useEffect(() => {
+    if (isSpectator && status.kind === "ended") spectatorConnectionEnded(status.error);
+  }, [status, isSpectator, spectatorConnectionEnded]);
 
   useEffect(() => {
     const playerName = gameState?.self_player.name;
@@ -1603,6 +1608,33 @@ function GameContent() {
     showSubmitHandPopover, showSubmitResultPopover,
   ]);
 
+  if (spectate.state.kind === "ended") {
+    const ended = spectate.state.error;
+    return (
+      <NoticeFrame>
+        {ended.code === "GAME_NOT_FOUND" ? (
+          <GameGoneNotice gameId={gameId} />
+        ) : (
+          <StatusNotice
+            title={ended.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Game Unavailable"}
+            actions={
+              <>
+                <button onClick={() => navigate("/play")} className="btn btn-primary flex-1 py-2">
+                  New Game
+                </button>
+                <button onClick={() => navigate("/")} className="btn btn-secondary flex-1 py-2">
+                  Home
+                </button>
+              </>
+            }
+          >
+            {getAppErrorMessage(ended, "game-connection", "This game is not available right now.")}
+          </StatusNotice>
+        )}
+      </NoticeFrame>
+    );
+  }
+
   if (!isSpectator) {
     if (seat.kind === "claiming") {
       return (
@@ -1671,28 +1703,6 @@ function GameContent() {
         />
       );
     }
-  }
-
-  if (isSpectator && connectionError) {
-    return (
-      <NoticeFrame>
-        <StatusNotice
-          title={connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Game Unavailable"}
-          actions={
-            <>
-              <button onClick={() => navigate("/play")} className="btn btn-primary flex-1 py-2">
-                New Game
-              </button>
-              <button onClick={() => navigate("/")} className="btn btn-secondary flex-1 py-2">
-                Home
-              </button>
-            </>
-          }
-        >
-          {getAppErrorMessage(connectionError, "game-connection", "This game is not available right now.")}
-        </StatusNotice>
-      </NoticeFrame>
-    );
   }
 
   if (!gameState) {

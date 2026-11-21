@@ -148,6 +148,18 @@ describe('useSpectateRequest', () => {
     expect(readTabSpectate('game-1')).toBeNull()
   })
 
+  it('ends watching for good when the server closes the connection', async () => {
+    answers({ status: 'approved', session_id: 'spectator-session' })
+    const hook = await requestToWatch()
+    await settle()
+    const gameEnded = createAppError({ code: 'GAME_NOT_FOUND', context: 'default', fallbackMessage: 'Game ended' })
+
+    act(() => hook.result.current.connectionEnded(gameEnded))
+
+    expect(hook.result.current.state).toEqual({ kind: 'ended', target: 'Alice', error: gameEnded })
+    expect(readTabSpectate('game-1')).toBeNull()
+  })
+
   it('reports a request the server no longer has and lets the spectator choose again', async () => {
     getStatus.mockRejectedValue(
       createAppError({ code: 'SPECTATE_REQUEST_NOT_FOUND', context: 'spectate-status', fallbackMessage: 'gone' }),

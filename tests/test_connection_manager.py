@@ -132,3 +132,21 @@ class TestSpectateMessages:
 
         lists = [[r["spectator_name"] for r in m["payload"]["requests"]] for m in player.sent]
         assert lists == [["Carol"], ["Carol", "Dan"]]
+
+    @pytest.mark.anyio
+    async def test_a_spectator_accepted_after_its_game_was_dropped_is_closed(self, monkeypatch):
+        loaded = {"game1": True}
+        monkeypatch.setattr(ws_module, "_game_is_loaded", lambda game_id: loaded.get(game_id, False))
+        cm = ConnectionManager()
+        spectator = _SpectateSocket()
+        spectator.accept_gate.clear()
+
+        connecting = asyncio.create_task(cm.connect_spectator("game1", "Bob", cast(WebSocket, spectator)))
+        await asyncio.sleep(0)
+        loaded["game1"] = False
+        await cm.close_spectators("game1")
+        spectator.accept_gate.set()
+
+        assert not await connecting
+        assert spectator.closed == 4004
+        assert not cm._spectators.get("game1")

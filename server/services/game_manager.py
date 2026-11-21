@@ -175,13 +175,18 @@ def _remap_id_dict[T](d: dict[str, T], reverse_map: dict[str, str]) -> dict[str,
 
 
 class SpectateListener(Protocol):
-    """Hears when a player's spectate requests change."""
+    """Hears when a player's spectate requests change, and when a game's spectators lose their game."""
 
     def spectate_requests_changed(self, game_id: str, target_player_name: str) -> None: ...
+
+    def game_dropped(self, game_id: str) -> None: ...
 
 
 class _NoSpectateListener:
     def spectate_requests_changed(self, game_id: str, target_player_name: str) -> None:
+        pass
+
+    def game_dropped(self, game_id: str) -> None:
         pass
 
 
@@ -1378,6 +1383,7 @@ class GameManager:
         self._pending_games.pop(game_id, None)
         self._clear_runtime_player_mappings_for_game(game_id)
         self._spectate_requests.drop_game(game_id)
+        self._spectate_listener.game_dropped(game_id)
 
         self._cancel_host_handoff(game_id)
         abandoned_cleanup = self._abandoned_cleanup_tasks.pop(game_id, None)
