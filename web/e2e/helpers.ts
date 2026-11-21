@@ -372,6 +372,13 @@ export async function serveGame(
   })
 }
 
+/** Opens a game whose server then ends the connection with `code`, as when the game is gone or can't be reached. */
+function serveGameEndedWith(code: string) {
+  return (page: Page, baseURL: string) => serveGame(page, baseURL, { phase: 'build', counts: {} }, {
+    onSocket: (ws) => ws.send(JSON.stringify({ type: 'connection_error', payload: { code } })),
+  })
+}
+
 export interface PageUnderTest {
   name: string
   path: string
@@ -469,6 +476,24 @@ export const PAGES: PageUnderTest[] = [
     path: `/game/${SHARE_GAME_ID}/share/Bob`,
     serve: serveShareInProgress,
     primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Home' }),
+  },
+  {
+    name: 'share not found',
+    path: `/game/${SHARE_GAME_ID}/share/Nobody`,
+    serve: serveWithoutBackend,
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Home' }),
+  },
+  {
+    name: 'game not found',
+    path: `/game/${GAME_ID}/play`,
+    serve: serveGameEndedWith('GAME_NOT_FOUND'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'New Game' }),
+  },
+  {
+    name: 'game unavailable',
+    path: `/game/${GAME_ID}/play`,
+    serve: serveGameEndedWith('SERVER_CAPACITY'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Try again' }),
   },
 ]
 

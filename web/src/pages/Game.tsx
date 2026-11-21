@@ -1818,6 +1818,14 @@ function GameContent() {
 
   const timelinePhase = displayBattleResolution ? "battle" : currentPhase;
   const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
+  const canSpectate = currentPhase === "eliminated" && gameState.players.some(
+    (p) =>
+      !p.is_puppet &&
+      p.phase !== "eliminated" &&
+      p.phase !== "awaiting_elimination" &&
+      p.phase !== "winner" &&
+      p.phase !== "game_over"
+  );
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
   const isWinner = selfPlacement === 1;
 
@@ -1878,23 +1886,7 @@ function GameContent() {
     let left: ReactNode = null;
     let right: ReactNode = null;
 
-    if (actionBarPhase === "eliminated") {
-      const hasWatchablePlayers = gameState.players.some(
-        (p) =>
-          !p.is_puppet &&
-          p.phase !== "eliminated" &&
-          p.phase !== "awaiting_elimination" &&
-          p.phase !== "winner" &&
-          p.phase !== "game_over"
-      );
-      if (hasWatchablePlayers) {
-        right = (
-          <button onClick={handleSpectateNewTab} className="btn btn-secondary">
-            Spectate
-          </button>
-        );
-      }
-    } else if (actionBarPhase === "draft") {
+    if (actionBarPhase === "draft") {
       left = (
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
@@ -2715,15 +2707,21 @@ function GameContent() {
                   >
                     Review
                   </button>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={openShareModal}
-                  >
-                    Share Game
-                  </button>
+                  {canSpectate && (
+                    <button onClick={handleSpectateNewTab} className="btn btn-secondary">
+                      Spectate
+                    </button>
+                  )}
                 </>
               ) : groups?.left}
-              main={groups?.right}
+              main={endOfGame ? (
+                <button
+                  className="btn btn-primary"
+                  onClick={openShareModal}
+                >
+                  Share Game
+                </button>
+              ) : groups?.right}
             />
           );
         })()}
