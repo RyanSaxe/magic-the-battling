@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-import shutil
 import sqlite3
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -46,10 +46,22 @@ def default_db_path() -> Path:
 def backup_db(source: Path, destination: Path | None = None) -> Path:
     destination = destination or source.with_suffix(source.suffix + ".bak")
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists():
-        destination.unlink()
-    source.replace(destination)
-    shutil.copy2(destination, source)
+    # Removing the previous backup first keeps the free space this needs to one copy of the database.
+    # Migrations run only after this copy is complete, so if it fails the live database is unchanged.
+    destination.unlink(missing_ok=True)
+    # Renaming the copy into place only once it is complete means a file at the backup path is never a
+    # partial copy, for example when the volume runs out of space.
+    partial = destination.with_name(destination.name + ".partial")
+    partial.unlink(missing_ok=True)
+    try:
+        with closing(sqlite3.connect(str(source))) as live, closing(sqlite3.connect(str(partial))) as copy:
+            # The partial copy is deleted on any failure, so a rollback journal for it would only be left behind.
+            copy.execute("PRAGMA journal_mode=OFF")
+            live.backup(copy)
+        partial.replace(destination)
+    except BaseException:
+        partial.unlink(missing_ok=True)
+        raise
     return destination
 
 
@@ -95,13 +107,9 @@ def _migrate_active_game_snapshots(conn: sqlite3.Connection, *, apply: bool) -> 
 
     for row in rows:
         raw_json = str(row["state_json"])
-        if _is_current_wrapped_payload(raw_json):
-            result.already_current += 1
-            continue
-
         try:
             game = restore_game_from_snapshot(raw_json)
-            new_json = game.snapshot_dump_json()
+            new_json = raw_json if _is_current_wrapped_payload(raw_json) else game.snapshot_dump_json()
         except Exception:
             result.failed += 1
             continue
