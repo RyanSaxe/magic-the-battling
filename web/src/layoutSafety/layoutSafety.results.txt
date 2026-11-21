@@ -46,6 +46,25 @@ card-below-minimum
   build                1536x864     113/1591  336d0c4d
   build                1920x1080     40/1591  9b6eefa1
   build                2560x1440     20/1591  36052644
+  deck                 320x568     1249/1420  09016bc0
+  deck                 375x667      854/1420  a9abf7f7
+  deck                 393x852      424/1420  4ae1cbb5
+  deck                 430x932      339/1420  1c4bada3
+  deck                 768x1024     107/1420  bb927f34
+  deck                 820x1180     111/1420  8ad1151c
+  deck                 1024x768     166/1420  db218a66
+  deck                 1024x500     774/1420  ca750572
+  deck                 1180x820     193/1420  3eaf4f67
+  deck                 1280x600     369/1420  670c77ad
+  deck                 1280x720     223/1420  2b93893e
+  deck                 1280x800     135/1420  c217e91b
+  deck                 1366x768     180/1420  7567886a
+  deck                 1366x1024     79/1420  eec07d07
+  deck                 1440x600     276/1420  b602844d
+  deck                 1440x900     119/1420  245d7180
+  deck                 1536x864     107/1420  266ff015
+  deck                 1920x1080     40/1420  f5f2d44f
+  deck                 2560x1440     20/1420  e2dd4774
   draft                320x568        41/204  48fedac8
   draft                375x667        12/204  22255359
   draft                393x852        10/204  bf060291
@@ -82,6 +101,15 @@ card-below-minimum
   reward-stage-end     1440x600       16/436  c57cd11d
   reward-stage-end     1440x900       12/436  08174031
   reward-stage-end     1536x864       12/436  08174031
+  upgrade-apply        288x140         12/21  1df0e2d6
+  upgrade-apply        288x220          9/21  bf0ef172
+  upgrade-apply        288x360          3/21  f1825783
+  upgrade-apply        420x140         12/21  1df0e2d6
+  upgrade-apply        420x220          6/21  3c1f55a0
+  upgrade-apply        558x140          9/21  bf0ef172
+  upgrade-apply        558x220          3/21  f1825783
+  upgrade-apply        900x140          6/21  3c1f55a0
+  upgrade-apply        1400x140         3/21  f1825783
 card-outside-zone
   build                320x568         5/353  d046d794
   build                375x667         1/353  f04fe07d
@@ -98,6 +126,22 @@ card-outside-zone
   build                1440x600       3/1591  133ed934
   build                1440x900       8/1591  992b3aaa
   build                1920x1080     26/1591  e142f9fa
+  deck                 320x568       52/1420  460cdfdf
+  deck                 375x667        5/1420  ac984e5a
+  deck                 393x852       26/1420  7550ab80
+  deck                 430x932       34/1420  767bae75
+  deck                 768x1024      42/1420  740eebc4
+  deck                 820x1180      10/1420  7a9551ac
+  deck                 1024x768      14/1420  02d49cdb
+  deck                 1024x500      24/1420  0848b527
+  deck                 1180x820      12/1420  91f9f09c
+  deck                 1280x720      25/1420  98301f1c
+  deck                 1280x800      37/1420  da977492
+  deck                 1366x768      15/1420  8ca75cf7
+  deck                 1366x1024     69/1420  022b7e43
+  deck                 1440x600       4/1420  dc365b25
+  deck                 1440x900      12/1420  5bce69f5
+  deck                 1920x1080     23/1420  89d91ecd
   draft                320x568         8/204  6a9243ef
   draft                393x852         2/204  81b846d3
   draft                430x932         5/204  dca8c3ba
@@ -199,6 +243,25 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   build                1536x864    d9988700
   build                1920x1080   bd23dbaf
   build                2560x1440   be5b9a9a
+  deck                 320x568     34695313
+  deck                 375x667     5afa871f
+  deck                 393x852     37358992
+  deck                 430x932     ff922591
+  deck                 768x1024    dbdddc77
+  deck                 820x1180    c1106c47
+  deck                 1024x768    c12617c7
+  deck                 1024x500    3526258d
+  deck                 1180x820    b6a2660f
+  deck                 1280x600    627c436f
+  deck                 1280x720    7e631eaf
+  deck                 1280x800    309a8102
+  deck                 1366x768    f8ca3160
+  deck                 1366x1024   83c499ff
+  deck                 1440x600    6dfeefca
+  deck                 1440x900    5ff20614
+  deck                 1536x864    e176d54c
+  deck                 1920x1080   6ebf7325
+  deck                 2560x1440   bc025001
   draft                320x568     c5466ea3
   draft                375x667     664b6e8a
   draft                393x852     cc665331
@@ -256,3 +319,53 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   reward-stage-end     1536x864    6ce5ae3b
   reward-stage-end     1920x1080   fcae97e5
   reward-stage-end     2560x1440   f33eddfb
+  upgrade-apply        288x140     35a05b6a
+  upgrade-apply        288x220     cc4934e1
+  upgrade-apply        288x360     dcd8c8a8
+  upgrade-apply        288x560     a9c29442
+  upgrade-apply        288x900     630bd601
+  upgrade-apply        420x140     78c35d22
+  upgrade-apply        420x220     984cad36
+  upgrade-apply        420x360     8c205fd6
+  upgrade-apply        420x560     5e358c2c
+  upgrade-apply        420x900     91e6aa5f
+  upgrade-apply        558x140     743c3189
+  upgrade-apply        558x220     a591083f
+  upgrade-apply        558x360     635b5388
+  upgrade-apply        558x560     eae145a8
+  upgrade-apply        558x900     d2046c15
+  upgrade-apply        900x140     1b340fca
+  upgrade-apply        900x220     0b869bea
+  upgrade-apply        900x360     5b578cbd
+  upgrade-apply        900x560     b012fdb3
+  upgrade-apply        900x900     d634b19c
+  upgrade-apply        1400x140    40866741
+  upgrade-apply        1400x220    cec28e64
+  upgrade-apply        1400x360    81fe1d41
+  upgrade-apply        1400x560    87b0b8e4
+  upgrade-apply        1400x900    cc00611e
+  upgrade-list         288x140     c82b5fc4
+  upgrade-list         288x220     79f3d422
+  upgrade-list         288x360     7623dd15
+  upgrade-list         288x560     1a3366a3
+  upgrade-list         288x900     3e089d09
+  upgrade-list         420x140     94178bcd
+  upgrade-list         420x220     e9426fec
+  upgrade-list         420x360     fb5f8b1c
+  upgrade-list         420x560     dcb123d6
+  upgrade-list         420x900     6e7e7234
+  upgrade-list         558x140     927d777f
+  upgrade-list         558x220     da817ade
+  upgrade-list         558x360     64d1623a
+  upgrade-list         558x560     44e1e94a
+  upgrade-list         558x900     0451efd8
+  upgrade-list         900x140     bc7e22ae
+  upgrade-list         900x220     d5f8d144
+  upgrade-list         900x360     fa80dcd7
+  upgrade-list         900x560     b0ecf37d
+  upgrade-list         900x900     fa743ce2
+  upgrade-list         1400x140    0b0bf24c
+  upgrade-list         1400x220    81054227
+  upgrade-list         1400x360    c26558b7
+  upgrade-list         1400x560    a190aed0
+  upgrade-list         1400x900    29adfd5c

@@ -102,7 +102,9 @@ export function checkZoneLayout(
   }
 
   const gap = config.sectionGap ?? 0;
-  const { width: boardW, height: boardH } = layout.containerSize;
+  const boardW = layout.containerSize.width;
+  // The zones fill the board apart from the height the config reserves for other content.
+  const boardH = layout.containerSize.height - (config.fixedHeight ?? 0);
   const stack = (ids: string[]) =>
     ids.reduce((sum, id) => sum + layout.frames[id].outerHeight, 0) + gap * Math.max(0, ids.length - 1);
   const bottomH = Math.max(stack(bottomLeft), bottomRight.length > 0 ? layout.frames[bottomRight[0]].outerHeight : 0);
@@ -159,7 +161,7 @@ export function checkZoneLayout(
     }
   }
 
-  if (!isMobileViewport(viewport)) {
+  if (zoneCase.hasDividers && !isMobileViewport(viewport)) {
     for (const failure of grabEachDivider(zoneCase, layout, saved, board)) fail("grab-moves-layout", failure);
   }
   return failures;

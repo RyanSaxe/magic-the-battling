@@ -1,3 +1,5 @@
+import { deckLayoutConfig } from "../components/common/deckLayout";
+import { upgradeApplyLayoutConfig, upgradeListLayoutConfig } from "../components/common/upgradeModalLayouts";
 import type { ZoneConstraints } from "../hooks/computeConstrainedLayout";
 import type { CardLayoutConfig } from "../hooks/useCardLayout";
 import { GAME_SHELL_SMALL_BREAKPOINT_PX } from "../hooks/useGameShellMode";
@@ -70,7 +72,17 @@ export function isMobileViewport(viewport: Viewport): boolean {
   return viewport.width < MOBILE_BREAKPOINT_PX;
 }
 
-export type ZonePhase = "draft" | "build" | "reward" | "reward-stage-end";
+export type ZonePhase =
+  | "draft"
+  | "build"
+  | "reward"
+  | "reward-stage-end"
+  /** DeckDisplay, in the game summary and the shared round view. */
+  | "deck"
+  /** The upgrade modals' list of upgrades. */
+  | "upgrade-list"
+  /** The upgrades modal choosing a card to apply an upgrade to. */
+  | "upgrade-apply";
 
 export interface ZoneCase {
   phase: ZonePhase;
@@ -81,6 +93,8 @@ export interface ZoneCase {
   railZone?: string;
   /** The phase lets the player drag the vertical divider beside the rail. */
   allowHorizontalResize: boolean;
+  /** The surface shows dividers, so it can be dragged and saved. */
+  hasDividers: boolean;
 }
 
 // Pools grow by about a card a round, so long games reach the 30s.
@@ -111,6 +125,7 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
           config: draftLayoutConfig({ packCount: pack, poolCount: pool, upgradeRailCount: rail }),
           railZone: "upgrades",
           allowHorizontalResize: horizontal,
+          hasDividers: true,
         });
       }
     }
@@ -125,6 +140,7 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
           config: buildLayoutConfig({ handSize: hand, sideboardCount: sideboard, upgradeRailCount: rail }),
           railZone: "commandZone",
           allowHorizontalResize: true,
+          hasDividers: true,
         });
       }
     }
@@ -136,6 +152,7 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
       counts: { rewards },
       config: rewardLayoutConfig({ rewardCount: rewards, hasUpgradeSection: false, upgradeCount: 0, poolCount: 0 }),
       allowHorizontalResize: false,
+      hasDividers: true,
     });
     for (const offered of OFFERED_UPGRADE_COUNTS) {
       // Reward.tsx shows at least one pool slot.
@@ -146,8 +163,79 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
           counts: { rewards, offered, pool },
           config: rewardLayoutConfig({ rewardCount: rewards, hasUpgradeSection: true, upgradeCount: offered, poolCount: pool }),
           allowHorizontalResize: false,
+          hasDividers: true,
         });
       }
+    }
+  }
+  // A hidden hand or sideboard in the shared round view is laid out as one card.
+  for (const hand of [1, ...HAND_SIZES]) {
+    for (const sideboard of POOL_COUNTS) {
+      for (const upgrades of DECK_UPGRADE_COUNTS) {
+        cases.push({
+          phase: "deck",
+          label: `hand ${hand}, sideboard ${sideboard}, upgrades ${upgrades}`,
+          counts: { hand, sideboard, upgrades },
+          config: deckLayoutConfig({
+            handCount: hand,
+            battlefieldCount: DECK_BATTLEFIELD_COUNT,
+            sideboardCount: sideboard,
+            upgradeCount: upgrades,
+          }),
+          railZone: "commandZone",
+          allowHorizontalResize: true,
+          hasDividers: true,
+        });
+      }
+    }
+  }
+  return cases;
+}
+
+// DeckDisplay's battlefield holds the three chosen basics beside treasure and poison.
+const DECK_BATTLEFIELD_COUNT = 3 + 2;
+const DECK_UPGRADE_COUNTS = [0, 1, 2, 4, 8];
+
+// The modals size their cards to the modal, not the board, so they are swept over boxes
+// from a phone's modal to a wide desktop's instead of over the viewports.
+const MODAL_WIDTHS = [288, 420, 558, 900, 1400];
+const MODAL_HEIGHTS = [140, 220, 360, 560, 900];
+export const MODAL_BOXES: Viewport[] = MODAL_WIDTHS.flatMap((width) =>
+  MODAL_HEIGHTS.map((height) => ({
+    name: `${width}x${height}`,
+    width,
+    height,
+    zoneBoard: { width, height },
+    battleBoard: { width, height },
+  })),
+);
+const MODAL_UPGRADE_COUNTS = [1, 2, 3, 4, 6, 8, 10];
+const APPLY_TARGET_COUNTS = [1, 2, 5, 10, 16, 24, 32];
+// The apply view's separator: py-2 around a 1px rule.
+const APPLY_SEPARATOR_HEIGHT = 17;
+
+export function modalCases(): ZoneCase[] {
+  const cases: ZoneCase[] = [];
+  for (const upgrades of MODAL_UPGRADE_COUNTS) {
+    cases.push({
+      phase: "upgrade-list",
+      label: `upgrades ${upgrades}`,
+      counts: { upgrades },
+      config: upgradeListLayoutConfig(upgrades),
+      allowHorizontalResize: false,
+      hasDividers: false,
+    });
+  }
+  for (const upgrades of [1, 2, 3]) {
+    for (const targets of APPLY_TARGET_COUNTS) {
+      cases.push({
+        phase: "upgrade-apply",
+        label: `upgrades ${upgrades}, targets ${targets}`,
+        counts: { upgrades, targets },
+        config: upgradeApplyLayoutConfig({ upgradeCount: upgrades, targetCount: targets, separatorHeight: APPLY_SEPARATOR_HEIGHT }),
+        allowHorizontalResize: false,
+        hasDividers: false,
+      });
     }
   }
   return cases;
@@ -180,23 +268,26 @@ const SAVED_LAYOUT_COUNTS: Record<string, number[]> = {
   sideboard: [0, 4, 10, 20, 32],
   rewards: [1, 3],
   offered: [1, 4],
+  upgrades: [0, 2, 8],
 };
 
 /** Saved layouts are checked on fewer card counts, since each runs against every saved layout. */
 export function checksSavedLayouts(zoneCase: ZoneCase): boolean {
-  return Object.entries(zoneCase.counts).every(([zone, count]) => SAVED_LAYOUT_COUNTS[zone].includes(count));
+  return zoneCase.hasDividers && Object.entries(zoneCase.counts).every(([zone, count]) => SAVED_LAYOUT_COUNTS[zone].includes(count));
 }
 
 /** One ordinary game per phase, for checks that do not depend on card counts. */
 export function isTypicalCase(viewport: Viewport, zoneCase: ZoneCase): boolean {
-  const typical: Record<ZonePhase, string> = {
+  const typical: Partial<Record<ZonePhase, string>> = {
     draft: "pack 5, pool 10",
     build: "hand 5, sideboard 10",
     reward: "rewards 2",
     "reward-stage-end": "rewards 2, upgrades 3, pool 10",
+    deck: "hand 5, sideboard 10, upgrades 2",
   };
+  const label = typical[zoneCase.phase];
   const rail = hasUpgradeRail(viewport) ? 2 : 0;
-  return zoneCase.label.startsWith(typical[zoneCase.phase]) && (zoneCase.counts.rail ?? rail) === rail;
+  return label !== undefined && zoneCase.label.startsWith(label) && (zoneCase.counts.rail ?? rail) === rail;
 }
 
 export interface BattleCase {
