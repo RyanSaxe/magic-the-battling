@@ -9,11 +9,12 @@ import { DefaultOpponentsField } from '../components/dashboard/DefaultOpponentsF
 import { DetailHero, HeroLink } from '../components/dashboard/DetailHero'
 import { GameHistory, type LoadGames } from '../components/dashboard/GameHistory'
 import { HomeHeader } from '../components/dashboard/HomeHeader'
-import { Breadcrumb } from '../components/dashboard/Section'
-import { getBattlers, getBattlerGames, updateBattler, deleteBattler } from '../api/client'
+import { Breadcrumb, NoticeTile } from '../components/dashboard/Section'
+import { getBattler, getBattlerGames, updateBattler, deleteBattler } from '../api/client'
+import { useFirstLoad } from '../hooks/useFirstLoad'
 import type { UserBattler, PlayMode } from '../types'
 import { countLabel, cubeTitle, modeLabel, winRate } from '../utils/accountFormat'
-import { unknownToAppError } from '../utils/appError'
+import { AppError, unknownToAppError } from '../utils/appError'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
 
 export function BattlerView() {
@@ -23,9 +24,21 @@ export function BattlerView() {
   const { user, loading: authLoading } = useAuth()
   const { addToast } = useToast()
 
-  const [battler, setBattler] = useState<UserBattler | null>(null)
-  const [loadingData, setLoadingData] = useState(true)
   const [showSettings, setShowSettings] = useState(false)
+  const presetId = Number(listId)
+  // Resolves to null when the player has no such preset, which sends them back to the dashboard.
+  const loadPreset = useCallback(async () => {
+    if (!Number.isInteger(presetId)) return null
+    try {
+      return await getBattler(presetId)
+    } catch (err) {
+      if (err instanceof AppError && err.status === 404) return null
+      throw err
+    }
+  }, [presetId])
+  const presetLoad = useFirstLoad(loadPreset, !!user)
+  const battler = presetLoad.state.status === 'loaded' ? presetLoad.state.value : null
+  const missing = presetLoad.state.status === 'loaded' && battler === null
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -34,22 +47,8 @@ export function BattlerView() {
   }, [authLoading, user, navigate, location.pathname])
 
   useEffect(() => {
-    if (!user || !listId) return
-    let cancelled = false
-    getBattlers()
-      .then(({ battlers }) => {
-        if (cancelled) return
-        const b = battlers.find((x) => x.id === Number(listId))
-        if (!b) {
-          navigate('/dashboard', { replace: true })
-          return
-        }
-        setBattler(b)
-      })
-      .catch(() => { if (!cancelled) addToast('Failed to load data', 'error') })
-      .finally(() => { if (!cancelled) setLoadingData(false) })
-    return () => { cancelled = true }
-  }, [user, listId, navigate, addToast])
+    if (missing) navigate('/dashboard', { replace: true })
+  }, [missing, navigate])
 
   const battlerId = battler?.id
   const loadGames = useCallback<LoadGames>((filters, offset) => {
@@ -62,7 +61,15 @@ export function BattlerView() {
     })
   }, [battlerId])
 
-  if (authLoading || !user || loadingData || !battler) {
+  if (presetLoad.state.status === 'failed') {
+    return (
+      <PageFrame header={<HomeHeader />} center contentClassName="items-center">
+        <NoticeTile action={{ label: 'Retry', onClick: presetLoad.retry }}>This preset didn&apos;t load.</NoticeTile>
+      </PageFrame>
+    )
+  }
+
+  if (authLoading || !user || !battler) {
     return (
       <PageFrame header={<HomeHeader />} center contentClassName="items-center">
         <p className="text-amber-200/70">Loading...</p>
@@ -125,7 +132,7 @@ export function BattlerView() {
           onSave={async (updates) => {
             try {
               const updated = await updateBattler(battler.id, updates)
-              setBattler(updated)
+              presetLoad.update({ status: 'loaded', value: updated })
               setShowSettings(false)
             } catch (err) {
               addToast(unknownToAppError(err, 'update-battler', 'Failed to save').message, 'error')
@@ -195,7 +202,7 @@ function SettingsModal({
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
               placeholder={battler.cube_id}
             />
           </div>
@@ -205,7 +212,7 @@ function SettingsModal({
               type="checkbox"
               checked={playMode === 'constructed'}
               onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
-              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+              className="w-4 h-4 rounded bg-black/40 border-black/40"
             />
             <span className="text-white text-sm">Constructed</span>
             <span className="text-amber-200/45 text-xs">— bring your own deck</span>
@@ -216,7 +223,7 @@ function SettingsModal({
               type="checkbox"
               checked={useUpgrades}
               onChange={(e) => setUseUpgrades(e.target.checked)}
-              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+              className="w-4 h-4 rounded bg-black/40 border-black/40"
             />
             <span className="text-white text-sm">Upgrades</span>
           </label>
@@ -236,7 +243,7 @@ function SettingsModal({
             onClick={() => {
               if (window.confirm(`Delete "${battler.display_name || battler.cube_id}"?`)) onDelete()
             }}
-            className="btn btn-secondary py-2 px-4 text-red-400 hover:text-red-300"
+            className="btn btn-secondary btn-destructive py-2 px-4"
           >
             Delete
           </button>

@@ -282,7 +282,7 @@ export function UpgradesModal({
         {readyToConfirm && (
           <button
             onClick={handleConfirm}
-            className="absolute bottom-4 right-4 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold px-5 py-2 rounded shadow-lg transition-colors"
+            className="btn btn-primary absolute bottom-4 right-4 text-sm font-semibold"
           >
             Confirm
           </button>

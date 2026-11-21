@@ -11,7 +11,8 @@ import { type AppError, createAppError, wsPayloadToAppError } from '../utils/app
 import { hydrateGameState } from '../utils/catalogHydration'
 import { connectionErrorForCloseCode } from '../utils/connectionClose'
 
-interface SpectateRequest {
+/** A request to watch this player, still waiting on their answer. */
+export interface SpectateRequest {
   request_id: string
   spectator_name: string
 }
@@ -31,7 +32,8 @@ interface ConnectionState {
   status: ConnectionStatus
   gameState: GameState | null
   lobbyState: LobbyState | null
-  pendingSpectateRequest: SpectateRequest | null
+  /** Every request waiting on this player's answer, oldest first, exactly as the server last sent them. */
+  spectateRequests: SpectateRequest[]
   serverNotice: ServerNoticeStatus | null
 }
 
@@ -58,7 +60,7 @@ function initialConnectionState(key: string | null): ConnectionState {
     status: key ? { kind: 'connecting' } : { kind: 'idle' },
     gameState: null,
     lobbyState: null,
-    pendingSpectateRequest: null,
+    spectateRequests: [],
     serverNotice: null,
   }
 }
@@ -146,11 +148,14 @@ export function useWebSocket(
       ws.onopen = () => {
         if (!isCurrentSocket() || ended) return
         reconnectAttempts = 0
-        update((s) => ({ ...s, status: { kind: 'open' } }))
+        // The server sends this connection's waiting requests only when there are some.
+        update((s) => ({ ...s, status: { kind: 'open' }, spectateRequests: [] }))
       }
 
       const messageQueue: MessageEvent[] = []
       let processing = false
+      // Followed message by message rather than through rendered state, which can skip "starting" entirely.
+      let lobbyStartStatus: LobbyState['start_status'] | null = null
 
       async function processQueue() {
         if (processing) return
@@ -184,15 +189,27 @@ export function useWebSocket(
               const hydrated = hydrateGameState(payload, catalog)
               update((s) => ({ ...s, gameState: hydrated, lobbyState: null }))
             } else if (message.type === 'lobby_state') {
-              update((s) => ({ ...s, lobbyState: message.payload }))
+              const lobby = message.payload as LobbyState
+              if (lobbyStartStatus === 'starting' && lobby.start_status === 'failed') {
+                onServerErrorRef.current?.(
+                  createAppError({
+                    code: 'USER_MESSAGE',
+                    detail: lobby.start_error,
+                    context: 'default',
+                    fallbackMessage: 'The game could not start.',
+                  }),
+                )
+              }
+              lobbyStartStatus = lobby.start_status
+              update((s) => ({ ...s, lobbyState: lobby }))
             } else if (message.type === 'error') {
               onServerErrorRef.current?.(
                 wsPayloadToAppError(message.payload, 'default', 'That action could not be completed.'),
               )
             } else if (message.type === 'connection_error') {
               end(wsPayloadToAppError(message.payload, 'default', 'The connection could not be established.'))
-            } else if (message.type === 'spectate_request') {
-              update((s) => ({ ...s, pendingSpectateRequest: message.payload }))
+            } else if (message.type === 'spectate_requests') {
+              update((s) => ({ ...s, spectateRequests: message.payload.requests }))
             } else if (message.type === 'server_notice') {
               update((s) => ({ ...s, serverNotice: message.payload }))
             } else if (message.type === 'kicked') {
@@ -254,19 +271,14 @@ export function useWebSocket(
     }
   }, [])
 
-  const clearSpectateRequest = useCallback(() => {
-    setStored((prev) => ({ ...prev, state: { ...prev.state, pendingSpectateRequest: null } }))
-  }, [])
-
   return {
     status: state.status,
     isConnected: state.status.kind === 'open',
     connectionError: state.status.kind === 'ended' ? state.status.error : null,
     gameState: state.gameState,
     lobbyState: state.lobbyState,
-    pendingSpectateRequest: state.pendingSpectateRequest,
+    spectateRequests: state.spectateRequests,
     serverNotice: state.serverNotice,
     send,
-    clearSpectateRequest,
   }
 }

@@ -51,7 +51,7 @@ export function LayoutResetControl({
       <div className="relative">
         <button
           type="button"
-          className="modal-chrome border gold-border rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-amber-100/85 hover:text-white shadow-lg"
+          className="btn-secondary rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.18em]"
           onClick={() => setConfirmOpen((open) => !open)}
         >
           Reset Layout
@@ -82,7 +82,7 @@ export function LayoutResetControl({
               </button>
               <button
                 type="button"
-                className="rounded-md border gold-border bg-[#2a2320] px-2.5 py-1 text-xs text-amber-100 hover:text-white"
+                className="btn-secondary rounded-md px-2.5 py-1 text-xs"
                 onClick={() => {
                   onConfirm();
                   setConfirmOpen(false);

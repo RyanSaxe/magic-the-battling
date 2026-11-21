@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
@@ -6,9 +6,9 @@ import { AddCubeModal } from '../components/dashboard/AddCubeModal'
 import { DashboardFrame } from '../components/dashboard/DashboardFrame'
 import { DetailHero, HeroLink, type HeroAction } from '../components/dashboard/DetailHero'
 import { GameHistory, type LoadGames } from '../components/dashboard/GameHistory'
-import { Breadcrumb, SectionTitle } from '../components/dashboard/Section'
+import { Breadcrumb, NoticeTile, SectionTitle } from '../components/dashboard/Section'
 import { followCube, getCubeGames, getCubeSummary, unfollowCube } from '../api/client'
-import type { CubeSummary } from '../types'
+import { useFirstLoad } from '../hooks/useFirstLoad'
 import { formatWhen, modeLabel, upgradesLabel } from '../utils/accountFormat'
 import { unknownToAppError } from '../utils/appError'
 
@@ -17,25 +17,14 @@ const ALL_GAMES = { playMode: null, useUpgrades: null, mineOnly: false }
 export function CubeView() {
   const { cubeId = '' } = useParams<{ cubeId: string }>()
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { addToast } = useToast()
-  const [summary, setSummary] = useState<CubeSummary | null>(null)
   const [showSaveModal, setShowSaveModal] = useState(false)
   const [changingFollow, setChangingFollow] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    getCubeSummary(cubeId)
-      .then((data) => {
-        if (!cancelled) setSummary(data)
-      })
-      .catch(() => {
-        if (!cancelled) addToast('Failed to load the cube', 'error')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [cubeId, user, addToast])
+  // Waits for sign-in to be known, since the summary says whether this player follows the cube.
+  const loadSummary = useCallback(() => getCubeSummary(cubeId), [cubeId])
+  const summaryLoad = useFirstLoad(loadSummary, !authLoading)
+  const summary = summaryLoad.state.status === 'loaded' ? summaryLoad.state.value : null
 
   const loadGames = useCallback<LoadGames>(
     (filters, offset) =>
@@ -53,10 +42,10 @@ export function CubeView() {
     try {
       if (summary.follow_id !== null) {
         await unfollowCube(summary.follow_id)
-        setSummary({ ...summary, is_following: false, follow_id: null })
+        summaryLoad.update({ status: 'loaded', value: { ...summary, is_following: false, follow_id: null } })
       } else {
         const follow = await followCube(cubeId)
-        setSummary({ ...summary, is_following: true, follow_id: follow.id })
+        summaryLoad.update({ status: 'loaded', value: { ...summary, is_following: true, follow_id: follow.id } })
       }
     } catch (err) {
       addToast(unknownToAppError(err, 'follow-cube', 'Failed to change the follow').message, 'error')
@@ -105,6 +94,9 @@ export function CubeView() {
             { label: 'Popular Setup', value: setup ? `${modeLabel(setup.play_mode)} · ${upgradesLabel(setup.use_upgrades)}` : '—' },
           ]}
         />
+        {summaryLoad.state.status === 'failed' && (
+          <NoticeTile action={{ label: 'Retry', onClick: summaryLoad.retry }}>This cube&apos;s details didn&apos;t load.</NoticeTile>
+        )}
         <GameHistory
           loadGames={loadGames}
           initialFilters={ALL_GAMES}

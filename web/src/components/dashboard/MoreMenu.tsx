@@ -4,6 +4,7 @@ export interface MoreMenuItem {
   label: string
   onSelect: () => void
   danger?: boolean
+  disabled?: boolean
 }
 
 /** A ⋯ button that opens a short list of a card's less common actions. */
@@ -49,11 +50,12 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
               key={item.label}
               type="button"
               role="menuitem"
+              disabled={item.disabled}
               onClick={() => {
                 setOpen(false)
                 item.onSelect()
               }}
-              className={`w-full text-left px-4 py-2 text-sm hover:bg-white/10 transition-colors ${
+              className={`w-full text-left px-4 py-2 text-sm hover:bg-white/10 transition-colors disabled:opacity-50 ${
                 item.danger ? 'text-red-400 hover:text-red-300' : 'text-amber-100/85'
               }`}
             >

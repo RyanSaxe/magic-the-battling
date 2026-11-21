@@ -229,7 +229,7 @@ function JoinLobbyNotice({
           if (e.key === 'Enter') void join(playerName)
         }}
         maxLength={32}
-        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
       />
       {error && <p className="mt-2 text-red-300">{error}</p>}
     </StatusNotice>

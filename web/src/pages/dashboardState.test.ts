@@ -2,28 +2,28 @@ import { describe, expect, it } from 'vitest'
 import type { FollowedBattler, UserBattler } from '../types'
 import {
   NO_FOLLOWS,
+  canRemove,
   findFollow,
   followFor,
+  isFollowPending,
   isFollowing,
   libraryEntries,
-  visitLoadsFirstPage,
+  loadedLibrary,
+  nextLibraryPage,
+  withAddedPreset,
   withDiscoverResults,
   withFollow,
+  withFollowPending,
+  withFollowSettled,
   withFollowingPage,
+  withLibraryPage,
+  withLibraryPageRequested,
+  withRemovalStarted,
+  withRemoved,
   withoutFollow,
+  type Library,
+  type LibraryEntry,
 } from './dashboardState'
-
-describe('visitLoadsFirstPage', () => {
-  it('loads on the first visit and on a visit after a failed load', () => {
-    expect(visitLoadsFirstPage('idle')).toBe(true)
-    expect(visitLoadsFirstPage('failed')).toBe(true)
-  })
-
-  it('sends no second request while the first page is loading or once it has loaded', () => {
-    expect(visitLoadsFirstPage('loading')).toBe(false)
-    expect(visitLoadsFirstPage('loaded')).toBe(false)
-  })
-})
 
 function followed(id: number, cubeId: string): FollowedBattler {
   return {
@@ -38,7 +38,7 @@ function followed(id: number, cubeId: string): FollowedBattler {
 
 const cubeIds = (follows: typeof NO_FOLLOWS) => follows.records.map((f) => f.cube_id)
 
-describe('follows shared by the Following and Discover tabs', () => {
+describe('follows as Discover shows them', () => {
   it('lists a cube followed from Discover first in Following, where its follow can be found to unfollow', () => {
     let follows = withFollowingPage(NO_FOLLOWS, { following: [followed(1, 'old')], has_more: false }, 0)
     follows = withDiscoverResults(follows, [{ cube_id: 'new', is_following: false }])
@@ -85,6 +85,20 @@ describe('follows shared by the Following and Discover tabs', () => {
     expect(cubeIds(follows)).toEqual(['a'])
     expect(isFollowing(follows, 'z')).toBe(true)
   })
+
+  it('holds a cube pending while its follow or unfollow runs, and lets go when it lands or fails', () => {
+    let follows = withFollowPending(NO_FOLLOWS, 'auto')
+    expect(isFollowPending(follows, 'auto')).toBe(true)
+
+    follows = withFollow(follows, followed(1, 'auto'))
+    expect([isFollowPending(follows, 'auto'), isFollowing(follows, 'auto')]).toEqual([false, true])
+
+    follows = withFollowSettled(withFollowPending(follows, 'auto'), 'auto')
+    expect([isFollowPending(follows, 'auto'), isFollowing(follows, 'auto')]).toEqual([false, true])
+
+    follows = withoutFollow(withFollowPending(follows, 'auto'), 'auto')
+    expect([isFollowPending(follows, 'auto'), isFollowing(follows, 'auto')]).toEqual([false, false])
+  })
 })
 
 function serverFollowing(cubeIds: string[]) {
@@ -118,15 +132,87 @@ describe('findFollow', () => {
   })
 })
 
-describe('libraryEntries', () => {
-  it('lists saved cubes and decks before followed cubes', () => {
-    const preset = (id: number) => ({ id, cube_id: `cube-${id}` }) as UserBattler
-    const entries = libraryEntries([preset(1), preset(2)], [followed(7, 'auto')])
+const preset = (id: number) => ({ id, cube_id: `cube-${id}` }) as UserBattler
 
-    expect(entries.map((e) => (e.kind === 'saved' ? `saved ${e.preset.id}` : `following ${e.follow.id}`))).toEqual([
+/** Saved presets as GET /battlers pages them: in order of position, with a new one saved last. */
+function serverPresets(count: number) {
+  const ids = Array.from({ length: count }, (_, i) => i + 1)
+  return {
+    page: (offset: number) => ({ battlers: ids.slice(offset, offset + 20).map(preset), has_more: offset + 20 < ids.length }),
+    save: () => {
+      ids.push(ids.length + 1)
+      return preset(ids.length)
+    },
+    remove: (id: number) => ids.splice(ids.indexOf(id), 1),
+  }
+}
+
+const NO_FOLLOWING = { following: [], has_more: false }
+
+function nextSavedPage(library: Library, server: ReturnType<typeof serverPresets>): Library {
+  const next = nextLibraryPage(library)
+  if (next?.list !== 'saved') throw new Error(`expected a saved page, not ${JSON.stringify(next)}`)
+  return withLibraryPage(withLibraryPageRequested(library), { list: 'saved', page: server.page(next.offset) })
+}
+
+const savedIds = (library: Library) =>
+  libraryEntries(library).flatMap((entry) => (entry.kind === 'saved' ? [entry.preset.id] : []))
+
+describe('the dashboard library', () => {
+  it('lists saved cubes and decks before followed cubes', () => {
+    const library = loadedLibrary({ battlers: [preset(1), preset(2)], has_more: false }, { following: [followed(7, 'auto')], has_more: false })
+
+    expect(libraryEntries(library).map((e) => (e.kind === 'saved' ? `saved ${e.preset.id}` : `following ${e.follow.id}`))).toEqual([
       'saved 1',
       'saved 2',
       'following 7',
     ])
+  })
+
+  it('shows a preset saved before every preset has loaded once, and the next page skips none', () => {
+    const server = serverPresets(21)
+    let library = loadedLibrary(server.page(0), NO_FOLLOWING)
+
+    library = withAddedPreset(library, server.save())
+    expect(savedIds(library)).toContain(22)
+    library = nextSavedPage(library, server)
+
+    expect(savedIds(library)).toEqual(Array.from({ length: 22 }, (_, i) => i + 1))
+    expect(nextLibraryPage(library)).toBeNull()
+  })
+
+  it('shows a preset once when the page that holds it lands before its save returns', () => {
+    const server = serverPresets(21)
+    let library = loadedLibrary(server.page(0), NO_FOLLOWING)
+
+    const saved = server.save()
+    library = nextSavedPage(library, server)
+    library = withAddedPreset(library, saved)
+
+    expect(savedIds(library)).toEqual(Array.from({ length: 22 }, (_, i) => i + 1))
+  })
+
+  it('asks for the next page one earlier after a loaded preset is deleted', () => {
+    const server = serverPresets(25)
+    let library = loadedLibrary(server.page(0), NO_FOLLOWING)
+    const fifth: LibraryEntry = { kind: 'saved', preset: preset(5) }
+
+    library = withRemovalStarted(library, fifth)
+    server.remove(5)
+    library = withRemoved(library, fifth)
+    library = nextSavedPage(library, server)
+
+    expect(savedIds(library)).toEqual([1, 2, 3, 4, ...Array.from({ length: 20 }, (_, i) => i + 6)])
+  })
+
+  it('runs a page and a removal one at a time, so a page never lands on a list a removal has shifted', () => {
+    const server = serverPresets(25)
+    const loaded = loadedLibrary(server.page(0), NO_FOLLOWING)
+    const first: LibraryEntry = { kind: 'saved', preset: preset(1) }
+
+    expect(canRemove(withLibraryPageRequested(loaded), first)).toBe(false)
+    const removing = withRemovalStarted(loaded, first)
+    expect([canRemove(removing, first), nextLibraryPage(removing)]).toEqual([false, null])
+    expect(nextLibraryPage(withRemoved(removing, first))).toEqual({ list: 'saved', offset: 19 })
   })
 })

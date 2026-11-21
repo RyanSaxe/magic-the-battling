@@ -1,6 +1,7 @@
 const LEGACY_SESSION_KEY = 'mtb_session'
 const LEGACY_PLAYER_KEY = 'mtb_player'
 const SESSION_KEY_PREFIX = 'mtb_session:'
+const SPECTATE_KEY_PREFIX = 'mtb_spectate:'
 
 /** The connection credential this tab uses for one game. It lives per tab, so each tab connects on its own. */
 export interface TabSession {
@@ -48,4 +49,41 @@ export function saveTabSession(gameId: string, session: TabSession): void {
 
 export function clearTabSession(gameId: string): void {
   sessionStorage.removeItem(sessionKey(gameId))
+}
+
+/** The request this tab made to watch a player in one game, with its spectator session once approved. */
+export interface TabSpectate {
+  target: string
+  requestId: string
+  sessionId: string | null
+}
+
+function spectateKey(gameId: string): string {
+  return `${SPECTATE_KEY_PREFIX}${gameId}`
+}
+
+export function readTabSpectate(gameId: string): TabSpectate | null {
+  const raw = sessionStorage.getItem(spectateKey(gameId))
+  if (!raw) return null
+  try {
+    const value = JSON.parse(raw) as Partial<TabSpectate>
+    if (typeof value.target === 'string' && typeof value.requestId === 'string') {
+      return {
+        target: value.target,
+        requestId: value.requestId,
+        sessionId: typeof value.sessionId === 'string' ? value.sessionId : null,
+      }
+    }
+  } catch {
+    // An unreadable entry is treated as no request.
+  }
+  return null
+}
+
+export function saveTabSpectate(gameId: string, spectate: TabSpectate): void {
+  sessionStorage.setItem(spectateKey(gameId), JSON.stringify(spectate))
+}
+
+export function clearTabSpectate(gameId: string): void {
+  sessionStorage.removeItem(spectateKey(gameId))
 }
