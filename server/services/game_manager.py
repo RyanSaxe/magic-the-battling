@@ -3038,21 +3038,14 @@ class GameManager:
                 if not fp.is_eliminated:
                     self._record_bot_poison(db, game_id, fp, battler_elo=battler_elo, stage=stage, round_num=round_num)
 
-        paired: set[str] = set()
         paired_bot_names: set[str] = set()
-        for player in live_players:
-            if player.name in paired:
-                continue
-            opponent = battle.find_opponent(game, player)
-            if opponent and opponent.name not in paired:
-                battle.start(game, player, opponent)
-                paired.add(player.name)
-                paired.add(opponent.name)
-                if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
-                    for fp in game.puppets:
-                        if fp.player_history_id == opponent.source_player_history_id:
-                            paired_bot_names.add(fp.name)
-                            break
+        for player, opponent in battle.get_round_table(game).draw_battles():
+            battle.start(game, player, opponent)
+            if isinstance(opponent, StaticOpponent) and opponent.source_player_history_id:
+                for fp in game.puppets:
+                    if fp.player_history_id == opponent.source_player_history_id:
+                        paired_bot_names.add(fp.name)
+                        break
 
         battle.resolve_unpaired_bot_battles(game, paired_bot_names, stage, round_num, game.config.num_rounds_per_stage)
 
