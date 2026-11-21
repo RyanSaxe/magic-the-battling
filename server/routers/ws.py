@@ -28,6 +28,7 @@ ACTION_REQUIRED_PHASES: dict[str, str] = {
     "draft_done": "draft",
     "build_move": "build",
     "build_swap": "build",
+    "build_set_basics": "build",
     "build_ready": "build",
     "build_unready": "build",
     "build_apply_upgrade": "build",
@@ -662,6 +663,8 @@ def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str
                 payload["card_b_id"],
                 payload["source_b"],
             )
+        case "build_set_basics":
+            return game_manager.handle_build_set_basics(game, player, payload["basics"])
         case "build_ready":
             db_session = db.SessionLocal()
             try:

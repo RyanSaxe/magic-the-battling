@@ -2624,6 +2624,13 @@ class GameManager:
         build.swap_card(player, card_a, source_a, card_b, source_b)
         return True
 
+    def handle_build_set_basics(self, game: Game, player: Player, basics: list[str]) -> bool | str:
+        try:
+            build.set_basics(game, player, basics)
+            return True
+        except ValueError as e:
+            return str(e)
+
     def handle_build_ready(
         self,
         game: Game,
