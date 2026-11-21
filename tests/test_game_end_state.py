@@ -633,6 +633,74 @@ def test_a_puppet_from_a_game_with_sudden_death_plays_the_ordinary_build_of_that
     assert puppet.snapshots["3_2"] == builds[None]
 
 
+def _add_build(
+    db, history: PlayerGameHistory, stage: int, round_number: int, *, treasures: int, poison: int, **columns
+) -> None:
+    snapshot_data = BattleSnapshotData(
+        hand=[], vanguard=None, basic_lands=BASICS, applied_upgrades=[], treasures=treasures, poison=poison
+    )
+    db.add(
+        BattleSnapshot(
+            player_history_id=history.id,
+            stage=stage,
+            round=round_number,
+            hand_json="[]",
+            basic_lands_json="[]",
+            applied_upgrades_json="[]",
+            treasures=treasures,
+            poison=poison,
+            full_state_json=snapshot_data.model_dump_json(),
+            **columns,
+        )
+    )
+
+
+def test_share_shows_a_puppet_in_each_sudden_death_it_fought_with_its_ordinary_build(client):
+    """Ava wins a Goldfish game in Sudden Death against Rook, a puppet replaying a past player who once rebuilt for
+    a Sudden Death of their own."""
+    db = db_module.SessionLocal()
+    try:
+        db.add(GameRecord(id="past-game", ended_at=datetime.now(UTC)))
+        db.add(GameRecord(id="goldfish", ended_at=datetime.now(UTC)))
+        past_rook = PlayerGameHistory(
+            game_id="past-game", player_name="Rook", battler_elo=1200, max_stage=4, max_round=2
+        )
+        ava = PlayerGameHistory(
+            game_id="goldfish", player_name="Ava", battler_elo=1200, max_stage=4, max_round=2, final_placement=1
+        )
+        db.add_all([past_rook, ava])
+        db.flush()
+        rook = PlayerGameHistory(
+            game_id="goldfish",
+            player_name="Rook",
+            battler_elo=1200,
+            max_stage=4,
+            max_round=2,
+            is_puppet=True,
+            source_history_id=past_rook.id,
+            poison_history_json='{"4_2": 8}',
+            final_placement=2,
+            final_poison=10,
+        )
+        db.add(rook)
+        _add_build(db, past_rook, 4, 2, treasures=2, poison=8)
+        _add_build(db, past_rook, 4, 2, treasures=77, poison=9, sudden_death_build=1)
+        _add_build(db, ava, 4, 2, treasures=3, poison=8, opponent_name="Rook")
+        _add_build(db, ava, 4, 2, treasures=3, poison=9, opponent_name="Rook", sudden_death_build=1)
+        _add_build(db, ava, 4, 2, treasures=3, poison=9, opponent_name="Rook", sudden_death_build=2)
+        db.commit()
+    finally:
+        db.close()
+
+    rook_rows = _share_rows(client, "goldfish", "Ava")["Rook"]["snapshots"]
+
+    assert [(s["sudden_death_build"], s["poison"], s["treasures"]) for s in rook_rows] == [
+        (None, 8, 2),
+        (1, 9, 2),
+        (2, 9, 2),
+    ]
+
+
 def test_both_builds_of_a_sudden_death_fight_share_its_number_even_after_a_failed_save(
     client, start_lobby, monkeypatch
 ):
