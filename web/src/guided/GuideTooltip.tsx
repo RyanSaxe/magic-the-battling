@@ -101,8 +101,8 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
             </div>
           )}
           {step.content.gallery && step.content.gallery.length > 0 && (
-            <div className="mt-4 rounded-xl border border-sky-300/15 bg-black/20 p-3">
-              <div className="text-[0.68rem] uppercase tracking-[0.18em] text-sky-100/80">
+            <div className="mt-4 rounded-xl border gold-divider bg-black/20 p-3">
+              <div className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--ivory-soft)]">
                 Cards shown here
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
@@ -111,7 +111,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
                     key={`${media.imageUrl}:${media.alt}`}
                     src={media.imageUrl}
                     alt={media.alt}
-                    className="w-full rounded-md border border-sky-300/15 shadow-sm"
+                    className="w-full rounded-md border gold-divider shadow-sm"
                   />
                 ))}
               </div>

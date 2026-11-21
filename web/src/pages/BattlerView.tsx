@@ -98,11 +98,11 @@ export function BattlerView() {
             </span>
             <HeroLink to={`/cube/${encodeURIComponent(battler.cube_id)}`}>View Public Cube Page →</HeroLink>
           </>}
-          chips={[
-            `Mode: ${mode === 'Deck' ? 'Deck (Constructed)' : 'Cube (Limited)'}`,
-            `Upgrades: ${battler.use_upgrades ? 'On' : 'Off'}`,
-            `Default Opponents: ${battler.puppet_count}`,
-            `Open Spectating: ${battler.auto_approve_spectators ? 'On' : 'Off'}`,
+          details={[
+            { label: 'Mode', value: mode === 'Deck' ? 'Deck (Constructed)' : 'Cube (Limited)' },
+            { label: 'Upgrades', value: battler.use_upgrades ? 'On' : 'Off' },
+            { label: 'Default Opponents', value: String(battler.puppet_count) },
+            { label: 'Open Spectating', value: battler.auto_approve_spectators ? 'On' : 'Off' },
           ]}
           actions={[{ label: 'Edit Preset', onClick: () => setShowSettings(true) }]}
           play={{ label: 'Play Preset', onClick: () => navigate(battlerPlayUrl(battler)) }}

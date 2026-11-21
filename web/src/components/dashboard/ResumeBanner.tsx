@@ -21,12 +21,12 @@ export function ResumeBanner({ seat }: { seat: ResumableSeat }) {
         <div className="min-w-0">
           <div
             className={`flex items-center gap-1.5 text-[10.5px] leading-4 font-bold uppercase tracking-[0.1em] ${
-              inGame ? 'text-emerald-300' : 'text-amber-300'
+              inGame ? 'text-[#86efac]' : 'text-[var(--color-gold-bright)]'
             }`}
           >
             <span
               className={`h-[7px] w-[7px] shrink-0 rounded-full ${
-                inGame ? 'bg-green-500 shadow-[0_0_6px_#22c55e]' : 'bg-amber-500'
+                inGame ? 'bg-[#22c55e] shadow-[0_0_6px_#22c55e]' : 'bg-[var(--color-gold)]'
               }`}
             />
             {resumeHeadline(seat)}
