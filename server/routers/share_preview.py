@@ -2,7 +2,8 @@ import hashlib
 import logging
 import re
 import time
-from collections import defaultdict
+from collections import OrderedDict
+from collections.abc import Callable
 from html import escape
 from pathlib import Path
 from urllib.parse import quote
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 from server.db import database
 from server.db.models import GameRecord
 from server.errors import AppHTTPException
+from server.runtime_config import BEHIND_FLY_PROXY
 from server.schemas.api import ShareGameResponse
 from server.services.preview import cache_key as preview_cache_key
 from server.services.preview import preview_service
@@ -28,8 +30,39 @@ VALID_NAME_RE = re.compile(r"^[^/]{1,64}$")
 
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX = 10
-_rate_limits: dict[str, list[float]] = defaultdict(list)
 PREVIEW_RENDER_VERSION = "preview-v4"
+
+
+class SlidingWindowRateLimiter:
+    def __init__(self, *, window_seconds: float, max_requests: int, clock: Callable[[], float] = time.monotonic):
+        self._window_seconds = window_seconds
+        self._max_requests = max_requests
+        self._clock = clock
+        # Ordered by each client's latest allowed request, so clients idle for a whole window sit at the front.
+        self._requests: OrderedDict[str, list[float]] = OrderedDict()
+
+    def allow(self, client: str) -> bool:
+        now = self._clock()
+        while self._requests:
+            oldest_client, oldest_times = next(iter(self._requests.items()))
+            if now - oldest_times[-1] < self._window_seconds:
+                break
+            del self._requests[oldest_client]
+
+        recent = [t for t in self._requests.get(client, []) if now - t < self._window_seconds]
+        if len(recent) >= self._max_requests:
+            self._requests[client] = recent
+            return False
+        recent.append(now)
+        self._requests[client] = recent
+        self._requests.move_to_end(client)
+        return True
+
+    def tracked_clients(self) -> int:
+        return len(self._requests)
+
+
+_preview_rate_limiter = SlidingWindowRateLimiter(window_seconds=RATE_LIMIT_WINDOW, max_requests=RATE_LIMIT_MAX)
 
 
 def _get_db():
@@ -40,14 +73,12 @@ def _get_db():
         db.close()
 
 
-def _check_rate_limit(client_ip: str) -> bool:
-    now = time.monotonic()
-    timestamps = _rate_limits[client_ip]
-    _rate_limits[client_ip] = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW]
-    if len(_rate_limits[client_ip]) >= RATE_LIMIT_MAX:
-        return False
-    _rate_limits[client_ip].append(now)
-    return True
+def _client_ip(request: Request) -> str:
+    # uvicorn trusts every X-Forwarded-For entry, and a client can send its own, so behind
+    # Fly use the address Fly's proxy saw instead.
+    if BEHIND_FLY_PROXY and (fly_client_ip := request.headers.get("fly-client-ip")):
+        return fly_client_ip
+    return request.client.host if request.client else "unknown"
 
 
 def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameResponse | None:
@@ -154,8 +185,7 @@ async def preview_image(
     if not VALID_ID_RE.match(game_id) or not VALID_NAME_RE.match(player_name):
         return Response(status_code=400)
 
-    client_ip = request.client.host if request.client else "unknown"
-    if not _check_rate_limit(client_ip):
+    if not _preview_rate_limiter.allow(_client_ip(request)):
         return Response(status_code=429, headers={"Retry-After": "60"})
 
     share_data = _fetch_share_data(game_id, player_name, db)

@@ -1,10 +1,15 @@
 import asyncio
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastapi.testclient import TestClient
 from playwright.async_api import Error as PlaywrightError
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from server.routers.share_preview import _build_og_html
+import server.routers.share_preview as share_preview_module
+from server.main import app
+from server.routers.share_preview import RATE_LIMIT_MAX, SlidingWindowRateLimiter, _build_og_html
 from server.schemas.api import ShareGameResponse, SharePlayerData
 from server.services.preview import PreviewService
 
@@ -137,3 +142,39 @@ class TestPreviewServiceRestart:
 
         with pytest.raises(PlaywrightError, match="Some other Playwright error"):
             asyncio.run(service.screenshot("http://example.com/embed", "cache_key_456"))
+
+
+class TestPreviewRateLimit:
+    def test_behind_fly_forged_forwarded_for_addresses_share_one_limit(self, client, monkeypatch):
+        monkeypatch.setattr(share_preview_module, "BEHIND_FLY_PROXY", True)
+        monkeypatch.setattr(
+            share_preview_module,
+            "_preview_rate_limiter",
+            SlidingWindowRateLimiter(window_seconds=60, max_requests=RATE_LIMIT_MAX),
+        )
+        # scripts/start_server.sh runs uvicorn with --proxy-headers --forwarded-allow-ips "*".
+        # uvicorn and Starlette type ASGI apps differently, hence the casts.
+        proxied = TestClient(cast(Any, ProxyHeadersMiddleware(cast(Any, app), trusted_hosts="*")))
+
+        statuses = [
+            proxied.get(
+                "/game/missing/share/Alice/preview.png",
+                headers={"X-Forwarded-For": f"198.51.100.{i}", "Fly-Client-IP": "203.0.113.7"},
+            ).status_code
+            for i in range(RATE_LIMIT_MAX + 1)
+        ]
+
+        assert statuses[:RATE_LIMIT_MAX] == [404] * RATE_LIMIT_MAX
+        assert statuses[RATE_LIMIT_MAX] == 429
+
+    def test_limiter_forgets_clients_idle_for_a_whole_window(self):
+        now = 0.0
+        limiter = SlidingWindowRateLimiter(window_seconds=60, max_requests=1, clock=lambda: now)
+
+        assert limiter.allow("a")
+        assert not limiter.allow("a")
+        now = 61.0
+        assert limiter.allow("b")
+
+        assert limiter.tracked_clients() == 1
+        assert limiter.allow("a")
