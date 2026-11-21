@@ -252,6 +252,14 @@ export function warmCubeCache(cubeId: string): void {
 
 // ── Auth ────────────────────────────────────────────────────────────
 
+// The auth cookie is httpOnly, so the client keeps its own note of whether it holds a session.
+// With no note yet it still asks once, so sessions that predate the note keep working.
+const SIGNED_IN_KEY = 'mtb_signed_in'
+
+function rememberSignedIn(signedIn: boolean): void {
+  window.localStorage.setItem(SIGNED_IN_KEY, signedIn ? '1' : '0')
+}
+
 export async function authRegister(username: string, password: string, email: string): Promise<AuthUser> {
   const response = await fetch(`${API_BASE}/auth/register`, {
     method: 'POST',
@@ -262,6 +270,7 @@ export async function authRegister(username: string, password: string, email: st
   if (!response.ok) {
     await throwResponseError(response, 'register', 'Failed to register')
   }
+  rememberSignedIn(true)
   return response.json()
 }
 
@@ -275,17 +284,22 @@ export async function authLogin(username: string, password: string): Promise<Aut
   if (!response.ok) {
     await throwResponseError(response, 'login', 'Failed to log in')
   }
+  rememberSignedIn(true)
   return response.json()
 }
 
 export async function authLogout(): Promise<void> {
   await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' })
+  rememberSignedIn(false)
 }
 
 export async function authGetMe(): Promise<AuthUser | null> {
+  if (window.localStorage.getItem(SIGNED_IN_KEY) === '0') return null
   try {
     const response = await fetch(`${API_BASE}/auth/me`, { credentials: 'include' })
+    if (response.status === 401) rememberSignedIn(false)
     if (!response.ok) return null
+    rememberSignedIn(true)
     return response.json()
   } catch {
     return null
