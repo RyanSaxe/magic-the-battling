@@ -648,7 +648,7 @@ export function Play() {
 
         <main className="flex-1 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className="zone-pack shell-scroll-col flex-1 min-h-0 flex flex-col px-4 py-4 sm:py-2 sm:items-center sm:justify-center overflow-auto">
-            <section className="w-full max-w-md mx-auto modal-chrome border gold-border rounded-lg overflow-hidden flex-1 min-h-0 flex flex-col sm:flex-none felt-raised-panel">
+            <section className="w-full max-w-md mx-auto modal-chrome border gold-border rounded-lg overflow-hidden grow shrink-0 flex flex-col sm:flex-none felt-raised-panel">
               <div className="p-4 sm:p-5 flex-1 min-h-0 flex flex-col sm:flex-none">
                 <div className="mb-4">
                   <div className="mb-1 flex items-center justify-between gap-3">
