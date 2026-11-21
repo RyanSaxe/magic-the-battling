@@ -1,20 +1,22 @@
-import { useState, useRef, useEffect, type ReactNode } from 'react'
+import { useState, useRef, useEffect, type ReactNode, type Ref } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/authState'
 import { JoinGameModal } from '../home/JoinGameModal'
 
 interface AppHeaderProps {
   renderRight: (opts: { compact: boolean }) => ReactNode
+  ref?: Ref<HTMLElement>
+  padClassName?: string
 }
 
-export function AppHeader({ renderRight }: AppHeaderProps) {
+export function AppHeader({ renderRight, ref, padClassName = 'bar-pad-both' }: AppHeaderProps) {
   return (
-    <header className="shrink-0 py-3 frame-chrome bar-pad-both">
+    <header ref={ref} className={`shrink-0 py-3 frame-chrome ${padClassName}`}>
       <div className="hidden sm:flex items-center justify-between">
         <div>
           <div className="flex items-baseline">
             <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-              Crucible
+              Pitfight
             </h1>
             <span className="hero-sep mx-2.5">—</span>
             <span className="hero-subtitle text-base font-normal tracking-widest">
@@ -33,11 +35,12 @@ export function AppHeader({ renderRight }: AppHeaderProps) {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex items-baseline whitespace-nowrap">
-              <h1 className="hero-title text-lg font-bold tracking-wide leading-tight">
-                Crucible
+              <h1 className="hero-title text-lg font-bold tracking-wide leading-tight shrink-0">
+                Pitfight
               </h1>
-              <span className="hero-sep mx-1 text-xs">—</span>
-              <span className="hero-subtitle text-[11px] font-normal tracking-wider">
+              <span className="hero-sep ml-1 text-xs shrink-0">—</span>
+              {/* The gap after the dash is padding, not margin, so truncating keeps the first letter's overhang. */}
+              <span className="hero-subtitle pl-1 text-[11px] font-normal tracking-wider min-w-0 truncate">
                 an MtG format
               </span>
             </div>

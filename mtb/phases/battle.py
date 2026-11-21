@@ -334,6 +334,7 @@ def _is_finale(game: Game) -> bool:
 
 def _determine_coin_flip(
     game: Game,
+    *,
     player_name: str,
     player_poison: int,
     player_last_result: LastBattleResult | None,
@@ -362,7 +363,12 @@ def _start_vs_static(game: Game, player: Player, opponent: StaticOpponent, is_su
         raise ValueError("Player is not in battle phase")
 
     coin_flip_name = _determine_coin_flip(
-        game, player.name, player.poison, player.last_battle_result, opponent.name, opponent.poison
+        game,
+        player_name=player.name,
+        player_poison=player.poison,
+        player_last_result=player.last_battle_result,
+        opponent_name=opponent.name,
+        opponent_poison=opponent.poison,
     )
 
     winner_pref = player.play_draw_preference if coin_flip_name == player.name else opponent.play_draw_preference
@@ -409,7 +415,12 @@ def _start_vs_player(game: Game, player: Player, opponent: Player, is_sudden_dea
             raise ValueError("Cannot start pairing yet - not all players are ready")
 
     coin_flip_name = _determine_coin_flip(
-        game, player.name, player.poison, player.last_battle_result, opponent.name, opponent.poison
+        game,
+        player_name=player.name,
+        player_poison=player.poison,
+        player_last_result=player.last_battle_result,
+        opponent_name=opponent.name,
+        opponent_poison=opponent.poison,
     )
 
     winner_pref = player.play_draw_preference if coin_flip_name == player.name else opponent.play_draw_preference
