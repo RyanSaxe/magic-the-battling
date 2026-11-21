@@ -33,12 +33,20 @@ from server.schemas.api import (
     StartGameResponse,
 )
 from server.services.auth import get_optional_user
-from server.services.game_manager import PendingGame, game_manager
+from server.services.game_manager import (
+    LOBBY_STARTING_MESSAGE,
+    BattlerReady,
+    LobbyStartFailedError,
+    LobbyStartRefusedError,
+    PendingGame,
+    game_manager,
+)
 from server.services.game_serialization import catalog_entries_for_cards
 from server.services.ops_manager import ops_manager
 from server.services.seat_tokens import SeatClaimRefusal, SeatClaimRefusedError
 from server.services.session_manager import session_manager
 from server.services.share import build_share_data
+from server.services.spectate_requests import SpectateRequest, TooManySpectateRequestsError
 
 logger = logging.getLogger(__name__)
 
@@ -231,9 +239,7 @@ def _create_game_response(request: CreateGameRequest, user_id: str | None = None
             on_complete=broadcast_lobby,
         )
         if error:
-            host_battler = pending.player_battlers.get(session.player_id)
-            if host_battler is not None:
-                host_battler.battler_error = error
+            game_manager.record_player_battler_error(pending, session.player_id, request.cube_id, error)
     return CreateGameResponse(
         game_id=pending.game_id,
         join_code=pending.join_code,
@@ -343,12 +349,12 @@ async def join_game(game_id: str, request: JoinGameRequest, current_user: User |
             raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
         if pending.join_code.upper() != request.join_code.upper():
             raise api_error(400, ErrorCode.INVALID_JOIN_CODE, "Invalid join code")
-        if pending.is_started:
-            raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
         return _join_lobby(pending, request, current_user)
 
 
 def _join_lobby(pending: PendingGame, request: JoinGameRequest, current_user: User | None) -> JoinGameResponse:
+    if not pending.accepts_changes:
+        raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, LOBBY_STARTING_MESSAGE)
     if pending.has_player_named(request.player_name):
         raise api_error(409, ErrorCode.PLAYER_NAME_TAKEN, "Player name already taken")
     if len(pending.player_names) + pending.puppet_count >= pending.target_player_count:
@@ -442,7 +448,7 @@ def get_game_cards(game_id: str, player_name: str | None = None):
         player_id = game_manager.get_player_id_by_name(game_id, player_name)
         if player_id:
             player_battler = pending.player_battlers.get(player_id)
-            battler = player_battler.battler if player_battler else None
+            battler = player_battler.battler if isinstance(player_battler, BattlerReady) else None
     elif pending and pending.battler:
         battler = pending.battler
     elif game and game.config.play_mode == "constructed" and player_name:
@@ -461,7 +467,7 @@ def get_game_cards(game_id: str, player_name: str | None = None):
 
 
 @router.post("/{game_id}/start", response_model=StartGameResponse)
-def start_game(game_id: str, session_id: str | None = None, db: Session = Depends(get_db)):  # noqa: B008
+async def start_game(game_id: str, session_id: str | None = None, db: Session = Depends(get_db)):  # noqa: B008
     if ops_manager.blocks_new_games():
         raise _server_update_http_error("Server is updating. New games are temporarily blocked.")
 
@@ -475,20 +481,19 @@ def start_game(game_id: str, session_id: str | None = None, db: Session = Depend
     if session.player_id != pending.host_player_id:
         raise api_error(403, ErrorCode.INVALID_REQUEST, "Only the host can start the game")
 
-    if pending.is_started:
-        raise api_error(400, ErrorCode.GAME_ALREADY_STARTED, "Game has already started")
+    try:
+        await game_manager.start_lobby(
+            game_id,
+            session.player_id,
+            db,
+            on_change=lambda: connection_manager.broadcast_lobby_state(game_id),
+        )
+    except LobbyStartRefusedError as exc:
+        raise api_error(400, ErrorCode.INVALID_REQUEST, str(exc)) from exc
+    except LobbyStartFailedError as exc:
+        raise api_error(500, ErrorCode.UNKNOWN, str(exc)) from exc
 
-    if pending.target_player_count < 2:
-        raise api_error(400, ErrorCode.INVALID_REQUEST, "Need at least 2 players to start")
-
-    can_start, reason = game_manager.can_start_game(game_id, session.player_id)
-    if not can_start:
-        raise api_error(400, ErrorCode.INVALID_REQUEST, reason or "Cannot start game")
-
-    game = game_manager.start_game(game_id, db)
-    if not game:
-        raise api_error(500, ErrorCode.UNKNOWN, "Failed to start game")
-
+    await connection_manager.broadcast_game_state(game_id)
     return StartGameResponse(success=True)
 
 
@@ -595,40 +600,33 @@ async def create_spectate_request(game_id: str, request: SpectateRequestCreate):
         raise api_error(404, ErrorCode.SPECTATE_TARGET_NOT_FOUND, "Target player not found")
 
     try:
-        request_id = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
-    except ValueError as exc:
+        spectate_request = game_manager.create_spectate_request(game_id, target_name, request.spectator_name)
+    except TooManySpectateRequestsError as exc:
         raise api_error(429, ErrorCode.INVALID_REQUEST, str(exc)) from exc
 
-    auto_approve = (pending and pending.auto_approve_spectators) or (game and game.config.auto_approve_spectators)
-    if not auto_approve:
-        target_player_id = game_manager.get_player_id_by_name(game_id, target_name)
-        if target_player_id:
-            await connection_manager.send_to_player(
-                game_id,
-                target_player_id,
-                {
-                    "type": "spectate_request",
-                    "payload": {
-                        "request_id": request_id,
-                        "spectator_name": request.spectator_name,
-                    },
-                },
-            )
+    return SpectateRequestResponse(request_id=spectate_request.request_id)
 
-    return SpectateRequestResponse(request_id=request_id)
+
+def _spectate_status(spectate_request: SpectateRequest | None) -> SpectateRequestStatus:
+    if spectate_request is None:
+        raise api_error(404, ErrorCode.SPECTATE_REQUEST_NOT_FOUND, "Spectate request not found")
+    return SpectateRequestStatus(
+        status=spectate_request.status,
+        session_id=spectate_request.session_id,
+        player_id=spectate_request.player_id,
+    )
 
 
 @router.get("/{game_id}/spectate-request/{request_id}", response_model=SpectateRequestStatus)
 def get_spectate_request_status(game_id: str, request_id: str):
-    req = game_manager.get_spectate_request(request_id)
-    if not req or req.game_id != game_id:
-        raise api_error(404, ErrorCode.SPECTATE_REQUEST_NOT_FOUND, "Spectate request not found")
+    return _spectate_status(game_manager.get_spectate_request(game_id, request_id))
 
-    return SpectateRequestStatus(
-        status=req.status,
-        session_id=req.session_id,
-        player_id=req.player_id,
-    )
+
+@router.delete("/{game_id}/spectate-request/{request_id}", response_model=SpectateRequestStatus)
+async def cancel_spectate_request(game_id: str, request_id: str):
+    """Withdraw a request still waiting for an answer. Returns the request's status, which is cancelled unless the
+    request was already answered or had expired."""
+    return _spectate_status(game_manager.cancel_spectate_request(game_id, request_id))
 
 
 @router.get("/{game_id}/share/{player_name}", response_model=ShareGameResponse)

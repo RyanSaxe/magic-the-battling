@@ -23,10 +23,9 @@ export function useGame(
     gameState,
     lobbyState,
     send,
-    pendingSpectateRequest,
+    spectateRequests,
     serverNotice,
     connectionError,
-    clearSpectateRequest,
   } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError, onVoiceSignal)
 
   const startGame = useCallback(() => {
@@ -148,15 +147,14 @@ export function useGame(
 
   const spectateResponse = useCallback((requestId: string, allowed: boolean) => {
     send('spectate_response', { request_id: requestId, allowed })
-    clearSpectateRequest()
-  }, [send, clearSpectateRequest])
+  }, [send])
 
   return {
     status,
     isConnected,
     gameState,
     lobbyState,
-    pendingSpectateRequest,
+    spectateRequests,
     serverNotice,
     connectionError,
     send,

@@ -178,6 +178,13 @@ router = APIRouter(prefix="/api/battlers", tags=["battlers"])
 
 BATTLERS_PAGE_SIZE = 20
 
+# A Sudden Death build comes after the ordinary build of the round it shares, so a game's last hand is its last one.
+_LAST_BUILD_FIRST = (
+    BattleSnapshot.stage.desc(),
+    BattleSnapshot.round.desc(),
+    func.coalesce(BattleSnapshot.sudden_death_build, 0).desc(),
+)
+
 
 @router.get("")
 def list_battlers(
@@ -346,7 +353,7 @@ def _query_cube_games(
         final_snap = (
             db.query(BattleSnapshot.hand_json)
             .filter(BattleSnapshot.player_history_id == best.id)
-            .order_by(BattleSnapshot.stage.desc(), BattleSnapshot.round.desc())
+            .order_by(*_LAST_BUILD_FIRST)
             .first()
         )
         if final_snap and final_snap[0]:
@@ -544,7 +551,7 @@ def list_my_games(
         final_snap = (
             db.query(BattleSnapshot.hand_json)
             .filter(BattleSnapshot.player_history_id == hist.id)
-            .order_by(BattleSnapshot.stage.desc(), BattleSnapshot.round.desc())
+            .order_by(*_LAST_BUILD_FIRST)
             .first()
         )
         if final_snap and final_snap[0]:
@@ -623,6 +630,20 @@ def list_following(
         )
 
     return {"following": results, "has_more": has_more}
+
+
+# Declared after the other GET routes, since "/my-games" and "/following" would match this path first.
+@router.get("/{battler_id}")
+def get_battler(
+    battler_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(_get_db),
+):
+    battler = db.query(UserBattler).filter(UserBattler.id == battler_id, UserBattler.user_id == user.id).first()
+    if not battler:
+        raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, "Battler not found")
+    [resp] = _battler_responses(db, str(user.id), [battler])
+    return resp
 
 
 class FollowCubeRequest(BaseModel):

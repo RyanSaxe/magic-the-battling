@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { buildGuideDefinition } from "./content";
+import {
+  BATTLE_SUBMIT_BUTTON_LABEL,
+  BUILD_SUBMIT_BUTTON_LABEL,
+  DRAFT_DONE_BUTTON_LABEL,
+  REWARD_CONTINUE_BUTTON_LABEL,
+} from "../constants/phases";
 import type { GuidedWalkthroughContext } from "./types";
 
 const baseContext: GuidedWalkthroughContext = {
@@ -38,6 +44,19 @@ describe("buildGuideDefinition", () => {
     expect(step?.sidebarState?.playerName).toBeTypeOf("function");
     expect(step?.sidebarState?.detailTab).toBe("seen");
     expect(step?.waitForLayoutTargetId).toBeTypeOf("function");
+  });
+
+  it.each([
+    { guideId: "draft", stepId: "continue", targetId: "draft-continue", label: DRAFT_DONE_BUTTON_LABEL },
+    { guideId: "build", stepId: "submit", targetId: "build-submit", label: BUILD_SUBMIT_BUTTON_LABEL },
+    { guideId: "battle", stepId: "submit", targetId: "battle-submit", label: BATTLE_SUBMIT_BUTTON_LABEL },
+    { guideId: "reward", stepId: "continue", targetId: "reward-continue", label: REWARD_CONTINUE_BUTTON_LABEL },
+  ] as const)("names the $label button on the $guideId guide's $stepId step", ({ guideId, stepId, targetId, label }) => {
+    const guide = buildGuideDefinition(guideId, baseContext);
+    const step = guide.steps.find((candidate) => candidate.id === stepId);
+
+    expect(step?.targetId).toBe(targetId);
+    expect(step?.content.summary).toContain(label);
   });
 
   it("keeps the reward continue step clickable while the guide is open", () => {

@@ -14,9 +14,14 @@ interface PageFrameProps {
   hints?: boolean
   /** False for content that sizes itself to the column and may overhang its edges. */
   scroll?: boolean
-  /** Takes the place of the right rail, for a page with its own sidebar. */
+  /** The page's sidebar, docked inside the felt's gold edge. */
   aside?: ReactNode
   footer?: ReactNode
+}
+
+/** A sidebar docked between the board and the right rail, inside the felt's gold edge. */
+export function FrameSidebar({ children }: { children: ReactNode }) {
+  return <div className="frame-sidebar zone-divider-bg shrink-0 flex min-h-0">{children}</div>
 }
 
 export function PageFrame({
@@ -45,7 +50,8 @@ export function PageFrame({
           {hints && <HintsBanner variant="rail" />}
         </main>
 
-        {aside ?? <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />}
+        {aside && <FrameSidebar>{aside}</FrameSidebar>}
+        <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
       </div>
 
       {footer ?? (

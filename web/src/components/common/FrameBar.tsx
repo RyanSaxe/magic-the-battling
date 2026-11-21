@@ -77,8 +77,6 @@ interface BottomBarProps {
   secondary?: ReactNode
   /** The main action, at the right edge. */
   main?: ReactNode
-  /** Replaces the bar's side padding, for a bar that must stop short of a sidebar. */
-  padClassName?: string
   className?: string
   guideTarget?: string
   ref?: Ref<HTMLElement>
@@ -88,13 +86,12 @@ interface BottomBarProps {
 export function BottomBar({
   secondary,
   main,
-  padClassName = 'frame-bar-pad',
   className = '',
   guideTarget,
   ref,
 }: BottomBarProps) {
   return (
-    <footer ref={ref} className={`frame-bar shrink-0 frame-chrome ${padClassName} ${className}`}>
+    <footer ref={ref} className={`frame-bar shrink-0 frame-chrome frame-bar-pad ${className}`}>
       <div
         className="h-[var(--frame-bar-height)] flex items-center justify-between gap-1.5 sm:gap-2"
         data-guide-target={guideTarget}
