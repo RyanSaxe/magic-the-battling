@@ -35,15 +35,15 @@ card-below-minimum
   build                820x1180       24/353  efec91f7
   build                1024x768       13/353  5069a769
   build                1024x500      107/353  17e20130
-  build                1180x820     132/1591  120195d6
-  build                1280x600     409/1591  92b44cf9
-  build                1280x720     199/1591  0e0b9c26
-  build                1280x800     126/1591  98a290ba
-  build                1366x768     134/1591  a9a769eb
+  build                1180x820     168/1591  0b287b88
+  build                1280x600     385/1591  170ff055
+  build                1280x720     214/1591  2ef9f3ff
+  build                1280x800     124/1591  afae6273
+  build                1366x768     145/1591  ca916f31
   build                1366x1024     76/1591  5bb31f36
-  build                1440x600     269/1591  638f7a20
-  build                1440x900      95/1591  c12148ac
-  build                1536x864     105/1591  a8066b0f
+  build                1440x600     298/1591  17af17fc
+  build                1440x900      83/1591  38fbbafe
+  build                1536x864     113/1591  336d0c4d
   build                1920x1080     40/1591  9b6eefa1
   build                2560x1440     20/1591  36052644
   draft                320x568        41/204  48fedac8
@@ -54,13 +54,13 @@ card-below-minimum
   draft                820x1180        4/204  15f3fa8d
   draft                1024x768        2/204  86b27d4d
   draft                1024x500        4/204  d7108799
-  draft                1180x820       14/900  07f3a969
-  draft                1280x600       71/900  537a6558
+  draft                1180x820       15/900  5f627bef
+  draft                1280x600       56/900  a0a1d8e5
   draft                1280x720       22/900  fe791b59
-  draft                1280x800       15/900  e39123b6
+  draft                1280x800       13/900  fc6af72f
   draft                1366x768       20/900  2eb00375
   draft                1366x1024      12/900  9add57f1
-  draft                1440x600       84/900  286c288f
+  draft                1440x600       78/900  4b19a2ba
   draft                1440x900       12/900  9add57f1
   draft                1536x864       12/900  9add57f1
   draft                1920x1080      10/900  2b62b1c9
@@ -73,13 +73,13 @@ card-below-minimum
   reward-stage-end     820x1180       24/436  b09a2635
   reward-stage-end     1024x768       44/436  5e04b535
   reward-stage-end     1024x500      352/436  9a921281
-  reward-stage-end     1180x820       12/436  08174031
+  reward-stage-end     1180x820       24/436  350aa42d
   reward-stage-end     1280x600       28/436  f2929df1
   reward-stage-end     1280x720       12/436  08174031
   reward-stage-end     1280x800       12/436  08174031
   reward-stage-end     1366x768       12/436  08174031
   reward-stage-end     1366x1024      12/436  08174031
-  reward-stage-end     1440x600       60/436  430146b1
+  reward-stage-end     1440x600       16/436  c57cd11d
   reward-stage-end     1440x900       12/436  08174031
   reward-stage-end     1536x864       12/436  08174031
 card-outside-zone
@@ -89,26 +89,27 @@ card-outside-zone
   build                430x932         3/353  d90b4209
   build                768x1024        8/353  2afa5be4
   build                820x1180        1/353  28e03fad
-  build                1180x820      64/1591  a7acc079
-  build                1280x600       6/1591  c69be56e
-  build                1280x800      22/1591  d3f220d6
-  build                1366x768      38/1591  35579b7b
-  build                1366x1024     70/1591  36d6e4f3
-  build                1440x600       8/1591  acdd7d6a
-  build                1536x864      34/1591  b8541824
-  build                1920x1080     16/1591  9d7ac481
+  build                1180x820      31/1591  620b857b
+  build                1280x600       2/1591  31e8f442
+  build                1280x720       8/1591  d3112d2b
+  build                1280x800      24/1591  a0b48604
+  build                1366x768      46/1591  05f2db34
+  build                1366x1024     89/1591  2fa0a74a
+  build                1440x600       3/1591  133ed934
+  build                1440x900       8/1591  992b3aaa
+  build                1920x1080     26/1591  e142f9fa
   draft                320x568         8/204  6a9243ef
   draft                393x852         2/204  81b846d3
   draft                430x932         5/204  dca8c3ba
   draft                768x1024       14/204  7acc0e0f
   draft                1024x768        2/204  8f707d57
-  draft                1180x820       11/900  bb18b41f
-  draft                1280x600        1/900  9c04c1ac
+  draft                1180x820       14/900  8d6b53fb
   draft                1280x720        4/900  9a102365
-  draft                1280x800       70/900  fa7f887d
-  draft                1366x768       21/900  f914c4fd
-  draft                1366x1024      25/900  1bfd7a59
-  draft                1440x900        4/900  40efa185
+  draft                1280x800       55/900  fba62341
+  draft                1366x768       24/900  d66696e7
+  draft                1366x1024      20/900  9b8cc77d
+  draft                1440x900        3/900  60db4ec5
+  draft                1536x864        2/900  b370f8f5
   draft                2560x1440       2/900  b370f8f5
   reward-stage-end     320x568         4/436  c2f8886d
   reward-stage-end     375x667         3/436  5f093913
@@ -117,7 +118,8 @@ card-outside-zone
   reward-stage-end     768x1024        4/436  aedfba85
   reward-stage-end     820x1180       20/436  46d52d69
   reward-stage-end     1280x800        4/436  7d944da5
-  reward-stage-end     1366x768        4/436  68cc3f09
+  reward-stage-end     1366x768        4/436  3982bfbd
+  reward-stage-end     1440x900        4/436  3982bfbd
 measurement-changes-layout
   battle               320x568           5/5  ebb62454
   battle               375x667           5/5  a666684b
@@ -127,17 +129,17 @@ measurement-changes-layout
   battle               820x1180          5/5  97f38605
   battle               1024x768          5/5  6a45c6cc
   battle               1024x500          5/5  d2e1ed92
-  battle               1180x820          4/5  465c9ecd
-  battle               1280x600          4/5  87c99aad
-  battle               1280x720          4/5  157b96fd
-  battle               1280x800          4/5  2602451d
-  battle               1366x768          4/5  40bc5df1
-  battle               1366x1024         4/5  2ed1b915
-  battle               1440x600          4/5  6fd5777d
-  battle               1440x900          4/5  286bb9e9
-  battle               1536x864          4/5  9bf31731
-  battle               1920x1080         4/5  d2927819
-  battle               2560x1440         4/5  ddf07185
+  battle               1180x820          4/5  81fca39d
+  battle               1280x600          4/5  0dbbea95
+  battle               1280x720          4/5  6f402add
+  battle               1280x800          4/5  c858d585
+  battle               1366x768          4/5  2e75466d
+  battle               1366x1024         4/5  3bc924e1
+  battle               1440x600          4/5  453e0b1d
+  battle               1440x900          4/5  178ce601
+  battle               1536x864          4/5  a3a42625
+  battle               1920x1080         4/5  1bd5741d
+  battle               2560x1440         4/5  b14cd30d
 
 Layout fingerprints: a hash of every size the sweep renders, per phase and viewport.
   battle               320x568     24f3983c
@@ -148,17 +150,17 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   battle               820x1180    02eb8a84
   battle               1024x768    b643ea26
   battle               1024x500    52cfff50
-  battle               1180x820    0359650c
-  battle               1280x600    f7d36230
-  battle               1280x720    ad9da464
-  battle               1280x800    16a47e48
-  battle               1366x768    2b62cd0a
-  battle               1366x1024   804e4d72
-  battle               1440x600    53104cd4
-  battle               1440x900    abc5e60c
-  battle               1536x864    e6e9dce6
-  battle               1920x1080   5b94dfb2
-  battle               2560x1440   0ec3c60c
+  battle               1180x820    4c5da6ba
+  battle               1280x600    0fbfba96
+  battle               1280x720    2ce19cb2
+  battle               1280x800    177b5150
+  battle               1366x768    8f4d7ab0
+  battle               1366x1024   5b732258
+  battle               1440x600    3bc96614
+  battle               1440x900    d49526c8
+  battle               1536x864    b5337708
+  battle               1920x1080   8dcccc7c
+  battle               2560x1440   4ecd1f02
   battle-sudden-death  320x568     6a6bd6a2
   battle-sudden-death  375x667     6412e454
   battle-sudden-death  393x852     415b7022
@@ -167,17 +169,17 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   battle-sudden-death  820x1180    ab8070b8
   battle-sudden-death  1024x768    a7a37054
   battle-sudden-death  1024x500    2e31a034
-  battle-sudden-death  1180x820    b1e79230
-  battle-sudden-death  1280x600    88576d48
-  battle-sudden-death  1280x720    7074b55e
-  battle-sudden-death  1280x800    af3da27a
-  battle-sudden-death  1366x768    e081ff26
-  battle-sudden-death  1366x1024   d97705ac
-  battle-sudden-death  1440x600    ac000158
-  battle-sudden-death  1440x900    8399556e
-  battle-sudden-death  1536x864    eb6e1378
-  battle-sudden-death  1920x1080   715b01ba
-  battle-sudden-death  2560x1440   5c42c8d8
+  battle-sudden-death  1180x820    945384b2
+  battle-sudden-death  1280x600    e644ac42
+  battle-sudden-death  1280x720    a9d8ef68
+  battle-sudden-death  1280x800    89dfddac
+  battle-sudden-death  1366x768    332d60b8
+  battle-sudden-death  1366x1024   9d115dee
+  battle-sudden-death  1440x600    a1c7bef8
+  battle-sudden-death  1440x900    dd2e16ae
+  battle-sudden-death  1536x864    bc38f25a
+  battle-sudden-death  1920x1080   e75084a8
+  battle-sudden-death  2560x1440   1b915c66
   build                320x568     b95718eb
   build                375x667     7087740f
   build                393x852     891ac55f
@@ -186,17 +188,17 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   build                820x1180    f8796c40
   build                1024x768    db61b4b2
   build                1024x500    5d86983e
-  build                1180x820    976dc770
-  build                1280x600    3297aa29
-  build                1280x720    2d2cd769
-  build                1280x800    a3a6fe3f
-  build                1366x768    d9a63ead
-  build                1366x1024   48ae9197
-  build                1440x600    68f60980
-  build                1440x900    f2baedbe
-  build                1536x864    ca14bb5f
-  build                1920x1080   4daa3084
-  build                2560x1440   399b007d
+  build                1180x820    4d59cdee
+  build                1280x600    1d1be0b2
+  build                1280x720    fd390dbd
+  build                1280x800    324a2bc0
+  build                1366x768    bec3843e
+  build                1366x1024   96a4b596
+  build                1440x600    5f7ea07c
+  build                1440x900    8e245bef
+  build                1536x864    d9988700
+  build                1920x1080   bd23dbaf
+  build                2560x1440   be5b9a9a
   draft                320x568     c5466ea3
   draft                375x667     664b6e8a
   draft                393x852     cc665331
@@ -205,17 +207,17 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   draft                820x1180    e9b94265
   draft                1024x768    1ab4fa16
   draft                1024x500    103af885
-  draft                1180x820    1133b65c
-  draft                1280x600    920db8f8
-  draft                1280x720    4f7b2582
-  draft                1280x800    4c3d1c55
-  draft                1366x768    9d68352e
-  draft                1366x1024   4101a53b
-  draft                1440x600    a8b26528
-  draft                1440x900    2e3d92e9
-  draft                1536x864    223a1827
-  draft                1920x1080   61776a39
-  draft                2560x1440   49921e63
+  draft                1180x820    91e802a7
+  draft                1280x600    d73f9232
+  draft                1280x720    a2ad7e94
+  draft                1280x800    709401b5
+  draft                1366x768    0805169e
+  draft                1366x1024   eccb77ae
+  draft                1440x600    c292e907
+  draft                1440x900    4e344c8c
+  draft                1536x864    4efb7662
+  draft                1920x1080   9b651287
+  draft                2560x1440   269d42b2
   reward               320x568     e002c6ca
   reward               375x667     e3b098ff
   reward               393x852     87a5af89
@@ -224,17 +226,17 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   reward               820x1180    1b0de712
   reward               1024x768    24fb59cc
   reward               1024x500    901f0075
-  reward               1180x820    8142d6d9
-  reward               1280x600    715025ad
-  reward               1280x720    f8ff0b0a
-  reward               1280x800    524976ab
-  reward               1366x768    1028e52c
-  reward               1366x1024   c1be1c36
-  reward               1440x600    49022139
-  reward               1440x900    73ffdcba
-  reward               1536x864    8473f4a2
-  reward               1920x1080   b1c6651a
-  reward               2560x1440   19b77cd9
+  reward               1180x820    d7736bf0
+  reward               1280x600    0c355007
+  reward               1280x720    f3ffaad4
+  reward               1280x800    90c57da8
+  reward               1366x768    2a542270
+  reward               1366x1024   822112c2
+  reward               1440x600    fe2f7300
+  reward               1440x900    419c8b73
+  reward               1536x864    f1516c6f
+  reward               1920x1080   1f200b59
+  reward               2560x1440   46b6f7cd
   reward-stage-end     320x568     9e637b4d
   reward-stage-end     375x667     d1fa2cee
   reward-stage-end     393x852     4b783232
@@ -243,14 +245,14 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   reward-stage-end     820x1180    411659b1
   reward-stage-end     1024x768    5fc2d2a1
   reward-stage-end     1024x500    b63d4355
-  reward-stage-end     1180x820    a67001ee
-  reward-stage-end     1280x600    9dacb0f9
-  reward-stage-end     1280x720    340f1cdd
-  reward-stage-end     1280x800    b2ef523b
-  reward-stage-end     1366x768    36791bed
-  reward-stage-end     1366x1024   8864ec8a
-  reward-stage-end     1440x600    89140f99
-  reward-stage-end     1440x900    f766156d
-  reward-stage-end     1536x864    58f9db65
-  reward-stage-end     1920x1080   fa13d0a5
-  reward-stage-end     2560x1440   ebc5b366
+  reward-stage-end     1180x820    20e5ffa1
+  reward-stage-end     1280x600    150013fd
+  reward-stage-end     1280x720    070ea8f5
+  reward-stage-end     1280x800    cd9ce698
+  reward-stage-end     1366x768    cc7f2d6f
+  reward-stage-end     1366x1024   ce08294f
+  reward-stage-end     1440x600    f7430b51
+  reward-stage-end     1440x900    31e5eb0f
+  reward-stage-end     1536x864    6ce5ae3b
+  reward-stage-end     1920x1080   fcae97e5
+  reward-stage-end     2560x1440   f33eddfb

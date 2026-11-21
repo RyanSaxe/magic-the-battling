@@ -25,9 +25,9 @@ export interface Viewport {
   battleBoard: Box;
 }
 
-// Board content boxes measured in WebKit from the game screen at each viewport.
-// The game shell decides them (header, action bar, rails, sidebar); the Playwright
-// layout checks measure the real ones, so these only need to be realistic. Phones
+// Board content boxes measured in WebKit from the game screen at each viewport, so
+// the sweep's fingerprints describe the boards players get. The game shell decides
+// them (header, action bar, rails, sidebar), so they change when it does. Phones
 // in landscape are left out: the game covers the board with a prompt to turn the
 // phone upright, so short desktop windows stand in for short landscape screens.
 const MEASURED: [number, number, Box, Box][] = [
@@ -39,17 +39,17 @@ const MEASURED: [number, number, Box, Box][] = [
   [820, 1180, { width: 736, height: 1092 }, { width: 736, height: 1052.25 }],
   [1024, 768, { width: 940, height: 680 }, { width: 940, height: 640.25 }],
   [1024, 500, { width: 940, height: 412 }, { width: 940, height: 372.25 }],
-  [1180, 820, { width: 880, height: 732 }, { width: 880, height: 732 }],
-  [1280, 600, { width: 980, height: 512 }, { width: 980, height: 512 }],
-  [1280, 720, { width: 980, height: 632 }, { width: 980, height: 632 }],
-  [1280, 800, { width: 980, height: 712 }, { width: 980, height: 712 }],
-  [1366, 768, { width: 1066, height: 680 }, { width: 1066, height: 680 }],
-  [1366, 1024, { width: 1066, height: 936 }, { width: 1066, height: 936 }],
-  [1440, 600, { width: 1140, height: 512 }, { width: 1140, height: 512 }],
-  [1440, 900, { width: 1140, height: 812 }, { width: 1140, height: 812 }],
-  [1536, 864, { width: 1236, height: 776 }, { width: 1236, height: 776 }],
-  [1920, 1080, { width: 1620, height: 992 }, { width: 1620, height: 992 }],
-  [2560, 1440, { width: 2260, height: 1352 }, { width: 2260, height: 1352 }],
+  [1180, 820, { width: 852, height: 732 }, { width: 852, height: 732 }],
+  [1280, 600, { width: 952, height: 512 }, { width: 952, height: 512 }],
+  [1280, 720, { width: 952, height: 632 }, { width: 952, height: 632 }],
+  [1280, 800, { width: 952, height: 712 }, { width: 952, height: 712 }],
+  [1366, 768, { width: 1038, height: 680 }, { width: 1038, height: 680 }],
+  [1366, 1024, { width: 1038, height: 936 }, { width: 1038, height: 936 }],
+  [1440, 600, { width: 1112, height: 512 }, { width: 1112, height: 512 }],
+  [1440, 900, { width: 1112, height: 812 }, { width: 1112, height: 812 }],
+  [1536, 864, { width: 1208, height: 776 }, { width: 1208, height: 776 }],
+  [1920, 1080, { width: 1592, height: 992 }, { width: 1592, height: 992 }],
+  [2560, 1440, { width: 2232, height: 1352 }, { width: 2232, height: 1352 }],
 ];
 
 export const VIEWPORTS: Viewport[] = MEASURED.map(([width, height, zoneBoard, battleBoard]) => ({
