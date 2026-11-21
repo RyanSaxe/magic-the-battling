@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from sqlalchemy import create_engine, inspect, text
 
 import server.db.database as db_module
@@ -53,6 +55,25 @@ def _finish_rewards(gm: GameManager, game: Game, game_id: str, players: list[Pla
         db.close()
 
 
+def _play_until_alice_wins(gm: GameManager, game: Game, game_id: str) -> None:
+    for p in game.players:
+        if p.name != "Alice" and p.phase != "eliminated":
+            p.poison = 9
+    for _ in range(10):
+        if any(p.phase == "winner" for p in game.players):
+            return
+        for p in game.players:
+            if p.phase == "draft":
+                gm.handle_draft_done(game, p)
+        _ready_all(gm, game, game_id, [p for p in game.players if p.phase == "build"])
+        for b in list(game.active_battles):
+            pair = [p for p in game.players if p.phase != "eliminated" and p.name in (b.player.name, b.opponent.name)]
+            winner = "Alice" if any(p.name == "Alice" for p in pair) else b.opponent.name
+            _submit(gm, game, game_id, pair, winner)
+        _finish_rewards(gm, game, game_id, game.players)
+    raise AssertionError("the game did not end within 10 rounds")
+
+
 def _share_rows(client, game_id: str, owner: str) -> dict[str, dict]:
     response = client.get(f"/api/games/{game_id}/share/{owner}")
     assert response.status_code == 200
@@ -95,10 +116,15 @@ def test_share_page_shows_final_state_of_player_eliminated_mid_game(client, star
 
     assert dave.phase == "eliminated"
     assert any(p.phase != "eliminated" and p.placement == 0 for p in game.players)
+    in_progress = client.get(f"/api/games/{game_id}/share/Dave")
+    assert in_progress.status_code == 404
+    assert in_progress.json()["code"] == "GAME_IN_PROGRESS"
+    dave_at_elimination = {"final_poison": dave.poison, "final_treasures": dave.treasures}
+
+    _play_until_alice_wins(gm, game, game_id)
+
     rows = _share_rows(client, game_id, "Dave")
-    assert rows["Dave"]["final_poison"] == dave.poison
-    assert rows["Dave"]["final_treasures"] == dave.treasures
-    assert rows["Alice"]["final_treasures"] is None
+    assert {key: rows["Dave"][key] for key in dave_at_elimination} == dave_at_elimination
 
 
 def test_share_page_shows_how_sudden_death_ended(client, start_lobby):
@@ -127,7 +153,7 @@ def test_share_page_shows_how_sudden_death_ended(client, start_lobby):
 def test_share_page_for_game_without_final_record_uses_last_snapshot(client):
     db = db_module.SessionLocal()
     try:
-        db.add(GameRecord(id="old-game"))
+        db.add(GameRecord(id="old-game", ended_at=datetime.now(UTC)))
         history = PlayerGameHistory(
             game_id="old-game", player_name="Alice", battler_elo=1200, max_stage=3, max_round=2, final_placement=2
         )
