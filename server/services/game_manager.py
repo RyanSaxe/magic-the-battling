@@ -66,6 +66,7 @@ from mtb.phases.elimination import (
 from server.db.models import (
     ActiveGameSnapshot,
     BattleSnapshot,
+    CubeMetadata,
     GamePlayerRecord,
     GameRecord,
     PlayerGameHistory,
@@ -223,6 +224,92 @@ class GameStartQueueFullError(RuntimeError):
 class SeatClaim:
     player_id: str
     seat_token: str
+
+
+@dataclass(frozen=True)
+class _RunningSeat:
+    """Where a seat stands in a started game, read from the live game or from its snapshot."""
+
+    config: Config
+    player_count: int
+    stage: int
+    round: int
+    poison: int
+    phase: str
+
+
+def _running_seat_in_game(game: Game, player_name: str) -> _RunningSeat | None:
+    player = next((p for p in game.players if p.name == player_name), None)
+    if player is None:
+        return None
+    return _RunningSeat(
+        config=game.config,
+        player_count=len(game.players) + len(game.puppets),
+        stage=player.stage,
+        round=player.round,
+        poison=player.poison,
+        phase=player.phase,
+    )
+
+
+def _running_seat_in_snapshot(
+    config: dict[str, Any], players: list[dict[str, Any]], puppet_count: int, player_name: str
+) -> _RunningSeat | None:
+    player = next((p for p in players if p.get("name") == player_name), None)
+    if player is None:
+        return None
+    return _RunningSeat(
+        config=Config.model_validate(config),
+        player_count=len(players) + puppet_count,
+        stage=player["stage"],
+        round=player["round"],
+        poison=player["poison"],
+        phase=player["phase"],
+    )
+
+
+def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame) -> ResumableGame:
+    return ResumableGame(
+        game_id=seat.game_id,
+        player_name=seat.player_name,
+        kind="lobby",
+        cube_id=pending.cube_id,
+        play_mode=pending.play_mode,
+        use_upgrades=pending.use_upgrades,
+        player_count=len(pending.player_names) + pending.puppet_count,
+    )
+
+
+def _resumable_game_seat(seat: ResumableSeat, running: _RunningSeat, last_active_at: datetime | None) -> ResumableGame:
+    return ResumableGame(
+        game_id=seat.game_id,
+        player_name=seat.player_name,
+        kind="game",
+        last_active_at=last_active_at,
+        cube_id=running.config.cube_id,
+        play_mode=running.config.play_mode,
+        use_upgrades=running.config.use_upgrades,
+        player_count=running.player_count,
+        stage=running.stage,
+        round=running.round,
+        poison=running.poison,
+    )
+
+
+def _with_cube_metadata(session: Session, games: list[ResumableGame]) -> list[ResumableGame]:
+    cube_ids = {game.cube_id for game in games}
+    metadata = {
+        cast(str, row.cube_id): row for row in session.query(CubeMetadata).filter(CubeMetadata.cube_id.in_(cube_ids))
+    }
+    return [
+        game.model_copy(
+            update={
+                "cube_name": cast(str | None, meta.name) if (meta := metadata.get(game.cube_id)) else None,
+                "cube_image_uri": cast(str | None, meta.image_uri) if meta else None,
+            }
+        )
+        for game in games
+    ]
 
 
 def _transfer_card_state(card_id: str, from_zones: Zones, to_zones: Zones) -> None:
@@ -1758,44 +1845,53 @@ class GameManager:
                     GamePlayerRecord.is_puppet.is_(False),
                 )
             }
-            snapshot_activity = {
-                cast(str, game_id): cast(datetime, activity)
-                for game_id, activity in session.query(
-                    ActiveGameSnapshot.game_id, ActiveGameSnapshot.last_human_activity_at
+            # json_extract keeps the snapshot's card registry out of Python; only the seats are parsed.
+            snapshots = {
+                cast(str, row.game_id): row
+                for row in session.query(
+                    ActiveGameSnapshot.game_id,
+                    ActiveGameSnapshot.last_human_activity_at,
+                    func.json_extract(ActiveGameSnapshot.state_json, "$.data.config").label("config_json"),
+                    func.json_extract(ActiveGameSnapshot.state_json, "$.data.players").label("players_json"),
+                    func.coalesce(
+                        func.json_array_length(ActiveGameSnapshot.state_json, "$.data.puppets"),
+                        func.json_array_length(ActiveGameSnapshot.state_json, "$.data.fake_players"),
+                        0,
+                    ).label("puppet_count"),
                 ).filter(ActiveGameSnapshot.game_id.in_(stored_game_ids))
             }
+
+            resumable: list[ResumableGame] = []
+            for seat in seats:
+                pending = self._pending_games.get(seat.game_id)
+                if pending is not None and not pending.is_started:
+                    if seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name)):
+                        resumable.append(_resumable_lobby_seat(seat, pending))
+                    continue
+
+                if not seat_token_matches(seat.seat_token, stored_hashes.get((seat.game_id, seat.player_name))):
+                    continue
+                game = self._active_games.get(seat.game_id)
+                if game is not None:
+                    running = _running_seat_in_game(game, seat.player_name)
+                    last_active_at = self._last_human_activity.get(seat.game_id)
+                elif (snapshot := snapshots.get(seat.game_id)) is not None:
+                    running = _running_seat_in_snapshot(
+                        json.loads(snapshot.config_json),
+                        json.loads(snapshot.players_json),
+                        snapshot.puppet_count,
+                        seat.player_name,
+                    )
+                    last_active_at = _utc_or_default(snapshot.last_human_activity_at, datetime.now(UTC))
+                else:
+                    continue
+                if running is None or running.phase in FINISHED_PLAYER_PHASES:
+                    continue
+                resumable.append(_resumable_game_seat(seat, running, last_active_at))
+
+            return _with_cube_metadata(session, resumable)
         finally:
             session.close()
-
-        resumable: list[ResumableGame] = []
-        for seat in seats:
-            pending = self._pending_games.get(seat.game_id)
-            if pending is not None and not pending.is_started:
-                if seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name)):
-                    resumable.append(ResumableGame(game_id=seat.game_id, player_name=seat.player_name, kind="lobby"))
-                continue
-
-            if not seat_token_matches(seat.seat_token, stored_hashes.get((seat.game_id, seat.player_name))):
-                continue
-            game = self._active_games.get(seat.game_id)
-            if game is not None:
-                player = next((p for p in game.players if p.name == seat.player_name), None)
-                if player is None or player.phase in FINISHED_PLAYER_PHASES:
-                    continue
-                last_active_at = self._last_human_activity.get(seat.game_id)
-            elif seat.game_id in snapshot_activity:
-                last_active_at = _utc_or_default(snapshot_activity[seat.game_id], datetime.now(UTC))
-            else:
-                continue
-            resumable.append(
-                ResumableGame(
-                    game_id=seat.game_id,
-                    player_name=seat.player_name,
-                    kind="game",
-                    last_active_at=last_active_at,
-                )
-            )
-        return resumable
 
     def issue_lobby_seat_token(self, game_id: str, player_name: str) -> str:
         """Give the named lobby seat a fresh token, replacing any earlier one."""
