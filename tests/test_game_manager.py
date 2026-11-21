@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
@@ -12,7 +13,14 @@ from mtb.phases import battle, reward
 from server.db.models import ActiveGameSnapshot, GameRecord, PlayerGameHistory
 from server.routers.ws import ConnectionManager
 from server.runtime_config import MAX_GAME_START_QUEUE
-from server.services.game_manager import GameManager
+from server.services.game_manager import (
+    BattlerLoading,
+    BattlerMissing,
+    BattlerReady,
+    GameManager,
+    LobbyStage,
+    LobbyStartRefusedError,
+)
 
 
 @pytest.fixture
@@ -430,7 +438,7 @@ class TestGameStartQueueGuards:
         assert reason is not None
         assert "starting many games" in reason.lower()
 
-    def test_can_start_game_rejects_when_start_queue_full(self, game_manager):
+    def test_start_is_refused_when_start_queue_full(self, game_manager):
         pending = game_manager.create_game(player_name="Host", player_id="host_pid")
         pending.target_player_count = 2
         joined = game_manager.join_game(pending.join_code, "Guest", "guest_pid")
@@ -439,11 +447,12 @@ class TestGameStartQueueGuards:
         pending.player_ready["guest_pid"] = True
         game_manager._game_start_waiters = MAX_GAME_START_QUEUE
 
-        can_start, reason = game_manager.can_start_game(pending.game_id, "host_pid")
+        async def no_broadcast() -> None:
+            pass
 
-        assert can_start is False
-        assert reason is not None
-        assert "starting many games" in reason.lower()
+        with pytest.raises(LobbyStartRefusedError, match="starting many games"):
+            asyncio.run(game_manager.start_lobby(pending.game_id, "host_pid", None, on_change=no_broadcast))
+        assert pending.stage is LobbyStage.OPEN
 
 
 class TestConstructedLobbyRules:
@@ -461,34 +470,25 @@ class TestConstructedLobbyRules:
         pending.target_player_count = 2
         game_manager.join_game(pending.join_code, "Bob", "bob_pid")
 
-        pending.player_battlers["alice_pid"].battler = Battler(
-            cards=[card_factory(f"a{i}") for i in range(100)],
-            upgrades=[],
-            vanguards=[],
-            elo=1150.0,
+        pending.player_battlers["alice_pid"] = BattlerReady(
+            "alice_deck",
+            Battler(cards=[card_factory(f"a{i}") for i in range(100)], upgrades=[], vanguards=[], elo=1150.0),
         )
-        pending.player_battlers["bob_pid"].battler = Battler(
-            cards=[card_factory(f"b{i}") for i in range(100)],
-            upgrades=[],
-            vanguards=[],
-            elo=1250.0,
+        pending.player_battlers["bob_pid"] = BattlerReady(
+            "bob_deck",
+            Battler(cards=[card_factory(f"b{i}") for i in range(100)], upgrades=[], vanguards=[], elo=1250.0),
         )
         pending.player_ready["alice_pid"] = True
         pending.player_ready["bob_pid"] = True
 
-        can_start, error = game_manager.can_start_game(pending.game_id, "alice_pid")
-
-        assert can_start is True
-        assert error is None
+        assert game_manager.start_rules(pending, "alice_pid") is None
 
     def test_get_lobby_state_includes_constructed_battler_status(self, game_manager, card_factory):
         pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
-        pending.player_battlers["alice_pid"].battler = Battler(
-            cards=[card_factory(f"a{i}") for i in range(100)],
-            upgrades=[],
-            vanguards=[],
+        pending.player_battlers["alice_pid"] = BattlerReady(
+            "alice_deck",
+            Battler(cards=[card_factory(f"a{i}") for i in range(100)], upgrades=[], vanguards=[]),
         )
-        pending.player_battlers["alice_pid"].battler_id = "alice_deck"
 
         lobby = game_manager.get_lobby_state(pending.game_id)
 
@@ -544,20 +544,10 @@ class TestConstructedLobbyRules:
 
         assert len(battle_view.opponent_zones.library) == 1
 
-    def test_clear_player_battler_resets_state_and_unreadies(self, game_manager, card_factory):
+    def test_clear_player_battler_resets_state_and_unreadies(self, game_manager):
         pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
         loading_task = MagicMock()
-        loading_task.done.return_value = False
-
-        pending.player_battlers["alice_pid"].battler_id = "alice_deck"
-        pending.player_battlers["alice_pid"].battler = Battler(
-            cards=[card_factory(f"a{i}") for i in range(100)],
-            upgrades=[],
-            vanguards=[],
-        )
-        pending.player_battlers["alice_pid"].battler_loading = True
-        pending.player_battlers["alice_pid"].battler_error = "bad battler"
-        pending.player_battlers["alice_pid"]._loading_task = loading_task
+        pending.player_battlers["alice_pid"] = BattlerLoading("alice_deck", loading_task)
         pending.player_ready["alice_pid"] = True
 
         success, error = game_manager.clear_player_battler(pending.game_id, "alice_pid")
@@ -565,26 +555,24 @@ class TestConstructedLobbyRules:
         assert success is True
         assert error is None
         loading_task.cancel.assert_called_once()
-        assert pending.player_battlers["alice_pid"].battler_id is None
-        assert pending.player_battlers["alice_pid"].battler is None
-        assert pending.player_battlers["alice_pid"].battler_loading is False
-        assert pending.player_battlers["alice_pid"].battler_error is None
-        assert pending.player_battlers["alice_pid"]._loading_task is None
+        assert pending.player_battlers["alice_pid"] == BattlerMissing()
         assert pending.player_ready["alice_pid"] is False
 
-    def test_start_game_supports_constructed_puppets_in_sync_path(self, game_manager, mock_db_session, card_factory):
-        pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
-        pending.puppet_count = 1
-        pending.player_battlers["alice_pid"].battler = Battler(
-            cards=[card_factory(f"a{i}") for i in range(100)],
-            upgrades=[],
-            vanguards=[],
-            elo=1234.0,
+    def test_start_loads_puppets_for_a_constructed_table(
+        self, game_manager, mock_db_session, card_factory, start_game_now
+    ):
+        pending = game_manager.create_game(
+            player_name="Alice", player_id="alice_pid", play_mode="constructed", target_player_count=2
         )
-        pending.player_ready["alice_pid"] = True
+        pending.puppet_count = 1
+        pending.player_battlers["alice_pid"] = BattlerReady(
+            "alice_deck",
+            Battler(cards=[card_factory(f"a{i}") for i in range(100)], upgrades=[], vanguards=[], elo=1234.0),
+        )
+        game_manager._count_available_bots = MagicMock(return_value=1)
         game_manager.load_fake_players_for_game = MagicMock()
 
-        game = game_manager.start_game(pending.game_id, mock_db_session)
+        game = start_game_now(game_manager, pending.game_id, mock_db_session)
 
         assert game is not None
         game_manager.load_fake_players_for_game.assert_called_once()
@@ -918,13 +906,12 @@ class TestCleanupStaleGameRecords:
 
 
 class TestFinishedGameSnapshots:
-    def test_finished_game_snapshot_is_not_written_again(self, game_manager, mock_cube_data, test_db):
+    def test_finished_game_snapshot_is_not_written_again(self, game_manager, mock_cube_data, test_db, start_game_now):
         pending = game_manager.create_game("Alice", "pid-a", cube_id="test", target_player_count=2)
         game_manager.join_game(pending.join_code, "Bob", "pid-b")
         game_id = pending.game_id
         session = db.SessionLocal()
-        game = game_manager.start_game(game_id, session)
-        assert game is not None
+        game = start_game_now(game_manager, game_id, session)
         game_manager.persist_all_games()
 
         game_manager.complete_game(game_id, game.players[0], session)
@@ -940,7 +927,7 @@ class TestFinishedGameSnapshots:
 
 class TestRoundTablePairing:
     def test_build_odds_survive_a_restart_and_name_every_opponent_the_round_can_draw(
-        self, game_manager, mock_cube_data, test_db
+        self, game_manager, mock_cube_data, test_db, start_game_now
     ):
         player_ids = [f"pid-{i}" for i in range(6)]
         pending = game_manager.create_game("P0", player_ids[0], cube_id="test", target_player_count=6)
@@ -948,7 +935,7 @@ class TestRoundTablePairing:
             game_manager.join_game(pending.join_code, f"P{i}", player_id)
         game_id = pending.game_id
         session = db.SessionLocal()
-        assert game_manager.start_game(game_id, session) is not None
+        start_game_now(game_manager, game_id, session)
 
         def shown_odds() -> dict[str, dict[str, float]]:
             odds = {}

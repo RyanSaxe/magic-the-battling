@@ -92,8 +92,8 @@ def _cleanup_game_manager(game_manager: GameManager) -> None:
         _cancel_task(pending._loading_task)
         pending._loading_task = None
         for player_battler in pending.player_battlers.values():
-            _cancel_task(player_battler._loading_task)
-            player_battler._loading_task = None
+            if isinstance(player_battler, gm_module.BattlerLoading):
+                _cancel_task(player_battler.task)
 
     for task in list(game_manager._post_game_cleanup_tasks.values()):
         _cancel_task(task)
@@ -351,6 +351,25 @@ def game_with_players(client):
         "alice": {"session_id": d1["session_id"], "player_id": d1["player_id"], "seat_token": d1["seat_token"]},
         "bob": {"session_id": d2["session_id"], "player_id": d2["player_id"], "seat_token": d2["seat_token"]},
     }
+
+
+async def _no_broadcast() -> None:
+    pass
+
+
+@pytest.fixture
+def start_game_now():
+    """Ready every player in a lobby, then start it through GameManager as its host."""
+
+    def _start(manager: GameManager, game_id: str, db=None):
+        pending = manager.get_pending_game(game_id)
+        assert pending is not None
+        for player_id in pending.player_ids:
+            ready, error = manager.set_player_ready(game_id, player_id, True)
+            assert ready, error
+        return asyncio.run(manager.start_lobby(game_id, pending.host_player_id, db, on_change=_no_broadcast))
+
+    return _start
 
 
 @pytest.fixture
