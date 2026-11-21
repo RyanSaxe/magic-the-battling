@@ -23,12 +23,12 @@ export function SideboardZone({
       validFromZones={validFromZones}
       className="p-4 bg-black/20 rounded-lg min-h-[200px]"
     >
-      <div className="text-xs text-[var(--ivory-muted)] mb-2 uppercase tracking-wide">
+      <div className="text-xs text-[var(--ivory-felt)] mb-2 uppercase tracking-wide">
         Sideboard ({cards.length})
       </div>
       <div className="flex flex-wrap gap-1.5">
         {cards.length === 0 ? (
-          <div className="text-[var(--ivory-muted)] text-sm">No cards in sideboard</div>
+          <div className="text-[var(--ivory-felt)] text-sm">No cards in sideboard</div>
         ) : (
           cards.map((card) => (
             draggable ? (

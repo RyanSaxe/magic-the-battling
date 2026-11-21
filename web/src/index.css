@@ -47,6 +47,9 @@
   --ivory-muted: #b8aea3;
   --ivory-faint: #94897f;
 
+  /* Quiet text on the felt: muted ivory a step lighter, so it holds 4.5:1 on the felt's lightest centre */
+  --ivory-felt: #e0d6c8;
+
   /* Bright gold marker for something waiting on the player */
   --color-gold-bright: #f5d76e;
 
