@@ -13,7 +13,7 @@ from server.observability import (
     record_ws_broadcast_latency,
 )
 from server.runtime_config import MAX_WS_CONNECTIONS
-from server.services.game_manager import game_manager
+from server.services.game_manager import LobbyStartFailedError, LobbyStartRefusedError, game_manager
 from server.services.ops_manager import ops_manager
 from server.services.session_manager import Session, session_manager
 
@@ -606,31 +606,6 @@ async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
             await connection_manager.send_error(websocket, error or "Failed to clear battler")
         return True
 
-    if action == "start_game":
-        if ops_manager.blocks_new_games():
-            await connection_manager.send_error(
-                websocket,
-                "Server is updating. New games are temporarily blocked.",
-                ErrorCode.SERVER_UPDATING,
-            )
-            return True
-        can_start, error = game_manager.can_start_game(game_id, player_id)
-        if not can_start:
-            await connection_manager.send_error(websocket, error or "Cannot start game")
-            return True
-
-        db_session = db.SessionLocal()
-        try:
-            result = await game_manager.start_game_async(game_id, db_session)
-        finally:
-            db_session.close()
-
-        if result:
-            await connection_manager.broadcast_game_state(game_id)
-        else:
-            await connection_manager.send_error(websocket, "Failed to start game")
-        return True
-
     if action == "add_puppet":
         if game_manager.add_puppet(game_id, player_id):
             await connection_manager.broadcast_lobby_state(game_id)
@@ -680,6 +655,38 @@ async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
         return True
 
     return False
+
+
+async def _start_lobby(game_id: str, player_id: str, websocket: WebSocket) -> None:
+    """Start the lobby without holding its lock, so other players' changes are refused rather than queued."""
+    if game_manager.get_game(game_id):
+        # A second click that reached the server after the first start finished; the game is already on its way.
+        return
+    if ops_manager.blocks_new_games():
+        await connection_manager.send_error(
+            websocket,
+            "Server is updating. New games are temporarily blocked.",
+            ErrorCode.SERVER_UPDATING,
+        )
+        return
+
+    db_session = db.SessionLocal()
+    try:
+        await game_manager.start_lobby(
+            game_id,
+            player_id,
+            db_session,
+            on_change=lambda: connection_manager.broadcast_lobby_state(game_id),
+        )
+    except LobbyStartRefusedError as exc:
+        await connection_manager.send_error(websocket, str(exc))
+        return
+    except LobbyStartFailedError:
+        # The lobby state every player was just sent carries the reason.
+        return
+    finally:
+        db_session.close()
+    await connection_manager.broadcast_game_state(game_id)
 
 
 def _dispatch_game_action(action: str, payload: dict, game, player, game_id: str) -> bool | str | None:  # noqa: PLR0912
@@ -839,6 +846,10 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
         )
         return
 
+    if action == "start_game":
+        await _start_lobby(game_id, player_id, websocket)
+        return
+
     lock = game_manager.get_action_lock(game_id)
     async with lock:
         if await _handle_lobby_action(action, payload, game_id, player_id, websocket):
@@ -863,23 +874,28 @@ async def handle_message(game_id: str, player_id: str, data: dict, websocket: We
             return
 
         result = _dispatch_game_action(action, payload, game, player, game_id)
+        await _report_game_action_result(action, result, game, game_id, websocket)
 
-        if result in {"sudden_death", "game_over", True, None}:
-            game_manager.mark_game_dirty(game_id)
 
-        if result is False:
-            await connection_manager.send_error(
-                websocket,
-                f"Unknown action: {action}",
-                ErrorCode.UNKNOWN_ACTION,
-            )
-        elif result == "game_over":
-            winners = [p for p in game.players if p.phase == "winner"]
-            winner_name = winners[0].name if winners else None
-            await connection_manager.broadcast_game_over(game_id, winner_name)
-        elif result == "sudden_death" or result is True or result is None:
-            await connection_manager.broadcast_game_state(game_id)
-        elif isinstance(result, str):
-            await connection_manager.send_error(websocket, result)
-        else:
-            await connection_manager.send_error(websocket, f"Failed to execute action: {action}")
+async def _report_game_action_result(
+    action: str, result: bool | str | None, game, game_id: str, websocket: WebSocket
+) -> None:
+    if result in {"sudden_death", "game_over", True, None}:
+        game_manager.mark_game_dirty(game_id)
+
+    if result is False:
+        await connection_manager.send_error(
+            websocket,
+            f"Unknown action: {action}",
+            ErrorCode.UNKNOWN_ACTION,
+        )
+    elif result == "game_over":
+        winners = [p for p in game.players if p.phase == "winner"]
+        winner_name = winners[0].name if winners else None
+        await connection_manager.broadcast_game_over(game_id, winner_name)
+    elif result == "sudden_death" or result is True or result is None:
+        await connection_manager.broadcast_game_state(game_id)
+    elif isinstance(result, str):
+        await connection_manager.send_error(websocket, result)
+    else:
+        await connection_manager.send_error(websocket, f"Failed to execute action: {action}")

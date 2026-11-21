@@ -104,11 +104,11 @@
   --frame-rail-edge: calc(var(--frame-rail-width) + 1px);
   --frame-bar-height: 42px;
   --sidebar-width: 16rem;
-  --sidebar-lane-nudge: 10px;
-  --surface-gutter: 12px;
-  --bar-mobile-inline: 6px;
-  --bar-bottom-left-desktop: calc(var(--frame-rail-edge) - 4px);
-  --bar-bottom-right-desktop: calc(var(--sidebar-width) + var(--surface-gutter) - var(--sidebar-lane-nudge) - 4px);
+  /* Docked inside the felt's gold edge, the sidebar is narrower, so with the right rail back the board loses 28px. */
+  --frame-sidebar-width: 242px;
+  /* From the board's gold edge to the screen's right edge: the docked sidebar, its 2px edge and the rail. */
+  --frame-dock-width: calc(var(--frame-sidebar-width) + 2px + var(--frame-rail-width));
+  --bar-inline: 6px;
 }
 
 body {
@@ -180,15 +180,17 @@ input:-webkit-autofill:focus {
       var(--chrome) 70%);
 }
 
-/* The 42px bars above and below the felt line their content up with the felt's gold edge. */
-.frame-bar-pad {
-  padding-left: var(--bar-mobile-inline);
-  padding-right: var(--bar-mobile-inline);
+/* The 42px bars above and below the felt line their content up with the felt's gold edge.
+   Registered as a length so a script that places a popover reads it in pixels. */
+@property --bar-inline {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 6px;
 }
 
-.bar-pad-main {
-  padding-left: var(--bar-mobile-inline);
-  padding-right: var(--bar-mobile-inline);
+.frame-bar-pad {
+  padding-left: var(--bar-inline);
+  padding-right: var(--bar-inline);
 }
 
 /* Felt content area — gold emboss + dark groove for 3D depth */
@@ -204,6 +206,12 @@ input:-webkit-autofill:focus {
     inset 0 -4px 0 0 rgba(0, 0, 0, 0.24),
     inset 0 8px 20px -4px rgba(0, 0, 0, 0.38),
     inset 0 -8px 20px -8px rgba(0, 0, 0, 0.4);
+}
+
+/* A docked sidebar sits inside the felt's gold edge, which the board's own edge closes on its left. */
+.frame-sidebar {
+  --sidebar-width: var(--frame-sidebar-width);
+  padding: 2px 2px 2px 0;
 }
 
 .modal-chrome {
@@ -224,14 +232,8 @@ input:-webkit-autofill:focus {
 
 /* Desktop left chrome strip — game pages only */
 @media (min-width: 640px) {
-  .frame-bar-pad {
-    padding-left: var(--frame-rail-edge);
-    padding-right: var(--frame-rail-edge);
-  }
-
-  .bar-pad-main {
-    padding-left: var(--bar-bottom-left-desktop);
-    padding-right: var(--bar-bottom-right-desktop);
+  :root {
+    --bar-inline: var(--frame-rail-edge);
   }
 
   .game-surface {
@@ -372,8 +374,8 @@ input:-webkit-autofill:focus {
     inset 0 -2px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* Share board: the band under a round hidden while the game goes on, a seam strip like the zone dividers */
-.share-hidden-round-band {
+/* Share board: the band under a round, a seam strip like the zone dividers */
+.share-round-band {
   height: 28px;
   display: flex;
   align-items: center;
@@ -385,7 +387,7 @@ input:-webkit-autofill:focus {
     inset 0 -2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.share-hidden-round-band-title {
+.share-round-band-title {
   font-family: 'Cinzel', serif;
   font-weight: 700;
   font-size: 13px;
