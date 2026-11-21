@@ -431,7 +431,7 @@ export interface ServerStatus extends ServerNoticeStatus {
 }
 
 export interface SpectateRequestStatus {
-  status: 'pending' | 'approved' | 'denied'
+  status: 'pending' | 'approved' | 'watching' | 'denied' | 'cancelled' | 'expired'
   session_id?: string
   player_id?: string
 }

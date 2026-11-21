@@ -10,11 +10,9 @@ import { BusyNotice, StatusNotice } from "../components/common/StatusNotice";
 import { useGame } from "../hooks/useGame";
 import { useVoiceChat } from "../hooks/useVoiceChat";
 import type { VoiceSignalPayload } from "../hooks/useWebSocket";
-import {
-  getGameStatus,
-  createSpectateRequest,
-  getSpectateRequestStatus,
-} from "../api/client";
+import { type SpectateRequestControls, useSpectateRequest } from "../hooks/useSpectateRequest";
+import { getGameStatus } from "../api/client";
+import { SpectateRequestModal } from "../components/SpectateRequestModal";
 import type { BattleView, Card as CardType, GameStatusResponse, PlayerView, RevealAnimation, ZoneName } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
@@ -100,11 +98,6 @@ import {
 } from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
 import { DIALOG_BACKDROP, LINK, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
-
-interface SpectatorConfig {
-  spectatePlayer: string;
-  requestId: string;
-}
 
 // Each area stops 3px into the life number, short of its middle even for one digit, so - and + never overlap.
 const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_+_5px_-_44px)]";
@@ -222,13 +215,13 @@ function GameGoneNotice({ gameId }: { gameId: string }) {
 function PlayerSelectionModal({
   gameId,
   reconnectRefused,
-  onSpectating,
+  spectate,
   onReconnect,
   spectateOnly = false,
 }: {
   gameId: string;
   reconnectRefused?: AppError;
-  onSpectating: (sessionId: string, config: SpectatorConfig) => void;
+  spectate: SpectateRequestControls;
   onReconnect: (playerName: string) => void;
   spectateOnly?: boolean;
 }) {
@@ -239,13 +232,12 @@ function PlayerSelectionModal({
   const [statusAttempt, setStatusAttempt] = useState(0);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [spectatorName, setSpectatorName] = useState("");
-  const [requestStatus, setRequestStatus] = useState<
-    "idle" | "waiting" | "denied"
-  >("idle");
   const [error, setError] = useState("");
+  const requestError = spectate.state.kind === "choosing" ? spectate.state.error : undefined;
   const shownError =
-    error || (reconnectRefused ? getAppErrorMessage(reconnectRefused, "rejoin-game", "Could not reconnect.") : "");
-  const pollingRef = useRef<number | null>(null);
+    error ||
+    requestError?.message ||
+    (reconnectRefused ? getAppErrorMessage(reconnectRefused, "rejoin-game", "Could not reconnect.") : "");
 
   useEffect(() => {
     let interval: number | null = null;
@@ -281,69 +273,23 @@ function PlayerSelectionModal({
     };
   }, [gameId, statusAttempt]);
 
-  useEffect(() => {
-    return () => {
-      if (pollingRef.current) {
-        clearTimeout(pollingRef.current);
-      }
-    };
-  }, []);
-
-  const handleWatchRequest = async () => {
+  const handleWatchRequest = () => {
     if (!selectedPlayer || !spectatorName.trim()) {
       setError("Please enter your name");
       return;
     }
-
     setError("");
-    try {
-      const { request_id } = await createSpectateRequest(
-        gameId,
-        selectedPlayer,
-        spectatorName
-      );
-      setRequestStatus("waiting");
-      pollForApproval(request_id, selectedPlayer);
-    } catch (err) {
-      setError(unknownToAppError(err, "spectate-request", "Failed to send watch request").message);
-    }
+    void spectate.request(selectedPlayer, spectatorName);
   };
 
-  const pollForApproval = (requestId: string, playerName: string) => {
-    const poll = async () => {
-      try {
-        const result = await getSpectateRequestStatus(gameId, requestId);
-        if (result.status === "approved" && result.session_id) {
-          onSpectating(result.session_id, {
-            spectatePlayer: playerName,
-            requestId,
-          });
-        } else if (result.status === "denied") {
-          setRequestStatus("denied");
-        } else {
-          pollingRef.current = window.setTimeout(poll, 1000);
-        }
-      } catch (err) {
-        setError(unknownToAppError(err, "spectate-status", "Failed to check request status").message);
-        setRequestStatus("idle");
-      }
-    };
-    poll();
+  const handleQuickWatch = (playerName: string) => {
+    setError("");
+    void spectate.request(playerName, "Spectator");
   };
 
-  const handleQuickWatch = async (playerName: string) => {
-    setError("");
-    setSelectedPlayer(playerName);
-    try {
-      const { request_id } = await createSpectateRequest(
-        gameId,
-        playerName,
-        "Spectator"
-      );
-      pollForApproval(request_id, playerName);
-    } catch (err) {
-      setError(unknownToAppError(err, "spectate-request", "Failed to start spectating").message);
-    }
+  const backToPlayers = (leaveRequest: () => void) => {
+    leaveRequest();
+    setSelectedPlayer(null);
   };
 
   if (statusError?.code === "GAME_NOT_FOUND") {
@@ -382,6 +328,51 @@ function PlayerSelectionModal({
     );
   }
 
+  const request = spectate.state;
+  if (request.kind === "sending") {
+    return (
+      <NoticeFrame>
+        <BusyNotice label={`Asking to watch ${request.target}...`} />
+      </NoticeFrame>
+    );
+  }
+
+  if (request.kind === "waiting") {
+    return (
+      <NoticeFrame onHome={spectate.cancel}>
+        <StatusNotice
+          title={`Waiting for ${request.target}`}
+          actions={
+            <button onClick={() => backToPlayers(spectate.cancel)} className="btn btn-secondary flex-1 py-2">
+              Cancel
+            </button>
+          }
+        >
+          {request.target} has been asked to let you watch. You&apos;ll start watching as soon as they allow it.
+        </StatusNotice>
+      </NoticeFrame>
+    );
+  }
+
+  if (request.kind === "denied" || request.kind === "expired") {
+    return (
+      <NoticeFrame>
+        <StatusNotice
+          title={request.kind === "denied" ? "Request denied" : "Request expired"}
+          actions={
+            <button onClick={() => backToPlayers(spectate.dismiss)} className="btn btn-secondary flex-1 py-2">
+              Try Again
+            </button>
+          }
+        >
+          {request.kind === "denied"
+            ? `${request.target} denied your request to watch.`
+            : `${request.target} didn't answer your request to watch in time.`}
+        </StatusNotice>
+      </NoticeFrame>
+    );
+  }
+
   if (!status) {
     return (
       <NoticeFrame>
@@ -414,43 +405,7 @@ function PlayerSelectionModal({
           </div>
         )}
 
-        {requestStatus === "waiting" && (
-          <div className="text-center py-8">
-            <div className="animate-spin w-8 h-8 border-4 border-amber-500 border-t-transparent rounded-full mx-auto mb-4" />
-            <p className="text-[var(--ivory-muted)]">
-              Waiting for {selectedPlayer} to respond...
-            </p>
-            <button
-              onClick={() => {
-                if (pollingRef.current) clearTimeout(pollingRef.current);
-                setRequestStatus("idle");
-                setSelectedPlayer(null);
-              }}
-              className="mt-4 text-[var(--ivory-muted)] hover:text-white text-sm"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-
-        {requestStatus === "denied" && (
-          <div className="text-center py-8">
-            <p className="text-red-400 mb-4">
-              {selectedPlayer} denied your request to watch.
-            </p>
-            <button
-              onClick={() => {
-                setRequestStatus("idle");
-                setSelectedPlayer(null);
-              }}
-              className="btn btn-secondary"
-            >
-              Try Again
-            </button>
-          </div>
-        )}
-
-        {requestStatus === "idle" && !selectedPlayer && (
+        {!selectedPlayer && (
           <>
             {!spectateOnly && !accountSeatName && (
               <div className={`${OPTION_BOX} px-3 py-2.5 mb-4 text-[13px] leading-snug text-[var(--ivory-muted)]`}>
@@ -517,7 +472,7 @@ function PlayerSelectionModal({
           </>
         )}
 
-        {requestStatus === "idle" && selectedPlayer && (
+        {selectedPlayer && (
           <div className="space-y-4">
             <p className="text-[var(--ivory-muted)] text-center">
               Request to watch <strong>{selectedPlayer}</strong>'s game
@@ -551,41 +506,6 @@ function PlayerSelectionModal({
         )}
       </div>
     </NoticeFrame>
-  );
-}
-
-function SpectateRequestModal({
-  spectatorName,
-  requestId,
-  onRespond,
-}: {
-  spectatorName: string;
-  requestId: string;
-  onRespond: (requestId: string, allowed: boolean) => void;
-}) {
-  return (
-    <div className={`fixed inset-0 ${DIALOG_BACKDROP} flex items-center justify-center z-50`}>
-      <div className="modal-chrome border gold-border rounded-lg p-6 w-full max-w-sm mx-4">
-        <h2 className="text-xl text-white mb-4">Spectate Request</h2>
-        <p className="text-[var(--ivory-muted)] mb-6">
-          <strong>{spectatorName}</strong> wants to watch your game.
-        </p>
-        <div className="flex gap-3">
-          <button
-            className="btn btn-primary flex-1"
-            onClick={() => onRespond(requestId, true)}
-          >
-            Allow
-          </button>
-          <button
-            className="btn btn-secondary flex-1"
-            onClick={() => onRespond(requestId, false)}
-          >
-            Deny
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -876,9 +796,16 @@ function GameContent() {
   });
   const session = seat.kind === "held" ? seat.session : null;
 
-  const [spectatorSessionId, setSpectatorSessionId] = useState<string | null>(null);
-  const [spectatorConfig, setSpectatorConfig] = useState<SpectatorConfig | null>(null);
-  const [spectatingPlayer, setSpectatingPlayer] = useState<string | null>(null);
+  const spectate = useSpectateRequest(gameId);
+  // A tab with a seat here, held or being reclaimed, plays it, even if it watched the game before joining.
+  const watching =
+    spectate.state.kind === "watching" && (seat.kind === "none" || isSpectateMode) ? spectate.state : null;
+  const spectatePlayer = watching?.target ?? null;
+  const spectateRequestId = watching?.requestId ?? null;
+  const spectatorConfig = useMemo(
+    () => (spectatePlayer && spectateRequestId ? { spectatePlayer, requestId: spectateRequestId } : null),
+    [spectatePlayer, spectateRequestId],
+  );
 
   const sizes = useViewportCardSizes();
   const shellMode = useGameShellMode();
@@ -908,9 +835,9 @@ function GameContent() {
   }, []);
 
   const navigate = useNavigate();
-  const { status, gameState, isConnected, send, actions, pendingSpectateRequest, serverNotice, connectionError } = useGame(
+  const { status, gameState, isConnected, send, actions, spectateRequests, serverNotice } = useGame(
     gameId || null,
-    spectatorConfig ? spectatorSessionId : isSpectateMode ? null : session?.sessionId ?? null,
+    watching ? watching.sessionId : isSpectateMode ? null : session?.sessionId ?? null,
     spectatorConfig,
     handleServerError,
     handleVoiceSignal,
@@ -974,6 +901,11 @@ function GameContent() {
     if (status.kind === "open") connectionOpened(session.sessionId);
     if (status.kind === "ended") connectionEnded(session.sessionId, status.error);
   }, [status, session, isSpectator, connectionOpened, connectionEnded]);
+
+  const spectatorConnectionEnded = spectate.connectionEnded;
+  useEffect(() => {
+    if (isSpectator && status.kind === "ended") spectatorConnectionEnded(status.error);
+  }, [status, isSpectator, spectatorConnectionEnded]);
 
   useEffect(() => {
     const playerName = gameState?.self_player.name;
@@ -1187,12 +1119,6 @@ function GameContent() {
   const handleOpponentLifeChange = (life: number) => {
     if (isSpectator) return;
     actions.battleUpdateLife("opponent", life);
-  };
-
-  const handleSpectating = (sessionId: string, config: SpectatorConfig) => {
-    setSpectatorSessionId(sessionId);
-    setSpectatorConfig(config);
-    setSpectatingPlayer(config.spectatePlayer);
   };
 
   const handleSpectateNewTab = () => {
@@ -1688,6 +1614,33 @@ function GameContent() {
     showSubmitHandPopover, showSubmitResultPopover,
   ]);
 
+  if (spectate.state.kind === "ended") {
+    const ended = spectate.state.error;
+    return (
+      <NoticeFrame>
+        {ended.code === "GAME_NOT_FOUND" ? (
+          <GameGoneNotice gameId={gameId} />
+        ) : (
+          <StatusNotice
+            title={ended.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Game Unavailable"}
+            actions={
+              <>
+                <button onClick={() => navigate("/play")} className="btn btn-primary flex-1 py-2">
+                  New Game
+                </button>
+                <button onClick={() => navigate("/")} className="btn btn-secondary flex-1 py-2">
+                  Home
+                </button>
+              </>
+            }
+          >
+            {getAppErrorMessage(ended, "game-connection", "This game is not available right now.")}
+          </StatusNotice>
+        )}
+      </NoticeFrame>
+    );
+  }
+
   if (!isSpectator) {
     if (seat.kind === "claiming") {
       return (
@@ -1750,7 +1703,7 @@ function GameContent() {
         <PlayerSelectionModal
           gameId={gameId}
           reconnectRefused={seat.kind === "none" ? seat.refused : undefined}
-          onSpectating={handleSpectating}
+          spectate={spectate}
           onReconnect={(playerName) => void claim(playerName)}
           spectateOnly={isSpectateMode}
         />
@@ -1758,29 +1711,15 @@ function GameContent() {
     }
   }
 
-  if (isSpectator && connectionError) {
-    return (
-      <NoticeFrame>
-        <StatusNotice
-          title={connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Game Unavailable"}
-          actions={
-            <>
-              <button onClick={() => navigate("/play")} className="btn btn-primary flex-1 py-2">
-                New Game
-              </button>
-              <button onClick={() => navigate("/")} className="btn btn-secondary flex-1 py-2">
-                Home
-              </button>
-            </>
-          }
-        >
-          {getAppErrorMessage(connectionError, "game-connection", "This game is not available right now.")}
-        </StatusNotice>
-      </NoticeFrame>
-    );
-  }
-
   if (!gameState) {
+    if (watching) {
+      // A game still in its lobby sends spectators nothing until it starts.
+      return (
+        <NoticeFrame>
+          <BusyNotice label={isConnected ? `Waiting for ${watching.target}'s game to start...` : "Connecting..."} />
+        </NoticeFrame>
+      );
+    }
     return (
       <div className="game-table flex items-center justify-center">
         <div className="text-white">{isConnected ? 'Loading game...' : 'Connecting...'}</div>
@@ -1819,6 +1758,14 @@ function GameContent() {
 
   const timelinePhase = displayBattleResolution ? "battle" : currentPhase;
   const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
+  const canSpectate = currentPhase === "eliminated" && gameState.players.some(
+    (p) =>
+      !p.is_puppet &&
+      p.phase !== "eliminated" &&
+      p.phase !== "awaiting_elimination" &&
+      p.phase !== "winner" &&
+      p.phase !== "game_over"
+  );
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
   const isWinner = selfPlacement === 1;
 
@@ -1879,23 +1826,7 @@ function GameContent() {
     let left: ReactNode = null;
     let right: ReactNode = null;
 
-    if (actionBarPhase === "eliminated") {
-      const hasWatchablePlayers = gameState.players.some(
-        (p) =>
-          !p.is_puppet &&
-          p.phase !== "eliminated" &&
-          p.phase !== "awaiting_elimination" &&
-          p.phase !== "winner" &&
-          p.phase !== "game_over"
-      );
-      if (hasWatchablePlayers) {
-        right = (
-          <button onClick={handleSpectateNewTab} className="btn btn-secondary">
-            Spectate
-          </button>
-        );
-      }
-    } else if (actionBarPhase === "draft") {
+    if (actionBarPhase === "draft") {
       left = (
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
@@ -2258,9 +2189,9 @@ function GameContent() {
           />
         )}
         {/* Spectator Banner */}
-        {isSpectator && spectatingPlayer && (
+        {isSpectator && spectatePlayer && (
           <div className="bg-purple-900/80 text-purple-200 text-center py-2">
-            Watching {spectatingPlayer}'s game (spectator mode)
+            Watching {spectatePlayer}'s game (spectator mode)
           </div>
         )}
         <div ref={guideRootRef} className="relative flex flex-col flex-1 min-h-0">
@@ -2716,15 +2647,21 @@ function GameContent() {
                   >
                     Review
                   </button>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={openShareModal}
-                  >
-                    Share Game
-                  </button>
+                  {canSpectate && (
+                    <button onClick={handleSpectateNewTab} className="btn btn-secondary">
+                      Spectate
+                    </button>
+                  )}
                 </>
               ) : groups?.left}
-              main={groups?.right}
+              main={endOfGame ? (
+                <button
+                  className="btn btn-primary"
+                  onClick={openShareModal}
+                >
+                  Share Game
+                </button>
+              ) : groups?.right}
             />
           );
         })()}
@@ -2771,12 +2708,8 @@ function GameContent() {
           onClose={() => setActionMenuOpen(false)}
         />
       )}
-      {pendingSpectateRequest && (
-        <SpectateRequestModal
-          spectatorName={pendingSpectateRequest.spectator_name}
-          requestId={pendingSpectateRequest.request_id}
-          onRespond={actions.spectateResponse}
-        />
+      {spectateRequests[0] && (
+        <SpectateRequestModal request={spectateRequests[0]} onRespond={actions.spectateResponse} />
       )}
       {showUpgradesModal && (
         <UpgradesModal

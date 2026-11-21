@@ -86,4 +86,36 @@ describe('useWebSocket connection status', () => {
 
     expect(hook.result.current.status).toMatchObject({ kind: 'ended', error: { code: 'KICKED' } })
   })
+
+  it('shows the requests to watch exactly as the server last listed them', async () => {
+    const hook = render('game-A', 'session-A')
+    const socket = await openSocket()
+    const carol = { request_id: 'request-1', spectator_name: 'Carol' }
+    const dan = { request_id: 'request-2', spectator_name: 'Dan' }
+
+    act(() => socket.serverMessage({ type: 'spectate_requests', payload: { requests: [carol, dan] } }))
+    expect(hook.result.current.spectateRequests).toEqual([carol, dan])
+
+    act(() => socket.serverMessage({ type: 'spectate_requests', payload: { requests: [carol] } }))
+    expect(hook.result.current.spectateRequests).toEqual([carol])
+  })
+
+  it('starts each connection with no requests to watch', async () => {
+    const hook = render('game-A', 'session-A')
+    const socket = await openSocket()
+    act(() => {
+      socket.serverMessage({
+        type: 'spectate_requests',
+        payload: { requests: [{ request_id: 'request-1', spectator_name: 'Carol' }] },
+      })
+      socket.serverClose(1006)
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(1_000)
+    })
+
+    act(() => FakeWebSocket.latest().serverOpen())
+
+    expect(hook.result.current.spectateRequests).toEqual([])
+  })
 })
