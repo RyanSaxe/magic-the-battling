@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { expect, test as base, type Locator, type Page, type Route, type WebSocketRoute } from '@playwright/test'
+import { expect, test as base, type Locator, type Page, type Response, type Route, type WebSocketRoute } from '@playwright/test'
 import type {
   AuthUser,
   FollowedBattler,
@@ -19,12 +19,31 @@ const SHOW_REAL_CARD_ART = process.env.LAYOUT_CARD_ART === 'real'
 
 const isLoopback = (ipAddress: string) => ipAddress.startsWith('127.') || ipAddress === '::1' || ipAddress === '[::1]'
 
+/** Google Fonts' hosts, which the helpers answer from copies in fixtures/fonts. */
+const FONT_HOSTS = new Set(['fonts.googleapis.com', 'fonts.gstatic.com'])
+/** Scryfall's card art hosts, which the helpers answer with a placeholder unless LAYOUT_CARD_ART=real. */
+const CARD_ART_HOSTS = new Set(['cards.scryfall.io', 'backs.scryfall.io'])
+
+const isLocalUrl = (url: string) => {
+  const { hostname } = new URL(url)
+  // The helpers answer the font and card art hosts themselves, so those responses never leave this machine.
+  return hostname === 'localhost' || isLoopback(hostname) || FONT_HOSTS.has(hostname) || CARD_ART_HOSTS.has(hostname)
+}
+
+/** The response's URL when it came from a server other than this machine, or null. */
+export async function outsideUrl(response: Pick<Response, 'serverAddr' | 'url'>): Promise<string | null> {
+  const address = await response.serverAddr().catch(() => undefined)
+  // A response still arriving as the test ends can't report its address, so judge it by where it was sent.
+  if (address === undefined) return isLocalUrl(response.url()) ? null : response.url()
+  return address && !isLoopback(address.ipAddress) ? response.url() : null
+}
+
 /** Fails a test when any response came from a server other than this machine, so the tests never depend on the network. */
 export const test = base.extend<{ stayOffline: void }>({
   stayOffline: [async ({ page }, use) => {
     const outsideResponses: Promise<string | null>[] = []
     page.on('response', (response) => {
-      outsideResponses.push(response.serverAddr().then((address) => (address && !isLoopback(address.ipAddress) ? response.url() : null)))
+      outsideResponses.push(outsideUrl(response))
     })
     await use()
     // Real card art is fetched on purpose, for screenshots taken on a developer's machine.
@@ -219,7 +238,7 @@ async function serveFromTable(page: Page, baseURL: string, responses: Record<str
   const appOrigin = new URL(baseURL).origin
   await page.route('**/*', (route) => {
     const url = new URL(route.request().url())
-    if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') return serveGoogleFont(route, url)
+    if (FONT_HOSTS.has(url.hostname)) return serveGoogleFont(route, url)
     if (url.origin !== appOrigin) return route.abort()
     if (!url.pathname.startsWith('/api/')) return route.continue()
     const response = responses[url.pathname]
@@ -334,7 +353,7 @@ export async function serveGame(
   { guideProgress, onSocket }: ServeGameOptions = {},
 ) {
   await serveWithoutBackend(page, baseURL)
-  await page.route(/^https:\/\/(cards|backs)\.scryfall\.io\//, (route) =>
+  await page.route((url) => CARD_ART_HOSTS.has(url.hostname), (route) =>
     SHOW_REAL_CARD_ART ? route.continue() : route.fulfill({ body: CARD_PLACEHOLDER_SVG, contentType: 'image/svg+xml' }))
   await page.addInitScript(({ session, progressKey, guideProgress }) => {
     sessionStorage.setItem('mtb_session', session.sessionId)
@@ -350,6 +369,13 @@ export async function serveGame(
   await page.routeWebSocket(/\/ws\//, (ws) => {
     ws.send(JSON.stringify({ type: 'game_bootstrap', payload: gameBootstrap(screen) }))
     onSocket?.(ws)
+  })
+}
+
+/** Opens a game whose server then ends the connection with `code`, as when the game is gone or can't be reached. */
+function serveGameEndedWith(code: string) {
+  return (page: Page, baseURL: string) => serveGame(page, baseURL, { phase: 'build', counts: {} }, {
+    onSocket: (ws) => ws.send(JSON.stringify({ type: 'connection_error', payload: { code } })),
   })
 }
 
@@ -450,6 +476,24 @@ export const PAGES: PageUnderTest[] = [
     path: `/game/${SHARE_GAME_ID}/share/Bob`,
     serve: serveShareInProgress,
     primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Home' }),
+  },
+  {
+    name: 'share not found',
+    path: `/game/${SHARE_GAME_ID}/share/Nobody`,
+    serve: serveWithoutBackend,
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Home' }),
+  },
+  {
+    name: 'game not found',
+    path: `/game/${GAME_ID}/play`,
+    serve: serveGameEndedWith('GAME_NOT_FOUND'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'New Game' }),
+  },
+  {
+    name: 'game unavailable',
+    path: `/game/${GAME_ID}/play`,
+    serve: serveGameEndedWith('SERVER_CAPACITY'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Try again' }),
   },
 ]
 

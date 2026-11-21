@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
 import { NoticeFrame } from "../components/common/NoticeFrame";
+import { FrameSidebar } from "../components/common/PageFrame";
 import { GuideButton, HomeButton } from "../components/common/AppHeader";
 import { BottomBar, BrandMark, TopBar } from "../components/common/FrameBar";
 import { BusyNotice, StatusNotice } from "../components/common/StatusNotice";
@@ -814,8 +815,6 @@ function GameContent() {
   const [actionBarRef, actionBarHeight] = useElementHeight();
   const usesOverlaySidebar = shellMode !== "big";
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
-  const isSmallShell = shellMode === "small";
-  const actionBarPaddingClass = shellMode === "big" ? "bar-pad-main" : undefined;
 
   const { addToast } = useToast();
   const [phaseActionState, dispatchPhaseAction] = useReducer(
@@ -1758,6 +1757,14 @@ function GameContent() {
 
   const timelinePhase = displayBattleResolution ? "battle" : currentPhase;
   const isEndPhase = currentPhase === "eliminated" || currentPhase === "winner" || currentPhase === "game_over";
+  const canSpectate = currentPhase === "eliminated" && gameState.players.some(
+    (p) =>
+      !p.is_puppet &&
+      p.phase !== "eliminated" &&
+      p.phase !== "awaiting_elimination" &&
+      p.phase !== "winner" &&
+      p.phase !== "game_over"
+  );
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
   const isWinner = selfPlacement === 1;
 
@@ -1818,23 +1825,7 @@ function GameContent() {
     let left: ReactNode = null;
     let right: ReactNode = null;
 
-    if (actionBarPhase === "eliminated") {
-      const hasWatchablePlayers = gameState.players.some(
-        (p) =>
-          !p.is_puppet &&
-          p.phase !== "eliminated" &&
-          p.phase !== "awaiting_elimination" &&
-          p.phase !== "winner" &&
-          p.phase !== "game_over"
-      );
-      if (hasWatchablePlayers) {
-        right = (
-          <button onClick={handleSpectateNewTab} className="btn btn-secondary">
-            Spectate
-          </button>
-        );
-      }
-    } else if (actionBarPhase === "draft") {
+    if (actionBarPhase === "draft") {
       left = (
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
@@ -2369,20 +2360,17 @@ function GameContent() {
                   </div>
                 </>
               ) : (
-                <Sidebar
-                  players={gameState.players}
-                  currentPlayer={self_player}
-                  phaseContent={renderPhaseContent()}
-                  useUpgrades={gameState.use_upgrades}
-                  renderMicToggle={renderMicToggle}
-                />
+                <FrameSidebar>
+                  <Sidebar
+                    players={gameState.players}
+                    currentPlayer={self_player}
+                    phaseContent={renderPhaseContent()}
+                    useUpgrades={gameState.use_upgrades}
+                    renderMicToggle={renderMicToggle}
+                  />
+                </FrameSidebar>
               )}
-              {shellMode === "mobile" && (
-                <div className="w-[4px] shrink-0 frame-chrome" />
-              )}
-              {isSmallShell && (
-                <div className="w-10 shrink-0 frame-chrome" />
-              )}
+              <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
             </div>
             {activeDndPanel === 'sideboard' && current_battle && (
               <div onClick={(e) => handlePanelClickToMove(e, 'sideboard', 'player')}>
@@ -2625,31 +2613,28 @@ function GameContent() {
                 </div>
               </>
             ) : (
-              <Sidebar
-                players={gameState.players}
-                currentPlayer={self_player}
-                phaseContent={renderPhaseContent()}
-                useUpgrades={gameState.use_upgrades}
-                renderMicToggle={renderMicToggle}
-              />
+              <FrameSidebar>
+                <Sidebar
+                  players={gameState.players}
+                  currentPlayer={self_player}
+                  phaseContent={renderPhaseContent()}
+                  useUpgrades={gameState.use_upgrades}
+                  renderMicToggle={renderMicToggle}
+                />
+              </FrameSidebar>
             )}
-            {shellMode === "mobile" && (
-              <div className="w-[4px] shrink-0 frame-chrome" />
-            )}
-            {isSmallShell && (
-              <div className="w-10 shrink-0 frame-chrome" />
-            )}
+            <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
           </div>
         )}
         {/* Bottom Action Bar */}
         {!isSpectator && (() => {
           const endOfGame = isEndPhase && gameId && !displayBattleResolution;
           const groups = endOfGame ? null : renderActionButtons();
+          // Above the docked sidebar's z-[45], so the popovers over Submit Hand and Submit Result show over it.
           return (
             <BottomBar
               ref={actionBarRef}
-              className="relative z-40"
-              padClassName={actionBarPaddingClass}
+              className="relative z-[46]"
               guideTarget="phase-action-bar"
               secondary={endOfGame ? (
                 <>
@@ -2661,15 +2646,21 @@ function GameContent() {
                   >
                     Review
                   </button>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={openShareModal}
-                  >
-                    Share Game
-                  </button>
+                  {canSpectate && (
+                    <button onClick={handleSpectateNewTab} className="btn btn-secondary">
+                      Spectate
+                    </button>
+                  )}
                 </>
               ) : groups?.left}
-              main={groups?.right}
+              main={endOfGame ? (
+                <button
+                  className="btn btn-primary"
+                  onClick={openShareModal}
+                >
+                  Share Game
+                </button>
+              ) : groups?.right}
             />
           );
         })()}

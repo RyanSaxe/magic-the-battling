@@ -78,7 +78,7 @@ function RoundPopover({
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-2 left-0 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 w-max min-w-[180px] max-h-[300px] overflow-y-auto"
+      className="absolute bottom-full mb-4 left-2 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 w-max min-w-[180px] max-h-[300px] overflow-y-auto"
     >
       {options.map((opt) => (
         <button
@@ -337,7 +337,7 @@ export function ShareGame() {
         scroll={false}
         aside={usesOverlaySidebar ? undefined : (
           <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto flex-1 pt-3">
               {renderSidebarContent()}
             </div>
           </aside>
@@ -345,7 +345,6 @@ export function ShareGame() {
         footer={
           <BottomBar
             ref={bottomBarRef}
-            padClassName={shellMode === 'big' ? 'bar-pad-main' : undefined}
             secondary={
               <div className="relative">
                 <button
