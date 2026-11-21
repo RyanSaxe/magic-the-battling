@@ -3135,9 +3135,16 @@ class GameManager:
                 poison_taken=poison_dealt,
             )
             eliminate_player(game, player, player.round, player.stage)
+            self._persist_player_placement(db, game_id, player)
             self._eliminate_dead_puppets(game, game_id, db)
-            self.complete_game(game_id or "", None, db)
-            return "game_over"
+            winner, is_game_over = check_game_over(game)
+            if is_game_over:
+                self.complete_game(game_id or "", winner, db)
+                return "game_over"
+            # A surviving human may have readied while this fight ran; nobody else will start their round.
+            if build.all_ready(game):
+                self._start_all_battles(game, game_id, db)
+            return None
 
         self._eliminate_dead_puppets(game, game_id, db)
         winner, is_game_over = check_game_over(game)

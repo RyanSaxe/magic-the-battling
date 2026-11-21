@@ -743,6 +743,74 @@ class TestBotSpecificScenarios:
             assert h1.in_sudden_death, "Human should have in_sudden_death flag"
             assert b1.in_sudden_death, "Bot should have in_sudden_death flag"
 
+    @staticmethod
+    def _start_human_vs_puppet_sudden_death_beside_a_survivor() -> tuple[GameManager, Game, Player, Player, Puppet]:
+        game, manager, participants = create_test_game(2, 2)
+        h1, h2 = game.players
+        b1, b2 = game.puppets
+        for p in participants:
+            setup_participant_for_battle(p)
+        b2.is_eliminated = True
+
+        h1.poison = 10
+        b1.poison = 10
+        h1.phase = "awaiting_elimination"
+        h2.phase = "draft"
+        assert manager._check_sudden_death_ready(game, "test-game", None) == "sudden_death"
+        return manager, game, h1, h2, b1
+
+    @staticmethod
+    def _puppet_wins_sudden_death(manager: GameManager, game: Game, human: Player, puppet: Puppet) -> str | None:
+        human.phase = "battle"
+        static_puppet = puppet.get_opponent_for_round(human.stage, human.round)
+        assert static_puppet is not None
+        b = battle.start(game, human, static_puppet, is_sudden_death=True)
+        return end_battle_with_result(manager, game, b, static_puppet.name, check_eliminations=False)
+
+    def test_human_losing_sudden_death_to_puppet_leaves_game_running_for_surviving_human(
+        self, reset_singletons, mock_cube_data
+    ):
+        manager, game, h1, h2, b1 = self._start_human_vs_puppet_sudden_death_beside_a_survivor()
+
+        result = self._puppet_wins_sudden_death(manager, game, h1, b1)
+
+        assert result != "game_over"
+        assert h1.phase == "eliminated"
+        assert h2.phase == "draft"
+        assert not b1.is_eliminated
+
+    def test_human_losing_sudden_death_to_puppet_starts_final_when_survivor_already_ready(
+        self, reset_singletons, mock_cube_data
+    ):
+        manager, game, h1, h2, b1 = self._start_human_vs_puppet_sudden_death_beside_a_survivor()
+        h2.round = 2
+        h2.phase = "build"
+        h2.build_ready = True
+
+        result = self._puppet_wins_sudden_death(manager, game, h1, b1)
+
+        assert result != "game_over"
+        assert h2.phase == "battle"
+        assert [(b.player.name, b.opponent.name) for b in game.active_battles] == [(h2.name, b1.name)]
+
+    def test_lone_human_losing_sudden_death_to_puppet_ends_the_game(self, reset_singletons, mock_cube_data):
+        game, manager, participants = create_test_game(1, 2)
+        (human,) = game.players
+        b1, b2 = game.puppets
+        for p in participants:
+            setup_participant_for_battle(p)
+        b2.is_eliminated = True
+        human.poison = 10
+        b1.poison = 10
+        human.phase = "awaiting_elimination"
+        assert manager._check_sudden_death_ready(game, "test-game", None) == "sudden_death"
+
+        result = self._puppet_wins_sudden_death(manager, game, human, b1)
+
+        assert result == "game_over"
+        assert human.phase == "eliminated"
+        assert not b1.is_eliminated
+
     def test_bot_ghost_available_for_pairing(self, reset_singletons, mock_cube_data):
         """When a bot is eliminated with odd survivors, it should be available as ghost."""
         game, _manager, participants = create_test_game(2, 2)
