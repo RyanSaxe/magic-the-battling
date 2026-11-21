@@ -4,6 +4,7 @@ import { SurfaceCard } from '../common/SurfaceCard'
 import { CubeBadge, type CubeBadgeTone } from './CubeBadge'
 import { Chip } from './CubeTile'
 import { PlayIcon } from './Section'
+import { LINK } from '../common/styles'
 
 export interface HeroStat {
   label: string
@@ -103,7 +104,7 @@ export function DetailHero({ imageUri, badge, title, links, chips, actions, play
   )
 }
 
-const HERO_LINK = 'text-amber-400 hover:text-amber-300 transition-colors'
+const HERO_LINK = `${LINK} transition-colors`
 
 /** A link in a hero's line of links: to another page here, or out to another site. */
 export function HeroLink({ children, ...target }: { children: ReactNode } & ({ to: string } | { href: string })) {

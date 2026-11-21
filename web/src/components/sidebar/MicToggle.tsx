@@ -14,19 +14,19 @@ function getMicVisual(props: Pick<MicToggleProps, 'muted' | 'connectionState' | 
   const { muted, connectionState, remoteMuted } = props
 
   if (connectionState === 'connecting') {
-    return { icon: 'mic', color: 'text-gray-400', animation: 'animate-mic-connecting', title: 'Connecting...' }
+    return { icon: 'mic', color: 'text-[var(--ivory-muted)]', animation: 'animate-mic-connecting', title: 'Connecting...' }
   }
   if (connectionState === 'failed') {
     return { icon: 'warning', color: 'text-amber-400', animation: '', title: 'Connection failed' }
   }
   if (connectionState === 'disconnected') {
-    return { icon: 'warning', color: 'text-gray-500', animation: '', title: 'Disconnected' }
+    return { icon: 'warning', color: 'text-[var(--ivory-muted)]', animation: '', title: 'Disconnected' }
   }
   if (muted) {
     return { icon: 'off', color: 'text-red-400 hover:text-red-300', animation: '', title: 'Unmute' }
   }
   if (remoteMuted) {
-    return { icon: 'off', color: 'text-gray-400', animation: '', title: 'Player muted' }
+    return { icon: 'off', color: 'text-[var(--ivory-muted)]', animation: '', title: 'Player muted' }
   }
   return { icon: 'mic', color: 'text-indigo-300 hover:text-indigo-200', animation: '', title: 'Mute' }
 }

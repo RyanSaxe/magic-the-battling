@@ -3,6 +3,7 @@ import { getGameCards, type GameCardsResponse } from '../api/client'
 import { CardPreviewModal } from './card/CardPreviewModal'
 import type { Card } from '../types'
 import { unknownToAppError } from '../utils/appError'
+import { TEXT_INPUT } from './common/styles'
 
 const COLOR_CHIPS: { code: string; label: string; bg: string; text: string; ring: string }[] = [
   { code: 'W', label: 'W', bg: 'bg-amber-100', text: 'text-amber-900', ring: 'ring-amber-300' },
@@ -120,7 +121,7 @@ export function CardsView({
   }
 
   const inputClass =
-    'w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] placeholder-gray-500'
+    `${TEXT_INPUT} placeholder-[var(--ivory-faint)]`
 
   const showFilters = which === 'cards'
 
@@ -166,7 +167,7 @@ export function CardsView({
             ))}
           </div>
 
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-[var(--ivory-muted)]">
             {sorted.length === allCards.length
               ? `${allCards.length} cards`
               : `${sorted.length} of ${allCards.length} cards`}
@@ -176,7 +177,7 @@ export function CardsView({
 
       <div className="flex-1 overflow-y-auto min-h-0 pb-3">
         {sorted.length === 0 ? (
-          <div className="text-gray-500 text-center py-8">No cards match</div>
+          <div className="text-[var(--ivory-muted)] text-center py-8">No cards match</div>
         ) : (
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
             {sorted.map((card) => (

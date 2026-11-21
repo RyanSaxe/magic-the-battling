@@ -15,7 +15,7 @@ export function ControlsTab({ phase }: { phase: string }) {
 
       {hotkeys.length > 0 && (
         <div>
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+          <h3 className="text-xs font-medium text-[var(--ivory-muted)] uppercase tracking-wide mb-2">
             Keyboard Shortcuts
           </h3>
           <div className="space-y-1.5">
@@ -28,7 +28,7 @@ export function ControlsTab({ phase }: { phase: string }) {
 
       {hoverHotkeys.length > 0 && (
         <div>
-          <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+          <h3 className="text-xs font-medium text-[var(--ivory-muted)] uppercase tracking-wide mb-2">
             When Hovering a Card
           </h3>
           <div className="space-y-1.5">

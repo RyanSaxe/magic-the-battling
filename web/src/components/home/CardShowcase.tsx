@@ -366,7 +366,7 @@ export function CardShowcase() {
             className={`w-2.5 h-2.5 rounded-full transition-colors ${
               i === currentStage
                 ? "bg-amber-400"
-                : "bg-gray-600 hover:bg-gray-500"
+                : "bg-[var(--stone-light)] hover:bg-[var(--ivory)]/50"
             }`}
             aria-label={`Stage ${i + 1}`}
           />

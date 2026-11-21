@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, type ReactNode } from 'react'
 import { ToastContext, type Toast, type ToastVariant } from './toastState'
+import { POPOVER_CHROME } from '../components/common/styles'
 
 const MAX_TOASTS = 5
 const TOAST_DURATION = 5000
@@ -29,8 +30,8 @@ const variantConfig: Record<
     ),
   },
   info: {
-    badgeColor: 'bg-blue-500/20',
-    iconColor: 'text-blue-400',
+    badgeColor: 'bg-[var(--ivory)]/15',
+    iconColor: 'text-[var(--ivory)]',
     label: 'Info',
     icon: (
       <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -73,14 +74,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           return (
             <div
               key={toast.id}
-              className="pointer-events-auto animate-toast-fade modal-chrome border gold-border rounded-lg shadow-xl px-3 py-2.5 max-w-md w-[min(94vw,32rem)] flex items-center gap-2.5"
+              className={`pointer-events-auto animate-toast-fade ${POPOVER_CHROME} px-3 py-2.5 max-w-md w-[min(94vw,32rem)] flex items-center gap-2.5`}
             >
               <span className={`inline-flex items-center justify-center rounded-full h-7 w-7 shrink-0 ${config.badgeColor} ${config.iconColor}`}>
                 {config.icon}
               </span>
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] uppercase tracking-widest text-amber-300/80 mb-0.5">{config.label}</div>
-                <p className="text-sm text-gray-100 leading-snug">{toast.message}</p>
+                <p className="text-sm text-[var(--ivory)] leading-snug">{toast.message}</p>
               </div>
               <button
                 onClick={() => removeToast(toast.id)}

@@ -10,6 +10,7 @@ import { useElementHeight } from '../../hooks/useElementHeight'
 import { SUDDEN_DEATH_BAR_HEIGHT, battleBoardMetrics } from './phaseLayouts'
 import { buildAppliedUpgradeMap, buildHiddenAppliedUpgradeMap } from '../../utils/upgrades'
 import { canInteractWithBattleZone } from '../../utils/battleInteraction'
+import { POPOVER_CHROME } from '../../components/common/styles'
 
 interface ContextMenuState {
   card: CardType
@@ -110,7 +111,7 @@ function ZoneActionMenu({
             onDraw()
             onClose()
           }}
-          className="w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10 transition-colors"
+          className="menu-item w-full px-3 py-1.5 text-left text-sm text-white transition-colors"
         >
           Draw
         </button>
@@ -120,7 +121,7 @@ function ZoneActionMenu({
             onShuffle()
             onClose()
           }}
-          className="w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10 transition-colors"
+          className="menu-item w-full px-3 py-1.5 text-left text-sm text-white transition-colors"
         >
           Shuffle
         </button>
@@ -243,7 +244,7 @@ export function BattlePhase({
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <div className="text-xl text-white mb-4">Waiting for the Fight</div>
-          <p className="text-gray-400">Waiting for opponent to finish building...</p>
+          <p className="text-[var(--ivory-muted)]">Waiting for opponent to finish building...</p>
         </div>
       </div>
     )
@@ -390,7 +391,7 @@ export function BattlePhase({
             <span className="text-[13px] text-[var(--color-gold-dark)]">Loser is eliminated</span>
             <span className="relative group cursor-help">
               <span className="text-xs text-[var(--color-gold-dark)]">ⓘ</span>
-              <span className="absolute right-0 top-full mt-2 w-64 p-2 modal-chrome border gold-border rounded-lg felt-raised-panel text-xs text-left whitespace-normal leading-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              <span className={`absolute right-0 top-full mt-2 w-64 p-2 ${POPOVER_CHROME} text-xs text-left whitespace-normal leading-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50`}>
                 Multiple players reached lethal poison. The two with the lowest poison are reset to 9 and face off. A draw causes both players to rebuild. Play continues until one is eliminated.
               </span>
             </span>

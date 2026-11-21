@@ -5,6 +5,7 @@ import { AppHeader, HomeButton } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { unknownToAppError } from '../utils/appError'
+import { LINK, TEXT_INPUT } from '../components/common/styles'
 
 export function Login() {
   const navigate = useNavigate()
@@ -44,26 +45,26 @@ export function Login() {
         )}
 
         <div className="mb-4">
-          <label htmlFor="username" className="block text-gray-300 text-sm mb-1">Username</label>
+          <label htmlFor="username" className="block text-[var(--ivory-muted)] text-sm mb-1">Username</label>
           <input
             id="username"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+            className={TEXT_INPUT}
             autoFocus
             required
           />
         </div>
 
         <div className="mb-6">
-          <label htmlFor="password" className="block text-gray-300 text-sm mb-1">Password</label>
+          <label htmlFor="password" className="block text-[var(--ivory-muted)] text-sm mb-1">Password</label>
           <input
             id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+            className={TEXT_INPUT}
             required
           />
         </div>
@@ -76,9 +77,9 @@ export function Login() {
           {loading ? 'Logging in...' : 'Log In'}
         </button>
 
-        <p className="text-center text-gray-400 text-sm mt-4">
+        <p className="text-center text-[var(--ivory-muted)] text-sm mt-4">
           Don't have an account?{' '}
-          <Link to={`/register${returnTo !== '/' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} className="text-amber-400 hover:text-amber-300">Create one</Link>
+          <Link to={`/register${returnTo !== '/' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} className={LINK}>Create one</Link>
         </p>
       </SurfaceCard>
     </PageFrame>

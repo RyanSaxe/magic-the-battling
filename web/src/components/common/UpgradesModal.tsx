@@ -202,7 +202,7 @@ export function UpgradesModal({
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl leading-none shrink-0 ml-4 p-1"
+            className="text-[var(--ivory-muted)] hover:text-white text-2xl leading-none shrink-0 ml-4 p-1"
           >
             &times;
           </button>
@@ -274,7 +274,7 @@ export function UpgradesModal({
                   ))}
                 </CardGrid>
               ) : (
-                <p className="text-gray-500">{isRevealMode ? 'No hidden upgrades to reveal' : 'No upgrades yet'}</p>
+                <p className="text-[var(--ivory-muted)]">{isRevealMode ? 'No hidden upgrades to reveal' : 'No upgrades yet'}</p>
               )}
             </div>
           </div>

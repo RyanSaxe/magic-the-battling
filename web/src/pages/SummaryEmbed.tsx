@@ -57,7 +57,7 @@ export function SummaryEmbed() {
     <div
       ref={containerRef}
       style={{ width: 1200, height: 630 }}
-      className="bg-gray-900 text-white overflow-hidden"
+      className="bg-[var(--chrome)] text-white overflow-hidden"
     >
       {summaryData ? (
         <div className="w-full h-full flex flex-col pt-3 px-2 pb-2">

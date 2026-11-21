@@ -97,6 +97,7 @@ import {
   hasBattleResultConflict,
 } from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
+import { DIALOG_BACKDROP, LINK, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
 
 // Each area stops 3px into the life number, short of its middle even for one digit, so - and + never overlap.
 const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_+_5px_-_44px)]";
@@ -407,34 +408,34 @@ function PlayerSelectionModal({
         {!selectedPlayer && (
           <>
             {!spectateOnly && !accountSeatName && (
-              <div className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 mb-4 text-[13px] leading-snug text-gray-300">
+              <div className={`${OPTION_BOX} px-3 py-2.5 mb-4 text-[13px] leading-snug text-[var(--ivory-muted)]`}>
                 To take your seat back, open this link in the browser you joined from. If you played with an account,{" "}
                 <button
                   onClick={() => navigate(`/login?returnTo=${encodeURIComponent(`/game/${gameId}/play`)}`)}
-                  className="text-amber-400 hover:text-amber-300 underline"
+                  className={`${LINK} underline`}
                 >
                   log in
                 </button>
                 .
               </div>
             )}
-            <p className="text-gray-400 text-center mb-4">
+            <p className="text-[var(--ivory-muted)] text-center mb-4">
               {accountSeatName ? "Reconnect to your seat or watch a player" : "Select a player to watch"}
             </p>
             <div className="space-y-3 mb-6">
               {humanPlayers.map((player) => (
                 <div
                   key={player.name}
-                  className="flex items-center justify-between bg-gray-800/50 rounded-lg p-3"
+                  className={`flex items-center justify-between ${OPTION_BOX} p-3`}
                 >
                   <div className="flex items-center gap-3">
                     <div
                       className={`w-2 h-2 rounded-full ${
-                        player.is_connected ? "bg-green-500" : "bg-gray-500"
+                        player.is_connected ? "bg-green-500" : "bg-[var(--ivory-faint)]"
                       }`}
                     />
                     <span className="text-white">{player.name}</span>
-                    <span className="text-gray-500 text-sm">
+                    <span className="text-[var(--ivory-muted)] text-sm">
                       ({player.phase})
                     </span>
                   </div>
@@ -473,16 +474,16 @@ function PlayerSelectionModal({
 
         {selectedPlayer && (
           <div className="space-y-4">
-            <p className="text-gray-300 text-center">
+            <p className="text-[var(--ivory-muted)] text-center">
               Request to watch <strong>{selectedPlayer}</strong>'s game
             </p>
             <div>
-              <label className="block text-gray-300 mb-1">Your Name</label>
+              <label className="block text-[var(--ivory-muted)] mb-1">Your Name</label>
               <input
                 type="text"
                 value={spectatorName}
                 onChange={(e) => setSpectatorName(e.target.value)}
-                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+                className={TEXT_INPUT}
                 placeholder="Enter your name"
               />
             </div>
@@ -2169,13 +2170,13 @@ function GameContent() {
     <CardPreviewContext.Provider value={{ setPreviewCard }}>
       <div className="game-table h-dvh overflow-hidden flex flex-col">
         {!isConnected && (
-          <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center">
+          <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
             <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
               <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              <span className="text-sm text-gray-100">Reconnecting...</span>
+              <span className="text-sm text-[var(--ivory)]">Reconnecting...</span>
             </div>
           </div>
         )}
@@ -2264,7 +2265,7 @@ function GameContent() {
                       className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight"
                     >
                       <div className="flex items-center gap-1">
-                        <span className="text-gray-300 truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
+                        <span className="text-[var(--ivory-muted)] truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
                         {!canManipulateOpponent && voiceTargetsAvailable && (() => {
                           const oppPeer = voiceChat.state.peers.find(p => p.name === battleViewForDisplay.opponent_name)
                           return oppPeer ? (
@@ -2278,9 +2279,9 @@ function GameContent() {
                           ) : null
                         })()}
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>-</button>
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>-</button>
                           <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
-                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>+</button>
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>+</button>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 leading-tight">
@@ -2294,9 +2295,9 @@ function GameContent() {
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>-</button>
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>-</button>
                           <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
-                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>+</button>
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>+</button>
                         </div>
                         {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
                           <MicToggle
@@ -2305,7 +2306,7 @@ function GameContent() {
                             onClick={() => voiceChat.toggleSelfMute()}
                           />
                         )}
-                        <span className="text-gray-300 truncate max-w-[60px] leading-tight">{self_player.name}</span>
+                        <span className="text-[var(--ivory-muted)] truncate max-w-[60px] leading-tight">{self_player.name}</span>
                       </div>
                     </div>
                   )}
@@ -2558,7 +2559,7 @@ function GameContent() {
                     <h2 className="text-2xl text-red-400 mb-4">
                       You Have Been Eliminated
                     </h2>
-                    <p className="text-gray-300 mb-6">
+                    <p className="text-[var(--ivory-muted)] mb-6">
                       Waiting until all fights are complete to determine if you
                       will compete in sudden death to stay alive.
                     </p>
@@ -2566,7 +2567,7 @@ function GameContent() {
                       <h3 className="text-amber-400 font-medium mb-2">
                         Sudden Death Rules
                       </h3>
-                      <ul className="text-gray-400 text-sm space-y-1">
+                      <ul className="text-[var(--ivory-muted)] text-sm space-y-1">
                         <li>
                           Triggers when 2+ players eliminated with fewer than 2
                           survivors

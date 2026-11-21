@@ -3,7 +3,6 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { PageFrame } from '../components/common/PageFrame'
-import { SurfaceCard } from '../components/common/SurfaceCard'
 import { DashboardFrame } from '../components/dashboard/DashboardFrame'
 import { DefaultOpponentsField } from '../components/dashboard/DefaultOpponentsField'
 import { DetailHero, HeroLink } from '../components/dashboard/DetailHero'
@@ -16,6 +15,8 @@ import type { UserBattler, PlayMode } from '../types'
 import { countLabel, cubeTitle, modeLabel, winRate } from '../utils/accountFormat'
 import { AppError, unknownToAppError } from '../utils/appError'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
+import { OPTION_BOX, TEXT_INPUT } from '../components/common/styles'
+import { Dialog } from '../components/common/Dialog'
 
 export function BattlerView() {
   const { listId } = useParams<{ listId: string }>()
@@ -182,73 +183,61 @@ function SettingsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <SurfaceCard className="relative">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
-          <h3 className="text-white font-semibold">Settings</h3>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-amber-100/70 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
-          >
-            ✕
-          </button>
+    <Dialog title="Settings" onClose={onClose}>
+
+      <div className="space-y-3">
+        <div>
+          <label className="block text-white text-sm mb-1">Display Name</label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            className={TEXT_INPUT}
+            placeholder={battler.cube_id}
+          />
         </div>
 
-        <div className="space-y-3">
-          <div>
-            <label className="block text-white text-sm mb-1">Display Name</label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
-              placeholder={battler.cube_id}
-            />
-          </div>
+        <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
+          <input
+            type="checkbox"
+            checked={playMode === 'constructed'}
+            onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
+            className="w-4 h-4 rounded bg-black/40 border-black/40"
+          />
+          <span className="text-white text-sm">Constructed</span>
+          <span className="text-amber-200/45 text-xs">— bring your own deck</span>
+        </label>
 
-          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={playMode === 'constructed'}
-              onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
-              className="w-4 h-4 rounded bg-black/40 border-black/40"
-            />
-            <span className="text-white text-sm">Constructed</span>
-            <span className="text-amber-200/45 text-xs">— bring your own deck</span>
-          </label>
+        <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
+          <input
+            type="checkbox"
+            checked={useUpgrades}
+            onChange={(e) => setUseUpgrades(e.target.checked)}
+            className="w-4 h-4 rounded bg-black/40 border-black/40"
+          />
+          <span className="text-white text-sm">Upgrades</span>
+        </label>
 
-          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useUpgrades}
-              onChange={(e) => setUseUpgrades(e.target.checked)}
-              className="w-4 h-4 rounded bg-black/40 border-black/40"
-            />
-            <span className="text-white text-sm">Upgrades</span>
-          </label>
+        <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />
+      </div>
 
-          <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />
-        </div>
-
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn btn-primary flex-1 py-2 font-semibold disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-          <button
-            onClick={() => {
-              if (window.confirm(`Delete "${battler.display_name || battler.cube_id}"?`)) onDelete()
-            }}
-            className="btn btn-secondary btn-destructive py-2 px-4"
-          >
-            Delete
-          </button>
-        </div>
-      </SurfaceCard>
-    </div>
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="btn btn-primary flex-1 py-2 font-semibold disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+        <button
+          onClick={() => {
+            if (window.confirm(`Delete "${battler.display_name || battler.cube_id}"?`)) onDelete()
+          }}
+          className="btn btn-secondary btn-destructive py-2 px-4"
+        >
+          Delete
+        </button>
+      </div>
+    </Dialog>
   )
 }

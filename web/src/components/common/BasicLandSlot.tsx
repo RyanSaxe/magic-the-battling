@@ -106,7 +106,7 @@ export function BasicLandSlot({
                     onPick(name);
                     setOpen(false);
                   }}
-                  className="flex flex-col items-center gap-0.5 p-1 rounded hover:bg-gray-700/50"
+                  className="menu-item flex flex-col items-center gap-0.5 p-1 rounded"
                 >
                   <img
                     src={BASIC_LAND_IMAGES[name]}
@@ -118,7 +118,7 @@ export function BasicLandSlot({
                       borderRadius: "var(--card-border-radius)",
                     }}
                   />
-                  <span className="text-[9px] text-gray-400">{name}</span>
+                  <span className="text-[9px] text-[var(--ivory-muted)]">{name}</span>
                 </button>
               ))}
             </div>

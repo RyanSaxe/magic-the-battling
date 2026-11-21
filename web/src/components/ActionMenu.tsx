@@ -125,7 +125,7 @@ export function ActionMenu({
       >
         {card && (
           <>
-            <div className="px-3 py-1.5 text-xs text-gray-400 border-b gold-divider truncate">
+            <div className="px-3 py-1.5 text-xs text-[var(--ivory-muted)] border-b gold-divider truncate">
               {card.name}
             </div>
 
@@ -155,6 +155,7 @@ export function ActionMenu({
             <MenuItem
               label="Move To"
               hasSubmenu
+              open={submenu === 'moveTo'}
               onClick={() => setSubmenu(submenu === 'moveTo' ? 'none' : 'moveTo')}
             />
             {submenu === 'moveTo' && (
@@ -172,6 +173,7 @@ export function ActionMenu({
                 <MenuItem
                   label="Add Counter"
                   hasSubmenu
+                  open={submenu === 'addCounter'}
                   guideTarget="battle-action-add-counter"
                   onClick={() => setSubmenu(submenu === 'addCounter' ? 'none' : 'addCounter')}
                 />
@@ -199,6 +201,7 @@ export function ActionMenu({
                     <MenuItem
                       label="Remove Counter"
                       hasSubmenu
+                      open={submenu === 'removeCounter'}
                       onClick={() => setSubmenu(submenu === 'removeCounter' ? 'none' : 'removeCounter')}
                     />
                     {submenu === 'removeCounter' && (
@@ -222,6 +225,7 @@ export function ActionMenu({
                 <MenuItem
                   label="Spawn Token"
                   hasSubmenu
+                  open={submenu === 'spawnToken'}
                   onClick={() => setSubmenu(submenu === 'spawnToken' ? 'none' : 'spawnToken')}
                 />
                 {submenu === 'spawnToken' && (
@@ -257,6 +261,7 @@ export function ActionMenu({
                 <MenuItem
                   label="Attach To"
                   hasSubmenu
+                  open={submenu === 'attachTo'}
                   onClick={() => setSubmenu(submenu === 'attachTo' ? 'none' : 'attachTo')}
                 />
                 {submenu === 'attachTo' && (
@@ -320,6 +325,7 @@ export function ActionMenu({
         <MenuItem
           label="Roll a Die"
           hasSubmenu
+          open={submenu === 'rollDie'}
           onClick={() => setSubmenu(submenu === 'rollDie' ? 'none' : 'rollDie')}
         />
         {submenu === 'rollDie' && (
@@ -358,12 +364,14 @@ function MenuItem({
   label,
   onClick,
   hasSubmenu,
+  open,
   disabled,
   guideTarget,
 }: {
   label: string
   onClick: () => void
   hasSubmenu?: boolean
+  open?: boolean
   disabled?: boolean
   guideTarget?: string
 }) {
@@ -371,14 +379,15 @@ function MenuItem({
     <button
       className={`
         w-full px-3 py-1.5 text-left text-sm flex items-center justify-between
-        ${disabled ? 'text-gray-500 cursor-not-allowed' : 'text-white hover:bg-gray-700'}
+        menu-item ${disabled ? 'text-[var(--ivory-faint)] cursor-not-allowed' : 'text-white'}
       `}
       data-guide-target={guideTarget}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
+      aria-expanded={hasSubmenu ? open : undefined}
     >
       <span>{label}</span>
-      {hasSubmenu && <span className="text-gray-400">›</span>}
+      {hasSubmenu && <span className="text-[var(--ivory-muted)]">›</span>}
     </button>
   )
 }
@@ -390,7 +399,7 @@ function MenuDivider() {
 function Submenu({ children, maxHeight }: { children: React.ReactNode; maxHeight?: number }) {
   return (
     <div
-      className="ml-2 pl-2 border-l gold-divider"
+      className="menu-submenu"
       style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}
     >
       {children}

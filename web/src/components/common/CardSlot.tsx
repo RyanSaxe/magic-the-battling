@@ -9,12 +9,12 @@ export function CardSlot({ label, dimensions, selected = false, onClick }: CardS
   return (
     <div
       className={`card-slot flex items-center justify-center rounded border-2 border-dashed bg-black/20 ${
-        selected ? 'border-amber-400 ring-2 ring-amber-400/50' : 'border-gray-600/60'
+        selected ? 'border-amber-400 ring-2 ring-amber-400/50' : 'border-[var(--stone-light)]/60'
       } ${onClick ? 'cursor-pointer' : ''}`}
       style={{ width: dimensions.width, height: dimensions.height }}
       onClick={onClick}
     >
-      <span className="text-[9px] text-gray-500 text-center leading-tight px-1">
+      <span className="text-[9px] text-[var(--ivory-muted)] text-center leading-tight px-1">
         {label}
       </span>
     </div>
