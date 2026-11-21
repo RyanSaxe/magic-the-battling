@@ -7,6 +7,7 @@ from pydantic_core import PydanticCustomError
 from mtb.models.cards import Card
 from mtb.models.game import BattleResolution
 from mtb.models.types import BuildSource, CardDestination, Phase, PlayMode, ZoneName, normalize_play_mode
+from server.services.spectate_requests import SpectateStatus
 
 LastResult = Literal["win", "loss", "draw"]
 CubeLoadingStatus = Literal["loading", "ready", "error"]
@@ -385,7 +386,7 @@ class SpectateRequestResponse(BaseModel):
 
 
 class SpectateRequestStatus(BaseModel):
-    status: Literal["pending", "approved", "denied"]
+    status: SpectateStatus
     session_id: str | None = None
     player_id: str | None = None
 
