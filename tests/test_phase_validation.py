@@ -93,11 +93,11 @@ class TestValidateActionPhase:
 
 class TestPhaseValidationIntegration:
     def test_build_action_during_build_phase_succeeds(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until, start_lobby
     ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
@@ -120,11 +120,11 @@ class TestPhaseValidationIntegration:
             assert msg["type"] == "game_state"
 
     def test_build_move_rejects_second_rapid_move_when_one_slot_open(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until, start_lobby
     ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             bootstrap = ws_receive_json(ws)
@@ -188,11 +188,11 @@ class TestPhaseValidationIntegration:
             assert len(final_self["sideboard"]) == baseline_sideboard_count - 1
 
     def test_draft_action_during_build_phase_rejected(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until, start_lobby
     ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
@@ -220,11 +220,11 @@ class TestPhaseValidationIntegration:
             assert "build" in msg["payload"]["message"]
 
     def test_battle_action_during_build_phase_rejected(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until, start_lobby
     ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)
@@ -247,11 +247,11 @@ class TestPhaseValidationIntegration:
             assert "build" in msg["payload"]["message"]
 
     def test_reward_action_during_build_phase_rejected(
-        self, client, game_with_players, ws_receive_json, ws_receive_json_until
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until, start_lobby
     ):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             state = ws_receive_json(ws)

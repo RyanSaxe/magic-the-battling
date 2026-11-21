@@ -143,8 +143,8 @@ export async function joinGame(joinCode: string, playerName: string): Promise<Jo
   return response.json()
 }
 
-export async function startGame(gameId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/games/${gameId}/start`, {
+export async function startGame(gameId: string, sessionId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/start?session_id=${encodeURIComponent(sessionId)}`, {
     method: 'POST',
   })
   if (!response.ok) {

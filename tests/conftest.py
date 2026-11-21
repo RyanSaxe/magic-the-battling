@@ -314,3 +314,17 @@ def game_with_players(client):
         "alice": {"session_id": d1["session_id"], "player_id": d1["player_id"]},
         "bob": {"session_id": d2["session_id"], "player_id": d2["player_id"]},
     }
+
+
+@pytest.fixture
+def start_lobby(client):
+    """Ready every player in a lobby, then start it through the HTTP route as its host."""
+
+    def _start(game_id: str, host_session_id: str):
+        pending = games_module.game_manager.get_pending_game(game_id)
+        assert pending is not None
+        for player_id in pending.player_ids:
+            games_module.game_manager.set_player_ready(game_id, player_id, True)
+        return client.post(f"/api/games/{game_id}/start", params={"session_id": host_session_id})
+
+    return _start

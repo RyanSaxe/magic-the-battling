@@ -108,8 +108,8 @@ class TestJoinGame:
 
         assert response.status_code == 404
 
-    def test_join_started_game_returns_400(self, game_with_players, client):
-        client.post(f"/api/games/{game_with_players['game_id']}/start")
+    def test_join_started_game_returns_400(self, game_with_players, client, start_lobby):
+        start_lobby(game_with_players["game_id"], game_with_players["alice"]["session_id"])
 
         response = client.post(
             "/api/games/join",
@@ -206,8 +206,8 @@ class TestGetGameCards:
 
 
 class TestStartGame:
-    def test_start_with_enough_players(self, game_with_players, client):
-        response = client.post(f"/api/games/{game_with_players['game_id']}/start")
+    def test_start_with_enough_players(self, game_with_players, start_lobby):
+        response = start_lobby(game_with_players["game_id"], game_with_players["alice"]["session_id"])
 
         assert response.status_code == 200
         assert response.json()["success"] is True
@@ -217,10 +217,51 @@ class TestStartGame:
 
         assert response.status_code == 404
 
+    @pytest.mark.parametrize("session_id", [None, "not-a-session"])
+    def test_start_without_a_valid_session_is_refused(self, game_with_players, client, session_id):
+        game_id = game_with_players["game_id"]
+        params = {"session_id": session_id} if session_id else {}
+
+        response = client.post(f"/api/games/{game_id}/start", params=params)
+
+        assert response.status_code == 401
+        assert client.get(f"/api/games/{game_id}/lobby").json()["is_started"] is False
+
+    def test_start_by_a_player_who_is_not_the_host_is_refused(self, game_with_players, client):
+        game_id = game_with_players["game_id"]
+
+        response = client.post(
+            f"/api/games/{game_id}/start",
+            params={"session_id": game_with_players["bob"]["session_id"]},
+        )
+
+        assert response.status_code == 403
+        assert response.json()["detail"] == "Only the host can start the game"
+
+    def test_start_before_everyone_is_ready_is_refused_and_lobby_can_still_start(
+        self, game_with_players, client, start_lobby
+    ):
+        game_id = game_with_players["game_id"]
+        host_session_id = game_with_players["alice"]["session_id"]
+
+        refused = client.post(f"/api/games/{game_id}/start", params={"session_id": host_session_id})
+
+        assert refused.status_code == 400
+        assert refused.json()["detail"] == "Not all players are ready"
+        assert start_lobby(game_id, host_session_id).status_code == 200
+
+    def test_start_with_fewer_players_than_the_table_is_refused(self, client, start_lobby):
+        create = client.post("/api/games", json={"player_name": "Alice", "cube_id": "test", "target_player_count": 4})
+
+        response = start_lobby(create.json()["game_id"], create.json()["session_id"])
+
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Need exactly 4 players"
+
 
 class TestGetGameState:
-    def test_requires_valid_session(self, game_with_players, client):
-        client.post(f"/api/games/{game_with_players['game_id']}/start")
+    def test_requires_valid_session(self, game_with_players, client, start_lobby):
+        start_lobby(game_with_players["game_id"], game_with_players["alice"]["session_id"])
 
         response = client.get(
             f"/api/games/{game_with_players['game_id']}",
@@ -230,10 +271,10 @@ class TestGetGameState:
         assert response.status_code == 401
         assert response.json()["code"] == "INVALID_SESSION"
 
-    def test_returns_game_state_shape(self, game_with_players, client):
+    def test_returns_game_state_shape(self, game_with_players, client, start_lobby):
         game_id = game_with_players["game_id"]
         session_id = game_with_players["alice"]["session_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, session_id)
 
         response = client.get(f"/api/games/{game_id}", params={"session_id": session_id})
 
@@ -258,9 +299,9 @@ class TestGetGameState:
 
 
 class TestRejoinGame:
-    def test_rejoin_recovers_stale_pending_connection(self, game_with_players, client):
+    def test_rejoin_recovers_stale_pending_connection(self, game_with_players, client, start_lobby):
         game_id = game_with_players["game_id"]
-        client.post(f"/api/games/{game_id}/start")
+        start_lobby(game_id, game_with_players["alice"]["session_id"])
 
         first = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice"})
         assert first.status_code == 200
@@ -268,7 +309,7 @@ class TestRejoinGame:
         second = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice"})
         assert second.status_code == 200
 
-    def test_authenticated_owner_keeps_slot_ownership_after_rejoin(self, client):
+    def test_authenticated_owner_keeps_slot_ownership_after_rejoin(self, client, start_lobby):
         register = client.post(
             "/api/auth/register",
             json={"username": "owner_user", "password": "password123", "email": "owner@test.com"},
@@ -290,7 +331,7 @@ class TestRejoinGame:
         )
         assert join.status_code == 200
 
-        start = client.post(f"/api/games/{game_id}/start")
+        start = start_lobby(game_id, create.json()["session_id"])
         assert start.status_code == 200
 
         rejoin = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice"})
