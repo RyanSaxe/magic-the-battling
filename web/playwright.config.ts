@@ -10,15 +10,22 @@ export default defineConfig({
     baseURL: `http://localhost:${port}`,
   },
   projects: [
-    { name: 'iPhone SE', testIgnore: 'game-layout.spec.ts', use: { ...devices['iPhone SE'] } },
+    { name: 'iPhone SE', testIgnore: ['game-layout.spec.ts', 'frame-bar.spec.ts'], use: { ...devices['iPhone SE'] } },
     {
       name: 'iPhone 15, short viewport',
-      testIgnore: 'game-layout.spec.ts',
+      testIgnore: ['game-layout.spec.ts', 'frame-bar.spec.ts'],
       use: { ...devices['iPhone 15'], viewport: { width: 393, height: 560 } },
     },
-    { name: 'iPhone 15 landscape', testIgnore: 'game-layout.spec.ts', use: { ...devices['iPhone 15 landscape'] } },
-    // Each screen in the game layout spec sets its own viewport, so it runs once.
+    { name: 'iPhone 15 landscape', testIgnore: ['game-layout.spec.ts', 'frame-bar.spec.ts'], use: { ...devices['iPhone 15 landscape'] } },
+    // The game layout and frame specs set each screen's viewport themselves, so each runs once.
     { name: 'game layout', testMatch: 'game-layout.spec.ts', use: { ...devices['Desktop Safari'] } },
+    {
+      name: 'frame bars',
+      testMatch: 'frame-bar.spec.ts',
+      // The game layout spec's divider checks reload the board many times, and run past their timeout when this spec shares the CPU with them.
+      dependencies: ['game layout'],
+      use: { ...devices['Desktop Safari'] },
+    },
   ],
   webServer: {
     command: `npx vite build && npx vite preview --port ${port} --strictPort`,

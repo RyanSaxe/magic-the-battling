@@ -50,7 +50,7 @@ const SIGNED_OUT_RESPONSES: Record<string, MockResponse> = {
 
 const USER: AuthUser = { user_id: 'user-1', username: 'tester' }
 
-function battler(id: number, cubeId: string, name: string): UserBattler {
+export function battler(id: number, cubeId: string, name: string): UserBattler {
   return {
     id,
     cube_id: cubeId,
@@ -69,6 +69,10 @@ function battler(id: number, cubeId: string, name: string): UserBattler {
     game_count: 12,
     human_player_count: 5,
     last_played: '2026-01-02T00:00:00Z',
+    my_game_count: 4,
+    my_win_count: 1,
+    my_average_placement: 2.25,
+    my_last_played: '2026-01-02T00:00:00Z',
   }
 }
 
@@ -88,7 +92,7 @@ const FOLLOWING: FollowedBattler[] = [
   },
 ]
 
-function gameSummary(index: number): GameSummary {
+export function gameSummary(index: number): GameSummary {
   return {
     game_id: `game-${index}`,
     created_at: '2026-01-02T00:00:00Z',
@@ -113,9 +117,22 @@ const SIGNED_IN_RESPONSES: Record<string, MockResponse> = {
   '/api/battlers': { json: { battlers: BATTLERS, has_more: false } },
   '/api/battlers/following': { json: { following: FOLLOWING, has_more: false } },
   '/api/battlers/my-games': { json: GAMES },
-  '/api/discover': { json: { results: [], has_more: false } },
+  '/api/discover': { json: { results: [], has_more: false, total: 0 } },
   '/api/battlers/1/games': { json: GAMES },
   '/api/battlers/cube/vintage-cube/games': { json: GAMES },
+  '/api/battlers/cube/vintage-cube': {
+    json: {
+      cube_id: 'vintage-cube',
+      cube_name: 'Vintage Cube',
+      cube_image_uri: null,
+      game_count: 4,
+      human_player_count: 5,
+      last_played: '2026-01-02T00:00:00Z',
+      popular_setup: { play_mode: 'limited', use_upgrades: true },
+      is_following: false,
+      follow_id: null,
+    },
+  },
 }
 
 export const LOBBY_GAME_ID = 'game-lobby'
@@ -339,19 +356,31 @@ export const PAGES: PageUnderTest[] = [
     name: 'dashboard',
     path: '/dashboard',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('button', { name: '+ Add Cube' }),
+    primaryAction: (page) => page.getByRole('button', { name: 'New Game' }),
+  },
+  {
+    name: 'games',
+    path: '/dashboard/games',
+    serve: serveSignedIn,
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search games' }),
+  },
+  {
+    name: 'discover',
+    path: '/dashboard/discover',
+    serve: serveSignedIn,
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search cubes' }),
   },
   {
     name: 'battler',
     path: '/dashboard/list/1',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play', exact: true }),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play Preset' }),
   },
   {
     name: 'cube',
     path: '/cube/vintage-cube',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play', exact: true }),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play Cube' }),
   },
   {
     name: 'lobby',

@@ -3,6 +3,8 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
 import { NoticeFrame } from "../components/common/NoticeFrame";
+import { GuideButton, HomeButton } from "../components/common/AppHeader";
+import { BottomBar, BrandMark, TopBar } from "../components/common/FrameBar";
 import { BusyNotice, StatusNotice } from "../components/common/StatusNotice";
 import { useGame } from "../hooks/useGame";
 import { useVoiceChat } from "../hooks/useVoiceChat";
@@ -874,12 +876,7 @@ function GameContent() {
   const usesOverlaySidebar = shellMode !== "big";
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen;
   const isSmallShell = shellMode === "small";
-  const phaseTimelineHeaderClassName =
-    shellMode === "small" ? "py-1.5 bar-pad-both" : "py-1.5 bar-pad-left";
-  const phaseTimelineRightActionsClassName =
-    shellMode === "small" ? "" : "sm:-translate-x-2";
-  const actionBarPaddingClass =
-    shellMode === "small" ? "bar-pad-both" : "bar-pad-main";
+  const actionBarPaddingClass = shellMode === "big" ? "bar-pad-main" : undefined;
 
   const { addToast } = useToast();
   const buildReadyPendingRef = useRef(false);
@@ -1855,7 +1852,7 @@ function GameContent() {
     openUpgradesModal(undefined, "reveal", initialRevealIds);
   };
 
-  const renderActionButtons = (): ReactNode => {
+  const renderActionButtons = (): { left: ReactNode; right: ReactNode } | null => {
     if (isSpectator) {
       return null;
     }
@@ -2111,12 +2108,7 @@ function GameContent() {
 
     if (!left && !right) return null;
 
-    return (
-      <>
-        <div className="flex items-center gap-1.5 sm:gap-2">{left}</div>
-        <div className="flex items-center gap-1.5 sm:gap-2">{right}</div>
-      </>
-    );
+    return { left, right };
   };
 
   const handleCreateTreasure = () => {
@@ -2271,28 +2263,35 @@ function GameContent() {
         >
         {/* Header - Phase Timeline aligned to the center lane between left rail and right sidebar */}
         <div ref={phaseTimelineRef} className="relative">
-          <PhaseTimeline
-            currentPhase={timelinePhase}
-            stage={self_player.stage}
-            round={self_player.round}
-            nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
-            nextRound={isStageIncreasing ? 1 : self_player.round + 1}
-            inSuddenDeath={self_player.in_sudden_death}
-            suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
-            useUpgrades={gameState.use_upgrades}
-            headerClassName={phaseTimelineHeaderClassName}
-            rightActionsClassName={phaseTimelineRightActionsClassName}
-            onOpenRules={openRulesPanel}
-            hamburger={usesOverlaySidebar ? (
+          <TopBar
+            lead={
+              <>
+                <BrandMark className="hidden sm:block mr-2" />
+                <PhaseTimeline
+                  currentPhase={timelinePhase}
+                  stage={self_player.stage}
+                  round={self_player.round}
+                  nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
+                  nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+                  inSuddenDeath={self_player.in_sudden_death}
+                  suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
+                  useUpgrades={gameState.use_upgrades}
+                  onOpenRules={openRulesPanel}
+                  title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
+                />
+              </>
+            }
+            helpers={<GuideButton onClick={() => openRulesPanel()} className={isEndPhase ? "hidden sm:inline-block" : ""} />}
+            home={<HomeButton className={isEndPhase ? "" : "hidden sm:inline-block"} />}
+            account={usesOverlaySidebar ? (
               <button
                 onClick={() => setSidebarOpen((o) => !o)}
-                className="btn btn-secondary text-xs sm:text-sm"
+                className="btn btn-secondary btn-icon"
                 data-guide-target="sidebar-toggle"
               >
                 ☰
               </button>
             ) : undefined}
-            title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
           />
         </div>
 
@@ -2684,36 +2683,37 @@ function GameContent() {
           </div>
         )}
         {/* Bottom Action Bar */}
-        {!isSpectator && (
-          <div ref={actionBarRef} className="shrink-0 relative frame-chrome z-40">
-            <div
-              className={`h-[var(--frame-bar-height)] flex items-center justify-between gap-1.5 sm:gap-2 ${actionBarPaddingClass} timeline-actions`}
-              data-guide-target="phase-action-bar"
-            >
-              {isEndPhase && gameId && !displayBattleResolution ? (
+        {!isSpectator && (() => {
+          const endOfGame = isEndPhase && gameId && !displayBattleResolution;
+          const groups = endOfGame ? null : renderActionButtons();
+          return (
+            <BottomBar
+              ref={actionBarRef}
+              className="relative z-40"
+              padClassName={actionBarPaddingClass}
+              guideTarget="phase-action-bar"
+              secondary={endOfGame ? (
                 <>
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <button
-                      className="btn bg-slate-700 hover:bg-slate-600 text-white"
-                      onClick={() =>
-                        window.open(shareUrl, "_blank", "noopener,noreferrer")
-                      }
-                    >
-                      Review
-                    </button>
-                    <button
-                      className="btn bg-purple-600 hover:bg-purple-500 text-white"
-                      onClick={openShareModal}
-                    >
-                      Share Game
-                    </button>
-                  </div>
-                  <div />
+                  <button
+                    className="btn bg-slate-700 hover:bg-slate-600 text-white"
+                    onClick={() =>
+                      window.open(shareUrl, "_blank", "noopener,noreferrer")
+                    }
+                  >
+                    Review
+                  </button>
+                  <button
+                    className="btn bg-purple-600 hover:bg-purple-500 text-white"
+                    onClick={openShareModal}
+                  >
+                    Share Game
+                  </button>
                 </>
-              ) : renderActionButtons()}
-            </div>
-          </div>
-        )}
+              ) : groups?.left}
+              main={groups?.right}
+            />
+          );
+        })()}
         {!isSpectator && (
           <GameGuideLayer
             rootRef={guideRootRef}
