@@ -166,7 +166,10 @@ function dividerPositions(zoneCase: ZoneCase, layout: ContainerLayout): Partial<
   return positions;
 }
 
-/** Presses and releases each divider without moving it, the way useResizableLayout wires useZoneDividers. */
+/**
+ * Presses and releases each divider, once without moving it and once after
+ * moving it 1px and back, the way useResizableLayout wires useZoneDividers.
+ */
 function grabEachDivider(
   zoneCase: ZoneCase,
   rendered: ContainerLayout,
@@ -179,7 +182,6 @@ function grabEachDivider(
     useZoneDividers({
       containerHeight: rendered.containerSize.height,
       containerWidth: rendered.containerSize.width,
-      currentLayout: rendered.dims,
       layoutConfig: config,
       allowHorizontalResize: zoneCase.allowHorizontalResize,
       measureInitialConstraints: () =>
@@ -192,6 +194,7 @@ function grabEachDivider(
           sectionPadBottom: config.sectionPadBottom,
           sectionGap: config.sectionGap,
         }),
+      renderedConstraints: rendered.constraints,
       constraints: saved,
       onConstraintsChange: (constraints) => {
         writes.push(constraints);
@@ -203,12 +206,16 @@ function grabEachDivider(
   unmount();
 
   const moved: string[] = [];
-  for (const divider of DIVIDERS) {
+  const grabs = DIVIDERS.flatMap((divider) => [
+    { divider, deltas: [0] },
+    { divider, deltas: [1, -1] },
+  ]);
+  for (const { divider, deltas } of grabs) {
     const handle = callbacks[divider];
     if (!handle) continue;
     const before = writes.length;
     handle.onDragStart();
-    handle.onDrag(0);
+    for (const delta of deltas) handle.onDrag(delta);
     handle.onDragEnd();
     if (writes.length === before) continue;
     const after = layoutForContainer(board.width, board.height, { ...config, constraints: writes[writes.length - 1] });
@@ -221,7 +228,8 @@ function grabEachDivider(
       .filter((id) => config.zones[id].count > 0 && rendered.dims[id].width !== after.dims[id].width)
       .map((id) => `${id} cards ${rendered.dims[id].width}→${after.dims[id].width}px`);
     if (dividerMoves.length + cardChanges.length > 0) {
-      moved.push(`grabbing ${divider}: ${[...dividerMoves, ...cardChanges].join(", ")}`);
+      const grab = deltas.length > 1 ? `moving ${divider} and back` : `grabbing ${divider}`;
+      moved.push(`${grab}: ${[...dividerMoves, ...cardChanges].join(", ")}`);
     }
   }
   return moved;
