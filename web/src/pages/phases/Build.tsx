@@ -14,7 +14,7 @@ import { CardGrid } from "../../components/common/CardGrid";
 import { LayoutResetControl } from "../../components/common/LayoutResetControl";
 import { UpgradeGrid } from "../../components/common/UpgradeGrid";
 import { ZoneLayout } from "../../components/common/ZoneLayout";
-import { usePersistedConstraints, type BoardSize } from "../../hooks/usePersistedConstraints";
+import { useSavedLayout, type BoardSize } from "../../hooks/useSavedLayout";
 import { useResizableLayout } from "../../hooks/useResizableLayout";
 import { buildLayoutConfig } from "./phaseLayouts";
 
@@ -289,7 +289,7 @@ export function BuildPhase({
     setConstraints,
     clearConstraints,
     resolution: persistedLayout,
-  } = usePersistedConstraints(
+  } = useSavedLayout(
     {
       scopeKey: "phase:build",
       stage: self_player.stage,

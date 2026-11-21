@@ -1,16 +1,16 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { BoardSize, PersistedConstraintEntry } from "./usePersistedConstraints";
+import type { BoardSize, PersistedConstraintEntry } from "./useSavedLayout";
 import {
   boardSizeBand,
   resolveConstraintHistory,
   resetConstraintHistoryFrom,
   upsertConstraintHistoryEntry,
-  usePersistedConstraints,
-} from "./usePersistedConstraints";
+  useSavedLayout,
+} from "./useSavedLayout";
 
-describe("usePersistedConstraints helpers", () => {
+describe("useSavedLayout helpers", () => {
   it("resolves an exact constraint entry for the current stage and round", () => {
     const entries: PersistedConstraintEntry[] = [
       {
@@ -172,7 +172,7 @@ function createStorageMock() {
   };
 }
 
-describe("usePersistedConstraints", () => {
+describe("useSavedLayout", () => {
   const location = { scopeKey: "phase:build", stage: 4, round: 2 };
   const laptop: BoardSize = { width: 980, height: 712 };
   const desktop: BoardSize = { width: 1620, height: 992 };
@@ -188,7 +188,7 @@ describe("usePersistedConstraints", () => {
   });
 
   it("applies a saved layout only on boards in the band it was saved in", () => {
-    const { result, rerender } = renderHook(({ board }) => usePersistedConstraints(location, board), {
+    const { result, rerender } = renderHook(({ board }) => useSavedLayout(location, board), {
       initialProps: { board: laptop },
     });
     act(() => result.current.setConstraints({ topFraction: 0.3 }));
@@ -203,10 +203,10 @@ describe("usePersistedConstraints", () => {
   });
 
   it("inherits a layout from an earlier round only within its band", () => {
-    const { result } = renderHook(() => usePersistedConstraints({ ...location, round: 1 }, laptop));
+    const { result } = renderHook(() => useSavedLayout({ ...location, round: 1 }, laptop));
     act(() => result.current.setConstraints({ topFraction: 0.3 }));
 
-    const later = renderHook(({ board }) => usePersistedConstraints(location, board), {
+    const later = renderHook(({ board }) => useSavedLayout(location, board), {
       initialProps: { board: laptop },
     });
     expect(later.result.current.resolution.source).toBe("inherited");
@@ -222,12 +222,12 @@ describe("usePersistedConstraints", () => {
         entries: [{ stage: 4, round: 2, mode: "constraints", constraints: { topFraction: 0.3 } }],
       }),
     );
-    const { result } = renderHook(() => usePersistedConstraints(location, laptop));
+    const { result } = renderHook(() => useSavedLayout(location, laptop));
     expect(result.current.constraints).toBeNull();
   });
 
   it("uses the automatic layout until the board has been measured", () => {
-    const { result } = renderHook(() => usePersistedConstraints(location, null));
+    const { result } = renderHook(() => useSavedLayout(location, null));
     act(() => result.current.setConstraints({ topFraction: 0.3 }));
     expect(result.current.constraints).toBeNull();
     expect(localStorage.length).toBe(0);

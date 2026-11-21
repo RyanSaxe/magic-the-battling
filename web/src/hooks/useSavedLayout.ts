@@ -54,7 +54,7 @@ interface PersistedConstraintStore {
   bands: Record<string, PersistedConstraintEntry[]>;
 }
 
-export interface UsePersistedConstraintsResult {
+export interface UseSavedLayoutResult {
   constraints: ZoneConstraints | null;
   setConstraints: (c: ZoneConstraints) => void;
   clearConstraints: () => void;
@@ -168,10 +168,10 @@ export function resetConstraintHistoryFrom(
  * band. Until the board has been measured there is no band, and the layout
  * is the automatic one.
  */
-export function usePersistedConstraints(
+export function useSavedLayout(
   location: PersistedConstraintLocation | null,
   board: BoardSize | null,
-): UsePersistedConstraintsResult {
+): UseSavedLayoutResult {
   const [revision, bumpRevision] = useReducer((count: number) => count + 1, 0);
 
   const scopeKey = location?.scopeKey ?? null;
