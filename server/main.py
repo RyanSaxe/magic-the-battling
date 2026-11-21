@@ -218,6 +218,10 @@ if static_dir.exists():
     async def icon_512():
         return FileResponse(static_dir / "icon-512.png", media_type="image/png")
 
+    @app.get("/icon-512-maskable.png")
+    async def icon_512_maskable():
+        return FileResponse(static_dir / "icon-512-maskable.png", media_type="image/png")
+
     @app.get("/apple-touch-icon.png")
     async def apple_touch_icon():
         return FileResponse(static_dir / "apple-touch-icon.png", media_type="image/png")
