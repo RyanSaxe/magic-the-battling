@@ -17,5 +17,6 @@ export function getPlacementBadgeColor(position: number, total: number): { bg: s
 export function getPlayerPhaseStatusLabel(phase: Phase, buildReady: boolean): string {
   if (phase === "build" && buildReady) return "ready"
   if (phase === "reward") return "end"
+  if (phase === "battle") return "fight"
   return phase
 }

@@ -7,10 +7,8 @@ import { HintsBanner } from './HintsBanner'
  * Which screens center content that fits in the column. Elsewhere it starts at
  * the top, and content taller than the column always starts at the top and scrolls.
  * - always: every screen.
- * - except-short-wide: all but screens 640px or wider and 820px or shorter, which
- *   start at the top with 1rem of vertical padding.
- * - tall-wide: only screens 640px or wider and taller than 820px. Shorter wide
- *   screens start at the top with 1rem of vertical padding.
+ * - except-short-wide: all but screens 640px or wider and 820px or shorter.
+ * - tall-wide: only screens 640px or wider and taller than 820px.
  */
 export type PageFrameCenter = 'always' | 'except-short-wide' | 'tall-wide'
 
@@ -23,7 +21,7 @@ const CENTER_CLASS: Record<PageFrameCenter, string> = {
 interface PageFrameProps {
   header: ReactNode
   children: ReactNode
-  /** Padding and horizontal alignment of the scrolling content column. */
+  /** Horizontal padding and alignment of the scrolling content column, which has 1rem of vertical padding. */
   contentClassName?: string
   center?: PageFrameCenter
   hints?: boolean
@@ -45,7 +43,7 @@ export function PageFrame({
   footer,
 }: PageFrameProps) {
   const centerClass = center ? CENTER_CLASS[center] : ''
-  const scrollClass = scroll ? 'overflow-y-auto overflow-x-hidden overscroll-contain' : ''
+  const scrollClass = scroll ? 'overflow-y-auto overflow-x-hidden overscroll-contain py-4' : ''
   return (
     <div className="game-table h-dvh flex flex-col overflow-hidden">
       {header}

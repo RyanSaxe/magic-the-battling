@@ -636,7 +636,7 @@ export function Lobby() {
       <PageFrame
         header={header}
         center="tall-wide"
-        contentClassName="px-4 py-4 sm:items-center"
+        contentClassName="px-4 sm:items-center"
         hints
       >
         <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md overflow-visible sm:flex-none felt-raised-panel">

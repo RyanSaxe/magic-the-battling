@@ -16,7 +16,7 @@ export function AppHeader({ renderRight, ref, padClassName = 'bar-pad-both' }: A
         <div>
           <div className="flex items-baseline">
             <h1 className="hero-title text-[32px] font-bold tracking-wide leading-tight">
-              Crucible
+              Pitfight
             </h1>
             <span className="hero-sep mx-2.5">—</span>
             <span className="hero-subtitle text-base font-normal tracking-widest">
@@ -36,7 +36,7 @@ export function AppHeader({ renderRight, ref, padClassName = 'bar-pad-both' }: A
           <div className="min-w-0">
             <div className="flex items-baseline whitespace-nowrap">
               <h1 className="hero-title text-lg font-bold tracking-wide leading-tight shrink-0">
-                Crucible
+                Pitfight
               </h1>
               <span className="hero-sep ml-1 text-xs shrink-0">—</span>
               {/* The gap after the dash is padding, not margin, so truncating keeps the first letter's overhang. */}

@@ -124,7 +124,7 @@ def _build_og_html(
         ordinals = {1: "1st", 2: "2nd", 3: "3rd"}
         placement = f"{ordinals.get(owner.final_placement, f'{owner.final_placement}th')} Place - "
 
-    title = escape(f"{placement}{player_name}'s Game | Crucible", quote=True)
+    title = escape(f"{placement}{player_name}'s Game | Pitfight", quote=True)
     description = escape(f"Check out {player_name}'s game with {len(share_data.players)} players", quote=True)
     encoded_name = quote(player_name, safe="")
     share_url = escape(f"{base_url}/game/{game_id}/share/{encoded_name}", quote=True)

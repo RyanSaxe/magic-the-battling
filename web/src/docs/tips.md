@@ -5,7 +5,7 @@ order: 6
 
 ## Global
 
-- Track your economy. If a line wins a battle but burns multiple [treasures](doc:game-pieces#treasures), it might be better to lose.
+- Track your economy. If a line wins a fight but burns multiple [treasures](doc:game-pieces#treasures), it might be better to lose.
 - Keep your next stage in mind. A card that is mediocre now can be excellent when your hand size grows during [round wrap-up](doc:reward).
 - Look at your opponents' details in the [sidebar](doc:controls): [poison](doc:game-pieces#poison) totals, [treasure](doc:game-pieces#treasures) totals, known [upgrades](doc:game-pieces#upgrades), and recent cards cast.
 
@@ -27,7 +27,7 @@ order: 6
 ## Battle
 
 - Because [draws count as losses](doc:battle#magic rule modifications) for both players, be very mindful of just trading resources.
-- Using [treasures](doc:game-pieces#treasures) to win battles is much better in later stages than in early stages.
+- Using [treasures](doc:game-pieces#treasures) to win fights is much better in later stages than in early stages.
 - If you have a repeatable [treasure](doc:game-pieces#treasures) producer, try to keep it alive while exhausting your opponents resources.
 
 ## Reward

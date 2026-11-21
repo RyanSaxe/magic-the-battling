@@ -47,7 +47,8 @@ export function Home() {
         contentClassName="items-center px-4 pb-6"
       >
         <CardShowcase />
-        <p className="text-gray-400 text-sm mt-6">
+        {/* mt-10 rather than mt-6 offsets the column's top padding, so the showcase stays centered where it was. */}
+        <p className="text-gray-400 text-sm mt-10">
           <Link to="/login" className="text-amber-400 hover:text-amber-300">
             Log in
           </Link>

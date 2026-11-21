@@ -9,14 +9,7 @@ import { buildGuideDefinition } from "./content";
 import { useGuidePositioning, type SpotlightRect } from "./useGuidePositioning";
 import { GuideOverlay } from "./GuideOverlay";
 import { GuideTooltip } from "./GuideTooltip";
-
-type AnimPhase =
-  | "idle"
-  | "entering"
-  | "exit-tooltip"
-  | "morph-spot"
-  | "enter-tooltip"
-  | "exiting";
+import { planRequestTransition, type AnimPhase } from "./walkthroughPhase";
 
 const MORPH_EASING = "cubic-bezier(0.22,1,0.36,1)";
 
@@ -135,27 +128,39 @@ export function GuidedWalkthrough({
   }, [context.currentPhase, finishGuide, guide.phase]);
 
   useEffect(() => {
-    if (requestActive || !displayState) {
-      return;
-    }
+    const transition = planRequestTransition({
+      animPhase,
+      requestActive,
+      hasDisplayState: displayState !== null,
+      reducedMotion,
+    });
 
-    if (reducedMotion) {
+    if (transition === "idle") {
       queueMicrotask(() => {
         setAnimPhase("idle");
       });
       return;
     }
 
-    if (animPhase === "exiting") {
-      return;
+    if (transition === "exit") {
+      clearPhaseTimer();
+      const exitId = requestAnimationFrame(() => {
+        setPendingState(null);
+        setAnimPhase("exiting");
+      });
+      return () => cancelAnimationFrame(exitId);
     }
 
-    clearPhaseTimer();
-    const exitId = requestAnimationFrame(() => {
-      setPendingState(null);
-      setAnimPhase("exiting");
-    });
-    return () => cancelAnimationFrame(exitId);
+    if (transition === "restart") {
+      const restartId = requestAnimationFrame(() => {
+        clearPhaseTimer();
+        hasCommittedInitialLayoutRef.current = false;
+        setDisplayState(null);
+        setPendingState(null);
+        setAnimPhase("entering");
+      });
+      return () => cancelAnimationFrame(restartId);
+    }
   }, [animPhase, clearPhaseTimer, displayState, reducedMotion, requestActive]);
 
   useEffect(() => {
