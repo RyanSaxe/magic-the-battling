@@ -8,6 +8,7 @@ import {
 } from "../hooks/computeConstrainedLayout";
 import { computeBattleZones, useBattleCardSizes } from "../hooks/useBattleCardSizes";
 import { layoutForContainer, useCardLayout, type ContainerLayout } from "../hooks/useCardLayout";
+import { useLayoutDrag } from "../hooks/useLayoutDrag";
 import { measureFromPlacement } from "../hooks/useResizableLayout";
 import { useZoneDividers, type DividerCallbacks } from "../hooks/useZoneDividers";
 import { getUpgradeGridDims } from "../utils/upgradeGrid";
@@ -196,8 +197,13 @@ function grabEachDivider(
 ): string[] {
   const { config } = zoneCase;
   const writes: ZoneConstraints[] = [];
-  const { result } = renderHook(() =>
-    useZoneDividers({
+  const save = (constraints: ZoneConstraints) => {
+    writes.push(constraints);
+  };
+  // Composed the way useResizableLayout composes them.
+  const { result } = renderHook(() => {
+    const layout = useLayoutDrag(saved, save);
+    return useZoneDividers({
       containerHeight: rendered.containerSize.height,
       containerWidth: rendered.containerSize.width,
       layoutConfig: config,
@@ -213,15 +219,13 @@ function grabEachDivider(
           sectionGap: config.sectionGap,
         }),
       renderedConstraints: rendered.constraints,
-      constraints: saved,
-      onConstraintsChange: (constraints) => {
-        writes.push(constraints);
-      },
+      constraints: layout.constraints,
+      drag: layout.drag,
+      onConstraintsChange: save,
       onConstraintsClear: () => {},
-    }),
-  );
+    });
+  });
   const callbacks: DividerCallbacks = result.current;
-  releaseRenderedHooks();
 
   const moved: string[] = [];
   const grabs = DIVIDERS.flatMap((divider) => [
@@ -232,9 +236,11 @@ function grabEachDivider(
     const handle = callbacks[divider];
     if (!handle) continue;
     const before = writes.length;
-    handle.onDragStart();
-    for (const delta of deltas) handle.onDrag(delta);
-    handle.onDragEnd();
+    act(() => {
+      handle.onDragStart();
+      for (const delta of deltas) handle.onDrag(delta);
+      handle.onDragEnd();
+    });
     if (writes.length === before) continue;
     const after = layoutForContainer(board.width, board.height, { ...config, constraints: writes[writes.length - 1] });
     const positionsBefore = dividerPositions(zoneCase, rendered);
@@ -250,6 +256,7 @@ function grabEachDivider(
       moved.push(`${grab}: ${[...dividerMoves, ...cardChanges].join(", ")}`);
     }
   }
+  releaseRenderedHooks();
   return moved;
 }
 
