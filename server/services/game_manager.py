@@ -109,6 +109,8 @@ from server.services.session_manager import session_manager
 
 logger = logging.getLogger(__name__)
 
+HOST_HANDOFF_GRACE_SECONDS = 60.0
+
 
 def _current_task() -> asyncio.Task | None:
     try:
@@ -190,6 +192,7 @@ class PendingGame:
     battler_error: str | None = None
     player_user_ids: dict[str, str] = field(default_factory=dict)
     seat_token_hashes: dict[str, str] = field(default_factory=dict)
+    host_away_since: datetime | None = None
     _loading_task: asyncio.Task | None = field(default=None, repr=False)
 
     def has_player_named(self, name: str) -> bool:
@@ -233,6 +236,7 @@ class GameManager:
         self._join_code_to_game: dict[str, str] = {}
         self._cleanup_tasks: dict[str, asyncio.Task] = {}
         self._pending_disconnect_tasks: dict[str, asyncio.Task] = {}
+        self._host_handoff_tasks: dict[str, asyncio.Task] = {}
         self._spectate_requests: dict[str, PendingSpectateRequest] = {}
         self._dirty_games: set[str] = set()
         self._last_human_activity: dict[str, datetime] = {}
@@ -726,6 +730,10 @@ class GameManager:
         for task in list(self._pending_disconnect_tasks.values()):
             task.cancel()
         self._pending_disconnect_tasks.clear()
+
+        for task in list(self._host_handoff_tasks.values()):
+            task.cancel()
+        self._host_handoff_tasks.clear()
 
         game_ids = list(set(self._active_games.keys()) | set(self._pending_games.keys()))
         for game_id in game_ids:
@@ -1233,6 +1241,7 @@ class GameManager:
         self._pending_games.pop(game_id, None)
         self._clear_runtime_player_mappings_for_game(game_id)
 
+        self._cancel_host_handoff(game_id)
         cleanup_task = self._cleanup_tasks.pop(game_id, None)
         # The scheduled cleanup itself ends up here, and must not cancel itself mid-run.
         if cleanup_task is not None and cleanup_task is not _current_task():
@@ -1813,7 +1822,10 @@ class GameManager:
         self._player_id_to_name.pop(player_id, None)
 
         if not pending.player_ids:
+            self._cancel_host_handoff(game_id)
             del self._pending_games[game_id]
+        elif player_id == pending.host_player_id:
+            self._pass_host_after_removal(pending)
 
         return True
 
@@ -1848,6 +1860,76 @@ class GameManager:
     def cancel_pending_disconnect(self, game_id: str, player_id: str) -> None:
         key = f"{game_id}:{player_id}"
         if task := self._pending_disconnect_tasks.pop(key, None):
+            task.cancel()
+
+    # The lobby host is the one piece of lobby state that changes on its own. These methods are the only place
+    # host_player_id changes after creation: the creator hosts while present and for a grace period after
+    # leaving, then the role passes for good to the earliest-joined player who is connected.
+
+    def note_lobby_player_present(self, game_id: str, player_id: str) -> None:
+        pending = self._pending_games.get(game_id)
+        if pending is None or pending.is_started:
+            return
+        if player_id == pending.host_player_id:
+            pending.host_away_since = None
+            self._cancel_host_handoff(game_id)
+            return
+        away_since = pending.host_away_since
+        if away_since is not None and datetime.now(UTC) - away_since >= timedelta(seconds=HOST_HANDOFF_GRACE_SECONDS):
+            self._hand_off_host(pending)
+
+    def note_lobby_player_away(
+        self,
+        game_id: str,
+        player_id: str,
+        on_host_change: Callable[[], Coroutine[Any, Any, None]],
+    ) -> None:
+        pending = self._pending_games.get(game_id)
+        if pending is None or pending.is_started or player_id != pending.host_player_id:
+            return
+        pending.host_away_since = datetime.now(UTC)
+        self._cancel_host_handoff(game_id)
+
+        async def hand_off_after_grace() -> None:
+            await asyncio.sleep(HOST_HANDOFF_GRACE_SECONDS)
+            self._host_handoff_tasks.pop(game_id, None)
+            if pending.host_away_since is not None and self._hand_off_host(pending):
+                await on_host_change()
+
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        self._host_handoff_tasks[game_id] = loop.create_task(hand_off_after_grace())
+
+    def _hand_off_host(self, pending: PendingGame) -> bool:
+        connected = self._connected_player_ids(pending.game_id)
+        successor = next(
+            (pid for pid in pending.player_ids if pid in connected and pid != pending.host_player_id),
+            None,
+        )
+        if successor is None:
+            return False
+        pending.host_player_id = successor
+        pending.host_away_since = None
+        self._cancel_host_handoff(pending.game_id)
+        return True
+
+    def _pass_host_after_removal(self, pending: PendingGame) -> None:
+        connected = self._connected_player_ids(pending.game_id)
+        successor = next((pid for pid in pending.player_ids if pid in connected), None)
+        if successor is not None:
+            pending.host_player_id = successor
+            pending.host_away_since = None
+            self._cancel_host_handoff(pending.game_id)
+            return
+        # Nobody is here to take over: the next in line holds the role while away, and the first player to
+        # connect can take it at once, since the removed host has been gone longer than the grace period.
+        pending.host_player_id = pending.player_ids[0]
+        pending.host_away_since = datetime.now(UTC) - timedelta(seconds=HOST_HANDOFF_GRACE_SECONDS)
+
+    def _cancel_host_handoff(self, game_id: str) -> None:
+        if task := self._host_handoff_tasks.pop(game_id, None):
             task.cancel()
 
     def add_puppet(self, game_id: str, player_id: str) -> bool:
@@ -2045,6 +2127,7 @@ class GameManager:
         if not pending:
             return None
 
+        connected = self._connected_player_ids(game_id)
         players = []
         for i, name in enumerate(pending.player_names):
             player_id = pending.player_ids[i]
@@ -2055,6 +2138,7 @@ class GameManager:
                     name=name,
                     is_ready=pending.player_ready.get(player_id, False),
                     is_host=player_id == pending.host_player_id,
+                    is_connected=player_id in connected,
                     battler_id=player_battler.battler_id if player_battler else None,
                     battler_status=(
                         self._get_pending_player_battler_status(player_battler)

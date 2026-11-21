@@ -236,6 +236,7 @@ class LobbyPlayer(BaseModel):
     name: str
     is_ready: bool = False
     is_host: bool = False
+    is_connected: bool = False
     battler_id: str | None = None
     battler_status: BattlerLoadingStatus | None = None
     battler_error: str | None = None

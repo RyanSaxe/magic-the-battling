@@ -69,6 +69,8 @@ def _cleanup_game_manager(game_manager: GameManager) -> None:
         _cancel_task(task)
     for task in list(game_manager._pending_disconnect_tasks.values()):
         _cancel_task(task)
+    for task in list(game_manager._host_handoff_tasks.values()):
+        _cancel_task(task)
 
     game_manager._pending_games.clear()
     game_manager._active_games.clear()
@@ -77,6 +79,7 @@ def _cleanup_game_manager(game_manager: GameManager) -> None:
     game_manager._join_code_to_game.clear()
     game_manager._cleanup_tasks.clear()
     game_manager._pending_disconnect_tasks.clear()
+    game_manager._host_handoff_tasks.clear()
     game_manager._spectate_requests.clear()
     game_manager._dirty_games.clear()
     game_manager._last_human_activity.clear()

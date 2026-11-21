@@ -396,6 +396,11 @@ async def _handle_player_disconnect(game_id: str, player_id: str, websocket: Web
         player_id,
         on_removed=lambda: connection_manager.broadcast_lobby_state(game_id),
     )
+    game_manager.note_lobby_player_away(
+        game_id,
+        player_id,
+        on_host_change=lambda: connection_manager.broadcast_lobby_state(game_id),
+    )
     await connection_manager.broadcast_lobby_state(game_id)
 
 
@@ -452,6 +457,7 @@ async def _connect_player_to_game(websocket: WebSocket, game_id: str, session: S
     connected = await connection_manager.connect(game_id, player_id, websocket)
     if not connected:
         return None
+    game_manager.note_lobby_player_present(game_id, player_id)
     return pending, game
 
 
