@@ -108,6 +108,20 @@ dependency, so install the hook once per clone with `uvx pre-commit install`.
 CI runs the same checks, pytest with coverage, the web build and a load test on
 every pull request. CI does not run `npm test`, so run it yourself.
 
+When a pull request changes the server image (`server/`, `mtb/`, `scripts/`,
+`Dockerfile`, `fly*.toml`, `pyproject.toml` or `uv.lock`), CI also builds it
+and runs `scripts/check_image_boot.py`, which boots it without network access
+on an empty volume and on the games in `tests/fixtures/active_game_snapshots`.
+Run it yourself with:
+
+```sh
+docker build --tag mtb:boot-check . && python3 scripts/check_image_boot.py mtb:boot-check
+```
+
+Those games stand in for the ones in progress when a deploy restarts the
+server. If a change stops them restoring, keep the old snapshot format readable
+rather than regenerating the fixtures.
+
 ## Branches, deploys and releases
 
 Branch from `develop` and open pull requests into `develop`. Merging into

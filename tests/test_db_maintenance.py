@@ -1,7 +1,13 @@
+import json
 import sqlite3
+import subprocess
+import sys
 from pathlib import Path
 
 from server.db.maintenance import apply_db_maintenance, inspect_db_maintenance
+from server.db.snapshot_migration import backup_db
+
+MAINTAIN_DB_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "maintain_db.py"
 
 
 def _init_snapshot_tables(db_path: Path) -> None:
@@ -51,6 +57,14 @@ def _old_snapshot_json() -> str:
     )
 
 
+def _snapshot_rows(db_path: Path) -> tuple[list[tuple], list[tuple]]:
+    with sqlite3.connect(str(db_path)) as conn:
+        return (
+            conn.execute("SELECT * FROM active_game_snapshots ORDER BY game_id").fetchall(),
+            conn.execute("SELECT * FROM battle_snapshots ORDER BY id").fetchall(),
+        )
+
+
 def test_inspect_db_maintenance_reports_pending_changes(tmp_path):
     db_path = tmp_path / "snapshots.db"
     _init_snapshot_tables(db_path)
@@ -95,7 +109,7 @@ def test_apply_db_maintenance_creates_bak_and_rewrites_original_db(tmp_path):
             (_old_snapshot_json(),),
         )
 
-    original_before = db_path.read_bytes()
+    original_rows = _snapshot_rows(db_path)
     result = apply_db_maintenance(db_path)
 
     assert result.total_failed == 0
@@ -103,7 +117,9 @@ def test_apply_db_maintenance_creates_bak_and_rewrites_original_db(tmp_path):
     assert result.backup_path == db_path.with_suffix(".db.bak")
     assert result.backup_path is not None
     assert result.backup_path.exists()
-    assert result.backup_path.read_bytes() == original_before
+    assert _snapshot_rows(result.backup_path) == original_rows
+    with sqlite3.connect(str(result.backup_path)) as conn:
+        assert conn.execute("PRAGMA integrity_check").fetchone() == ("ok",)
 
     with sqlite3.connect(str(db_path)) as conn:
         state_json = conn.execute("SELECT state_json FROM active_game_snapshots WHERE game_id = 'g1'").fetchone()[0]
@@ -111,3 +127,48 @@ def test_apply_db_maintenance_creates_bak_and_rewrites_original_db(tmp_path):
 
     assert '"card_registry"' in state_json
     assert '"card_registry"' in full_state_json
+
+
+def test_inspect_db_maintenance_counts_a_current_snapshot_that_does_not_restore_as_failed(tmp_path):
+    db_path = tmp_path / "snapshots.db"
+    _init_snapshot_tables(db_path)
+    unrestorable = json.dumps({"data": {"players": "renamed-field"}, "card_registry": {}})
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute("INSERT INTO active_game_snapshots (game_id, state_json) VALUES (?, ?)", ("g1", unrestorable))
+
+    result = inspect_db_maintenance(db_path)
+
+    assert result.total_failed == 1
+    assert result.snapshot_storage.active_game_snapshots.already_current == 0
+
+
+def test_backup_copies_the_database_and_leaves_the_live_file_in_place(tmp_path):
+    db_path = tmp_path / "mtb.db"
+    writer = sqlite3.connect(str(db_path))
+    writer.execute("PRAGMA journal_mode=WAL")
+    writer.execute("CREATE TABLE users (id TEXT)")
+    writer.execute("INSERT INTO users VALUES ('u1')")
+    writer.commit()
+    live_inode = db_path.stat().st_ino
+
+    backup_path = backup_db(db_path)
+    writer.close()
+
+    assert db_path.stat().st_ino == live_inode
+    for path in (db_path, backup_path):
+        with sqlite3.connect(str(path)) as conn:
+            assert conn.execute("SELECT id FROM users").fetchall() == [("u1",)]
+
+
+def test_maintain_db_has_nothing_to_do_on_a_fresh_volume(tmp_path):
+    db_path = tmp_path / "mtb.db"
+
+    result = subprocess.run(
+        [sys.executable, str(MAINTAIN_DB_SCRIPT), "--apply", "--db-path", str(db_path)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert not db_path.exists()

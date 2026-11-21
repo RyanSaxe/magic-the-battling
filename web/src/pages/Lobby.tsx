@@ -11,6 +11,7 @@ import { MicToggle } from "../components/sidebar/MicToggle";
 import { useToast } from "../contexts";
 import { AppHeader } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
+import { SurfaceCard } from "../components/common/SurfaceCard";
 import { type AppError, getAppErrorMessage } from "../utils/appError";
 import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import {
@@ -211,7 +212,7 @@ function VoiceChatSwitch({
         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
           Voice
         </span>
-        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400">
+        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400 max-[389px]:hidden">
           Beta
         </span>
         <input
@@ -526,8 +527,8 @@ export function Lobby() {
   if (!session) {
     return (
       <>
-        <PageFrame header={header} center="except-short-wide" contentClassName="items-center">
-          <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
+        <PageFrame header={header} center contentClassName="items-center px-4">
+          <SurfaceCard>
             <h2 className="text-lg font-semibold text-amber-200">
               Unable to Reconnect
             </h2>
@@ -549,7 +550,7 @@ export function Lobby() {
                 Home
               </button>
             </div>
-          </div>
+          </SurfaceCard>
         </PageFrame>
         {showRulesPanel && (
           <RulesPanel
@@ -568,9 +569,9 @@ export function Lobby() {
   if (!lobbyState) {
     return (
       <>
-        <PageFrame header={header} center="except-short-wide" contentClassName="items-center">
+        <PageFrame header={header} center contentClassName="items-center px-4">
           {connectionError && !invalidSession ? (
-            <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
+            <SurfaceCard>
               <h2 className="text-lg font-semibold text-amber-200">
                 {connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Lobby Unavailable"}
               </h2>
@@ -595,7 +596,7 @@ export function Lobby() {
                   Home
                 </button>
               </div>
-            </div>
+            </SurfaceCard>
           ) : (
             <div className="modal-chrome border gold-border rounded-lg px-5 py-3 flex items-center gap-3">
               <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
@@ -635,11 +636,11 @@ export function Lobby() {
       )}
       <PageFrame
         header={header}
-        center="tall-wide"
-        contentClassName="px-4 sm:items-center"
+        center
+        contentClassName="px-4"
         hints
       >
-        <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md overflow-visible sm:flex-none felt-raised-panel">
+        <SurfaceCard className="overflow-visible">
           {lobbyState &&
             (() => {
               const isHost = currentPlayer?.is_host ?? false;
@@ -1014,7 +1015,7 @@ export function Lobby() {
             </div>
 
             <div className="space-y-3 mb-3">
-              <div className="flex items-center justify-between rounded-md border border-black/40 bg-black/40 px-2 py-1">
+              <div className="flex items-center justify-between gap-2 rounded-md border border-black/40 bg-black/40 px-2 py-1">
                 <GuidedModeSwitch
                   enabled={isGuidedMode}
                   setEnabled={handleGuidedModeToggle}
@@ -1084,7 +1085,7 @@ export function Lobby() {
                 </>
               );
             })()}
-        </div>
+        </SurfaceCard>
       </PageFrame>
       {showRulesPanel && (
         <RulesPanel

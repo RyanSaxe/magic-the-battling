@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/authState'
 import { useSession } from '../../hooks/useSession'
 import { unknownToAppError } from '../../utils/appError'
 import { rememberPlayerForGame } from '../../utils/deviceIdentity'
+import { SurfaceCard } from '../common/SurfaceCard'
 
 interface JoinGameModalProps {
   onClose: () => void
@@ -61,10 +62,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
-      <div
-        className="relative modal-chrome border gold-border rounded-lg p-5 w-full max-w-sm felt-raised-panel"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <SurfaceCard className="relative" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
           <h2 className="text-white font-semibold">Join Game</h2>
           <button
@@ -121,7 +119,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
             </button>
           </div>
         </div>
-      </div>
+      </SurfaceCard>
     </div>
   )
 }

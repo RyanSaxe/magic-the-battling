@@ -64,13 +64,14 @@ def _print_result(db_path: Path, result, *, mode: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     db_path = _resolve_db_path(args.db_path)
-    if not db_path.exists():
-        print(f"error: database not found at {db_path}", file=sys.stderr)
-        return 1
-
     if args.backup_path and args.no_backup:
         print("error: --backup-path cannot be used with --no-backup", file=sys.stderr)
         return 1
+
+    if not db_path.exists():
+        # A fresh volume has no database yet; the server creates it in the current format.
+        print(f"no database at {db_path}; nothing to maintain")
+        return 0
 
     if args.apply:
         result = apply_db_maintenance(
