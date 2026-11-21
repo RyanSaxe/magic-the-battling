@@ -330,6 +330,26 @@ input:-webkit-autofill:focus {
   }
 }
 
+/* Read-only facts as plain text with gold middots between them. Each item's dot sits before it, and the list is
+   pulled left by one dot inside a clipped box, so a line that wraps never starts with a dot. */
+.detail-line {
+  overflow: hidden;
+}
+
+.detail-line > ul {
+  display: flex;
+  flex-wrap: wrap;
+  margin-left: -1.25em;
+}
+
+.detail-line li::before {
+  content: "·";
+  display: inline-block;
+  width: 1.25em;
+  text-align: center;
+  color: var(--brass-dot);
+}
+
 /* An item in a walnut menu or picker. Hover fills the whole item, including a submenu's indent. */
 .menu-item:hover:not(:disabled) {
   background-color: var(--stone);

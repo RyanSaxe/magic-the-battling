@@ -4,7 +4,7 @@ import type { GameSummary } from '../../types'
 import { cubeTitle, formatWhen, gameMeta, modeLabel, seatsLabel, upgradesLabel } from '../../utils/accountFormat'
 import { SurfaceCard } from '../common/SurfaceCard'
 import { PlacementTag } from '../common/Tag'
-import { Chip } from './CubeTile'
+import { DetailLine } from './Details'
 
 const MAX_HAND_CARDS = 7
 const HAND_OVERLAP_PX = 8
@@ -122,10 +122,7 @@ export function RecapCard({ game }: { game: GameSummary }) {
         </div>
       )}
       <div className="mt-auto flex items-center justify-between gap-2">
-        <div className="flex flex-wrap gap-1.5">
-          <Chip>{modeLabel(game.play_mode)}</Chip>
-          <Chip>{upgradesLabel(game.use_upgrades ?? true)}</Chip>
-        </div>
+        <DetailLine items={[modeLabel(game.play_mode), upgradesLabel(game.use_upgrades ?? true)]} />
         <span className="shrink-0 text-xs font-semibold text-amber-400">View Recap →</span>
       </div>
     </SurfaceCard>

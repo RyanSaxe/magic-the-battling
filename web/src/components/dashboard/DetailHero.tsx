@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { SurfaceCard } from '../common/SurfaceCard'
 import { CubeBadge, type CubeBadgeTone } from './CubeBadge'
-import { Chip } from './CubeTile'
+import { HeroDetails, type Detail } from './Details'
 import { PlayIcon } from './Section'
 import { LINK } from '../common/styles'
 
@@ -26,7 +26,7 @@ interface DetailHeroProps {
   title: string
   /** A line of text and HeroLinks, such as where the cube comes from. */
   links: ReactNode
-  chips?: string[]
+  details?: Detail[]
   /** The buttons before Play, such as Edit Preset or Follow. */
   actions: HeroAction[]
   play: { label: string; onClick: () => void }
@@ -36,7 +36,7 @@ interface DetailHeroProps {
 }
 
 /** The top of a saved preset's page or a cube's page: its art, name, links, settings, actions and record. */
-export function DetailHero({ imageUri, badge, title, links, chips, actions, play, stats, caption }: DetailHeroProps) {
+export function DetailHero({ imageUri, badge, title, links, details, actions, play, stats, caption }: DetailHeroProps) {
   return (
     <SurfaceCard as="section" layout="tile" aria-label={title} className="overflow-hidden">
       <div className="relative">
@@ -55,13 +55,7 @@ export function DetailHero({ imageUri, badge, title, links, chips, actions, play
             </CubeBadge>
             <h1 className="mt-2 font-['Cinzel',serif] text-2xl font-bold leading-tight text-amber-50 drop-shadow-md">{title}</h1>
             <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-amber-100/85">{links}</div>
-            {chips && chips.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {chips.map((chip) => (
-                  <Chip key={chip}>{chip}</Chip>
-                ))}
-              </div>
-            )}
+            {details && details.length > 0 && <HeroDetails details={details} className="mt-3" />}
           </div>
           <div className="flex shrink-0 flex-wrap gap-2 [&>*]:flex-1 md:[&>*]:flex-none">
             {actions.map((action, index) => (
