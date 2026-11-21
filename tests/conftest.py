@@ -80,7 +80,6 @@ def _cleanup_game_manager(game_manager: GameManager) -> None:
     game_manager._spectate_requests.clear()
     game_manager._dirty_games.clear()
     game_manager._last_human_activity.clear()
-    game_manager._connected_humans.clear()
     game_manager._action_locks.clear()
     game_manager._game_starts_in_flight = 0
     game_manager._game_start_waiters = 0
@@ -159,6 +158,7 @@ def _install_runtime_state(
     monitoring_module.game_manager = game_manager
 
     ws_module.connection_manager = connection_manager
+    game_manager.attach_connected_player_ids(connection_manager.get_connected_player_ids)
     games_module.connection_manager = connection_manager
     ops_module.connection_manager = connection_manager
     monitoring_module.connection_manager = connection_manager

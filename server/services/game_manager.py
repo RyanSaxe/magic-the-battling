@@ -3,7 +3,7 @@ import json
 import logging
 import random
 import secrets
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Collection, Coroutine
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -222,7 +222,8 @@ class GameManager:
         self._spectate_requests: dict[str, PendingSpectateRequest] = {}
         self._dirty_games: set[str] = set()
         self._last_human_activity: dict[str, datetime] = {}
-        self._connected_humans: dict[str, int] = {}
+        # The server attaches ConnectionManager's view; a manager used on its own (rules tests) has no sockets.
+        self._connected_player_ids: Callable[[str], Collection[str]] = lambda _game_id: ()
         self._snapshot_task: asyncio.Task | None = None
         self._action_locks: dict[str, asyncio.Lock] = {}
         self._game_start_slots = asyncio.Semaphore(MAX_GAME_STARTS_IN_FLIGHT)
@@ -244,12 +245,10 @@ class GameManager:
             if human_activity:
                 self._last_human_activity[game_id] = datetime.now(UTC)
 
-    def update_connected_humans(self, game_id: str, delta: int) -> None:
-        next_count = self._connected_humans.get(game_id, 0) + delta
-        if next_count <= 0:
-            self._connected_humans.pop(game_id, None)
-            return
-        self._connected_humans[game_id] = next_count
+    def attach_connected_player_ids(self, connected_player_ids: Callable[[str], Collection[str]]) -> None:
+        self._connected_player_ids = connected_player_ids
+
+    def note_human_activity(self, game_id: str) -> None:
         self._last_human_activity[game_id] = datetime.now(UTC)
 
     def loaded_games_count(self) -> int:
@@ -259,7 +258,7 @@ class GameManager:
         hot_cutoff = datetime.now(UTC) - timedelta(minutes=HOT_ACTION_WINDOW_MINUTES)
         hot = 0
         for game_id in self._active_games:
-            connected = self._connected_humans.get(game_id, 0) > 0
+            connected = bool(self._connected_player_ids(game_id))
             last_human = _utc_or_default(
                 self._last_human_activity.get(game_id),
                 datetime.min.replace(tzinfo=UTC),
@@ -560,7 +559,6 @@ class GameManager:
                 logger.warning("No human player mappings restored for game_id=%s", game_id)
             last_activity = cast(datetime | None, row.last_human_activity_at)
             self._last_human_activity[game_id] = _utc_or_default(last_activity, datetime.now(UTC))
-            self._connected_humans[game_id] = 0
             self._dirty_games.discard(game_id)
             logger.info("Restored active game from snapshot: game_id=%s", game_id)
             return True
@@ -589,7 +587,6 @@ class GameManager:
                     self.mark_game_dirty(snapshot_game_id, human_activity=False)
                 self._restore_human_player_mappings(session, snapshot_game_id, game)
                 self._last_human_activity[snapshot_game_id] = _utc_or_default(last_activity, datetime.now(UTC))
-                self._connected_humans[snapshot_game_id] = 0
                 restored += 1
             session.commit()
         finally:
@@ -674,7 +671,7 @@ class GameManager:
         cutoff = datetime.now(UTC) - timedelta(minutes=IDLE_EVICT_MINUTES)
         candidates: list[str] = []
         for game_id in self._active_games:
-            if self._connected_humans.get(game_id, 0) > 0:
+            if self._connected_player_ids(game_id):
                 continue
             last_human = _utc_or_default(
                 self._last_human_activity.get(game_id),
@@ -980,7 +977,6 @@ class GameManager:
         self._active_games[game_id] = game
         self._pending_games.pop(game_id, None)
         self._last_human_activity[game_id] = datetime.now(UTC)
-        self._connected_humans[game_id] = 0
         self.mark_game_dirty(game_id)
 
         return game
@@ -1086,7 +1082,6 @@ class GameManager:
                 self._active_games[game_id] = game
                 self._pending_games.pop(game_id, None)
                 self._last_human_activity[game_id] = datetime.now(UTC)
-                self._connected_humans[game_id] = 0
                 self.mark_game_dirty(game_id)
                 return game
         except GameStartQueueFullError:
@@ -1222,7 +1217,6 @@ class GameManager:
         # The scheduled cleanup itself ends up here, and must not cancel itself mid-run.
         if cleanup_task is not None and cleanup_task is not _current_task():
             cleanup_task.cancel()
-        self._connected_humans.pop(game_id, None)
         self._last_human_activity.pop(game_id, None)
         self._action_locks.pop(game_id, None)
         if not preserve_snapshot:

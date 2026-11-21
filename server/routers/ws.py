@@ -22,6 +22,8 @@ obs_logger = logging.getLogger(OBSERVABILITY_LOGGER_NAME)
 
 router = APIRouter()
 
+SEAT_MOVED_CLOSE_CODE = 4006
+
 ACTION_REQUIRED_PHASES: dict[str, str] = {
     "draft_swap": "draft",
     "draft_roll": "draft",
@@ -123,28 +125,29 @@ class ConnectionManager:
             return False
         game_manager.cancel_abandoned_cleanup(game_id)
         await websocket.accept()
+        previous = self._connections[game_id].get(player_id)
         self._connections[game_id][player_id] = websocket
         self._pending_connections[game_id].discard(player_id)
-        game_manager.update_connected_humans(game_id, +1)
+        game_manager.note_human_activity(game_id)
+        if previous is not None and previous is not websocket:
+            await _close_replaced_socket(previous)
         return True
 
-    def disconnect(self, game_id: str, player_id: str, websocket: WebSocket):
+    def disconnect(self, game_id: str, player_id: str, websocket: WebSocket) -> None:
         logger.debug("Disconnect called for game_id=%s, player_id=%s", game_id, player_id)
-        if game_id in self._connections:
-            was_tracked = self._connections[game_id].get(player_id) is websocket
-            if self._connections[game_id].get(player_id) is websocket:
-                self._connections[game_id].pop(player_id, None)
-                game_manager.update_connected_humans(game_id, -1)
-            remaining = len(self._connections[game_id])
-            logger.debug("Remaining connections for game_id=%s: %d", game_id, remaining)
-            if not self._connections[game_id]:
-                del self._connections[game_id]
-                logger.info("All players disconnected from game_id=%s, scheduling abandoned cleanup", game_id)
-                game_manager.schedule_abandoned_cleanup(game_id)
-            elif not was_tracked:
-                logger.debug("Disconnect ignored for stale socket game_id=%s player_id=%s", game_id, player_id)
         if game_id in self._pending_connections:
             self._pending_connections[game_id].discard(player_id)
+        players = self._connections.get(game_id)
+        if players is None or players.get(player_id) is not websocket:
+            logger.debug("Disconnect ignored for stale socket game_id=%s player_id=%s", game_id, player_id)
+            return
+        del players[player_id]
+        game_manager.note_human_activity(game_id)
+        logger.debug("Remaining connections for game_id=%s: %d", game_id, len(players))
+        if not players:
+            del self._connections[game_id]
+            logger.info("All players disconnected from game_id=%s, scheduling abandoned cleanup", game_id)
+            game_manager.schedule_abandoned_cleanup(game_id)
 
     def get_connected_player_ids(self, game_id: str) -> set[str]:
         return set(self._connections.get(game_id, {}).keys())
@@ -331,7 +334,16 @@ class ConnectionManager:
                         self.disconnect_spectator(game_id, target_player_id, websocket)
 
 
+async def _close_replaced_socket(websocket: WebSocket) -> None:
+    try:
+        await send_ws(websocket, {"type": "seat_moved", "payload": {}})
+        await websocket.close(code=SEAT_MOVED_CLOSE_CODE, reason="Seat opened elsewhere")
+    except Exception:
+        logger.debug("Replaced socket was already closed", exc_info=True)
+
+
 connection_manager = ConnectionManager()
+game_manager.attach_connected_player_ids(connection_manager.get_connected_player_ids)
 
 
 async def _handle_spectator_connection(
@@ -373,6 +385,9 @@ async def _handle_spectator_connection(
 
 async def _handle_player_disconnect(game_id: str, player_id: str, websocket: WebSocket) -> None:
     connection_manager.disconnect(game_id, player_id, websocket)
+    # A late close from a socket that a newer one replaced must not mark the still-connected player as gone.
+    if player_id in connection_manager.get_connected_player_ids(game_id):
+        return
     game_manager.schedule_pending_disconnect(
         game_id,
         player_id,
@@ -488,35 +503,40 @@ async def websocket_endpoint(
 
     try:
         await _send_initial_player_state(websocket, game_id, player_id, pending, game)
-
         while True:
             data = await websocket.receive_json()
-            action = str(data.get("action", ""))
-            action_start = perf_counter()
-            action_result = "ok"
-            try:
-                await handle_message(game_id, player_id, data, websocket)
-            except Exception:
-                action_result = "exception"
-                raise
-            finally:
-                duration_ms = (perf_counter() - action_start) * 1000
-                record_ws_action_latency(action, game_id, duration_ms)
-                obs_logger.info(
-                    "WS action latency: action=%s game_id=%s player_id=%s result=%s duration_ms=%.2f",
-                    action,
-                    game_id,
-                    player_id,
-                    action_result,
-                    duration_ms,
-                )
-
+            await _run_player_action(game_id, player_id, data, websocket)
     except WebSocketDisconnect:
-        await _handle_player_disconnect(game_id, player_id, websocket)
+        pass
     except RuntimeError as exc:
         if "WebSocket is not connected" not in str(exc):
             raise
+    finally:
         await _handle_player_disconnect(game_id, player_id, websocket)
+
+
+async def _run_player_action(game_id: str, player_id: str, data: dict, websocket: WebSocket) -> None:
+    action = str(data.get("action", ""))
+    action_start = perf_counter()
+    action_result = "ok"
+    try:
+        await handle_message(game_id, player_id, data, websocket)
+    except Exception:
+        # A bug in one action must not end the socket: the player keeps playing and can still rejoin.
+        action_result = "exception"
+        logger.exception("WS action failed: action=%s game_id=%s player_id=%s", action, game_id, player_id)
+        await connection_manager.send_error(websocket, "That action failed. Please try again.", ErrorCode.UNKNOWN)
+    finally:
+        duration_ms = (perf_counter() - action_start) * 1000
+        record_ws_action_latency(action, game_id, duration_ms)
+        obs_logger.info(
+            "WS action latency: action=%s game_id=%s player_id=%s result=%s duration_ms=%.2f",
+            action,
+            game_id,
+            player_id,
+            action_result,
+            duration_ms,
+        )
 
 
 def _validate_action_phase(action: str, player) -> str | None:
