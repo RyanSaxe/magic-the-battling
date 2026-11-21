@@ -67,6 +67,7 @@ def init_db():
         _migrate(conn, "player_game_history", "user_id", "TEXT")
         _migrate(conn, "player_game_history", "final_poison", "INTEGER")
         _migrate(conn, "player_game_history", "final_treasures", "INTEGER")
+        _migrate(conn, "battle_snapshots", "opponent_name", "TEXT")
 
     _backfill_game_cube_ids()
     _backfill_cube_metadata()
