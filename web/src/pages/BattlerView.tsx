@@ -103,8 +103,8 @@ export function BattlerView() {
             `Default Opponents: ${battler.puppet_count}`,
             `Open Spectating: ${battler.auto_approve_spectators ? 'On' : 'Off'}`,
           ]}
-          actions={[{ label: 'Edit Preset', onClick: () => setShowSettings(true) }]}
-          play={{ label: 'Play Preset', onClick: () => navigate(battlerPlayUrl(battler)) }}
+          actions={[{ label: 'Edit', onClick: () => setShowSettings(true) }]}
+          play={{ label: 'Play', onClick: () => navigate(battlerPlayUrl(battler)) }}
           stats={[
             { label: 'Your Games', value: battler.my_game_count },
             {
