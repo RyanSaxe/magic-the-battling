@@ -1117,37 +1117,39 @@ class GameManager:
         self.delete_snapshot(game_id)
         self._schedule_cleanup(game_id)
 
-    def _persist_player_placement(self, db: Session | None, game_id: str | None, name: str, placement: int) -> None:
+    def _persist_player_placement(self, db: Session | None, game_id: str | None, participant: Player | Puppet) -> None:
         if not db or not game_id:
             return
+        if self._write_final_state(db, game_id, participant):
+            db.commit()
+
+    def _persist_final_placements(self, db: Session, game_id: str, game: Game) -> None:
+        participants: list[Player | Puppet] = [p for p in game.players if p.placement > 0]
+        participants.extend(fp for fp in game.puppets if fp.placement > 0)
+
+        for participant in participants:
+            self._write_final_state(db, game_id, participant)
+        db.commit()
+
+    def _eliminate_dead_puppets(self, game: Game, game_id: str | None, db: Session | None) -> None:
+        for puppet in process_puppet_eliminations(game):
+            self._persist_player_placement(db, game_id, puppet)
+
+    def _write_final_state(self, db: Session, game_id: str, participant: Player | Puppet) -> bool:
         history = (
             db.query(PlayerGameHistory)
             .filter(
                 PlayerGameHistory.game_id == game_id,
-                PlayerGameHistory.player_name == name,
+                PlayerGameHistory.player_name == participant.name,
             )
             .first()
         )
         if history:
-            history.final_placement = placement  # ty: ignore[invalid-assignment]
-            db.commit()
-
-    def _persist_final_placements(self, db: Session, game_id: str, game: Game) -> None:
-        all_participants = [(p.name, p.placement) for p in game.players if p.placement > 0]
-        all_participants.extend((fp.name, fp.placement) for fp in game.puppets if fp.placement > 0)
-
-        for name, placement in all_participants:
-            history = (
-                db.query(PlayerGameHistory)
-                .filter(
-                    PlayerGameHistory.game_id == game_id,
-                    PlayerGameHistory.player_name == name,
-                )
-                .first()
-            )
-            if history:
-                history.final_placement = placement  # ty: ignore[invalid-assignment]
-        db.commit()
+            history.final_placement = participant.placement  # ty: ignore[invalid-assignment]
+            history.final_poison = participant.poison  # ty: ignore[invalid-assignment]
+            # Puppets replay builds from a past game, so they have no treasures of their own.
+            history.final_treasures = participant.treasures if isinstance(participant, Player) else None  # ty: ignore[invalid-assignment]
+        return history is not None
 
     def _schedule_cleanup(self, game_id: str, delay: float = 300.0) -> None:
         """Schedule async cleanup after delay seconds (default 5 min)."""
@@ -3077,11 +3079,11 @@ class GameManager:
                 poison_taken=poison_dealt,
             )
             eliminate_player(game, player, player.round, player.stage)
-            process_puppet_eliminations(game)
+            self._eliminate_dead_puppets(game, game_id, db)
             self.complete_game(game_id or "", None, db)
             return "game_over"
 
-        process_puppet_eliminations(game)
+        self._eliminate_dead_puppets(game, game_id, db)
         winner, is_game_over = check_game_over(game)
         if is_game_over and winner is not None:
             self._set_static_battle_resolution(
@@ -3284,7 +3286,7 @@ class GameManager:
             return self._check_sudden_death_ready(game, game_id, db)
 
         # All other paths: eliminate bots normally
-        process_puppet_eliminations(game)
+        self._eliminate_dead_puppets(game, game_id, db)
 
         if is_finale:
             # Player at lethal = eliminated
@@ -3791,7 +3793,7 @@ class GameManager:
             return self._check_sudden_death_ready(game, game_id, db)
 
         # Neither at lethal - both get rewards
-        process_puppet_eliminations(game)
+        self._eliminate_dead_puppets(game, game_id, db)
         self._set_pvp_battle_resolution(
             game,
             player,
@@ -3907,7 +3909,7 @@ class GameManager:
         opponent_at_lethal = opponent.poison >= game.config.poison_to_lose
 
         if is_finale:
-            process_puppet_eliminations(game)
+            self._eliminate_dead_puppets(game, game_id, db)
             return self._handle_pvp_finale(
                 game,
                 player,
@@ -3957,7 +3959,7 @@ class GameManager:
         loser = random.choice(bots)
         winner_puppet = bots[0] if loser is bots[1] else bots[1]
         eliminate_puppet(game, loser)
-        self._persist_player_placement(db, game_id, loser.name, loser.placement)
+        self._persist_player_placement(db, game_id, loser)
         winner_puppet.poison = game.config.poison_to_lose - 1
         winner, is_game_over = check_game_over(game)
         if is_game_over:
@@ -3973,12 +3975,12 @@ class GameManager:
         if not needs_sudden_death(game):
             for p in get_would_be_dead(game):
                 eliminate_player(game, p, p.round, p.stage)
-                self._persist_player_placement(db, game_id, p.name, p.placement)
+                self._persist_player_placement(db, game_id, p)
             for puppet in get_would_be_dead_puppets(game):
                 eliminate_puppet(game, puppet)
-                self._persist_player_placement(db, game_id, puppet.name, puppet.placement)
+                self._persist_player_placement(db, game_id, puppet)
 
-            process_puppet_eliminations(game)
+            self._eliminate_dead_puppets(game, game_id, db)
             winner, is_game_over = check_game_over(game)
             if is_game_over:
                 self.complete_game(game_id or "", winner, db)
@@ -3995,11 +3997,11 @@ class GameManager:
         for p in get_would_be_dead(game):
             if p.name not in fighter_names:
                 eliminate_player(game, p, p.round, p.stage)
-                self._persist_player_placement(db, game_id, p.name, p.placement)
+                self._persist_player_placement(db, game_id, p)
         for puppet in get_would_be_dead_puppets(game):
             if puppet.name not in fighter_names:
                 eliminate_puppet(game, puppet)
-                self._persist_player_placement(db, game_id, puppet.name, puppet.placement)
+                self._persist_player_placement(db, game_id, puppet)
 
         humans = [f for f in (f1, f2) if isinstance(f, Player)]
         puppets = [f for f in (f1, f2) if isinstance(f, Puppet)]
@@ -4072,7 +4074,7 @@ class GameManager:
         self._advance_puppet_if_needed(game, opponent_name)
 
         if not get_would_be_dead(game):
-            process_puppet_eliminations(game)
+            self._eliminate_dead_puppets(game, game_id, db)
         winner, is_game_over = check_game_over(game)
         if is_game_over:
             self.complete_game(game_id or "", winner, db)

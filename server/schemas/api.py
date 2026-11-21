@@ -354,6 +354,7 @@ class SharePlayerData(BaseModel):
     name: str
     final_placement: int | None
     final_poison: int
+    final_treasures: int | None = None
     is_puppet: bool
     snapshots: list[SharePlayerSnapshot]
 
