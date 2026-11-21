@@ -25,6 +25,7 @@ import type { LobbyState, PlayMode } from "../types";
 import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
 import { DIALOG_BACKDROP, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
 import { Dialog } from "../components/common/Dialog";
+import { DefaultOpponentsField } from "../components/dashboard/DefaultOpponentsField";
 
 type SoloPhase =
   | "idle"
@@ -780,25 +781,7 @@ export function Play() {
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
           />
-          <div className={`${OPTION_BOX} p-3`}>
-            <label className="block text-[var(--ivory-muted)] text-sm mb-2">
-              Opponents
-            </label>
-            <div className="flex gap-1.5">
-              {OPPONENT_OPTIONS.map((count) => (
-                <button
-                  key={count}
-                  onClick={() => setOpponents(count)}
-                  className={`px-3 py-1.5 rounded text-sm font-medium btn-dark-border transition-colors ${opponents === count
-                    ? "bg-amber-500 text-black"
-                    : "bg-black/40 text-[var(--ivory-muted)] hover:bg-black/30"
-                    }`}
-                >
-                  {count}
-                </button>
-              ))}
-            </div>
-          </div>
+          <DefaultOpponentsField label="Opponents" value={opponents} onChange={setOpponents} />
         </AdvancedOptionsModal>
       )}
 
@@ -872,10 +855,7 @@ function RecoveryOpponentPicker({
           <button
             key={n}
             onClick={() => setSelected(n)}
-            className={`px-4 py-2 rounded text-sm font-medium transition-colors ${selected === n
-              ? "bg-amber-500 text-black"
-              : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-              }`}
+            className={`btn ${selected === n ? "btn-primary" : "btn-secondary"} text-sm font-medium`}
           >
             {n}
           </button>

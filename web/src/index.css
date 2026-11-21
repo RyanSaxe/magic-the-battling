@@ -350,6 +350,33 @@ input:-webkit-autofill:focus {
   color: var(--brass-dot);
 }
 
+/* A segmented control: a recessed track whose chosen option is a raised walnut thumb, so it reads as clickable where
+   the flat read-only details don't. In the components layer so a caller's layout classes, such as xl:hidden, apply. */
+@layer components {
+  .segmented-track {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid rgba(212, 175, 55, 0.25);
+    border-radius: 6px;
+    background: #171210;
+  }
+
+  .segmented-option {
+    border-radius: 4px;
+    color: var(--ivory-key);
+  }
+
+  .segmented-option:hover {
+    color: var(--ivory);
+  }
+
+  .segmented-option[aria-checked="true"] {
+    background: var(--btn-secondary-fill);
+    color: var(--gold-pale);
+  }
+}
+
 /* An item in a walnut menu or picker. Hover fills the whole item, including a submenu's indent. */
 .menu-item:hover:not(:disabled) {
   background-color: var(--stone);
@@ -1206,10 +1233,12 @@ input:-webkit-autofill:focus {
 }
 
 /* Small buttons, such as the game actions on cards and in the sidebar, keep their own sizes by taking a colour class
-   without .btn, so the raise follows those colour classes too. */
+   without .btn, so the raise follows those colour classes too. A segmented control's chosen option takes the same
+   raise. */
 .btn,
 .btn-secondary,
-.btn-game {
+.btn-game,
+.segmented-option[aria-checked="true"] {
   box-shadow: inset 0 1px 0 var(--btn-raise-edge), 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
