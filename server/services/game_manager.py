@@ -113,6 +113,8 @@ from server.services.session_manager import session_manager
 logger = logging.getLogger(__name__)
 
 HOST_HANDOFF_GRACE_SECONDS = 60.0
+POST_GAME_CLEANUP_SECONDS = 300.0
+ABANDONED_CLEANUP_SECONDS = 86400.0
 FINISHED_PLAYER_PHASES = frozenset({"eliminated", "winner", "game_over"})
 
 
@@ -238,7 +240,8 @@ class GameManager:
         self._player_to_game: dict[str, str] = {}
         self._player_id_to_name: dict[str, str] = {}
         self._join_code_to_game: dict[str, str] = {}
-        self._cleanup_tasks: dict[str, asyncio.Task] = {}
+        self._post_game_cleanup_tasks: dict[str, asyncio.Task] = {}
+        self._abandoned_cleanup_tasks: dict[str, asyncio.Task] = {}
         self._pending_disconnect_tasks: dict[str, asyncio.Task] = {}
         self._host_handoff_tasks: dict[str, asyncio.Task] = {}
         self._spectate_requests: dict[str, PendingSpectateRequest] = {}
@@ -724,12 +727,13 @@ class GameManager:
         active_before = len(self._active_games)
         pending_before = len(self._pending_games)
         spectate_before = len(self._spectate_requests)
-        cleanup_before = len(self._cleanup_tasks)
+        cleanup_before = len(self._post_game_cleanup_tasks) + len(self._abandoned_cleanup_tasks)
         pending_disconnect_before = len(self._pending_disconnect_tasks)
 
-        for task in list(self._cleanup_tasks.values()):
-            task.cancel()
-        self._cleanup_tasks.clear()
+        for tasks in (self._post_game_cleanup_tasks, self._abandoned_cleanup_tasks):
+            for task in list(tasks.values()):
+                task.cancel()
+            tasks.clear()
 
         for task in list(self._pending_disconnect_tasks.values()):
             task.cancel()
@@ -1165,7 +1169,7 @@ class GameManager:
             self._persist_final_placements(db, game_id, game)
 
         self.delete_snapshot(game_id)
-        self._schedule_cleanup(game_id)
+        self._schedule_cleanup(self._post_game_cleanup_tasks, game_id, POST_GAME_CLEANUP_SECONDS)
 
     def _persist_player_placement(self, db: Session | None, game_id: str | None, participant: Player | Puppet) -> None:
         if not db or not game_id:
@@ -1201,10 +1205,9 @@ class GameManager:
             history.final_treasures = participant.treasures if isinstance(participant, Player) else None  # ty: ignore[invalid-assignment]
         return history is not None
 
-    def _schedule_cleanup(self, game_id: str, delay: float = 300.0) -> None:
-        """Schedule async cleanup after delay seconds (default 5 min)."""
-        if game_id in self._cleanup_tasks:
-            self._cleanup_tasks[game_id].cancel()
+    def _schedule_cleanup(self, tasks: dict[str, asyncio.Task], game_id: str, delay: float) -> None:
+        if existing := tasks.pop(game_id, None):
+            existing.cancel()
 
         async def cleanup_after_delay():
             await asyncio.sleep(delay)
@@ -1215,17 +1218,16 @@ class GameManager:
         except RuntimeError:
             return
 
-        task = loop.create_task(cleanup_after_delay())
-        self._cleanup_tasks[game_id] = task
+        tasks[game_id] = loop.create_task(cleanup_after_delay())
 
-    def schedule_abandoned_cleanup(self, game_id: str, delay: float = 86400.0) -> None:
+    def schedule_abandoned_cleanup(self, game_id: str, delay: float = ABANDONED_CLEANUP_SECONDS) -> None:
         """Schedule cleanup for abandoned game (default 24 hours)."""
         logger.info("Scheduling abandoned game cleanup for game_id=%s in %.0f seconds", game_id, delay)
-        self._schedule_cleanup(game_id, delay)
+        self._schedule_cleanup(self._abandoned_cleanup_tasks, game_id, delay)
 
     def cancel_abandoned_cleanup(self, game_id: str) -> None:
-        """Cancel scheduled cleanup when a player reconnects."""
-        if task := self._cleanup_tasks.pop(game_id, None):
+        """Cancel the abandoned-game cleanup when a player reconnects. A finished game's cleanup still runs."""
+        if task := self._abandoned_cleanup_tasks.pop(game_id, None):
             task.cancel()
             logger.info("Cancelled abandoned game cleanup for game_id=%s", game_id)
 
@@ -1246,10 +1248,14 @@ class GameManager:
         self._clear_runtime_player_mappings_for_game(game_id)
 
         self._cancel_host_handoff(game_id)
-        cleanup_task = self._cleanup_tasks.pop(game_id, None)
-        # The scheduled cleanup itself ends up here, and must not cancel itself mid-run.
-        if cleanup_task is not None and cleanup_task is not _current_task():
-            cleanup_task.cancel()
+        abandoned_cleanup = self._abandoned_cleanup_tasks.pop(game_id, None)
+        # Unloading only frees memory, so a finished game's post-game cleanup stays scheduled and still retires it.
+        post_game_cleanup = None if preserve_snapshot else self._post_game_cleanup_tasks.pop(game_id, None)
+        running = _current_task()
+        for cleanup_task in (abandoned_cleanup, post_game_cleanup):
+            # The scheduled cleanup itself ends up here, and must not cancel itself mid-run.
+            if cleanup_task is not None and cleanup_task is not running:
+                cleanup_task.cancel()
         self._last_human_activity.pop(game_id, None)
         self._action_locks.pop(game_id, None)
         if not preserve_snapshot:

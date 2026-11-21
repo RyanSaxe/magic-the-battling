@@ -65,7 +65,9 @@ def _cleanup_game_manager(game_manager: GameManager) -> None:
             _cancel_task(player_battler._loading_task)
             player_battler._loading_task = None
 
-    for task in list(game_manager._cleanup_tasks.values()):
+    for task in list(game_manager._post_game_cleanup_tasks.values()):
+        _cancel_task(task)
+    for task in list(game_manager._abandoned_cleanup_tasks.values()):
         _cancel_task(task)
     for task in list(game_manager._pending_disconnect_tasks.values()):
         _cancel_task(task)
@@ -77,7 +79,8 @@ def _cleanup_game_manager(game_manager: GameManager) -> None:
     game_manager._player_to_game.clear()
     game_manager._player_id_to_name.clear()
     game_manager._join_code_to_game.clear()
-    game_manager._cleanup_tasks.clear()
+    game_manager._post_game_cleanup_tasks.clear()
+    game_manager._abandoned_cleanup_tasks.clear()
     game_manager._pending_disconnect_tasks.clear()
     game_manager._host_handoff_tasks.clear()
     game_manager._spectate_requests.clear()
