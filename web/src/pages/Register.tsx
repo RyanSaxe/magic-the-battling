@@ -5,7 +5,7 @@ import { AppHeader, HomeButton } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { unknownToAppError } from '../utils/appError'
-import { LINK, TEXT_INPUT } from '../components/common/styles'
+import { FIELD_HINT, FIELD_LABEL, LINK, TEXT_INPUT } from '../components/common/styles'
 
 export function Register() {
   const navigate = useNavigate()
@@ -51,7 +51,7 @@ export function Register() {
         )}
 
         <div className="mb-4">
-          <label htmlFor="username" className="block text-[var(--ivory-muted)] text-sm mb-1">Username</label>
+          <label htmlFor="username" className={FIELD_LABEL}>Username</label>
           <input
             id="username"
             type="text"
@@ -65,11 +65,11 @@ export function Register() {
             pattern="[a-zA-Z0-9_]+"
             title="Letters, numbers, and underscores only"
           />
-          <p className="text-[var(--ivory-muted)] text-xs mt-1">3-30 characters: letters, numbers, underscores</p>
+          <p className={FIELD_HINT}>3-30 characters: letters, numbers, underscores</p>
         </div>
 
         <div className="mb-4">
-          <label htmlFor="email" className="block text-[var(--ivory-muted)] text-sm mb-1">Email</label>
+          <label htmlFor="email" className={FIELD_LABEL}>Email</label>
           <input
             id="email"
             type="email"
@@ -81,7 +81,7 @@ export function Register() {
         </div>
 
         <div className="mb-4">
-          <label htmlFor="password" className="block text-[var(--ivory-muted)] text-sm mb-1">Password</label>
+          <label htmlFor="password" className={FIELD_LABEL}>Password</label>
           <input
             id="password"
             type="password"
@@ -91,11 +91,11 @@ export function Register() {
             required
             minLength={8}
           />
-          <p className="text-[var(--ivory-muted)] text-xs mt-1">At least 8 characters</p>
+          <p className={FIELD_HINT}>At least 8 characters</p>
         </div>
 
         <div className="mb-6">
-          <label htmlFor="confirm-password" className="block text-[var(--ivory-muted)] text-sm mb-1">Confirm Password</label>
+          <label htmlFor="confirm-password" className={FIELD_LABEL}>Confirm Password</label>
           <input
             id="confirm-password"
             type="password"
