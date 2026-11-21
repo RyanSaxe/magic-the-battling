@@ -5,6 +5,7 @@ import type {
   GuidedGuideId,
   GuidedWalkthroughContext,
 } from "./types";
+import { textForInput } from "../utils/inputMode";
 
 const CONDITIONAL_GUIDE_PRIORITY: ConditionalGuideId[] = [
   "hint_treasure_producer",
@@ -300,7 +301,10 @@ function buildBattleGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
       mobileCardPlacement: "bottom-center",
       primaryActionLabel: "Next",
       content: {
-        summary: "Double click permanents to tap/untap them. Right click for a full option menu.",
+        summary: textForInput({
+          text: "Double click permanents to tap/untap them. Right click for a full option menu.",
+          touch: "Double-tap permanents to tap/untap them. Tap a card, then Actions, for a full option menu.",
+        }),
       },
     },
     {

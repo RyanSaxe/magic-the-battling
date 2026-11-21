@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { GAME_HINTS } from "../../constants/hints";
+import { textForInput } from "../../utils/inputMode";
 
 const CYCLE_INTERVAL = 8000;
 const FADE_OUT_DURATION = 280;
@@ -99,7 +100,7 @@ export function HintsBanner({ variant = "default" }: { variant?: HintsBannerVari
       <p
         className={`flex-1 text-center leading-tight ${tipTextClass} ${visible ? "hint-fade-in" : "hint-fade-out"}`}
       >
-        {GAME_HINTS[index]}
+        {textForInput(GAME_HINTS[index])}
       </p>
       <button
         onClick={next}

@@ -17,5 +17,12 @@ In the current game rules, the loot in this step does not change based on who wo
 
 ## Controls
 
+:::pointer
 - Click the button on the bottom right to continue to the [draft phase](doc:draft).
 - If you're playing with [upgrades](doc:game-pieces#upgrades), on the third and final round of the stage, you must select your upgrade before you can continue to the [draft phase](doc:draft).
+:::
+
+:::touch
+- Tap the button on the bottom right to continue to the [draft phase](doc:draft).
+- If you're playing with [upgrades](doc:game-pieces#upgrades), on the third and final round of the stage, you must select your upgrade before you can continue to the [draft phase](doc:draft).
+:::

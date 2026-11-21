@@ -30,8 +30,18 @@ The battle phase is where you play a quick mini-game of magic with a few modifie
 
 ## Controls
 
+:::pointer
 - You can drag and drop cards between any zones, including your opponent's zones in order to make casting cards like Reanimate easier to resolve.
 - Click "actions" on the bottom left to see what actions you can take.
   - If a card is selected, some extra actions will appear.
   - Right clicking on a card will also bring up the action options for that card.
 - Click "submit" on the bottom right when you know the result of the game to move onto the next phase.
+:::
+
+:::touch
+- Press and hold a card, then drag it to any zone, including your opponent's zones, to make cards like Reanimate easier to resolve.
+- Double-tap a card to tap or untap it.
+- Tap “Actions” at the bottom left to see what actions you can take.
+  - Tap a card first to add its own actions: Tap/Untap, Flip, Move To and more.
+- Tap “Submit Result” at the bottom right when you know the result of the game to move on to the next phase.
+:::
