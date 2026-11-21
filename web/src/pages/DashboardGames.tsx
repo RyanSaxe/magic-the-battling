@@ -23,7 +23,7 @@ interface LoadedGames {
   totalWins: number
 }
 
-/** Every finished game the player has played, newest first, searchable by cube, preset or opponent. */
+/** Every finished game the player has played, newest first, searchable by cube, preset, opponent or card. */
 export function DashboardGames() {
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
@@ -103,7 +103,8 @@ export function DashboardGames() {
             )}
           </div>
           <SearchBox
-            label="Search cubes, presets, opponents"
+            label="Search games"
+            placeholder="Cube, preset, player or card"
             value={searchText}
             onChange={setSearchText}
             className="w-full sm:w-72"

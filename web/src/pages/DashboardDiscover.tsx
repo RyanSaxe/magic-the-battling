@@ -153,7 +153,13 @@ export function DashboardDiscover() {
               </span>
             )}
           </div>
-          <SearchBox label="Search cube names and IDs" value={searchText} onChange={setSearchText} className="w-full sm:w-72" />
+          <SearchBox
+            label="Search cubes"
+            placeholder="Cube name or CubeCobra ID"
+            value={searchText}
+            onChange={setSearchText}
+            className="w-full sm:w-72"
+          />
         </div>
         {failed ? (
           <NoticeTile

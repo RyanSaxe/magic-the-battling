@@ -1,11 +1,14 @@
 /** A search field styled like the dashboard's join code box, with a button that clears it. */
 export function SearchBox({
   label,
+  placeholder,
   value,
   onChange,
   className,
 }: {
   label: string
+  /** What the field searches, shown while it is empty. */
+  placeholder: string
   value: string
   onChange: (value: string) => void
   className?: string
@@ -20,7 +23,7 @@ export function SearchBox({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         aria-label={label}
-        placeholder={label}
+        placeholder={placeholder}
         className="min-w-0 flex-1 bg-transparent text-sm text-white focus:outline-none [&::-webkit-search-cancel-button]:hidden"
       />
       {value && (

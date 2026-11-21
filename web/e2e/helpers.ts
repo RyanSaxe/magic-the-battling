@@ -250,13 +250,13 @@ export const PAGES: PageUnderTest[] = [
     name: 'games',
     path: '/dashboard/games',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search cubes, presets, opponents' }),
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search games' }),
   },
   {
     name: 'discover',
     path: '/dashboard/discover',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search cube names and IDs' }),
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search cubes' }),
   },
   {
     name: 'battler',
