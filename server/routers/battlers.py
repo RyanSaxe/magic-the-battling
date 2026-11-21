@@ -268,13 +268,28 @@ def _load_cube_metadata(db: Session, cube_id: str) -> CubeMetadata | None:
     return meta
 
 
+def _has_placed_seat(db: Session, player_user_id: str | None = None):
+    """Whether a human finished the game with a placement, or, given player_user_id, whether that player did."""
+    seat_filter = [
+        PlayerGameHistory.game_id == GameRecord.id,
+        PlayerGameHistory.is_puppet.is_(False),
+        PlayerGameHistory.final_placement.isnot(None),
+    ]
+    if player_user_id is not None:
+        seat_filter.append(PlayerGameHistory.user_id == player_user_id)
+    return db.query(PlayerGameHistory.id).filter(*seat_filter).correlate(GameRecord).exists()
+
+
 def _query_cube_games(
     db: Session,
     cube_id: str,
+    *,
     play_mode: str | None,
     use_upgrades: bool | None,
     offset: int,
+    player_user_id: str | None = None,
 ) -> dict:
+    """A page of a cube's finished games. With player_user_id, only that player's games, each shown by their seat."""
     base_filter = [
         GameRecord.cube_id == cube_id,
         GameRecord.ended_at.isnot(None),
@@ -284,17 +299,7 @@ def _query_cube_games(
     if use_upgrades is not None:
         base_filter.append(_game_uses_upgrades() == use_upgrades)
 
-    has_placed_human = (
-        db.query(PlayerGameHistory.id)
-        .filter(
-            PlayerGameHistory.game_id == GameRecord.id,
-            PlayerGameHistory.is_puppet.is_(False),
-            PlayerGameHistory.final_placement.isnot(None),
-        )
-        .correlate(GameRecord)
-        .exists()
-    )
-    query = db.query(GameRecord).filter(*base_filter, has_placed_human)
+    query = db.query(GameRecord).filter(*base_filter, _has_placed_seat(db, player_user_id))
 
     total_games = query.count()
 
@@ -311,6 +316,8 @@ def _query_cube_games(
         histories = db.query(PlayerGameHistory).filter(PlayerGameHistory.game_id == game.id).all()
         humans = [h for h in histories if not h.is_puppet]
         placed_humans = [h for h in humans if h.final_placement is not None]
+        if player_user_id is not None:
+            placed_humans = [h for h in placed_humans if h.user_id == player_user_id]
         if not placed_humans:
             continue
 
@@ -366,7 +373,7 @@ def list_cube_games(
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(_get_db),
 ):
-    return _query_cube_games(db, cube_id, play_mode, use_upgrades, offset)
+    return _query_cube_games(db, cube_id, play_mode=play_mode, use_upgrades=use_upgrades, offset=offset)
 
 
 @router.get("/{battler_id}/games")
@@ -375,6 +382,7 @@ def list_battler_games(
     *,
     play_mode: str | None = Query(default=None),
     use_upgrades: bool | None = Query(default=None),
+    mine_only: bool = Query(default=False),
     offset: int = Query(default=0, ge=0),
     user: User = Depends(get_current_user),
     db: Session = Depends(_get_db),
@@ -383,7 +391,15 @@ def list_battler_games(
     if not battler:
         raise api_error(404, ErrorCode.BATTLER_NOT_FOUND, "Battler not found")
 
-    return _query_cube_games(db, str(battler.cube_id), play_mode, use_upgrades, offset)
+    player_user_id = str(user.id) if mine_only else None
+    return _query_cube_games(
+        db,
+        str(battler.cube_id),
+        play_mode=play_mode,
+        use_upgrades=use_upgrades,
+        offset=offset,
+        player_user_id=player_user_id,
+    )
 
 
 @router.get("/my-games")

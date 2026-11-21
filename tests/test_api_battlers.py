@@ -195,3 +195,52 @@ class TestPresetStats:
         assert preset["my_game_count"] == 0
         assert updated["my_game_count"] == 1
         assert updated["cube_name"] == "Vintage Cube"
+
+
+class TestMyGamesFilter:
+    def test_mine_only_lists_just_your_games_shown_by_your_seat(self, client, vintage_cube, kestrel):
+        _add_game(
+            "shared",
+            cube_id="vintage",
+            played_on=_day(10),
+            seats=[Seat("rook", 1, hand=("rook-card",)), Seat("kestrel", 2, kestrel, hand=("kestrel-card",))],
+        )
+        _add_game("rooks-solo", cube_id="vintage", played_on=_day(11), seats=[Seat("rook", 1)])
+        _add_game(
+            "with-a-puppet",
+            cube_id="vintage",
+            played_on=_day(12),
+            seats=[Seat("kestrel", 1, kestrel), Seat("bot", 2, is_puppet=True)],
+        )
+        preset = _save_preset(client)
+
+        mine = client.get(f"/api/battlers/{preset['id']}/games", params={"mine_only": "true"}).json()
+        everyone = client.get(f"/api/battlers/{preset['id']}/games").json()
+
+        assert [(g["game_id"], g["best_human_name"], g["best_human_placement"]) for g in mine["games"]] == [
+            ("with-a-puppet", "kestrel", 1),
+            ("shared", "kestrel", 2),
+        ]
+        assert mine["games"][1]["hand_scryfall_ids"] == ["kestrel-card"]
+        assert mine["total_games"] == 2
+        assert [g["game_id"] for g in everyone["games"]] == ["with-a-puppet", "rooks-solo", "shared"]
+        assert everyone["games"][2]["best_human_name"] == "rook"
+
+    def test_mine_only_combines_with_the_mode_and_upgrades_filters(self, client, vintage_cube, kestrel):
+        _add_game("old-format", cube_id="vintage", config={}, played_on=_day(10), seats=[Seat("kestrel", 1, kestrel)])
+        _add_game(
+            "constructed",
+            cube_id="vintage",
+            config={"play_mode": "constructed", "use_upgrades": False},
+            played_on=_day(11),
+            seats=[Seat("kestrel", 1, kestrel)],
+        )
+        preset = _save_preset(client)
+
+        limited_with_upgrades = client.get(
+            f"/api/battlers/{preset['id']}/games",
+            params={"mine_only": "true", "play_mode": "limited", "use_upgrades": "true"},
+        ).json()
+
+        assert [g["game_id"] for g in limited_with_upgrades["games"]] == ["old-format"]
+        assert limited_with_upgrades["total_games"] == preset["my_game_count"] == 1
