@@ -4,6 +4,7 @@ import { DroppableZone } from '../../dnd'
 import type { ZoneName } from '../../types'
 import type { ZoneOwner } from '../../dnd/types'
 import { PANEL_GAP, PANEL_MAX_WIDTH, resolveBattlePanelLayout } from './DndPanelLayout'
+import { useGameShellMode } from '../../hooks/useGameShellMode'
 
 interface DndPanelProps {
   title: string
@@ -44,6 +45,8 @@ export function DndPanel({
   const [mobileHeight, setMobileHeight] = useState<number | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
   const isBattleTone = tone === 'battle'
+  // A battle panel covers the sidebar, which docks inside the frame only in the big shell.
+  const dockedSidebar = useGameShellMode() === 'big'
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -112,7 +115,7 @@ export function DndPanel({
 
   return (
     <div
-      className={`fixed top-0 left-0 right-0 sm:left-auto sm:!max-h-none sm:!h-full ${isBattleTone ? 'sm:w-[calc(16rem-1px)] battle-panel-chrome' : 'sm:w-64 modal-chrome border-b sm:border-b-0 sm:border-l-2 gold-border'} z-50 flex flex-col${mobileHeight == null ? ' max-h-[50vh]' : ''}`}
+      className={`fixed top-0 left-0 right-0 sm:left-auto sm:!max-h-none sm:!h-full ${isBattleTone ? `${dockedSidebar ? 'sm:w-[var(--frame-dock-width)]' : 'sm:w-[calc(16rem-1px)]'} battle-panel-chrome` : 'sm:w-64 modal-chrome border-b sm:border-b-0 sm:border-l-2 gold-border'} z-50 flex flex-col${mobileHeight == null ? ' max-h-[50vh]' : ''}`}
       style={mobileHeight != null ? { height: mobileHeight } : undefined}
     >
       <div className={`px-2 py-1.5 sm:px-3 sm:py-[10px] flex justify-between items-center shrink-0 ${isBattleTone ? 'dnd-panel-header-battle' : 'border-b sm:border-b-2 gold-border'}`}>

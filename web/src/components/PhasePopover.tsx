@@ -56,7 +56,8 @@ export function PhasePopover({
     const rect = el.getBoundingClientRect()
     const vw = window.innerWidth
     const vh = window.innerHeight
-    const pad = 8
+    // Keeps clear of the felt's gold edge, which the bars' padding lines up with.
+    const pad = parseFloat(getComputedStyle(el).getPropertyValue('--bar-inline')) + 8
 
     let top = anchorRect.bottom + 8
     let left = anchorRect.left + anchorRect.width / 2 - rect.width / 2
