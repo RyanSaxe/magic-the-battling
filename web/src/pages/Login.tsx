@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
-import { AppHeader } from '../components/common/AppHeader'
+import { AppHeader, HomeButton } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { unknownToAppError } from '../utils/appError'
@@ -32,16 +32,9 @@ export function Login() {
 
   return (
     <PageFrame
-      header={<AppHeader renderRight={({ compact }) => (
-        <button
-          onClick={() => navigate('/')}
-          className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
-        >
-          Home
-        </button>
-      )} />}
+      header={<AppHeader home={<HomeButton />} />}
       center
-      contentClassName="items-center px-4"
+      contentClassName="items-center"
     >
       <SurfaceCard as="form" onSubmit={handleSubmit}>
         <h2 className="text-xl font-bold text-white mb-5">Log In</h2>
@@ -57,7 +50,7 @@ export function Login() {
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
             autoFocus
             required
           />
@@ -70,7 +63,7 @@ export function Login() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
             required
           />
         </div>

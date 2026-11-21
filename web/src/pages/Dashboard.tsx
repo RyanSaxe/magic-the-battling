@@ -156,7 +156,7 @@ export function Dashboard() {
 
   return (
     <>
-      <DashboardFrame header={<AppHeader renderRight={({ compact }) => <UserMenuButton compact={compact} />} />}>
+      <DashboardFrame header={<AppHeader account={<UserMenuButton />} />}>
         {resumable && <ResumeBanner seat={resumable} />}
 
         <SurfaceCard

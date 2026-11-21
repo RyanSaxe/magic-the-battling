@@ -9,7 +9,7 @@ import { InfoIcon } from "../components/icons/InfoIcon";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { MicToggle } from "../components/sidebar/MicToggle";
 import { useToast } from "../contexts";
-import { AppHeader } from "../components/common/AppHeader";
+import { AppHeader, GuideButton, HomeButton } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
 import { BusyNotice } from "../components/common/StatusNotice";
 import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
@@ -505,25 +505,17 @@ export function Lobby() {
   };
 
   const header = (
-    <AppHeader renderRight={({ compact }) => (
-      <>
-        <button
-          onClick={() => navigate("/")}
-          className={`btn btn-secondary ${compact ? "py-1.5 px-3 text-sm" : "py-2 px-4"}`}
-        >
-          Home
-        </button>
-        <button
+    <AppHeader
+      helpers={
+        <GuideButton
           onClick={() => {
             setRulesPanelTarget(undefined);
             setShowRulesPanel(true);
           }}
-          className={`btn btn-secondary ${compact ? "py-1.5 px-3 text-sm" : "py-2 px-4"}`}
-        >
-          {compact ? "?" : "Guide"}
-        </button>
-      </>
-    )} />
+        />
+      }
+      home={<HomeButton />}
+    />
   );
 
   const rulesPanel = showRulesPanel && (
@@ -540,7 +532,7 @@ export function Lobby() {
   if (seat.kind !== "held") {
     return (
       <>
-        <PageFrame header={header} center contentClassName="items-center px-4">
+        <PageFrame header={header} center contentClassName="items-center">
           <LobbySeatNotice
             gameId={gameId}
             seat={seat}
@@ -557,7 +549,7 @@ export function Lobby() {
   if (!lobbyState) {
     return (
       <>
-        <PageFrame header={header} center contentClassName="items-center px-4">
+        <PageFrame header={header} center contentClassName="items-center">
           <BusyNotice label="Loading lobby..." />
         </PageFrame>
         {rulesPanel}
@@ -581,7 +573,6 @@ export function Lobby() {
       <PageFrame
         header={header}
         center
-        contentClassName="px-4"
         hints
       >
         <SurfaceCard className="overflow-visible">
@@ -749,7 +740,7 @@ export function Lobby() {
                             }}
                             placeholder={isConstructed ? "Enter deck list" : "CubeCobra cube ID"}
                             disabled={isBattlerLoading}
-                            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] disabled:opacity-50 disabled:cursor-not-allowed"
                           />
                         )}
                         <button
@@ -992,12 +983,8 @@ export function Lobby() {
                 <button
                   onClick={toggleReady}
                   disabled={readyActionDisabled}
-                  className={`btn btn-dark-border w-full py-2 disabled:cursor-not-allowed ${
-                    isReady
-                      ? "bg-gray-600 text-white hover:bg-gray-500"
-                      : readyActionDisabled
-                        ? "bg-gray-700 text-gray-400"
-                        : "bg-green-600 text-white hover:bg-green-500"
+                  className={`btn btn-dark-border w-full py-2 ${
+                    isReady ? "btn-secondary" : "btn-success"
                   }`}
                 >
                   {isReady ? "Unready" : "Ready"}

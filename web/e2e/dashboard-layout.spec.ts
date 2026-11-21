@@ -1,5 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
-import { PAGES, battler, openPage } from './helpers'
+import type { Locator, Page } from '@playwright/test'
+import { PAGES, battler, expect, openPage, test } from './helpers'
 
 const dashboard = PAGES.find((pageUnderTest) => pageUnderTest.name === 'dashboard')!
 

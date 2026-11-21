@@ -64,7 +64,7 @@ export function BattlerView() {
 
   if (authLoading || !user || loadingData || !battler) {
     return (
-      <PageFrame header={<HomeHeader />} center contentClassName="items-center">
+      <PageFrame header={<HomeHeader newGame />} center contentClassName="items-center">
         <p className="text-amber-200/70">Loading...</p>
       </PageFrame>
     )
@@ -75,7 +75,7 @@ export function BattlerView() {
 
   return (
     <>
-      <DashboardFrame>
+      <DashboardFrame header={<HomeHeader newGame />}>
         <Breadcrumb to="/dashboard" label="Cubes & Decks" current={title} />
         <DetailHero
           imageUri={battler.cube_image_uri}
@@ -195,7 +195,7 @@ function SettingsModal({
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
               placeholder={battler.cube_id}
             />
           </div>
@@ -205,7 +205,7 @@ function SettingsModal({
               type="checkbox"
               checked={playMode === 'constructed'}
               onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
-              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+              className="w-4 h-4 rounded bg-black/40 border-black/40"
             />
             <span className="text-white text-sm">Constructed</span>
             <span className="text-amber-200/45 text-xs">— bring your own deck</span>
@@ -216,7 +216,7 @@ function SettingsModal({
               type="checkbox"
               checked={useUpgrades}
               onChange={(e) => setUseUpgrades(e.target.checked)}
-              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+              className="w-4 h-4 rounded bg-black/40 border-black/40"
             />
             <span className="text-white text-sm">Upgrades</span>
           </label>
@@ -236,7 +236,7 @@ function SettingsModal({
             onClick={() => {
               if (window.confirm(`Delete "${battler.display_name || battler.cube_id}"?`)) onDelete()
             }}
-            className="btn btn-secondary py-2 px-4 text-red-400 hover:text-red-300"
+            className="btn btn-secondary btn-destructive py-2 px-4"
           >
             Delete
           </button>
