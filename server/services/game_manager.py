@@ -1277,7 +1277,7 @@ class GameManager:
         self._action_locks.pop(game_id, None)
         if not preserve_snapshot:
             self.delete_snapshot(game_id)
-        self._close_game_record(game_id)
+            self._close_game_record(game_id)
 
     def _load_battler(self, cube_id: str, use_upgrades: bool, use_vanguards: bool, play_mode: PlayMode) -> Battler:
         upgrades_id = DEFAULT_UPGRADES_ID if use_upgrades else None
