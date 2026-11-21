@@ -191,7 +191,7 @@ function CubeIdInput({
         type="text"
         value={cubeId}
         onChange={(e) => setCubeId(e.target.value)}
-        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500"
+        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
         placeholder="auto"
       />
     </div>
@@ -211,7 +211,7 @@ function UpgradesCheckbox({
         type="checkbox"
         checked={useUpgrades}
         onChange={(e) => setUseUpgrades(e.target.checked)}
-        className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+        className="w-4 h-4 rounded bg-black/40 border-black/40"
       />
       <span className="text-white text-sm">Upgrades</span>
       <span className="text-gray-500 text-xs">
@@ -235,7 +235,7 @@ function ConstructedCheckbox({
         type="checkbox"
         checked={isConstructed}
         onChange={(e) => setPlayMode(e.target.checked ? "constructed" : "limited")}
-        className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+        className="w-4 h-4 rounded bg-black/40 border-black/40"
       />
       <span className="text-white text-sm">Constructed</span>
       <span className="text-gray-500 text-xs">
@@ -651,7 +651,7 @@ export function Play() {
                     }
                     disabled={nameLoading}
                     placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-                    className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50"
+                    className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] disabled:opacity-50"
                   />
                 )}
                 <GuidedModeField enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
@@ -774,7 +774,7 @@ export function Play() {
               type="checkbox"
               checked={autoApproveSpectators}
               onChange={(e) => setAutoApproveSpectators(e.target.checked)}
-              className="w-4 h-4 rounded bg-black/40 border-black/40 text-amber-500 focus:ring-amber-500"
+              className="w-4 h-4 rounded bg-black/40 border-black/40"
             />
             <span className="text-white text-sm">Open Spectating</span>
             <span className="text-gray-500 text-xs">— let anyone watch</span>

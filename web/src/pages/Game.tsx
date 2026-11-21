@@ -520,7 +520,7 @@ function PlayerSelectionModal({
                 type="text"
                 value={spectatorName}
                 onChange={(e) => setSpectatorName(e.target.value)}
-                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
                 placeholder="Enter your name"
               />
             </div>
@@ -1898,13 +1898,13 @@ function GameContent() {
               self_player.treasures <= 0 ||
               (self_player.current_pack?.length ?? 0) === 0
             }
-            className="btn bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-game"
             data-guide-target="draft-roll"
           >
             Roll for 1💰
           </button>
           {self_player.upgrades.length > 0 && (
-            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn btn-secondary">
               View Upgrades
             </button>
           )}
@@ -1926,13 +1926,13 @@ function GameContent() {
           hasPendingBuildUpgrades ? (
             <button
               onClick={() => openUpgradesModal(undefined, 'auto')}
-              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              className="btn btn-game btn-pending"
               data-guide-target="build-apply-upgrade"
             >
               Apply Upgrade
             </button>
           ) : (
-            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn bg-gray-600 hover:bg-gray-500 text-white">
+            <button onClick={() => openUpgradesModal(undefined, 'view')} className="btn btn-secondary">
               View Upgrades
             </button>
           )
@@ -1942,7 +1942,7 @@ function GameContent() {
             <span className="text-amber-400 text-sm">Waiting...</span>
             <button
               onClick={actions.buildUnready}
-              className="btn bg-gray-600 hover:bg-gray-500 text-white"
+              className="btn btn-secondary"
             >
               Change
             </button>
@@ -1953,7 +1953,7 @@ function GameContent() {
           hasPendingBuildUpgrades ? (
             <button
               onClick={() => openUpgradesModal(undefined, 'auto')}
-              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              className="btn btn-game btn-pending"
               data-guide-target="build-apply-upgrade"
             >
               Apply Upgrade
@@ -1961,7 +1961,7 @@ function GameContent() {
           ) : (
             <button
               onClick={() => openUpgradesModal(undefined, 'view')}
-              className="btn bg-gray-600 hover:bg-gray-500 text-white"
+              className="btn btn-secondary"
             >
               View Upgrades
             </button>
@@ -1983,12 +1983,12 @@ function GameContent() {
                   {
                     label: "Play",
                     onClick: () => handleBuildReadySubmit('play'),
-                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                    className: "btn btn-success text-sm py-1.5",
                   },
                   {
                     label: "Draw",
                     onClick: () => handleBuildReadySubmit('draw'),
-                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                    className: "btn btn-success text-sm py-1.5",
                   },
                 ]}
                 onClose={() => setShowSubmitHandPopover(false)}
@@ -2011,7 +2011,7 @@ function GameContent() {
           {hasUnrevealedBattleUpgrades && (
             <button
               onClick={() => openBattleRevealUpgradesModal()}
-              className="btn bg-purple-600 hover:bg-purple-500 text-white"
+              className="btn btn-game btn-pending"
               data-guide-target="battle-reveal-upgrade"
             >
               Reveal Upgrade
@@ -2042,7 +2042,7 @@ function GameContent() {
             </span>
             <button
               onClick={() => setIsChangingResult(true)}
-              className="btn bg-gray-600 hover:bg-gray-500 text-white"
+              className="btn btn-secondary"
             >
               Change
             </button>
@@ -2054,7 +2054,7 @@ function GameContent() {
             {isChangingResult && (
               <button
                 onClick={() => { setIsChangingResult(false); setShowSubmitResultPopover(false); }}
-                className="text-gray-400 text-sm hover:text-white"
+                className="btn btn-secondary"
               >
                 Cancel
               </button>
@@ -2074,14 +2074,14 @@ function GameContent() {
                     onClick: () => {
                       handleBattleResultSubmit(self_player.name);
                     },
-                    className: "btn bg-green-600 hover:bg-green-500 text-white text-sm py-1.5",
+                    className: "btn btn-success text-sm py-1.5",
                   },
                   {
                     label: "Draw",
                     onClick: () => {
                       handleBattleResultSubmit("draw");
                     },
-                    className: "btn btn-danger text-sm py-1.5",
+                    className: "btn btn-secondary text-sm py-1.5",
                   },
                   {
                     label: "I Lost",
@@ -2709,7 +2709,7 @@ function GameContent() {
               secondary={endOfGame ? (
                 <>
                   <button
-                    className="btn bg-slate-700 hover:bg-slate-600 text-white"
+                    className="btn btn-secondary"
                     onClick={() =>
                       window.open(shareUrl, "_blank", "noopener,noreferrer")
                     }
@@ -2717,7 +2717,7 @@ function GameContent() {
                     Review
                   </button>
                   <button
-                    className="btn bg-purple-600 hover:bg-purple-500 text-white"
+                    className="btn btn-secondary"
                     onClick={openShareModal}
                   >
                     Share Game
