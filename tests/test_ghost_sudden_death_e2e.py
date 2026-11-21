@@ -123,7 +123,7 @@ def start_battle_between(
     Returns None for bot-vs-bot (auto-resolved), Battle object otherwise.
     """
     if isinstance(p1, Puppet) and isinstance(p2, Puppet):
-        battle.resolve_puppet_vs_puppet(p1, p2, stage, round_num)
+        battle.resolve_puppet_vs_puppet(p1, p2, stage, round_num, use_upgrades=game.config.use_upgrades)
         return None
 
     if isinstance(p1, Puppet):

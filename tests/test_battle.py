@@ -447,6 +447,20 @@ def test_end_battle_with_draw_returns_draw_result():
     assert bob.phase == "battle"
 
 
+def test_unpaired_puppets_deal_fibonacci_damage_without_upgrades(card_factory, monkeypatch):
+    game = create_game(["Alice"], num_players=1)
+    game.config.use_upgrades = False
+    stage_6_hand = [card_factory(f"c{i}") for i in range(6)]
+    bot1 = Puppet(name="Bot1", player_history_id=1, snapshots={"6_1": StaticOpponent(name="Bot1", hand=stage_6_hand)})
+    bot2 = Puppet(name="Bot2", player_history_id=2, snapshots={"6_1": StaticOpponent(name="Bot2", hand=stage_6_hand)})
+    game.puppets = [bot1, bot2]
+    monkeypatch.setattr(battle.random, "choices", lambda *_args, **_kwargs: ["bot1_wins"])
+
+    battle.resolve_unpaired_bot_battles(game, set(), 6, 1, game.config.num_rounds_per_stage)
+
+    assert bot2.poison == 3
+
+
 class TestPairingProbabilities:
     def test_get_pairing_probabilities_single_candidate(self):
         game = create_game(["Alice", "Bob"], num_players=2)

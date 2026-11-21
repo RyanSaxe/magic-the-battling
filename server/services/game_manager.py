@@ -2318,7 +2318,7 @@ class GameManager:
             return []
 
         if use_upgrades:
-            return reward.build_damage_events(attacker)
+            return reward.build_damage_events(attacker, use_upgrades=use_upgrades)
 
         return [BattleResolutionEvent(event_type="base_increment") for _ in range(damage)]
 
