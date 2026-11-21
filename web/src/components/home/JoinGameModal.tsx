@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { joinGame } from '../../api/client'
 import { useAuth } from '../../contexts/authState'
 import { unknownToAppError } from '../../utils/appError'
-import { findRememberedSeatByJoinCode, rememberPlayerForGame } from '../../utils/deviceIdentity'
-import { saveTabSession } from '../../utils/tabSession'
+import { joinLobbyByCode } from '../../utils/joinLobby'
 import { SurfaceCard } from '../common/SurfaceCard'
 
 interface JoinGameModalProps {
@@ -41,21 +39,11 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
       return
     }
 
-    // This browser already holds that seat: the lobby page takes it back with the seat token.
-    const heldSeat = findRememberedSeatByJoinCode(code)
-    if (heldSeat && heldSeat.name === name) {
-      navigate(`/game/${heldSeat.gameId}/lobby`)
-      return
-    }
-
     setLoading(true)
     setError('')
 
     try {
-      const response = await joinGame(code, name)
-      saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id })
-      rememberPlayerForGame(response.game_id, name, { seatToken: response.seat_token, joinCode: code.toUpperCase() })
-      navigate(`/game/${response.game_id}/lobby`)
+      navigate(await joinLobbyByCode(code, name))
     } catch (err) {
       setError(unknownToAppError(err, 'join-game', 'Failed to join game').message)
     } finally {
