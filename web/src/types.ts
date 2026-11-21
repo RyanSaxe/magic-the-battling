@@ -392,6 +392,16 @@ export interface ResumableGame {
   player_name: string
   kind: 'lobby' | 'game'
   last_active_at: string | null
+  cube_id: string
+  cube_name: string | null
+  cube_image_uri: string | null
+  play_mode: PlayMode
+  use_upgrades: boolean
+  player_count: number
+  /** A lobby has no stage, round or poison yet. */
+  stage: number | null
+  round: number | null
+  poison: number | null
 }
 
 export interface GameStatusResponse {
