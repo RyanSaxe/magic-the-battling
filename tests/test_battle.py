@@ -1,3 +1,8 @@
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 from conftest import setup_battle_ready
 
@@ -692,6 +697,33 @@ class TestViableCandidates:
         viable2 = battle.get_viable_candidates(alice, candidates)
 
         assert [c.name for c in viable1] == [c.name for c in viable2]
+
+    def test_get_viable_candidates_is_the_same_after_a_restart(self):
+        script = """
+from mtb.models.game import create_game
+from mtb.phases import battle
+
+game = create_game([f"P{i}" for i in range(8)], num_players=8)
+for player in game.players:
+    player.phase = "battle"
+player = game.players[0]
+viable = battle.get_viable_candidates(player, battle.get_all_pairing_candidates(game, player))
+print(sorted(c.name for c in viable))
+"""
+        repo_root = Path(__file__).resolve().parents[1]
+        samples = {
+            subprocess.run(
+                [sys.executable, "-c", script],
+                cwd=repo_root,
+                env={**os.environ, "PYTHONHASHSEED": hash_seed},
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout
+            for hash_seed in ("0", "1", "2")
+        }
+
+        assert len(samples) == 1
 
     def test_get_viable_candidates_changes_with_round(self):
         game = create_game(["Alice", "Bob", "Charlie", "Diana", "Eve"], num_players=5)

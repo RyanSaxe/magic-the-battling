@@ -218,7 +218,8 @@ def get_viable_candidates(player: Player, all_candidates: list[PairingCandidate]
     if len(all_candidates) <= 3:
         return all_candidates
 
-    seed = hash((player.name, player.round, player.stage))
+    # hash() of a str changes with every process, so the three shown in Build would change on restart.
+    seed = hashlib.sha256(f"{player.name}:{player.round}:{player.stage}".encode()).digest()
     rng = random.Random(seed)
     return rng.sample(all_candidates, 3)
 
