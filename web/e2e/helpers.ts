@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { Locator, Page, Route } from '@playwright/test'
+import { expect, test as base, type Locator, type Page, type Route } from '@playwright/test'
 import type {
   AuthUser,
   FollowedBattler,
@@ -12,6 +12,23 @@ import type {
 } from '../src/types'
 
 type MockResponse = { status?: number; json: unknown }
+
+const isLoopback = (ipAddress: string) => ipAddress.startsWith('127.') || ipAddress === '::1' || ipAddress === '[::1]'
+
+/** Fails a test when any response came from a server other than this machine, so the tests never depend on the network. */
+export const test = base.extend<{ stayOffline: void }>({
+  stayOffline: [async ({ page }, use) => {
+    const outsideResponses: Promise<string | null>[] = []
+    page.on('response', (response) => {
+      outsideResponses.push(response.serverAddr().then((address) => (address && !isLoopback(address.ipAddress) ? response.url() : null)))
+    })
+    await use()
+    const reachedNetwork = (await Promise.all(outsideResponses)).filter((url) => url !== null)
+    expect(reachedNetwork, 'responses from servers outside this machine').toEqual([])
+  }, { auto: true }],
+})
+
+export { expect }
 
 const SERVER_STATUS: MockResponse = {
   json: {
