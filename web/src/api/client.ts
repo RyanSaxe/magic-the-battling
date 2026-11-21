@@ -152,12 +152,16 @@ export async function startGame(gameId: string, sessionId: string): Promise<void
   }
 }
 
-export async function rejoinGame(gameId: string, playerName: string): Promise<JoinGameResponse> {
+export async function rejoinGame(
+  gameId: string,
+  playerName: string,
+  seatToken: string | null,
+): Promise<JoinGameResponse> {
   const response = await fetch(`${API_BASE}/games/${gameId}/rejoin`, {
     method: 'POST',
     headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
     credentials: 'include',
-    body: JSON.stringify({ player_name: playerName }),
+    body: JSON.stringify({ player_name: playerName, seat_token: seatToken }),
   })
   if (!response.ok) {
     await throwResponseError(response, 'rejoin-game', 'Failed to rejoin game')
