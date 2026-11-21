@@ -1,5 +1,5 @@
-import { expect, test, type Locator, type Page } from '@playwright/test'
-import { PAGES, openPage, swipeIntoView } from './helpers'
+import type { Locator, Page } from '@playwright/test'
+import { PAGES, expect, openPage, swipeIntoView, test } from './helpers'
 
 type Box = { x: number; y: number; width: number; height: number }
 

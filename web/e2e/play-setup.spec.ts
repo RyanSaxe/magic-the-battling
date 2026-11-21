@@ -1,5 +1,4 @@
-import { expect, test } from '@playwright/test'
-import { serveWithoutBackend, swipeIntoView } from './helpers'
+import { expect, serveWithoutBackend, swipeIntoView, test } from './helpers'
 
 test.beforeEach(async ({ page, baseURL }) => {
   await serveWithoutBackend(page, baseURL!)

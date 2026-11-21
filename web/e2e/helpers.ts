@@ -1,4 +1,6 @@
-import type { Locator, Page } from '@playwright/test'
+import { basename } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { expect, test as base, type Locator, type Page, type Route } from '@playwright/test'
 import type {
   AuthUser,
   FollowedBattler,
@@ -11,6 +13,23 @@ import type {
 import { gameBootstrap, type ScreenState } from './gameStates'
 
 type MockResponse = { status?: number; json: unknown }
+
+const isLoopback = (ipAddress: string) => ipAddress.startsWith('127.') || ipAddress === '::1' || ipAddress === '[::1]'
+
+/** Fails a test when any response came from a server other than this machine, so the tests never depend on the network. */
+export const test = base.extend<{ stayOffline: void }>({
+  stayOffline: [async ({ page }, use) => {
+    const outsideResponses: Promise<string | null>[] = []
+    page.on('response', (response) => {
+      outsideResponses.push(response.serverAddr().then((address) => (address && !isLoopback(address.ipAddress) ? response.url() : null)))
+    })
+    await use()
+    const reachedNetwork = (await Promise.all(outsideResponses)).filter((url) => url !== null)
+    expect(reachedNetwork, 'responses from servers outside this machine').toEqual([])
+  }, { auto: true }],
+})
+
+export { expect }
 
 const SERVER_STATUS: MockResponse = {
   json: {
@@ -157,14 +176,24 @@ const SHARE_GAME: ShareGameResponse = {
   })),
 }
 
-const GOOGLE_FONTS_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com']
+const FONT_FIXTURES = fileURLToPath(new URL('./fixtures/fonts/', import.meta.url))
+
+// The header's Cinzel title sets how much room its buttons have, so the tests serve the
+// Google Fonts stylesheet and font files the app loads from copies in fixtures/fonts.
+function serveGoogleFont(route: Route, url: URL) {
+  const headers = { 'Access-Control-Allow-Origin': '*' }
+  if (url.hostname === 'fonts.googleapis.com') {
+    return route.fulfill({ path: `${FONT_FIXTURES}cinzel.css`, contentType: 'text/css', headers })
+  }
+  return route.fulfill({ path: `${FONT_FIXTURES}${basename(url.pathname)}`, contentType: 'font/woff2', headers })
+}
 
 async function serveFromTable(page: Page, baseURL: string, responses: Record<string, MockResponse>) {
   const appOrigin = new URL(baseURL).origin
   await page.route('**/*', (route) => {
     const url = new URL(route.request().url())
-    // The header's Cinzel title sets how much room its buttons have, so its font is the one outside request let through.
-    if (url.origin !== appOrigin) return GOOGLE_FONTS_HOSTS.includes(url.hostname) ? route.continue() : route.abort()
+    if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') return serveGoogleFont(route, url)
+    if (url.origin !== appOrigin) return route.abort()
     if (!url.pathname.startsWith('/api/')) return route.continue()
     const response = responses[url.pathname]
     if (!response) return route.fulfill({ status: 404, json: { detail: 'Not mocked' } })
