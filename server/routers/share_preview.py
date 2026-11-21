@@ -86,6 +86,9 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
         share_data = build_share_data(db, game_id, player_name)
     except AppHTTPException:
         return None
+    # Mid-game the preview would show the sharer's last build without its hand, so previews wait for the game to end.
+    if share_data.in_progress:
+        return None
 
     # Share pages are public for finished games; this flag is bookkeeping for
     # "someone actively shared this game", not an authorization gate.
