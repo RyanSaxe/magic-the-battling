@@ -245,12 +245,23 @@ async function restoreSavedLayout(page: Page, screen: Screen) {
       entries: [{ stage: 4, round: 2, mode: 'constraints', constraints: saved }],
     }))
   }, { phase: screen.state.phase, saved: screen.saved ?? null })
-  await page.reload({ waitUntil: 'domcontentloaded' })
-  // The header's Cinzel title sets the header's height, and with it the board's.
-  await page.evaluate(() => document.fonts.load('16px Cinzel'))
-  const crashed = page.getByRole('heading', { name: 'Something went wrong' })
-  await expect(page.locator('main .card').first().or(crashed)).toBeVisible()
-  if (await crashed.isVisible()) throw new Error(`the game crashed: ${await page.locator('p').first().innerText()}`)
+  await reloadStyled(page)
+}
+
+/** Reloads the game and waits until it shows cards on a settled board. */
+async function reloadStyled(page: Page) {
+  // Under Playwright's request routing, WebKit now and then loads the page without applying its stylesheet,
+  // although the stylesheet's request succeeds; the board measured then is not the one players see.
+  for (let attempt = 1; ; attempt++) {
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    // The header's Cinzel title sets the header's height, and with it the board's.
+    await page.evaluate(() => document.fonts.load('16px Cinzel'))
+    const crashed = page.getByRole('heading', { name: 'Something went wrong' })
+    await expect(page.locator('main .card').first().or(crashed)).toBeVisible()
+    if (await crashed.isVisible()) throw new Error(`the game crashed: ${await page.locator('p').first().innerText()}`)
+    if (await page.evaluate(() => document.styleSheets.length > 0)) break
+    if (attempt === 3) throw new Error('the page loaded without its stylesheet three times')
+  }
   await waitForStableLayout(page)
 }
 
