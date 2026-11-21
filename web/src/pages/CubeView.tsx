@@ -32,7 +32,7 @@ export function CubeView() {
           <UserMenuButton compact={compact} />
         </div>
       )} />}
-      contentClassName="px-4 py-4"
+      contentClassName="px-4"
     >
       {cubeId && (
         <CubeGameHistory

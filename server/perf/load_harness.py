@@ -680,6 +680,7 @@ def rss_window_dict(values: list[float]) -> dict[str, float | int | None]:
 
 
 def choose_timeout_seconds(
+    *,
     single_game_seconds: float,
     concurrency: int,
     multiplier: float,
@@ -1334,6 +1335,7 @@ async def preload_idle_hot_games(
 
 
 def summarize_run(
+    *,
     label: str,
     cfg: HarnessConfig,
     games: int,
@@ -1557,6 +1559,7 @@ def build_report(
 
 
 async def run_sweep(
+    *,
     cfg: HarnessConfig,
     games: int,
     concurrency: int,
