@@ -1,0 +1,55 @@
+import asyncio
+
+import server.db.database as db_module
+import server.services.game_manager as gm_module
+from server.db.models import ActiveGameSnapshot
+
+
+def _started_game(game_manager, db) -> str:
+    pending = game_manager.create_game("Alice", "pid-alice", cube_id="test", target_player_count=2)
+    game_manager.join_game(pending.join_code, "Bob", "pid-bob")
+    assert game_manager.start_game(pending.game_id, db) is not None
+    return pending.game_id
+
+
+def test_a_game_resumed_after_eviction_outlives_its_abandoned_cleanup(mock_cube_data, test_db):
+    game_manager = gm_module.game_manager
+
+    async def scenario() -> tuple[bool, bool]:
+        db = db_module.SessionLocal()
+        try:
+            game_id = _started_game(game_manager, db)
+            game_manager.schedule_abandoned_cleanup(game_id, delay=0.2)
+            game_manager.mark_game_dirty(game_id, human_activity=False)
+            game_manager.persist_dirty_games()
+            game_manager._cleanup_game(game_id, preserve_snapshot=True)
+
+            assert game_manager.rejoin_game(game_id, "Alice", "pid-alice-2")
+            await asyncio.sleep(0.4)
+
+            still_loaded = game_manager.get_game(game_id) is not None
+            snapshot_kept = db.get(ActiveGameSnapshot, game_id) is not None
+            return still_loaded, snapshot_kept
+        finally:
+            db.close()
+
+    still_loaded, snapshot_kept = asyncio.run(scenario())
+
+    assert still_loaded
+    assert snapshot_kept
+
+
+def test_the_scheduled_cleanup_still_removes_a_finished_game(mock_cube_data, test_db):
+    game_manager = gm_module.game_manager
+
+    async def scenario() -> bool:
+        db = db_module.SessionLocal()
+        try:
+            game_id = _started_game(game_manager, db)
+            game_manager.schedule_abandoned_cleanup(game_id, delay=0.05)
+            await asyncio.sleep(0.2)
+            return game_manager.get_game(game_id) is None
+        finally:
+            db.close()
+
+    assert asyncio.run(scenario())

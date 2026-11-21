@@ -103,6 +103,13 @@ from server.services.session_manager import session_manager
 logger = logging.getLogger(__name__)
 
 
+def _current_task() -> asyncio.Task | None:
+    try:
+        return asyncio.current_task()
+    except RuntimeError:
+        return None
+
+
 def _utc_or_default(value: datetime | None, default: datetime) -> datetime:
     if value is None:
         return default
@@ -622,20 +629,30 @@ class GameManager:
     def cleanup_stale_game_records(self, max_age_hours: int = STALE_GAME_CLEANUP_HOURS) -> int:
         cutoff = datetime.now(UTC) - timedelta(hours=max_age_hours)
         session = db.SessionLocal()
+        loaded_ids = list(self._active_games)
         try:
             stale = (
                 session.query(GameRecord)
                 .outerjoin(ActiveGameSnapshot, ActiveGameSnapshot.game_id == GameRecord.id)
                 .filter(
                     GameRecord.ended_at.is_(None),
+                    GameRecord.id.not_in(loaded_ids),
                     func.coalesce(ActiveGameSnapshot.last_human_activity_at, GameRecord.created_at) < cutoff,
                 )
                 .all()
             )
-            if not stale:
+            # A paused game expires by its last human activity, even when an older eviction stamped ended_at.
+            stale_snapshot_ids = [
+                game_id
+                for (game_id,) in session.query(ActiveGameSnapshot.game_id).filter(
+                    ActiveGameSnapshot.last_human_activity_at < cutoff,
+                    ActiveGameSnapshot.game_id.not_in(loaded_ids),
+                )
+            ]
+            stale_ids = {cast(str, record.id) for record in stale} | set(stale_snapshot_ids)
+            if not stale_ids:
                 return 0
 
-            stale_ids = [record.id for record in stale]
             now = datetime.now(UTC)
             for record in stale:
                 record.ended_at = now  # ty: ignore[invalid-assignment]
@@ -644,7 +661,7 @@ class GameManager:
                 synchronize_session=False
             )
             session.commit()
-            logger.info("Closed %d stale game records older than %dh", len(stale_ids), max_age_hours)
+            logger.info("Retired %d stale games older than %dh", len(stale_ids), max_age_hours)
             return len(stale_ids)
         except Exception:
             logger.exception("Error cleaning up stale game records")
@@ -1201,7 +1218,10 @@ class GameManager:
         self._pending_games.pop(game_id, None)
         self._clear_runtime_player_mappings_for_game(game_id)
 
-        self._cleanup_tasks.pop(game_id, None)
+        cleanup_task = self._cleanup_tasks.pop(game_id, None)
+        # The scheduled cleanup itself ends up here, and must not cancel itself mid-run.
+        if cleanup_task is not None and cleanup_task is not _current_task():
+            cleanup_task.cancel()
         self._connected_humans.pop(game_id, None)
         self._last_human_activity.pop(game_id, None)
         self._action_locks.pop(game_id, None)
