@@ -8,8 +8,11 @@ import pytest
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
+import server.db.database as db_module
 import server.routers.ws as ws_module
+import server.services.game_manager as gm_module
 from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID
+from server.db.models import GameRecord
 
 
 class TestWebSocketConnection:
@@ -239,6 +242,30 @@ class TestGameWebSocket:
             assert "payload" in msg
             assert msg["payload"]["code"] == "UNKNOWN_ACTION"
 
+    def test_upgrade_pick_outside_reward_done_grants_nothing(
+        self, client, game_with_players, ws_receive_json, ws_receive_json_until, start_lobby
+    ):
+        game_id = game_with_players["game_id"]
+        alice_ids = game_with_players["alice"]
+        start_lobby(game_id, alice_ids["session_id"])
+        game = ws_module.game_manager.get_game(game_id)
+        assert game is not None
+        alice = ws_module.game_manager.get_player(game, alice_ids["player_id"])
+        assert alice is not None
+        alice.phase = "reward"
+
+        with client.websocket_connect(f"/ws/{game_id}?session_id={alice_ids['session_id']}") as ws:
+            ws_receive_json(ws)
+            ws.send_json({"action": "reward_pick_upgrade", "payload": {"upgrade_id": game.available_upgrades[0].id}})
+            msg = ws_receive_json_until(
+                ws,
+                lambda message: message["type"] == "error",
+                description="error response for reward_pick_upgrade",
+            )
+
+        assert msg["payload"]["code"] == "UNKNOWN_ACTION"
+        assert alice.upgrades == []
+
     def test_start_game_broadcasts_game_state(self, client, game_with_players, ws_receive_json, ws_receive_json_until):
         game_id = game_with_players["game_id"]
         alice_session = game_with_players["alice"]["session_id"]
@@ -322,6 +349,20 @@ class TestGameWebSocket:
         with client.websocket_connect(f"/ws/{game_id}?session_id={session_id}") as ws:
             msg = ws_receive_json(ws)
             assert msg["type"] == "game_bootstrap"
+
+    def test_evicting_an_idle_game_does_not_record_it_as_ended(
+        self, client, game_with_players, monkeypatch, start_lobby
+    ):
+        game_id = game_with_players["game_id"]
+        start_lobby(game_id, game_with_players["alice"]["session_id"])
+        monkeypatch.setattr(gm_module, "IDLE_EVICT_MINUTES", 0)
+
+        assert ws_module.game_manager.evict_cold_games() == 1
+
+        with db_module.SessionLocal() as session:
+            record = session.get(GameRecord, game_id)
+            assert record is not None
+            assert record.ended_at is None
 
     def test_missing_runtime_mapping_rejects_invalid_session(
         self, client, game_with_players, ws_receive_json, start_lobby

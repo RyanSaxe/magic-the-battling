@@ -985,6 +985,8 @@ export interface ContainerLayout {
   containerSize: ContainerSize;
   dims: CardLayoutResult;
   frames: ZoneFrameResult;
+  /** The divider fractions the frames were drawn with. */
+  constraints: Required<ZoneConstraints>;
 }
 
 /**
@@ -1032,6 +1034,7 @@ export function useCardLayout(
   CardLayoutResult,
   ContainerSize,
   ZoneFrameResult,
+  Required<ZoneConstraints>,
 ] {
   const zoneIds = Object.keys(config.zones);
 
@@ -1045,6 +1048,9 @@ export function useCardLayout(
   const [zoneFrames, setZoneFrames] = useState<ZoneFrameResult>(() =>
     makeDefaultFrames(zoneIds),
   );
+  const [renderedConstraints, setRenderedConstraints] = useState<
+    Required<ZoneConstraints>
+  >({ topFraction: 0.5, leftFraction: 0.7, bottomLeftSplit: 0.5 });
 
   const configRef = useRef(config);
   // eslint-disable-next-line react-hooks/refs -- must sync before useLayoutEffect reads it
@@ -1064,6 +1070,13 @@ export function useCardLayout(
       );
       setDims((prev) => (dimsEqual(prev, next.dims) ? prev : next.dims));
       setZoneFrames((prev) => (framesEqual(prev, next.frames) ? prev : next.frames));
+      setRenderedConstraints((prev) =>
+        prev.topFraction === next.constraints.topFraction &&
+        prev.leftFraction === next.constraints.leftFraction &&
+        prev.bottomLeftSplit === next.constraints.bottomLeftSplit
+          ? prev
+          : next.constraints,
+      );
     },
     [],
   );
@@ -1114,5 +1127,5 @@ export function useCardLayout(
     }
   });
 
-  return [refCallback, dims, containerSize, zoneFrames];
+  return [refCallback, dims, containerSize, zoneFrames, renderedConstraints];
 }

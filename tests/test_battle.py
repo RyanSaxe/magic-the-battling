@@ -1,3 +1,8 @@
+import os
+import subprocess
+import sys
+from pathlib import Path
+
 import pytest
 from conftest import setup_battle_ready
 
@@ -447,6 +452,20 @@ def test_end_battle_with_draw_returns_draw_result():
     assert bob.phase == "battle"
 
 
+def test_unpaired_puppets_deal_fibonacci_damage_without_upgrades(card_factory, monkeypatch):
+    game = create_game(["Alice"], num_players=1)
+    game.config.use_upgrades = False
+    stage_6_hand = [card_factory(f"c{i}") for i in range(6)]
+    bot1 = Puppet(name="Bot1", player_history_id=1, snapshots={"6_1": StaticOpponent(name="Bot1", hand=stage_6_hand)})
+    bot2 = Puppet(name="Bot2", player_history_id=2, snapshots={"6_1": StaticOpponent(name="Bot2", hand=stage_6_hand)})
+    game.puppets = [bot1, bot2]
+    monkeypatch.setattr(battle.random, "choices", lambda *_args, **_kwargs: ["bot1_wins"])
+
+    battle.resolve_unpaired_bot_battles(game, set(), 6, 1, game.config.num_rounds_per_stage)
+
+    assert bot2.poison == 3
+
+
 class TestPairingProbabilities:
     def test_get_pairing_probabilities_single_candidate(self):
         game = create_game(["Alice", "Bob"], num_players=2)
@@ -678,6 +697,33 @@ class TestViableCandidates:
         viable2 = battle.get_viable_candidates(alice, candidates)
 
         assert [c.name for c in viable1] == [c.name for c in viable2]
+
+    def test_get_viable_candidates_is_the_same_after_a_restart(self):
+        script = """
+from mtb.models.game import create_game
+from mtb.phases import battle
+
+game = create_game([f"P{i}" for i in range(8)], num_players=8)
+for player in game.players:
+    player.phase = "battle"
+player = game.players[0]
+viable = battle.get_viable_candidates(player, battle.get_all_pairing_candidates(game, player))
+print(sorted(c.name for c in viable))
+"""
+        repo_root = Path(__file__).resolve().parents[1]
+        samples = {
+            subprocess.run(
+                [sys.executable, "-c", script],
+                cwd=repo_root,
+                env={**os.environ, "PYTHONHASHSEED": hash_seed},
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout
+            for hash_seed in ("0", "1", "2")
+        }
+
+        assert len(samples) == 1
 
     def test_get_viable_candidates_changes_with_round(self):
         game = create_game(["Alice", "Bob", "Charlie", "Diana", "Eve"], num_players=5)
@@ -1434,6 +1480,58 @@ class TestFaceDownScrubbing:
         result = manager.handle_battle_update_card_state(game, alice, "tap", opaque_id)
         assert result
         assert creature.id in b.opponent_zones.tapped_card_ids
+
+    def test_pvp_opponent_can_act_on_face_down_card_after_other_views_are_built(self, mock_cube_data, test_db):
+        manager = GameManager()
+        pending = manager.create_game("Alice", "pid-a", cube_id="test", target_player_count=2)
+        manager.join_game(pending.join_code, "Bob", "pid-b")
+        game_id = pending.game_id
+        game = manager.start_game(game_id, None)
+        assert game is not None
+        alice, bob = game.players
+        for p in (alice, bob):
+            p.hand, p.sideboard = p.sideboard[:3], p.sideboard[3:]
+            assert manager.handle_build_ready(game, p, ["Plains", "Island", "Swamp"], game_id, None) is None
+        b = game.active_battles[0]
+        bob_card = bob.hand[0]
+        assert manager.handle_battle_move(game, bob, bob_card.id, "hand", "battlefield")
+        assert manager.handle_battle_update_card_state(game, bob, "face_down", bob_card.id)
+
+        # broadcast_game_state builds every player's view in turn, then each spectator's
+        alice_view = manager.get_game_state(game_id, "pid-a")
+        manager.get_game_state(game_id, "pid-b")
+        manager.get_game_state(game_id, "pid-a")
+        assert alice_view is not None
+        assert alice_view.current_battle is not None
+        opaque_id = alice_view.current_battle.opponent_zones.face_down_card_ids[0]
+
+        assert manager.handle_battle_move(
+            game, alice, opaque_id, "battlefield", "graveyard", from_owner="opponent", to_owner="opponent"
+        )
+        bob_zones = b.player_zones if b.player.name == bob.name else b.opponent_zones
+        assert bob_card.id in {c.id for c in bob_zones.graveyard}
+
+    def test_pvp_shuffle_changes_the_ids_shown_for_the_shuffled_library(self, card_factory):
+        game = create_game(["Alice", "Bob"], num_players=2)
+        alice, bob = game.players
+        setup_battle_ready(alice)
+        setup_battle_ready(bob)
+
+        face_down, first, second = card_factory("FaceDown"), card_factory("First"), card_factory("Second")
+        bob.hand = [face_down, first, second]
+
+        b = battle.start(game, alice, bob)
+        battle.move_zone(b, bob, face_down, "hand", "battlefield")
+        battle.update_card_state(b, bob, "face_down", face_down.id)
+        battle.move_zone(b, bob, first, "hand", "library")
+        battle.move_zone(b, bob, second, "hand", "library")
+
+        manager = GameManager()
+        ids_before = {c.id for c in manager._make_battle_view(b, alice, game).opponent_zones.library}
+        assert manager.handle_battle_update_card_state(game, bob, "shuffle_library", "")
+        ids_after = {c.id for c in manager._make_battle_view(b, alice, game).opponent_zones.library}
+
+        assert ids_before.isdisjoint(ids_after)
 
     def test_static_opponent_face_down_not_scrubbed(self, card_factory):
         """Against StaticOpponent, face-down cards should preserve real data."""
