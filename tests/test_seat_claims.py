@@ -44,17 +44,16 @@ def test_knowing_the_game_id_and_a_name_is_not_enough_to_take_a_seat(client, gam
     assert _seat_owner_name(client, game_id, game_with_players["alice"]["session_id"]) == "Alice"
 
 
-def test_the_seat_token_takes_the_seat_back_and_is_replaced(client, game_with_players):
+def test_the_seat_token_takes_the_seat_back_and_keeps_working(client, game_with_players):
     game_id = _started(client, game_with_players)
-    first_token = game_with_players["alice"]["seat_token"]
+    seat_token = game_with_players["alice"]["seat_token"]
 
-    reclaimed = _rejoin(client, game_id, "Alice", first_token)
+    reclaimed = _rejoin(client, game_id, "Alice", seat_token)
 
     assert reclaimed.status_code == 200
     assert _seat_owner_name(client, game_id, reclaimed.json()["session_id"]) == "Alice"
-    assert reclaimed.json()["seat_token"] != first_token
-    assert _rejoin(client, game_id, "Alice", first_token).status_code == 403
-    assert _rejoin(client, game_id, "Alice", reclaimed.json()["seat_token"]).status_code == 200
+    assert reclaimed.json()["seat_token"] == seat_token
+    assert _rejoin(client, game_id, "Alice", seat_token).status_code == 200
 
 
 def test_a_lobby_seat_can_be_taken_back(client, game_with_players):
@@ -67,6 +66,18 @@ def test_a_lobby_seat_can_be_taken_back(client, game_with_players):
     bob = next(p for p in lobby["players"] if p["name"] == "Bob")
     assert bob["player_id"] == reclaimed.json()["player_id"]
     assert [p["name"] for p in lobby["players"]] == ["Alice", "Bob"]
+
+
+def test_a_lobby_seat_needs_its_token(client, game_with_players):
+    game_id = game_with_players["game_id"]
+    stranger = TestClient(app)
+
+    missing = _rejoin(stranger, game_id, "Bob")
+    wrong = _rejoin(stranger, game_id, "Bob", game_with_players["alice"]["seat_token"])
+
+    assert missing.status_code == 403
+    assert missing.json()["code"] == "SEAT_CLAIM_REQUIRED"
+    assert wrong.status_code == 403
 
 
 def test_the_host_keeps_hosting_after_taking_their_lobby_seat_back(client, game_with_players):
@@ -133,7 +144,8 @@ def test_a_seat_from_before_seat_tokens_is_claimed_once_by_name(client, game_wit
     assert _rejoin(client, game_id, "Alice", first.json()["seat_token"]).status_code == 200
 
 
-def test_an_account_seat_needs_the_account_or_the_token(client):
+@pytest.mark.parametrize("started", [False, True])
+def test_an_account_seat_needs_the_account_or_the_token(client, started):
     client.post(
         "/api/auth/register",
         json={"username": "seat_owner", "password": "password123", "email": "seat_owner@test.com"},
@@ -143,7 +155,8 @@ def test_an_account_seat_needs_the_account_or_the_token(client):
     ).json()
     client.post("/api/games/join", json={"join_code": created["join_code"], "player_name": "Bob"})
     game_id = created["game_id"]
-    client.post(f"/api/games/{game_id}/start")
+    if started:
+        client.post(f"/api/games/{game_id}/start")
     logged_out = TestClient(app)
 
     without_login = _rejoin(logged_out, game_id, "seat_owner")
@@ -154,6 +167,8 @@ def test_an_account_seat_needs_the_account_or_the_token(client):
     assert without_login.json()["code"] == "NOT_AUTHENTICATED"
     assert with_token.status_code == 200
     assert with_login.status_code == 200
+    assert _rejoin(logged_out, game_id, "seat_owner", created["seat_token"]).status_code == 403
+    assert _rejoin(logged_out, game_id, "seat_owner", with_login.json()["seat_token"]).status_code == 200
 
 
 @pytest.mark.parametrize("started", [False, True])

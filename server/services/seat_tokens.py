@@ -33,6 +33,14 @@ def seat_token_matches(seat_token: str | None, stored_hash: str | None) -> bool:
     return hmac.compare_digest(hash_seat_token(seat_token), stored_hash)
 
 
+def token_after_claim(seat_token: str | None, stored_hash: str | None) -> str:
+    """The token a successful claim hands back. A browser that proved the seat with its token keeps it, so a lost
+    response can't lock it out. Any other claim gets a new token, which replaces the old one."""
+    if seat_token is not None and seat_token_matches(seat_token, stored_hash):
+        return seat_token
+    return new_seat_token()
+
+
 def seat_claim_refusal(
     *,
     stored_hash: str | None,

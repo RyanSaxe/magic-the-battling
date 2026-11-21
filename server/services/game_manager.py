@@ -107,6 +107,7 @@ from server.services.seat_tokens import (
     new_seat_token,
     seat_claim_refusal,
     seat_token_matches,
+    token_after_claim,
 )
 from server.services.session_manager import session_manager
 
@@ -1796,7 +1797,7 @@ class GameManager:
         seat_token: str | None,
         user_id: str | None,
     ) -> SeatClaim:
-        """Give the named seat back to a caller who owns it: its player id, and a fresh token for the seat.
+        """Give the named seat back to a caller who owns it: its player id, and the seat token to keep.
 
         The player id stays the same, so spectators and lobby state keep following the seat; the newest socket
         for it replaces the older one. Raises SeatClaimRefusedError when the game or seat is gone, or the caller
@@ -1824,8 +1825,9 @@ class GameManager:
                 )
                 .first()
             )
+            stored_hash = cast(str | None, record.seat_token_hash) if record else None
             refusal = seat_claim_refusal(
-                stored_hash=cast(str | None, record.seat_token_hash) if record else None,
+                stored_hash=stored_hash,
                 owner_user_id=cast(str | None, record.user_id) if record else None,
                 seat_token=seat_token,
                 user_id=user_id,
@@ -1836,17 +1838,17 @@ class GameManager:
             player_id = self.get_player_id_by_name(game_id, player_name) or secrets.token_urlsafe(8)
             self._player_to_game[player_id] = game_id
             self._player_id_to_name[player_id] = player_name
-            fresh_token = new_seat_token()
+            claimed_token = token_after_claim(seat_token, stored_hash)
             self._persist_human_player_mappings(
                 session,
                 game_id,
                 [(player_id, player_name)],
-                seat_token_hashes={player_name: hash_seat_token(fresh_token)},
+                seat_token_hashes={player_name: hash_seat_token(claimed_token)},
             )
             session.commit()
         finally:
             session.close()
-        return SeatClaim(player_id=player_id, seat_token=fresh_token)
+        return SeatClaim(player_id=player_id, seat_token=claimed_token)
 
     def _reclaim_lobby_seat(
         self,
@@ -1859,15 +1861,18 @@ class GameManager:
         if player_name not in pending.player_names:
             raise SeatClaimRefusedError(SeatClaimRefusal.SEAT_NOT_FOUND)
         player_id = pending.player_ids[pending.player_names.index(player_name)]
+        stored_hash = pending.seat_token_hashes.get(player_name)
         refusal = seat_claim_refusal(
-            stored_hash=pending.seat_token_hashes.get(player_name),
+            stored_hash=stored_hash,
             owner_user_id=pending.player_user_ids.get(player_id),
             seat_token=seat_token,
             user_id=user_id,
         )
         if refusal is not None:
             raise SeatClaimRefusedError(refusal)
-        return SeatClaim(player_id=player_id, seat_token=self.issue_lobby_seat_token(pending.game_id, player_name))
+        claimed_token = token_after_claim(seat_token, stored_hash)
+        pending.seat_token_hashes[player_name] = hash_seat_token(claimed_token)
+        return SeatClaim(player_id=player_id, seat_token=claimed_token)
 
     def remove_player_from_pending(self, game_id: str, player_id: str) -> bool:
         pending = self._pending_games.get(game_id)
