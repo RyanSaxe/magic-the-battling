@@ -18,6 +18,7 @@ export function useGame(
   onVoiceSignal?: (payload: VoiceSignalPayload) => void,
 ) {
   const {
+    status,
     isConnected,
     gameState,
     lobbyState,
@@ -26,9 +27,6 @@ export function useGame(
     serverNotice,
     connectionError,
     clearSpectateRequest,
-    kicked,
-    invalidSession,
-    gameNotFound,
   } = useWebSocket(gameId, sessionId, spectatorConfig, onServerError, onVoiceSignal)
 
   const startGame = useCallback(() => {
@@ -158,15 +156,13 @@ export function useGame(
   }, [send, clearSpectateRequest])
 
   return {
+    status,
     isConnected,
     gameState,
     lobbyState,
     pendingSpectateRequest,
     serverNotice,
     connectionError,
-    kicked,
-    invalidSession,
-    gameNotFound,
     send,
     actions: {
       startGame,

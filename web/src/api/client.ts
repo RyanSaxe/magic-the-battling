@@ -3,6 +3,7 @@ import type {
   CardCatalogEntry,
   CreateGameResponse,
   JoinGameResponse,
+  LobbyState,
   GameStatusResponse,
   SpectateRequestStatus,
   ShareGameResponse,
@@ -165,6 +166,14 @@ export async function rejoinGame(
   })
   if (!response.ok) {
     await throwResponseError(response, 'rejoin-game', 'Failed to rejoin game')
+  }
+  return response.json()
+}
+
+export async function getLobby(gameId: string): Promise<LobbyState> {
+  const response = await fetch(`${API_BASE}/games/${gameId}/lobby`)
+  if (!response.ok) {
+    await throwResponseError(response, 'game-status', 'Failed to load the lobby')
   }
   return response.json()
 }

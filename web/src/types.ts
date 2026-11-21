@@ -330,6 +330,7 @@ export interface LobbyPlayer {
   name: string
   is_ready: boolean
   is_host: boolean
+  is_connected: boolean
   battler_id: string | null
   battler_status: BattlerLoadingStatus | null
   battler_error: string | null
