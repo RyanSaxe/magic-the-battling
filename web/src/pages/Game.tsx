@@ -51,6 +51,7 @@ import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import {
   comparePlayersForSidebar,
   getSidebarPlayerOrder,
+  suddenDeathDecidesGame,
 } from "../utils/playerPlacement";
 import {
   buildAppliedUpgradeMap,
@@ -77,7 +78,11 @@ import {
   type VisibleGuideStep,
 } from "./gameGuideState";
 import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
-import { canUseBattleFaceDownAction, canUseBattleFlipAction } from "../utils/battleInteraction";
+import {
+  canUseBattleFaceDownAction,
+  canUseBattleFlipAction,
+  hasBattleResultConflict,
+} from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
 
 interface SpectatorConfig {
@@ -1904,8 +1909,11 @@ function GameContent() {
       );
 
       if (mySubmission && !isChangingResult) {
-        const resultsConflict =
-          opponentSubmission && mySubmission !== opponentSubmission;
+        const resultsConflict = hasBattleResultConflict({
+          mySubmission,
+          opponentSubmission,
+          isResolved: displayBattleResolution,
+        });
         right = (
           <div className="flex items-center gap-1.5 sm:gap-2">
             <span
@@ -2161,6 +2169,8 @@ function GameContent() {
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+            inSuddenDeath={self_player.in_sudden_death}
+            suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
             useUpgrades={gameState.use_upgrades}
             headerClassName={phaseTimelineHeaderClassName}
             rightActionsClassName={phaseTimelineRightActionsClassName}

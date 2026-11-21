@@ -38,6 +38,7 @@ interface BuildPhaseProps {
       cardBId: string,
       sourceB: BuildSource,
     ) => void;
+    buildSetBasics: (basics: string[]) => void;
     buildReady: (
       basics: string[],
       playDrawPreference: "play" | "draw",
@@ -195,6 +196,7 @@ export function BuildPhase({
     const next = [...selectedBasics];
     next[index] = name;
     onBasicsChange(next);
+    actions.buildSetBasics(next.filter(Boolean));
   };
 
   const appliedUpgrades = self_player.upgrades.filter((u) => u.upgrade_target);
