@@ -23,7 +23,8 @@ import {
 } from "../utils/deviceIdentity";
 import type { LobbyState, PlayMode } from "../types";
 import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
-import { DIALOG_BACKDROP, DIALOG_CLOSE_BUTTON, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
+import { DIALOG_BACKDROP, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
+import { Dialog } from "../components/common/Dialog";
 
 type SoloPhase =
   | "idle"
@@ -151,30 +152,15 @@ function AdvancedOptionsModal({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className={`absolute inset-0 ${DIALOG_BACKDROP}`}
+    <Dialog title={title} onClose={onClose}>
+      <div className="space-y-3">{children}</div>
+      <button
         onClick={onClose}
-      />
-      <SurfaceCard className="relative">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
-          <h3 className="text-white font-semibold">{title}</h3>
-          <button
-            onClick={onClose}
-            className={DIALOG_CLOSE_BUTTON}
-          >
-            ✕
-          </button>
-        </div>
-        <div className="space-y-3">{children}</div>
-        <button
-          onClick={onClose}
-          className="btn btn-primary play-action-btn w-full py-2 mt-4"
-        >
-          Done
-        </button>
-      </SurfaceCard>
-    </div>
+        className="btn btn-primary play-action-btn w-full py-2 mt-4"
+      >
+        Done
+      </button>
+    </Dialog>
   );
 }
 

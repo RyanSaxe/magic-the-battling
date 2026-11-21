@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { createBattler } from '../../api/client'
 import type { PlayMode, UserBattler } from '../../types'
 import { unknownToAppError } from '../../utils/appError'
-import { SurfaceCard } from '../common/SurfaceCard'
 import { DefaultOpponentsField } from './DefaultOpponentsField'
-import { DIALOG_BACKDROP, DIALOG_CLOSE_BUTTON, OPTION_BOX, TEXT_INPUT } from '../common/styles'
+import { OPTION_BOX, TEXT_INPUT } from '../common/styles'
+import { Dialog } from '../common/Dialog'
 
 export function AddCubeModal({
   initialCubeId = '',
@@ -49,78 +49,65 @@ export function AddCubeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className={`absolute inset-0 ${DIALOG_BACKDROP}`} onClick={onClose} />
-      <SurfaceCard as="form" onSubmit={handleSubmit} className="relative">
-        <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
-          <h3 className="text-white font-semibold">Add Cube / Deck</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className={DIALOG_CLOSE_BUTTON}
-          >
-            ✕
-          </button>
+    <Dialog title="Add Cube / Deck" onClose={onClose} onSubmit={handleSubmit}>
+
+      <div className="space-y-3">
+        <div>
+          <label className="block text-white text-sm mb-1">CubeCobra ID</label>
+          <input
+            type="text"
+            value={cubeId}
+            onChange={(e) => setCubeId(e.target.value)}
+            className={TEXT_INPUT}
+            placeholder="e.g. auto"
+            autoFocus
+            required
+          />
         </div>
 
-        <div className="space-y-3">
-          <div>
-            <label className="block text-white text-sm mb-1">CubeCobra ID</label>
-            <input
-              type="text"
-              value={cubeId}
-              onChange={(e) => setCubeId(e.target.value)}
-              className={TEXT_INPUT}
-              placeholder="e.g. auto"
-              autoFocus
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-white text-sm mb-1">Display Name <span className="text-amber-200/45">(optional)</span></label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className={TEXT_INPUT}
-              placeholder="My Draft Cube"
-            />
-          </div>
-
-          <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
-            <input
-              type="checkbox"
-              checked={playMode === 'constructed'}
-              onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
-              className="w-4 h-4 rounded bg-black/40 border-black/40"
-            />
-            <span className="text-white text-sm">Constructed</span>
-            <span className="text-amber-200/45 text-xs">— bring your own deck</span>
-          </label>
-
-          <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
-            <input
-              type="checkbox"
-              checked={useUpgrades}
-              onChange={(e) => setUseUpgrades(e.target.checked)}
-              className="w-4 h-4 rounded bg-black/40 border-black/40"
-            />
-            <span className="text-white text-sm">Upgrades</span>
-            <span className="text-amber-200/45 text-xs">— upgrade a card every 3 rounds</span>
-          </label>
-
-          <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />
+        <div>
+          <label className="block text-white text-sm mb-1">Display Name <span className="text-amber-200/45">(optional)</span></label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            className={TEXT_INPUT}
+            placeholder="My Draft Cube"
+          />
         </div>
 
-        <button
-          type="submit"
-          disabled={saving || !cubeId.trim()}
-          className="btn btn-primary w-full py-2 mt-4 font-semibold disabled:opacity-50"
-        >
-          {saving ? 'Saving...' : 'Add Cube / Deck'}
-        </button>
-      </SurfaceCard>
-    </div>
+        <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
+          <input
+            type="checkbox"
+            checked={playMode === 'constructed'}
+            onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
+            className="w-4 h-4 rounded bg-black/40 border-black/40"
+          />
+          <span className="text-white text-sm">Constructed</span>
+          <span className="text-amber-200/45 text-xs">— bring your own deck</span>
+        </label>
+
+        <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
+          <input
+            type="checkbox"
+            checked={useUpgrades}
+            onChange={(e) => setUseUpgrades(e.target.checked)}
+            className="w-4 h-4 rounded bg-black/40 border-black/40"
+          />
+          <span className="text-white text-sm">Upgrades</span>
+          <span className="text-amber-200/45 text-xs">— upgrade a card every 3 rounds</span>
+        </label>
+
+        <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />
+      </div>
+
+      <button
+        type="submit"
+        disabled={saving || !cubeId.trim()}
+        className="btn btn-primary w-full py-2 mt-4 font-semibold disabled:opacity-50"
+      >
+        {saving ? 'Saving...' : 'Add Cube / Deck'}
+      </button>
+    </Dialog>
   )
 }
