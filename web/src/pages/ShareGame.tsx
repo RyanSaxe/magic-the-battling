@@ -82,7 +82,7 @@ function RoundPopover({
           className={`text-sm py-1.5 px-3 rounded text-left transition-colors ${
             opt.value === selectedRound
               ? 'bg-amber-600/80 text-white'
-              : 'text-gray-300 hover:bg-gray-700/60'
+              : 'menu-item text-gray-300'
           }`}
         >
           {opt.label}

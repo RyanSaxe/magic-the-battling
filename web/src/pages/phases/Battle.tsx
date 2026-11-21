@@ -111,7 +111,7 @@ function ZoneActionMenu({
             onDraw()
             onClose()
           }}
-          className="w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10 transition-colors"
+          className="menu-item w-full px-3 py-1.5 text-left text-sm text-white transition-colors"
         >
           Draw
         </button>
@@ -121,7 +121,7 @@ function ZoneActionMenu({
             onShuffle()
             onClose()
           }}
-          className="w-full px-3 py-1.5 text-left text-sm text-white hover:bg-white/10 transition-colors"
+          className="menu-item w-full px-3 py-1.5 text-left text-sm text-white transition-colors"
         >
           Shuffle
         </button>

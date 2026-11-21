@@ -72,31 +72,31 @@ export function UserMenuButton() {
             </div>
             <button
               onClick={() => { setOpen(false); navigate('/dashboard') }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+              className="w-full text-left px-4 py-2 menu-item text-sm text-gray-200 transition-colors"
             >
               Dashboard
             </button>
             <button
               onClick={() => { setOpen(false); navigate('/dashboard/games') }}
-              className="sm:hidden w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+              className="sm:hidden w-full text-left px-4 py-2 menu-item text-sm text-gray-200 transition-colors"
             >
               Games
             </button>
             <button
               onClick={() => { setOpen(false); navigate('/dashboard/discover') }}
-              className="sm:hidden w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+              className="sm:hidden w-full text-left px-4 py-2 menu-item text-sm text-gray-200 transition-colors"
             >
               Discover
             </button>
             <button
               onClick={() => { setOpen(false); navigate('/play') }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+              className="w-full text-left px-4 py-2 menu-item text-sm text-gray-200 transition-colors"
             >
               Play Game
             </button>
             <button
               onClick={() => { setOpen(false); setShowJoinModal(true) }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-white/10 transition-colors"
+              className="w-full text-left px-4 py-2 menu-item text-sm text-gray-200 transition-colors"
             >
               Join Game
             </button>
@@ -113,7 +113,7 @@ export function UserMenuButton() {
                   setLoggingOut(false)
                 }
               }}
-              className="w-full text-left px-4 py-2 text-sm text-gray-400 hover:bg-white/10 hover:text-gray-200 transition-colors disabled:opacity-50"
+              className="w-full text-left px-4 py-2 menu-item text-sm text-gray-400 hover:text-gray-200 transition-colors disabled:opacity-50"
             >
               {loggingOut ? 'Logging out...' : 'Log Out'}
             </button>

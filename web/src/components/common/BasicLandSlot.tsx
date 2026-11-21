@@ -106,7 +106,7 @@ export function BasicLandSlot({
                     onPick(name);
                     setOpen(false);
                   }}
-                  className="flex flex-col items-center gap-0.5 p-1 rounded hover:bg-gray-700/50"
+                  className="menu-item flex flex-col items-center gap-0.5 p-1 rounded"
                 >
                   <img
                     src={BASIC_LAND_IMAGES[name]}
