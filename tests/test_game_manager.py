@@ -884,3 +884,34 @@ class TestCleanupStaleGameRecords:
         snapshot = session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id == "stale_game").first()
         assert snapshot is None
         session.close()
+
+    def test_removes_old_snapshot_of_a_game_already_marked_ended(self, game_manager, test_db):
+        session = db.SessionLocal()
+        old_time = datetime.now(UTC) - timedelta(hours=72)
+        record = self._create_game_record(session, "paused_game", old_time)
+        record.ended_at = old_time  # ty: ignore[invalid-assignment]
+        session.commit()
+        self._create_snapshot(session, "paused_game", old_time)
+        session.close()
+
+        cleaned = game_manager.cleanup_stale_game_records(max_age_hours=48)
+
+        assert cleaned == 1
+        session = db.SessionLocal()
+        assert session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id == "paused_game").first() is None
+        session.close()
+
+    def test_keeps_a_game_that_is_loaded_in_memory(self, game_manager, test_db):
+        session = db.SessionLocal()
+        old_time = datetime.now(UTC) - timedelta(hours=72)
+        self._create_game_record(session, "loaded_game", old_time)
+        self._create_snapshot(session, "loaded_game", old_time)
+        session.close()
+        game_manager._active_games["loaded_game"] = MagicMock()
+
+        cleaned = game_manager.cleanup_stale_game_records(max_age_hours=48)
+
+        assert cleaned == 0
+        session = db.SessionLocal()
+        assert session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id == "loaded_game").first()
+        session.close()
