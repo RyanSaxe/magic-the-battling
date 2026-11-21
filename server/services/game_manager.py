@@ -63,7 +63,14 @@ from mtb.phases.elimination import (
     setup_sudden_death_battle,
     would_be_dead_ready_for_elimination,
 )
-from server.db.models import ActiveGameSnapshot, BattleSnapshot, GamePlayerRecord, GameRecord, PlayerGameHistory
+from server.db.models import (
+    ActiveGameSnapshot,
+    BattleSnapshot,
+    GamePlayerRecord,
+    GameRecord,
+    PlayerGameHistory,
+    QuarantinedGameSnapshot,
+)
 from server.runtime_config import (
     HOT_ACTION_WINDOW_MINUTES,
     IDLE_EVICT_MINUTES,
@@ -567,8 +574,16 @@ class GameManager:
                 snapshot_game_id = cast(str, row.game_id)
                 try:
                     game = restore_game_from_snapshot(cast(str, row.state_json))
-                except Exception:
-                    logger.exception("Invalid snapshot; deleting row for game_id=%s", snapshot_game_id)
+                except Exception as exc:
+                    logger.exception("Snapshot does not restore; quarantining game_id=%s", snapshot_game_id)
+                    session.add(
+                        QuarantinedGameSnapshot(
+                            game_id=snapshot_game_id,
+                            state_json=row.state_json,
+                            last_human_activity_at=row.last_human_activity_at,
+                            error=f"{type(exc).__name__}: {exc}",
+                        )
+                    )
                     session.delete(row)
                     continue
                 last_activity = cast(datetime | None, row.last_human_activity_at)
