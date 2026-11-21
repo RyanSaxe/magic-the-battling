@@ -50,6 +50,8 @@ const TYPICAL: Record<string, ScreenState> = {
   'battle-sudden-death': { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 }, suddenDeath: true },
   reward: { phase: 'reward', counts: { sideboard: 8 } },
   'reward-stage-end': { phase: 'reward', counts: { sideboard: 8, upgrades: 1 }, stageEnd: true },
+  // The game summary, which lays out the player's final deck with the same engine as the phases.
+  'game-over': { phase: 'game_over', counts: { hand: 5, handSize: 5, sideboard: 10, upgrades: 2 } },
 }
 
 const SAMPLE: Screen[] = [
