@@ -5,6 +5,7 @@ import { AppHeader, HomeButton } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { unknownToAppError } from '../utils/appError'
+import { LINK, TEXT_INPUT } from '../components/common/styles'
 
 export function Register() {
   const navigate = useNavigate()
@@ -56,7 +57,7 @@ export function Register() {
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+            className={TEXT_INPUT}
             autoFocus
             required
             minLength={3}
@@ -74,7 +75,7 @@ export function Register() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+            className={TEXT_INPUT}
             required
           />
         </div>
@@ -86,7 +87,7 @@ export function Register() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+            className={TEXT_INPUT}
             required
             minLength={8}
           />
@@ -100,7 +101,7 @@ export function Register() {
             type="password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+            className={TEXT_INPUT}
             required
             minLength={8}
           />
@@ -116,7 +117,7 @@ export function Register() {
 
         <p className="text-center text-gray-400 text-sm mt-4">
           Already have an account?{' '}
-          <Link to={`/login${returnTo !== '/' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} className="text-amber-400 hover:text-amber-300">Log in</Link>
+          <Link to={`/login${returnTo !== '/' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} className={LINK}>Log in</Link>
         </p>
       </SurfaceCard>
     </PageFrame>

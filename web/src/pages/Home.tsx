@@ -9,6 +9,7 @@ import { ResumeGameStrip } from "../components/ResumeGame";
 import { useResumableGames } from "../hooks/useResumableGames";
 import { useAuth } from "../contexts/authState";
 import { prefetchLegendaryName } from "../utils/prefetchName";
+import { LINK } from "../components/common/styles";
 
 export function Home() {
   const navigate = useNavigate();
@@ -56,11 +57,11 @@ export function Home() {
         <CardShowcase />
         {/* mt-10 rather than mt-6 offsets the column's top padding, so the showcase stays centered where it was. */}
         <p className="text-gray-400 text-sm mt-10">
-          <Link to="/login" className="text-amber-400 hover:text-amber-300">
+          <Link to="/login" className={LINK}>
             Log in
           </Link>
           {" or "}
-          <Link to="/register" className="text-amber-400 hover:text-amber-300">
+          <Link to="/register" className={LINK}>
             create an account
           </Link>
           {" to track your games"}

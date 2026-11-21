@@ -21,6 +21,7 @@ import {
   setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
+import { LINK, TEXT_INPUT } from "../components/common/styles";
 
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 
@@ -672,7 +673,7 @@ export function Lobby() {
                             target="_blank"
                             rel="noopener noreferrer"
                             title={summaryBattlerId}
-                            className="mt-0.5 block truncate text-[11px] text-amber-400 hover:text-amber-300 transition-colors"
+                            className={`mt-0.5 block truncate text-[11px] ${LINK} transition-colors`}
                           >
                             {summaryBattlerId}
                           </a>
@@ -740,7 +741,7 @@ export function Lobby() {
                             }}
                             placeholder={isConstructed ? "Enter deck list" : "CubeCobra cube ID"}
                             disabled={isBattlerLoading}
-                            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] disabled:opacity-50 disabled:cursor-not-allowed"
+                            className={`${TEXT_INPUT} disabled:opacity-50 disabled:cursor-not-allowed`}
                           />
                         )}
                         <button

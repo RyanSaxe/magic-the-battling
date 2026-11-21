@@ -9,6 +9,7 @@ import { PHASE_HOTKEYS } from '../constants/hotkeys'
 import { HotkeyRow } from './HotkeyRow'
 import { selectInputBlocks } from '../docs/parse'
 import { canHover } from '../utils/inputMode'
+import { LINK } from './common/styles'
 
 function urlTransform(url: string) {
   if (url.startsWith('doc:') || url.startsWith('docs:')) return url
@@ -83,14 +84,14 @@ export function DocRenderer({ content, className }: DocRendererProps) {
         return (
           <button
             onClick={() => docNav.navigate(docId, tab)}
-            className="text-amber-400 hover:text-amber-300 underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors cursor-pointer"
+            className={`${LINK} underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors cursor-pointer`}
           >
             {children}
           </button>
         )
       }
       return (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors">
+        <a href={href} target="_blank" rel="noopener noreferrer" className={`${LINK} underline decoration-dotted decoration-amber-400/15 underline-offset-2 hover:decoration-solid hover:decoration-amber-400/40 transition-colors`}>
           {children}
         </a>
       )

@@ -98,6 +98,7 @@ import {
   hasBattleResultConflict,
 } from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
+import { LINK, OPTION_BOX } from "../components/common/styles";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -451,11 +452,11 @@ function PlayerSelectionModal({
         {requestStatus === "idle" && !selectedPlayer && (
           <>
             {!spectateOnly && !accountSeatName && (
-              <div className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 mb-4 text-[13px] leading-snug text-gray-300">
+              <div className={`${OPTION_BOX} px-3 py-2.5 mb-4 text-[13px] leading-snug text-gray-300`}>
                 To take your seat back, open this link in the browser you joined from. If you played with an account,{" "}
                 <button
                   onClick={() => navigate(`/login?returnTo=${encodeURIComponent(`/game/${gameId}/play`)}`)}
-                  className="text-amber-400 hover:text-amber-300 underline"
+                  className={`${LINK} underline`}
                 >
                   log in
                 </button>

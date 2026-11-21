@@ -15,6 +15,7 @@ import type { UserBattler, PlayMode } from '../types'
 import { countLabel, cubeTitle, modeLabel, winRate } from '../utils/accountFormat'
 import { unknownToAppError } from '../utils/appError'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
+import { DIALOG_BACKDROP, DIALOG_CLOSE_BUTTON, OPTION_BOX, TEXT_INPUT } from '../components/common/styles'
 
 export function BattlerView() {
   const { listId } = useParams<{ listId: string }>()
@@ -176,13 +177,13 @@ function SettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className={`absolute inset-0 ${DIALOG_BACKDROP}`} onClick={onClose} />
       <SurfaceCard className="relative">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
           <h3 className="text-white font-semibold">Settings</h3>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-amber-100/70 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            className={DIALOG_CLOSE_BUTTON}
           >
             ✕
           </button>
@@ -195,12 +196,12 @@ function SettingsModal({
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+              className={TEXT_INPUT}
               placeholder={battler.cube_id}
             />
           </div>
 
-          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
+          <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
             <input
               type="checkbox"
               checked={playMode === 'constructed'}
@@ -211,7 +212,7 @@ function SettingsModal({
             <span className="text-amber-200/45 text-xs">— bring your own deck</span>
           </label>
 
-          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
+          <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
             <input
               type="checkbox"
               checked={useUpgrades}

@@ -23,6 +23,7 @@ import {
 } from "../utils/deviceIdentity";
 import type { LobbyState, PlayMode } from "../types";
 import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
+import { DIALOG_BACKDROP, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
 
 type SoloPhase =
   | "idle"
@@ -152,7 +153,7 @@ function AdvancedOptionsModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className={`absolute inset-0 ${DIALOG_BACKDROP}`}
         onClick={onClose}
       />
       <SurfaceCard className="relative">
@@ -191,7 +192,7 @@ function CubeIdInput({
         type="text"
         value={cubeId}
         onChange={(e) => setCubeId(e.target.value)}
-        className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+        className={TEXT_INPUT}
         placeholder="auto"
       />
     </div>
@@ -206,7 +207,7 @@ function UpgradesCheckbox({
   setUseUpgrades: (v: boolean) => void;
 }) {
   return (
-    <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
+    <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
       <input
         type="checkbox"
         checked={useUpgrades}
@@ -230,7 +231,7 @@ function ConstructedCheckbox({
 }) {
   const isConstructed = playMode === "constructed";
   return (
-    <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
+    <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
       <input
         type="checkbox"
         checked={isConstructed}
@@ -651,7 +652,7 @@ export function Play() {
                     }
                     disabled={nameLoading}
                     placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-                    className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] disabled:opacity-50"
+                    className={`${TEXT_INPUT} disabled:opacity-50`}
                   />
                 )}
                 <GuidedModeField enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
@@ -769,7 +770,7 @@ export function Play() {
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
           />
-          <label className="bg-black/35 border border-black/40 rounded-lg px-3 py-2.5 flex items-center gap-2 cursor-pointer">
+          <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
             <input
               type="checkbox"
               checked={autoApproveSpectators}
@@ -793,7 +794,7 @@ export function Play() {
             useUpgrades={useUpgrades}
             setUseUpgrades={setUseUpgrades}
           />
-          <div className="bg-black/35 border border-black/40 rounded-lg p-3">
+          <div className={`${OPTION_BOX} p-3`}>
             <label className="block text-gray-300 text-sm mb-2">
               Opponents
             </label>
@@ -825,7 +826,7 @@ export function Play() {
       {soloPhase === "not-enough-puppets" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className={`absolute inset-0 ${DIALOG_BACKDROP}`}
             onClick={handleCancelSolo}
           />
           <SurfaceCard className="relative text-center">

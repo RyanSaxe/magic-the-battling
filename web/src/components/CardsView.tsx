@@ -3,6 +3,7 @@ import { getGameCards, type GameCardsResponse } from '../api/client'
 import { CardPreviewModal } from './card/CardPreviewModal'
 import type { Card } from '../types'
 import { unknownToAppError } from '../utils/appError'
+import { TEXT_INPUT } from './common/styles'
 
 const COLOR_CHIPS: { code: string; label: string; bg: string; text: string; ring: string }[] = [
   { code: 'W', label: 'W', bg: 'bg-amber-100', text: 'text-amber-900', ring: 'ring-amber-300' },
@@ -120,7 +121,7 @@ export function CardsView({
   }
 
   const inputClass =
-    'w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] placeholder-gray-500'
+    `${TEXT_INPUT} placeholder-gray-500`
 
   const showFilters = which === 'cards'
 

@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/authState'
 import { unknownToAppError } from '../../utils/appError'
 import { joinLobbyByCode } from '../../utils/joinLobby'
 import { SurfaceCard } from '../common/SurfaceCard'
+import { DIALOG_BACKDROP, DIALOG_CLOSE_BUTTON, TEXT_INPUT } from '../common/styles'
 
 interface JoinGameModalProps {
   onClose: () => void
@@ -53,7 +54,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${DIALOG_BACKDROP}`}
       onClick={onClose}
     >
       <SurfaceCard className="relative" onClick={(e) => e.stopPropagation()}>
@@ -61,7 +62,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
           <h2 className="text-white font-semibold">Join Game</h2>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-full bg-black/35 btn-dark-border text-amber-100/70 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center"
+            className={DIALOG_CLOSE_BUTTON}
             aria-label="Close join game modal"
           >
             ✕
@@ -82,7 +83,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
               value={playerName}
               onChange={(e) => !user && setManualName(e.target.value)}
               disabled={!!user}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] disabled:opacity-50"
+              className={`${TEXT_INPUT} disabled:opacity-50`}
               placeholder="Enter your name"
               autoFocus={!user}
             />
@@ -95,7 +96,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-              className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] uppercase font-mono"
+              className={`${TEXT_INPUT} uppercase font-mono`}
               placeholder="ABC123"
             />
           </div>
