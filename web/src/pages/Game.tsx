@@ -168,7 +168,7 @@ function GameNoticeFrame({ children }: { children: ReactNode }) {
     />
   );
   return (
-    <PageFrame header={header} center="except-short-wide" contentClassName="items-center px-4">
+    <PageFrame header={header} center contentClassName="items-center px-4">
       {children}
     </PageFrame>
   );

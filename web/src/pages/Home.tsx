@@ -47,7 +47,7 @@ export function Home() {
             </button>
           </>
         )} />}
-        center="always"
+        center
         contentClassName="items-center px-4 pb-6"
       >
         {resumable && <ResumeGameStrip seat={resumable} />}

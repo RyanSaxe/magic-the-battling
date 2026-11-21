@@ -18,7 +18,7 @@ export function NotFound() {
     />
   )
   return (
-    <PageFrame header={header} center="except-short-wide" contentClassName="items-center px-4">
+    <PageFrame header={header} center contentClassName="items-center px-4">
       <StatusNotice
         title="Page not found"
         actions={

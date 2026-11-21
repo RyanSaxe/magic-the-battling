@@ -10,6 +10,7 @@ import { AppHeader } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
 import { ResumeGameCard } from "../components/ResumeGame";
 import { useResumableGames } from "../hooks/useResumableGames";
+import { SurfaceCard } from "../components/common/SurfaceCard";
 import { getLegendaryName } from "../utils/prefetchName";
 import { saveTabSession } from "../utils/tabSession";
 import {
@@ -153,7 +154,7 @@ function AdvancedOptionsModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative modal-chrome border gold-border rounded-lg p-5 w-full max-w-sm felt-raised-panel">
+      <SurfaceCard className="relative">
         <div className="flex items-center justify-between mb-4 pb-3 border-b border-black/40">
           <h3 className="text-white font-semibold">{title}</h3>
           <button
@@ -170,7 +171,7 @@ function AdvancedOptionsModal({
         >
           Done
         </button>
-      </div>
+      </SurfaceCard>
     </div>
   );
 }
@@ -615,12 +616,12 @@ export function Play() {
             Home
           </button>
         )} />}
-        center="tall-wide"
-        contentClassName="px-4 sm:items-center"
+        center
+        contentClassName="px-4"
         hints
       >
-        <section className="w-full max-w-md mx-auto modal-chrome border gold-border rounded-lg overflow-hidden grow shrink-0 flex flex-col sm:flex-none felt-raised-panel">
-          <div className="p-4 sm:p-5 flex-1 min-h-0 flex flex-col sm:flex-none">
+        <SurfaceCard as="section" className="overflow-hidden flex flex-col">
+          <div className="flex flex-col">
             {resumableGames.map((seat) => (
               <ResumeGameCard key={seat.gameId} seat={seat} />
             ))}
@@ -657,7 +658,7 @@ export function Play() {
             </div>
 
             {/* Single active-mode card for all breakpoints */}
-            <div className="w-full max-w-md mx-auto flex-1 min-h-0 sm:flex-none flex flex-col gap-3">
+            <div className="w-full max-w-md mx-auto flex flex-col gap-3">
               {activeMode === "solo" ? (
                 <>
                   {inactiveCard(
@@ -665,7 +666,7 @@ export function Play() {
                     <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
                     "Play with Friends",
                   )}
-                  <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col flex-1 min-h-0">
+                  <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col">
                     <div className="flex items-center gap-3 mb-2">
                       <GoldfishIcon className="w-8 h-8 text-amber-400" />
                       <h2 className="text-lg font-semibold text-white">Goldfish</h2>
@@ -709,7 +710,7 @@ export function Play() {
                     <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
                     "Goldfish",
                   )}
-                  <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col flex-1 min-h-0">
+                  <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col">
                     <div className="flex items-center gap-3 mb-2">
                       <FriendsIcon className="w-8 h-8 text-amber-400" />
                       <h2 className="text-lg font-semibold text-white">
@@ -751,7 +752,7 @@ export function Play() {
               )}
             </div>
           </div>
-        </section>
+        </SurfaceCard>
       </PageFrame>
 
       {showFriendsAdvanced && (
@@ -824,7 +825,7 @@ export function Play() {
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={handleCancelSolo}
           />
-          <div className="relative modal-chrome border gold-border rounded-lg p-8 w-full max-w-md text-center">
+          <SurfaceCard className="relative text-center">
             <h2 className="text-xl font-bold text-white mb-4">
               Not enough puppet data
             </h2>
@@ -859,7 +860,7 @@ export function Play() {
             >
               Cancel
             </button>
-          </div>
+          </SurfaceCard>
         </div>
       )}
     </>

@@ -13,6 +13,7 @@ import { AppHeader } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
 import { BusyNotice } from "../components/common/StatusNotice";
 import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
+import { SurfaceCard } from "../components/common/SurfaceCard";
 import { type AppError, getAppErrorMessage } from "../utils/appError";
 import {
   getDefaultNewPlayerPreference,
@@ -212,7 +213,7 @@ function VoiceChatSwitch({
         <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-300">
           Voice
         </span>
-        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400">
+        <span className="rounded-full bg-amber-500/20 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-amber-400 max-[389px]:hidden">
           Beta
         </span>
         <input
@@ -539,7 +540,7 @@ export function Lobby() {
   if (seat.kind !== "held") {
     return (
       <>
-        <PageFrame header={header} center="except-short-wide" contentClassName="items-center">
+        <PageFrame header={header} center contentClassName="items-center px-4">
           <LobbySeatNotice
             gameId={gameId}
             seat={seat}
@@ -556,7 +557,7 @@ export function Lobby() {
   if (!lobbyState) {
     return (
       <>
-        <PageFrame header={header} center="except-short-wide" contentClassName="items-center">
+        <PageFrame header={header} center contentClassName="items-center px-4">
           <BusyNotice label="Loading lobby..." />
         </PageFrame>
         {rulesPanel}
@@ -579,11 +580,11 @@ export function Lobby() {
       )}
       <PageFrame
         header={header}
-        center="tall-wide"
-        contentClassName="px-4 sm:items-center"
+        center
+        contentClassName="px-4"
         hints
       >
-        <div className="modal-chrome border gold-border rounded-lg p-4 w-full max-w-md overflow-visible sm:flex-none felt-raised-panel">
+        <SurfaceCard className="overflow-visible">
           {lobbyState &&
             (() => {
               const isHost = currentPlayer?.is_host ?? false;
@@ -975,7 +976,7 @@ export function Lobby() {
             </div>
 
             <div className="space-y-3 mb-3">
-              <div className="flex items-center justify-between rounded-md border border-black/40 bg-black/40 px-2 py-1">
+              <div className="flex items-center justify-between gap-2 rounded-md border border-black/40 bg-black/40 px-2 py-1">
                 <GuidedModeSwitch
                   enabled={isGuidedMode}
                   setEnabled={handleGuidedModeToggle}
@@ -1045,7 +1046,7 @@ export function Lobby() {
                 </>
               );
             })()}
-        </div>
+        </SurfaceCard>
       </PageFrame>
       {showRulesPanel && (
         <RulesPanel
