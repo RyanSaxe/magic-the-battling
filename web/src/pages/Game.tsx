@@ -2537,7 +2537,7 @@ function GameContent() {
             >
               {isEndPhase && gameId && !displayBattleResolution ? (
                 <>
-                  <div className="flex items-center gap-1.5 sm:gap-2 py-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <button
                       className="btn bg-slate-700 hover:bg-slate-600 text-white"
                       onClick={() =>
