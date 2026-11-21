@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
-import type { PersistedConstraintEntry } from "./usePersistedConstraints";
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { BoardSize, PersistedConstraintEntry } from "./usePersistedConstraints";
 import {
+  boardSizeBand,
   resolveConstraintHistory,
   resetConstraintHistoryFrom,
   upsertConstraintHistoryEntry,
+  usePersistedConstraints,
 } from "./usePersistedConstraints";
 
 describe("usePersistedConstraints helpers", () => {
@@ -152,5 +156,80 @@ describe("usePersistedConstraints helpers", () => {
         constraints: { leftFraction: 0.7 },
       },
     ]);
+  });
+});
+
+function createStorageMock() {
+  const store = new Map<string, string>();
+  return {
+    get length() {
+      return store.size;
+    },
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+  };
+}
+
+describe("usePersistedConstraints", () => {
+  const location = { scopeKey: "phase:build", stage: 4, round: 2 };
+  const laptop: BoardSize = { width: 980, height: 712 };
+  const desktop: BoardSize = { width: 1620, height: 992 };
+
+  beforeEach(() => vi.stubGlobal("localStorage", createStorageMock()));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("groups boards into bands with edges at 800 and 1400px wide and 600 and 900px tall", () => {
+    expect(boardSizeBand({ width: 799, height: 599 })).toBe("w0h0");
+    expect(boardSizeBand(laptop)).toBe("w1h1");
+    expect(boardSizeBand({ width: 1400, height: 900 })).toBe("w2h2");
+    expect(boardSizeBand({ width: 1140, height: 812 })).toBe(boardSizeBand({ width: 1180, height: 840 }));
+  });
+
+  it("applies a saved layout only on boards in the band it was saved in", () => {
+    const { result, rerender } = renderHook(({ board }) => usePersistedConstraints(location, board), {
+      initialProps: { board: laptop },
+    });
+    act(() => result.current.setConstraints({ topFraction: 0.3 }));
+    expect(result.current.constraints).toEqual({ topFraction: 0.3 });
+
+    rerender({ board: desktop });
+    expect(result.current.constraints).toBeNull();
+    expect(result.current.resolution.canReset).toBe(false);
+
+    rerender({ board: { width: 1020, height: 700 } });
+    expect(result.current.constraints).toEqual({ topFraction: 0.3 });
+  });
+
+  it("inherits a layout from an earlier round only within its band", () => {
+    const { result } = renderHook(() => usePersistedConstraints({ ...location, round: 1 }, laptop));
+    act(() => result.current.setConstraints({ topFraction: 0.3 }));
+
+    const later = renderHook(({ board }) => usePersistedConstraints(location, board), {
+      initialProps: { board: laptop },
+    });
+    expect(later.result.current.resolution.source).toBe("inherited");
+    later.rerender({ board: desktop });
+    expect(later.result.current.resolution.source).toBe("dynamic");
+  });
+
+  it("drops layouts saved before boards had bands", () => {
+    localStorage.setItem(
+      "mtb_zone_constraints:v2:phase:build",
+      JSON.stringify({
+        version: 2,
+        entries: [{ stage: 4, round: 2, mode: "constraints", constraints: { topFraction: 0.3 } }],
+      }),
+    );
+    const { result } = renderHook(() => usePersistedConstraints(location, laptop));
+    expect(result.current.constraints).toBeNull();
+  });
+
+  it("uses the automatic layout until the board has been measured", () => {
+    const { result } = renderHook(() => usePersistedConstraints(location, null));
+    act(() => result.current.setConstraints({ topFraction: 0.3 }));
+    expect(result.current.constraints).toBeNull();
+    expect(localStorage.length).toBe(0);
   });
 });

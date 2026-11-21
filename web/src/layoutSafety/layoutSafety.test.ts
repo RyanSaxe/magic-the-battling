@@ -105,7 +105,7 @@ function sweep(): Results {
         const label = saved ? `${zoneCase.label}, saved ${JSON.stringify(saved)}` : zoneCase.label;
         const failures = checkZoneLayout(viewport, zoneCase, saved);
         const checks: CheckId[] = ["card-outside-zone", "card-below-minimum", "zones-off-board", "grab-moves-layout"];
-        if (saved) checks.push("divider-off-saved-layout");
+        if (saved) checks.push("divider-off-saved-layout", "saved-layout-squeezes-zone");
         for (const check of checks) results.record(check, zoneCase.phase, viewport, label, failures);
         const { width, height } = viewport.zoneBoard;
         const layout = layoutForContainer(width, height, { ...zoneCase.config, constraints: saved });
