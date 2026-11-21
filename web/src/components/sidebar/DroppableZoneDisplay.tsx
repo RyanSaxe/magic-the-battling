@@ -196,7 +196,7 @@ export function DroppableZoneDisplay({
           onClick={() => cards.length > 0 && setShowModal(true)}
           className={`w-full flex flex-col items-center p-2 rounded ${
             cards.length > 0
-              ? 'hover:bg-gray-700/50 cursor-pointer'
+              ? 'hover:bg-[var(--stone)]/50 cursor-pointer'
               : 'cursor-default'
           }`}
         >
@@ -205,7 +205,7 @@ export function DroppableZoneDisplay({
           </div>
           {cards.length === 0 ? (
             <div
-              className="border border-dashed border-gray-600 rounded flex items-center justify-center"
+              className="border border-dashed border-[var(--stone-light)] rounded flex items-center justify-center"
               style={{ width: sizeStyles[size].width, height: sizeStyles[size].height }}
             >
               <span className="text-gray-600 text-[10px]">Empty</span>

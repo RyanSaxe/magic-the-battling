@@ -30,8 +30,8 @@ const variantConfig: Record<
     ),
   },
   info: {
-    badgeColor: 'bg-blue-500/20',
-    iconColor: 'text-blue-400',
+    badgeColor: 'bg-[var(--ivory)]/15',
+    iconColor: 'text-[var(--ivory)]',
     label: 'Info',
     icon: (
       <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">

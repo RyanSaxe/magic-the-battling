@@ -237,7 +237,7 @@ export function Card({
         {...restInteractiveProps}
       >
         {isLoading && (
-          <div className="skeleton absolute inset-0 flex items-center justify-center bg-gray-800">
+          <div className="skeleton absolute inset-0 flex items-center justify-center">
             <span className="text-gray-400 text-xs text-center px-2">{card.name}</span>
           </div>
         )}

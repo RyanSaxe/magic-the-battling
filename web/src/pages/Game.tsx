@@ -98,7 +98,7 @@ import {
   hasBattleResultConflict,
 } from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
-import { DIALOG_BACKDROP, LINK, OPTION_BOX } from "../components/common/styles";
+import { DIALOG_BACKDROP, LINK, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
 
 interface SpectatorConfig {
   spectatePlayer: string;
@@ -470,7 +470,7 @@ function PlayerSelectionModal({
               {humanPlayers.map((player) => (
                 <div
                   key={player.name}
-                  className="flex items-center justify-between bg-gray-800/50 rounded-lg p-3"
+                  className={`flex items-center justify-between ${OPTION_BOX} p-3`}
                 >
                   <div className="flex items-center gap-3">
                     <div
@@ -527,7 +527,7 @@ function PlayerSelectionModal({
                 type="text"
                 value={spectatorName}
                 onChange={(e) => setSpectatorName(e.target.value)}
-                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
+                className={TEXT_INPUT}
                 placeholder="Enter your name"
               />
             </div>

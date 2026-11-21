@@ -22,13 +22,13 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-          <div className="bg-gray-800 rounded-lg p-8 max-w-lg">
+        <div className="min-h-screen bg-[var(--chrome)] flex items-center justify-center p-4">
+          <div className="modal-chrome rounded-lg p-8 max-w-lg">
             <h1 className="text-2xl font-bold text-red-400 mb-4">Something went wrong</h1>
             <p className="text-gray-300 mb-4">
               {this.state.error?.message || 'An unexpected error occurred'}
             </p>
-            <pre className="bg-gray-900 p-4 rounded text-sm text-gray-400 overflow-auto max-h-64">
+            <pre className="bg-[var(--chrome)] p-4 rounded text-sm text-gray-400 overflow-auto max-h-64">
               {this.state.error?.stack}
             </pre>
             <button

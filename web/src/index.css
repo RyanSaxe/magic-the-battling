@@ -39,6 +39,9 @@
   --stone: #4e443d;
   --stone-light: #5e534b;
 
+  /* A switch's track while it's off */
+  --walnut-track: #29231f;
+
   /* Ivory label text on walnut */
   --ivory: #f3ead9;
 
@@ -211,6 +214,20 @@ input:-webkit-autofill:focus {
   --btn-secondary-fill: var(--stone);
   --btn-secondary-fill-hover: var(--stone-light);
   --btn-secondary-fill-pressed: #453b35;
+}
+
+/* A switch's track. It sits in the components layer so peer-checked: can turn it gold. */
+@layer components {
+  .switch-track {
+    background-color: var(--walnut-track);
+    box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.22);
+  }
+}
+
+/* The switch's checkbox is visually hidden, so its track shows the focus ring */
+.peer:focus-visible ~ .switch-track {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
 }
 
 /* An item in a walnut menu or picker. Hover fills the whole item, including a submenu's indent. */

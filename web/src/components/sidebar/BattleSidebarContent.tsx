@@ -76,7 +76,7 @@ function LifeCounter({
           onChange={(e) => setInputValue(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="w-10 h-6 text-center text-white text-sm rounded border border-[var(--gold-border)] focus:outline-none focus:border-[var(--color-gold)]" style={{ background: 'var(--chrome)' }}
+          className="w-10 h-6 text-center text-white text-sm rounded border border-[var(--gold-border)] focus:outline-none focus:border-[var(--color-gold-bright)]" style={{ background: 'var(--chrome)' }}
           autoFocus
         />
       ) : (
