@@ -64,8 +64,8 @@ export function PageFrame({
       </div>
 
       {footer ?? (
-        <footer className="shrink-0 frame-chrome bar-pad-both py-2">
-          <div className="flex items-center justify-between">
+        <footer className="shrink-0 frame-chrome bar-pad-both">
+          <div className="h-[var(--frame-bar-height)] flex items-center justify-between">
             <a
               href="https://discord.gg/2NAjcWXNKn"
               target="_blank"
