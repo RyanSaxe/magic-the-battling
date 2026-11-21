@@ -430,13 +430,13 @@ input:-webkit-autofill:focus {
    page still lays out, centers and scrolls around its scaled size. A browser
    without zoom shows the card at its normal size. */
 @media (min-width: 1600px) {
-  .surface-card {
+  .surface-card-page {
     zoom: 1.15;
   }
 }
 
 @media (min-width: 1920px) {
-  .surface-card {
+  .surface-card-page {
     zoom: 1.3;
   }
 }
