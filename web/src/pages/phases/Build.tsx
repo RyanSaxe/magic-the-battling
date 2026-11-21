@@ -14,7 +14,7 @@ import { CardGrid } from "../../components/common/CardGrid";
 import { LayoutResetControl } from "../../components/common/LayoutResetControl";
 import { UpgradeGrid } from "../../components/common/UpgradeGrid";
 import { ZoneLayout } from "../../components/common/ZoneLayout";
-import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
+import { usePersistedConstraints, type BoardSize } from "../../hooks/usePersistedConstraints";
 import { useResizableLayout } from "../../hooks/useResizableLayout";
 import { buildLayoutConfig } from "./phaseLayouts";
 
@@ -283,16 +283,20 @@ export function BuildPhase({
     setStableSBCount(self_player.sideboard.length);
   }
 
+  const [measuredBoard, setMeasuredBoard] = useState<BoardSize | null>(null);
   const {
     constraints,
     setConstraints,
     clearConstraints,
     resolution: persistedLayout,
-  } = usePersistedConstraints({
-    scopeKey: "phase:build",
-    stage: self_player.stage,
-    round: self_player.round,
-  });
+  } = usePersistedConstraints(
+    {
+      scopeKey: "phase:build",
+      stage: self_player.stage,
+      round: self_player.round,
+    },
+    measuredBoard,
+  );
 
   const layoutConfig = buildLayoutConfig({
     handSize: maxHandSize,
@@ -300,13 +304,15 @@ export function BuildPhase({
     upgradeRailCount: hasDesktopUpgradeRail ? self_player.upgrades.length : 0,
   });
 
-  const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
+  const { containerRef, dims, containerSize, zoneFrames, zoneRefs, dividerCallbacks } =
     useResizableLayout({
       layoutConfig,
       constraints,
       onConstraintsChange: setConstraints,
       onConstraintsClear: clearConstraints,
     });
+  // A saved layout belongs to a board size band, known once the board is measured.
+  if (measuredBoard !== containerSize) setMeasuredBoard(containerSize);
 
   const handDims = { width: dims.hand.width, height: dims.hand.height };
   const bfDims = {
@@ -338,7 +344,7 @@ export function BuildPhase({
     return (
       <button
         type="button"
-        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-600 text-white shadow-md ring-1 ring-black/40 hover:bg-purple-500 transition-opacity duration-150 ${visibilityClasses}`}
+        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold btn-game transition-opacity duration-150 ${visibilityClasses}`}
         onClick={(e) => {
           e.stopPropagation();
           onQuickUpgrade?.(card.id);
@@ -357,7 +363,7 @@ export function BuildPhase({
     return (
       <button
         type="button"
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold bg-purple-600 text-white shadow-md ring-1 ring-black/40 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto hover:bg-purple-500 transition-opacity duration-150"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold btn-game opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-150"
         onClick={(e) => {
           e.stopPropagation();
           onQuickApplyUpgrade(upgrade.id);
@@ -536,10 +542,10 @@ export function BuildPhase({
                           actions.buildSetCompanion(card.id);
                         }
                       }}
-                      className={`absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg disabled:opacity-50 disabled:cursor-not-allowed ${
+                      className={`absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg ${
                         isActiveCompanion
-                          ? "bg-amber-500/90 text-black"
-                          : "bg-purple-600/80 text-white hover:bg-purple-500/90"
+                          ? "bg-amber-500/90 text-black disabled:opacity-50 disabled:cursor-not-allowed"
+                          : "btn-game"
                       }`}
                     >
                       {isActiveCompanion ? "Companion" : "Set Companion"}

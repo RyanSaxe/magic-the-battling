@@ -4,7 +4,7 @@ import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { LayoutResetControl } from '../../components/common/LayoutResetControl'
 import { UpgradeGrid } from '../../components/common/UpgradeGrid'
 import { ZoneLayout } from '../../components/common/ZoneLayout'
-import { usePersistedConstraints } from '../../hooks/usePersistedConstraints'
+import { usePersistedConstraints, type BoardSize } from '../../hooks/usePersistedConstraints'
 import { useResizableLayout } from '../../hooks/useResizableLayout'
 import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
 import { draftLayoutConfig } from './phaseLayouts'
@@ -37,16 +37,20 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
   const pool = [...self_player.hand, ...self_player.sideboard]
   const hasDesktopUpgradeRail = showDesktopUpgradeRail && self_player.upgrades.length > 0
 
+  const [measuredBoard, setMeasuredBoard] = useState<BoardSize | null>(null)
   const {
     constraints,
     setConstraints,
     clearConstraints,
     resolution: persistedLayout,
-  } = usePersistedConstraints({
-    scopeKey: 'phase:draft',
-    stage: self_player.stage,
-    round: self_player.round,
-  })
+  } = usePersistedConstraints(
+    {
+      scopeKey: 'phase:draft',
+      stage: self_player.stage,
+      round: self_player.round,
+    },
+    measuredBoard,
+  )
 
   const layoutConfig = draftLayoutConfig({
     packCount: currentPack.length,
@@ -54,7 +58,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     upgradeRailCount: hasDesktopUpgradeRail ? self_player.upgrades.length : 0,
   })
 
-  const { containerRef, dims, zoneFrames, zoneRefs, dividerCallbacks } =
+  const { containerRef, dims, containerSize, zoneFrames, zoneRefs, dividerCallbacks } =
     useResizableLayout({
       layoutConfig,
       constraints,
@@ -62,6 +66,9 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
       onConstraintsClear: clearConstraints,
       allowHorizontalResize: !isMobile,
     })
+  // A saved layout belongs to a board size band, known once the board is measured.
+  if (measuredBoard !== containerSize) setMeasuredBoard(containerSize)
+
   const packDims = dims.pack
   const poolDims = dims.pool
   const upgradesDims = dims.upgrades

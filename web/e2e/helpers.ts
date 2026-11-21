@@ -1,6 +1,6 @@
 import { basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { expect, test as base, type Locator, type Page, type Route } from '@playwright/test'
+import { expect, test as base, type Locator, type Page, type Route, type WebSocketRoute } from '@playwright/test'
 import type {
   AuthUser,
   FollowedBattler,
@@ -10,9 +10,12 @@ import type {
   SharePlayerSnapshot,
   UserBattler,
 } from '../src/types'
-import { gameBootstrap, type ScreenState } from './gameStates'
+import { GAME_ID, PLAYER_NAME, gameBootstrap, type ScreenState } from './gameStates'
 
 type MockResponse = { status?: number; json: unknown }
+
+/** Set LAYOUT_CARD_ART=real to load real card images from Scryfall, for screenshots; runs stay offline otherwise. */
+const SHOW_REAL_CARD_ART = process.env.LAYOUT_CARD_ART === 'real'
 
 const isLoopback = (ipAddress: string) => ipAddress.startsWith('127.') || ipAddress === '::1' || ipAddress === '[::1]'
 
@@ -24,6 +27,8 @@ export const test = base.extend<{ stayOffline: void }>({
       outsideResponses.push(response.serverAddr().then((address) => (address && !isLoopback(address.ipAddress) ? response.url() : null)))
     })
     await use()
+    // Real card art is fetched on purpose, for screenshots taken on a developer's machine.
+    if (SHOW_REAL_CARD_ART) return
     const reachedNetwork = (await Promise.all(outsideResponses)).filter((url) => url !== null)
     expect(reachedNetwork, 'responses from servers outside this machine').toEqual([])
   }, { auto: true }],
@@ -50,7 +55,7 @@ const SIGNED_OUT_RESPONSES: Record<string, MockResponse> = {
 
 const USER: AuthUser = { user_id: 'user-1', username: 'tester' }
 
-function battler(id: number, cubeId: string, name: string): UserBattler {
+export function battler(id: number, cubeId: string, name: string): UserBattler {
   return {
     id,
     cube_id: cubeId,
@@ -69,6 +74,10 @@ function battler(id: number, cubeId: string, name: string): UserBattler {
     game_count: 12,
     human_player_count: 5,
     last_played: '2026-01-02T00:00:00Z',
+    my_game_count: 4,
+    my_win_count: 1,
+    my_average_placement: 2.25,
+    my_last_played: '2026-01-02T00:00:00Z',
   }
 }
 
@@ -88,7 +97,7 @@ const FOLLOWING: FollowedBattler[] = [
   },
 ]
 
-function gameSummary(index: number): GameSummary {
+export function gameSummary(index: number): GameSummary {
   return {
     game_id: `game-${index}`,
     created_at: '2026-01-02T00:00:00Z',
@@ -113,9 +122,22 @@ const SIGNED_IN_RESPONSES: Record<string, MockResponse> = {
   '/api/battlers': { json: { battlers: BATTLERS, has_more: false } },
   '/api/battlers/following': { json: { following: FOLLOWING, has_more: false } },
   '/api/battlers/my-games': { json: GAMES },
-  '/api/discover': { json: { results: [], has_more: false } },
+  '/api/discover': { json: { results: [], has_more: false, total: 0 } },
   '/api/battlers/1/games': { json: GAMES },
   '/api/battlers/cube/vintage-cube/games': { json: GAMES },
+  '/api/battlers/cube/vintage-cube': {
+    json: {
+      cube_id: 'vintage-cube',
+      cube_name: 'Vintage Cube',
+      cube_image_uri: null,
+      game_count: 4,
+      human_player_count: 5,
+      last_played: '2026-01-02T00:00:00Z',
+      popular_setup: { play_mode: 'limited', use_upgrades: true },
+      is_following: false,
+      follow_id: null,
+    },
+  },
 }
 
 export const LOBBY_GAME_ID = 'game-lobby'
@@ -272,22 +294,43 @@ const CARD_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
   <rect x="40" y="70" width="408" height="300" rx="6" fill="#55534d"/>
 </svg>`
 
-/** Set LAYOUT_CARD_ART=real to load real card images from Scryfall, for screenshots; runs stay offline otherwise. */
-const SHOW_REAL_CARD_ART = process.env.LAYOUT_CARD_ART === 'real'
+/** A player's Guided Mode progress in a game: the guides they have seen and the one left open at a step. */
+export interface GuideProgress {
+  seen: string[]
+  active_guide?: { id: string; step: number }
+}
+
+export interface ServeGameOptions {
+  /** Turns Guided Mode on with this progress. */
+  guideProgress?: GuideProgress
+  /** Receives the game socket, to read the client's actions and send more state. */
+  onSocket?: (ws: WebSocketRoute) => void
+}
 
 /** Opens a game whose server sends `screen` as its state. */
-export async function serveGame(page: Page, baseURL: string, screen: ScreenState) {
+export async function serveGame(
+  page: Page,
+  baseURL: string,
+  screen: ScreenState,
+  { guideProgress, onSocket }: ServeGameOptions = {},
+) {
   await serveWithoutBackend(page, baseURL)
   await page.route(/^https:\/\/(cards|backs)\.scryfall\.io\//, (route) =>
     SHOW_REAL_CARD_ART ? route.continue() : route.fulfill({ body: CARD_PLACEHOLDER_SVG, contentType: 'image/svg+xml' }))
-  await page.addInitScript((session) => {
+  await page.addInitScript(({ session, progressKey, guideProgress }) => {
     sessionStorage.setItem('mtb_session', session.sessionId)
     sessionStorage.setItem('mtb_player', session.playerId)
-    // Guided Mode is on for new players and opens panels over the board, so play as a returning player.
-    localStorage.setItem('mtb_guided_mode_preference', '0')
-  }, LOBBY_SESSION)
+    if (guideProgress) {
+      localStorage.setItem('mtb_guided_mode_preference', '1')
+      localStorage.setItem('mtb_guided_progress', JSON.stringify({ [progressKey]: guideProgress }))
+    } else {
+      // Guided Mode is on for new players and opens panels over the board, so play as a returning player.
+      localStorage.setItem('mtb_guided_mode_preference', '0')
+    }
+  }, { session: LOBBY_SESSION, progressKey: `${GAME_ID}::${PLAYER_NAME}`, guideProgress })
   await page.routeWebSocket(/\/ws\//, (ws) => {
     ws.send(JSON.stringify({ type: 'game_bootstrap', payload: gameBootstrap(screen) }))
+    onSocket?.(ws)
   })
 }
 
@@ -330,19 +373,31 @@ export const PAGES: PageUnderTest[] = [
     name: 'dashboard',
     path: '/dashboard',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('button', { name: '+ Add Cube' }),
+    primaryAction: (page) => page.getByRole('button', { name: 'New Game' }),
+  },
+  {
+    name: 'games',
+    path: '/dashboard/games',
+    serve: serveSignedIn,
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search games' }),
+  },
+  {
+    name: 'discover',
+    path: '/dashboard/discover',
+    serve: serveSignedIn,
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search cubes' }),
   },
   {
     name: 'battler',
     path: '/dashboard/list/1',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play', exact: true }),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play Preset' }),
   },
   {
     name: 'cube',
     path: '/cube/vintage-cube',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play', exact: true }),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play Cube' }),
   },
   {
     name: 'lobby',

@@ -1,5 +1,5 @@
-import { expect, test, type Locator } from '@playwright/test'
-import { LOBBY_GAME_ID, serveLobby } from './helpers'
+import type { Locator } from '@playwright/test'
+import { LOBBY_GAME_ID, expect, serveLobby, test } from './helpers'
 
 async function boxOf(locator: Locator) {
   const box = await locator.boundingBox()
