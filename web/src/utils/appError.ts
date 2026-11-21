@@ -180,6 +180,9 @@ export function getAppErrorMessage(
         if (context === 'share-game') {
           return 'This game is no longer available to share.'
         }
+        if (context === 'join-game') {
+          return 'No game found with that join code. Check the code and try again.'
+        }
         return 'This game is no longer available. It may have ended or been cleared during a server restart.'
       case 'SPECTATE_TARGET_NOT_FOUND':
         return 'That player is no longer available to spectate.'

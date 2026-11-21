@@ -52,10 +52,18 @@ interface WindowControlButtonProps {
   ariaLabel: string
   title: string
   colorClassName: string
+  touchAreaClassName: string
   onClick: () => void
   onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
   disabled?: boolean
 }
+
+// The dots are 8px apart, so each area stops halfway into the gap next to it. Offsets count
+// from inside the dot's 1px border, and every area starts at the header's top edge because
+// the window clips anything above it.
+const CLOSE_TOUCH_AREA = '[--touch-area-w:35px] [--touch-area-left:-18px] [--touch-area-top:-13px]'
+const MINIMIZE_TOUCH_AREA = '[--touch-area-w:22px] [--touch-area-top:-13px]'
+const RESET_TOUCH_AREA = '[--touch-area-left:-5px] [--touch-area-top:-13px]'
 
 const WINDOW_STORAGE_KEY = 'mtb_rules_panel_window:v2'
 const LEGACY_WINDOW_STORAGE_KEY = 'mtb_rules_panel_window:v1'
@@ -143,6 +151,7 @@ function WindowControlButton({
   ariaLabel,
   title,
   colorClassName,
+  touchAreaClassName,
   onClick,
   onPointerDown,
   disabled = false,
@@ -155,7 +164,7 @@ function WindowControlButton({
       onClick={onClick}
       onPointerDown={onPointerDown}
       disabled={disabled}
-      className={`h-3.5 w-3.5 rounded-full border border-black/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-opacity ${
+      className={`touch-area ${touchAreaClassName} h-3.5 w-3.5 rounded-full border border-black/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-opacity ${
         disabled ? `${colorClassName} cursor-default opacity-45` : `${colorClassName} hover:opacity-90`
       }`}
     />
@@ -520,6 +529,7 @@ export function RulesPanel({
                 ariaLabel="Close guide"
                 title="Close"
                 colorClassName="bg-[#ff5f57]"
+                touchAreaClassName={CLOSE_TOUCH_AREA}
                 onClick={onClose}
                 onPointerDown={handleControlPointerDown}
               />
@@ -527,6 +537,7 @@ export function RulesPanel({
                 ariaLabel="Minimize guide"
                 title="Minimize"
                 colorClassName="bg-[#febc2e]"
+                touchAreaClassName={MINIMIZE_TOUCH_AREA}
                 onClick={handleCollapse}
                 onPointerDown={handleControlPointerDown}
                 disabled={isCollapsed}
@@ -535,6 +546,7 @@ export function RulesPanel({
                 ariaLabel={isCollapsed ? 'Open guide' : 'Reset guide window'}
                 title={isCollapsed ? 'Open' : 'Reset'}
                 colorClassName="bg-[#28c840]"
+                touchAreaClassName={RESET_TOUCH_AREA}
                 onClick={handleGreenControl}
                 onPointerDown={handleControlPointerDown}
               />
@@ -606,6 +618,7 @@ export function RulesPanel({
               ariaLabel="Close guide"
               title="Close"
               colorClassName="bg-[#ff5f57]"
+              touchAreaClassName={CLOSE_TOUCH_AREA}
               onClick={onClose}
               onPointerDown={handleControlPointerDown}
             />
@@ -613,6 +626,7 @@ export function RulesPanel({
               ariaLabel="Minimize guide"
               title="Minimize"
               colorClassName="bg-[#febc2e]"
+              touchAreaClassName={MINIMIZE_TOUCH_AREA}
               onClick={handleCollapse}
               onPointerDown={handleControlPointerDown}
               disabled={isCollapsed}
@@ -621,6 +635,7 @@ export function RulesPanel({
               ariaLabel={isCollapsed ? 'Open guide' : 'Reset guide window'}
               title={isCollapsed ? 'Open' : 'Reset'}
               colorClassName="bg-[#28c840]"
+              touchAreaClassName={RESET_TOUCH_AREA}
               onClick={handleGreenControl}
               onPointerDown={handleControlPointerDown}
             />

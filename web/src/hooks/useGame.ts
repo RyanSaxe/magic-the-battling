@@ -72,6 +72,10 @@ export function useGame(
     send('build_swap', { card_a_id: cardAId, source_a: sourceA, card_b_id: cardBId, source_b: sourceB })
   }, [send])
 
+  const buildSetBasics = useCallback((basics: string[]) => {
+    send('build_set_basics', { basics })
+  }, [send])
+
   const buildReady = useCallback((basics: string[], playDrawPreference: 'play' | 'draw', handOrder?: string[]) => {
     send('build_ready', { basics, play_draw_preference: playDrawPreference, hand_order: handOrder })
   }, [send])
@@ -178,6 +182,7 @@ export function useGame(
       draftDone,
       buildMove,
       buildSwap,
+      buildSetBasics,
       buildReady,
       buildUnready,
       buildApplyUpgrade,

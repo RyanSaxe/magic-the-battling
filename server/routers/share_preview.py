@@ -6,7 +6,6 @@ import time
 from collections import defaultdict
 from html import escape
 from pathlib import Path
-from typing import cast
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Request
@@ -15,8 +14,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from server.db import database
 from server.db.models import GameRecord, PlayerGameHistory
-from server.routers.games import _build_human_snapshots, _build_puppet_snapshots
-from server.schemas.api import ShareGameResponse, SharePlayerData
+from server.routers.games import build_share_player
+from server.schemas.api import ShareGameResponse
 from server.services.preview import cache_key as preview_cache_key
 from server.services.preview import preview_service
 
@@ -79,24 +78,7 @@ def _fetch_share_data(game_id: str, player_name: str, db: Session) -> ShareGameR
         game_record.shared = True  # ty: ignore[invalid-assignment]
         db.commit()
 
-    players: list[SharePlayerData] = []
-    for history in histories:
-        is_puppet = bool(history.is_puppet)
-        if is_puppet:
-            snapshots = _build_puppet_snapshots(history, db)
-        else:
-            snapshots = _build_human_snapshots(history)
-
-        final_poison = snapshots[-1].poison if snapshots else 0
-        players.append(
-            SharePlayerData(
-                name=str(history.player_name),
-                final_placement=cast(int, history.final_placement) if history.final_placement is not None else None,
-                final_poison=final_poison,
-                is_puppet=is_puppet,
-                snapshots=snapshots,
-            )
-        )
+    players = [build_share_player(history, db) for history in histories]
 
     created_at = game_record.created_at.isoformat() if game_record.created_at else ""
 
