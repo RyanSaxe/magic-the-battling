@@ -607,7 +607,7 @@ class GameManager:
         try:
             record = session.query(GameRecord).filter(GameRecord.id == game_id).first()
             if record and record.ended_at is None:
-                record.ended_at = datetime.now(UTC)  # ty: ignore[invalid-assignment]
+                record.ended_at = datetime.now(UTC)
                 session.commit()
         except Exception:
             logger.debug("Skipping ended_at update for game_id=%s", game_id, exc_info=True)
