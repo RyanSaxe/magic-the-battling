@@ -1691,3 +1691,16 @@ input:-webkit-autofill:focus {
     inset 0 2px 8px rgba(0, 0, 0, 0.4),
     inset 0 -2px 8px rgba(0, 0, 0, 0.25);
 }
+
+.rotate-prompt {
+  display: none;
+}
+
+/* Phones in landscape leave too little height for the board. Tablets are taller than 500px in landscape, and
+   pointer: coarse keeps it off short desktop windows, which a width limit can't do without missing large phones
+   (932px and wider in landscape). */
+@media (orientation: landscape) and (max-height: 499px) and (pointer: coarse) {
+  .rotate-prompt {
+    display: flex;
+  }
+}
