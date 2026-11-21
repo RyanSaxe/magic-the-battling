@@ -14,7 +14,7 @@ export function StatusNotice({
   return (
     <SurfaceCard>
       <h2 className="text-lg font-semibold text-amber-200">{title}</h2>
-      <div className="text-sm text-gray-200 mt-2 leading-snug">{children}</div>
+      <div className="text-sm text-[var(--ivory)] mt-2 leading-snug">{children}</div>
       <div className="mt-4 flex flex-wrap gap-2">{actions}</div>
     </SurfaceCard>
   )
@@ -31,7 +31,7 @@ export function BusyNotice({ label }: { label: string }) {
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
         />
       </svg>
-      <span className="text-sm text-gray-100">{label}</span>
+      <span className="text-sm text-[var(--ivory)]">{label}</span>
     </div>
   )
 }

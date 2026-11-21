@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { winsLabel } from '../../utils/accountFormat'
 import { SurfaceCard } from '../common/SurfaceCard'
 import { SECTION_TITLE_TYPE } from './typography'
+import { LINK } from '../common/styles'
 
 const SECTION_META_TYPE = 'text-[12.5px] leading-5'
 
@@ -12,7 +13,7 @@ export function SectionTitle({ children }: { children: ReactNode }) {
 
 export function SectionLink({ to, children }: { to: string; children: ReactNode }) {
   return (
-    <Link to={to} className={`${SECTION_META_TYPE} font-medium text-amber-400 hover:text-amber-300 transition-colors whitespace-nowrap`}>
+    <Link to={to} className={`${SECTION_META_TYPE} font-medium ${LINK} transition-colors whitespace-nowrap`}>
       {children}
     </Link>
   )
@@ -78,7 +79,7 @@ export function NoticeTile({
 export function Breadcrumb({ to, label, current }: { to: string; label: string; current: string }) {
   return (
     <nav aria-label="Breadcrumb" className="flex min-w-0 items-baseline gap-2 text-xs">
-      <Link to={to} className="shrink-0 text-amber-400 hover:text-amber-300 transition-colors">
+      <Link to={to} className={`shrink-0 ${LINK} transition-colors`}>
         ← {label}
       </Link>
       <span className="text-amber-200/45">/</span>

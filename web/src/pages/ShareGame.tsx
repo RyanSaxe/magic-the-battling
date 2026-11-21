@@ -90,7 +90,7 @@ function RoundPopover({
           className={`text-sm py-1.5 px-3 rounded text-left transition-colors ${
             opt.value === selectedRound
               ? 'bg-amber-600/80 text-white'
-              : 'text-gray-300 hover:bg-gray-700/60'
+              : 'menu-item text-[var(--ivory-muted)]'
           }`}
         >
           {opt.label}
@@ -238,7 +238,7 @@ export function ShareGame() {
         <div className="flex-1 flex items-center justify-center px-4">
           <SurfaceCard>
             <h2 className="text-lg font-semibold text-amber-200">No Round Data</h2>
-            <p className="text-sm text-gray-200 mt-2 leading-snug">
+            <p className="text-sm text-[var(--ivory)] mt-2 leading-snug">
               No round data is available for this game.
             </p>
           </SurfaceCard>
@@ -269,7 +269,7 @@ export function ShareGame() {
     return (
       <div className="flex-1 flex items-center justify-center px-4">
         <SurfaceCard>
-          <p className="text-sm text-gray-200 leading-snug">
+          <p className="text-sm text-[var(--ivory)] leading-snug">
             {currentPlayerData ? absentMessage : 'Select a player to view their deck.'}
           </p>
         </SurfaceCard>
@@ -401,7 +401,7 @@ export function ShareGame() {
             }`}
           >
             <aside className="w-[var(--sidebar-width)] h-full frame-chrome flex flex-col overflow-hidden">
-              <div className="px-3 py-2 text-sm font-medium text-gray-400">
+              <div className="px-3 py-2 text-sm font-medium text-[var(--ivory-muted)]">
                 Players
               </div>
               <div className="overflow-y-auto flex-1">

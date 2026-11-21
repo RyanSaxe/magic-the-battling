@@ -45,7 +45,7 @@ export function PileZone({
         disabled={!allowInteraction}
         className={`zone-pile ${bgColor} w-16 h-24 flex items-center justify-center`}
       >
-        <span className="text-gray-500 text-xs">{label}</span>
+        <span className="text-[var(--ivory-muted)] text-xs">{label}</span>
       </DroppableZone>
     )
   }
@@ -92,7 +92,7 @@ export function PileZone({
             </h3>
             <button
               onClick={() => setIsExpanded(false)}
-              className="text-gray-400 hover:text-white"
+              className="text-[var(--ivory-muted)] hover:text-white"
             >
               Close
             </button>

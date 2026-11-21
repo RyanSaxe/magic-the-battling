@@ -169,7 +169,7 @@ export function PlayerRow({
         </div>
       </div>
 
-      <div className="justify-self-end self-end max-w-[8.5rem] text-xs text-gray-400">
+      <div className="justify-self-end self-end max-w-[8.5rem] text-xs text-[var(--ivory-muted)]">
         <ResultBadge
           result={player.last_result}
           inSuddenDeath={player.in_sudden_death}
@@ -202,7 +202,7 @@ export function PlayerRow({
         </div>
       </div>
 
-      <div className="justify-self-end self-start max-w-[8.5rem] min-w-0 text-xs text-gray-400">
+      <div className="justify-self-end self-start max-w-[8.5rem] min-w-0 text-xs text-[var(--ivory-muted)]">
         <div className="text-right">
           <StatusLine player={player} variant={variant} />
         </div>

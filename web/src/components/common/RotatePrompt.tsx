@@ -8,7 +8,7 @@ export function RotatePrompt() {
     <div className="rotate-prompt game-table fixed inset-0 z-[200] items-center justify-center p-4">
       <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-4 flex items-center gap-3">
         <MdScreenRotation className="h-7 w-7 shrink-0 text-amber-400" aria-hidden="true" />
-        <span className="text-sm text-gray-100">Turn your phone upright to keep playing.</span>
+        <span className="text-sm text-[var(--ivory)]">Turn your phone upright to keep playing.</span>
       </div>
     </div>
   );

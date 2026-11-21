@@ -113,14 +113,14 @@ export function ZoneModal({
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-lg leading-none"
+            className="text-[var(--ivory-muted)] hover:text-white text-lg leading-none"
           >
             ✕
           </button>
         </div>
         <div ref={bodyRef} className="flex-1 min-h-0 p-3 overflow-auto">
           {cards.length === 0 ? (
-            <div className="text-gray-500 text-center py-4">No cards</div>
+            <div className="text-[var(--ivory-muted)] text-center py-4">No cards</div>
           ) : (
             <div
               className="grid gap-2 justify-center content-start"
@@ -179,9 +179,9 @@ export function ZoneDisplay({
           cards.length > 0 ? "hover:cursor-pointer" : "cursor-default"
         }`}
       >
-        <div className="text-[10px] text-gray-400 uppercase mb-1">{title}</div>
+        <div className="text-[10px] text-[var(--ivory-muted)] uppercase mb-1">{title}</div>
         {cards.length === 0 ? (
-          <span className="text-gray-500 text-xs">No Cards Seen</span>
+          <span className="text-[var(--ivory-muted)] text-xs">No Cards Seen</span>
         ) : (
           <div className="flex flex-col items-center gap-0.5">
             <div className="grid gap-1 grid-cols-3">
@@ -205,7 +205,7 @@ export function ZoneDisplay({
               )}
             </div>
             {remainingCount > 0 && (
-              <div className="text-[10px] text-gray-400">
+              <div className="text-[10px] text-[var(--ivory-muted)]">
                 +{remainingCount} more
               </div>
             )}

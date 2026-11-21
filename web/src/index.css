@@ -39,8 +39,16 @@
   --stone: #4e443d;
   --stone-light: #5e534b;
 
-  /* Ivory label text on walnut */
+  /* A switch's track while it's off */
+  --walnut-track: #29231f;
+
+  /* Ivory label text on walnut, then quieter text, then the faintest, which is for disabled text and placeholders */
   --ivory: #f3ead9;
+  --ivory-muted: #b8aea3;
+  --ivory-faint: #94897f;
+
+  /* Quiet text on the felt: muted ivory a step lighter, so it holds 4.5:1 on the felt's lightest centre */
+  --ivory-felt: #e0d6c8;
 
   /* Bright gold marker for something waiting on the player */
   --color-gold-bright: #f5d76e;
@@ -219,6 +227,65 @@ input:-webkit-autofill:focus {
   --btn-secondary-fill: var(--stone);
   --btn-secondary-fill-hover: var(--stone-light);
   --btn-secondary-fill-pressed: #453b35;
+}
+
+/* A switch's track: walnut when off and gold when on */
+@layer components {
+  .switch-track {
+    background-color: var(--walnut-track);
+    box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.22);
+  }
+
+  .peer:checked ~ .switch-track {
+    background-color: var(--color-gold);
+  }
+}
+
+/* The switch's checkbox is visually hidden, so its track shows the focus ring */
+.peer:focus-visible ~ .switch-track {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+}
+
+/* An item in a walnut menu or picker. Hover fills the whole item, including a submenu's indent. */
+.menu-item:hover:not(:disabled) {
+  background-color: var(--stone);
+}
+
+/* Inside the item, so the menu's rounded edges and a scrolling submenu don't clip the ring */
+.menu-item:focus-visible {
+  outline-offset: -2px;
+}
+
+.menu-item[aria-expanded="true"] {
+  background-color: rgba(212, 175, 55, 0.12);
+  color: #fae6a2;
+}
+
+/* A submenu sits recessed under its row. Its items are indented past a gold guide line, drawn on each row so it
+   scrolls with them and shows over their hover. */
+.menu-submenu {
+  background-color: #332a28;
+}
+
+.menu-submenu .menu-item {
+  padding-left: 26px;
+  background-image: linear-gradient(to right,
+      transparent 12px,
+      rgba(212, 175, 55, 0.28) 12px,
+      rgba(212, 175, 55, 0.28) 13px,
+      transparent 13px);
+}
+
+/* A destructive item, like Delete. These reds keep 4.5:1 on walnut and on every hover fill. */
+.menu-item-destructive,
+.btn-secondary.btn-destructive {
+  color: #fca5a5;
+}
+
+.menu-item-destructive:hover:not(:disabled),
+.btn-secondary.btn-destructive:hover:not(:disabled) {
+  color: #fecaca;
 }
 
 .battle-panel-chrome {
@@ -980,15 +1047,6 @@ input:-webkit-autofill:focus {
   background: color-mix(in srgb, var(--btn-secondary-fill) 55%, transparent);
   color: color-mix(in srgb, var(--ivory) 42%, transparent);
   cursor: not-allowed;
-}
-
-/* A destructive action that isn't the main one, like Delete. These reds keep 4.5:1 on every secondary fill. */
-.btn-secondary.btn-destructive {
-  color: #fca5a5;
-}
-
-.btn-secondary.btn-destructive:hover:not(:disabled) {
-  color: #fecaca;
 }
 
 .btn-danger {

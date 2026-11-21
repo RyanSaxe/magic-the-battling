@@ -81,11 +81,11 @@ export function HintsBanner({ variant = "default" }: { variant?: HintsBannerVari
     ? "text-amber-200/95 font-semibold text-xs uppercase tracking-[0.04em] shrink-0"
     : "text-amber-400 font-medium text-xs shrink-0";
   const navButtonClass = variant === "rail"
-    ? "touch-area text-gray-500 hover:text-gray-300 transition-colors text-base leading-none shrink-0 px-1"
-    : "text-gray-500 hover:text-gray-300 transition-colors text-sm shrink-0";
+    ? "touch-area text-[var(--ivory-muted)] hover:text-[var(--ivory)] transition-colors text-base leading-none shrink-0 px-1"
+    : "text-[var(--ivory-muted)] hover:text-[var(--ivory)] transition-colors text-sm shrink-0";
   const tipTextClass = variant === "rail"
-    ? "text-[12px] text-gray-400"
-    : "text-xs text-gray-300";
+    ? "text-[12px] text-[var(--ivory-muted)]"
+    : "text-xs text-[var(--ivory-muted)]";
 
   return (
     <div className={wrapperClass}>

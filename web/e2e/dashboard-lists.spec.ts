@@ -173,7 +173,7 @@ test.describe('on a phone held upright', () => {
     await page.goto('/dashboard')
 
     await addPreset(page, 'cube-22', 'Preset 22')
-    await page.getByRole('button', { name: '✕' }).click()
+    await page.getByRole('button', { name: 'Close Add Cube / Deck' }).click()
     await page.getByRole('button', { name: 'Load more' }).click()
     await expect(page.getByRole('button', { name: 'Load more' })).toBeHidden()
     const saved = page.waitForResponse((response) => response.request().method() === 'POST')
