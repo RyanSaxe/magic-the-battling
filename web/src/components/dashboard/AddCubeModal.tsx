@@ -3,17 +3,20 @@ import { createBattler } from '../../api/client'
 import type { PlayMode, UserBattler } from '../../types'
 import { unknownToAppError } from '../../utils/appError'
 import { SurfaceCard } from '../common/SurfaceCard'
+import { DefaultOpponentsField } from './DefaultOpponentsField'
 
 export function AddCubeModal({
+  initialCubeId = '',
   onClose,
   onCreated,
   addToast,
 }: {
+  initialCubeId?: string
   onClose: () => void
   onCreated: (b: UserBattler) => void
   addToast: (msg: string, type: 'error' | 'info') => void
 }) {
-  const [cubeId, setCubeId] = useState('')
+  const [cubeId, setCubeId] = useState(initialCubeId)
   const [displayName, setDisplayName] = useState('')
   const [playMode, setPlayMode] = useState<PlayMode>('limited')
   const [useUpgrades, setUseUpgrades] = useState(true)
@@ -106,21 +109,7 @@ export function AddCubeModal({
             <span className="text-amber-200/45 text-xs">— upgrade a card every 3 rounds</span>
           </label>
 
-          <div className="bg-black/35 border border-black/40 rounded-lg p-3">
-            <label className="block text-amber-100/70 text-sm mb-2">Default Opponents</label>
-            <div className="flex gap-1.5">
-              {([1, 3, 5, 7] as const).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPuppetCount(n)}
-                  className={`btn ${puppetCount === n ? 'btn-primary' : 'btn-secondary'} px-3 py-1.5 text-sm font-medium`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
+          <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />
         </div>
 
         <button
