@@ -20,7 +20,6 @@ import { rewardZoneStyles } from "./rewardZoneStyles";
 interface RewardPhaseProps {
   gameState: GameState;
   actions: {
-    rewardPickUpgrade: (upgradeId: string) => void;
     rewardDone: (upgradeId?: string) => void;
   };
   selectedUpgradeId: string | null;

@@ -4280,13 +4280,6 @@ class GameManager:
         human.phase = "build"
         return "sudden_death"
 
-    def handle_reward_pick_upgrade(self, game: Game, player: Player, upgrade_id: str) -> bool:
-        upgrade = next((u for u in game.available_upgrades if u.id == upgrade_id), None)
-        if not upgrade:
-            return False
-        reward.pick_upgrade(game, player, upgrade)
-        return True
-
     def handle_reward_apply_upgrade(self, player: Player, upgrade_id: str, target_card_id: str) -> bool:
         return self._apply_upgrade(player, upgrade_id, target_card_id)
 
