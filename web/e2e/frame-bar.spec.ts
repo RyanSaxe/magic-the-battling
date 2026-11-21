@@ -146,17 +146,19 @@ for (const { name, viewport, isMobile } of SCREENS) {
         const choices = page.locator(`[data-guide-target="${popover}"]`)
         await choices.getByRole('button', { name: choice }).waitFor()
 
-        const { popoverRight, feltInnerRight, choiceOnTop } = await page.evaluate(({ popover, choice }) => {
+        const { popoverRight, feltInnerRight, popoverBottom, seamTop, choiceOnTop } = await page.evaluate(({ popover, choice }) => {
           const box = document.querySelector(`[data-guide-target="${popover}"]`)!.getBoundingClientRect()
           const felt = (document.querySelector('.frame-sidebar') ?? document.querySelector('main'))!.getBoundingClientRect()
           const choiceButton = Array.from(document.querySelectorAll(`[data-guide-target="${popover}"] button`))
             .find((element) => element.textContent?.trim() === choice)!
           const choiceBox = choiceButton.getBoundingClientRect()
           const topmost = document.elementFromPoint(choiceBox.left + choiceBox.width / 2, choiceBox.top + choiceBox.height / 2)
-          return { popoverRight: box.right, feltInnerRight: felt.right - 2, choiceOnTop: !!topmost && choiceButton.contains(topmost) }
+          const seamTop = document.querySelector('footer')!.getBoundingClientRect().top - 2
+          return { popoverRight: box.right, feltInnerRight: felt.right - 2, popoverBottom: box.bottom, seamTop, choiceOnTop: !!topmost && choiceButton.contains(topmost) }
         }, { popover, choice })
 
         expect.soft(feltInnerRight - popoverRight, 'gap between the choices and the gold edge').toBeGreaterThanOrEqual(MIN_POPOVER_GAP)
+        expect.soft(seamTop - popoverBottom, 'gap between the choices and the bottom seam').toBeGreaterThanOrEqual(MIN_POPOVER_GAP)
         expect.soft(choiceOnTop, `"${choice}" is in front of everything at its spot`).toBe(true)
       })
     }
