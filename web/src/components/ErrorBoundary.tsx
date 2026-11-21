@@ -1,4 +1,6 @@
 import { Component, type ReactNode } from 'react'
+import { NoticeFrame } from './common/NoticeFrame'
+import { StatusNotice } from './common/StatusNotice'
 
 interface Props {
   children: ReactNode
@@ -21,27 +23,36 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      // This sits outside the router, so the header has no Home button. Go Home loads the home page afresh instead.
       return (
-        <div className="min-h-screen bg-[var(--chrome)] flex items-center justify-center p-4">
-          <div className="modal-chrome rounded-lg p-8 max-w-lg">
-            <h1 className="text-2xl font-bold text-red-400 mb-4">Something went wrong</h1>
-            <p className="text-[var(--ivory-muted)] mb-4">
-              {this.state.error?.message || 'An unexpected error occurred'}
-            </p>
-            <pre className="bg-[var(--chrome)] p-4 rounded text-sm text-[var(--ivory-muted)] overflow-auto max-h-64">
-              {this.state.error?.stack}
-            </pre>
-            <button
-              onClick={() => {
-                this.setState({ hasError: false, error: null })
-                window.location.href = '/'
-              }}
-              className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+        <NoticeFrame home={null}>
+          <div className="w-full max-w-lg">
+            <StatusNotice
+              title="Something went wrong"
+              actions={
+                <>
+                  <button onClick={() => window.location.reload()} className="btn btn-primary flex-1 py-2">
+                    Reload Page
+                  </button>
+                  <button
+                    onClick={() => {
+                      this.setState({ hasError: false, error: null })
+                      window.location.href = '/'
+                    }}
+                    className="btn btn-secondary flex-1 py-2"
+                  >
+                    Go Home
+                  </button>
+                </>
+              }
             >
-              Go Home
-            </button>
+              <p>{this.state.error?.message || 'An unexpected error occurred'}</p>
+              <pre className="mt-3 bg-[var(--chrome)] p-4 rounded text-xs text-[var(--ivory-muted)] overflow-auto max-h-64">
+                {this.state.error?.stack}
+              </pre>
+            </StatusNotice>
           </div>
-        </div>
+        </NoticeFrame>
       )
     }
 
