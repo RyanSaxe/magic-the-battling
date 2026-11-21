@@ -54,13 +54,16 @@ Start the dev server and visit [`/docs`](http://localhost:8000/docs) for the aut
 
 Deployed to [Fly.io](https://fly.io) via Docker — see `fly.toml` and `Dockerfile`.
 
-On container startup, deploys now run `scripts/maintain_db.py --apply` against `/data/mtb.db` before booting the server. If pending DB maintenance exists, the script preserves the previous database as `/data/mtb.db.bak` and then applies the migration to the live DB path.
+On container startup, deploys run `scripts/maintain_db.py --apply` against `/data/mtb.db` before booting the server. If pending DB maintenance exists, the script first copies the database to `/data/mtb.db.bak` and then applies the migration to the live DB. A fresh volume with no database needs no maintenance, and a maintenance failure is logged without stopping the server from starting. Run `uv run python scripts/maintain_db.py --db-path <copy of mtb.db>` to see what a deploy would change: `active_game_snapshots.failed` counts the games in progress that the new code cannot restore. If any row fails, `--apply` changes nothing and makes no backup.
+
+When the server starts, it moves any active game snapshot it cannot restore to the `quarantined_game_snapshots` table, with the error, and logs the game id, instead of deleting it.
 
 ### PR Labels
 
 Labels on the merged PR control deploy behavior and release creation.
 
 **Deploy delay** (`deploy:*`) — controls how long players are warned before the server restarts.
+During the warning the server is in draining mode and blocks new games. Once the deploy finishes, fails or is cancelled, the workflow returns the server to normal mode. If that step fails, set the mode by hand with `APP_BASE_URL=https://<app>.fly.dev OPS_API_TOKEN=<token> OPS_UPDATED_BY=<your name> sh scripts/ops_mode.sh normal`.
 Both workflows support the same labels but have different defaults:
 
 | Label | Dev default | Prod default | Use case |
@@ -74,7 +77,7 @@ Both workflows support the same labels but have different defaults:
 
 | Label | Effect |
 |-------|--------|
-| *(none)* | No release created |
+| *(none)* | Bump patch version |
 | `release:patch` | Bump patch version (e.g. v1.0.0 → v1.0.1) |
 | `release:minor` | Bump minor version (e.g. v1.0.0 → v1.1.0) |
 | `release:major` | Bump major version (e.g. v1.0.0 → v2.0.0) |
