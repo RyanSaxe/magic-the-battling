@@ -1014,7 +1014,7 @@ export function Lobby() {
             </div>
 
             <div className="space-y-3 mb-3">
-              <div className="flex items-center justify-between gap-2 rounded-md border border-black/40 bg-black/40 px-2 py-1 max-[389px]:px-1">
+              <div className="flex items-center justify-between rounded-md border border-black/40 bg-black/40 px-2 py-1">
                 <GuidedModeSwitch
                   enabled={isGuidedMode}
                   setEnabled={handleGuidedModeToggle}
