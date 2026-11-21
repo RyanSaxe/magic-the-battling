@@ -56,6 +56,8 @@ class PlayerGameHistory(Base):
     max_stage = Column(Integer, nullable=False)
     max_round = Column(Integer, nullable=False)
     final_placement = Column(Integer, nullable=True)
+    final_poison = Column(Integer, nullable=True)
+    final_treasures = Column(Integer, nullable=True)
     is_puppet = Column(Boolean, default=False)
     source_history_id = Column(Integer, ForeignKey("player_game_history.id"), nullable=True)
     poison_history_json = Column(Text, nullable=True)

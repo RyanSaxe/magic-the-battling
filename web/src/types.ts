@@ -425,6 +425,7 @@ export interface SharePlayerData {
   name: string
   final_placement: number | null
   final_poison: number
+  final_treasures: number | null
   is_puppet: boolean
   snapshots: SharePlayerSnapshot[]
 }
