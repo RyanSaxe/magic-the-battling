@@ -24,6 +24,7 @@ import {
 } from "../utils/deviceIdentity";
 import { DIALOG_BACKDROP, LINK, TEXT_INPUT } from "../components/common/styles";
 import { Tag } from "../components/common/Tag";
+import { PuppetIcon } from "../components/icons";
 
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 
@@ -968,9 +969,7 @@ export function Lobby() {
                             />
                           </svg>
                         ) : (
-                          <span
-                            className={`w-2 h-2 rounded-full shrink-0 ${botAvailable ? "bg-[var(--ivory-muted)]" : "bg-red-700/50"}`}
-                          />
+                          <PuppetIcon size="sm" className={`shrink-0 ${botAvailable ? "" : "opacity-50"}`} />
                         )}
                         <span
                           className={`text-sm italic ${isSearching ? "text-amber-400" : botAvailable ? "text-[var(--ivory-soft)]" : "text-red-400/70"}`}

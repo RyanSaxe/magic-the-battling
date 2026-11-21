@@ -19,7 +19,10 @@ export function PuppetIcon({ size = 'md', className = '' }: PuppetIconProps) {
       fill="none"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
+      role="img"
+      aria-label="Puppet"
     >
+      <title>Puppet</title>
       <rect x="4" y="0.5" width="16" height="2.5" rx="1.25" fill="#D8CFC2" stroke="#736B63" strokeWidth="1.2" />
       <line x1="7" y1="3" x2="7" y2="12.5" stroke="#736B63" strokeWidth="1" opacity="0.5" />
       <line x1="12" y1="3" x2="12" y2="5.5" stroke="#736B63" strokeWidth="1" opacity="0.5" />
