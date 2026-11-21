@@ -54,7 +54,7 @@ export function CubeTile({ title, cubeId, imageUri, badge, chips, footer, href, 
             className="absolute inset-0 h-full w-full object-cover object-[center_28%] brightness-[0.68]"
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#2a2118] via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--art-fade)] via-transparent to-transparent" />
         <span
           className={`absolute right-2.5 top-2.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${BADGE_CLASSES[badge]}`}
         >

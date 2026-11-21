@@ -1,3 +1,5 @@
+import { SECTION_TITLE_TYPE } from './typography'
+
 export interface SegmentOption<T extends string> {
   value: T
   label: string
@@ -34,9 +36,7 @@ export function SegmentedFilter<T extends string>({
           aria-checked={option.value === value}
           onClick={() => onChange(option.value)}
           className={`flex-1 rounded-full px-3 py-1 whitespace-nowrap transition-colors ${
-            variant === 'heading'
-              ? 'text-[11.5px] leading-4 font-bold uppercase tracking-[0.12em]'
-              : 'text-xs font-medium'
+            variant === 'heading' ? SECTION_TITLE_TYPE : 'text-xs font-medium'
           } ${
             option.value === value
               ? 'border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]'

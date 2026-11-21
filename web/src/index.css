@@ -28,6 +28,9 @@
   /* Modal / popover chrome */
   --chrome-modal: #3d3330;
 
+  /* The colour a cube's art fades into on its card and page */
+  --art-fade: #2a2118;
+
   /* Zone column — blends toward sidebar chrome */
   --zone-column-bg: #3d3330;
 

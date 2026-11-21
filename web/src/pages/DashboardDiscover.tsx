@@ -2,11 +2,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
-import { PageFrame } from '../components/common/PageFrame'
 import { CubeTile } from '../components/dashboard/CubeTile'
-import { HomeHeader } from '../components/dashboard/HomeHeader'
-import { SearchBox } from '../components/dashboard/SearchBox'
-import { NoticeTile, SectionTitle } from '../components/dashboard/Section'
+import { DashboardFrame } from '../components/dashboard/DashboardFrame'
+import { ListHeader, LoadMoreButton, ResultGrid } from '../components/dashboard/ResultList'
+import { Count, NoticeTile, SectionCounts } from '../components/dashboard/Section'
 import { discoverCubes, followCube, getFollowing, unfollowCube, type DiscoverResult } from '../api/client'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { countLabel, cubeTitle, formatWhen } from '../utils/accountFormat'
@@ -141,91 +140,79 @@ export function DashboardDiscover() {
   const shown = current ?? loaded
 
   return (
-    <PageFrame header={<HomeHeader />} contentClassName="px-4">
-      <div className="mx-auto flex w-full max-w-[1080px] min-[1600px]:max-w-[1400px] flex-col gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pt-2">
-          <div className="flex items-baseline gap-4">
-            <SectionTitle>Discover</SectionTitle>
-            {current && current.total > 0 && (
-              <span className="text-[12.5px] leading-5 tabular-nums text-amber-100/70">
-                <strong className="text-amber-50">{current.total}</strong>{' '}
+    <DashboardFrame>
+      <ListHeader
+        title="Discover"
+        counts={
+          current &&
+          current.total > 0 && (
+            <SectionCounts>
+              <Count value={current.total}>
+                {' '}
                 {search ? (current.total === 1 ? 'matching cube' : 'matching cubes') : current.total === 1 ? 'popular cube' : 'popular cubes'}
-              </span>
-            )}
-          </div>
-          <SearchBox
-            label="Search cubes"
-            placeholder="Cube name or CubeCobra ID"
-            value={searchText}
-            onChange={setSearchText}
-            className="w-full sm:w-72"
-          />
-        </div>
-        {failed ? (
-          <NoticeTile
-            action={{
-              label: 'Retry',
-              onClick: () => {
-                setFailedSearch(null)
-                setAttempt((n) => n + 1)
-              },
-            }}
-          >
-            The cubes didn&apos;t load.
-          </NoticeTile>
-        ) : !shown ? (
-          <NoticeTile>Loading...</NoticeTile>
-        ) : shown.results.length === 0 ? (
-          shown.search ? (
-            <NoticeTile action={{ label: 'Clear search', onClick: () => setSearchText('') }}>
-              No cubes match &ldquo;{shown.search}&rdquo;.
-            </NoticeTile>
-          ) : (
-            <NoticeTile action={{ label: 'New Game', onClick: () => navigate('/play') }}>
-              No cube has a finished game yet.
-            </NoticeTile>
+              </Count>
+            </SectionCounts>
           )
+        }
+        search={{
+          label: 'Search cubes',
+          placeholder: 'Cube name or CubeCobra ID',
+          value: searchText,
+          onChange: setSearchText,
+        }}
+      />
+      {failed ? (
+        <NoticeTile
+          action={{
+            label: 'Retry',
+            onClick: () => {
+              setFailedSearch(null)
+              setAttempt((n) => n + 1)
+            },
+          }}
+        >
+          The cubes didn&apos;t load.
+        </NoticeTile>
+      ) : !shown ? (
+        <NoticeTile>Loading...</NoticeTile>
+      ) : shown.results.length === 0 ? (
+        shown.search ? (
+          <NoticeTile action={{ label: 'Clear search', onClick: () => setSearchText('') }}>
+            No cubes match &ldquo;{shown.search}&rdquo;.
+          </NoticeTile>
         ) : (
-          <div
-            aria-busy={!current}
-            className={`grid grid-cols-1 gap-3 transition-opacity sm:grid-cols-2 lg:grid-cols-3 ${current ? '' : 'opacity-60'}`}
-          >
-            {shown.results.map((result) => {
-              const following = isFollowing(follows, result.cube_id)
-              const href = `/cube/${encodeURIComponent(result.cube_id)}`
-              return (
-                <CubeTile
-                  key={result.cube_id}
-                  title={cubeTitle(result)}
-                  cubeId={result.cube_id}
-                  imageUri={result.cube_image_uri}
-                  badge={following ? 'Following' : 'Cube'}
-                  chips={[countLabel(result.player_count, 'player'), countLabel(result.game_count, 'community game')]}
-                  footer={result.last_played ? `Last played ${formatWhen(result.last_played)}` : 'No games yet'}
-                  href={href}
-                  onPlay={() => navigate(`/play?cubeId=${encodeURIComponent(result.cube_id)}`)}
-                  menuItems={[
-                    { label: 'View', onSelect: () => navigate(href) },
-                    following
-                      ? { label: 'Unfollow', onSelect: () => unfollow(result.cube_id), danger: true }
-                      : { label: 'Follow', onSelect: () => follow(result) },
-                  ]}
-                />
-              )
-            })}
-          </div>
-        )}
-        {current?.hasMore && (
-          <button
-            type="button"
-            onClick={loadMore}
-            disabled={loadingMore}
-            className="btn btn-secondary self-center px-6 py-2 disabled:opacity-50"
-          >
-            {loadingMore ? 'Loading...' : 'Load more'}
-          </button>
-        )}
-      </div>
-    </PageFrame>
+          <NoticeTile action={{ label: 'New Game', onClick: () => navigate('/play') }}>
+            No cube has a finished game yet.
+          </NoticeTile>
+        )
+      ) : (
+        <ResultGrid busy={!current}>
+          {shown.results.map((result) => {
+            const following = isFollowing(follows, result.cube_id)
+            const href = `/cube/${encodeURIComponent(result.cube_id)}`
+            return (
+              <CubeTile
+                key={result.cube_id}
+                title={cubeTitle(result)}
+                cubeId={result.cube_id}
+                imageUri={result.cube_image_uri}
+                badge={following ? 'Following' : 'Cube'}
+                chips={[countLabel(result.player_count, 'player'), countLabel(result.game_count, 'community game')]}
+                footer={result.last_played ? `Last played ${formatWhen(result.last_played)}` : 'No games yet'}
+                href={href}
+                onPlay={() => navigate(`/play?cubeId=${encodeURIComponent(result.cube_id)}`)}
+                menuItems={[
+                  { label: 'View', onSelect: () => navigate(href) },
+                  following
+                    ? { label: 'Unfollow', onSelect: () => unfollow(result.cube_id), danger: true }
+                    : { label: 'Follow', onSelect: () => follow(result) },
+                ]}
+              />
+            )
+          })}
+        </ResultGrid>
+      )}
+      {current?.hasMore && <LoadMoreButton loading={loadingMore} onClick={loadMore} />}
+    </DashboardFrame>
   )
 }

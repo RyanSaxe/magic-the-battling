@@ -3,21 +3,22 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
-import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { JoinGameModal } from '../components/home/JoinGameModal'
 import { AddCubeModal } from '../components/dashboard/AddCubeModal'
 import { CubeTile } from '../components/dashboard/CubeTile'
+import { DashboardFrame } from '../components/dashboard/DashboardFrame'
 import { GameTile } from '../components/dashboard/GameTile'
 import { JoinCodeBox } from '../components/dashboard/JoinCodeBox'
 import { ResumeBanner } from '../components/dashboard/ResumeBanner'
-import { NoticeTile, SectionLink, SectionTitle } from '../components/dashboard/Section'
+import { LoadMoreButton } from '../components/dashboard/ResultList'
+import { Count, NoticeTile, SectionCounts, SectionLink, SectionTitle, WinsCount } from '../components/dashboard/Section'
 import { SegmentedFilter } from '../components/dashboard/SegmentedFilter'
 import { deleteBattler, getBattlers, getFollowing, getMyGames, unfollowCube } from '../api/client'
 import { useResumableGames } from '../hooks/useResumableGames'
 import type { FollowedBattler, GameSummary, UserBattler } from '../types'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
-import { countLabel, cubeTitle, formatWhen, upgradesLabel, winsLabel } from '../utils/accountFormat'
+import { countLabel, cubeTitle, formatWhen, upgradesLabel } from '../utils/accountFormat'
 import { libraryEntries, type FirstPageStatus, type LibraryEntry } from './dashboardState'
 
 const RECENT_GAME_COUNT = 3
@@ -155,159 +156,146 @@ export function Dashboard() {
 
   return (
     <>
-      <PageFrame
-        header={<AppHeader renderRight={({ compact }) => <UserMenuButton compact={compact} />} />}
-        contentClassName="px-4"
-      >
-        <div className="mx-auto flex w-full max-w-[1080px] min-[1600px]:max-w-[1400px] flex-col gap-3">
-          {resumable && <ResumeBanner seat={resumable} />}
+      <DashboardFrame header={<AppHeader renderRight={({ compact }) => <UserMenuButton compact={compact} />} />}>
+        {resumable && <ResumeBanner seat={resumable} />}
 
-          <SurfaceCard
-            as="section"
-            layout="tile"
-            aria-label="Start or join a game"
-            className="flex flex-col gap-3 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => navigate('/play')}
-                className="btn btn-primary flex h-9 flex-1 items-center justify-center gap-2 !py-0 px-5 font-semibold sm:flex-none"
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-                New Game
-              </button>
-              <JoinCodeBox playerName={user.username} className="hidden md:flex" />
-              <button
-                type="button"
-                onClick={() => setShowJoinModal(true)}
-                className="btn btn-secondary h-9 flex-1 !py-0 px-4 font-medium sm:flex-none md:hidden"
-              >
-                Join Code
-              </button>
-            </div>
-            {myGames && (
-              <div className="flex items-center justify-between gap-4 whitespace-nowrap text-[12.5px] leading-5 tabular-nums text-amber-100/70 sm:justify-end">
-                <span>
-                  <strong className="text-amber-50">{myGames.totalGames}</strong>{' '}
-                  {myGames.totalGames === 1 ? 'game' : 'games'}
-                </span>
-                <span className="text-amber-300">{winsLabel(myGames.totalWins, myGames.totalGames)}</span>
-                {library && (
-                  <span className="hidden lg:inline">
-                    <strong className="text-amber-50">{allCount}</strong> saved &amp; followed
-                  </span>
-                )}
-              </div>
-            )}
-          </SurfaceCard>
+        <SurfaceCard
+          as="section"
+          layout="tile"
+          aria-label="Start or join a game"
+          className="flex flex-col gap-3 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/play')}
+              className="btn btn-primary flex h-9 flex-1 items-center justify-center gap-2 !py-0 px-5 font-semibold sm:flex-none"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+              New Game
+            </button>
+            <JoinCodeBox playerName={user.username} className="hidden md:flex" />
+            <button
+              type="button"
+              onClick={() => setShowJoinModal(true)}
+              className="btn btn-secondary h-9 flex-1 !py-0 px-4 font-medium sm:flex-none md:hidden"
+            >
+              Join Code
+            </button>
+          </div>
+          {myGames && (
+            <SectionCounts className="flex items-center justify-between gap-4 whitespace-nowrap sm:justify-end">
+              <Count value={myGames.totalGames}>{' '}{myGames.totalGames === 1 ? 'game' : 'games'}</Count>
+              <WinsCount wins={myGames.totalWins} games={myGames.totalGames} />
+              {library && (
+                <Count value={allCount} className="hidden lg:inline"> saved &amp; followed</Count>
+              )}
+            </SectionCounts>
+          )}
+        </SurfaceCard>
+
+        <div
+          data-testid="dashboard-board"
+          style={{ '--board-rows': `auto repeat(${cardRows}, 1fr) auto` } as CSSProperties}
+          className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_0.5rem_minmax(0,1fr)] xl:[grid-template-rows:var(--board-rows)]"
+        >
+          <SegmentedFilter
+            label="Section"
+            variant="heading"
+            value={phoneSection}
+            onChange={setPhoneSection}
+            className="col-span-full w-full sm:w-auto sm:justify-self-start xl:hidden"
+            options={[
+              { value: 'library', label: SECTION_NAMES.library },
+              { value: 'recent', label: SECTION_NAMES.recent },
+            ]}
+          />
 
           <div
-            data-testid="dashboard-board"
-            style={{ '--board-rows': `auto repeat(${cardRows}, 1fr) auto` } as CSSProperties}
-            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_0.5rem_minmax(0,1fr)] xl:[grid-template-rows:var(--board-rows)]"
+            data-testid="library-header"
+            style={gridCell(1, 1)}
+            className={`col-span-full ${libraryCell} xl:col-span-2 ${SECTION_HEADER}`}
           >
-            <SegmentedFilter
-              label="Section"
-              variant="heading"
-              value={phoneSection}
-              onChange={setPhoneSection}
-              className="col-span-full w-full sm:w-auto sm:justify-self-start xl:hidden"
-              options={[
-                { value: 'library', label: SECTION_NAMES.library },
-                { value: 'recent', label: SECTION_NAMES.recent },
-              ]}
-            />
-
-            <div
-              data-testid="library-header"
-              style={gridCell(1, 1)}
-              className={`col-span-full ${libraryCell} xl:col-span-2 ${SECTION_HEADER}`}
-            >
-              <div className="max-xl:hidden">
-                <SectionTitle>{SECTION_NAMES.library}</SectionTitle>
-              </div>
-              <div className="flex w-full items-center gap-3 sm:ml-auto sm:w-auto">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(true)}
-                  className="btn btn-secondary flex-1 py-1.5 px-3 text-xs font-semibold sm:flex-none"
-                >
-                  + Add Cube / Deck
-                </button>
-                <SectionLink to="/dashboard/discover">Discover cubes →</SectionLink>
-              </div>
+            <div className="max-xl:hidden">
+              <SectionTitle>{SECTION_NAMES.library}</SectionTitle>
             </div>
-
-            {libraryStatus === 'failed' ? (
-              <NoticeTile style={gridCell(2, 1)} className={libraryNotice} action={{ label: 'Retry', onClick: loadLibrary }}>
-                Your cubes and decks didn&apos;t load.
-              </NoticeTile>
-            ) : !library ? (
-              <NoticeTile style={gridCell(2, 1)} className={libraryNotice}>
-                Loading...
-              </NoticeTile>
-            ) : entries.length === 0 ? (
-              <NoticeTile
-                style={gridCell(2, 1)}
-                className={libraryNotice}
-                action={{ label: 'Add Cube / Deck', onClick: () => setShowAddModal(true) }}
-              >
-                Save a cube or deck with your settings to play it again in one click.
-              </NoticeTile>
-            ) : (
-              entries.map((entry, index) => (
-                <LibraryTile
-                  key={entry.kind === 'saved' ? `saved-${entry.preset.id}` : `following-${entry.follow.id}`}
-                  entry={entry}
-                  style={gridCell(2 + Math.floor(index / 2), 1 + (index % 2))}
-                  className={libraryCell}
-                  onDelete={removePreset}
-                  onUnfollow={unfollow}
-                />
-              ))
-            )}
-
-            {libraryHasMore && (
+            <div className="flex w-full items-center gap-3 sm:ml-auto sm:w-auto">
               <button
                 type="button"
-                onClick={loadMoreLibrary}
-                disabled={loadingMore}
-                style={gridCell(2 + libraryRows, 1)}
-                className={`btn btn-secondary ${libraryNotice} justify-self-center px-6 py-2 disabled:opacity-50`}
+                onClick={() => setShowAddModal(true)}
+                className="btn btn-secondary flex-1 py-1.5 px-3 text-xs font-semibold sm:flex-none"
               >
-                {loadingMore ? 'Loading...' : 'Load more'}
+                + Add Cube / Deck
               </button>
-            )}
-
-            {/* One section, so it can stay in view while the cubes scroll; subgrid keeps its cards on the cube rows. */}
-            <section
-              aria-label={SECTION_NAMES.recent}
-              style={{ '--recent-rows': `1 / span ${1 + recentRows}` } as CSSProperties}
-              className={`${phoneSection === 'recent' ? 'contents' : 'hidden'} xl:sticky xl:top-0 xl:col-start-4 xl:grid xl:[grid-row:var(--recent-rows)] xl:[grid-template-rows:subgrid] xl:self-start`}
-            >
-              <div data-testid="recent-header" className={`col-span-full justify-end xl:justify-between ${SECTION_HEADER}`}>
-                <div className="max-xl:hidden">
-                  <SectionTitle>{SECTION_NAMES.recent}</SectionTitle>
-                </div>
-                <SectionLink to="/dashboard/games">All games →</SectionLink>
-              </div>
-
-              {myGamesStatus === 'failed' ? (
-                <NoticeTile action={{ label: 'Retry', onClick: loadMyGames }}>Your games didn&apos;t load.</NoticeTile>
-              ) : !myGames ? (
-                <NoticeTile>Loading...</NoticeTile>
-              ) : recentGames.length === 0 ? (
-                <NoticeTile>Your finished games show up here.</NoticeTile>
-              ) : (
-                recentGames.map((game) => <GameTile key={game.game_id} game={game} />)
-              )}
-            </section>
+              <SectionLink to="/dashboard/discover">Discover cubes →</SectionLink>
+            </div>
           </div>
+
+          {libraryStatus === 'failed' ? (
+            <NoticeTile style={gridCell(2, 1)} className={libraryNotice} action={{ label: 'Retry', onClick: loadLibrary }}>
+              Your cubes and decks didn&apos;t load.
+            </NoticeTile>
+          ) : !library ? (
+            <NoticeTile style={gridCell(2, 1)} className={libraryNotice}>
+              Loading...
+            </NoticeTile>
+          ) : entries.length === 0 ? (
+            <NoticeTile
+              style={gridCell(2, 1)}
+              className={libraryNotice}
+              action={{ label: 'Add Cube / Deck', onClick: () => setShowAddModal(true) }}
+            >
+              Save a cube or deck with your settings to play it again in one click.
+            </NoticeTile>
+          ) : (
+            entries.map((entry, index) => (
+              <LibraryTile
+                key={entry.kind === 'saved' ? `saved-${entry.preset.id}` : `following-${entry.follow.id}`}
+                entry={entry}
+                style={gridCell(2 + Math.floor(index / 2), 1 + (index % 2))}
+                className={libraryCell}
+                onDelete={removePreset}
+                onUnfollow={unfollow}
+              />
+            ))
+          )}
+
+          {libraryHasMore && (
+            <LoadMoreButton
+              loading={loadingMore}
+              onClick={loadMoreLibrary}
+              style={gridCell(2 + libraryRows, 1)}
+              className={`${libraryNotice} justify-self-center`}
+            />
+          )}
+
+          {/* One section, so it can stay in view while the cubes scroll; subgrid keeps its cards on the cube rows. */}
+          <section
+            aria-label={SECTION_NAMES.recent}
+            style={{ '--recent-rows': `1 / span ${1 + recentRows}` } as CSSProperties}
+            className={`${phoneSection === 'recent' ? 'contents' : 'hidden'} xl:sticky xl:top-0 xl:col-start-4 xl:grid xl:[grid-row:var(--recent-rows)] xl:[grid-template-rows:subgrid] xl:self-start`}
+          >
+            <div data-testid="recent-header" className={`col-span-full justify-end xl:justify-between ${SECTION_HEADER}`}>
+              <div className="max-xl:hidden">
+                <SectionTitle>{SECTION_NAMES.recent}</SectionTitle>
+              </div>
+              <SectionLink to="/dashboard/games">All games →</SectionLink>
+            </div>
+
+            {myGamesStatus === 'failed' ? (
+              <NoticeTile action={{ label: 'Retry', onClick: loadMyGames }}>Your games didn&apos;t load.</NoticeTile>
+            ) : !myGames ? (
+              <NoticeTile>Loading...</NoticeTile>
+            ) : recentGames.length === 0 ? (
+              <NoticeTile>Your finished games show up here.</NoticeTile>
+            ) : (
+              recentGames.map((game) => <GameTile key={game.game_id} game={game} />)
+            )}
+          </section>
         </div>
-      </PageFrame>
+      </DashboardFrame>
 
       {showAddModal && (
         <AddCubeModal
@@ -352,8 +340,7 @@ function LibraryTile({
         footer={
           preset.my_game_count > 0 ? (
             <>
-              <strong className="text-amber-50">{preset.my_game_count}</strong>{' '}
-              {preset.my_game_count === 1 ? 'game' : 'games'}
+              <Count value={preset.my_game_count}>{' '}{preset.my_game_count === 1 ? 'game' : 'games'}</Count>
               {preset.my_last_played && ` · ${formatWhen(preset.my_last_played)}`}
             </>
           ) : (
