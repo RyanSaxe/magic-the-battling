@@ -1262,6 +1262,7 @@ class GameManager:
         self._active_games.pop(game_id, None)
         self._pending_games.pop(game_id, None)
         self._clear_runtime_player_mappings_for_game(game_id)
+        self._drop_spectate_requests_for_game(game_id)
 
         self._cancel_host_handoff(game_id)
         abandoned_cleanup = self._abandoned_cleanup_tasks.pop(game_id, None)
@@ -2150,13 +2151,21 @@ class GameManager:
         )
 
     def cleanup_expired_spectate_requests(self) -> int:
+        """Expire unanswered and denied requests; approved ones last as long as their game is loaded."""
         expiry = datetime.now(UTC) - timedelta(minutes=SPECTATE_REQUEST_TTL_MINUTES)
-        removed = 0
+        expired = [
+            request_id
+            for request_id, req in self._spectate_requests.items()
+            if req.status != "approved" and req.created_at < expiry
+        ]
+        for request_id in expired:
+            del self._spectate_requests[request_id]
+        return len(expired)
+
+    def _drop_spectate_requests_for_game(self, game_id: str) -> None:
         for request_id, req in list(self._spectate_requests.items()):
-            if req.created_at < expiry or req.status in {"approved", "denied"}:
-                self._spectate_requests.pop(request_id, None)
-                removed += 1
-        return removed
+            if req.game_id == game_id:
+                del self._spectate_requests[request_id]
 
     def _get_pending_target_elo(self, pending: PendingGame) -> float | None:
         if pending.play_mode == "limited":

@@ -106,3 +106,29 @@ def test_only_the_watched_player_can_answer_a_spectate_request(client, start_gam
 
     answer_request(game_id, victim["session_id"], request_id, allowed=allowed)
     assert _request_status(client, game_id, request_id)["status"] == ("approved" if allowed else "denied")
+
+
+def test_approved_spectator_can_still_connect_and_reconnect_after_other_requests(
+    client, start_game, watched_player_name
+):
+    host, _ = start_game("Alice", "Bob", auto_approve_spectators=True)
+    game_id = host["game_id"]
+    request_id = _request_to_watch(client, game_id, "Alice")
+    # Every new request sweeps expired ones, as the background loop does every few seconds.
+    _request_to_watch(client, game_id, "Bob")
+
+    status = _request_status(client, game_id, request_id)
+    assert status["status"] == "approved"
+    url = _spectate_url(game_id, status["session_id"], request_id, "Alice")
+    assert watched_player_name(url) == "Alice"
+    assert watched_player_name(url) == "Alice"
+
+
+def test_denied_spectator_still_sees_the_denial_after_other_requests(client, start_game, answer_request):
+    host, _ = start_game("Alice", "Bob")
+    game_id = host["game_id"]
+    request_id = _request_to_watch(client, game_id, "Alice")
+    answer_request(game_id, host["session_id"], request_id, allowed=False)
+    _request_to_watch(client, game_id, "Bob")
+
+    assert _request_status(client, game_id, request_id)["status"] == "denied"
