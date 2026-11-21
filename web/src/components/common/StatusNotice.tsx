@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { SurfaceCard } from './SurfaceCard'
 
 /** A titled message with its actions, for screens that explain why a lobby or game can't be shown. */
 export function StatusNotice({
@@ -11,11 +12,11 @@ export function StatusNotice({
   actions: ReactNode
 }) {
   return (
-    <div className="modal-chrome border gold-border rounded-lg p-5 max-w-md w-[min(92vw,28rem)]">
+    <SurfaceCard>
       <h2 className="text-lg font-semibold text-amber-200">{title}</h2>
       <div className="text-sm text-gray-200 mt-2 leading-snug">{children}</div>
       <div className="mt-4 flex flex-wrap gap-2">{actions}</div>
-    </div>
+    </SurfaceCard>
   )
 }
 
