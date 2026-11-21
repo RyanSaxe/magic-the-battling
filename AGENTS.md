@@ -1,8 +1,8 @@
-# Working on Crucible
+# Working on Pitfight
 
-Crucible is a web app for playing a Magic: The Gathering format that mixes
-cube drafting with roguelike elimination battles. Players draft, build a hand,
-battle each other, take poison, and the last one standing wins.
+Pitfight is a web app for playing a Magic: The Gathering format that mixes
+cube drafting with roguelike elimination fights. Players draft, build a hand,
+fight each other, take poison, and the last one standing wins.
 [README.md](README.md) covers running and deploying the app. This file covers
 changing it.
 
@@ -35,7 +35,7 @@ for upgrades in (True, False):
 "
 ```
 
-Their cards are mock cards, so they look odd in battle.
+Their cards are mock cards, so they look odd in a fight.
 
 ## Modules
 
@@ -63,12 +63,13 @@ Their cards are mock cards, so they look odd in battle.
 ## Names
 
 The code keeps the project's original name, Magic: The Battling, and players
-see Crucible. Use these names in anything a player reads:
+see Pitfight. Use these names in anything a player reads:
 
 | In the code                       | Players see (limited)    | Players see (constructed) |
 | --------------------------------- | ------------------------ | ------------------------- |
 | `mtb` (Python package)            | —                        | —                         |
 | `battler`                         | Cube                     | Deck                      |
+| `battle` (phase id)               | Fight                    | Fight                     |
 | `mtb_` (browser storage keys)     | —                        | —                         |
 | `MTB_` (environment variables)    | —                        | —                         |
 | `magic-the-battling` (Fly apps)   | —                        | —                         |
