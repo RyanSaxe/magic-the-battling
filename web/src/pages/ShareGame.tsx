@@ -70,7 +70,7 @@ function RoundPopover({
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-2 left-0 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 min-w-[180px] max-h-[300px] overflow-y-auto"
+      className="absolute bottom-full mb-2 left-2 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 min-w-[180px] max-h-[300px] overflow-y-auto"
     >
       {options.map((opt) => (
         <button

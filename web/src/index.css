@@ -84,7 +84,7 @@
   --frame-sidebar-width: 242px;
   /* From the board's gold edge to the screen's right edge: the docked sidebar, its 2px edge and the rail. */
   --frame-dock-width: calc(var(--frame-sidebar-width) + 2px + var(--frame-rail-width));
-  --bar-mobile-inline: 6px;
+  --bar-inline: 6px;
 }
 
 body {
@@ -151,10 +151,17 @@ input:-webkit-autofill:focus {
       var(--chrome) 70%);
 }
 
-/* The 42px bars above and below the felt line their content up with the felt's gold edge. */
+/* The 42px bars above and below the felt line their content up with the felt's gold edge.
+   Registered as a length so a script that places a popover reads it in pixels. */
+@property --bar-inline {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 6px;
+}
+
 .frame-bar-pad {
-  padding-left: var(--bar-mobile-inline);
-  padding-right: var(--bar-mobile-inline);
+  padding-left: var(--bar-inline);
+  padding-right: var(--bar-inline);
 }
 
 /* Felt content area — gold emboss + dark groove for 3D depth */
@@ -193,9 +200,8 @@ input:-webkit-autofill:focus {
 
 /* Desktop left chrome strip — game pages only */
 @media (min-width: 640px) {
-  .frame-bar-pad {
-    padding-left: var(--frame-rail-edge);
-    padding-right: var(--frame-rail-edge);
+  :root {
+    --bar-inline: var(--frame-rail-edge);
   }
 
   .game-surface {
