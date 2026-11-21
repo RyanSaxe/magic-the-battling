@@ -257,10 +257,11 @@ export function ShareGame() {
       )
     }
 
-    if (currentSnapshot) {
+    if (currentPlayerData && currentSnapshot) {
       return (
         <div className="flex-1 min-h-0 flex flex-col">
           <ShareRoundDetail
+            player={currentPlayerData}
             snapshot={currentSnapshot}
             useUpgrades={data.use_upgrades}
             enableResize
@@ -304,6 +305,8 @@ export function ShareGame() {
               isSelected={pv.name === selectedPlayer}
               variant="share"
               shareStatus={shareStatus}
+              // Mid-game a rank would read as a final standing that doesn't exist yet.
+              showPlacement={!data.in_progress || pv.placement > 0}
               onClick={() => {
                 setSelectedPlayer(pv.name)
                 if (usesOverlaySidebar) setSidebarOpen(false)

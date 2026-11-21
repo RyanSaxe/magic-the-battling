@@ -423,6 +423,8 @@ export interface SpectateRequestStatus {
   player_id?: string
 }
 
+export type ShareSnapshotVisibility = 'full' | 'hand_hidden' | 'hidden'
+
 export interface SharePlayerSnapshot {
   stage: number
   round: number
@@ -435,6 +437,7 @@ export interface SharePlayerSnapshot {
   treasures: number
   poison: number
   vanguard: Card | null
+  visibility: ShareSnapshotVisibility
 }
 
 export interface SharePlayerData {
@@ -452,6 +455,7 @@ export interface ShareGameResponse {
   created_at: string
   use_upgrades: boolean
   cube_id?: string | null
+  in_progress: boolean
   players: SharePlayerData[]
 }
 

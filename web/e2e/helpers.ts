@@ -136,6 +136,7 @@ function shareSnapshot(stage: number, round: number): SharePlayerSnapshot {
     treasures: 2,
     poison: round,
     vanguard: null,
+    visibility: 'full',
   }
 }
 
@@ -147,6 +148,7 @@ const SHARE_GAME: ShareGameResponse = {
   created_at: '2026-01-02T00:00:00Z',
   use_upgrades: true,
   cube_id: 'vintage-cube',
+  in_progress: false,
   players: ['Alice', 'Bob', 'Carol', 'Dave'].map((name, index) => ({
     name,
     final_placement: index + 1,
@@ -184,6 +186,27 @@ export async function serveShareGame(page: Page, baseURL: string) {
   await serveFromTable(page, baseURL, {
     ...SIGNED_OUT_RESPONSES,
     [`/api/games/${SHARE_GAME_ID}/share/Alice`]: { json: SHARE_GAME },
+  })
+}
+
+// Dave went out first and shares while the others play on, so their rounds show only poison and treasures.
+const SHARE_MID_GAME: ShareGameResponse = {
+  ...SHARE_GAME,
+  owner_name: 'Dave',
+  in_progress: true,
+  players: SHARE_GAME.players.map((player) => ({
+    ...player,
+    final_placement: player.name === 'Dave' ? 4 : null,
+    snapshots: player.name === 'Dave'
+      ? SHARE_SNAPSHOTS
+      : SHARE_SNAPSHOTS.map((snapshot) => ({ ...snapshot, basic_lands: [], visibility: 'hidden' as const })),
+  })),
+}
+
+export async function serveShareMidGame(page: Page, baseURL: string) {
+  await serveFromTable(page, baseURL, {
+    ...SIGNED_OUT_RESPONSES,
+    [`/api/games/${SHARE_GAME_ID}/share/Dave`]: { json: SHARE_MID_GAME },
   })
 }
 
@@ -300,6 +323,13 @@ export const PAGES: PageUnderTest[] = [
     name: 'share',
     path: `/game/${SHARE_GAME_ID}/share/Alice`,
     serve: serveShareGame,
+    primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
+    fillsFelt: true,
+  },
+  {
+    name: 'share mid-game',
+    path: `/game/${SHARE_GAME_ID}/share/Dave`,
+    serve: serveShareMidGame,
     primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
     fillsFelt: true,
   },
