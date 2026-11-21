@@ -152,6 +152,12 @@ input:-webkit-autofill:focus {
       var(--chrome) 70%);
 }
 
+/* The 42px bars above and below the felt line their content up with the felt's gold edge. */
+.frame-bar-pad {
+  padding-left: var(--bar-mobile-inline);
+  padding-right: var(--bar-mobile-inline);
+}
+
 .bar-pad-both {
   padding-left: var(--surface-gutter);
   padding-right: var(--surface-gutter);
@@ -197,6 +203,11 @@ input:-webkit-autofill:focus {
 
 /* Desktop left chrome strip — game pages only */
 @media (min-width: 640px) {
+  .frame-bar-pad {
+    padding-left: var(--frame-rail-edge);
+    padding-right: var(--frame-rail-edge);
+  }
+
   .bar-pad-both {
     padding-left: var(--frame-rail-edge);
     padding-right: var(--frame-rail-edge);
@@ -813,6 +824,28 @@ input:-webkit-autofill:focus {
 
 .play-action-btn {
   border: 1px solid #000 !important;
+}
+
+/* Every bar button is 30px tall. Icon buttons such as ☰ are 30px squares, and .btn-icon-phone ones are squares
+   only below 640px, where their label shortens to an icon. Display is left to each button so it can hide on phones. */
+.frame-bar .btn {
+  height: 30px;
+  min-width: 30px;
+  padding: 0 10px;
+  line-height: 1;
+  font-size: 13px;
+}
+
+.frame-bar .btn-icon {
+  width: 30px;
+  padding: 0;
+}
+
+@media (width < 640px) {
+  .frame-bar .btn-icon-phone {
+    width: 30px;
+    padding: 0;
+  }
 }
 
 .timeline-actions .btn {
