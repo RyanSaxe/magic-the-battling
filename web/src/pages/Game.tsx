@@ -40,6 +40,7 @@ import { BattleRevealOverlay } from "../components/common/BattleRevealOverlay";
 import { BuildUpgradeOverlay } from "../components/common/BuildUpgradeOverlay";
 import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
 import { RevealBeforeSubmitModal } from "../components/common/RevealBeforeSubmitModal";
+import { RotatePrompt } from "../components/common/RotatePrompt";
 import { ServerStatusWindow } from "../components/common/ServerStatusWindow";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
@@ -76,6 +77,7 @@ import {
   shouldBlockGuidesForBattleResolution,
   type VisibleGuideStep,
 } from "./gameGuideState";
+import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
 import {
   canUseBattleFaceDownAction,
   canUseBattleFlipAction,
@@ -87,6 +89,10 @@ interface SpectatorConfig {
   spectatePlayer: string;
   requestId: string;
 }
+
+// Each area stops 3px into the life number, short of its middle even for one digit, so - and + never overlap.
+const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_+_5px_-_44px)]";
+const LIFE_PLUS_TOUCH_AREA = "touch-area [--touch-area-left:-5px]";
 
 const STATIC_DIVIDER_CALLBACKS = {
   onDragStart: () => {},
@@ -1062,6 +1068,36 @@ function GameContent() {
     queueMicrotask(() => setHoveredCard(null));
   }, [selfPhase]);
 
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    const trackPointer = (event: MouseEvent) => {
+      pointerRef.current = { x: event.clientX, y: event.clientY };
+    };
+    const forgetPointer = () => {
+      pointerRef.current = null;
+    };
+    window.addEventListener("mousemove", trackPointer);
+    document.documentElement.addEventListener("mouseleave", forgetPointer);
+    return () => {
+      window.removeEventListener("mousemove", trackPointer);
+      document.documentElement.removeEventListener("mouseleave", forgetPointer);
+    };
+  }, []);
+
+  const currentBattle = gameState?.current_battle;
+  useEffect(() => {
+    const pointer = pointerRef.current;
+    if (!currentBattle || !pointer) return;
+    // A card that slides under a resting pointer gets no mouseenter, so after
+    // each battle update the hover is re-read from what the pointer is on.
+    const cardId = document
+      .elementFromPoint(pointer.x, pointer.y)
+      ?.closest("[data-guide-card-id]")
+      ?.getAttribute("data-guide-card-id");
+    const card = cardId ? findBattleCard(currentBattle, cardId) : null;
+    queueMicrotask(() => setHoveredCard(card));
+  }, [currentBattle]);
+
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
     phase: gameState?.self_player?.phase ?? "draft",
@@ -1369,15 +1405,20 @@ function GameContent() {
   );
   const hotkeyMap: Record<string, () => void> = (() => {
     const currentPhaseId = gameState?.self_player.phase;
-    const map: Record<string, () => void> = {
-      '?': () => {
+    const map = buildPanelHotkeys({
+      guideOpen: rulesPanelOpen,
+      sidebarDrawerOpen: overlaySidebarOpen,
+      gameplayHotkeysDisabled,
+      openGuide: () => {
         openRulesPanel(
           currentPhaseId && ['draft', 'build', 'battle', 'reward'].includes(currentPhaseId)
             ? { docId: currentPhaseId, tab: 'controls' }
             : undefined,
         );
       },
-    };
+      closeGuide: () => setRulesPanelOpen(false),
+      closeSidebarDrawer: () => setSidebarOpen(false),
+    });
     if (!gameState || isSpectator || gameplayHotkeysDisabled) return map;
 
     const { self_player: sp, current_battle: cb } = gameState;
@@ -1475,17 +1516,13 @@ function GameContent() {
               }
             }
           };
-          const moveZones = { g: 'graveyard', h: 'hand', b: 'battlefield', e: 'exile', l: 'library' } as const;
-          for (const [key, toZone] of Object.entries(moveZones)) {
-            map[key] = () => {
-              if (toZone !== hoveredCard.zone) {
-                const zoneCards = ownerZones[hoveredCard.zone];
-                const idx = zoneCards.findIndex(c => c.id === hoveredCard.id);
-                actions.battleMove(hoveredCard.id, hoveredCard.zone, toZone as ZoneName, hoveredCard.owner, hoveredCard.owner);
-                const nextCard = zoneCards[idx + 1] ?? zoneCards[idx - 1] ?? null;
-                setHoveredCard(nextCard ? { id: nextCard.id, zone: hoveredCard.zone, owner: hoveredCard.owner } : null);
-              }
-            };
+          const moveHotkeys = buildCardMoveHotkeys({
+            hoveredCard,
+            moveCard: (card, toZone) => actions.battleMove(card.id, card.zone, toZone, card.owner, card.owner),
+            clearHoveredCard: () => setHoveredCard(null),
+          });
+          for (const [key, action] of Object.entries(moveHotkeys)) {
+            map[key] = action;
           }
           map['u'] = () => {
             if (!cb) return;
@@ -1541,7 +1578,7 @@ function GameContent() {
     return map;
   })();
 
-  useHotkeys(hotkeyMap, !gameplayHotkeysDisabled);
+  useHotkeys(hotkeyMap);
 
   const guideContext = useMemo<GuidedWalkthroughContext | null>(() => {
     if (!gameState) return null;
@@ -2184,9 +2221,9 @@ function GameContent() {
                           ) : null
                         })()}
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>-</button>
                           <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
-                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>+</button>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 leading-tight">
@@ -2200,9 +2237,9 @@ function GameContent() {
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>-</button>
                           <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
-                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>+</button>
                         </div>
                         {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
                           <MicToggle
@@ -2542,12 +2579,12 @@ function GameContent() {
         {!isSpectator && (
           <div ref={actionBarRef} className="shrink-0 relative frame-chrome z-40">
             <div
-              className={`flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 ${actionBarPaddingClass} timeline-actions`}
+              className={`h-[var(--frame-bar-height)] flex items-center justify-between gap-1.5 sm:gap-2 ${actionBarPaddingClass} timeline-actions`}
               data-guide-target="phase-action-bar"
             >
               {isEndPhase && gameId && !displayBattleResolution ? (
                 <>
-                  <div className="flex items-center gap-1.5 sm:gap-2 py-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <button
                       className="btn bg-slate-700 hover:bg-slate-600 text-white"
                       onClick={() =>
@@ -2682,6 +2719,7 @@ function GameContent() {
           useUpgrades={gameState.use_upgrades}
         />
       )}
+      <RotatePrompt />
     </CardPreviewContext.Provider>
   );
 }
