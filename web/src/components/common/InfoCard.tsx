@@ -60,7 +60,7 @@ export function InfoCard({
             className="absolute inset-0 w-full h-full object-cover brightness-[0.4]"
             loading="lazy"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#2a2118] via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--art-fade)] via-transparent to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 px-4 pb-2 flex items-end gap-2 min-w-0">
             <div className="flex-1 min-w-0">
               <h3 className="text-amber-50 font-semibold text-sm truncate font-['Cinzel',serif] drop-shadow-md">{title}</h3>
