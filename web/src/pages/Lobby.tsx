@@ -9,7 +9,7 @@ import { InfoIcon } from "../components/icons/InfoIcon";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { MicToggle } from "../components/sidebar/MicToggle";
 import { useToast } from "../contexts";
-import { AppHeader } from "../components/common/AppHeader";
+import { AppHeader, GuideButton, HomeButton } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
 import { BusyNotice } from "../components/common/StatusNotice";
 import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
@@ -505,25 +505,17 @@ export function Lobby() {
   };
 
   const header = (
-    <AppHeader renderRight={({ compact }) => (
-      <>
-        <button
-          onClick={() => navigate("/")}
-          className={`btn btn-secondary ${compact ? "py-1.5 px-3 text-sm" : "py-2 px-4"}`}
-        >
-          Home
-        </button>
-        <button
+    <AppHeader
+      helpers={
+        <GuideButton
           onClick={() => {
             setRulesPanelTarget(undefined);
             setShowRulesPanel(true);
           }}
-          className={`btn btn-secondary ${compact ? "py-1.5 px-3 text-sm" : "py-2 px-4"}`}
-        >
-          {compact ? "?" : "Guide"}
-        </button>
-      </>
-    )} />
+        />
+      }
+      home={<HomeButton />}
+    />
   );
 
   const rulesPanel = showRulesPanel && (

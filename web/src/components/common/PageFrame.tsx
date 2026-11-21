@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { FaDiscord } from 'react-icons/fa6'
 import { CubeCobraPrimerLink } from './CubeCobraPrimerLink'
+import { BottomBar } from './FrameBar'
 import { HintsBanner } from './HintsBanner'
 
 interface PageFrameProps {
@@ -48,8 +49,8 @@ export function PageFrame({
       </div>
 
       {footer ?? (
-        <footer className="shrink-0 frame-chrome bar-pad-both">
-          <div className="h-[var(--frame-bar-height)] flex items-center justify-between">
+        <BottomBar
+          secondary={
             <a
               href="https://discord.gg/2NAjcWXNKn"
               target="_blank"
@@ -59,9 +60,9 @@ export function PageFrame({
               <FaDiscord className="w-4 h-4" />
               Join Discord
             </a>
-            <CubeCobraPrimerLink />
-          </div>
-        </footer>
+          }
+          main={<CubeCobraPrimerLink />}
+        />
       )}
     </div>
   )

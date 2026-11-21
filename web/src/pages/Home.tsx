@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { CardShowcase } from "../components/home/CardShowcase";
 import { JoinGameModal } from "../components/home/JoinGameModal";
 import { AppHeader } from "../components/common/AppHeader";
+import { BarLabel } from "../components/common/FrameBar";
 import { PageFrame } from "../components/common/PageFrame";
 import { ResumeGameStrip } from "../components/ResumeGame";
 import { useResumableGames } from "../hooks/useResumableGames";
@@ -31,22 +32,23 @@ export function Home() {
   return (
     <>
       <PageFrame
-        header={<AppHeader renderRight={({ compact }) => (
-          <>
-            <button
-              onClick={() => setShowJoinModal(true)}
-              className={`btn btn-secondary ${compact ? "py-1.5 px-3 text-sm" : "py-2 px-4"}`}
-            >
-              {compact ? "Join" : "Join Game"}
+        header={<AppHeader
+          helpers={
+            <>
+              <button onClick={() => navigate("/login")} className="btn btn-secondary hidden sm:inline-block">
+                Log in
+              </button>
+              <button onClick={() => setShowJoinModal(true)} className="btn btn-secondary">
+                <BarLabel desktop="Join Game" phone="Join" />
+              </button>
+            </>
+          }
+          primary={
+            <button onClick={() => navigate("/play")} className="btn btn-primary font-semibold animate-gentle-glow">
+              <BarLabel desktop="Play Game" phone="Play" />
             </button>
-            <button
-              onClick={() => navigate("/play")}
-              className={`btn btn-primary ${compact ? "py-1.5 px-3 text-sm" : "py-2 px-4"} font-semibold animate-gentle-glow`}
-            >
-              {compact ? "Play" : "Play Game"}
-            </button>
-          </>
-        )} />}
+          }
+        />}
         center
         contentClassName="items-center pb-6"
       >

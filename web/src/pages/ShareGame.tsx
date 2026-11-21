@@ -12,7 +12,8 @@ import { CardPreviewContext, CardPreviewModal } from '../components/card'
 import { PLAYER_ROW_STACK_CLASS, PlayerRow } from '../components/PlayerList'
 import { useHotkeys } from '../hooks/useHotkeys'
 import { getSidebarPlayerOrder } from '../utils/playerPlacement'
-import { AppHeader } from '../components/common/AppHeader'
+import { AppHeader, HomeButton } from '../components/common/AppHeader'
+import { BottomBar } from '../components/common/FrameBar'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { BusyNotice, StatusNotice } from '../components/common/StatusNotice'
@@ -118,8 +119,6 @@ export function ShareGame() {
   const [bottomBarRef] = useElementHeight()
   const usesOverlaySidebar = shellMode !== 'big'
   const overlaySidebarOpen = usesOverlaySidebar && sidebarOpen
-  const bottomBarPaddingClass =
-    shellMode === 'small' ? 'bar-pad-both' : 'bar-pad-main'
   const setPreviewCard = useCallback((card: CardType | null, appliedUpgrades?: CardType[]) => {
     setPreviewCardState(card)
     setPreviewUpgrades(appliedUpgrades ?? [])
@@ -303,26 +302,25 @@ export function ShareGame() {
       <PageFrame
         header={<AppHeader
           ref={headerRef}
-          padClassName={shellMode === 'big' ? 'bar-pad-left' : 'bar-pad-both'}
-          renderRight={({ compact }) => (
-            <>
-              {!compact && data.cube_id && (
-                <a
-                  href={`https://cubecobra.com/cube/overview/${encodeURIComponent(data.cube_id)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-amber-400 hover:text-amber-300 transition-colors mr-1"
-                >
-                  CubeCobra
-                </a>
-              )}
-              <button
-                onClick={() => navigate('/')}
-                className={`btn btn-secondary ${compact ? 'py-1.5 px-3 text-sm' : 'py-2 px-4'}`}
-              >
-                Home
-              </button>
-            </>
+          helpers={data.cube_id && (
+            <a
+              href={`https://cubecobra.com/cube/overview/${encodeURIComponent(data.cube_id)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary hidden sm:inline-flex items-center"
+            >
+              CubeCobra ↗
+            </a>
+          )}
+          home={<HomeButton />}
+          account={usesOverlaySidebar && (
+            <button
+              onClick={() => setSidebarOpen((o) => !o)}
+              className="btn btn-secondary btn-icon"
+              aria-label="Players"
+            >
+              ☰
+            </button>
           )}
         />}
         scroll={false}
@@ -334,11 +332,13 @@ export function ShareGame() {
           </aside>
         )}
         footer={
-          <div ref={bottomBarRef} className="shrink-0 frame-chrome">
-            <div className={`flex items-center justify-between py-1.5 sm:py-2 ${bottomBarPaddingClass} timeline-actions`}>
+          <BottomBar
+            ref={bottomBarRef}
+            padClassName={shellMode === 'big' ? 'bar-pad-main' : undefined}
+            secondary={
               <div className="relative">
                 <button
-                  className="btn btn-secondary text-sm py-1.5 px-3"
+                  className="btn btn-secondary"
                   disabled={roundOptions.length === 0}
                   onClick={() => setRoundPopoverOpen((o) => !o)}
                 >
@@ -353,33 +353,26 @@ export function ShareGame() {
                   />
                 )}
               </div>
-              <div className="flex items-center gap-2">
+            }
+            main={
+              <>
                 <button
-                  className="btn btn-secondary text-sm py-1.5 disabled:opacity-30"
+                  className="btn btn-secondary disabled:opacity-30"
                   disabled={!hasPrev}
                   onClick={() => hasPrev && setSelectedRound(roundOptions[currentIndex - 1].value)}
                 >
                   Prev
                 </button>
                 <button
-                  className="btn btn-secondary text-sm py-1.5 disabled:opacity-30"
+                  className="btn btn-secondary disabled:opacity-30"
                   disabled={!hasNext}
                   onClick={() => hasNext && setSelectedRound(roundOptions[currentIndex + 1].value)}
                 >
                   Next
                 </button>
-                {usesOverlaySidebar && (
-                  <button
-                    onClick={() => setSidebarOpen((o) => !o)}
-                    className="btn btn-secondary py-1.5 px-2 text-sm"
-                    aria-label="Players"
-                  >
-                    ☰
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+              </>
+            }
+          />
         }
       >
         {renderContent()}
