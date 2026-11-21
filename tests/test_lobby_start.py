@@ -3,10 +3,12 @@ import threading
 
 import pytest
 
+import server.db.database as db_module
 import server.routers.ws as ws_module
 import server.services.game_manager as gm_module
 from mtb.models.cards import Battler
-from server.services.game_manager import GameManager, LobbyStage, LobbyStartFailedError
+from server.runtime_config import MAX_GAME_STARTS_IN_FLIGHT
+from server.services.game_manager import BattlerReady, GameManager, LobbyStage, LobbyStartFailedError
 
 
 async def _no_broadcast() -> None:
@@ -145,6 +147,62 @@ def test_players_who_left_during_a_failed_start_are_not_ready_when_the_lobby_reo
     assert pending.stage is LobbyStage.FAILED
     assert manager.get_pending_game(pending.game_id) is pending
     assert pending.player_ready == {"pid-alice": True, "pid-bob": False}
+
+
+@pytest.mark.parametrize("play_mode", ["limited", "constructed"])
+def test_a_start_that_fails_after_dealing_leaves_the_cube_and_decks_whole(
+    play_mode, mock_cube_data, test_db, card_factory
+):
+    manager = GameManager()
+    pending = _two_player_lobby(manager, play_mode=play_mode)
+    if play_mode == "limited":
+        pending.battler = manager._load_battler(pending.cube_id, pending.use_upgrades, pending.use_vanguards, play_mode)
+    else:
+        for player_id in pending.player_ids:
+            deck = Battler(cards=[card_factory(f"{player_id}-{i}") for i in range(100)], upgrades=[], vanguards=[])
+            pending.player_battlers[player_id] = BattlerReady(f"{player_id}-deck", deck)
+    _ready_everyone(manager, pending)
+
+    def card_counts() -> list[int]:
+        if pending.battler is not None:
+            return [len(pending.battler.cards)]
+        return [len(slot.battler.cards) for slot in pending.player_battlers.values()]
+
+    before = card_counts()
+
+    def fail_to_save(*args, **kwargs) -> None:
+        raise RuntimeError("database is locked")
+
+    manager._persist_human_player_mappings = fail_to_save
+    db = db_module.SessionLocal()
+    try:
+        with pytest.raises(LobbyStartFailedError):
+            asyncio.run(manager.start_lobby(pending.game_id, "pid-alice", db, on_change=_no_broadcast))
+    finally:
+        db.close()
+
+    assert card_counts() == before
+
+
+def test_a_lobby_closed_while_it_waits_to_start_does_not_become_a_game(mock_cube_data, test_db):
+    manager = GameManager()
+    pending = _two_player_lobby(manager)
+    _ready_everyone(manager, pending)
+
+    async def scenario():
+        for _ in range(MAX_GAME_STARTS_IN_FLIGHT):
+            await manager._game_start_slots.acquire()
+        start = asyncio.create_task(manager.start_lobby(pending.game_id, "pid-alice", None, on_change=_no_broadcast))
+        while manager.game_start_waiters_count() == 0:
+            await asyncio.sleep(0)
+        manager._cleanup_game(pending.game_id)
+        manager._game_start_slots.release()
+        with pytest.raises(LobbyStartFailedError):
+            await start
+
+    asyncio.run(scenario())
+
+    assert manager.get_game(pending.game_id) is None
 
 
 def test_the_lobby_view_and_the_start_route_refuse_a_table_short_of_puppets(client):

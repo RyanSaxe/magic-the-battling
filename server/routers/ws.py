@@ -659,6 +659,9 @@ async def _handle_lobby_action(  # noqa: PLR0912, PLR0915
 
 async def _start_lobby(game_id: str, player_id: str, websocket: WebSocket) -> None:
     """Start the lobby without holding its lock, so other players' changes are refused rather than queued."""
+    if game_manager.get_game(game_id):
+        # A second click that reached the server after the first start finished; the game is already on its way.
+        return
     if ops_manager.blocks_new_games():
         await connection_manager.send_error(
             websocket,

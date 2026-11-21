@@ -138,6 +138,10 @@ def _current_task() -> asyncio.Task | None:
         return None
 
 
+def _copy_for_dealing(battler: Battler) -> Battler:
+    return battler.model_copy(update={"cards": list(battler.cards)})
+
+
 def _utc_or_default(value: datetime | None, default: datetime) -> datetime:
     if value is None:
         return default
@@ -1068,6 +1072,9 @@ class GameManager:
         The lobby view, the websocket and the HTTP route all ask this. Whether the server has room for
         another game is checked when the start runs, since that changes without the lobby changing.
         """
+        return self._start_refusal(pending, by, lambda: self._count_available_bots(pending))
+
+    def _start_refusal(self, pending: PendingGame, by: str, available_bots: Callable[[], int | None]) -> str | None:
         if pending.stage is LobbyStage.STARTING:
             return "The game is already starting"
         if pending.stage is LobbyStage.STARTED:
@@ -1091,7 +1098,7 @@ class GameManager:
             return pending.battler_error
 
         if pending.puppet_count > 0:
-            available = self._count_available_bots(pending)
+            available = available_bots()
             if available is None or available < pending.puppet_count:
                 return "Not enough puppets are available for this table"
 
@@ -1160,6 +1167,8 @@ class GameManager:
             async with self._acquire_game_start_slot():
                 if pending.play_mode == "limited":
                     await self._finish_loading_cube(pending)
+                if self._pending_games.get(pending.game_id) is not pending:
+                    raise LobbyStartFailedError("The lobby closed while it was starting")
                 allowed, reason = self.can_accept_loaded_game()
                 if not allowed:
                     raise LobbyStartFailedError(reason)
@@ -1203,14 +1212,17 @@ class GameManager:
             play_mode=pending.play_mode,
         )
         game = create_game(pending.player_names, len(pending.player_names), config)
+        # Dealing shuffles and slices a battler's cards, so the game deals from its own copies and a start that
+        # fails after this leaves the lobby's cube and decks whole for the next attempt.
         if pending.play_mode == "limited":
             battler = pending.battler
             if battler is None:
                 raise LobbyStartFailedError("The cube isn't loaded")
-            set_battler(game, battler)
+            set_battler(game, _copy_for_dealing(battler))
             target_elo = battler.elo or 1200.0
         else:
-            set_player_battlers(game, self._build_constructed_battlers_by_player(pending))
+            battlers = self._build_constructed_battlers_by_player(pending)
+            set_player_battlers(game, {name: _copy_for_dealing(b) for name, b in battlers.items()})
             target_elo = self._get_game_target_elo(game)
 
         if db is not None:
@@ -2167,10 +2179,8 @@ class GameManager:
 
     def set_voice_chat_enabled(self, game_id: str, player_id: str, enabled: bool) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
-        if not pending:
+        if not pending or pending.is_started:
             return False, "Game not found"
-        if not pending.accepts_changes:
-            return False, LOBBY_STARTING_MESSAGE
         if player_id != pending.host_player_id:
             return False, "Only the host can toggle voice chat"
         pending.voice_chat_enabled = enabled
@@ -2356,6 +2366,7 @@ class GameManager:
                 )
             )
 
+        available = self._count_available_bots(pending)
         loading_error = pending.battler_error
         if pending.play_mode == "constructed":
             loading_error = next(
@@ -2367,7 +2378,7 @@ class GameManager:
             game_id=game_id,
             join_code=pending.join_code,
             players=players,
-            can_start=self.start_rules(pending, pending.host_player_id) is None,
+            can_start=self._start_refusal(pending, pending.host_player_id, lambda: available) is None,
             is_started=pending.is_started,
             start_status=pending.stage.value,
             start_error=pending.start_error,
@@ -2375,7 +2386,7 @@ class GameManager:
             puppet_count=pending.puppet_count,
             cube_loading_status=self._get_cube_loading_status(pending),
             cube_loading_error=loading_error,
-            available_puppet_count=self._count_available_bots(pending),
+            available_puppet_count=available,
             cube_id=pending.cube_id,
             use_upgrades=pending.use_upgrades,
             guided_mode_default=pending.guided_mode_default,
