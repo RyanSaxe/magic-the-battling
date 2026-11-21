@@ -1,8 +1,10 @@
-import type { SharePlayerSnapshot } from '../../types'
+import type { SharePlayerData, SharePlayerSnapshot } from '../../types'
+import { getShareHiddenRoundBand, getShareHiddenZones } from '../../utils/share'
 import { DeckDisplay } from '../common'
 import type { DeckDisplayResizeState } from '../common/DeckDisplay'
 
 interface ShareRoundDetailProps {
+  player: SharePlayerData
   snapshot: SharePlayerSnapshot
   useUpgrades: boolean
   enableResize?: boolean
@@ -13,6 +15,7 @@ interface ShareRoundDetailProps {
 }
 
 export function ShareRoundDetail({
+  player,
   snapshot,
   useUpgrades,
   enableResize = false,
@@ -23,6 +26,8 @@ export function ShareRoundDetail({
 }: ShareRoundDetailProps) {
   const upgrades = useUpgrades ? (snapshot.upgrades ?? snapshot.applied_upgrades) : []
   const companionIds = new Set(snapshot.command_zone.map((c) => c.id))
+  const hiddenZones = getShareHiddenZones(snapshot).filter((zone) => zone !== 'upgrades' || useUpgrades)
+  const band = getShareHiddenRoundBand(player, snapshot)
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <DeckDisplay
@@ -33,6 +38,7 @@ export function ShareRoundDetail({
         poison={snapshot.poison}
         upgrades={upgrades}
         companionIds={companionIds}
+        hiddenZones={hiddenZones}
         className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col"
         enableResize={enableResize}
         isMobile={isMobile}
@@ -45,6 +51,11 @@ export function ShareRoundDetail({
           message: 'This resets the current deck layout for this view on this device.',
         } : undefined}
       />
+      {band && (
+        <div className="share-hidden-round-band shrink-0">
+          <span className="share-hidden-round-band-title">{band}</span>
+        </div>
+      )}
     </div>
   )
 }

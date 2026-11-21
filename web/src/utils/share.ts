@@ -4,9 +4,28 @@ import type {
   PlayerView,
   SharePlayerData,
   SharePlayerSnapshot,
+  ShareSnapshotVisibility,
 } from '../types'
 
 export type SharePlayerRowBadge = 'viewing' | 'alive' | 'dead'
+
+export type ShareHiddenZone = 'hand' | 'sideboard' | 'upgrades'
+
+const HIDDEN_ZONES: Record<ShareSnapshotVisibility, ShareHiddenZone[]> = {
+  full: [],
+  hand_hidden: ['hand', 'upgrades'],
+  hidden: ['hand', 'sideboard', 'upgrades'],
+}
+
+export function getShareHiddenZones(snapshot: SharePlayerSnapshot): ShareHiddenZone[] {
+  return HIDDEN_ZONES[snapshot.visibility]
+}
+
+/** The band under a round the server hid while the game goes on, or null when the round shows in full. */
+export function getShareHiddenRoundBand(player: SharePlayerData, snapshot: SharePlayerSnapshot): string | null {
+  if (snapshot.visibility !== 'hidden') return null
+  return player.final_placement === null ? 'Still Fighting' : 'Game in Progress'
+}
 
 interface ShareRoundPosition {
   stage: number

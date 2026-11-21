@@ -125,6 +125,7 @@ export function PlayerRow({
   variant = "game",
   shareStatus,
   micToggle,
+  showPlacement = true,
 }: {
   player: PlayerView;
   players: PlayerView[];
@@ -134,6 +135,7 @@ export function PlayerRow({
   variant?: "game" | "share";
   shareStatus?: ShareResultStatus;
   micToggle?: ReactNode;
+  showPlacement?: boolean;
 }) {
   const isSelf = player.name === currentPlayerName;
   const showPairingProbability =
@@ -149,12 +151,14 @@ export function PlayerRow({
       data-guide-player-row={player.name}
       onClick={onClick}
     >
-      <PlacementBadge
-        player={player}
-        players={players}
-        variant="corner"
-        className="pointer-events-none absolute left-0 top-0 z-10"
-      />
+      {showPlacement && (
+        <PlacementBadge
+          player={player}
+          players={players}
+          variant="corner"
+          className="pointer-events-none absolute left-0 top-0 z-10"
+        />
+      )}
       <div className="min-w-0 self-end">
         <div className="flex items-center gap-1.5">
           {showLeadingMicToggle ? micToggle : null}
