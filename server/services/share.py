@@ -123,8 +123,12 @@ def build_share_data(db: Session, game_id: str, player_name: str) -> ShareGameRe
     if not game_record:
         raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
 
-    # Finished game snapshots are intentionally public-by-default. GameRecord.shared
-    # is an internal signal that someone actively generated a share link/preview.
+    # Snapshots hold every player's hand and sideboard, so they stay hidden while the game
+    # is played. Once it ends they are public by default; GameRecord.shared only records
+    # that someone generated a share link or preview.
+    if game_record.ended_at is None:
+        raise api_error(404, ErrorCode.GAME_IN_PROGRESS, "This game is still being played")
+
     config = json.loads(str(game_record.config_json)) if game_record.config_json else {}
     use_upgrades = config.get("use_upgrades", True)
 

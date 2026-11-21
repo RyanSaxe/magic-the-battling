@@ -1,12 +1,16 @@
 import json
 from datetime import UTC, datetime
+from time import monotonic, sleep
 from unittest.mock import MagicMock
 
 import pytest
 
+import server.routers.games as games_module
+import server.services.game_manager as gm_module
 from mtb.models.game import BattleSnapshotData
 from server.db import database
 from server.db.models import CubeMetadata, GameRecord, PlayerGameHistory
+from server.services.preview import preview_service
 from server.services.share import _build_puppet_snapshots
 
 
@@ -314,3 +318,68 @@ def test_battler_games_endpoint_names_the_cube(client, cubecobra_cube_json):
 
     assert response.status_code == 200
     assert response.json()["cube_name"] == "Vintage Cube"
+
+
+def _play_into_first_battle(client, start_lobby, ws_receive_json_until) -> str:
+    """Start a two-player game and ready both players, which records each player's first battle snapshot."""
+    host = client.post("/api/games", json={"player_name": "Alice", "cube_id": "test", "target_player_count": 2}).json()
+    guest = client.post("/api/games/join", json={"join_code": host["join_code"], "player_name": "Bob"}).json()
+    game_id = host["game_id"]
+    started = start_lobby(game_id, host["session_id"])
+    assert started.status_code == 200, started.text
+
+    for player in (host, guest):
+        with client.websocket_connect(f"/ws/{game_id}?session_id={player['session_id']}") as ws:
+            bootstrap = ws_receive_json_until(ws, lambda m: m["type"] == "game_bootstrap")
+            for card in bootstrap["payload"]["state"]["self_player"]["sideboard"][:3]:
+                move = {"card_id": card["id"], "source": "sideboard", "destination": "hand"}
+                ws.send_json({"action": "build_move", "payload": move})
+                ws_receive_json_until(ws, lambda m: m["type"] == "game_state")
+            ws.send_json({"action": "build_ready", "payload": {"basics": ["Plains", "Island", "Mountain"]}})
+            ws_receive_json_until(ws, lambda m: m["type"] == "game_state")
+
+    game = games_module.game_manager.get_game(game_id)
+    assert game is not None
+    assert all(player.phase == "battle" for player in game.players)
+    return game_id
+
+
+def test_share_hides_a_game_that_is_still_being_played(client, start_lobby, ws_receive_json_until):
+    game_id = _play_into_first_battle(client, start_lobby, ws_receive_json_until)
+
+    response = client.get(f"/api/games/{game_id}/share/Bob")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "GAME_IN_PROGRESS"
+
+
+def test_share_preview_image_hides_a_game_that_is_still_being_played(
+    client, start_lobby, ws_receive_json_until, monkeypatch
+):
+    async def fake_screenshot(url: str, cache_key: str) -> bytes:
+        return b"png"
+
+    monkeypatch.setattr(preview_service, "screenshot", fake_screenshot)
+    game_id = _play_into_first_battle(client, start_lobby, ws_receive_json_until)
+
+    response = client.get(f"/game/{game_id}/share/Bob/preview.png")
+
+    assert response.status_code == 404
+
+
+def test_share_hides_a_game_evicted_from_memory_while_still_being_played(
+    client, start_lobby, ws_receive_json_until, monkeypatch
+):
+    game_id = _play_into_first_battle(client, start_lobby, ws_receive_json_until)
+    monkeypatch.setattr(gm_module, "IDLE_EVICT_MINUTES", 0)
+    # The test client can return before the server has handled the last disconnect, so retry
+    # eviction the way the background loop does until the game is idle.
+    deadline = monotonic() + 1.0
+    while games_module.game_manager.evict_cold_games() == 0:
+        assert monotonic() < deadline, "the game never became idle enough to evict"
+        sleep(0.01)
+
+    response = client.get(f"/api/games/{game_id}/share/Bob")
+
+    assert response.status_code == 404
+    assert response.json()["code"] == "GAME_IN_PROGRESS"
