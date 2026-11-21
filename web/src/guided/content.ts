@@ -6,6 +6,7 @@ import type {
   GuidedWalkthroughContext,
 } from "./types";
 import { textForInput } from "../utils/inputMode";
+import { DRAFT_DONE_BUTTON_LABEL } from "../constants/phases";
 
 const CONDITIONAL_GUIDE_PRIORITY: ConditionalGuideId[] = [
   "hint_treasure_producer",
@@ -570,7 +571,10 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Ready to Draft",
         content: {
-          summary: "Whenever you're ready, click this button to start the build phase.",
+          summary: textForInput({
+            text: `Whenever you're ready, click ${DRAFT_DONE_BUTTON_LABEL} to start the build phase.`,
+            touch: `Whenever you're ready, tap ${DRAFT_DONE_BUTTON_LABEL} to start the build phase.`,
+          }),
         },
       },
     ],

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildGuideDefinition } from "./content";
+import { DRAFT_DONE_BUTTON_LABEL } from "../constants/phases";
 import type { GuidedWalkthroughContext } from "./types";
 
 const baseContext: GuidedWalkthroughContext = {
@@ -38,6 +39,14 @@ describe("buildGuideDefinition", () => {
     expect(step?.sidebarState?.playerName).toBeTypeOf("function");
     expect(step?.sidebarState?.detailTab).toBe("seen");
     expect(step?.waitForLayoutTargetId).toBeTypeOf("function");
+  });
+
+  it("names the button that ends the draft on the draft guide's last step", () => {
+    const guide = buildGuideDefinition("draft", baseContext);
+    const step = guide.steps.find((candidate) => candidate.id === "continue");
+
+    expect(step?.targetId).toBe("draft-continue");
+    expect(step?.content.summary).toContain(DRAFT_DONE_BUTTON_LABEL);
   });
 
   it("keeps the reward continue step clickable while the guide is open", () => {

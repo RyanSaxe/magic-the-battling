@@ -1,5 +1,6 @@
 export type Phase = "draft" | "build" | "battle" | "reward"
 export const PHASES: Phase[] = ['draft', 'build', 'battle', 'reward']
+export const DRAFT_DONE_BUTTON_LABEL = 'Go to Build'
 const SUDDEN_DEATH_PHASES: Phase[] = ['build', 'battle', 'reward']
 
 export function getTimelinePhases(inSuddenDeath: boolean): Phase[] {
