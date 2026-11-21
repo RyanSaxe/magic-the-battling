@@ -438,6 +438,7 @@ export interface SharePlayerSnapshot {
   poison: number
   vanguard: Card | null
   visibility: ShareSnapshotVisibility
+  sudden_death_build: number | null
 }
 
 export interface SharePlayerData {

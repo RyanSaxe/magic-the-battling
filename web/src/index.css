@@ -347,8 +347,8 @@ input:-webkit-autofill:focus {
     inset 0 -2px 3px rgba(0, 0, 0, 0.1);
 }
 
-/* Share board: the band under a round hidden while the game goes on, a seam strip like the zone dividers */
-.share-hidden-round-band {
+/* Share board: the band under a round, a seam strip like the zone dividers */
+.share-round-band {
   height: 28px;
   display: flex;
   align-items: center;
@@ -360,7 +360,7 @@ input:-webkit-autofill:focus {
     inset 0 -2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.share-hidden-round-band-title {
+.share-round-band-title {
   font-family: 'Cinzel', serif;
   font-weight: 700;
   font-size: 13px;
