@@ -1,5 +1,5 @@
 import type { SharePlayerData, SharePlayerSnapshot } from '../../types'
-import { getShareHiddenRoundBand, getShareHiddenZones } from '../../utils/share'
+import { getShareHiddenZones, getShareRoundBand } from '../../utils/share'
 import { DeckDisplay } from '../common'
 import type { DeckDisplayResizeState } from '../common/DeckDisplay'
 
@@ -27,7 +27,7 @@ export function ShareRoundDetail({
   const upgrades = useUpgrades ? (snapshot.upgrades ?? snapshot.applied_upgrades) : []
   const companionIds = new Set(snapshot.command_zone.map((c) => c.id))
   const hiddenZones = getShareHiddenZones(snapshot).filter((zone) => zone !== 'upgrades' || useUpgrades)
-  const band = getShareHiddenRoundBand(player, snapshot)
+  const band = getShareRoundBand(player, snapshot)
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <DeckDisplay
@@ -52,8 +52,8 @@ export function ShareRoundDetail({
         } : undefined}
       />
       {band && (
-        <div className="share-hidden-round-band shrink-0">
-          <span className="share-hidden-round-band-title">{band}</span>
+        <div className="share-round-band shrink-0">
+          <span className="share-round-band-title">{band}</span>
         </div>
       )}
     </div>
