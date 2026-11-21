@@ -239,6 +239,11 @@ input:-webkit-autofill:focus {
   background-color: var(--stone);
 }
 
+/* Inside the item, so the menu's rounded edges and a scrolling submenu don't clip the ring */
+.menu-item:focus-visible {
+  outline-offset: -2px;
+}
+
 .menu-item[aria-expanded="true"] {
   background-color: rgba(212, 175, 55, 0.12);
   color: #fae6a2;
