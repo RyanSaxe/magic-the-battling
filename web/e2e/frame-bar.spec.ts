@@ -17,6 +17,8 @@ const GAME_PHASES: Record<string, ScreenState> = {
   build: { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 } },
   fight: { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 } },
   reward: { phase: 'reward', counts: { sideboard: 8 } },
+  over: { phase: 'game_over', counts: { sideboard: 8 } },
+  eliminated: { phase: 'eliminated', counts: { sideboard: 8 } },
 }
 
 interface Surface {
@@ -119,6 +121,31 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
         if (frame.mainActionRight !== null) {
           expect.soft(frame.mainActionRight, 'main action sits at the right edge').toBeCloseTo(frame.footerInner.right, 0)
         }
+      })
+    }
+  })
+}
+
+const GAME_OVER_BARS = [
+  { phase: 'over', left: ['Review'] },
+  { phase: 'eliminated', left: ['Review', 'Spectate'] },
+]
+
+for (const { name, viewport, isMobile } of SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    for (const { phase, left } of GAME_OVER_BARS) {
+      test(`game ${phase} puts ${left.join(' and ')} at the left and Share Game, its one gold button, at the right`, async ({ page, baseURL }) => {
+        await serveGame(page, baseURL!, GAME_PHASES[phase])
+        await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+        const bar = page.getByRole('contentinfo')
+        await bar.getByRole('button', { name: 'Share Game' }).waitFor()
+
+        const labels = (role: string) => bar.locator(`[data-bar-role="${role}"] .btn`).allTextContents()
+        expect.soft(await labels('secondary'), 'left of the bottom bar').toEqual(left)
+        expect.soft(await labels('main'), 'right of the bottom bar').toEqual(['Share Game'])
+        expect.soft(await page.locator('.btn-primary').allTextContents(), 'gold buttons on the screen').toEqual(['Share Game'])
       })
     }
   })
