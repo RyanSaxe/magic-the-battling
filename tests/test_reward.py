@@ -298,6 +298,19 @@ def test_fibonacci_damage_formula():
     assert bob.poison == 5
 
 
+def test_static_opponent_deals_fibonacci_damage_without_upgrades(card_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    game.config.use_upgrades = False
+    alice, bob = game.players
+    bob.vanquishers = 3
+    bob.hand = [card_factory(f"c{i}") for i in range(bob.hand_size)]
+    ghost = StaticOpponent.from_player(bob)
+
+    reward.apply_poison_static(game, alice, ghost, player_won=False, is_draw=False)
+
+    assert alice.poison == 3
+
+
 def test_vs_static_rewards_given_when_sudden_death_triggers_for_bots(card_factory):
     """Non-lethal player should receive vanquisher/treasure rewards even when
     sudden death is triggered by multiple bots hitting lethal simultaneously."""

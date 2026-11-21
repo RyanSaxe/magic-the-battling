@@ -1,4 +1,5 @@
 import asyncio
+import hmac
 import json
 import logging
 import random
@@ -8,7 +9,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from httpx import HTTPStatusError, RequestError
 from sqlalchemy import func
@@ -142,13 +143,23 @@ def _utc_or_default(value: datetime | None, default: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
-def _scrub_face_down_cards(cards: list[Card], face_down_ids: set[str], id_map: dict[str, str]) -> list[Card]:
+def _opaque_card_id(key: bytes, card_id: str) -> str:
+    digest = hmac.digest(key, card_id.encode(), "sha256")
+    return str(UUID(bytes=digest[:16]))
+
+
+def _hidden_card_opaque_ids(b: Battle, zones: Zones) -> dict[str, str]:
+    # Derived from the battle's key, not stored, so every view of the battle shows the same ids
+    # and an action that sends one back resolves whichever view was built last.
+    hidden_ids = {*zones.face_down_card_ids, *(card.id for card in zones.library)}
+    return {card_id: _opaque_card_id(b._opaque_id_key, card_id) for card_id in hidden_ids}
+
+
+def _scrub_face_down_cards(cards: list[Card], face_down_ids: set[str], opaque_ids: dict[str, str]) -> list[Card]:
     result = []
     for card in cards:
         if card.id in face_down_ids:
-            opaque_id = str(uuid4())
-            id_map[opaque_id] = card.id
-            result.append(Card(id=opaque_id, scryfall_id="__scrubbed__", name="", image_url="", type_line=""))
+            result.append(Card(id=opaque_ids[card.id], scryfall_id="__scrubbed__", name="", image_url="", type_line=""))
         else:
             result.append(card)
     return result
@@ -341,6 +352,7 @@ class GameManager:
         self._host_handoff_tasks: dict[str, asyncio.Task] = {}
         self._spectate_requests: dict[str, PendingSpectateRequest] = {}
         self._dirty_games: set[str] = set()
+        self._finished_games: set[str] = set()
         self._last_human_activity: dict[str, datetime] = {}
         # The server attaches ConnectionManager's view; a manager used on its own (rules tests) has no sockets.
         self._connected_player_ids: Callable[[str], Collection[str]] = lambda _game_id: ()
@@ -471,6 +483,8 @@ class GameManager:
         return self.persist_dirty_games()
 
     def persist_dirty_games(self) -> int:
+        # complete_game deleted their snapshots, so a write would restore a finished game on the next boot.
+        self._dirty_games -= self._finished_games
         target_ids = [gid for gid in list(self._dirty_games) if gid in self._active_games]
         if not target_ids:
             return 0
@@ -1231,6 +1245,7 @@ class GameManager:
         game = self._active_games.get(game_id)
         if not game:
             return
+        self._finished_games.add(game_id)
 
         live_players = [p for p in game.players if p.phase != "eliminated"]
         live_bots = [fp for fp in game.puppets if not fp.is_eliminated]
@@ -1362,6 +1377,7 @@ class GameManager:
                 cleanup_task.cancel()
         self._last_human_activity.pop(game_id, None)
         self._action_locks.pop(game_id, None)
+        self._finished_games.discard(game_id)
         if not preserve_snapshot:
             self.delete_snapshot(game_id)
             self._close_game_record(game_id)
@@ -2672,7 +2688,7 @@ class GameManager:
             return []
 
         if use_upgrades:
-            return reward.build_damage_events(attacker)
+            return reward.build_damage_events(attacker, use_upgrades=use_upgrades)
 
         return [BattleResolutionEvent(event_type="base_increment") for _ in range(damage)]
 
@@ -2865,18 +2881,17 @@ class GameManager:
         face_down_ids = set(opponent_zones.face_down_card_ids)
 
         if is_pvp and face_down_ids:
-            id_map: dict[str, str] = {}
-            scrubbed_bf = _scrub_face_down_cards(opponent_zones.battlefield, face_down_ids, id_map)
-            scrubbed_gy = _scrub_face_down_cards(opponent_zones.graveyard, face_down_ids, id_map)
-            scrubbed_exile = _scrub_face_down_cards(opponent_zones.exile, face_down_ids, id_map)
-            scrubbed_cz = _scrub_face_down_cards(opponent_zones.command_zone, face_down_ids, id_map)
+            reverse_map = _hidden_card_opaque_ids(b, opponent_zones)
+            scrubbed_bf = _scrub_face_down_cards(opponent_zones.battlefield, face_down_ids, reverse_map)
+            scrubbed_gy = _scrub_face_down_cards(opponent_zones.graveyard, face_down_ids, reverse_map)
+            scrubbed_exile = _scrub_face_down_cards(opponent_zones.exile, face_down_ids, reverse_map)
+            scrubbed_cz = _scrub_face_down_cards(opponent_zones.command_zone, face_down_ids, reverse_map)
             scrubbed_library = _scrub_face_down_cards(
                 opponent_zones.library,
                 {card.id for card in opponent_zones.library},
-                id_map,
+                reverse_map,
             )
-            scrubbed_tokens = _scrub_face_down_cards(opponent_zones.spawned_tokens, face_down_ids, id_map)
-            reverse_map = {real: opaque for opaque, real in id_map.items()}
+            scrubbed_tokens = _scrub_face_down_cards(opponent_zones.spawned_tokens, face_down_ids, reverse_map)
             scrubbed_face_down_ids = _remap_id_list(opponent_zones.face_down_card_ids, reverse_map)
             scrubbed_tapped_ids = _remap_id_list(opponent_zones.tapped_card_ids, reverse_map)
             scrubbed_flipped_ids = _remap_id_list(opponent_zones.flipped_card_ids, reverse_map)
@@ -2885,7 +2900,6 @@ class GameManager:
                 reverse_map.get(k, k): [reverse_map.get(v, v) for v in vs]
                 for k, vs in opponent_zones.attachments.items()
             }
-            b._face_down_id_map = id_map
         else:
             scrubbed_bf = opponent_zones.battlefield
             scrubbed_gy = opponent_zones.graveyard
@@ -2898,7 +2912,6 @@ class GameManager:
             scrubbed_flipped_ids = opponent_zones.flipped_card_ids
             scrubbed_counters = opponent_zones.counters
             scrubbed_attachments = opponent_zones.attachments
-            b._face_down_id_map = {}
 
         hidden_opponent = Zones(
             battlefield=scrubbed_bf,
@@ -3047,8 +3060,7 @@ class GameManager:
             if player.in_sudden_death:
                 return self._handle_sudden_death_build_ready(game, player, game_id, db)
 
-            if build.all_ready(game):
-                self._start_all_battles(game, game_id, db)
+            self._start_round_if_ready(game, game_id, db)
             return None
         except ValueError as e:
             return str(e)
@@ -3113,6 +3125,10 @@ class GameManager:
                 # Clear to prevent double-returning
                 player.hand = []
                 player.sideboard = []
+
+    def _start_round_if_ready(self, game: Game, game_id: str | None, db: Session | None) -> None:
+        if build.all_ready(game):
+            self._start_all_battles(game, game_id, db)
 
     def _start_all_battles(self, game: Game, game_id: str | None = None, db: Session | None = None) -> None:
         # Clean up draft state before battles
@@ -3185,6 +3201,11 @@ class GameManager:
             return b.player_zones if is_battle_player else b.opponent_zones
         return b.opponent_zones if is_battle_player else b.player_zones
 
+    def _resolve_opaque_card_id(self, b: Battle, player: Player, card_id: str) -> str:
+        opponent_zones = self._get_zones_for_owner(b, player, "opponent")
+        real_ids = {opaque: real for real, opaque in _hidden_card_opaque_ids(b, opponent_zones).items()}
+        return real_ids.get(card_id, card_id)
+
     def _track_revealed_card(self, b: Battle, card, from_zones: Zones, to_zone: ZoneName) -> None:
         if to_zone not in battle.REVEALED_ZONES or not battle._is_revealed_card(card):
             return
@@ -3211,7 +3232,7 @@ class GameManager:
             if player.name not in (b.player.name, b.opponent.name):
                 continue
 
-            card_id = b._face_down_id_map.get(card_id, card_id)
+            card_id = self._resolve_opaque_card_id(b, player, card_id)
             from_zones = self._get_zones_for_owner(b, player, from_owner)
             to_zones = self._get_zones_for_owner(b, player, to_owner)
 
@@ -3278,8 +3299,12 @@ class GameManager:
     ) -> bool:
         for b in game.active_battles:
             if player.name in (b.player.name, b.opponent.name):
-                card_id = b._face_down_id_map.get(card_id, card_id)
-                return battle.update_card_state(b, player, action_type, card_id, data)
+                card_id = self._resolve_opaque_card_id(b, player, card_id)
+                updated = battle.update_card_state(b, player, action_type, card_id, data)
+                if updated and action_type == "shuffle_library":
+                    # With the same hidden ids, the other player could follow each card through the shuffle.
+                    b._opaque_id_key = secrets.token_bytes(32)
+                return updated
         return False
 
     def handle_battle_reveal_upgrade(self, game: Game, player: Player, upgrade_id: str) -> bool:
@@ -3500,9 +3525,14 @@ class GameManager:
                 poison_taken=poison_dealt,
             )
             eliminate_player(game, player, player.round, player.stage)
+            self._persist_player_placement(db, game_id, player)
             self._eliminate_dead_puppets(game, game_id, db)
-            self.complete_game(game_id or "", None, db)
-            return "game_over"
+            winner, is_game_over = check_game_over(game)
+            if is_game_over:
+                self.complete_game(game_id or "", winner, db)
+                return "game_over"
+            self._start_round_if_ready(game, game_id, db)
+            return None
 
         self._eliminate_dead_puppets(game, game_id, db)
         winner, is_game_over = check_game_over(game)
@@ -4563,6 +4593,13 @@ class GameManager:
         return None
 
     def _check_sudden_death_ready(self, game: Game, game_id: str | None, db: Session | None) -> str | None:
+        result = self._eliminate_or_start_sudden_death(game, game_id, db)
+        if result is None:
+            # Everyone else may have readied while waiting on a player this just eliminated.
+            self._start_round_if_ready(game, game_id, db)
+        return result
+
+    def _eliminate_or_start_sudden_death(self, game: Game, game_id: str | None, db: Session | None) -> str | None:
         """Check if sudden death should trigger and set it up."""
         if not would_be_dead_ready_for_elimination(game):
             return None
@@ -4620,13 +4657,6 @@ class GameManager:
         puppet.in_sudden_death = True
         human.phase = "build"
         return "sudden_death"
-
-    def handle_reward_pick_upgrade(self, game: Game, player: Player, upgrade_id: str) -> bool:
-        upgrade = next((u for u in game.available_upgrades if u.id == upgrade_id), None)
-        if not upgrade:
-            return False
-        reward.pick_upgrade(game, player, upgrade)
-        return True
 
     def handle_reward_apply_upgrade(self, player: Player, upgrade_id: str, target_card_id: str) -> bool:
         return self._apply_upgrade(player, upgrade_id, target_card_id)

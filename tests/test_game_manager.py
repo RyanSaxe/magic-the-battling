@@ -915,3 +915,24 @@ class TestCleanupStaleGameRecords:
         session = db.SessionLocal()
         assert session.query(ActiveGameSnapshot).filter(ActiveGameSnapshot.game_id == "loaded_game").first()
         session.close()
+
+
+class TestFinishedGameSnapshots:
+    def test_finished_game_snapshot_is_not_written_again(self, game_manager, mock_cube_data, test_db):
+        pending = game_manager.create_game("Alice", "pid-a", cube_id="test", target_player_count=2)
+        game_manager.join_game(pending.join_code, "Bob", "pid-b")
+        game_id = pending.game_id
+        session = db.SessionLocal()
+        game = game_manager.start_game(game_id, session)
+        assert game is not None
+        game_manager.persist_all_games()
+
+        game_manager.complete_game(game_id, game.players[0], session)
+        # ws.handle_message marks the game dirty after the action that ended it, and shutdown flushes every game
+        game_manager.mark_game_dirty(game_id)
+        game_manager.persist_dirty_games()
+        game_manager.persist_all_games()
+
+        session.expire_all()
+        assert session.get(ActiveGameSnapshot, game_id) is None
+        session.close()

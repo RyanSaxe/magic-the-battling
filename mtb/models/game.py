@@ -1,5 +1,6 @@
 import json
 import random
+import secrets
 import weakref
 from typing import Any, Literal
 
@@ -402,7 +403,7 @@ class Battle(BaseModel):
     opponent_life: int = 20
     is_sudden_death: bool = False
     pending_reveal_animations: list[PendingRevealAnimation] = Field(default_factory=list)
-    _face_down_id_map: dict[str, str] = PrivateAttr(default_factory=dict)
+    _opaque_id_key: bytes = PrivateAttr(default_factory=lambda: secrets.token_bytes(32))
 
 
 def create_game(player_names: list[str], num_players: int, config: Config | None = None) -> Game:
