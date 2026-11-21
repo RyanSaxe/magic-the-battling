@@ -206,6 +206,8 @@ export interface PageUnderTest {
   serve: (page: Page, baseURL: string) => Promise<void>
   /** The action a visitor comes to the page for, which must be reachable on any screen. */
   primaryAction: (page: Page) => Locator
+  /** The content is sized to the felt rather than scrolling in it, like the share page's board. */
+  fillsFelt?: boolean
 }
 
 export const PAGES: PageUnderTest[] = [
@@ -262,6 +264,7 @@ export const PAGES: PageUnderTest[] = [
     path: `/game/${SHARE_GAME_ID}/share/Alice`,
     serve: serveShareGame,
     primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
+    fillsFelt: true,
   },
 ]
 
