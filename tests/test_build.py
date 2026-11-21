@@ -141,6 +141,39 @@ def test_swap_card_clears_command_zone_when_companion_swapped_from_sideboard(car
     assert len(player.command_zone) == 0
 
 
+class TestSetBasics:
+    def test_set_basics_stores_a_partial_pick(self):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+
+        build.set_basics(game, player, ["Plains"])
+
+        assert player.chosen_basics == ["Plains"]
+
+    def test_set_basics_rejects_unknown_land(self):
+        game = create_game(["Alice"], num_players=1)
+
+        with pytest.raises(ValueError, match="Invalid basic land"):
+            build.set_basics(game, game.players[0], ["Plains", "Bayou"])
+
+    def test_set_basics_rejects_more_than_the_allowed_count(self):
+        game = create_game(["Alice"], num_players=1)
+
+        with pytest.raises(ValueError, match="Cannot choose more than"):
+            build.set_basics(game, game.players[0], ["Plains", "Island", "Swamp", "Forest"])
+
+    def test_set_basics_rejects_changes_after_ready(self, card_factory):
+        game = create_game(["Alice"], num_players=1)
+        player = game.players[0]
+        player.hand.extend([card_factory(f"c{i}") for i in range(3)])
+        build.set_ready(game, player, ["Plains", "Island", "Mountain"])
+
+        with pytest.raises(ValueError, match="while ready"):
+            build.set_basics(game, player, ["Swamp"])
+
+        assert player.chosen_basics == ["Plains", "Island", "Mountain"]
+
+
 class TestPlayDrawPreference:
     def test_set_ready_stores_play_preference(self, card_factory):
         game = create_game(["Alice"], num_players=1)

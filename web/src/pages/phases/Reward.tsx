@@ -15,6 +15,7 @@ import {
 import { usePersistedConstraints } from "../../hooks/usePersistedConstraints";
 import { useResizableLayout } from "../../hooks/useResizableLayout";
 import type { GameState, Card as CardType } from "../../types";
+import { rewardZoneStyles } from "./rewardZoneStyles";
 
 interface RewardPhaseProps {
   gameState: GameState;
@@ -206,17 +207,11 @@ export function RewardPhase({
     height: dims.pool.height,
   };
 
-  const controlledStyle = (height: number) => ({
-    height,
-    flex: "0 0 auto" as const,
-  });
-
-  const rewardsStyle = controlledStyle(zoneFrames.rewards.outerHeight);
-  const upgradesStyle = controlledStyle(zoneFrames.upgrades.outerHeight);
-  const poolStyle = {
-    minHeight: zoneFrames.pool.outerHeight,
-    flex: "1 1 auto" as const,
-  };
+  const {
+    rewards: rewardsStyle,
+    upgrades: upgradesStyle,
+    pool: poolStyle,
+  } = rewardZoneStyles(zoneFrames, hasUpgradeSection);
 
   void last_battle_result;
 
@@ -242,7 +237,7 @@ export function RewardPhase({
 
         <div
           ref={setRewardsNode}
-          className={`zone-pack w-full px-3 pt-5 pb-3 relative ${hasUpgradeSection ? "" : "flex-1 min-h-0"}`}
+          className="zone-pack w-full px-3 pt-5 pb-3 relative"
           style={rewardsStyle}
           data-guide-target="reward-summary"
         >

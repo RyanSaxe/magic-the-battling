@@ -30,11 +30,13 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
   }, [onClose])
 
   const handleSubmit = async () => {
-    if (!playerName.trim()) {
+    const name = playerName.trim()
+    const code = joinCode.trim()
+    if (!name) {
       setError('Please enter your name')
       return
     }
-    if (!joinCode.trim()) {
+    if (!code) {
       setError('Please enter a join code')
       return
     }
@@ -43,9 +45,9 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
     setError('')
 
     try {
-      const response = await joinGame(joinCode, playerName)
+      const response = await joinGame(code, name)
       saveSession(response.session_id, response.player_id)
-      rememberPlayerForGame(response.game_id, playerName.trim())
+      rememberPlayerForGame(response.game_id, name)
       navigate(`/game/${response.game_id}/lobby`)
     } catch (err) {
       setError(unknownToAppError(err, 'join-game', 'Failed to join game').message)
