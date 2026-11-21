@@ -655,10 +655,10 @@ export function Play() {
                     <div className="flex-1 flex items-center justify-center">
                       <p className="description-panel italic text-gray-200 text-base leading-relaxed px-4 py-3">
                         <span className="block text-amber-400/70">
-                          Battle historically winning hands!
+                          Fight historically winning hands!
                         </span>
                         <span className="block">
-                          Their cards are face up in battle. You can move them around to simulate the game and decide who would have won.
+                          Their cards are face up in the fight. You can move them around to simulate the game and decide who would have won.
                         </span>
                       </p>
                     </div>
