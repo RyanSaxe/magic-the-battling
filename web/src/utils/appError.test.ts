@@ -23,7 +23,7 @@ describe('appError', () => {
 
     const error = await responseToAppError(response, 'share-game', 'Failed to load shared game')
 
-    expect(error.message).toBe('This game is still being played.')
+    expect(error.message).toBe('This game is still being played. Its review opens when the game ends.')
   })
 
   it('uses create-game specific copy for server updates', () => {

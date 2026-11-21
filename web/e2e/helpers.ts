@@ -187,6 +187,16 @@ export async function serveShareGame(page: Page, baseURL: string) {
   })
 }
 
+export async function serveShareInProgress(page: Page, baseURL: string) {
+  await serveFromTable(page, baseURL, {
+    ...SIGNED_OUT_RESPONSES,
+    [`/api/games/${SHARE_GAME_ID}/share/Bob`]: {
+      status: 404,
+      json: { detail: 'This game is still being played', code: 'GAME_IN_PROGRESS' },
+    },
+  })
+}
+
 /** The lobby's states: connected to a lobby, waiting for its first update, or holding no session. */
 export type LobbyMode = 'connected' | 'loading' | 'no-session'
 
@@ -292,6 +302,12 @@ export const PAGES: PageUnderTest[] = [
     serve: serveShareGame,
     primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
     fillsFelt: true,
+  },
+  {
+    name: 'share in progress',
+    path: `/game/${SHARE_GAME_ID}/share/Bob`,
+    serve: serveShareInProgress,
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Home' }),
   },
 ]
 

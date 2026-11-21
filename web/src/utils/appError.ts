@@ -191,7 +191,7 @@ export function getAppErrorMessage(
         }
         return 'This game is no longer available. It may have ended or been cleared during a server restart.'
       case 'GAME_IN_PROGRESS':
-        return 'This game is still being played.'
+        return 'This game is still being played. Its review opens when the game ends.'
       case 'SPECTATE_TARGET_NOT_FOUND':
         return 'That player is no longer available to spectate.'
       case 'SPECTATE_REQUEST_NOT_FOUND':
