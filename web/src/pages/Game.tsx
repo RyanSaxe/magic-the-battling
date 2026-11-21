@@ -514,7 +514,7 @@ function PlayerSelectionModal({
                 type="text"
                 value={spectatorName}
                 onChange={(e) => setSpectatorName(e.target.value)}
-                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full bg-gray-800 text-white rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)]"
                 placeholder="Enter your name"
               />
             </div>

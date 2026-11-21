@@ -5,6 +5,7 @@
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
+  accent-color: var(--color-gold);
 
   /* Magic-themed color palette */
   --color-gold: #d4af37;
@@ -128,6 +129,11 @@ body {
 @layer base {
   button:not(:disabled) {
     cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gold-bright);
+    outline-offset: 2px;
   }
 }
 

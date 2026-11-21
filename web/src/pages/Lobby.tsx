@@ -740,7 +740,7 @@ export function Lobby() {
                             }}
                             placeholder={isConstructed ? "Enter deck list" : "CubeCobra cube ID"}
                             disabled={isBattlerLoading}
-                            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold)] disabled:opacity-50 disabled:cursor-not-allowed"
                           />
                         )}
                         <button
