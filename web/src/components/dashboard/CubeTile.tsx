@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SurfaceCard } from '../common/SurfaceCard'
-import { BADGE_CLASSES, type CubeBadge } from './badges'
+import { CubeBadge, type CubeBadgeTone } from './CubeBadge'
 import { MoreMenu, type MoreMenuItem } from './MoreMenu'
 
 
@@ -17,7 +17,7 @@ interface CubeTileProps {
   title: string
   cubeId: string
   imageUri?: string | null
-  badge: CubeBadge
+  badge: CubeBadgeTone
   chips: string[]
   footer: ReactNode
   /** The page the card opens. */
@@ -49,11 +49,9 @@ export function CubeTile({ title, cubeId, imageUri, badge, chips, footer, href, 
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[color:var(--art-fade)] via-transparent to-transparent" />
-        <span
-          className={`absolute right-2.5 top-2.5 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] ${BADGE_CLASSES[badge]}`}
-        >
+        <CubeBadge tone={badge} className="absolute right-2.5 top-2.5">
           {badge}
-        </span>
+        </CubeBadge>
         <div className="absolute inset-x-0 bottom-0 px-3.5 pb-2 min-w-0">
           <h3 className="truncate font-['Cinzel',serif] text-[15px] leading-5 font-bold text-amber-50 drop-shadow-md">
             <Link to={href} onClick={(e) => e.stopPropagation()}>{title}</Link>

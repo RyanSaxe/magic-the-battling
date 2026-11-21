@@ -4,6 +4,7 @@ import { useToast } from '../../contexts'
 import type { GameSummary, PlayMode } from '../../types'
 import { countLabel } from '../../utils/accountFormat'
 import { RecapCard } from './GameTile'
+import { LoadMoreButton } from './ResultList'
 import { NoticeTile } from './Section'
 import { SegmentedFilter } from './SegmentedFilter'
 
@@ -164,16 +165,7 @@ export function GameHistory({ loadGames, initialFilters, scoped = false, title }
         </div>
       )}
 
-      {current?.hasMore && (
-        <button
-          type="button"
-          onClick={loadMore}
-          disabled={loadingMore}
-          className="btn btn-secondary self-center px-6 py-2 disabled:opacity-50"
-        >
-          {loadingMore ? 'Loading...' : 'Load more'}
-        </button>
-      )}
+      {current?.hasMore && <LoadMoreButton loading={loadingMore} onClick={loadMore} />}
     </section>
   )
 }

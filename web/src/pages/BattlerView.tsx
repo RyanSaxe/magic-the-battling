@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link, useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/authState'
 import { useToast } from '../contexts'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
-import { DetailHero } from '../components/dashboard/DetailHero'
+import { DashboardFrame } from '../components/dashboard/DashboardFrame'
+import { DefaultOpponentsField } from '../components/dashboard/DefaultOpponentsField'
+import { DetailHero, HeroLink } from '../components/dashboard/DetailHero'
 import { GameHistory, type LoadGames } from '../components/dashboard/GameHistory'
 import { HomeHeader } from '../components/dashboard/HomeHeader'
-import { Breadcrumb, PlayIcon } from '../components/dashboard/Section'
+import { Breadcrumb } from '../components/dashboard/Section'
 import { getBattlers, getBattlerGames, updateBattler, deleteBattler } from '../api/client'
 import type { UserBattler, PlayMode } from '../types'
 import { countLabel, cubeTitle, modeLabel, winRate } from '../utils/accountFormat'
@@ -73,68 +75,48 @@ export function BattlerView() {
 
   return (
     <>
-      <PageFrame header={<HomeHeader />} contentClassName="px-4">
-        <div className="mx-auto flex w-full max-w-[1080px] min-[1600px]:max-w-[1400px] flex-col gap-3">
-          <Breadcrumb to="/dashboard" label="Cubes & Decks" current={title} />
-          <DetailHero
-            imageUri={battler.cube_image_uri}
-            badge={{ label: `Saved ${mode} Preset`, tone: mode }}
-            title={title}
-            links={<>
-              <span>
-                Source:{' '}
-                <a
-                  href={`https://cubecobra.com/cube/overview/${encodeURIComponent(battler.cube_id)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-amber-400 hover:text-amber-300 transition-colors"
-                >
-                  {battler.cube_id} on CubeCobra ↗
-                </a>
-              </span>
-              <Link to={`/cube/${encodeURIComponent(battler.cube_id)}`} className="text-amber-400 hover:text-amber-300 transition-colors">
-                View Public Cube Page →
-              </Link>
-            </>}
-            chips={[
-              `Mode: ${mode === 'Deck' ? 'Deck (Constructed)' : 'Cube (Limited)'}`,
-              `Upgrades: ${battler.use_upgrades ? 'On' : 'Off'}`,
-              `Default Opponents: ${battler.puppet_count}`,
-              `Open Spectating: ${battler.auto_approve_spectators ? 'On' : 'Off'}`,
-            ]}
-            actions={<>
-              <button type="button" onClick={() => setShowSettings(true)} className="btn btn-secondary px-4 py-2 text-sm font-medium">
-                Edit Preset
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate(battlerPlayUrl(battler))}
-                className="btn btn-primary flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold"
-              >
-                <PlayIcon />
-                Play Preset
-              </button>
-            </>}
-            stats={[
-              { label: 'Your Games', value: battler.my_game_count },
-              {
-                label: 'Your Wins',
-                value: battler.my_win_count,
-                detail: battler.my_game_count > 0 ? `(${winRate(battler.my_win_count, battler.my_game_count)})` : undefined,
-              },
-              { label: 'Avg Finish', value: battler.my_average_placement?.toFixed(1) ?? '—' },
-              { label: 'All Cube Games', value: battler.game_count, detail: countLabel(battler.human_player_count, 'player') },
-            ]}
-            caption={`Your games, wins and finish count your finished games on this cube in ${mode} mode with upgrades ${battler.use_upgrades ? 'on' : 'off'}.`}
-          />
-          <GameHistory
-            key={`${battler.play_mode}-${battler.use_upgrades}`}
-            scoped
-            loadGames={loadGames}
-            initialFilters={{ playMode: battler.play_mode, useUpgrades: battler.use_upgrades, mineOnly: true }}
-          />
-        </div>
-      </PageFrame>
+      <DashboardFrame>
+        <Breadcrumb to="/dashboard" label="Cubes & Decks" current={title} />
+        <DetailHero
+          imageUri={battler.cube_image_uri}
+          badge={{ label: `Saved ${mode} Preset`, tone: mode }}
+          title={title}
+          links={<>
+            <span>
+              Source:{' '}
+              <HeroLink href={`https://cubecobra.com/cube/overview/${encodeURIComponent(battler.cube_id)}`}>
+                {battler.cube_id} on CubeCobra ↗
+              </HeroLink>
+            </span>
+            <HeroLink to={`/cube/${encodeURIComponent(battler.cube_id)}`}>View Public Cube Page →</HeroLink>
+          </>}
+          chips={[
+            `Mode: ${mode === 'Deck' ? 'Deck (Constructed)' : 'Cube (Limited)'}`,
+            `Upgrades: ${battler.use_upgrades ? 'On' : 'Off'}`,
+            `Default Opponents: ${battler.puppet_count}`,
+            `Open Spectating: ${battler.auto_approve_spectators ? 'On' : 'Off'}`,
+          ]}
+          actions={[{ label: 'Edit Preset', onClick: () => setShowSettings(true) }]}
+          play={{ label: 'Play Preset', onClick: () => navigate(battlerPlayUrl(battler)) }}
+          stats={[
+            { label: 'Your Games', value: battler.my_game_count },
+            {
+              label: 'Your Wins',
+              value: battler.my_win_count,
+              detail: battler.my_game_count > 0 ? `(${winRate(battler.my_win_count, battler.my_game_count)})` : undefined,
+            },
+            { label: 'Avg Finish', value: battler.my_average_placement?.toFixed(1) ?? '—' },
+            { label: 'All Cube Games', value: battler.game_count, detail: countLabel(battler.human_player_count, 'player') },
+          ]}
+          caption={`Your games, wins and finish count your finished games on this cube in ${mode} mode with upgrades ${battler.use_upgrades ? 'on' : 'off'}.`}
+        />
+        <GameHistory
+          key={`${battler.play_mode}-${battler.use_upgrades}`}
+          scoped
+          loadGames={loadGames}
+          initialFilters={{ playMode: battler.play_mode, useUpgrades: battler.use_upgrades, mineOnly: true }}
+        />
+      </DashboardFrame>
 
       {showSettings && (
         <SettingsModal
@@ -239,21 +221,7 @@ function SettingsModal({
             <span className="text-white text-sm">Upgrades</span>
           </label>
 
-          <div className="bg-black/35 border border-black/40 rounded-lg p-3">
-            <label className="block text-amber-100/70 text-sm mb-2">Default Opponents</label>
-            <div className="flex gap-1.5">
-              {([1, 3, 5, 7] as const).map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setPuppetCount(n)}
-                  className={`btn ${puppetCount === n ? 'btn-primary' : 'btn-secondary'} px-3 py-1.5 text-sm font-medium`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
+          <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />
         </div>
 
         <div className="flex gap-2 mt-4">
