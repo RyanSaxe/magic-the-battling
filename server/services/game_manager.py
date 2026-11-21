@@ -232,6 +232,7 @@ class GameManager:
         self._pending_disconnect_tasks: dict[str, asyncio.Task] = {}
         self._spectate_requests: dict[str, PendingSpectateRequest] = {}
         self._dirty_games: set[str] = set()
+        self._finished_games: set[str] = set()
         self._last_human_activity: dict[str, datetime] = {}
         self._connected_humans: dict[str, int] = {}
         self._snapshot_task: asyncio.Task | None = None
@@ -363,6 +364,8 @@ class GameManager:
         return self.persist_dirty_games()
 
     def persist_dirty_games(self) -> int:
+        # complete_game deleted their snapshots, so a write would restore a finished game on the next boot.
+        self._dirty_games -= self._finished_games
         target_ids = [gid for gid in list(self._dirty_games) if gid in self._active_games]
         if not target_ids:
             return 0
@@ -1106,6 +1109,7 @@ class GameManager:
         game = self._active_games.get(game_id)
         if not game:
             return
+        self._finished_games.add(game_id)
 
         live_players = [p for p in game.players if p.phase != "eliminated"]
         live_bots = [fp for fp in game.puppets if not fp.is_eliminated]
@@ -1231,6 +1235,7 @@ class GameManager:
         self._connected_humans.pop(game_id, None)
         self._last_human_activity.pop(game_id, None)
         self._action_locks.pop(game_id, None)
+        self._finished_games.discard(game_id)
         if not preserve_snapshot:
             self.delete_snapshot(game_id)
         self._close_game_record(game_id)
