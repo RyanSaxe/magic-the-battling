@@ -231,7 +231,7 @@ function measureBoard({ zoneSelector, minCardWidth }: { zoneSelector: string; mi
 
 async function openScreen(page: Page, baseURL: string, screen: Screen) {
   await serveGame(page, baseURL, screen.state)
-  await page.goto(`/game/${GAME_ID}/play`)
+  await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
   await restoreSavedLayout(page, screen)
 }
 
@@ -245,7 +245,7 @@ async function restoreSavedLayout(page: Page, screen: Screen) {
       entries: [{ stage: 4, round: 2, mode: 'constraints', constraints: saved }],
     }))
   }, { phase: screen.state.phase, saved: screen.saved ?? null })
-  await page.reload()
+  await page.reload({ waitUntil: 'domcontentloaded' })
   // The header's Cinzel title sets the header's height, and with it the board's.
   await page.evaluate(() => document.fonts.load('16px Cinzel'))
   const crashed = page.getByRole('heading', { name: 'Something went wrong' })
