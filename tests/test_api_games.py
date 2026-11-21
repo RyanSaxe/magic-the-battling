@@ -1,5 +1,7 @@
 """REST endpoint tests - focus on contracts/shapes, not game logic."""
 
+import pytest
+
 import server.routers.games as games_module
 import server.services.game_manager as gm_module
 from mtb.models.cards import Battler
@@ -37,6 +39,24 @@ class TestCreateGame:
         assert lobby.status_code == 200
         assert lobby.json()["guided_mode_default"] is True
 
+    @pytest.mark.parametrize(
+        ("player_name", "message"),
+        [
+            ("   ", "Player name is required."),
+            ("x" * 33, "Player name must be 32 characters or fewer."),
+        ],
+        ids=["blank", "too_long"],
+    )
+    def test_rejects_blank_or_overlong_player_name(self, client, player_name, message):
+        response = client.post("/api/games", json={"player_name": player_name, "cube_id": "test"})
+
+        assert response.status_code == 422
+        assert response.json()["detail"] == message
+
+
+def _lobby_player_names(client, game_id: str) -> list[str]:
+    return [player["name"] for player in client.get(f"/api/games/{game_id}/lobby").json()["players"]]
+
 
 class TestJoinGame:
     def test_join_with_valid_code(self, client):
@@ -50,6 +70,14 @@ class TestJoinGame:
         assert "game_id" in data
         assert "session_id" in data
         assert "player_id" in data
+
+    def test_names_are_stored_trimmed_with_their_casing(self, client):
+        create = client.post("/api/games", json={"player_name": "  Alice ", "cube_id": "test"})
+        game_id = create.json()["game_id"]
+
+        client.post("/api/games/join", json={"join_code": create.json()["join_code"], "player_name": "bOb "})
+
+        assert _lobby_player_names(client, game_id) == ["Alice", "bOb"]
 
     def test_join_with_invalid_code_returns_404(self, client):
         response = client.post("/api/games/join", json={"join_code": "BADCODE", "player_name": "Bob"})
