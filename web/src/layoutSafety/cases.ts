@@ -3,6 +3,7 @@ import type { CardLayoutConfig } from "../hooks/useCardLayout";
 import { GAME_SHELL_SMALL_BREAKPOINT_PX } from "../hooks/useGameShellMode";
 import { MOBILE_BREAKPOINT_PX } from "../hooks/useViewportCardSizes";
 import {
+  SUDDEN_DEATH_BAR_HEIGHT,
   battleBoardMetrics,
   buildLayoutConfig,
   draftLayoutConfig,
@@ -238,7 +239,7 @@ export function battleCases(): BattleCase[] {
 export function battleConfig(viewport: Viewport, battleCase: BattleCase, isSuddenDeath: boolean) {
   const { fixedHeight, zoneColumnWidth } = battleBoardMetrics({
     isMobile: isMobileViewport(viewport),
-    isSuddenDeath,
+    bannerHeight: isSuddenDeath ? SUDDEN_DEATH_BAR_HEIGHT : 0,
   });
   // Defaults useBattleCardSizes applies to what Battle.tsx passes.
   return {
