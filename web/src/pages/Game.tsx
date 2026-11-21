@@ -40,6 +40,7 @@ import { BattleRevealOverlay } from "../components/common/BattleRevealOverlay";
 import { BuildUpgradeOverlay } from "../components/common/BuildUpgradeOverlay";
 import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
 import { RevealBeforeSubmitModal } from "../components/common/RevealBeforeSubmitModal";
+import { RotatePrompt } from "../components/common/RotatePrompt";
 import { ServerStatusWindow } from "../components/common/ServerStatusWindow";
 import { UpgradesModal } from "../components/common/UpgradesModal";
 import { DndPanel } from "../components/common/DndPanel";
@@ -50,6 +51,7 @@ import { shouldClearSessionOnInvalidEvent } from "../utils/sessionRecovery";
 import {
   comparePlayersForSidebar,
   getSidebarPlayerOrder,
+  suddenDeathDecidesGame,
 } from "../utils/playerPlacement";
 import {
   buildAppliedUpgradeMap,
@@ -76,13 +78,21 @@ import {
   type VisibleGuideStep,
 } from "./gameGuideState";
 import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
-import { canUseBattleFaceDownAction, canUseBattleFlipAction } from "../utils/battleInteraction";
+import {
+  canUseBattleFaceDownAction,
+  canUseBattleFlipAction,
+  hasBattleResultConflict,
+} from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
 
 interface SpectatorConfig {
   spectatePlayer: string;
   requestId: string;
 }
+
+// Each area stops 3px into the life number, short of its middle even for one digit, so - and + never overlap.
+const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_+_5px_-_44px)]";
+const LIFE_PLUS_TOUCH_AREA = "touch-area [--touch-area-left:-5px]";
 
 const STATIC_DIVIDER_CALLBACKS = {
   onDragStart: () => {},
@@ -1899,8 +1909,11 @@ function GameContent() {
       );
 
       if (mySubmission && !isChangingResult) {
-        const resultsConflict =
-          opponentSubmission && mySubmission !== opponentSubmission;
+        const resultsConflict = hasBattleResultConflict({
+          mySubmission,
+          opponentSubmission,
+          isResolved: displayBattleResolution,
+        });
         right = (
           <div className="flex items-center gap-1.5 sm:gap-2">
             <span
@@ -2156,6 +2169,8 @@ function GameContent() {
             round={self_player.round}
             nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
             nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+            inSuddenDeath={self_player.in_sudden_death}
+            suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
             useUpgrades={gameState.use_upgrades}
             headerClassName={phaseTimelineHeaderClassName}
             rightActionsClassName={phaseTimelineRightActionsClassName}
@@ -2206,9 +2221,9 @@ function GameContent() {
                           ) : null
                         })()}
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>-</button>
                           <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
-                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>+</button>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 leading-tight">
@@ -2222,9 +2237,9 @@ function GameContent() {
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>-</button>
                           <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
-                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>+</button>
                         </div>
                         {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
                           <MicToggle
@@ -2564,12 +2579,12 @@ function GameContent() {
         {!isSpectator && (
           <div ref={actionBarRef} className="shrink-0 relative frame-chrome z-40">
             <div
-              className={`flex items-center justify-between gap-1.5 sm:gap-2 py-1.5 ${actionBarPaddingClass} timeline-actions`}
+              className={`h-[var(--frame-bar-height)] flex items-center justify-between gap-1.5 sm:gap-2 ${actionBarPaddingClass} timeline-actions`}
               data-guide-target="phase-action-bar"
             >
               {isEndPhase && gameId && !displayBattleResolution ? (
                 <>
-                  <div className="flex items-center gap-1.5 sm:gap-2 py-1">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
                     <button
                       className="btn bg-slate-700 hover:bg-slate-600 text-white"
                       onClick={() =>
@@ -2704,6 +2719,7 @@ function GameContent() {
           useUpgrades={gameState.use_upgrades}
         />
       )}
+      <RotatePrompt />
     </CardPreviewContext.Provider>
   );
 }

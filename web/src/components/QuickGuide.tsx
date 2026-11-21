@@ -12,6 +12,7 @@ import {
 } from '../constants/phases'
 import { PHASE_HOTKEYS } from '../constants/hotkeys'
 import { HotkeyRow } from './HotkeyRow'
+import { canHover } from '../utils/inputMode'
 import { DocNavContext } from '../contexts/DocNavContext'
 import { CubeCobraPrimerLink } from './common/CubeCobraPrimerLink'
 
@@ -395,8 +396,8 @@ function buildPhaseGuideContent(doc: DocEntry): string {
 function PhaseControlsContent({ phase }: { phase: Phase }) {
   const phaseDoc = getPhaseDoc(phase)
   const controlsMarkdown = phaseDoc?.parsed.sections['controls']
-  const hotkeys = PHASE_HOTKEYS[phase] ?? []
-  const hoverHotkeys = PHASE_HOTKEYS[`${phase}-hover`] ?? []
+  const hotkeys = canHover ? PHASE_HOTKEYS[phase] ?? [] : []
+  const hoverHotkeys = canHover ? PHASE_HOTKEYS[`${phase}-hover`] ?? [] : []
 
   return (
     <div className="space-y-4 text-sm sm:text-base">

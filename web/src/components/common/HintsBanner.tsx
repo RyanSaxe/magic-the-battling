@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { GAME_HINTS } from "../../constants/hints";
+import { textForInput } from "../../utils/inputMode";
 
 const CYCLE_INTERVAL = 8000;
 const FADE_OUT_DURATION = 280;
@@ -80,7 +81,7 @@ export function HintsBanner({ variant = "default" }: { variant?: HintsBannerVari
     ? "text-amber-200/95 font-semibold text-xs uppercase tracking-[0.04em] shrink-0"
     : "text-amber-400 font-medium text-xs shrink-0";
   const navButtonClass = variant === "rail"
-    ? "text-gray-500 hover:text-gray-300 transition-colors text-base leading-none shrink-0 px-1"
+    ? "touch-area text-gray-500 hover:text-gray-300 transition-colors text-base leading-none shrink-0 px-1"
     : "text-gray-500 hover:text-gray-300 transition-colors text-sm shrink-0";
   const tipTextClass = variant === "rail"
     ? "text-[12px] text-gray-400"
@@ -99,7 +100,7 @@ export function HintsBanner({ variant = "default" }: { variant?: HintsBannerVari
       <p
         className={`flex-1 text-center leading-tight ${tipTextClass} ${visible ? "hint-fade-in" : "hint-fade-out"}`}
       >
-        {GAME_HINTS[index]}
+        {textForInput(GAME_HINTS[index])}
       </p>
       <button
         onClick={next}
