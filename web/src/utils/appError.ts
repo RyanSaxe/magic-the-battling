@@ -5,6 +5,7 @@ export type AppErrorCode =
   | 'NOT_AUTHENTICATED'
   | 'INVALID_SESSION'
   | 'GAME_NOT_FOUND'
+  | 'GAME_IN_PROGRESS'
   | 'SPECTATE_TARGET_NOT_FOUND'
   | 'SPECTATE_REQUEST_NOT_FOUND'
   | 'PLAYER_NOT_IN_GAME'
@@ -83,6 +84,7 @@ const KNOWN_CODES = new Set<AppErrorCode>([
   'NOT_AUTHENTICATED',
   'INVALID_SESSION',
   'GAME_NOT_FOUND',
+  'GAME_IN_PROGRESS',
   'SPECTATE_TARGET_NOT_FOUND',
   'SPECTATE_REQUEST_NOT_FOUND',
   'PLAYER_NOT_IN_GAME',
@@ -188,6 +190,8 @@ export function getAppErrorMessage(
           return 'No game found with that join code. Check the code and try again.'
         }
         return 'This game is no longer available. It may have ended or been cleared during a server restart.'
+      case 'GAME_IN_PROGRESS':
+        return 'This game is still being played. Its review opens when the game ends.'
       case 'SPECTATE_TARGET_NOT_FOUND':
         return 'That player is no longer available to spectate.'
       case 'SPECTATE_REQUEST_NOT_FOUND':

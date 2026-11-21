@@ -122,10 +122,6 @@ export function useGame(
     send('battle_pass_turn')
   }, [send])
 
-  const rewardPickUpgrade = useCallback((upgradeId: string) => {
-    send('reward_pick_upgrade', { upgrade_id: upgradeId })
-  }, [send])
-
   const rewardApplyUpgrade = useCallback((upgradeId: string, targetCardId: string) => {
     send('reward_apply_upgrade', { upgrade_id: upgradeId, target_card_id: targetCardId })
   }, [send])
@@ -190,7 +186,6 @@ export function useGame(
       battleUpdateCardState,
       battleUpdateLife,
       battlePassTurn,
-      rewardPickUpgrade,
       rewardApplyUpgrade,
       rewardDone,
       spectateResponse,

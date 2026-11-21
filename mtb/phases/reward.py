@@ -57,19 +57,25 @@ def _fibonacci(n: int) -> int:
     return a
 
 
-def calculate_damage(player: Player | StaticOpponent) -> int:
-    if isinstance(player, StaticOpponent) or player.game.config.use_upgrades:
+def _stage(player: Player | StaticOpponent) -> int:
+    # A static opponent's hand was submitted at its own stage, when hand size equalled stage.
+    if isinstance(player, StaticOpponent):
+        return len(player.hand)
+    return player.hand_size
+
+
+def calculate_damage(player: Player | StaticOpponent, *, use_upgrades: bool) -> int:
+    if use_upgrades:
         return 1 + count_applied_upgrades(player)
-    else:
-        return _fibonacci(player.hand_size - 2)
+    return _fibonacci(_stage(player) - 2)
 
 
-def build_damage_events(player: Player | StaticOpponent) -> list[BattleResolutionEvent]:
-    damage = calculate_damage(player)
+def build_damage_events(player: Player | StaticOpponent, *, use_upgrades: bool) -> list[BattleResolutionEvent]:
+    damage = calculate_damage(player, use_upgrades=use_upgrades)
     if damage <= 0:
         return []
 
-    if isinstance(player, StaticOpponent) or player.game.config.use_upgrades:
+    if use_upgrades:
         return [
             BattleResolutionEvent(event_type="base_increment"),
             *(
@@ -82,7 +88,7 @@ def build_damage_events(player: Player | StaticOpponent) -> list[BattleResolutio
 
 
 def apply_poison(winner: Player, loser: Player) -> int:
-    poison = calculate_damage(winner)
+    poison = calculate_damage(winner, use_upgrades=winner.game.config.use_upgrades)
     loser.poison += poison
     return poison
 
@@ -179,8 +185,8 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
     other = {player1.name: player2, player2.name: player1}
     for player in (player1, player2):
         opponent = other[player.name]
-        poison_taken = calculate_damage(opponent)
-        poison_dealt = calculate_damage(player)
+        poison_taken = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
+        poison_dealt = calculate_damage(player, use_upgrades=game.config.use_upgrades)
         player.poison += poison_taken
         _award_rewards(
             game,
@@ -193,10 +199,6 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
         )
 
 
-def calculate_static_opponent_damage(opponent: StaticOpponent) -> int:
-    return calculate_damage(opponent)
-
-
 def apply_bot_poison(game: Game, opponent: StaticOpponent, poison: int) -> None:
     for fake in game.puppets:
         if fake.player_history_id == opponent.source_player_history_id:
@@ -207,8 +209,8 @@ def apply_bot_poison(game: Game, opponent: StaticOpponent, poison: int) -> None:
 def apply_poison_pvp(game: Game, player: Player, opponent: Player, is_draw: bool, winner_name: str | None) -> dict:
     """Apply poison for PvP battle. Returns poison info dict."""
     if is_draw:
-        p1_poison = calculate_damage(opponent)
-        p2_poison = calculate_damage(player)
+        p1_poison = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
+        p2_poison = calculate_damage(player, use_upgrades=game.config.use_upgrades)
         player.poison += p1_poison
         opponent.poison += p2_poison
         return {
@@ -218,11 +220,11 @@ def apply_poison_pvp(game: Game, player: Player, opponent: Player, is_draw: bool
         }
 
     if winner_name == player.name:
-        poison = calculate_damage(player)
+        poison = calculate_damage(player, use_upgrades=game.config.use_upgrades)
         opponent.poison += poison
         return {"winner": player, "loser": opponent, "poison": poison}
     else:
-        poison = calculate_damage(opponent)
+        poison = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
         player.poison += poison
         return {"winner": opponent, "loser": player, "poison": poison}
 
@@ -233,15 +235,15 @@ def apply_poison_static(game: Game, player: Player, opponent: StaticOpponent, pl
     poison_taken = 0
 
     if player_won:
-        poison_dealt = calculate_damage(player)
+        poison_dealt = calculate_damage(player, use_upgrades=game.config.use_upgrades)
         apply_bot_poison(game, opponent, poison_dealt)
     elif is_draw:
-        poison_dealt = calculate_damage(player)
+        poison_dealt = calculate_damage(player, use_upgrades=game.config.use_upgrades)
         apply_bot_poison(game, opponent, poison_dealt)
-        poison_taken = calculate_static_opponent_damage(opponent)
+        poison_taken = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
         player.poison += poison_taken
     else:
-        poison_taken = calculate_static_opponent_damage(opponent)
+        poison_taken = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
         player.poison += poison_taken
 
     return {"poison_dealt": poison_dealt, "poison_taken": poison_taken}
@@ -405,13 +407,13 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
     poison_taken = 0
 
     if player_won:
-        poison_dealt = calculate_damage(player)
+        poison_dealt = calculate_damage(player, use_upgrades=game.config.use_upgrades)
         apply_bot_poison(game, opponent, poison_dealt)
     else:
-        poison_taken = calculate_static_opponent_damage(opponent)
+        poison_taken = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
         player.poison += poison_taken
         if is_draw:
-            apply_bot_poison(game, opponent, calculate_damage(player))
+            apply_bot_poison(game, opponent, calculate_damage(player, use_upgrades=game.config.use_upgrades))
 
     _award_rewards(
         game,

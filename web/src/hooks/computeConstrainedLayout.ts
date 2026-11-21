@@ -1,4 +1,4 @@
-import { bestFit, CARD_ASPECT_RATIO, type ZoneDims } from "./cardSizeUtils";
+import { bestFit, CARD_ASPECT_RATIO, MIN_CARD_WIDTH, type ZoneDims } from "./cardSizeUtils";
 import {
   computeLayout,
   DEFAULT_PASS_2_MAX_CARD_WIDTH,
@@ -203,6 +203,110 @@ export function deriveConstraintsFromLayout(
   return { topFraction, leftFraction, bottomLeftSplit };
 }
 
+/**
+ * The fractions a layout is drawn with: the given constraints, and for any
+ * fraction they leave out, the one the first layout pass derives.
+ */
+export function resolveConstraints(
+  containerW: number,
+  containerH: number,
+  config: CardLayoutConfig,
+  constraints: ZoneConstraints,
+): Required<ZoneConstraints> {
+  const { topFraction, leftFraction, bottomLeftSplit } = constraints;
+  if (topFraction !== undefined && leftFraction !== undefined && bottomLeftSplit !== undefined) {
+    return { topFraction, leftFraction, bottomLeftSplit };
+  }
+  const derived = deriveConstraintsFromLayout(
+    computeLayout(containerW, containerH, config),
+    config,
+    containerH,
+    containerW,
+  );
+  return {
+    topFraction: constraints.topFraction ?? derived.topFraction,
+    leftFraction: constraints.leftFraction ?? derived.leftFraction,
+    bottomLeftSplit: constraints.bottomLeftSplit ?? derived.bottomLeftSplit,
+  };
+}
+
+/** Room a zone keeps under a saved layout: one row of the narrowest cards allowed. */
+export const MIN_ZONE_CARD = { width: MIN_CARD_WIDTH, height: Math.round(MIN_CARD_WIDTH * CARD_ASPECT_RATIO) };
+
+function clampBetween(value: number, low: number, high: number): number {
+  // When the board can't give every zone its minimum, split what there is in proportion.
+  if (low > high) return low / (low + 1 - high);
+  return Math.max(low, Math.min(high, value));
+}
+
+/**
+ * The fractions this board draws a saved layout with. The ones it leaves out
+ * come from the first layout pass, and each is moved only as far as needed
+ * for every zone to keep room for one row of cards, or the room the automatic
+ * layout gives it when that is less. The saved values themselves stay as they
+ * are, so a larger board in the same band gets them back.
+ */
+export function clampSavedConstraints(
+  containerW: number,
+  containerH: number,
+  config: CardLayoutConfig,
+  savedFractions: ZoneConstraints,
+  automaticFrames: ZoneFrameResult,
+): Required<ZoneConstraints> {
+  const {
+    fixedHeight = 0,
+    padding = 0,
+    sectionPadH = 0,
+    sectionPadTop = 0,
+    sectionPadBottom = 0,
+    sectionGap = 0,
+  } = config;
+  const { topIds, blIds, brIds } = getActiveIds(config);
+  const sectionPadV = sectionPadTop + sectionPadBottom;
+  const minHeight = (id: string) =>
+    Math.min(sectionPadV + MIN_ZONE_CARD.height, automaticFrames[id].outerHeight);
+  const minWidth = (id: string) =>
+    Math.min(2 * sectionPadH + MIN_ZONE_CARD.width, automaticFrames[id].outerWidth);
+  const hasTop = topIds.length > 0;
+  const hasBottom = blIds.length > 0 || brIds.length > 0;
+  const availH = containerH - fixedHeight;
+  const availW = containerW - padding;
+  const clamped = resolveConstraints(containerW, containerH, config, savedFractions);
+
+  const usableH = availH - (hasTop && hasBottom ? sectionGap : 0);
+  if (hasTop && hasBottom && usableH > 0) {
+    const bottomMinH = Math.max(
+      blIds.reduce((sum, id) => sum + minHeight(id), 0) + Math.max(0, blIds.length - 1) * sectionGap,
+      brIds.length > 0 ? minHeight(brIds[0]) : 0,
+    );
+    clamped.topFraction = clampBetween(clamped.topFraction, minHeight(topIds[0]) / usableH, 1 - bottomMinH / usableH);
+  }
+
+  if (blIds.length >= 2) {
+    const bottomOuterH = hasTop ? usableH - Math.round(usableH * clamped.topFraction) : availH;
+    const totalInnerH = bottomOuterH - blIds.length * sectionPadV - (blIds.length - 1) * sectionGap;
+    if (totalInnerH > 0) {
+      const restMinH = blIds.slice(1).reduce((sum, id) => sum + minHeight(id) - sectionPadV, 0);
+      clamped.bottomLeftSplit = clampBetween(
+        clamped.bottomLeftSplit,
+        (minHeight(blIds[0]) - sectionPadV) / totalInnerH,
+        1 - restMinH / totalInnerH,
+      );
+    }
+  }
+
+  const rowW = availW - (blIds.length > 0 && brIds.length > 0 ? sectionGap : 0);
+  if (blIds.length > 0 && brIds.length > 0 && rowW > 0) {
+    clamped.leftFraction = clampBetween(
+      clamped.leftFraction,
+      minWidth(blIds[0]) / rowW,
+      1 - minWidth(brIds[0]) / rowW,
+    );
+  }
+
+  return clamped;
+}
+
 export function computeConstrainedFrames(
   containerW: number,
   containerH: number,
@@ -230,18 +334,12 @@ export function computeConstrainedFrames(
   const activeIds = [...topIds, ...blIds, ...brIds];
   if (activeIds.length === 0) return frames;
 
-  const unconstrained = computeLayout(containerW, containerH, config);
-  const derived = deriveConstraintsFromLayout(
-    unconstrained,
-    config,
-    containerH,
+  const { topFraction, leftFraction, bottomLeftSplit } = resolveConstraints(
     containerW,
+    containerH,
+    config,
+    constraints,
   );
-
-  const topFraction = constraints.topFraction ?? derived.topFraction;
-  const leftFraction = constraints.leftFraction ?? derived.leftFraction;
-  const bottomLeftSplit =
-    constraints.bottomLeftSplit ?? derived.bottomLeftSplit;
 
   const hasTop = topIds.length > 0;
   const hasBottom = blIds.length > 0 || brIds.length > 0;
@@ -320,6 +418,8 @@ export function computeConstrainedFrames(
 export interface ConstrainedLayoutState {
   dims: CardLayoutResult;
   frames: ZoneFrameResult;
+  /** The fractions the frames were drawn with. */
+  constraints: Required<ZoneConstraints>;
 }
 
 export function computeConstrainedLayoutState(
@@ -336,11 +436,12 @@ export function computeConstrainedLayoutState(
 
   const zoneIds = Object.keys(config.zones);
   const dims = makeDefaultDims(zoneIds);
+  const resolved = resolveConstraints(containerW, containerH, config, constraints);
   const frames = computeConstrainedFrames(
     containerW,
     containerH,
     config,
-    constraints,
+    resolved,
   );
 
   const resolve = (id: string): ResolvedZone => {
@@ -370,7 +471,7 @@ export function computeConstrainedLayoutState(
     );
   }
 
-  return { dims, frames };
+  return { dims, frames, constraints: resolved };
 }
 
 export function computeConstrainedLayout(

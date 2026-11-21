@@ -28,7 +28,6 @@ class TestValidateActionPhase:
             ("battle_submit_result", "battle"),
             ("battle_update_card_state", "battle"),
             ("battle_update_life", "battle"),
-            ("reward_pick_upgrade", "reward"),
             ("reward_apply_upgrade", "reward"),
             ("reward_done", "reward"),
         ],
@@ -50,7 +49,6 @@ class TestValidateActionPhase:
             ("battle_move", "battle", "build"),
             ("battle_reveal_upgrade", "battle", "build"),
             ("battle_submit_result", "battle", "draft"),
-            ("reward_pick_upgrade", "reward", "build"),
             ("reward_done", "reward", "draft"),
         ],
     )
@@ -86,7 +84,6 @@ class TestValidateActionPhase:
             "battle_update_card_state",
             "battle_update_life",
             "battle_pass_turn",
-            "reward_pick_upgrade",
             "reward_apply_upgrade",
             "reward_done",
         }
@@ -261,8 +258,8 @@ class TestPhaseValidationIntegration:
 
             ws.send_json(
                 {
-                    "action": "reward_pick_upgrade",
-                    "payload": {"upgrade_id": "fake"},
+                    "action": "reward_done",
+                    "payload": {},
                 }
             )
 

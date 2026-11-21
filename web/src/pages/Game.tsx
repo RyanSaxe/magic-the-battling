@@ -2,8 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo, typ
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
-import { AppHeader } from "../components/common/AppHeader";
-import { PageFrame } from "../components/common/PageFrame";
+import { NoticeFrame } from "../components/common/NoticeFrame";
 import { BusyNotice, StatusNotice } from "../components/common/StatusNotice";
 import { useGame } from "../hooks/useGame";
 import { useVoiceChat } from "../hooks/useVoiceChat";
@@ -152,27 +151,6 @@ function selectDraftGuideOpponent(
 
 // A seat lost for these reasons has no way back from this tab, so the page offers to watch instead.
 const SEAT_GONE_CODES = new Set(["INVALID_SESSION", "PLAYER_NOT_IN_GAME"]);
-
-function GameNoticeFrame({ children }: { children: ReactNode }) {
-  const navigate = useNavigate();
-  const header = (
-    <AppHeader
-      renderRight={({ compact }) => (
-        <button
-          onClick={() => navigate("/")}
-          className={`btn btn-secondary ${compact ? "py-1.5 px-3 text-sm" : "py-2 px-4"}`}
-        >
-          Home
-        </button>
-      )}
-    />
-  );
-  return (
-    <PageFrame header={header} center contentClassName="items-center px-4">
-      {children}
-    </PageFrame>
-  );
-}
 
 function GameGoneNotice({ gameId }: { gameId: string }) {
   const navigate = useNavigate();
@@ -354,15 +332,15 @@ function PlayerSelectionModal({
 
   if (statusError?.code === "GAME_NOT_FOUND") {
     return (
-      <GameNoticeFrame>
+      <NoticeFrame>
         <GameGoneNotice gameId={gameId} />
-      </GameNoticeFrame>
+      </NoticeFrame>
     );
   }
 
   if (statusError) {
     return (
-      <GameNoticeFrame>
+      <NoticeFrame>
         <StatusNotice
           title="Can't reach the server"
           actions={
@@ -384,15 +362,15 @@ function PlayerSelectionModal({
         >
           {getAppErrorMessage(statusError, "game-status", "The game could not be loaded. Check your connection.")}
         </StatusNotice>
-      </GameNoticeFrame>
+      </NoticeFrame>
     );
   }
 
   if (!status) {
     return (
-      <GameNoticeFrame>
+      <NoticeFrame>
         <BusyNotice label="Loading game..." />
-      </GameNoticeFrame>
+      </NoticeFrame>
     );
   }
 
@@ -408,7 +386,7 @@ function PlayerSelectionModal({
     !spectateOnly && user && humanPlayers.some((p) => p.name === user.username) ? user.username : null;
 
   return (
-    <GameNoticeFrame>
+    <NoticeFrame>
       <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-lg">
         <h1 className="text-2xl font-bold text-white text-center mb-6">
           Join Game
@@ -556,7 +534,7 @@ function PlayerSelectionModal({
           </div>
         )}
       </div>
-    </GameNoticeFrame>
+    </NoticeFrame>
   );
 }
 
@@ -1697,14 +1675,14 @@ function GameContent() {
   if (!isSpectator) {
     if (seat.kind === "claiming") {
       return (
-        <GameNoticeFrame>
+        <NoticeFrame>
           <BusyNotice label="Reconnecting to your seat..." />
-        </GameNoticeFrame>
+        </NoticeFrame>
       );
     }
     if (seat.kind === "lost" && seat.error.code === "SEAT_MOVED") {
       return (
-        <GameNoticeFrame>
+        <NoticeFrame>
           <StatusNotice
             title="Open in another tab"
             actions={
@@ -1720,19 +1698,19 @@ function GameContent() {
           >
             This game is now open in another tab or window. Only one can play your seat at a time.
           </StatusNotice>
-        </GameNoticeFrame>
+        </NoticeFrame>
       );
     }
     if (seat.kind === "lost" && seat.error.code === "GAME_NOT_FOUND") {
       return (
-        <GameNoticeFrame>
+        <NoticeFrame>
           <GameGoneNotice gameId={gameId} />
-        </GameNoticeFrame>
+        </NoticeFrame>
       );
     }
     if (seat.kind === "lost" && !SEAT_GONE_CODES.has(seat.error.code)) {
       return (
-        <GameNoticeFrame>
+        <NoticeFrame>
           <StatusNotice
             title="Game Unavailable"
             actions={
@@ -1748,7 +1726,7 @@ function GameContent() {
           >
             {getAppErrorMessage(seat.error, "game-connection", "This game is not available right now.")}
           </StatusNotice>
-        </GameNoticeFrame>
+        </NoticeFrame>
       );
     }
     if (seat.kind !== "held" || isSpectateMode) {
@@ -1766,7 +1744,7 @@ function GameContent() {
 
   if (isSpectator && connectionError) {
     return (
-      <GameNoticeFrame>
+      <NoticeFrame>
         <StatusNotice
           title={connectionError.code === "SPECTATE_TARGET_NOT_FOUND" ? "Spectate Unavailable" : "Game Unavailable"}
           actions={
@@ -1782,7 +1760,7 @@ function GameContent() {
         >
           {getAppErrorMessage(connectionError, "game-connection", "This game is not available right now.")}
         </StatusNotice>
-      </GameNoticeFrame>
+      </NoticeFrame>
     );
   }
 
