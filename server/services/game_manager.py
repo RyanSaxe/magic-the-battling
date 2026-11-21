@@ -2113,27 +2113,41 @@ class GameManager:
 
         game = self.get_game(game_id)
         if game and game.config.auto_approve_spectators:
-            self.approve_spectate_request(request_id)
+            self._approve_spectate_request(req)
 
         return request_id
 
     def get_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
         return self._spectate_requests.get(request_id)
 
-    def approve_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
+    def respond_to_spectate_request(self, request_id: str, *, game_id: str, responder_id: str, allowed: bool) -> bool:
+        """Approve or deny a pending request; only the player it asks to watch may answer it."""
         req = self._spectate_requests.get(request_id)
-        if req and req.status == "pending":
-            req.status = "approved"
-            session = session_manager.create_session(req.game_id)
-            req.session_id = session.session_id
-            req.player_id = session.player_id
-        return req
-
-    def deny_spectate_request(self, request_id: str) -> PendingSpectateRequest | None:
-        req = self._spectate_requests.get(request_id)
-        if req and req.status == "pending":
+        if req is None or req.status != "pending" or req.game_id != game_id:
+            return False
+        if self.get_player_id_by_name(game_id, req.target_player_name) != responder_id:
+            return False
+        if allowed:
+            self._approve_spectate_request(req)
+        else:
             req.status = "denied"
-        return req
+        return True
+
+    def _approve_spectate_request(self, req: PendingSpectateRequest) -> None:
+        req.status = "approved"
+        session = session_manager.create_session(req.game_id)
+        req.session_id = session.session_id
+        req.player_id = session.player_id
+
+    def is_spectator_approved(self, request_id: str, *, session_id: str, game_id: str, target_player_name: str) -> bool:
+        req = self._spectate_requests.get(request_id)
+        return (
+            req is not None
+            and req.status == "approved"
+            and req.session_id == session_id
+            and req.game_id == game_id
+            and req.target_player_name == target_player_name
+        )
 
     def cleanup_expired_spectate_requests(self) -> int:
         expiry = datetime.now(UTC) - timedelta(minutes=SPECTATE_REQUEST_TTL_MINUTES)
