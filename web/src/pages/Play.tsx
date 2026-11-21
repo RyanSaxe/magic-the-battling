@@ -617,7 +617,6 @@ export function Play() {
           </button>
         )} />}
         center
-        contentClassName="px-4"
         hints
       >
         <SurfaceCard as="section" className="overflow-hidden flex flex-col">

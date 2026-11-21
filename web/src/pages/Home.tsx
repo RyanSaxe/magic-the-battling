@@ -48,7 +48,7 @@ export function Home() {
           </>
         )} />}
         center
-        contentClassName="items-center px-4 pb-6"
+        contentClassName="items-center pb-6"
       >
         {resumable && <ResumeGameStrip seat={resumable} />}
         <CardShowcase />

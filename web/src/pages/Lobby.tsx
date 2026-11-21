@@ -540,7 +540,7 @@ export function Lobby() {
   if (seat.kind !== "held") {
     return (
       <>
-        <PageFrame header={header} center contentClassName="items-center px-4">
+        <PageFrame header={header} center contentClassName="items-center">
           <LobbySeatNotice
             gameId={gameId}
             seat={seat}
@@ -557,7 +557,7 @@ export function Lobby() {
   if (!lobbyState) {
     return (
       <>
-        <PageFrame header={header} center contentClassName="items-center px-4">
+        <PageFrame header={header} center contentClassName="items-center">
           <BusyNotice label="Loading lobby..." />
         </PageFrame>
         {rulesPanel}
@@ -581,7 +581,6 @@ export function Lobby() {
       <PageFrame
         header={header}
         center
-        contentClassName="px-4"
         hints
       >
         <SurfaceCard className="overflow-visible">

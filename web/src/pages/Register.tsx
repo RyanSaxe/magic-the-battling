@@ -47,7 +47,7 @@ export function Register() {
         </button>
       )} />}
       center
-      contentClassName="items-center px-4"
+      contentClassName="items-center"
     >
       <SurfaceCard as="form" onSubmit={handleSubmit}>
         <h2 className="text-xl font-bold text-white mb-5">Create Account</h2>

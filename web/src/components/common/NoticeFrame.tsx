@@ -19,7 +19,7 @@ export function NoticeFrame({ children }: { children: ReactNode }) {
     />
   )
   return (
-    <PageFrame header={header} center contentClassName="items-center px-4">
+    <PageFrame header={header} center contentClassName="items-center">
       {children}
     </PageFrame>
   )
