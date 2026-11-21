@@ -83,6 +83,10 @@ interface SpectatorConfig {
   requestId: string;
 }
 
+// Each area stops 3px into the life number, short of its middle even for one digit, so - and + never overlap.
+const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_+_5px_-_44px)]";
+const LIFE_PLUS_TOUCH_AREA = "touch-area [--touch-area-left:-5px]";
+
 const STATIC_DIVIDER_CALLBACKS = {
   onDragStart: () => {},
   onDrag: () => {},
@@ -2174,9 +2178,9 @@ function GameContent() {
                           ) : null
                         })()}
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>-</button>
                           <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
-                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>+</button>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 leading-tight">
@@ -2190,9 +2194,9 @@ function GameContent() {
                       </div>
                       <div className="flex items-center gap-1">
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className="text-gray-400 hover:text-white px-1 leading-none">-</button>
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>-</button>
                           <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
-                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className="text-gray-400 hover:text-white px-1 leading-none">+</button>
+                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-gray-400 hover:text-white px-1 leading-none`}>+</button>
                         </div>
                         {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
                           <MicToggle

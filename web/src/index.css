@@ -885,6 +885,27 @@ input:-webkit-autofill:focus {
   touch-action: none;
 }
 
+/* An invisible tap area around a small control, 44px unless --touch-area-w/-h say otherwise.
+   --touch-area-left and --touch-area-top move it off centre, to keep it clear of a neighbour
+   or inside a clipping parent.
+   Only on touch screens (same query as utils/inputMode.ts), so mouse hover is unchanged.
+   z-index keeps later siblings from covering the area. */
+@media (hover: none) {
+  .touch-area {
+    position: relative;
+    z-index: 1;
+  }
+
+  .touch-area::before {
+    content: "";
+    position: absolute;
+    top: var(--touch-area-top, calc(50% - var(--touch-area-h, 44px) / 2));
+    left: var(--touch-area-left, calc(50% - var(--touch-area-w, 44px) / 2));
+    width: var(--touch-area-w, 44px);
+    height: var(--touch-area-h, 44px);
+  }
+}
+
 /* Hero page styles */
 .hero-title {
   font-family: 'Cinzel', serif;

@@ -81,7 +81,7 @@ export function HintsBanner({ variant = "default" }: { variant?: HintsBannerVari
     ? "text-amber-200/95 font-semibold text-xs uppercase tracking-[0.04em] shrink-0"
     : "text-amber-400 font-medium text-xs shrink-0";
   const navButtonClass = variant === "rail"
-    ? "text-gray-500 hover:text-gray-300 transition-colors text-base leading-none shrink-0 px-1"
+    ? "touch-area text-gray-500 hover:text-gray-300 transition-colors text-base leading-none shrink-0 px-1"
     : "text-gray-500 hover:text-gray-300 transition-colors text-sm shrink-0";
   const tipTextClass = variant === "rail"
     ? "text-[12px] text-gray-400"

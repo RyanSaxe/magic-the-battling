@@ -290,7 +290,7 @@ function GuidedModeField({
       <div ref={guidedModeHelpRef} className="relative group shrink-0">
         <button
           type="button"
-          className="text-gray-400 hover:text-gray-200"
+          className="touch-area [--touch-area-left:-7px] text-gray-400 hover:text-gray-200"
           aria-label="What guided mode does"
           aria-expanded={showGuidedModeHelp}
           onClick={() => setShowGuidedModeHelp((v) => !v)}
