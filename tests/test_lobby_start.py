@@ -1,0 +1,194 @@
+import asyncio
+import threading
+
+import pytest
+
+import server.routers.ws as ws_module
+import server.services.game_manager as gm_module
+from mtb.models.cards import Battler
+from server.services.game_manager import GameManager, LobbyStage, LobbyStartFailedError
+
+
+async def _no_broadcast() -> None:
+    pass
+
+
+def _two_player_lobby(manager: GameManager, **settings):
+    pending = manager.create_game("Alice", "pid-alice", cube_id="test", target_player_count=2, **settings)
+    manager.join_game(pending.join_code, "Bob", "pid-bob")
+    return pending
+
+
+def _ready_everyone(manager: GameManager, pending) -> None:
+    for player_id in pending.player_ids:
+        assert manager.set_player_ready(pending.game_id, player_id, True) == (True, None)
+
+
+def _socket(client, game, player: str):
+    return client.websocket_connect(f"/ws/{game['game_id']}?session_id={game[player]['session_id']}")
+
+
+def _ready_both(ws_alice, ws_bob, ws_receive_json_until) -> None:
+    for ws in (ws_alice, ws_bob):
+        ws.send_json({"action": "set_ready", "payload": {"is_ready": True}})
+    for ws in (ws_alice, ws_bob):
+        ws_receive_json_until(
+            ws,
+            lambda m: m["type"] == "lobby_state" and all(p["is_ready"] for p in m["payload"]["players"]),
+            description="both players ready",
+        )
+
+
+def test_guests_see_the_lobby_starting_before_the_game(
+    client, game_with_players, ws_receive_json, ws_receive_json_until
+):
+    with _socket(client, game_with_players, "alice") as ws_alice, _socket(client, game_with_players, "bob") as ws_bob:
+        _ready_both(ws_alice, ws_bob, ws_receive_json_until)
+
+        ws_alice.send_json({"action": "start_game", "payload": {}})
+        seen: list[str] = []
+        while not seen or seen[-1] != "game_state":
+            message = ws_receive_json(ws_bob)
+            seen.append(message["payload"]["start_status"] if message["type"] == "lobby_state" else message["type"])
+
+    assert seen[-2:] == ["starting", "game_state"]
+
+
+def test_a_refused_start_leaves_the_lobby_open_and_tells_the_host(client, game_with_players, ws_receive_json_until):
+    game_id = game_with_players["game_id"]
+    with client.websocket_connect(f"/ws/{game_id}?session_id={game_with_players['alice']['session_id']}") as ws:
+        ws_receive_json_until(ws, lambda m: m["type"] == "lobby_state", description="Alice's lobby")
+
+        ws.send_json({"action": "start_game", "payload": {}})
+        error = ws_receive_json_until(ws, lambda m: m["type"] == "error", description="the refusal")
+
+    assert error["payload"]["message"] == "Not all players are ready"
+    lobby = client.get(f"/api/games/{game_id}/lobby").json()
+    assert lobby["start_status"] == "open"
+    assert lobby["is_started"] is False
+
+
+def test_a_start_that_fails_reopens_the_lobby_for_everyone_and_can_be_tried_again(
+    client, game_with_players, ws_receive_json_until, monkeypatch
+):
+    real_create_game = gm_module.create_game
+    monkeypatch.setattr(gm_module, "create_game", lambda *args, **kwargs: 1 / 0)
+    with _socket(client, game_with_players, "alice") as ws_alice, _socket(client, game_with_players, "bob") as ws_bob:
+        _ready_both(ws_alice, ws_bob, ws_receive_json_until)
+        ws_alice.send_json({"action": "start_game", "payload": {}})
+        failed = [
+            ws_receive_json_until(
+                ws,
+                lambda m: m["type"] == "lobby_state" and m["payload"]["start_status"] == "failed",
+                description="the failed start",
+            )["payload"]
+            for ws in (ws_alice, ws_bob)
+        ]
+
+        assert [lobby["start_error"] for lobby in failed] == ["Failed to start game"] * 2
+        assert all(lobby["is_started"] is False for lobby in failed)
+
+        monkeypatch.setattr(gm_module, "create_game", real_create_game)
+        ws_alice.send_json({"action": "start_game", "payload": {}})
+        ws_receive_json_until(ws_bob, lambda m: m["type"] == "game_state", description="Bob's game state")
+
+
+def test_the_lobby_cannot_change_while_it_starts(mock_cube_data, test_db):
+    manager = GameManager()
+    pending = _two_player_lobby(manager)
+    _ready_everyone(manager, pending)
+
+    async def scenario():
+        cube_loaded = asyncio.Event()
+        pending._loading_task = asyncio.create_task(cube_loaded.wait())
+        start = asyncio.create_task(manager.start_lobby(pending.game_id, "pid-alice", None, on_change=_no_broadcast))
+        while pending.stage is not LobbyStage.STARTING:
+            await asyncio.sleep(0)
+
+        refused = {
+            "unready": manager.set_player_ready(pending.game_id, "pid-bob", False),
+            "player count": manager.set_target_player_count(pending.game_id, "pid-alice", 4),
+            "kick": manager.kick_player(pending.game_id, "pid-alice", "pid-bob"),
+            "join": manager.join_game(pending.join_code, "Carol", "pid-carol"),
+        }
+        manager.schedule_pending_disconnect(pending.game_id, "pid-bob", delay=60)
+        bob_still_ready = pending.player_ready["pid-bob"]
+        manager.cancel_pending_disconnect(pending.game_id, "pid-bob")
+
+        cube_loaded.set()
+        return refused, bob_still_ready, await start
+
+    refused, bob_still_ready, game = asyncio.run(scenario())
+
+    assert refused == {
+        "unready": (False, "The game is starting"),
+        "player count": (False, "The game is starting"),
+        "kick": False,
+        "join": None,
+    }
+    assert bob_still_ready
+    assert [player.name for player in game.players] == ["Alice", "Bob"]
+
+
+def test_players_who_left_during_a_failed_start_are_not_ready_when_the_lobby_reopens(
+    mock_cube_data, test_db, monkeypatch
+):
+    manager = GameManager()
+    manager.attach_connected_player_ids(lambda _game_id: {"pid-alice"})
+    pending = _two_player_lobby(manager)
+    _ready_everyone(manager, pending)
+    monkeypatch.setattr(gm_module, "create_game", lambda *args, **kwargs: 1 / 0)
+
+    with pytest.raises(LobbyStartFailedError):
+        asyncio.run(manager.start_lobby(pending.game_id, "pid-alice", None, on_change=_no_broadcast))
+
+    assert pending.stage is LobbyStage.FAILED
+    assert manager.get_pending_game(pending.game_id) is pending
+    assert pending.player_ready == {"pid-alice": True, "pid-bob": False}
+
+
+def test_the_lobby_view_and_the_start_route_refuse_a_table_short_of_puppets(client):
+    created = client.post(
+        "/api/games",
+        json={"player_name": "Alice", "cube_id": "test", "target_player_count": 2, "puppet_count": 1},
+    ).json()
+    ws_module.game_manager.set_player_ready(created["game_id"], created["player_id"], True)
+
+    lobby = client.get(f"/api/games/{created['game_id']}/lobby").json()
+    response = client.post(f"/api/games/{created['game_id']}/start", params={"session_id": created["session_id"]})
+
+    assert lobby["can_start"] is False
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Not enough puppets are available for this table"
+
+
+def test_a_deck_submitted_twice_shows_as_loading_until_it_loads(test_db, card_factory):
+    manager = GameManager()
+    pending = manager.create_game("Alice", "pid-alice", play_mode="constructed")
+    release = threading.Event()
+
+    def load_deck(battler_id, use_upgrades, use_vanguards):
+        release.wait(timeout=5)
+        return Battler(cards=[card_factory(f"c{i}") for i in range(100)], upgrades=[], vanguards=[])
+
+    manager._load_constructed_battler = load_deck
+
+    def deck_status() -> str | None:
+        lobby = manager.get_lobby_state(pending.game_id)
+        assert lobby is not None
+        return lobby.players[0].battler_status
+
+    async def scenario():
+        try:
+            assert manager.start_player_battler_preload(pending, "pid-alice", "deck-1") is None
+            await asyncio.sleep(0.01)
+            assert manager.start_player_battler_preload(pending, "pid-alice", "deck-1") is None
+            await asyncio.sleep(0.05)
+            while_loading = deck_status()
+        finally:
+            release.set()
+        while deck_status() == "loading":
+            await asyncio.sleep(0.01)
+        return while_loading, deck_status()
+
+    assert asyncio.run(scenario()) == ("loading", "ready")

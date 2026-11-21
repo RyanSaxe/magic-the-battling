@@ -4,11 +4,12 @@ import json
 import logging
 import random
 import secrets
-from collections.abc import Callable, Collection, Coroutine
+from collections.abc import Awaitable, Callable, Collection, Coroutine
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any, Literal, cast
+from enum import StrEnum
+from typing import Any, ClassVar, Literal, cast
 from uuid import UUID, uuid4
 
 from httpx import HTTPStatusError, RequestError
@@ -88,6 +89,7 @@ from server.runtime_config import (
     STALE_GAME_CLEANUP_HOURS,
 )
 from server.schemas.api import (
+    BattlerLoadingStatus,
     BattleView,
     CubeLoadingStatus,
     GameBootstrapResponse,
@@ -126,6 +128,7 @@ HOST_HANDOFF_GRACE_SECONDS = 60.0
 POST_GAME_CLEANUP_SECONDS = 300.0
 ABANDONED_CLEANUP_SECONDS = 86400.0
 FINISHED_PLAYER_PHASES = frozenset({"eliminated", "winner", "game_over"})
+LOBBY_STARTING_MESSAGE = "The game is starting"
 
 
 def _current_task() -> asyncio.Task | None:
@@ -185,13 +188,46 @@ class PendingSpectateRequest:
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
-@dataclass
-class PendingPlayerBattler:
-    battler_id: str | None = None
-    battler: Battler | None = None
-    battler_loading: bool = False
-    battler_error: str | None = None
-    _loading_task: asyncio.Task | None = field(default=None, repr=False)
+@dataclass(frozen=True)
+class BattlerMissing:
+    status: ClassVar[BattlerLoadingStatus] = "missing"
+
+
+@dataclass(frozen=True)
+class BattlerLoading:
+    battler_id: str
+    task: asyncio.Task = field(repr=False, compare=False)
+    status: ClassVar[BattlerLoadingStatus] = "loading"
+
+
+@dataclass(frozen=True)
+class BattlerReady:
+    battler_id: str
+    battler: Battler
+    status: ClassVar[BattlerLoadingStatus] = "ready"
+
+
+@dataclass(frozen=True)
+class BattlerFailed:
+    battler_id: str
+    error: str
+    status: ClassVar[BattlerLoadingStatus] = "error"
+
+
+type PlayerBattler = BattlerMissing | BattlerLoading | BattlerReady | BattlerFailed
+"""A constructed player's deck in a lobby. GameManager._set_player_battler is the one place it changes."""
+
+
+class LobbyStage(StrEnum):
+    """Where a lobby is in starting. GameManager.start_lobby is the one place it changes.
+
+    A failed lobby is open again and keeps the reason its last start failed.
+    """
+
+    OPEN = "open"
+    STARTING = "starting"
+    STARTED = "started"
+    FAILED = "failed"
 
 
 @dataclass
@@ -202,7 +238,8 @@ class PendingGame:
     host_player_id: str
     player_names: list[str] = field(default_factory=list)
     player_ids: list[str] = field(default_factory=list)
-    is_started: bool = False
+    stage: LobbyStage = LobbyStage.OPEN
+    start_error: str | None = None
     use_upgrades: bool = True
     use_vanguards: bool = False
     target_player_count: int = 4
@@ -211,7 +248,7 @@ class PendingGame:
     voice_chat_enabled: bool = False
     play_mode: PlayMode = "limited"
     player_ready: dict[str, bool] = field(default_factory=dict)
-    player_battlers: dict[str, PendingPlayerBattler] = field(default_factory=dict)
+    player_battlers: dict[str, PlayerBattler] = field(default_factory=dict)
     puppet_count: int = 0
     battler: Battler | None = None
     battler_loading: bool = False
@@ -226,9 +263,26 @@ class PendingGame:
         folded = name.casefold()
         return any(existing.casefold() == folded for existing in self.player_names)
 
+    @property
+    def is_started(self) -> bool:
+        return self.stage is LobbyStage.STARTED
+
+    @property
+    def accepts_changes(self) -> bool:
+        """Whether players can join, leave, ready up or change decks, and the host can change the table."""
+        return self.stage in {LobbyStage.OPEN, LobbyStage.FAILED}
+
 
 class GameStartQueueFullError(RuntimeError):
     pass
+
+
+class LobbyStartRefusedError(Exception):
+    """The lobby can't start yet. Nothing about it changed."""
+
+
+class LobbyStartFailedError(Exception):
+    """The lobby began starting and couldn't finish. It is open again, with this reason."""
 
 
 @dataclass(frozen=True)
@@ -914,7 +968,7 @@ class GameManager:
             guided_mode_default=guided_mode_default,
             play_mode=play_mode,
             player_ready={player_id: False},
-            player_battlers={player_id: PendingPlayerBattler()},
+            player_battlers={player_id: BattlerMissing()},
             player_user_ids=player_user_ids,
         )
         self._pending_games[game_id] = pending
@@ -938,7 +992,7 @@ class GameManager:
         self, join_code: str, player_name: str, player_id: str, user_id: str | None = None
     ) -> PendingGame | None:
         pending = self.get_pending_game_by_code(join_code)
-        if not pending:
+        if not pending or not pending.accepts_changes:
             return None
 
         if pending.has_player_named(player_name):
@@ -953,7 +1007,7 @@ class GameManager:
         pending.player_names.append(player_name)
         pending.player_ids.append(player_id)
         pending.player_ready[player_id] = False
-        pending.player_battlers[player_id] = PendingPlayerBattler()
+        pending.player_battlers[player_id] = BattlerMissing()
         if user_id:
             pending.player_user_ids[player_id] = user_id
         self._player_to_game[player_id] = pending.game_id
@@ -968,19 +1022,22 @@ class GameManager:
         if not is_ready or pending.play_mode != "constructed":
             return True, None
 
-        player_battler = pending.player_battlers.get(player_id)
-        if player_battler is None or player_battler.battler is None:
-            return False, "Submit a valid battler before readying up"
-        if player_battler.battler_loading:
-            return False, "Battler is still loading"
-        if player_battler.battler_error:
-            return False, player_battler.battler_error
-        return True, None
+        match pending.player_battlers.get(player_id, BattlerMissing()):
+            case BattlerReady():
+                return True, None
+            case BattlerLoading():
+                return False, "Battler is still loading"
+            case BattlerFailed(error=error):
+                return False, error
+            case BattlerMissing():
+                return False, "Submit a valid battler before readying up"
 
     def set_player_ready(self, game_id: str, player_id: str, is_ready: bool) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
-        if not pending or pending.is_started:
+        if not pending:
             return False, "Game not found"
+        if not pending.accepts_changes:
+            return False, LOBBY_STARTING_MESSAGE
 
         can_ready, error = self._can_player_ready(pending, player_id, is_ready)
         if not can_ready:
@@ -991,8 +1048,10 @@ class GameManager:
 
     def clear_player_battler(self, game_id: str, player_id: str) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
-        if not pending or pending.is_started:
+        if not pending:
             return False, "Game not found"
+        if not pending.accepts_changes:
+            return False, LOBBY_STARTING_MESSAGE
 
         if pending.play_mode != "constructed":
             return False, "Battler submission is only available in constructed mode"
@@ -1000,66 +1059,141 @@ class GameManager:
         if player_id not in pending.player_ids:
             return False, "Player not found"
 
-        player_battler = self._get_pending_player_battler(pending, player_id)
-        if player_battler._loading_task and not player_battler._loading_task.done():
-            player_battler._loading_task.cancel()
-
-        player_battler.battler_id = None
-        player_battler.battler = None
-        player_battler.battler_loading = False
-        player_battler.battler_error = None
-        player_battler._loading_task = None
-        pending.player_ready[player_id] = False
+        self._set_player_battler(pending, player_id, BattlerMissing())
         return True, None
 
-    def can_start_game(self, game_id: str, player_id: str) -> tuple[bool, str | None]:
-        pending = self._pending_games.get(game_id)
-        if not pending:
-            return False, "Game not found"
+    def start_rules(self, pending: PendingGame, by: str) -> str | None:
+        """Why the player `by` can't start this lobby now, or None when they can.
 
-        if pending.is_started:
-            return False, "Game already started"
-
-        if player_id != pending.host_player_id:
-            return False, "Only the host can start the game"
+        The lobby view, the websocket and the HTTP route all ask this. Whether the server has room for
+        another game is checked when the start runs, since that changes without the lobby changing.
+        """
+        if pending.stage is LobbyStage.STARTING:
+            return "The game is already starting"
+        if pending.stage is LobbyStage.STARTED:
+            return "Game has already started"
+        if by != pending.host_player_id:
+            return "Only the host can start the game"
+        if pending.target_player_count < 2:
+            return "Need at least 2 players to start"
 
         total = len(pending.player_names) + pending.puppet_count
         if total != pending.target_player_count:
-            return False, f"Need exactly {pending.target_player_count} players"
+            return f"Need exactly {pending.target_player_count} players"
 
-        all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
-        if not all_ready:
-            return False, "Not all players are ready"
+        if not all(pending.player_ready.get(pid, False) for pid in pending.player_ids):
+            return "Not all players are ready"
 
         if pending.play_mode == "constructed":
-            missing_players = [
-                pending.player_names[i]
-                for i, pid in enumerate(pending.player_ids)
-                if pending.player_battlers.get(pid) is None or pending.player_battlers[pid].battler is None
-            ]
-            if missing_players:
-                return False, "All players must submit a valid battler"
+            if not all(isinstance(pending.player_battlers.get(pid), BattlerReady) for pid in pending.player_ids):
+                return "All players must submit a valid battler"
+        elif pending.battler_error:
+            return pending.battler_error
 
+        if pending.puppet_count > 0:
+            available = self._count_available_bots(pending)
+            if available is None or available < pending.puppet_count:
+                return "Not enough puppets are available for this table"
+
+        return None
+
+    async def start_lobby(
+        self,
+        game_id: str,
+        by: str,
+        db: Session | None,
+        on_change: Callable[[], Awaitable[None]],
+    ) -> Game:
+        """Start a lobby for its host and return the running game.
+
+        Raises LobbyStartRefusedError when start_rules or the server's capacity refuses, and
+        LobbyStartFailedError when the start began but couldn't finish. `on_change` runs when the lobby
+        moves to starting and when a failed start returns it to open, so the caller can show every player.
+        """
+        async with self.get_action_lock(game_id):
+            pending = self._pending_games.get(game_id)
+            if pending is None:
+                raise LobbyStartRefusedError("Game not found")
+            refusal = self.start_rules(pending, by) or self._server_start_refusal()
+            if refusal:
+                raise LobbyStartRefusedError(refusal)
+            pending.stage = LobbyStage.STARTING
+            pending.start_error = None
+
+        failure = "Failed to start game"
+        game: Game | None = None
+        try:
+            await on_change()
+            game = await self._run_lobby_start(pending, db)
+        except LobbyStartFailedError as exc:
+            failure = str(exc)
+        except Exception:
+            logger.exception("Lobby start failed: game_id=%s", game_id)
+        finally:
+            if game is None:
+                self._return_lobby_to_open(pending, failure)
+
+        if game is None:
+            await on_change()
+            raise LobbyStartFailedError(failure)
+        return game
+
+    def _server_start_refusal(self) -> str | None:
         allowed, reason = self.can_accept_loaded_game()
         if not allowed:
-            return False, reason
-
+            return reason
         if self._game_start_waiters >= MAX_GAME_START_QUEUE:
-            return False, "Server is starting many games. Please try again shortly."
+            return "Server is starting many games. Please try again shortly."
+        return None
 
-        return True, None
+    def _return_lobby_to_open(self, pending: PendingGame, reason: str) -> None:
+        pending.stage = LobbyStage.FAILED
+        pending.start_error = reason
+        # Readiness was frozen while the lobby started, so anyone who left meanwhile is still ready.
+        connected = self._connected_player_ids(pending.game_id)
+        for player_id in pending.player_ids:
+            if player_id not in connected:
+                pending.player_ready[player_id] = False
 
-    def start_game(self, game_id: str, db: Session | None = None) -> Game | None:
-        pending = self._pending_games.get(game_id)
-        total = len(pending.player_names) + pending.puppet_count if pending else 0
-        if not pending or total < 2:
-            return None
-        allowed, _ = self.can_accept_loaded_game()
-        if not allowed:
-            return None
+    async def _run_lobby_start(self, pending: PendingGame, db: Session | None) -> Game:
+        try:
+            async with self._acquire_game_start_slot():
+                if pending.play_mode == "limited":
+                    await self._finish_loading_cube(pending)
+                allowed, reason = self.can_accept_loaded_game()
+                if not allowed:
+                    raise LobbyStartFailedError(reason)
+                return self._create_started_game(pending, db)
+        except GameStartQueueFullError as exc:
+            raise LobbyStartFailedError(str(exc)) from exc
 
-        pending.is_started = True
+    async def _finish_loading_cube(self, pending: PendingGame) -> None:
+        if pending._loading_task and not pending._loading_task.done():
+            try:
+                await asyncio.wait_for(pending._loading_task, timeout=30.0)
+            except TimeoutError:
+                pass
 
+        if pending.battler_error:
+            raise LobbyStartFailedError(pending.battler_error)
+        if pending.battler is not None:
+            return
+
+        loop = asyncio.get_running_loop()
+        try:
+            pending.battler = await loop.run_in_executor(
+                None,
+                self._load_battler,
+                pending.cube_id,
+                pending.use_upgrades,
+                pending.use_vanguards,
+                pending.play_mode,
+            )
+        except Exception as e:
+            logger.warning("Failed to load cube %s for start: %s", pending.cube_id, e)
+            raise LobbyStartFailedError(self._normalize_battler_error(pending.cube_id, e)) from e
+
+    def _create_started_game(self, pending: PendingGame, db: Session | None) -> Game:
         config = Config(
             use_upgrades=pending.use_upgrades,
             use_vanguards=pending.use_vanguards,
@@ -1069,45 +1203,17 @@ class GameManager:
             play_mode=pending.play_mode,
         )
         game = create_game(pending.player_names, len(pending.player_names), config)
-        target_elo = 1200.0
         if pending.play_mode == "limited":
-            battler = self._load_battler(
-                pending.cube_id,
-                pending.use_upgrades,
-                pending.use_vanguards,
-                play_mode=pending.play_mode,
-            )
+            battler = pending.battler
+            if battler is None:
+                raise LobbyStartFailedError("The cube isn't loaded")
             set_battler(game, battler)
             target_elo = battler.elo or 1200.0
         else:
-            battlers_by_player = self._build_constructed_battlers_by_player(pending)
-            if battlers_by_player is None:
-                return None
-            set_player_battlers(game, battlers_by_player)
+            set_player_battlers(game, self._build_constructed_battlers_by_player(pending))
             target_elo = self._get_game_target_elo(game)
 
         if db is not None:
-            config_data = {
-                "use_upgrades": pending.use_upgrades,
-                "use_vanguards": pending.use_vanguards,
-                "cube_id": pending.cube_id,
-                "play_mode": pending.play_mode,
-            }
-            game_record = GameRecord(
-                id=game_id,
-                config_json=json.dumps(config_data),
-                cube_id=pending.cube_id,
-            )
-            db.add(game_record)
-            self._persist_human_player_mappings(
-                db,
-                game_id,
-                list(zip(pending.player_ids, pending.player_names, strict=False)),
-                player_user_ids=pending.player_user_ids,
-                seat_token_hashes=pending.seat_token_hashes,
-            )
-            db.commit()
-
             if pending.puppet_count > 0:
                 self.load_fake_players_for_game(
                     db,
@@ -1120,125 +1226,35 @@ class GameManager:
                     play_mode=pending.play_mode,
                 )
 
+            # Written last, so a start that fails before here leaves nothing behind for the next attempt.
+            config_data = {
+                "use_upgrades": pending.use_upgrades,
+                "use_vanguards": pending.use_vanguards,
+                "cube_id": pending.cube_id,
+                "play_mode": pending.play_mode,
+            }
+            db.add(GameRecord(id=pending.game_id, config_json=json.dumps(config_data), cube_id=pending.cube_id))
+            self._persist_human_player_mappings(
+                db,
+                pending.game_id,
+                list(zip(pending.player_ids, pending.player_names, strict=False)),
+                player_user_ids=pending.player_user_ids,
+                seat_token_hashes=pending.seat_token_hashes,
+            )
+            db.commit()
+
         logger.info(
             "Game started: game_id=%s cube=%s players=%s",
-            game_id,
+            pending.game_id,
             pending.cube_id,
             pending.player_names,
         )
-        self._active_games[game_id] = game
-        self._pending_games.pop(game_id, None)
-        self._last_human_activity[game_id] = datetime.now(UTC)
-        self.mark_game_dirty(game_id)
-
+        pending.stage = LobbyStage.STARTED
+        self._active_games[pending.game_id] = game
+        self._pending_games.pop(pending.game_id, None)
+        self._last_human_activity[pending.game_id] = datetime.now(UTC)
+        self.mark_game_dirty(pending.game_id)
         return game
-
-    async def start_game_async(self, game_id: str, db: Session | None = None) -> Game | None:  # noqa: PLR0912
-        try:
-            async with self._acquire_game_start_slot():
-                pending = self._pending_games.get(game_id)
-                total = len(pending.player_names) + pending.puppet_count if pending else 0
-                if not pending or total < 2:
-                    return None
-                allowed, _ = self.can_accept_loaded_game()
-                if not allowed:
-                    return None
-
-                if pending.play_mode == "limited" and pending._loading_task and not pending._loading_task.done():
-                    try:
-                        await asyncio.wait_for(pending._loading_task, timeout=30.0)
-                    except TimeoutError:
-                        pass
-
-                if pending.play_mode == "limited" and pending.battler_error:
-                    return None
-
-                if pending.play_mode == "limited" and not pending.battler:
-                    loop = asyncio.get_running_loop()
-                    try:
-                        pending.battler = await loop.run_in_executor(
-                            None,
-                            self._load_battler,
-                            pending.cube_id,
-                            pending.use_upgrades,
-                            pending.use_vanguards,
-                            pending.play_mode,
-                        )
-                    except Exception:
-                        return None
-
-                pending.is_started = True
-
-                config = Config(
-                    use_upgrades=pending.use_upgrades,
-                    use_vanguards=pending.use_vanguards,
-                    auto_approve_spectators=pending.auto_approve_spectators,
-                    voice_chat_enabled=pending.voice_chat_enabled,
-                    cube_id=pending.cube_id,
-                    play_mode=pending.play_mode,
-                )
-                game = create_game(pending.player_names, len(pending.player_names), config)
-                target_elo = 1200.0
-                if pending.play_mode == "limited":
-                    battler = pending.battler
-                    if battler is None:
-                        return None
-                    set_battler(game, battler)
-                    target_elo = battler.elo or 1200.0
-                else:
-                    battlers_by_player = self._build_constructed_battlers_by_player(pending)
-                    if battlers_by_player is None:
-                        return None
-                    set_player_battlers(game, battlers_by_player)
-                    target_elo = self._get_game_target_elo(game)
-
-                if db is not None:
-                    config_data = {
-                        "use_upgrades": pending.use_upgrades,
-                        "use_vanguards": pending.use_vanguards,
-                        "cube_id": pending.cube_id,
-                        "play_mode": pending.play_mode,
-                    }
-                    game_record = GameRecord(
-                        id=game_id,
-                        config_json=json.dumps(config_data),
-                        cube_id=pending.cube_id,
-                    )
-                    db.add(game_record)
-                    self._persist_human_player_mappings(
-                        db,
-                        game_id,
-                        list(zip(pending.player_ids, pending.player_names, strict=False)),
-                        player_user_ids=pending.player_user_ids,
-                        seat_token_hashes=pending.seat_token_hashes,
-                    )
-                    db.commit()
-
-                    if pending.puppet_count > 0:
-                        self.load_fake_players_for_game(
-                            db,
-                            game,
-                            count=pending.puppet_count,
-                            target_elo=target_elo,
-                            use_upgrades=pending.use_upgrades,
-                            use_vanguards=pending.use_vanguards,
-                            cube_id=pending.cube_id if pending.play_mode == "limited" else None,
-                            play_mode=pending.play_mode,
-                        )
-
-                logger.info(
-                    "Game started: game_id=%s cube=%s players=%s",
-                    game_id,
-                    pending.cube_id,
-                    pending.player_names,
-                )
-                self._active_games[game_id] = game
-                self._pending_games.pop(game_id, None)
-                self._last_human_activity[game_id] = datetime.now(UTC)
-                self.mark_game_dirty(game_id)
-                return game
-        except GameStartQueueFullError:
-            return None
 
     def complete_game(self, game_id: str, winner: Player | None, db: Session | None = None) -> None:
         """Complete a game - set phases, persist final state, schedule cleanup."""
@@ -1356,9 +1372,8 @@ class GameManager:
         if pending:
             if pending._loading_task and not pending._loading_task.done():
                 pending._loading_task.cancel()
-            for player_battler in pending.player_battlers.values():
-                if player_battler._loading_task and not player_battler._loading_task.done():
-                    player_battler._loading_task.cancel()
+            for player_id in list(pending.player_battlers):
+                self._set_player_battler(pending, player_id, BattlerMissing())
             self._join_code_to_game.pop(pending.join_code, None)
 
         self._active_games.pop(game_id, None)
@@ -1441,24 +1456,14 @@ class GameManager:
         except RuntimeError:
             pending.battler_loading = False
 
-    def _get_pending_player_battler(self, pending: PendingGame, player_id: str) -> PendingPlayerBattler:
-        player_battler = pending.player_battlers.get(player_id)
-        if player_battler is None:
-            player_battler = PendingPlayerBattler()
-            pending.player_battlers[player_id] = player_battler
-        return player_battler
-
-    def _get_pending_player_battler_status(
-        self,
-        player_battler: PendingPlayerBattler,
-    ) -> Literal["missing", "loading", "ready", "error"]:
-        if player_battler.battler_error:
-            return "error"
-        if player_battler.battler_loading:
-            return "loading"
-        if player_battler.battler is not None:
-            return "ready"
-        return "missing"
+    def _set_player_battler(self, pending: PendingGame, player_id: str, slot: PlayerBattler) -> None:
+        """The one way a constructed player's deck changes. A load it replaces is cancelled."""
+        previous = pending.player_battlers.get(player_id)
+        if isinstance(previous, BattlerLoading) and previous.task is not _current_task():
+            previous.task.cancel()
+        pending.player_battlers[player_id] = slot
+        if not isinstance(slot, BattlerReady):
+            pending.player_ready[player_id] = False
 
     async def _preload_player_battler(
         self,
@@ -1467,7 +1472,7 @@ class GameManager:
         battler_id: str,
         on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None,
     ) -> None:
-        player_battler = self._get_pending_player_battler(pending, player_id)
+        loaded: PlayerBattler
         try:
             async with self._battler_preload_slots:
                 loop = asyncio.get_running_loop()
@@ -1478,19 +1483,16 @@ class GameManager:
                     pending.use_upgrades,
                     pending.use_vanguards,
                 )
-            if player_battler.battler_id == battler_id:
-                player_battler.battler = battler
-                player_battler.battler_error = None
+            loaded = BattlerReady(battler_id, battler)
         except Exception as e:
-            if player_battler.battler_id == battler_id:
-                logger.warning("Failed to preload player battler %s: %s", battler_id, e)
-                player_battler.battler = None
-                player_battler.battler_error = self._normalize_battler_error(battler_id, e)
-        finally:
-            if player_battler.battler_id == battler_id:
-                player_battler.battler_loading = False
-            if on_complete:
-                await on_complete()
+            logger.warning("Failed to preload player battler %s: %s", battler_id, e)
+            loaded = BattlerFailed(battler_id, self._normalize_battler_error(battler_id, e))
+
+        slot = pending.player_battlers.get(player_id)
+        if isinstance(slot, BattlerLoading) and slot.task is _current_task():
+            self._set_player_battler(pending, player_id, loaded)
+        if on_complete:
+            await on_complete()
 
     def start_player_battler_preload(
         self,
@@ -1500,6 +1502,8 @@ class GameManager:
         on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None,
     ) -> str | None:
         battler_id = battler_id.strip()
+        if not pending.accepts_changes:
+            return LOBBY_STARTING_MESSAGE
         if pending.play_mode != "constructed":
             return "Battler submission is only available in constructed mode"
         if player_id not in pending.player_ids:
@@ -1507,24 +1511,16 @@ class GameManager:
         if not battler_id:
             return "Please provide a battler ID"
 
-        player_battler = self._get_pending_player_battler(pending, player_id)
-        player_battler.battler_id = battler_id
-        player_battler.battler = None
-        player_battler.battler_error = None
-        player_battler.battler_loading = True
-        pending.player_ready[player_id] = False
-
-        if player_battler._loading_task and not player_battler._loading_task.done():
-            player_battler._loading_task.cancel()
-
         try:
             loop = asyncio.get_running_loop()
-            task = loop.create_task(self._preload_player_battler(pending, player_id, battler_id, on_complete))
-            player_battler._loading_task = task
-            return None
         except RuntimeError:
-            player_battler.battler_loading = False
             return "Unable to load battler right now"
+        task = loop.create_task(self._preload_player_battler(pending, player_id, battler_id, on_complete))
+        self._set_player_battler(pending, player_id, BattlerLoading(battler_id, task))
+        return None
+
+    def record_player_battler_error(self, pending: PendingGame, player_id: str, battler_id: str, error: str) -> None:
+        self._set_player_battler(pending, player_id, BattlerFailed(battler_id, error))
 
     def _ensure_unique_name(self, name: str, existing_names: set[str]) -> str:
         """Return a unique version of the name, adding suffix if needed."""
@@ -1642,12 +1638,12 @@ class GameManager:
             snapshots=snapshots_dict,
         )
 
-    def _build_constructed_battlers_by_player(self, pending: PendingGame) -> dict[str, Battler] | None:
+    def _build_constructed_battlers_by_player(self, pending: PendingGame) -> dict[str, Battler]:
         battlers_by_player: dict[str, Battler] = {}
         for player_id, player_name in zip(pending.player_ids, pending.player_names, strict=False):
             player_battler = pending.player_battlers.get(player_id)
-            if player_battler is None or player_battler.battler is None:
-                return None
+            if not isinstance(player_battler, BattlerReady):
+                raise LobbyStartFailedError("All players must submit a valid battler")
             battlers_by_player[player_name] = player_battler.battler
         return battlers_by_player
 
@@ -2005,21 +2001,20 @@ class GameManager:
 
     def remove_player_from_pending(self, game_id: str, player_id: str) -> bool:
         pending = self._pending_games.get(game_id)
-        if not pending or pending.is_started or player_id not in pending.player_ids:
+        if not pending or not pending.accepts_changes or player_id not in pending.player_ids:
             return False
         self._remove_lobby_seat(pending, player_id)
         return True
 
     def _remove_lobby_seat(self, pending: PendingGame, player_id: str) -> None:
         """The one way a seat leaves a lobby, whether the host removed it or its player stayed away."""
+        self._set_player_battler(pending, player_id, BattlerMissing())
+        pending.player_battlers.pop(player_id)
         index = pending.player_ids.index(player_id)
         pending.seat_token_hashes.pop(pending.player_names.pop(index), None)
         pending.player_ids.pop(index)
         pending.player_ready.pop(player_id, None)
         pending.player_user_ids.pop(player_id, None)
-        player_battler = pending.player_battlers.pop(player_id, None)
-        if player_battler and player_battler._loading_task and not player_battler._loading_task.done():
-            player_battler._loading_task.cancel()
         self._player_to_game.pop(player_id, None)
         self._player_id_to_name.pop(player_id, None)
 
@@ -2040,7 +2035,7 @@ class GameManager:
             existing.cancel()
 
         pending = self._pending_games.get(game_id)
-        if pending and not pending.is_started and player_id in pending.player_ids:
+        if pending and pending.accepts_changes and player_id in pending.player_ids:
             pending.player_ready[player_id] = False
 
         async def remove_after_delay():
@@ -2133,7 +2128,7 @@ class GameManager:
 
     def add_puppet(self, game_id: str, player_id: str) -> bool:
         pending = self._pending_games.get(game_id)
-        if not pending or pending.is_started:
+        if not pending or not pending.accepts_changes:
             return False
         if player_id != pending.host_player_id:
             return False
@@ -2152,8 +2147,10 @@ class GameManager:
         self, game_id: str, player_id: str, target_player_count: int
     ) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
-        if not pending or pending.is_started:
+        if not pending:
             return False, "Game not found"
+        if not pending.accepts_changes:
+            return False, LOBBY_STARTING_MESSAGE
         if player_id != pending.host_player_id:
             return False, "Only the host can change the player cap"
         if target_player_count < 2 or target_player_count > 8:
@@ -2170,8 +2167,10 @@ class GameManager:
 
     def set_voice_chat_enabled(self, game_id: str, player_id: str, enabled: bool) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
-        if not pending or pending.is_started:
+        if not pending:
             return False, "Game not found"
+        if not pending.accepts_changes:
+            return False, LOBBY_STARTING_MESSAGE
         if player_id != pending.host_player_id:
             return False, "Only the host can toggle voice chat"
         pending.voice_chat_enabled = enabled
@@ -2179,7 +2178,7 @@ class GameManager:
 
     def remove_puppet(self, game_id: str, player_id: str) -> bool:
         pending = self._pending_games.get(game_id)
-        if not pending or pending.is_started:
+        if not pending or not pending.accepts_changes:
             return False
         if player_id != pending.host_player_id:
             return False
@@ -2190,7 +2189,7 @@ class GameManager:
 
     def kick_player(self, game_id: str, host_player_id: str, target_player_id: str) -> bool:
         pending = self._pending_games.get(game_id)
-        if not pending or pending.is_started:
+        if not pending or not pending.accepts_changes:
             return False
         if host_player_id != pending.host_player_id:
             return False
@@ -2289,7 +2288,7 @@ class GameManager:
         elos = [
             entry.battler.elo
             for entry in pending.player_battlers.values()
-            if entry.battler is not None and entry.battler.elo
+            if isinstance(entry, BattlerReady) and entry.battler.elo
         ]
         if not elos:
             return None
@@ -2297,13 +2296,12 @@ class GameManager:
 
     def _get_cube_loading_status(self, pending: PendingGame) -> CubeLoadingStatus:
         if pending.play_mode == "constructed":
-            if any(entry.battler_error for entry in pending.player_battlers.values()):
+            slots = pending.player_battlers.values()
+            if any(isinstance(entry, BattlerFailed) for entry in slots):
                 return "error"
-            if any(entry.battler_loading for entry in pending.player_battlers.values()):
-                return "loading"
-            if any(entry.battler is None for entry in pending.player_battlers.values()):
-                return "loading"
-            return "ready"
+            if all(isinstance(entry, BattlerReady) for entry in slots):
+                return "ready"
+            return "loading"
         if pending.battler_error:
             return "error"
         if pending.battler is not None:
@@ -2344,7 +2342,7 @@ class GameManager:
         players = []
         for i, name in enumerate(pending.player_names):
             player_id = pending.player_ids[i]
-            player_battler = pending.player_battlers.get(player_id)
+            player_battler = pending.player_battlers.get(player_id, BattlerMissing())
             players.append(
                 LobbyPlayer(
                     player_id=player_id,
@@ -2352,29 +2350,16 @@ class GameManager:
                     is_ready=pending.player_ready.get(player_id, False),
                     is_host=player_id == pending.host_player_id,
                     is_connected=player_id in connected,
-                    battler_id=player_battler.battler_id if player_battler else None,
-                    battler_status=(
-                        self._get_pending_player_battler_status(player_battler)
-                        if player_battler and pending.play_mode == "constructed"
-                        else None
-                    ),
-                    battler_error=player_battler.battler_error if player_battler else None,
+                    battler_id=None if isinstance(player_battler, BattlerMissing) else player_battler.battler_id,
+                    battler_status=player_battler.status if pending.play_mode == "constructed" else None,
+                    battler_error=player_battler.error if isinstance(player_battler, BattlerFailed) else None,
                 )
             )
 
-        all_ready = all(pending.player_ready.get(pid, False) for pid in pending.player_ids)
-        total = len(pending.player_names) + pending.puppet_count
-        available = self._count_available_bots(pending)
-        has_enough_bots = pending.puppet_count == 0 or (available is not None and available >= pending.puppet_count)
-        can_start = total == pending.target_player_count and all_ready and has_enough_bots
         loading_error = pending.battler_error
         if pending.play_mode == "constructed":
             loading_error = next(
-                (
-                    player_battler.battler_error
-                    for player_battler in pending.player_battlers.values()
-                    if player_battler.battler_error
-                ),
+                (slot.error for slot in pending.player_battlers.values() if isinstance(slot, BattlerFailed)),
                 None,
             )
 
@@ -2382,13 +2367,15 @@ class GameManager:
             game_id=game_id,
             join_code=pending.join_code,
             players=players,
-            can_start=can_start,
+            can_start=self.start_rules(pending, pending.host_player_id) is None,
             is_started=pending.is_started,
+            start_status=pending.stage.value,
+            start_error=pending.start_error,
             target_player_count=pending.target_player_count,
             puppet_count=pending.puppet_count,
             cube_loading_status=self._get_cube_loading_status(pending),
             cube_loading_error=loading_error,
-            available_puppet_count=available,
+            available_puppet_count=self._count_available_bots(pending),
             cube_id=pending.cube_id,
             use_upgrades=pending.use_upgrades,
             guided_mode_default=pending.guided_mode_default,
