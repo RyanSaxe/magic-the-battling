@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom'
 import { SidePanelHostContext } from './sidePanelHost'
 
 /**
- * Covers the board and its sidebar, between the bars, while something open closes on a tap there, so that tap only
- * closes it. It waits for the click: closing on the press would uncover the board in time to take the tap's click.
+ * Covers what's inside the felt, such as a game's board and sidebar or a page's cards, between the bars, while
+ * something open closes on a tap there, so that tap only closes it. It waits for the click: closing on the press
+ * would uncover what's under it in time to take the tap's click.
  */
 export function BoardBackdrop({ onTap, ref }: { onTap: () => void; ref?: Ref<HTMLDivElement> }) {
   const host = useContext(SidePanelHostContext)

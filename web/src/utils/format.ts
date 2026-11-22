@@ -20,9 +20,16 @@ export function getPlayerPhaseStatusLabel(phase: Phase, buildReady: boolean): st
   return phase
 }
 
+const HAS_ZONE = /(?:Z|[+-]\d\d:\d\d)$/
+
+/** The server stores UTC and sends some times without a zone, which Date.parse would read as the player's own. */
+export function parseServerTime(isoTime: string): number {
+  return Date.parse(HAS_ZONE.test(isoTime) ? isoTime : `${isoTime}Z`)
+}
+
 /** How long ago a moment was, in the rough terms a player needs: "just now", "4 min ago", "2 h ago", "3 days ago". */
 export function formatTimeSince(isoTime: string, now: number = Date.now()): string {
-  const minutes = Math.floor((now - Date.parse(isoTime)) / 60_000)
+  const minutes = Math.floor((now - parseServerTime(isoTime)) / 60_000)
   if (minutes < 1) return 'just now'
   if (minutes < 60) return `${minutes} min ago`
   const hours = Math.floor(minutes / 60)
