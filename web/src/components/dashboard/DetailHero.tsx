@@ -27,7 +27,7 @@ interface DetailHeroProps {
   /** A line of text and HeroLinks, such as where the cube comes from. */
   links: ReactNode
   details?: Detail[]
-  /** The buttons before Play, such as Edit Preset or Follow. */
+  /** The buttons before Play, such as Edit or Follow. */
   actions: HeroAction[]
   play: { label: string; onClick: () => void }
   stats: HeroStat[]
@@ -57,7 +57,7 @@ export function DetailHero({ imageUri, badge, title, links, details, actions, pl
             <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-xs text-amber-100/85">{links}</div>
             {details && details.length > 0 && <HeroDetails details={details} className="mt-3" />}
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2 [&>*]:flex-1 md:[&>*]:flex-none">
+          <div className="flex shrink-0 flex-wrap gap-2 [&>*]:flex-auto md:[&>*]:flex-none">
             {actions.map((action, index) => (
               // Keyed by place, since a toggle's label changes and it should stay the same button.
               <button

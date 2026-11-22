@@ -1819,10 +1819,6 @@ function GameContent() {
   };
 
   const renderActionButtons = (): { left: ReactNode; right: ReactNode } | null => {
-    if (isSpectator) {
-      return null;
-    }
-
     let left: ReactNode = null;
     let right: ReactNode = null;
 
@@ -2628,7 +2624,7 @@ function GameContent() {
           </div>
         )}
         {/* Bottom Action Bar */}
-        {!isSpectator && (() => {
+        {(() => {
           const endOfGame = isEndPhase && gameId && !displayBattleResolution;
           const groups = endOfGame ? null : renderActionButtons();
           // Above the docked sidebar's z-[45], so the popovers over Submit Hand and Submit Result show over it.
@@ -2637,6 +2633,8 @@ function GameContent() {
               ref={actionBarRef}
               className="relative z-[46]"
               guideTarget="phase-action-bar"
+              // A spectator watches the player's screen, so sees the player's bar without being able to use it.
+              inert={isSpectator}
               secondary={endOfGame ? (
                 <>
                   <button

@@ -257,12 +257,10 @@ export function PhaseTimeline({
                 disabled={welcomeGuideActive || isEnd}
                 onClick={() => handlePhaseClick(phase)}
                 data-guide-target={`timeline-phase-${phase}`}
-                className={`text-xs sm:text-sm font-medium capitalize transition-colors
-                  ${!isEnd ? "cursor-pointer" : "cursor-default"}
-                  ${isActive || isEndReward ? `rounded-[4px] px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : ""}
+                className={`phase-step text-xs sm:text-sm font-medium capitalize transition-colors
+                  ${isActive || isEndReward ? `rounded-[4px] px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : "phase-step-idle"}
                   ${isCompleted && !isEndReward ? "text-[var(--ivory-faint)] line-through decoration-[var(--gold-border-opaque)]" : ""}
                   ${isUpcoming ? "text-[var(--ivory-faint)]" : ""}
-                  ${welcomeGuideActive || isEnd ? "hover:brightness-100" : "hover:brightness-125"}
                 `}
               >
                 {isEndReward
