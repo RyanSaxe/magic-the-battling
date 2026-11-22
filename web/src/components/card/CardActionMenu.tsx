@@ -1,6 +1,7 @@
-import { useState, useRef, useLayoutEffect, useEffect } from 'react'
+import { useRef, useLayoutEffect, useEffect } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../../types'
 import { useFaceDown } from '../../contexts/faceDownState'
+import { useOpenSubmenus } from '../../hooks/useOpenSubmenus'
 import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../../utils/battleInteraction'
 import { clampMenuToViewport, menuMaxHeight } from '../../utils/menuPosition'
 
@@ -20,7 +21,7 @@ interface CardActionMenuProps {
   onClose: () => void
 }
 
-type Submenu = 'none' | 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo'
+type Submenu = 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo'
 
 const COUNTER_TYPES = ['+1/+1', '-1/-1', 'Loyalty', 'Charge', 'Custom']
 const ATTACH_TO_MAX_HEIGHT = 200
@@ -48,7 +49,7 @@ export function CardActionMenu({
   onClose,
 }: CardActionMenuProps) {
   const isFaceDown = useFaceDown(card.id)
-  const [submenu, setSubmenu] = useState<Submenu>('none')
+  const { isOpen, toggle } = useOpenSubmenus<Submenu>()
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -160,10 +161,10 @@ export function CardActionMenu({
             <MenuItem
               label="Add Counter"
               hasSubmenu
-              open={submenu === 'addCounter'}
-              onClick={() => setSubmenu(submenu === 'addCounter' ? 'none' : 'addCounter')}
+              open={isOpen('addCounter')}
+              onClick={() => toggle('addCounter')}
             />
-            {submenu === 'addCounter' && (
+            {isOpen('addCounter') && (
               <Submenu>
                 {COUNTER_TYPES.map(type => (
                   <MenuItem
@@ -189,10 +190,10 @@ export function CardActionMenu({
                 <MenuItem
                   label="Remove Counter"
                   hasSubmenu
-                  open={submenu === 'removeCounter'}
-                  onClick={() => setSubmenu(submenu === 'removeCounter' ? 'none' : 'removeCounter')}
+                  open={isOpen('removeCounter')}
+                  onClick={() => toggle('removeCounter')}
                 />
-                {submenu === 'removeCounter' && (
+                {isOpen('removeCounter') && (
                   <Submenu>
                     {Object.entries(counters).map(([type, count]) => (
                       <MenuItem
@@ -215,10 +216,10 @@ export function CardActionMenu({
             <MenuItem
               label="Spawn Token"
               hasSubmenu
-              open={submenu === 'spawnToken'}
-              onClick={() => setSubmenu(submenu === 'spawnToken' ? 'none' : 'spawnToken')}
+              open={isOpen('spawnToken')}
+              onClick={() => toggle('spawnToken')}
             />
-            {submenu === 'spawnToken' && (
+            {isOpen('spawnToken') && (
               <Submenu>
                 {card.tokens.map(token => (
                   <MenuItem
@@ -255,10 +256,10 @@ export function CardActionMenu({
             <MenuItem
               label="Attach To"
               hasSubmenu
-              open={submenu === 'attachTo'}
-              onClick={() => setSubmenu(submenu === 'attachTo' ? 'none' : 'attachTo')}
+              open={isOpen('attachTo')}
+              onClick={() => toggle('attachTo')}
             />
-            {submenu === 'attachTo' && (
+            {isOpen('attachTo') && (
               <Submenu maxHeight={ATTACH_TO_MAX_HEIGHT}>
                 {attachableCards.map(target => (
                   <MenuItem
@@ -284,10 +285,10 @@ export function CardActionMenu({
         <MenuItem
           label="Move To"
           hasSubmenu
-          open={submenu === 'moveTo'}
-          onClick={() => setSubmenu(submenu === 'moveTo' ? 'none' : 'moveTo')}
+          open={isOpen('moveTo')}
+          onClick={() => toggle('moveTo')}
         />
-        {submenu === 'moveTo' && (
+        {isOpen('moveTo') && (
           <Submenu>
             {moveTargets.map((target) => (
               <MenuItem key={target.zone} label={target.label} onClick={() => handleMove(target.zone)} />

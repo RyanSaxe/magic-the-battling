@@ -1,7 +1,8 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
 import { useFaceDown } from '../contexts/faceDownState'
+import { useOpenSubmenus } from '../hooks/useOpenSubmenus'
 import type { BattleSelectedCard } from '../pages/phases/Battle'
 import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../utils/battleInteraction'
 
@@ -46,7 +47,7 @@ interface ActionMenuProps {
   onClose: () => void
 }
 
-type SubmenuType = 'none' | 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo' | 'rollDie'
+type SubmenuType = 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo' | 'rollDie'
 
 const COUNTER_TYPES = ['+1/+1', '-1/-1', 'Loyalty', 'Charge', 'Custom']
 const DIE_SIDES = [2, 4, 6, 8, 10, 12, 20]
@@ -72,7 +73,7 @@ export function ActionMenu({
   onRollDie,
   onClose,
 }: ActionMenuProps) {
-  const [submenu, setSubmenu] = useState<SubmenuType>('none')
+  const { isOpen, toggle } = useOpenSubmenus<SubmenuType>()
   const menuRef = useRef<HTMLDivElement>(null)
 
   // The menu sits on the Actions button and grows upward, so a submenu would move every row above the one clicked.
@@ -165,10 +166,10 @@ export function ActionMenu({
             <MenuItem
               label="Move To"
               hasSubmenu
-              open={submenu === 'moveTo'}
-              onClick={() => setSubmenu(submenu === 'moveTo' ? 'none' : 'moveTo')}
+              open={isOpen('moveTo')}
+              onClick={() => toggle('moveTo')}
             />
-            {submenu === 'moveTo' && (
+            {isOpen('moveTo') && (
               <Submenu>
                 {zone !== 'hand' && <MenuItem label="Hand" onClick={() => handleMove('hand')} />}
                 {zone !== 'battlefield' && <MenuItem label="Battlefield" onClick={() => handleMove('battlefield')} />}
@@ -183,11 +184,11 @@ export function ActionMenu({
                 <MenuItem
                   label="Add Counter"
                   hasSubmenu
-                  open={submenu === 'addCounter'}
+                  open={isOpen('addCounter')}
                   guideTarget="battle-action-add-counter"
-                  onClick={() => setSubmenu(submenu === 'addCounter' ? 'none' : 'addCounter')}
+                  onClick={() => toggle('addCounter')}
                 />
-                {submenu === 'addCounter' && (
+                {isOpen('addCounter') && (
                   <Submenu>
                     {COUNTER_TYPES.map(type => (
                       <MenuItem
@@ -211,10 +212,10 @@ export function ActionMenu({
                     <MenuItem
                       label="Remove Counter"
                       hasSubmenu
-                      open={submenu === 'removeCounter'}
-                      onClick={() => setSubmenu(submenu === 'removeCounter' ? 'none' : 'removeCounter')}
+                      open={isOpen('removeCounter')}
+                      onClick={() => toggle('removeCounter')}
                     />
-                    {submenu === 'removeCounter' && (
+                    {isOpen('removeCounter') && (
                       <Submenu>
                         {Object.entries(counters).map(([type, count]) => (
                           <MenuItem
@@ -235,10 +236,10 @@ export function ActionMenu({
                 <MenuItem
                   label="Spawn Token"
                   hasSubmenu
-                  open={submenu === 'spawnToken'}
-                  onClick={() => setSubmenu(submenu === 'spawnToken' ? 'none' : 'spawnToken')}
+                  open={isOpen('spawnToken')}
+                  onClick={() => toggle('spawnToken')}
                 />
-                {submenu === 'spawnToken' && (
+                {isOpen('spawnToken') && (
                   <Submenu>
                     {card.tokens.map(token => (
                       <MenuItem
@@ -271,10 +272,10 @@ export function ActionMenu({
                 <MenuItem
                   label="Attach To"
                   hasSubmenu
-                  open={submenu === 'attachTo'}
-                  onClick={() => setSubmenu(submenu === 'attachTo' ? 'none' : 'attachTo')}
+                  open={isOpen('attachTo')}
+                  onClick={() => toggle('attachTo')}
                 />
-                {submenu === 'attachTo' && (
+                {isOpen('attachTo') && (
                   <Submenu maxHeight={200}>
                     {attachableCards.map(target => (
                       <MenuItem
@@ -302,10 +303,10 @@ export function ActionMenu({
         <MenuItem
           label="Roll a Die"
           hasSubmenu
-          open={submenu === 'rollDie'}
-          onClick={() => setSubmenu(submenu === 'rollDie' ? 'none' : 'rollDie')}
+          open={isOpen('rollDie')}
+          onClick={() => toggle('rollDie')}
         />
-        {submenu === 'rollDie' && (
+        {isOpen('rollDie') && (
           <Submenu>
             <div className="menu-submenu-grid grid grid-cols-4 pr-3">
               {DIE_SIDES.map(sides => (
