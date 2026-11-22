@@ -4,6 +4,8 @@ import { GAME_ID } from './gameStates'
 // The closed guide stays mounted while it fades out, so the next guide can take its place.
 const GUIDE_FADE_MS = 450
 
+test.skip(({ viewport }) => viewport!.width > viewport!.height, 'A phone held sideways sees a prompt to rotate it instead of the game')
+
 test('the board takes a tap while a closed guide fades out', async ({ page, baseURL }) => {
   // A guide shows only after its layout holds still for several animation frames, and WebKit on
   // Linux can go seconds between frames while a game first renders.

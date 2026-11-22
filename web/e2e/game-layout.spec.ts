@@ -1,14 +1,15 @@
 import type { Page } from '@playwright/test'
 import { MIN_CARD_WIDTH } from '../src/hooks/cardSizeUtils'
-import { expect, serveGame, test } from './helpers'
+import type { ZoneConstraints } from '../src/hooks/computeConstrainedLayout'
+import { boardSizeBand } from '../src/hooks/usePersistedConstraints'
+import { expect, serveGame, serveSpectating, test } from './helpers'
 import { GAME_ID, type ScreenState } from './gameStates'
 
 /**
  * Measures the rendered game board on each screen and reports which layout
  * checks fail. CI runs SAMPLE; `LAYOUT_SWEEP=full npm run test:e2e -- game-layout`
- * runs every phase at every viewport. The Vitest sweep in src/layoutSafety checks
- * the layout math on every screen, so the sample only needs to show that
- * the rendered board follows it.
+ * runs every phase at every viewport. A screen fails when its failing checks
+ * differ from the ones listed for it, so a fix or a regression both show up.
  *
  * `LAYOUT_COMPARE=1` also compares each screen's board, zone and card positions
  * and its pixels with a baseline in e2e/layout-baseline/, which git ignores. To
@@ -28,12 +29,17 @@ type Check =
   | 'zones-off-board'
   | 'sidebar-seams-off-board'
   | 'text-cut-off'
+  | 'divider-off-saved-layout'
+  | 'saved-layout-squeezes-zone'
   | 'grab-moves-layout'
 
 interface Screen {
   name: string
   viewport: { width: number; height: number }
   state: ScreenState
+  saved?: ZoneConstraints
+  /** Checks that fail on this screen today, each with what fails. */
+  knownFailures?: Partial<Record<Check, string>>
 }
 
 const TYPICAL: Record<string, ScreenState> = {
@@ -51,9 +57,41 @@ const TYPICAL: Record<string, ScreenState> = {
 
 const SAMPLE: Screen[] = [
   {
+    name: 'build 1280x720',
+    viewport: { width: 1280, height: 720 },
+    state: TYPICAL.build,
+  },
+  {
     name: 'build-with-upgrades 1280x720',
     viewport: { width: 1280, height: 720 },
     state: TYPICAL['build-with-upgrades'],
+  },
+  {
+    name: 'build-with-upgrades 1440x900 with a saved layout',
+    viewport: { width: 1440, height: 900 },
+    state: TYPICAL['build-with-upgrades'],
+    saved: { topFraction: 0.3, bottomLeftSplit: 0.3 },
+  },
+  {
+    name: 'build 1024x768 with a layout that leaves the lower zones no room',
+    viewport: { width: 1024, height: 768 },
+    state: TYPICAL.build,
+    saved: { topFraction: 0.9 },
+  },
+  {
+    name: 'build-sudden-death 1280x800',
+    viewport: { width: 1280, height: 800 },
+    state: TYPICAL['build-sudden-death'],
+  },
+  {
+    name: 'build-sudden-death 375x667',
+    viewport: { width: 375, height: 667 },
+    state: TYPICAL['build-sudden-death'],
+  },
+  {
+    name: 'reward-stage-end 1280x800',
+    viewport: { width: 1280, height: 800 },
+    state: TYPICAL['reward-stage-end'],
   },
   { name: 'draft 393x852', viewport: { width: 393, height: 852 }, state: TYPICAL.draft },
   {
@@ -61,6 +99,7 @@ const SAMPLE: Screen[] = [
     viewport: { width: 375, height: 667 },
     state: TYPICAL.reward,
   },
+  { name: 'battle 1280x800', viewport: { width: 1280, height: 800 }, state: TYPICAL.battle },
   {
     name: 'battle-sudden-death 1280x800',
     viewport: { width: 1280, height: 800 },
@@ -70,6 +109,12 @@ const SAMPLE: Screen[] = [
     name: 'battle-sudden-death 375x667',
     viewport: { width: 375, height: 667 },
     state: TYPICAL['battle-sudden-death'],
+  },
+  {
+    name: 'battle 1024x500',
+    viewport: { width: 1024, height: 500 },
+    state: TYPICAL.battle,
+    knownFailures: { 'card-below-minimum': 'six rows share a 372px board' },
   },
 ]
 
@@ -248,7 +293,7 @@ async function openScreen(page: Page, baseURL: string, screen: Screen) {
   await expectGameShown(page)
   await waitForStableLayout(page)
   await expectGameShown(page)
-  await reloadStyled(page)
+  await restoreSavedLayout(page, screen)
 }
 
 /** Waits until the game shows a card, and fails if it crashed instead. */
@@ -256,6 +301,24 @@ async function expectGameShown(page: Page) {
   const crashed = page.getByRole('heading', { name: 'Something went wrong' })
   await expect(page.locator('main .card').first().or(crashed)).toBeVisible()
   if (await crashed.isVisible()) throw new Error(`the game crashed: ${await page.locator('p').first().innerText()}`)
+}
+
+/** Puts back the layout the screen starts from, saved or not, and reloads the game. */
+async function restoreSavedLayout(page: Page, screen: Screen) {
+  // The game saves a layout for the size band of the board, measured the way useCardLayout measures it.
+  const board = await page.locator('main .zone-divider-bg > div, .battle-layout').first().evaluate((element) => ({
+    width: Math.floor(element.clientWidth / 4) * 4,
+    height: Math.floor(element.clientHeight / 4) * 4,
+  }))
+  await page.evaluate(({ phase, saved, band }) => {
+    const key = `mtb_zone_constraints:v2:phase:${phase}`
+    if (!saved) return localStorage.removeItem(key)
+    localStorage.setItem(key, JSON.stringify({
+      version: 3,
+      bands: { [band]: [{ stage: 4, round: 2, mode: 'constraints', constraints: saved }] },
+    }))
+  }, { phase: screen.state.phase, saved: screen.saved ?? null, band: boardSizeBand(board) })
+  await reloadStyled(page)
 }
 
 /** Reloads the game and waits until it shows cards on a settled board. */
@@ -301,35 +364,57 @@ function zoneBoxes(measurement: BoardMeasurement) {
   })
 }
 
+/** Where each divider sits as a fraction of the room it moves in, measured the way the divider measures it on drag start. */
+async function dividerFractions(page: Page) {
+  return page.evaluate(() => {
+    const height = (selector: string) => document.querySelector(selector)?.getBoundingClientRect().height ?? 0
+    const sectionPad = 32
+    const sectionGap = 2
+    const top = height('main .zone-hand') || height('main .zone-pack')
+    const first = height('main .zone-battlefield') || height('main .zone-upgrades')
+    const second = height('main .zone-sideboard')
+    return {
+      topFraction: top / (top + first + sectionGap + second),
+      bottomLeftSplit: (first - sectionPad) / (first + second - 2 * sectionPad),
+      space: { topFraction: top + first + sectionGap + second, bottomLeftSplit: first + second - 2 * sectionPad },
+    }
+  })
+}
+
 /**
- * Moves each divider a few pixels and back, which must leave the board where it was and save a layout that
- * reloads as the same board.
+ * Presses and releases each divider, each from the screen's starting layout: once without moving it, and once after
+ * moving it a few pixels and back, which saves a layout that must reload as the same board.
  */
-async function moveEachDividerAndBack(page: Page): Promise<string[]> {
+async function grabEachDivider(page: Page, screen: Screen): Promise<string[]> {
   const handles = page.locator('main .zone-divider-line > div[style*="resize"]')
-  const start = zoneBoxes(await measure(page))
   const moved: string[] = []
-  const compare = (label: string, after: string[]) => {
-    const changed = after.map((zone, position) => [start[position], zone]).filter(([was, now]) => was !== now)
+  const compare = (label: string, before: string[], after: string[]) => {
+    const changed = after.map((zone, position) => [before[position], zone]).filter(([was, now]) => was !== now)
     if (changed.length > 0) moved.push(`${label}: ${changed.map(([was, now]) => `${was} -> ${now}`).join(', ')}`)
   }
   const count = await handles.count()
-  // The lower divider goes first: once the top one has saved its place, dragging the lower one can't move it.
-  for (let index = count - 1; index >= 0; index--) {
-    const box = (await handles.nth(index).boundingBox())!
-    const [x, y] = [box.x + box.width / 2, box.y + box.height / 2]
-    const vertical = box.width < box.height
-    await page.mouse.move(x, y)
-    await page.mouse.down()
-    await page.mouse.move(vertical ? x + 4 : x, vertical ? y : y + 4)
-    await page.mouse.move(x, y)
-    await page.mouse.up()
-    await waitForStableLayout(page)
-    compare(`moving divider ${index} and back`, zoneBoxes(await measure(page)))
-  }
-  if (count > 0) {
-    await reloadStyled(page)
-    compare('after a reload', zoneBoxes(await measure(page)))
+  for (let index = 0; index < count; index++) {
+    for (const offset of [0, 4]) {
+      if (index > 0 || offset > 0) await restoreSavedLayout(page, screen)
+      const before = zoneBoxes(await measure(page))
+      const box = (await handles.nth(index).boundingBox())!
+      const [x, y] = [box.x + box.width / 2, box.y + box.height / 2]
+      const vertical = box.width < box.height
+      await page.mouse.move(x, y)
+      await page.mouse.down()
+      if (offset > 0) {
+        await page.mouse.move(vertical ? x + offset : x, vertical ? y : y + offset)
+        await page.mouse.move(x, y)
+      }
+      await page.mouse.up()
+      await waitForStableLayout(page)
+      const label = offset > 0 ? `moving divider ${index} and back` : `grabbing divider ${index}`
+      compare(label, before, zoneBoxes(await measure(page)))
+      if (offset > 0) {
+        await reloadStyled(page)
+        compare(`${label}, after a reload`, before, zoneBoxes(await measure(page)))
+      }
+    }
   }
   return moved
 }
@@ -349,16 +434,70 @@ for (const screen of SCREENS) {
         await expect.soft(page).toHaveScreenshot(`${screen.name}.png`)
       }
 
+      if (screen.saved) {
+        // A saved divider gives way only to keep a zone one row of 40px cards tall: 56px plus 32px of padding.
+        const oneRowZone = 88
+        const heights = measurement.zones.map((zone) => Math.round(zone.box.height))
+        const fractions = await dividerFractions(page)
+        for (const key of ['topFraction', 'bottomLeftSplit'] as const) {
+          const want = screen.saved[key]
+          if (want === undefined) continue
+          const offPx = Math.abs(fractions[key] - want) * fractions.space[key]
+          if (offPx > 1 && !heights.includes(oneRowZone)) {
+            (failures['divider-off-saved-layout'] ??= []).push(`${key} ${want} sits ${Math.round(offPx)}px away`)
+          }
+        }
+        for (const zone of measurement.zones) {
+          if (zone.box.height < oneRowZone - 0.5) {
+            (failures['saved-layout-squeezes-zone'] ??= []).push(`${zone.name} is ${Math.round(zone.box.height)}px tall`)
+          }
+        }
+      }
+
       await testInfo.attach('screen.png', { body: await page.screenshot(), contentType: 'image/png' })
       // Below 640px wide the phases turn their dividers off.
       if (screen.state.phase !== 'battle' && screen.viewport.width >= 640) {
-        const moved = await moveEachDividerAndBack(page)
+        const moved = await grabEachDivider(page, screen)
         if (moved.length > 0) failures['grab-moves-layout'] = moved
       }
 
       await testInfo.attach('failures.json', { body: JSON.stringify(failures, null, 2), contentType: 'application/json' })
-      expect(Object.keys(failures), JSON.stringify(failures, null, 2)).toEqual([])
+      const failing = Object.keys(failures).sort()
+      const expected = Object.keys(screen.knownFailures ?? {}).sort()
+      expect(failing, JSON.stringify(failures, null, 2)).toEqual(expected)
     })
+  })
+}
+
+// A banner spans the board and the sidebar, so both must move down together for the sidebar's lanes to meet the board's rows.
+const BANNER_FIGHTS = [
+  { banner: 'Sudden Death', open: (page: Page, baseURL: string) => serveGame(page, baseURL, TYPICAL['battle-sudden-death']), path: '' },
+  { banner: 'watching a player', open: serveSpectating('approved', TYPICAL.battle), path: '?spectate=true' },
+]
+
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test.describe(`${viewport.width}x${viewport.height}`, () => {
+    const isPhone = viewport.width < 640
+    test.use({ viewport, isMobile: isPhone, hasTouch: isPhone })
+
+    for (const { banner, open, path } of BANNER_FIGHTS) {
+      test(`a Fight under the ${banner} banner keeps the sidebar's lanes on the board's seams`, async ({ page, baseURL }) => {
+        await open(page, baseURL!)
+        await page.goto(`/game/${GAME_ID}/play${path}`, { waitUntil: 'domcontentloaded' })
+        await page.locator('[data-banner]').waitFor()
+        await expectGameShown(page)
+        if (isPhone) {
+          await page.locator('[data-guide-target="sidebar-toggle"]').click()
+          // The sidebar slides in over the board, so measure it once it stops.
+          await page.waitForFunction(() => document.getAnimations().length === 0)
+        }
+        await waitForStableLayout(page)
+
+        const { failures } = await measure(page)
+        expect(failures['sidebar-seams-off-board'], "sidebar seams away from the board's").toBeUndefined()
+        expect(await page.locator('aside[data-guide-target="sidebar-panel"] .zone-divider-line--horizontal').count(), 'sidebar lanes').toBe(2)
+      })
+    }
   })
 }
 
@@ -385,6 +524,56 @@ test.describe('a stylesheet that arrives after the game renders', () => {
   })
 })
 
+// On a slow network the game's script can run before its stylesheet has loaded, and WebKit then measures an
+// unstyled board on the first load. A reload takes the stylesheet from the cache, so only a first load shows it.
+test.describe('the first load over a slow network', () => {
+  for (const viewport of [{ width: 393, height: 852 }, { width: 1280, height: 800 }]) {
+    test(`shows Draft without crashing at ${viewport.width}x${viewport.height}`, async ({ page, baseURL }) => {
+      await page.setViewportSize(viewport)
+      await serveGame(page, baseURL!, { phase: 'draft', counts: { pack: 5, sideboard: 10 } })
+      await page.route(/\/assets\/.*\.css$/, async (route) => {
+        const response = await route.fetch()
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        await route.fulfill({ response })
+      })
+      await page.goto(`/game/${GAME_ID}/play`)
+      await expectGameShown(page)
+      await waitForStableLayout(page)
+      await expectGameShown(page)
+    })
+  }
+})
+
+test.describe('a saved layout', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  test('stays with the board size band it was saved in', async ({ page, baseURL }) => {
+    const handHeight = async () => Math.round((await page.locator('main .zone-hand').boundingBox())!.height)
+    await openScreen(page, baseURL!, { name: 'build', viewport: { width: 1280, height: 800 }, state: TYPICAL.build })
+    const automaticOnLaptop = await handHeight()
+
+    // A load measures the board at once, so the drag starts from the desktop's own layout.
+    await page.setViewportSize({ width: 1920, height: 1080 })
+    await reloadStyled(page)
+    const automaticOnDesktop = await handHeight()
+    const divider = (await page.locator('main .zone-divider-line > div[style*="resize"]').first().boundingBox())!
+    await page.mouse.move(divider.x + divider.width / 2, divider.y + divider.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(divider.x + divider.width / 2, divider.y + divider.height / 2 + 80, { steps: 4 })
+    await page.mouse.up()
+    await waitForStableLayout(page)
+    const savedOnDesktop = await handHeight()
+    expect(savedOnDesktop).toBeGreaterThan(automaticOnDesktop + 60)
+
+    // After a resize the zones keep their old sizes until the game has measured the board again.
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await expect.poll(handHeight).toBe(automaticOnLaptop)
+
+    await page.setViewportSize({ width: 1920, height: 1080 })
+    await expect.poll(handHeight).toBe(savedOnDesktop)
+  })
+})
+
 test.describe('the player cards', () => {
   const longName = 'Maximilian Vanderbergh'
   const screen: ScreenState = {
@@ -393,28 +582,47 @@ test.describe('the player cards', () => {
     opponents: [{ name: longName, last_result: 'draw', pairing_probability: 0.4 }],
   }
 
-  test.use({ viewport: { width: 1280, height: 800 } })
+  // The docked sidebar's cards are the narrowest, and on a phone the cards are in a drawer.
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    test(`keep a long name's last result whole on its line at ${viewport.width}x${viewport.height}`, async ({ page, baseURL }) => {
+      await page.setViewportSize(viewport)
+      await serveGame(page, baseURL!, screen)
+      await page.goto(`/game/${GAME_ID}/play`)
+      await expectGameShown(page)
+      const drawerToggle = page.locator('[data-guide-target="sidebar-toggle"]')
+      if (await drawerToggle.isVisible()) await drawerToggle.click()
 
-  // The docked sidebar's cards are the narrowest.
-  test("keep a long name's last result whole on its line", async ({ page, baseURL }) => {
-    await serveGame(page, baseURL!, screen)
+      const card = page.locator(`[data-guide-player-row="${longName}"]`)
+      // The phone's drawer slides in, so measure once it's whole on screen, and all in one frame.
+      await expect(card).toBeInViewport({ ratio: 1 })
+      const { card: cardBox, name, result } = await card.evaluate((element, longName) => {
+        const box = (target: Element) => {
+          const { left, right, top, bottom } = target.getBoundingClientRect()
+          return { left, right, middle: (top + bottom) / 2, cut: target.scrollWidth > target.clientWidth }
+        }
+        const byText = (text: string) => Array.from(element.querySelectorAll('span')).find((span) => span.textContent === text)!
+        return { card: box(element), name: box(byText(longName)), result: box(byText('Drew')) }
+      }, longName)
+
+      expect(name.cut, 'the name is cut short').toBe(true)
+      expect(result.cut, 'the result is cut short').toBe(false)
+      expect(result.left).toBeGreaterThanOrEqual(name.right)
+      expect(result.right).toBeLessThanOrEqual(cardBox.right)
+      expect(Math.abs(result.middle - name.middle)).toBeLessThan(3)
+    })
+  }
+
+  test('name the last fight the same way as the scouting Overview', async ({ page, baseURL }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await serveGame(page, baseURL!, { ...screen, opponents: [{ name: 'Bob', last_result: 'loss' }] })
     await page.goto(`/game/${GAME_ID}/play`)
     await expectGameShown(page)
 
-    const card = page.locator(`[data-guide-player-row="${longName}"]`)
-    const { card: cardBox, name, result } = await card.evaluate((element, longName) => {
-      const box = (target: Element) => {
-        const { left, right, top, bottom } = target.getBoundingClientRect()
-        return { left, right, middle: (top + bottom) / 2, cut: target.scrollWidth > target.clientWidth }
-      }
-      const byText = (text: string) => Array.from(element.querySelectorAll('span')).find((span) => span.textContent === text)!
-      return { card: box(element), name: box(byText(longName)), result: box(byText('Drew')) }
-    }, longName)
-
-    expect(name.cut, 'the name is cut short').toBe(true)
-    expect(result.cut, 'the result is cut short').toBe(false)
-    expect(result.left).toBeGreaterThanOrEqual(name.right)
-    expect(result.right).toBeLessThanOrEqual(cardBox.right)
-    expect(Math.abs(result.middle - name.middle)).toBeLessThan(3)
+    const card = page.locator('[data-guide-player-row="Bob"]')
+    await expect(card.getByTitle('Last fight')).toHaveText('Lost')
+    await card.getByRole('button').click()
+    await page.getByRole('radio', { name: 'Overview' }).click()
+    const lastResult = page.locator('dl > div', { has: page.getByText('Last result', { exact: true }) }).locator('dd')
+    await expect(lastResult).toHaveText('Lost')
   })
 })

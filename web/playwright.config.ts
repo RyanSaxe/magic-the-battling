@@ -11,8 +11,12 @@ export default defineConfig({
   },
   projects: [
     { name: 'iPhone SE', testIgnore: ['game-layout.spec.ts', 'frame-bar.spec.ts', 'phase-actions.spec.ts'], use: { ...devices['iPhone SE'] } },
-    // A page has to fit the shortest screen as well as the narrowest, so only the page spec repeats on a phone held sideways.
-    { name: 'iPhone 15 landscape', testMatch: 'page-frame.spec.ts', use: { ...devices['iPhone 15 landscape'] } },
+    {
+      name: 'iPhone 15, short viewport',
+      testIgnore: ['game-layout.spec.ts', 'frame-bar.spec.ts', 'phase-actions.spec.ts'],
+      use: { ...devices['iPhone 15'], viewport: { width: 393, height: 560 } },
+    },
+    { name: 'iPhone 15 landscape', testIgnore: ['game-layout.spec.ts', 'frame-bar.spec.ts', 'phase-actions.spec.ts'], use: { ...devices['iPhone 15 landscape'] } },
     // The game layout and frame specs set each screen's viewport themselves, so each runs once.
     {
       name: 'game layout',

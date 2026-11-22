@@ -31,7 +31,7 @@ const isLocalUrl = (url: string) => {
 }
 
 /** The response's URL when it came from a server other than this machine, or null. */
-async function outsideUrl(response: Pick<Response, 'serverAddr' | 'url'>): Promise<string | null> {
+export async function outsideUrl(response: Pick<Response, 'serverAddr' | 'url'>): Promise<string | null> {
   const address = await response.serverAddr().catch(() => undefined)
   // A response still arriving as the test ends can't report its address, so judge it by where it was sent.
   if (address === undefined) return isLocalUrl(response.url()) ? null : response.url()
@@ -187,7 +187,7 @@ const LOBBY_STATE: LobbyState = {
   play_mode: 'limited',
 }
 
-function shareSnapshot(stage: number, round: number): SharePlayerSnapshot {
+function shareSnapshot(stage: number, round: number, suddenDeathBuild: number | null = null): SharePlayerSnapshot {
   return {
     stage,
     round,
@@ -200,7 +200,7 @@ function shareSnapshot(stage: number, round: number): SharePlayerSnapshot {
     poison: round,
     vanguard: null,
     visibility: 'full',
-    sudden_death_build: null,
+    sudden_death_build: suddenDeathBuild,
   }
 }
 
@@ -260,6 +260,55 @@ export async function serveShareGame(page: Page, baseURL: string) {
   await serveFromTable(page, baseURL, {
     ...SIGNED_OUT_RESPONSES,
     [`/api/games/${SHARE_GAME_ID}/share/Alice`]: { json: SHARE_GAME },
+  })
+}
+
+// Dave went out first and shares while the others play on, so their rounds show only poison and treasures.
+const SHARE_MID_GAME: ShareGameResponse = {
+  ...SHARE_GAME,
+  owner_name: 'Dave',
+  in_progress: true,
+  players: SHARE_GAME.players.map((player) => ({
+    ...player,
+    final_placement: player.name === 'Dave' ? 4 : null,
+    snapshots: player.name === 'Dave'
+      ? SHARE_SNAPSHOTS
+      : SHARE_SNAPSHOTS.map((snapshot) => ({ ...snapshot, basic_lands: [], visibility: 'hidden' as const })),
+  })),
+}
+
+export async function serveShareMidGame(page: Page, baseURL: string) {
+  await serveFromTable(page, baseURL, {
+    ...SIGNED_OUT_RESPONSES,
+    [`/api/games/${SHARE_GAME_ID}/share/Dave`]: { json: SHARE_MID_GAME },
+  })
+}
+
+// Alice and Bob reached lethal in 3-3, drew their first Sudden Death and fought a second, so the page opens on its rebuild.
+const SHARE_SUDDEN_DEATH: ShareGameResponse = {
+  ...SHARE_GAME,
+  players: SHARE_GAME.players.map((player) => ({
+    ...player,
+    snapshots: ['Alice', 'Bob'].includes(player.name)
+      ? [...SHARE_SNAPSHOTS, shareSnapshot(3, 3, 1), shareSnapshot(3, 3, 2)]
+      : SHARE_SNAPSHOTS,
+  })),
+}
+
+export async function serveShareSuddenDeath(page: Page, baseURL: string) {
+  await serveFromTable(page, baseURL, {
+    ...SIGNED_OUT_RESPONSES,
+    [`/api/games/${SHARE_GAME_ID}/share/Alice`]: { json: SHARE_SUDDEN_DEATH },
+  })
+}
+
+export async function serveShareInProgress(page: Page, baseURL: string) {
+  await serveFromTable(page, baseURL, {
+    ...SIGNED_OUT_RESPONSES,
+    [`/api/games/${SHARE_GAME_ID}/share/Bob`]: {
+      status: 404,
+      json: { detail: 'This game is still being played', code: 'GAME_IN_PROGRESS' },
+    },
   })
 }
 
@@ -324,6 +373,13 @@ export async function serveGame(
   })
 }
 
+/** Opens a game whose server then ends the connection with `code`, as when the game is gone or can't be reached. */
+function serveGameEndedWith(code: string) {
+  return (page: Page, baseURL: string) => serveGame(page, baseURL, { phase: 'build', counts: {} }, {
+    onSocket: (ws) => ws.send(JSON.stringify({ type: 'connection_error', payload: { code } })),
+  })
+}
+
 const SPECTATE_REQUEST_ID = 'spectate-request-1'
 
 /** How the watched player has answered this tab's request to watch: not yet, no, too late, or yes. */
@@ -376,13 +432,18 @@ export interface PageUnderTest {
   fillsFelt?: boolean
 }
 
-/** One page for each component that fills the frame. Another state of the same component doesn't need its own entry. */
 export const PAGES: PageUnderTest[] = [
   {
     name: 'home',
     path: '/',
     serve: serveWithoutBackend,
     primaryAction: (page) => page.getByRole('main').getByRole('link', { name: 'create an account' }),
+  },
+  {
+    name: 'login',
+    path: '/login',
+    serve: serveWithoutBackend,
+    primaryAction: (page) => page.getByRole('button', { name: 'Log In' }),
   },
   {
     name: 'register',
@@ -403,8 +464,26 @@ export const PAGES: PageUnderTest[] = [
     primaryAction: (page) => page.getByRole('button', { name: 'New Game' }),
   },
   {
+    name: 'games',
+    path: '/dashboard/games',
+    serve: serveSignedIn,
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search games' }),
+  },
+  {
+    name: 'discover',
+    path: '/dashboard/discover',
+    serve: serveSignedIn,
+    primaryAction: (page) => page.getByRole('searchbox', { name: 'Search cubes' }),
+  },
+  {
     name: 'battler',
     path: '/dashboard/list/1',
+    serve: serveSignedIn,
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play', exact: true }),
+  },
+  {
+    name: 'cube',
+    path: '/cube/vintage-cube',
     serve: serveSignedIn,
     primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play', exact: true }),
   },
@@ -422,10 +501,66 @@ export const PAGES: PageUnderTest[] = [
     fillsFelt: true,
   },
   {
+    name: 'share mid-game',
+    path: `/game/${SHARE_GAME_ID}/share/Dave`,
+    serve: serveShareMidGame,
+    primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
+    fillsFelt: true,
+  },
+  {
+    name: 'share Sudden Death',
+    path: `/game/${SHARE_GAME_ID}/share/Alice`,
+    serve: serveShareSuddenDeath,
+    primaryAction: (page) => page.getByRole('button', { name: 'Prev' }),
+    fillsFelt: true,
+  },
+  {
+    name: 'share in progress',
+    path: `/game/${SHARE_GAME_ID}/share/Bob`,
+    serve: serveShareInProgress,
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Home' }),
+  },
+  {
+    name: 'share not found',
+    path: `/game/${SHARE_GAME_ID}/share/Nobody`,
+    serve: serveWithoutBackend,
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Home' }),
+  },
+  {
+    name: 'game not found',
+    path: `/game/${GAME_ID}/play`,
+    serve: serveGameEndedWith('GAME_NOT_FOUND'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'New Game' }),
+  },
+  {
+    name: 'game unavailable',
+    path: `/game/${GAME_ID}/play`,
+    serve: serveGameEndedWith('SERVER_CAPACITY'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Try again' }),
+  },
+  {
     name: 'spectate: choose a player',
     path: `/game/${GAME_ID}/play?spectate=true`,
     serve: serveSpectating(),
     primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Watch' }).first(),
+  },
+  {
+    name: 'spectate: waiting',
+    path: `/game/${GAME_ID}/play?spectate=true`,
+    serve: serveSpectating('pending'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Cancel' }),
+  },
+  {
+    name: 'spectate: denied',
+    path: `/game/${GAME_ID}/play?spectate=true`,
+    serve: serveSpectating('denied'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Try Again' }),
+  },
+  {
+    name: 'spectate: expired',
+    path: `/game/${GAME_ID}/play?spectate=true`,
+    serve: serveSpectating('expired'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Try Again' }),
   },
 ]
 
