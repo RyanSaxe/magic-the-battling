@@ -322,7 +322,7 @@ function AccordionItem({ id, label, expanded, onToggle, labelClassName, children
         className={`w-full py-3.5 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-l-3 transition-all duration-[400ms] ${
           expanded
             ? 'bg-amber-400/8 border-l-amber-400'
-            : 'border-l-transparent hover:border-l-amber-400/40 hover:bg-black/20'
+            : 'border-l-transparent hover:border-l-amber-400/40 hover:bg-[var(--stone)]'
         }`}
       >
         <span className={`font-medium text-base flex-1 text-left ${labelClassName ?? 'text-white'}`}>{label}</span>
@@ -813,7 +813,7 @@ export function QuickGuide({
           </div>
         )}
 
-        <div className="shrink-0 px-4 py-3.5 border-t border-[rgba(212,175,55,0.45)] bg-black/30">
+        <div className="shrink-0 px-4 py-3.5 border-t gold-divider">
           <div className="flex items-center justify-between gap-3">
             <a
               href={DISCORD_INVITE_URL}

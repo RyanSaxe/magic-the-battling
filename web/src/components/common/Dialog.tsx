@@ -48,7 +48,7 @@ export function Dialog({
   }
   const content = (
     <>
-      <div className="flex shrink-0 items-center justify-between mb-4 pb-3 border-b border-black/40">
+      <div className="flex shrink-0 items-center justify-between mb-4 pb-3 border-b gold-divider">
         <h2 id={titleId} className="text-white font-semibold">{title}</h2>
         <button ref={closeRef} type="button" onClick={onClose} className={DIALOG_CLOSE_BUTTON} aria-label={`Close ${title}`}>
           ✕

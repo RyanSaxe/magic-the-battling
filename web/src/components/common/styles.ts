@@ -1,6 +1,9 @@
+/** The solid walnut recess of anything typed into. The clear border keeps each field the size of a bordered one. */
+export const FIELD_SURFACE = 'bg-[var(--walnut-track)] border border-transparent'
+
 /** A text field on a walnut surface. */
 export const TEXT_INPUT =
-  'w-full h-[42px] bg-black/40 border border-black/40 text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold-bright)]'
+  `w-full h-[42px] ${FIELD_SURFACE} text-white rounded px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-[var(--color-gold-bright)]`
 
 /** The label above a text field. */
 export const FIELD_LABEL = 'block text-[var(--ivory-muted)] text-sm mb-1'
@@ -11,8 +14,8 @@ export const FIELD_HINT = 'text-[var(--ivory-muted)] text-xs mt-1'
 /** The line under a text field that says why the form can't be sent yet, in place of its hint. */
 export const FIELD_ERROR = 'text-red-300 text-xs mt-1'
 
-/** The recessed box that holds one option, such as a checkbox and its label, inside a card or dialog. */
-export const OPTION_BOX = 'bg-black/35 border border-black/40 rounded-lg'
+/** One option inside a card or dialog, such as a checkbox and its label, parted from what's above it by a hairline. */
+export const OPTION_BOX = 'border-t gold-divider'
 
 /** A text link on walnut or felt. */
 export const LINK = 'text-amber-400 hover:text-amber-300'

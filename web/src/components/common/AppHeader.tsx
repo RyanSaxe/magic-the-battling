@@ -84,7 +84,7 @@ export function UserMenuButton() {
         </button>
         {open && (
           <div className="absolute right-2 top-full mt-1 z-50 modal-chrome border gold-border rounded-lg shadow-2xl py-1 min-w-[160px]">
-            <div className="px-4 py-2 text-xs text-[var(--ivory-muted)] border-b border-black/40">
+            <div className="px-4 py-2 text-xs text-[var(--ivory-muted)] border-b gold-divider">
               {user?.username}
             </div>
             <button
@@ -117,7 +117,7 @@ export function UserMenuButton() {
             >
               Join Game
             </button>
-            <div className="border-t border-black/40 my-1" />
+            <div className="border-t gold-divider my-1" />
             <button
               disabled={loggingOut}
               onClick={async () => {

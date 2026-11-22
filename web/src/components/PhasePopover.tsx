@@ -119,7 +119,7 @@ export function PhasePopover({
       </div>
 
       <div className="p-3">
-        <div className="bg-black/35 rounded-lg border border-black/40 px-3 py-2">
+        <div className="px-3 py-2">
           {getPhaseSummaryRows(phase, useUpgrades).map((row, index) => (
             <p key={`${phase}-${index}`} className="text-xs text-[var(--ivory-muted)] mb-1.5 last:mb-0 leading-5">
               <span className="text-amber-400/90 mr-1.5">{index + 1}.</span>
@@ -128,7 +128,7 @@ export function PhasePopover({
           ))}
         </div>
 
-        <div className="mt-2 bg-black/35 rounded-lg border border-black/40 px-3 py-2">
+        <div className="mt-2 border-t gold-divider px-3 py-2">
           <p className="text-[11px] text-[var(--ivory-muted)] leading-[1.4]">
             <span className="text-amber-400/90 font-semibold text-[10px] uppercase tracking-wide mr-1.5">Tip</span>
             {getPhaseTip(phase)}

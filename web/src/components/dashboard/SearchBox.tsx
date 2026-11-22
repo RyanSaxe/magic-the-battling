@@ -1,3 +1,5 @@
+import { FIELD_SURFACE } from '../common/styles'
+
 /** A search field styled like the dashboard's join code box, with a button that clears it. */
 export function SearchBox({
   label,
@@ -16,7 +18,7 @@ export function SearchBox({
   return (
     <div
       role="search"
-      className={`flex h-9 items-center rounded-md border border-black/40 bg-black/40 pl-2.5 pr-1 ${className ?? ''}`}
+      className={`flex h-9 items-center rounded-md ${FIELD_SURFACE} pl-2.5 pr-1 ${className ?? ''}`}
     >
       <input
         type="search"

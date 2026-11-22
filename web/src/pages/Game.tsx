@@ -2441,7 +2441,7 @@ function GameContent() {
                       Waiting until all fights are complete to determine if you
                       will compete in sudden death to stay alive.
                     </p>
-                    <div className="bg-black/40 rounded-lg p-4 text-left">
+                    <div className="border-t gold-divider p-4 text-left">
                       <h3 className="text-amber-400 font-medium mb-2">
                         Sudden Death Rules
                       </h3>

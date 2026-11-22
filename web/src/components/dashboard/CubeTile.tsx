@@ -32,7 +32,7 @@ export function CubeTile({ title, cubeId, imageUri, badge, chips, footer, href, 
       style={style}
       className={`flex flex-col cursor-pointer transition-shadow hover:shadow-[inset_0_0_0_1px_rgba(255,236,181,0.58)] ${className ?? ''}`}
     >
-      <div className="relative h-[92px] shrink-0 overflow-hidden rounded-t-lg bg-black/40">
+      <div className="relative h-[92px] shrink-0 overflow-hidden rounded-t-lg bg-[var(--art-fade)]">
         {imageUri && (
           <img
             src={imageUri}

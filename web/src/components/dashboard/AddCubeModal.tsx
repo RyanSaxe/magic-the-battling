@@ -81,7 +81,7 @@ export function AddCubeModal({
             type="checkbox"
             checked={playMode === 'constructed'}
             onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
-            className="w-4 h-4 rounded bg-black/40 border-black/40"
+            className="w-4 h-4"
           />
           <span className="text-white text-sm">Constructed</span>
           <span className="text-amber-200/45 text-xs">— bring your own deck</span>
@@ -92,7 +92,7 @@ export function AddCubeModal({
             type="checkbox"
             checked={useUpgrades}
             onChange={(e) => setUseUpgrades(e.target.checked)}
-            className="w-4 h-4 rounded bg-black/40 border-black/40"
+            className="w-4 h-4"
           />
           <span className="text-white text-sm">Upgrades</span>
           <span className="text-amber-200/45 text-xs">— upgrade a card every 3 rounds</span>

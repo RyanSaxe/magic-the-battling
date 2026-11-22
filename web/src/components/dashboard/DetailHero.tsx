@@ -82,7 +82,7 @@ export function DetailHero({ imageUri, badge, title, links, details, actions, pl
           </div>
         </div>
       </div>
-      <dl className="grid grid-cols-2 gap-px border-t gold-divider bg-black/40 md:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-px border-t gold-divider bg-[var(--stone)] md:grid-cols-4">
         {stats.map((stat) => (
           <div key={stat.label} className="modal-chrome px-4 py-2.5">
             <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-100/60">{stat.label}</dt>
