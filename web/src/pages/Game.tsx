@@ -2599,6 +2599,7 @@ function GameContent() {
         <CardPreviewModal
           card={state.previewCard}
           appliedUpgrades={state.previewAppliedUpgrades}
+          counters={state.previewCounters}
           onClose={() => setPreviewCard(null)}
         />
       )}

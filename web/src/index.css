@@ -2278,6 +2278,44 @@ input:-webkit-autofill:focus {
   box-shadow: none;
 }
 
+.card-counters {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  pointer-events: none;
+}
+
+.counter-chip {
+  border-radius: 2px;
+  background: var(--chrome);
+  box-shadow: inset 0 0 0 1px var(--gold-border-opaque);
+  color: var(--ivory);
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.preview-counters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 95vw;
+  margin-top: 10px;
+}
+
+.preview-counters .counter-chip {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .card.unrevealed-upgrade::before {
   content: '';
   position: absolute;
