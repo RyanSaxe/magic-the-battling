@@ -24,6 +24,8 @@ export interface RulesPanelTarget {
 
 interface RulesPanelProps {
   onClose: () => void
+  /** Hears whether the window is minimized, which leaves the page's hotkeys on, and false when it closes. */
+  onMinimizedChange: (minimized: boolean) => void
   initialDocId?: string
   initialTab?: string
   gameId?: string
@@ -133,6 +135,7 @@ function defaultMobileCollapsedOrigin(viewport: ViewportBox, collapsedHeight: nu
 
 export function RulesPanel({
   onClose,
+  onMinimizedChange,
   initialDocId,
   initialTab,
   gameId,
@@ -150,6 +153,11 @@ export function RulesPanel({
   const [interaction, setInteraction] = useState<InteractionState>(null)
   const [collapsedPanelHeight, setCollapsedPanelHeight] = useState(DEFAULT_COLLAPSED_PANEL_HEIGHT_PX)
   const collapsedPanelRef = useRef<HTMLDivElement | null>(null)
+
+  useLayoutEffect(() => {
+    onMinimizedChange(isCollapsed)
+    return () => onMinimizedChange(false)
+  }, [isCollapsed, onMinimizedChange])
 
   const stopInteraction = useCallback(() => {
     setInteraction(null)

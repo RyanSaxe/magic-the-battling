@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
-import { useFaceDown } from '../contexts/faceDownState'
 import { useOpenSubmenus } from '../hooks/useOpenSubmenus'
 import type { BattleSelectedCard } from '../pages/phases/Battle'
 import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../utils/battleInteraction'
@@ -108,7 +107,7 @@ export function ActionMenu({
   const selectedOwner = selectedCard?.owner ?? 'player'
   const ownerZones = selectedOwner === 'player' ? battle.your_zones : battle.opponent_zones
   const onBattlefield = zone === 'battlefield'
-  const isFaceDown = useFaceDown(card?.id ?? '')
+  const isFaceDown = !!card && (ownerZones.face_down_card_ids || []).includes(card.id)
   const isScrubbed = !card?.name
 
   const tappedCardIds = new Set(ownerZones.tapped_card_ids || [])

@@ -18,7 +18,7 @@ import { SpectateRequestModal } from "../components/SpectateRequestModal";
 import type { BattleView, Card as CardType, GameStatusResponse, PlayerView, RevealAnimation, ZoneName } from "../types";
 import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
-import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
+import { BattlePhase, type BattleCardMenu, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
 import { RewardPhase } from "./phases/Reward";
 import { Sidebar, type FightSidebarView, type Scouting } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
@@ -32,6 +32,7 @@ import { GuideProvider } from "../guided/GuideContext";
 import { useGuideContext } from "../guided/guideState";
 import { buildGuideDefinition } from "../guided/content";
 import { getOrdinal } from "../utils/format";
+import { canHover } from "../utils/inputMode";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { ContextStripProvider, useContextStrip, useToast } from "../contexts";
 import { FaceDownProvider } from "../contexts/FaceDownContext";
@@ -980,6 +981,7 @@ function GameContent() {
 
   // Lifted state from Battle phase
   const [battleSelectedCard, setBattleSelectedCard] = useState<BattleSelectedCard | null>(null);
+  const [battleCardMenu, setBattleCardMenu] = useState<BattleCardMenu | null>(null);
   const [isChangingResult, setIsChangingResult] = useState(false);
   const actionMenuOpen = openSurface?.kind === "actions";
   const showSubmitHandPopover = openSurface?.kind === "submitHand";
@@ -1058,6 +1060,9 @@ function GameContent() {
     if (gameState?.self_player.phase !== 'battle' && battleSelectedCard !== null) {
       setBattleSelectedCard(null);
     }
+    if (gameState?.self_player.phase !== 'battle' && battleCardMenu !== null) {
+      setBattleCardMenu(null);
+    }
   }
 
   useEffect(() => {
@@ -1070,6 +1075,7 @@ function GameContent() {
 
   const rulesPanel = openSurface?.kind === "guide" ? openSurface : null;
   const rulesPanelOpen = rulesPanel !== null;
+  const [guideMinimized, setGuideMinimized] = useState(false);
   const shareOpen = openSurface?.kind === "share";
 
   // Hover tracking for hotkeys
@@ -1338,7 +1344,7 @@ function GameContent() {
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   // A zone panel sits beside the board rather than over it, so the Fight's hotkeys keep working while one is open.
   const modalOpen =
-    rulesPanelOpen ||
+    (rulesPanelOpen && !guideMinimized) ||
     showUpgradesModal ||
     actionMenuOpen ||
     shareOpen ||
@@ -2081,6 +2087,17 @@ function GameContent() {
     }
   }
 
+  const sideboardContextMenu = (card: CardType, owner: ZoneOwner) =>
+    canHover
+      ? (e: React.MouseEvent) =>
+          setBattleCardMenu({
+            card,
+            zone: 'sideboard',
+            position: { x: e.clientX, y: e.clientY },
+            isOpponent: owner === 'opponent',
+          })
+      : undefined
+
   const allFaceDownIds = (() => {
     if (!battleViewForDisplay) return new Set<string>()
     const ids = new Set<string>()
@@ -2311,6 +2328,8 @@ function GameContent() {
                       isMobile={sizes.isMobile}
                       selectedCard={battleSelectedCard}
                       onSelectedCardChange={setBattleSelectedCard}
+                      cardMenu={battleCardMenu}
+                      onCardMenuChange={setBattleCardMenu}
                       onCardHover={handleCardHover}
                       onOpponentCardHover={handleOpponentCardHover}
                       onCardHoverEnd={handleCardHoverEnd}
@@ -2356,6 +2375,7 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'player' })}
+                        onContextMenu={sideboardContextMenu(card, 'player')}
                         upgraded={battleUpgradedCardIds.has(card.id)}
                         appliedUpgrades={battleUpgradesByCardId.get(card.id)}
                         hiddenUpgradeCount={(battleHiddenUpgradesByCardId.get(card.id) ?? []).length}
@@ -2390,6 +2410,7 @@ function GameContent() {
                         onCardHoverEnd={handleCardHoverEnd}
                         selected={battleSelectedCard?.card.id === card.id}
                         onClick={() => setBattleSelectedCard({ card, zone: 'sideboard', owner: 'opponent' })}
+                        onContextMenu={sideboardContextMenu(card, 'opponent')}
                         upgraded={opponentBattleUpgradedCardIds.has(card.id)}
                         appliedUpgrades={opponentBattleUpgradesByCardId.get(card.id)}
                       />
@@ -2635,6 +2656,7 @@ function GameContent() {
       {rulesPanel && (
         <RulesPanel
           onClose={() => closeSurface("guide")}
+          onMinimizedChange={setGuideMinimized}
           initialDocId={rulesPanel.target?.docId}
           initialTab={rulesPanel.target?.tab}
           gameId={gameId}
