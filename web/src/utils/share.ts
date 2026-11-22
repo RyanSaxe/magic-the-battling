@@ -93,28 +93,36 @@ function getRoundTiming(player: SharePlayerData, selectedRound: string): 'before
   return order < 0 ? 'before' : 'after'
 }
 
-// A round shows what each player took into it, as its board does, so how a game ended shows from the round after.
+// The latest round is the last the sharer played.
+function endedOnLatestRound(data: ShareGameResponse, player: SharePlayerData, selectedRound: string): boolean {
+  if (getRoundTiming(player, selectedRound) !== 'last') return false
+
+  const sharer = data.players.find((candidate) => candidate.name === data.owner_name)
+  return !sharer || getRoundTiming(sharer, selectedRound) !== 'before'
+}
+
+// A row shows what each player took into the round until their game has ended: from the round after their last, or on
+// that last round where it's a finished game's last step.
 // Games saved before final state was recorded have no final treasures, so they keep showing the last snapshot.
 function getShareFinalStateForRound(
+  data: ShareGameResponse,
   player: SharePlayerData,
   selectedRound: string,
 ): { poison: number; treasures: number } | null {
-  if (player.final_treasures === null || getRoundTiming(player, selectedRound) !== 'after') return null
+  if (player.final_treasures === null) return null
 
-  return { poison: player.final_poison, treasures: player.final_treasures }
+  const showsHowItEnded = getRoundTiming(player, selectedRound) === 'after'
+    || (!data.in_progress && endedOnLatestRound(data, player, selectedRound))
+  return showsHowItEnded ? { poison: player.final_poison, treasures: player.final_treasures } : null
 }
 
-// A past round ranks players as they stood. The latest round, the last the sharer played, shows where they finished.
+// A past round ranks players as they stood. The latest round shows where they finished.
 function getSharePlacementForRound(data: ShareGameResponse, player: SharePlayerData, selectedRound: string): number {
   // While the game goes on, a player without final treasures finished after every round the page lists.
   if (player.final_placement === null || (data.in_progress && player.final_treasures === null)) return 0
 
-  const timing = getRoundTiming(player, selectedRound)
-  if (timing === 'after') return player.final_placement
-
-  const sharer = data.players.find((candidate) => candidate.name === data.owner_name)
-  const isLatestRound = !sharer || getRoundTiming(sharer, selectedRound) !== 'before'
-  return timing === 'last' && isLatestRound ? player.final_placement : 0
+  if (getRoundTiming(player, selectedRound) === 'after') return player.final_placement
+  return endedOnLatestRound(data, player, selectedRound) ? player.final_placement : 0
 }
 
 // A Sudden Death entry counts everyone who played its round, because a player who survived that round stays in the
@@ -171,7 +179,7 @@ export function buildSharePlayerViews(
     const snapshot = getSharePlayerSnapshotForRound(player, selectedRound)
     const latestSnapshot = getLatestShareSnapshot(player)
     const displaySnapshot = snapshot ?? latestSnapshot
-    const finalState = getShareFinalStateForRound(player, selectedRound)
+    const finalState = getShareFinalStateForRound(data, player, selectedRound)
 
     return {
       name: player.name,
