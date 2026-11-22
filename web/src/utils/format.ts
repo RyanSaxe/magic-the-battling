@@ -1,4 +1,13 @@
-import type { LastResult, Phase } from "../types"
+import type { LastResult, Phase, PlayerView } from "../types"
+
+const ACTIVITY_WORDS: Partial<Record<Phase, string>> = {
+  draft: "Drafting",
+  build: "Building",
+  battle: "Fighting",
+  reward: "Wrap-Up",
+  awaiting_elimination: "Waiting",
+  winner: "Winner",
+}
 
 export function getOrdinal(n: number): string {
   const suffixes = ['th', 'st', 'nd', 'rd']
@@ -13,11 +22,9 @@ export function getLastResultWord(result: LastResult): string {
   return "Drew"
 }
 
-export function getPlayerPhaseStatusLabel(phase: Phase, buildReady: boolean): string {
-  if (phase === "build" && buildReady) return "ready"
-  if (phase === "reward") return "end"
-  if (phase === "battle") return "fight"
-  return phase
+/** What a player still in the game is doing, or nothing once the game is over for them. */
+export function getPlayerActivity({ phase, build_ready }: Pick<PlayerView, "phase" | "build_ready">): string | undefined {
+  return phase === "build" && build_ready ? "Ready" : ACTIVITY_WORDS[phase]
 }
 
 const HAS_ZONE = /(?:Z|[+-]\d\d:\d\d)$/

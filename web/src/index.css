@@ -56,7 +56,8 @@
   --ivory-muted: #b8aea3;
   --ivory-faint: #94897f;
 
-  /* A lost fight and last place, on walnut */
+  /* A won fight and being ready, then a lost fight and last place, on walnut */
+  --win-text: #86efac;
   --loss-text: #f2b4aa;
 
   /* Quiet text on the felt: muted ivory a step lighter, so it holds 4.5:1 on the felt's lightest centre */
@@ -2642,7 +2643,6 @@ input:-webkit-autofill:focus {
    the card goes flat and dark once its player is out. */
 .player-card {
   --player-card-rank-width: 2.25rem;
-  --player-card-win: #86efac;
   position: relative;
 }
 
@@ -2763,7 +2763,7 @@ input:-webkit-autofill:focus {
 }
 
 .player-card-result-win {
-  color: var(--player-card-win);
+  color: var(--win-text);
 }
 
 .player-card-result-loss {
@@ -2829,5 +2829,261 @@ input:-webkit-autofill:focus {
 @media (orientation: landscape) and (max-height: 499px) {
   .rotate-prompt {
     display: flex;
+  }
+}
+
+/* Scouting's Overview: the player card's standings, opened up, with hairlines rather than boxes */
+.scouting-overview {
+  gap: 0.75rem;
+}
+
+.scouting-standings {
+  --scouting-hairline: 1px solid rgba(212, 175, 55, 0.22);
+  container-type: inline-size;
+  flex-shrink: 0;
+  color: var(--ivory);
+}
+
+.scouting-standing {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  padding: 2px 0 12px;
+}
+
+.scouting-standings .scouting-rank {
+  background: none;
+}
+
+.scouting-standings .scouting-rank .standings-rank-number {
+  font-size: 34px;
+}
+
+.scouting-standings .scouting-rank .standings-rank-suffix {
+  font-size: 10px;
+}
+
+.scouting-standings.is-self .scouting-rank .standings-rank-number {
+  color: var(--color-gold-bright);
+}
+
+.scouting-state {
+  min-width: 0;
+  padding: 4px 0 4px 14px;
+}
+
+.scouting-state-title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.scouting-state-title.is-ready {
+  color: var(--win-text);
+}
+
+.scouting-state-title.is-out {
+  color: var(--loss-text);
+}
+
+.scouting-state-detail {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ivory-muted);
+}
+
+.scouting-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 12px 0;
+  border-top: var(--scouting-hairline);
+}
+
+.scouting-cell {
+  min-width: 0;
+  padding-left: 8px;
+}
+
+.scouting-cell + .scouting-cell {
+  border-left: var(--scouting-hairline);
+  padding-left: 14px;
+}
+
+.scouting-token-count {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scouting-token {
+  height: 66px;
+  border-radius: var(--card-border-radius);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Both counts share a line box, so their labels line up with and without the /10 */
+.scouting-count {
+  display: flex;
+  align-items: baseline;
+  height: 32px;
+  font-family: 'Cinzel', serif;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 32px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.scouting-out-of {
+  margin-left: 2px;
+  font-size: 14px;
+  color: var(--ivory-key);
+}
+
+.scouting-key {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ivory-muted);
+}
+
+.scouting-value {
+  margin-top: 4px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 24px;
+  white-space: nowrap;
+}
+
+.scouting-note {
+  margin-left: 5px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ivory-muted);
+}
+
+.scouting-none {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ivory-muted);
+}
+
+/* Beside the list the panel leaves the Overview about 250px */
+@container (max-width: 260px) {
+  .scouting-standing {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .scouting-state {
+    padding-left: 12px;
+  }
+
+  .scouting-state-detail {
+    text-wrap: balance;
+  }
+
+  .scouting-cell {
+    padding-left: 0;
+  }
+
+  .scouting-cell + .scouting-cell {
+    padding-left: 10px;
+  }
+
+  .scouting-token-count {
+    gap: 7px;
+  }
+
+  .scouting-token {
+    height: 52px;
+  }
+
+  .scouting-count {
+    font-size: 24px;
+  }
+
+  .scouting-out-of {
+    font-size: 12px;
+  }
+
+  .scouting-note {
+    display: block;
+    margin-left: 0;
+    line-height: 16px;
+  }
+
+  .scouting-key {
+    letter-spacing: 0.07em;
+  }
+}
+
+@media (max-width: 639px) and (max-height: 700px) {
+  .scouting-standing {
+    padding: 0 0 8px;
+  }
+
+  .scouting-standings .scouting-rank .standings-rank-number {
+    font-size: 28px;
+  }
+
+  .scouting-state {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .scouting-pair {
+    padding: 8px 0;
+  }
+
+  .scouting-token {
+    height: 52px;
+  }
+
+  .scouting-count {
+    height: 28px;
+    font-size: 24px;
+    line-height: 28px;
+  }
+
+  .scouting-value {
+    margin-top: 1px;
+  }
+}
+
+/* The shortest phone, where Sudden Death's banner leaves the upgrades the least height */
+@media (max-width: 639px) and (max-height: 600px) {
+  .scouting-overview {
+    gap: 6px;
+  }
+
+  .scouting-standing {
+    padding-bottom: 6px;
+  }
+
+  .scouting-standings .scouting-rank .standings-rank-number {
+    font-size: 24px;
+  }
+
+  .scouting-state-title {
+    line-height: 20px;
+  }
+
+  .scouting-pair {
+    padding: 5px 0;
+  }
+
+  .scouting-token {
+    height: 40px;
+  }
+
+  .scouting-count {
+    height: 24px;
+    font-size: 22px;
+    line-height: 24px;
+  }
+
+  .scouting-value {
+    line-height: 20px;
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Card } from '../card'
 import { PoisonCard } from './PoisonCard'
 import type { BattleResolution, BattleView, Card as CardType } from '../../types'
+import { POISON_TO_LOSE } from '../../constants/rules'
 
 type OverlayOwner = 'player' | 'opponent'
 
@@ -55,7 +56,6 @@ const GROUP_EXIT_MS = 220
 const COUNTER_SETTLE_MS = 800
 const COUNTER_SETTLE_PAUSE_MS = 200
 const CONTINUATION_MS = 1500
-const POISON_TO_LOSE = 10
 
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
