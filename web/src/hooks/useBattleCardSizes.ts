@@ -3,6 +3,7 @@ import type { CardDimensions } from './useViewportCardSizes'
 
 const CARD_ASPECT_RATIO = 7 / 5
 const NUM_ROWS = 6
+export const BATTLEFIELD_INSET = 20 // 16px from p-2 + 4px from the .zone border
 
 interface BattleZoneConfig {
   playerHandCount: number
@@ -120,7 +121,6 @@ export function computeBattleZones(
   // and avoid leaving a visible remainder strip at the bottom.
   const rowH = availH / NUM_ROWS
   const handPadding = 48 // 32px from .hand-zone CSS + 16px from px-2 container
-  const bfPadding = 16
   const bfWidth = containerWidth - zoneColumnWidth
   const handWidth = containerWidth - zoneColumnWidth
 
@@ -133,10 +133,10 @@ export function computeBattleZones(
     opponentHandGap: opponentHandResult.gap,
     playerHand: { width: playerHandResult.width, height: playerHandResult.height },
     opponentHand: { width: opponentHandResult.width, height: opponentHandResult.height },
-    playerLands: computeZoneCards(playerLandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, bfPadding),
-    playerNonlands: computeZoneCards(playerNonlandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, bfPadding),
-    opponentLands: computeZoneCards(opponentLandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, bfPadding),
-    opponentNonlands: computeZoneCards(opponentNonlandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, bfPadding),
+    playerLands: computeZoneCards(playerLandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, BATTLEFIELD_INSET),
+    playerNonlands: computeZoneCards(playerNonlandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, BATTLEFIELD_INSET),
+    opponentLands: computeZoneCards(opponentLandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, BATTLEFIELD_INSET),
+    opponentNonlands: computeZoneCards(opponentNonlandCount, rowH, bfWidth, battlefieldGap, battlefieldMaxWidth, BATTLEFIELD_INSET),
   }
 }
 

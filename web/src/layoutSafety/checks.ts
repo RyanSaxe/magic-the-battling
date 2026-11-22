@@ -6,7 +6,7 @@ import {
   type ZoneConstraints,
   type ZoneFrame,
 } from "../hooks/computeConstrainedLayout";
-import { computeBattleZones, useBattleCardSizes } from "../hooks/useBattleCardSizes";
+import { BATTLEFIELD_INSET, computeBattleZones, useBattleCardSizes } from "../hooks/useBattleCardSizes";
 import { layoutForContainer, useCardLayout, type ContainerLayout } from "../hooks/useCardLayout";
 import { measureFromPlacement } from "../hooks/useResizableLayout";
 import { useZoneDividers, type DividerCallbacks } from "../hooks/useZoneDividers";
@@ -276,7 +276,7 @@ export function checkBattleLayout(
   const zones = computeBattleZones(board.width, board.height, config);
   // The horizontal padding computeBattleZones subtracts for hands and battlefields.
   const handWidth = board.width - config.zoneColumnWidth - 48;
-  const battlefieldWidth = board.width - config.zoneColumnWidth - 16;
+  const battlefieldWidth = board.width - config.zoneColumnWidth - BATTLEFIELD_INSET;
 
   const rows = [
     { name: "your hand", count: config.playerHandCount, card: zones.playerHand, gap: zones.playerHandGap, width: handWidth },

@@ -1,3 +1,4 @@
+import { BATTLEFIELD_INSET } from "../../hooks/useBattleCardSizes";
 import { ZONE_LAYOUT_PADDING, type CardLayoutConfig } from "../../hooks/useCardLayout";
 import { getUpgradeZoneLayoutBounds } from "../../utils/upgradeGrid";
 
@@ -113,7 +114,7 @@ export interface BattleBoardMetrics {
 
 export function battleBoardMetrics({ isMobile }: { isMobile: boolean }): BattleBoardMetrics {
   const handPadding = 16;
-  const battlefieldPadding = 20;
+  const battlefieldPadding = BATTLEFIELD_INSET;
   const midDividerHeight = 2;
   return {
     handPadding,

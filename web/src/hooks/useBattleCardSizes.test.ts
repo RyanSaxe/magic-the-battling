@@ -41,6 +41,17 @@ describe('computeBattleZones', () => {
     })
   })
 
+  describe('full battlefield row', () => {
+    it('fits inside the zone\'s padding and border', () => {
+      const zoneWidth = 314 // the battlefield on a 390px phone
+      const paddingAndBorder = 2 * (8 + 2)
+      const count = 4
+      const result = computeBattleZones(zoneWidth, 800, { ...defaults, playerNonlandCount: count })
+      const rowWidth = count * result.playerNonlands.width + (count - 1) * defaults.battlefieldGap
+      expect(rowWidth).toBeLessThanOrEqual(zoneWidth - paddingAndBorder)
+    })
+  })
+
   describe('short container', () => {
     it('sizes cards smaller but proportionally on a short viewport', () => {
       const result = computeBattleZones(1200, 350, defaults)
