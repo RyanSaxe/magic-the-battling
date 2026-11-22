@@ -181,6 +181,27 @@ describe('Play: starting a Goldfish game', () => {
     expect(getRememberedSeat('game-1')).toBeNull()
   })
 
+  it("fills in the name a guest last played under", async () => {
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+    fireEvent.change(screen.getByPlaceholderText('Enter your name'), { target: { value: 'Kellogg' } })
+    await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
+    cleanup()
+
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+
+    expect(screen.getByPlaceholderText<HTMLInputElement>('Enter your name').value).toBe('Kellogg')
+  })
+
   it('does not offer a failed start for resuming', async () => {
     render(
       <MemoryRouter>

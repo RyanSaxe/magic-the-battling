@@ -1,4 +1,5 @@
 const DEVICE_ID_KEY = "mtb_device_id";
+const GUEST_NAME_KEY = "mtb_guest_name";
 const GAME_PLAYER_MAP_KEY = "mtb_game_player_map";
 const GAME_NEW_PLAYER_PREF_MAP_KEY = "mtb_game_new_player_pref_map";
 const GUIDED_MODE_PREFERENCE_KEY = "mtb_guided_mode_preference";
@@ -210,6 +211,21 @@ export function forgetSeatForGame(gameId: string): void {
   if (!(gameId in map)) return;
   delete map[gameId];
   writeTrackedPlayerMap(map);
+}
+
+/** The name this browser last played under without an account. An account's name always comes before it. */
+export function getRememberedGuestName(): string | null {
+  if (!canUseStorage()) return null;
+  return window.localStorage.getItem(GUEST_NAME_KEY);
+}
+
+export function rememberGuestName(name: string): void {
+  if (!canUseStorage()) return;
+  try {
+    window.localStorage.setItem(GUEST_NAME_KEY, name);
+  } catch {
+    // Best effort only.
+  }
 }
 
 export function hasPlayedBefore(): boolean {
