@@ -191,4 +191,28 @@ describe('Game: what is open over the board', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open guide' }))
     expect(screen.getByRole('radio', { name: 'FAQ' }).getAttribute('aria-checked')).toBe('true')
   })
+
+  it('opens a minimized Guide from its button and links, and after it was closed minimized', async () => {
+    vi.stubGlobal('innerWidth', 1280)
+    await openGame(gameBootstrap({ phase: 'draft', counts: { pack: 2, sideboard: 2 } }))
+    const guideButton = find('[data-guide-target="guide-button"]')
+    const minimize = () => fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
+    fireEvent.click(guideButton)
+    fireEvent.click(screen.getByRole('radio', { name: 'FAQ' }))
+
+    minimize()
+    fireEvent.click(guideButton)
+    expect(screen.getByRole('radio', { name: 'FAQ' }).getAttribute('aria-checked')).toBe('true')
+
+    minimize()
+    fireEvent.click(find('[data-guide-target="timeline-phase-draft"]'))
+    fireEvent.click(screen.getByRole('button', { name: 'Controls' }))
+    expect(screen.getByRole('radio', { name: 'Controls' }).getAttribute('aria-checked')).toBe('true')
+
+    minimize()
+    fireEvent.click(screen.getByRole('button', { name: 'Close guide' }))
+    await vi.waitFor(() => expect(document.querySelector('.floating-window')).toBeNull())
+    fireEvent.click(guideButton)
+    expect(screen.getByRole('button', { name: 'Minimize guide' })).toBeTruthy()
+  })
 })

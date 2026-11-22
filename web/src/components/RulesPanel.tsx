@@ -24,7 +24,8 @@ export interface RulesPanelTarget {
 
 interface RulesPanelProps {
   onClose: () => void
-  /** Hears whether the window is minimized, which leaves the page's hotkeys on, and false when it closes. */
+  /** The page owns this, so opening the Guide restores it, and a minimized one leaves the page's hotkeys on. */
+  minimized: boolean
   onMinimizedChange: (minimized: boolean) => void
   /** A panel is open over the minimized window, so Escape closes that panel and not the Guide. */
   behindPanel?: boolean
@@ -116,13 +117,9 @@ function resolveInitialDesktopWindowState(): DesktopWindowState | null {
   return clampDesktopWindowForMode(
     stored?.windowState ?? defaultDesktopWindowState(viewport),
     viewport,
-    stored?.isCollapsed ?? false,
+    false,
     DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
   )
-}
-
-function resolveInitialCollapsedState(): boolean {
-  return loadStoredWindowState()?.isCollapsed ?? false
 }
 
 function defaultMobileCollapsedOrigin(viewport: ViewportBox, collapsedHeight: number) {
@@ -137,6 +134,7 @@ function defaultMobileCollapsedOrigin(viewport: ViewportBox, collapsedHeight: nu
 
 export function RulesPanel({
   onClose,
+  minimized: isCollapsed,
   onMinimizedChange,
   behindPanel = false,
   initialDocId,
@@ -150,17 +148,11 @@ export function RulesPanel({
   const [desktopWindow, setDesktopWindow] = useState<DesktopWindowState | null>(() =>
     resolveInitialDesktopWindowState(),
   )
-  const [isCollapsed, setIsCollapsed] = useState(() => resolveInitialCollapsedState())
   const [navigationHint, setNavigationHint] = useState(MOBILE_COLLAPSED_LABEL_FALLBACK)
   const [mobileCollapsedOrigin, setMobileCollapsedOrigin] = useState<{ x: number; y: number } | null>(null)
   const [interaction, setInteraction] = useState<InteractionState>(null)
   const [collapsedPanelHeight, setCollapsedPanelHeight] = useState(DEFAULT_COLLAPSED_PANEL_HEIGHT_PX)
   const collapsedPanelRef = useRef<HTMLDivElement | null>(null)
-
-  useLayoutEffect(() => {
-    onMinimizedChange(isCollapsed)
-    return () => onMinimizedChange(false)
-  }, [isCollapsed, onMinimizedChange])
 
   const stopInteraction = useCallback(() => {
     setInteraction(null)
@@ -208,25 +200,25 @@ export function RulesPanel({
     if (isDesktopViewport()) {
       syncDesktopWindow(true)
     }
-    setIsCollapsed(true)
-  }, [stopInteraction, syncDesktopWindow])
+    onMinimizedChange(true)
+  }, [onMinimizedChange, stopInteraction, syncDesktopWindow])
 
   const handleRestore = useCallback(() => {
     stopInteraction()
     if (isDesktopViewport()) {
       syncDesktopWindow(false)
     }
-    setIsCollapsed(false)
-  }, [stopInteraction, syncDesktopWindow])
+    onMinimizedChange(false)
+  }, [onMinimizedChange, stopInteraction, syncDesktopWindow])
 
   const resetWindow = useCallback(() => {
     stopInteraction()
-    setIsCollapsed(false)
+    onMinimizedChange(false)
     if (!isDesktopViewport()) {
       return
     }
     setDesktopWindow(defaultDesktopWindowState(currentViewportBox()))
-  }, [stopInteraction])
+  }, [onMinimizedChange, stopInteraction])
 
   const beginDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (isDesktop) {

@@ -73,8 +73,10 @@ export function reduceGameSurface(open: GameSurface | null, event: GameSurfaceEv
   switch (event.type) {
     case "open":
       if (canSitBesideGuide(event.surface)) return { ...event.surface, guide: minimizedGuide(open) };
-      // The Guide's window stays as it is when it's sent to another page.
-      if (event.surface.kind === "guide") return { ...event.surface, minimized: guideShowing(open)?.minimized };
+      // Opening the Guide restores it, at the place it was left unless it's sent to a page.
+      if (event.surface.kind === "guide") {
+        return { kind: "guide", target: event.surface.target ?? guideShowing(open)?.target };
+      }
       return event.surface;
     case "toggle":
       return open && isSameSurface(open, event.surface) ? null : event.surface;

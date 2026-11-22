@@ -451,14 +451,19 @@ export function Lobby() {
     submitBattler();
   };
 
+  const openGuide = (target?: RulesPanelTarget) => {
+    // Without a page, a Guide already open keeps its place.
+    if (target || !showRulesPanel) setRulesPanelTarget(target);
+    setGuideMinimized(false);
+    setShowRulesPanel(true);
+  };
   const lobbyHotkeyMap: Record<string, () => void> = {
     "?": () => {
       if (showRulesPanel) {
         setShowRulesPanel(false);
         return;
       }
-      setRulesPanelTarget(undefined);
-      setShowRulesPanel(true);
+      openGuide();
     },
   };
   const guideTakesKeys = showRulesPanel && !guideMinimized;
@@ -530,10 +535,7 @@ export function Lobby() {
     <AppHeader
       helpers={
         <GuideButton
-          onClick={() => {
-            setRulesPanelTarget(undefined);
-            setShowRulesPanel(true);
-          }}
+          onClick={() => openGuide()}
         />
       }
       home={<HomeButton />}
@@ -543,6 +545,7 @@ export function Lobby() {
   const rulesPanel = showRulesPanel && (
     <RulesPanel
       onClose={() => setShowRulesPanel(false)}
+      minimized={guideMinimized}
       onMinimizedChange={setGuideMinimized}
       initialDocId={rulesPanelTarget?.docId}
       initialTab={rulesPanelTarget?.tab}
@@ -660,11 +663,6 @@ export function Lobby() {
                   Starting...
                 </span>
               );
-
-              const openGuide = (target?: RulesPanelTarget) => {
-                setRulesPanelTarget(target);
-                setShowRulesPanel(true);
-              };
 
               const filledSlots = [
                 ...lobbyState.players.map((player) => ({
@@ -1060,6 +1058,7 @@ export function Lobby() {
       {showRulesPanel && (
         <RulesPanel
           onClose={() => setShowRulesPanel(false)}
+          minimized={guideMinimized}
           onMinimizedChange={setGuideMinimized}
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
