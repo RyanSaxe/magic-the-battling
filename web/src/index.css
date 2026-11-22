@@ -496,10 +496,16 @@ input:-webkit-autofill:focus {
   color: var(--ivory-muted);
 }
 
-/* A zone's label straddles the felt's top edge, so above a phone's panel, which covers the whole board, it would
-   show cut in half. */
+/* A zone's label straddles the felt's top edge, so it would show cut in half above a panel covering the board's
+   middle, as any panel does on a phone and scouting does beside a drawer. */
 @media (width < 640px) {
   .game-surface:has(.side-panel--open) [data-zone-label] {
+    visibility: hidden;
+  }
+}
+
+@media (width < 1120px) {
+  .game-surface:has(.side-panel-beside > .side-panel--open) [data-zone-label] {
     visibility: hidden;
   }
 }
