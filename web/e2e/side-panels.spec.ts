@@ -3,6 +3,7 @@ import { expect, serveGame, test } from './helpers'
 import { GAME_ID, type ScreenState } from './gameStates'
 
 const FIGHT: ScreenState = { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 } }
+const DRAFT: ScreenState = { phase: 'draft', counts: { pack: 5, sideboard: 10 } }
 const SCREENS = [
   { name: '1280×800', viewport: { width: 1280, height: 800 }, isMobile: false, rail: 40 },
   { name: '1024×768', viewport: { width: 1024, height: 768 }, isMobile: false, rail: 40 },
@@ -11,6 +12,7 @@ const SCREENS = [
 const BAR_HEIGHT = 42
 const DOCKED_SIDEBAR_FROM = 1120
 const SIDEBAR_COLUMN = 242
+const SCOUTING_WIDTH = 288
 const SEAM = 2
 
 /** The open panel with this title. A panel turns inert the moment it closes, and leaves once it has slid out. */
@@ -88,6 +90,46 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
         await page.getByRole('button', { name: '☰' }).click()
         await expectOnFrameEdges(page, 'Fight')
       }
+    })
+  })
+}
+
+/** The player list's box: the docked sidebar from 1120px, the drawer's panel below that. */
+async function playerListBox(page: Page) {
+  return page.evaluate(() => {
+    const list = document.querySelector('[data-guide-target="sidebar-opponent-list"]')!
+    const column = list.closest('.side-panel') ?? list.closest('.frame-sidebar')!
+    const { left, right } = column.getBoundingClientRect()
+    return { left, right }
+  })
+}
+
+const boardBox = (page: Page) => page.locator('main').evaluate((main) => main.getBoundingClientRect().toJSON())
+
+for (const { name, viewport } of SCREENS.filter((screen) => screen.viewport.width >= 640)) {
+  test.describe(name, () => {
+    test.use({ viewport })
+
+    test('scouting opens beside the player list, over a board that stays put', async ({ page, baseURL }) => {
+      await serveGame(page, baseURL!, DRAFT)
+      await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+      await page.getByRole('contentinfo').waitFor()
+      if (viewport.width < DOCKED_SIDEBAR_FROM) {
+        await page.getByRole('button', { name: '☰' }).click()
+        await settled(sidePanel(page, 'Players'))
+      }
+      const board = await boardBox(page)
+
+      await page.getByRole('button', { name: /Bob/ }).click()
+      const { box, headerBottom, footerTop, panelOverHeader, panelOverFooter } = await measure(page, sidePanel(page, 'Scouting Bob'))
+      const list = await playerListBox(page)
+
+      expect.soft(panelOverHeader || panelOverFooter, 'the panel shows over a bar').toBe(false)
+      expect.soft(box.y, 'top, on the gold edge under the top bar').toBe(headerBottom + SEAM)
+      expect.soft(box.y + box.height, 'bottom, on the gold edge over the bottom bar').toBe(footerTop - SEAM)
+      expect.soft(box.x + box.width, "right, on the player list's gold edge").toBe(list.left - (viewport.width >= DOCKED_SIDEBAR_FROM ? SEAM : 0))
+      expect.soft(box.width, 'width').toBe(SCOUTING_WIDTH)
+      expect.soft(await boardBox(page), 'the board under the panel').toEqual(board)
     })
   })
 }

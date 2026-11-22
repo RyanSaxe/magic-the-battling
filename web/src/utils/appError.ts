@@ -237,7 +237,7 @@ export function getAppErrorMessage(
       case 'INVALID_CREDENTIALS':
         return 'Incorrect username or password.'
       case 'BATTLER_NOT_FOUND':
-        return 'That battler no longer exists.'
+        return 'That preset no longer exists.'
       case 'ALREADY_FOLLOWING':
         return "You're already following this cube."
       case 'FOLLOW_NOT_FOUND':

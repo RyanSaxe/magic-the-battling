@@ -32,4 +32,17 @@ describe("reduceGameSurface", () => {
     expect(reduceGameSurface({ kind: "players" }, { type: "phaseChanged", phase: "reward" })).toEqual({ kind: "players" });
     expect(reduceGameSurface({ kind: "submitHand" }, { type: "phaseChanged", phase: "battle" })).toBeNull();
   });
+
+  it("returns to the drawer when a scouting panel opened from it closes", () => {
+    const fromDrawer = reduceGameSurface({ kind: "players" }, { type: "scout", player: "Bob", tab: "seen" });
+    expect(fromDrawer).toEqual({ kind: "scouting", player: "Bob", tab: "seen", fromDrawer: true });
+    expect(reduceGameSurface(fromDrawer, { type: "close", kind: "scouting" })).toEqual({ kind: "players" });
+    expect(reduceGameSurface(fromDrawer, { type: "close", kind: "players" })).toBeNull();
+  });
+
+  it("closes a scouting panel opened beside the docked list outright", () => {
+    const docked = reduceGameSurface(null, { type: "scout", player: "Bob", tab: "overview" });
+    expect(reduceGameSurface(docked, { type: "close", kind: "scouting" })).toBeNull();
+    expect(reduceGameSurface(docked, { type: "phaseChanged", phase: "build" })).toBeNull();
+  });
 });

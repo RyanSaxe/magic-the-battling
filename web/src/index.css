@@ -429,6 +429,20 @@ input:-webkit-autofill:focus {
   z-index: 45;
 }
 
+/* Even empty, this layer slowed every click by up to a second in WebKit on Linux, so it shows only with a panel in
+   it. */
+.side-panel-frame:empty {
+  display: none;
+}
+
+/* Beneath every panel in the frame, and above the board. */
+.board-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: auto;
+}
+
 /* One panel for every zone, drawer and player list: below 640px it covers the board, from 640px the column the
    docked sidebar takes on wide screens, with that column's gold edge. */
 .side-panel {
@@ -479,6 +493,16 @@ input:-webkit-autofill:focus {
   color: var(--ivory);
 }
 
+.side-panel-prefix {
+  margin-right: 6px;
+  font-weight: 400;
+  color: var(--ivory-muted);
+}
+
+.side-panel-name {
+  color: var(--color-gold-bright);
+}
+
 .side-panel-count {
   margin-left: 6px;
   font-size: 12px;
@@ -486,10 +510,16 @@ input:-webkit-autofill:focus {
   color: var(--ivory-muted);
 }
 
-/* A zone's label straddles the felt's top edge, so above a phone's panel, which covers the whole board, it would
-   show cut in half. */
+/* A zone's label straddles the felt's top edge, so it would show cut in half above a panel covering the board's
+   middle, as any panel does on a phone and scouting does beside a drawer. */
 @media (width < 640px) {
   .game-surface:has(.side-panel--open) [data-zone-label] {
+    visibility: hidden;
+  }
+}
+
+@media (width < 1120px) {
+  .game-surface:has(.side-panel-beside > .side-panel--open) [data-zone-label] {
     visibility: hidden;
   }
 }
@@ -547,6 +577,24 @@ input:-webkit-autofill:focus {
     width: var(--frame-sidebar-width);
     border-left: 0;
   }
+}
+
+/* Beside the sidebar's column, over the board, with a shadow on its edge so it reads as a layer on top. It is
+   clipped at the column's gold edge, so it slides out from under the player list. */
+.side-panel-beside {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: calc(var(--frame-sidebar-width) + 2px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.side-panel-beside > .side-panel {
+  width: 288px;
+  border-left: 2px solid var(--seam-stroke);
+  box-shadow: -14px 0 28px rgba(0, 0, 0, 0.56), -4px 0 10px rgba(0, 0, 0, 0.4);
 }
 
 /* Zone-specific backgrounds */
@@ -722,6 +770,106 @@ input:-webkit-autofill:focus {
 
 .gold-divider {
   border-color: rgba(212, 175, 55, 0.15);
+}
+
+/* A window floating over the game, such as the Quick Guide and the server notice. Its title bar drags it. It fades
+   and scales in as it opens and out as it closes, and eases between places and sizes unless it follows a drag. */
+.floating-window {
+  position: absolute;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(212, 175, 55, 0.48);
+  border-radius: 10px;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.68),
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 236, 181, 0.1);
+  transition:
+    left 200ms ease-out,
+    top 200ms ease-out,
+    width 200ms ease-out,
+    height 200ms ease-out,
+    opacity 160ms ease-out,
+    transform 160ms ease-out;
+}
+
+@starting-style {
+  .floating-window {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.floating-window--instant {
+  transition: opacity 160ms ease-out, transform 160ms ease-out;
+}
+
+.floating-window--closing {
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+/* Its rule stops short of the window's edges, at the content's padding. */
+.floating-window-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 16px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(212, 175, 55, 0.26);
+}
+
+/* A window's text rewraps as it grows back from minimized, and scroll anchoring would move it off the reader's place. */
+.floating-window * {
+  overflow-anchor: none;
+}
+
+/* The bar is darker than the window, so its controls keep the walnut fill of buttons on the bars. */
+.floating-window-bar {
+  --btn-secondary-fill: var(--chrome-modal);
+  --btn-secondary-fill-hover: var(--stone);
+  --btn-secondary-fill-pressed: #332a27;
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 10px 0 12px;
+  background: #261f1c;
+  border-bottom: 1px solid rgba(212, 175, 55, 0.26);
+  user-select: none;
+}
+
+.floating-window-grip {
+  flex-shrink: 0;
+  fill: var(--brass-dot);
+}
+
+.floating-window-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-gold-bright);
+}
+
+/* .btn sets a padding that would squeeze the icon out of this square. */
+.btn.floating-window-control {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ivory);
 }
 
 .felt-raised-panel {
@@ -1414,6 +1562,8 @@ input:-webkit-autofill:focus {
 
 .animate-gentle-glow {
   animation: gentle-glow 3s ease-in-out infinite;
+  /* Adds the glow to the button's own shadow. Replacing it would flatten the raise, or hold it while pressed. */
+  animation-composition: add;
 }
 
 .mic-level-bar {

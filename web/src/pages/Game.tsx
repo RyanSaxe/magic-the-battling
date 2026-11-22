@@ -19,7 +19,7 @@ import { DraftPhase } from "./phases/Draft";
 import { BuildPhase } from "./phases/Build";
 import { BattlePhase, type BattleSelectedCard, type BattleZoneModalState } from "./phases/Battle";
 import { RewardPhase } from "./phases/Reward";
-import { Sidebar } from "../components/sidebar";
+import { Sidebar, type FightSidebarView, type Scouting } from "../components/sidebar";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
 import { MicToggle } from "../components/sidebar/MicToggle";
 import { GameSummary } from "../components/GameSummary";
@@ -95,11 +95,13 @@ import {
 } from "./pendingPhaseAction";
 import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
 import {
+  isDrawerOpen,
   isZonePanelOpen,
   reduceGameSurface,
   type GameSurface,
   type GameSurfaceKind,
   type PanelZone,
+  type ScoutingTab,
   type UpgradesWindowMode,
 } from "./gameSurfaces";
 import {
@@ -425,20 +427,22 @@ function PlayerSelectionModal({
               {humanPlayers.map((player) => (
                 <div
                   key={player.name}
-                  className={`flex items-center justify-between ${OPTION_BOX} p-3`}
+                  className={`flex flex-wrap items-center justify-between gap-x-3 gap-y-2 ${OPTION_BOX} p-3`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <div
-                      className={`w-2 h-2 rounded-full ${
+                      className={`w-2 h-2 shrink-0 rounded-full ${
                         player.is_connected ? "bg-green-500" : "bg-[var(--ivory-faint)]"
                       }`}
                     />
-                    <span className="text-white">{player.name}</span>
-                    <span className="text-[var(--ivory-muted)] text-sm">
-                      ({player.phase})
-                    </span>
+                    <div className="flex min-w-0 flex-wrap items-center gap-x-3">
+                      <span className="min-w-0 break-words text-white">{player.name}</span>
+                      <span className="min-w-0 break-words text-[var(--ivory-muted)] text-sm">
+                        ({player.phase})
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="ml-auto flex gap-2 empty:hidden">
                     {player.name === accountSeatName ? (
                       <button
                         onClick={() => onReconnect(player.name)}
@@ -473,7 +477,7 @@ function PlayerSelectionModal({
 
         {selectedPlayer && (
           <div className="space-y-4">
-            <p className="text-[var(--ivory-muted)] text-center">
+            <p className="text-[var(--ivory-muted)] text-center break-words">
               Request to watch <strong>{selectedPlayer}</strong>'s game
             </p>
             <div>
@@ -513,6 +517,8 @@ function GameGuideLayer({
   context,
   sidebarOpen,
   setSidebarOpen,
+  scouting,
+  setScouting,
   guideCompletionTrigger,
   onVisibleGuideStepChange,
 }: {
@@ -520,6 +526,8 @@ function GameGuideLayer({
   context: GuidedWalkthroughContext;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
+  scouting: Scouting | null;
+  setScouting: (player: string | null, tab?: ScoutingTab) => void;
   guideCompletionTrigger: {
     guideId: GuidedGuideId;
     stepId: string;
@@ -528,7 +536,8 @@ function GameGuideLayer({
   onVisibleGuideStepChange: (step: VisibleGuideStep | null) => void;
 }) {
   const GUIDE_HANDOFF_LINGER_MS = 450;
-  const { state, setRevealedPlayerName } = useContextStrip();
+  const scoutedPlayerName = scouting?.player ?? null;
+  const scoutingTab = scouting?.tab ?? "seen";
   const { guideRequest, finishGuide, skipTutorial, updateGuideStep } = useGuideContext();
   const [activeStepState, setActiveStepState] = useState<{
     nonce: number | null;
@@ -544,7 +553,7 @@ function GameGuideLayer({
   const sidebarRestoreRef = useRef<{
     sidebarOpen: boolean;
     revealedPlayerName: string | null;
-    revealedPlayerTab: "seen" | "overview";
+    revealedPlayerTab: ScoutingTab;
   } | null>(null);
   const activeRequest = guideRequest ?? renderRequest;
   const requestActive = !!guideRequest && guideRequest.nonce === activeRequest?.nonce;
@@ -605,18 +614,18 @@ function GameGuideLayer({
       setSidebarOpen(snapshot.sidebarOpen);
     }
     if (
-      state.revealedPlayerName !== snapshot.revealedPlayerName
-      || state.revealedPlayerTab !== snapshot.revealedPlayerTab
+      scoutedPlayerName !== snapshot.revealedPlayerName
+      || scoutingTab !== snapshot.revealedPlayerTab
     ) {
-      setRevealedPlayerName(snapshot.revealedPlayerName, snapshot.revealedPlayerTab);
+      setScouting(snapshot.revealedPlayerName, snapshot.revealedPlayerTab);
     }
   }, [
     context.isMobile,
-    setRevealedPlayerName,
+    scoutedPlayerName,
+    scoutingTab,
+    setScouting,
     setSidebarOpen,
     sidebarOpen,
-    state.revealedPlayerName,
-    state.revealedPlayerTab,
   ]);
 
   const resolvedSidebarState = useMemo(() => {
@@ -649,8 +658,8 @@ function GameGuideLayer({
     if (!sidebarRestoreRef.current) {
       sidebarRestoreRef.current = {
         sidebarOpen,
-        revealedPlayerName: state.revealedPlayerName,
-        revealedPlayerTab: state.revealedPlayerTab,
+        revealedPlayerName: scoutedPlayerName,
+        revealedPlayerTab: scoutingTab,
       };
     }
 
@@ -665,16 +674,16 @@ function GameGuideLayer({
     if (
       resolvedSidebarState.playerName !== undefined
       && (
-        state.revealedPlayerName !== resolvedSidebarState.playerName
+        scoutedPlayerName !== resolvedSidebarState.playerName
         || (
           resolvedSidebarState.detailTab !== undefined
-          && state.revealedPlayerTab !== resolvedSidebarState.detailTab
+          && scoutingTab !== resolvedSidebarState.detailTab
         )
       )
     ) {
-      setRevealedPlayerName(
+      setScouting(
         resolvedSidebarState.playerName,
-        resolvedSidebarState.detailTab ?? state.revealedPlayerTab,
+        resolvedSidebarState.detailTab ?? scoutingTab,
       );
     }
   }, [
@@ -682,11 +691,11 @@ function GameGuideLayer({
     guideRequest,
     resolvedSidebarState,
     restoreSidebarState,
-    setRevealedPlayerName,
+    scoutedPlayerName,
+    scoutingTab,
+    setScouting,
     setSidebarOpen,
     sidebarOpen,
-    state.revealedPlayerName,
-    state.revealedPlayerTab,
   ]);
 
   useLayoutEffect(() => restoreSidebarState, [restoreSidebarState]);
@@ -809,10 +818,18 @@ function GameContent() {
   const sizes = useViewportCardSizes();
   const shellMode = useGameShellMode();
   const [openSurface, dispatchSurface] = useReducer(reduceGameSurface, null);
-  const sidebarOpen = openSurface?.kind === "players";
+  const sidebarOpen = isDrawerOpen(openSurface);
   const setSidebarOpen = useCallback((open: boolean) => {
     dispatchSurface(open ? { type: "open", surface: { kind: "players" } } : { type: "close", kind: "players" });
   }, []);
+  const scouting = useMemo<Scouting | null>(
+    () => (openSurface?.kind === "scouting" ? { player: openSurface.player, tab: openSurface.tab } : null),
+    [openSurface],
+  );
+  const setScouting = useCallback((player: string | null, tab: ScoutingTab = "seen") => {
+    dispatchSurface(player ? { type: "scout", player, tab } : { type: "close", kind: "scouting" });
+  }, []);
+  const [fightSidebarView, setFightSidebarView] = useState<FightSidebarView>("fight");
   const [battleSidebarLayout, setBattleSidebarLayout] = useState<BattleSidebarLayout>(null);
   const [battleLifeRailRef, battleLifeRailHeight] = useElementHeight();
   const [sidePanelHost, setSidePanelHost] = useState<HTMLElement | null>(null);
@@ -892,7 +909,7 @@ function GameContent() {
     )
   }, [gameState?.self_player.name, voiceChat, voiceTargetNames, voiceTargetsAvailable])
 
-  const { state, setPreviewCard, setRevealedPlayerName } = useContextStrip();
+  const { state, setPreviewCard } = useContextStrip();
 
   const isSpectator = !!spectatorConfig;
   const guideRootRef = useRef<HTMLDivElement>(null);
@@ -1034,12 +1051,12 @@ function GameContent() {
   }
 
   useEffect(() => {
-    setRevealedPlayerName(null);
     queueMicrotask(() => {
       dispatchSurface({ type: "phaseChanged", phase: selfPhase });
+      setFightSidebarView("fight");
       if (selfPhase !== "battle") setIsChangingResult(false);
     });
-  }, [selfPhase, setRevealedPlayerName]);
+  }, [selfPhase]);
 
   const rulesPanel = openSurface?.kind === "guide" ? openSurface : null;
   const rulesPanelOpen = rulesPanel !== null;
@@ -1356,7 +1373,7 @@ function GameContent() {
     if (!usesOverlaySidebar && phase !== "battle") {
       sidebarPlayers.slice(0, 8).forEach((player, index) => {
         map[String(index + 1)] = () => {
-          setRevealedPlayerName(player.name, "seen");
+          setScouting(player.name, "seen");
         };
       });
     }
@@ -1516,7 +1533,7 @@ function GameContent() {
       currentBattle: current_battle,
       isMobile: usesOverlaySidebar,
       sidebarOpen,
-      revealedPlayerName: state.revealedPlayerName,
+      revealedPlayerName: scouting?.player ?? null,
       useUpgrades: gameState.use_upgrades,
       hasRewardUpgradeChoice: needsUpgrade,
       showBuildSubmitPopover: showSubmitHandPopover,
@@ -1530,7 +1547,7 @@ function GameContent() {
     };
   }, [
     gameState, usesOverlaySidebar, sidebarOpen,
-    state.revealedPlayerName,
+    scouting,
     showSubmitHandPopover, showSubmitResultPopover,
   ]);
 
@@ -1862,7 +1879,7 @@ function GameContent() {
                 onClose={() => closeSurface("submitHand")}
                 guideTarget="build-submit-popover"
                 closeOnOutsideClick
-                ignoreOutsideClickSelector={buildSubmitGuideActive ? "[data-guided-tooltip='true']" : undefined}
+                ignoreOutsideClickSelector={buildSubmitGuideActive ? "[data-guided-tooltip='true']" : "[data-guide-target='build-submit']"}
               />
             )}
           </div>
@@ -1962,7 +1979,7 @@ function GameContent() {
                 onClose={() => closeSurface("submitResult")}
                 guideTarget="battle-submit-popover"
                 closeOnOutsideClick
-                ignoreOutsideClickSelector={battleSubmitGuideActive ? "[data-guided-tooltip='true']" : undefined}
+                ignoreOutsideClickSelector={battleSubmitGuideActive ? "[data-guided-tooltip='true']" : "[data-guide-target='battle-submit']"}
               />
             )}
           </div>
@@ -2062,10 +2079,12 @@ function GameContent() {
     return ids
   })()
 
-  const renderPhaseContent = (): ReactNode => {
-    if ((currentPhase === "battle" || displayBattleResolution) && battleViewForDisplay) {
+  const inFight = (currentPhase === "battle" || displayBattleResolution) && !!battleViewForDisplay;
+  const renderFight = (viewSwitch: ReactNode): ReactNode => {
+    if (battleViewForDisplay) {
       return (
         <BattleSidebarContent
+          header={viewSwitch}
           currentBattle={battleViewForDisplay}
           selfUpgrades={getRevealedAppliedUpgrades(self_player.upgrades)}
           yourLife={battleViewForDisplay.your_life}
@@ -2099,18 +2118,27 @@ function GameContent() {
       <Sidebar
         players={gameState.players}
         currentPlayer={self_player}
-        phaseContent={renderPhaseContent()}
+        renderFight={inFight ? renderFight : undefined}
+        fightView={fightSidebarView}
+        onFightViewChange={setFightSidebarView}
         useUpgrades={gameState.use_upgrades}
         isMobile={usesOverlaySidebar}
+        scoutInline={shellMode === "mobile"}
+        scouting={scouting}
+        onScout={setScouting}
+        onStopScouting={() => setScouting(null)}
         renderMicToggle={renderMicToggle}
       />
     );
     if (!usesOverlaySidebar) return <FrameSidebar>{sidebar}</FrameSidebar>;
-    const inFight = (currentPhase === "battle" || displayBattleResolution) && !!battleViewForDisplay;
     return (
       <SidePanel
         open={overlaySidebarOpen}
-        title={inFight ? "Fight" : "Players"}
+        title={
+          scouting && shellMode === "mobile" ? "Scouting"
+          : inFight && fightSidebarView === "fight" ? "Fight"
+          : "Players"
+        }
         onClose={() => setSidebarOpen(false)}
         closeOnBoardTap
       >
@@ -2187,7 +2215,7 @@ function GameContent() {
             home={<HomeButton className={isEndPhase ? "" : "hidden sm:inline-block"} />}
             account={usesOverlaySidebar ? (
               <button
-                onClick={() => dispatchSurface({ type: "toggle", surface: { kind: "players" } })}
+                onClick={() => setSidebarOpen(!sidebarOpen)}
                 className="btn btn-secondary btn-icon"
                 data-guide-target="sidebar-toggle"
               >
@@ -2401,6 +2429,7 @@ function GameContent() {
                   selectedPoolCardId={selectedPoolCardId}
                   onPoolCardSelect={setSelectedPoolCardId}
                   isMobile={sizes.isMobile}
+                  isDesktop={shellMode === "big"}
                 />
               )}
               {currentPhase === "awaiting_elimination" && (
@@ -2495,6 +2524,8 @@ function GameContent() {
             context={guideContext!}
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
+            scouting={scouting}
+            setScouting={setScouting}
             guideCompletionTrigger={guideCompletionTrigger}
             onVisibleGuideStepChange={setVisibleGuideStep}
           />
