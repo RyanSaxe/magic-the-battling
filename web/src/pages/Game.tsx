@@ -2096,7 +2096,12 @@ function GameContent() {
     if (!usesOverlaySidebar) return <FrameSidebar>{sidebar}</FrameSidebar>;
     const inFight = (currentPhase === "battle" || displayBattleResolution) && !!battleViewForDisplay;
     return (
-      <SidePanel open={overlaySidebarOpen} title={inFight ? "Fight" : "Players"} onClose={() => setSidebarOpen(false)}>
+      <SidePanel
+        open={overlaySidebarOpen}
+        title={inFight ? "Fight" : "Players"}
+        onClose={() => setSidebarOpen(false)}
+        closeOnBoardTap
+      >
         {sidebar}
       </SidePanel>
     );

@@ -15,6 +15,10 @@ interface SidePanelProps {
   count?: number
   onClose: () => void
   headerActions?: ReactNode
+  /** Slides out of view while it stays open, so a card dragged out of it can be dropped on the board it covers. */
+  steppedAside?: boolean
+  /** A tap on the board outside the panel closes it. */
+  closeOnBoardTap?: boolean
   children: ReactNode
 }
 
@@ -25,7 +29,16 @@ interface SidePanelProps {
  *
  * It stays mounted while it slides out, and drops its content once it has gone.
  */
-export function SidePanel({ open, title, count, onClose, headerActions, children }: SidePanelProps) {
+export function SidePanel({
+  open,
+  title,
+  count,
+  onClose,
+  headerActions,
+  steppedAside = false,
+  closeOnBoardTap = false,
+  children,
+}: SidePanelProps) {
   const host = useContext(SidePanelHostContext)
   const panelRef = useRef<HTMLElement>(null)
   const [present, setPresent] = useState(open)
@@ -54,11 +67,22 @@ export function SidePanel({ open, title, count, onClose, headerActions, children
     return () => window.removeEventListener('keydown', handleKey)
   }, [open, onClose])
 
+  useEffect(() => {
+    if (!open || !closeOnBoardTap || !host) return
+    const felt = host.parentElement
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null
+      if (target && felt?.contains(target) && !host.contains(target)) onClose()
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [open, closeOnBoardTap, host, onClose])
+
   if (!present || !host) return null
   return createPortal(
     <section
       ref={panelRef}
-      className={`side-panel frame-chrome${open ? ' side-panel--open' : ''}`}
+      className={`side-panel frame-chrome${open ? ' side-panel--open' : ''}${steppedAside ? ' side-panel--aside' : ''}`}
       aria-label={title}
       inert={!open}
       onTransitionEnd={(event) => {

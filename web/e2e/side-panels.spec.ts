@@ -224,6 +224,18 @@ test.describe('one panel at a time', () => {
       await expect(showSideboard).toHaveCount(0)
     })
 
+    test('a tap on the board closes the drawer, and a tap inside it doesn\'t', async ({ page, baseURL }) => {
+      await openGame(page, baseURL!, BUILD)
+      await page.getByRole('button', { name: '☰' }).click()
+      const drawer = sidePanel(page, 'Players')
+      await settled(drawer)
+
+      await drawer.getByText('Players', { exact: true }).click()
+      await expect(drawer).toBeVisible()
+      await page.locator('.zone-sideboard').click({ position: { x: 20, y: 40 } })
+      await expect(drawer).toHaveCount(0)
+    })
+
     test('Escape in the drawer\'s life total cancels the edit and leaves the drawer open', async ({ page, baseURL }) => {
       await openGame(page, baseURL!, FIGHT)
       await page.getByRole('button', { name: '☰' }).click()
@@ -235,6 +247,29 @@ test.describe('one panel at a time', () => {
       await expect(drawer.getByRole('spinbutton')).toHaveCount(0)
       await expect(drawer).toBeVisible()
     })
+  })
+})
+
+test.describe('a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('dragging a card out of a panel moves the panel aside, so the card drops on the board', async ({ page, baseURL }) => {
+    const sent = await openGame(page, baseURL!, FIGHT)
+    await page.locator('.battle-side-column-player .battle-side-cell').filter({ hasText: 'Graveyard' }).click()
+    const graveyard = sidePanel(page, 'Graveyard')
+    await settled(graveyard)
+
+    const card = (await graveyard.locator('.card').first().boundingBox())!
+    await page.mouse.move(card.x + card.width / 2, card.y + card.height / 2)
+    await page.mouse.down()
+    await page.mouse.move(card.x + card.width / 2, card.y + card.height / 2 + 30, { steps: 5 })
+    // Slid fully past the frame's right gold edge, which clips it.
+    await expect.poll(async () => (await graveyard.boundingBox())?.x ?? 0, 'the panel\'s left edge').toBeGreaterThanOrEqual(390 - 4 - SEAM)
+
+    const hand = (await page.locator('[data-guide-target="battle-hand"]').boundingBox())!
+    await page.mouse.move(hand.x + hand.width / 2, hand.y + hand.height / 2, { steps: 10 })
+    await page.mouse.up()
+    await expect.poll(() => sent.filter((action) => action === 'battle_move').length).toBe(1)
   })
 })
 

@@ -389,7 +389,7 @@ export function ShareGame() {
       >
         {renderContent()}
         {usesOverlaySidebar && (
-          <SidePanel open={overlaySidebarOpen} title="Players" onClose={closeSidebar}>
+          <SidePanel open={overlaySidebarOpen} title="Players" onClose={closeSidebar} closeOnBoardTap>
             <div className="overflow-y-auto flex-1 pt-3">
               {renderSidebarContent()}
             </div>

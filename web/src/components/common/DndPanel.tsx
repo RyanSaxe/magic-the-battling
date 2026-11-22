@@ -1,8 +1,10 @@
 import { useState, useCallback, useRef } from 'react'
 import { bestFit, MIN_CARD_WIDTH, type ZoneDims } from '../../hooks/cardSizeUtils'
 import { DroppableZone } from '../../dnd'
+import { useGameDnd } from '../../dnd/useGameDnd'
+import { useGameShellMode } from '../../hooks/useGameShellMode'
 import type { ZoneName } from '../../types'
-import type { ZoneOwner } from '../../dnd/types'
+import { makeZoneId, type ZoneOwner } from '../../dnd/types'
 import { PANEL_GAP, PANEL_MAX_WIDTH, resolveBattlePanelLayout } from './DndPanelLayout'
 import { SidePanel } from './SidePanel'
 
@@ -49,6 +51,9 @@ export function DndPanel({
   const [dims, setDims] = useState<ZoneDims>(DEFAULT_DIMS)
   const observerRef = useRef<ResizeObserver | null>(null)
   const isBattleTone = tone === 'battle'
+  const { activeFromZoneId } = useGameDnd()
+  // On a phone the panel covers the whole board, so it steps aside while a card is dragged out of it.
+  const steppedAside = useGameShellMode() === 'mobile' && !!zone && activeFromZoneId === makeZoneId(zone, zoneOwner)
 
   const bodyRef = useCallback(
     (node: HTMLElement | null) => {
@@ -94,7 +99,14 @@ export function DndPanel({
   }
 
   return (
-    <SidePanel open={open} title={title} count={count} onClose={onClose} headerActions={headerActions}>
+    <SidePanel
+      open={open}
+      title={title}
+      count={count}
+      onClose={onClose}
+      headerActions={headerActions}
+      steppedAside={steppedAside}
+    >
       <div
         ref={bodyRef}
         className="flex-1 min-h-0 p-2 flex items-center justify-center"
@@ -109,6 +121,7 @@ export function DndPanel({
             zoneOwner={zoneOwner}
             validFromZones={validFromZones}
             idPrefix="panel"
+            disabled={steppedAside}
             className={isBattleTone ? 'w-full h-full overflow-auto' : 'flex flex-wrap gap-1.5 justify-center content-center w-full h-full'}
           >
             {isBattleTone ? (

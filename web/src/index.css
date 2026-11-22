@@ -315,6 +315,10 @@ input:-webkit-autofill:focus {
   transform: translateX(0);
 }
 
+.side-panel--open.side-panel--aside {
+  transform: translateX(100%);
+}
+
 @starting-style {
   .side-panel--open {
     transform: translateX(100%);
