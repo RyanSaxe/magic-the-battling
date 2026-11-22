@@ -543,8 +543,7 @@ export function Lobby() {
       onClose={() => setShowRulesPanel(false)}
       minimized={guideMinimized}
       onMinimizedChange={setGuideMinimized}
-      initialDocId={rulesPanelTarget?.docId}
-      initialTab={rulesPanelTarget?.tab}
+      target={rulesPanelTarget}
       gameId={gameId}
       playerName={currentPlayer?.name}
       useUpgrades={undefined}
@@ -1048,8 +1047,7 @@ export function Lobby() {
           onClose={() => setShowRulesPanel(false)}
           minimized={guideMinimized}
           onMinimizedChange={setGuideMinimized}
-          initialDocId={rulesPanelTarget?.docId}
-          initialTab={rulesPanelTarget?.tab}
+          target={rulesPanelTarget}
           gameId={gameId}
           playerName={currentPlayer?.name}
           useUpgrades={lobbyState?.use_upgrades}
