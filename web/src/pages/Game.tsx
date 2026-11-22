@@ -1637,7 +1637,7 @@ function GameContent() {
       return (
         <NoticeFrame>
           <StatusNotice
-            title="Open in another tab"
+            title="Open somewhere else"
             actions={
               <>
                 <button onClick={takeBack} className="btn btn-primary flex-1 py-2">

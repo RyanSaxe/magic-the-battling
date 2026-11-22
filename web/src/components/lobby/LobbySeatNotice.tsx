@@ -52,7 +52,7 @@ export function LobbySeatNotice({
     case 'SEAT_MOVED':
       return (
         <StatusNotice
-          title="Open in another tab"
+          title="Open somewhere else"
           actions={
             <>
               <button onClick={onTakeBack} className="btn btn-primary flex-1 py-2">
