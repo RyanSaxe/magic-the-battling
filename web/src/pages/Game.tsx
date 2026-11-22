@@ -4,6 +4,7 @@ import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
 import { NoticeFrame } from "../components/common/NoticeFrame";
 import { Banner } from "../components/common/Banner";
+import { SurfaceCard } from "../components/common/SurfaceCard";
 import { FrameFelt, FrameSidebar } from "../components/common/PageFrame";
 import { GuideButton, HomeButton } from "../components/common/AppHeader";
 import { BottomBar, BrandMark, TopBar } from "../components/common/FrameBar";
@@ -78,7 +79,9 @@ import type {
 } from "../guided/types";
 import {
   getRememberedSeat,
+  getRememberedSpectatorName,
   rememberPlayerForGame,
+  rememberSpectatorName,
 } from "../utils/deviceIdentity";
 import {
   isSubmitPopoverGuideStepActive,
@@ -227,12 +230,13 @@ function PlayerSelectionModal({
   spectateOnly?: boolean;
 }) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [status, setStatus] = useState<GameStatusResponse | null>(null);
   const [statusError, setStatusError] = useState<AppError | null>(null);
   const [statusAttempt, setStatusAttempt] = useState(0);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
-  const [spectatorName, setSpectatorName] = useState("");
+  const [typedSpectatorName, setTypedSpectatorName] = useState(() => getRememberedSpectatorName() ?? "");
+  const spectatorName = user ? user.username : typedSpectatorName;
   const [error, setError] = useState("");
   const requestError = spectate.state.kind === "choosing" ? spectate.state.error : undefined;
   const shownError =
@@ -280,6 +284,7 @@ function PlayerSelectionModal({
       return;
     }
     setError("");
+    if (!user) rememberSpectatorName(spectatorName.trim());
     void spectate.request(selectedPlayer, spectatorName);
   };
 
@@ -374,7 +379,7 @@ function PlayerSelectionModal({
     );
   }
 
-  if (!status) {
+  if (!status || authLoading) {
     return (
       <NoticeFrame>
         <BusyNotice label="Loading game..." />
@@ -395,10 +400,8 @@ function PlayerSelectionModal({
 
   return (
     <NoticeFrame>
-      <div className="bg-black/60 backdrop-blur rounded-lg p-8 w-full max-w-lg">
-        <h1 className="text-2xl font-bold text-white text-center mb-6">
-          Join Game
-        </h1>
+      <SurfaceCard>
+        <h2 className="text-xl font-bold text-white mb-5">{accountSeatName ? "Join Game" : "Watch a game"}</h2>
 
         {shownError && (
           <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
@@ -408,19 +411,7 @@ function PlayerSelectionModal({
 
         {!selectedPlayer && (
           <>
-            {!spectateOnly && !accountSeatName && (
-              <div className={`${OPTION_BOX} px-3 py-2.5 mb-4 text-[13px] leading-snug text-[var(--ivory-muted)]`}>
-                To take your seat back, open this link in the browser you joined from. If you played with an account,{" "}
-                <button
-                  onClick={() => navigate(`/login?returnTo=${encodeURIComponent(`/game/${gameId}/play`)}`)}
-                  className={`${LINK} underline`}
-                >
-                  log in
-                </button>
-                .
-              </div>
-            )}
-            <p className="text-[var(--ivory-muted)] text-center mb-4">
+            <p className="text-[var(--ivory-muted)] mb-4">
               {accountSeatName ? "Reconnect to your seat or watch a player" : "Select a player to watch"}
             </p>
             <div className="space-y-3 mb-6">
@@ -466,6 +457,18 @@ function PlayerSelectionModal({
                 </div>
               ))}
             </div>
+            {!spectateOnly && !accountSeatName && (
+              <div className={`${OPTION_BOX} px-3 py-2.5 mb-4 text-[13px] leading-snug text-[var(--ivory-muted)]`}>
+                To take your seat back, open this link in the browser you joined from. If you played with an account,{" "}
+                <button
+                  onClick={() => navigate(`/login?returnTo=${encodeURIComponent(`/game/${gameId}/play`)}`)}
+                  className={`${LINK} underline`}
+                >
+                  log in
+                </button>
+                .
+              </div>
+            )}
             <button
               onClick={() => navigate("/")}
               className="btn btn-secondary w-full py-2"
@@ -477,7 +480,7 @@ function PlayerSelectionModal({
 
         {selectedPlayer && (
           <div className="space-y-4">
-            <p className="text-[var(--ivory-muted)] text-center break-words">
+            <p className="text-[var(--ivory-muted)] break-words">
               Request to watch <strong>{selectedPlayer}</strong>'s game
             </p>
             <div>
@@ -485,8 +488,9 @@ function PlayerSelectionModal({
               <input
                 type="text"
                 value={spectatorName}
-                onChange={(e) => setSpectatorName(e.target.value)}
-                className={TEXT_INPUT}
+                onChange={(e) => !user && setTypedSpectatorName(e.target.value)}
+                disabled={!!user}
+                className={`${TEXT_INPUT} disabled:opacity-50`}
                 placeholder="Enter your name"
               />
             </div>
@@ -507,7 +511,7 @@ function PlayerSelectionModal({
             </div>
           </div>
         )}
-      </div>
+      </SurfaceCard>
     </NoticeFrame>
   );
 }
