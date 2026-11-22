@@ -237,7 +237,7 @@ def create_battler(
     db.add(battler)
     db.commit()
     db.refresh(battler)
-    database.save_cube_metadata(request.cube_id)
+    _save_cube_metadata(db, request.cube_id)
     [resp] = _battler_responses(db, str(user.id), [battler])
     return resp
 
@@ -279,10 +279,18 @@ def delete_battler(
 GAMES_PAGE_SIZE = 20
 
 
+def _save_cube_metadata(db: Session, cube_id: str) -> None:
+    """Closes the session first, so a slow CubeCobra doesn't hold one of the pool's few connections.
+
+    Closing detaches what the session loaded, and its next query takes a connection again."""
+    db.close()
+    database.save_cube_metadata(cube_id)
+
+
 def _load_cube_metadata(db: Session, cube_id: str) -> CubeMetadata | None:
     meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first()
     if meta is None:
-        database.save_cube_metadata(cube_id)
+        _save_cube_metadata(db, cube_id)
         meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first()
     return meta
 
@@ -325,6 +333,7 @@ def _query_cube_games(
     player_user_id: str | None = None,
 ) -> dict:
     """A page of a cube's finished games. With player_user_id, only that player's games, each shown by their seat."""
+    meta = _load_cube_metadata(db, cube_id)
     base_filter = [
         GameRecord.cube_id == cube_id,
         GameRecord.ended_at.isnot(None),
@@ -342,7 +351,6 @@ def _query_cube_games(
     has_more = len(games) > GAMES_PAGE_SIZE
     games = games[:GAMES_PAGE_SIZE]
 
-    meta = _load_cube_metadata(db, cube_id)
     cube_name = str(meta.name) if meta and meta.name else None
     cube_image_uri = str(meta.image_uri) if meta and meta.image_uri else None
 
@@ -678,7 +686,7 @@ def follow_cube(
     db.add(follow)
     db.commit()
     db.refresh(follow)
-    database.save_cube_metadata(request.cube_id)
+    _save_cube_metadata(db, request.cube_id)
     meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == request.cube_id).first()
     return FollowedBattlerResponse(
         id=cast(int, follow.id),
