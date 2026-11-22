@@ -2778,9 +2778,10 @@ input:-webkit-autofill:focus {
 
 /* Poison and treasure keep one width, 34px and a 2px gap, so the label after them starts at the same place on every
    card. They grow to it from their contents, so a crowded line takes their spare room before it shortens the label,
-   and the odds keep the card's padding. */
+   and the odds keep the card's padding. The line keeps its height when a Fight hides all three. */
 .player-card-line:last-child {
   gap: 2px;
+  min-height: 1lh;
 }
 
 .player-card-stat {

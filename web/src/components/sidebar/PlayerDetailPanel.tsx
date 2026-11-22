@@ -93,6 +93,7 @@ function Standings({
   const odds = isSelf ? null : player.pairing_probability;
   // The server has no odds during a Fight and sends 0 for everyone, except in Sudden Death, which fixes the pairing.
   const oddsUnknown = viewerFighting && !player.in_sudden_death;
+  const hiddenInFight = viewerFighting && !isSelf;
 
   return (
     <div className={`scouting-standings${isSelf ? " is-self" : ""}`}>
@@ -107,15 +108,17 @@ function Standings({
           <div className="scouting-state-detail">{detail}</div>
         </div>
       </div>
-      <div className="scouting-pair">
-        <TokenCount
-          image={POISON_COUNTER_IMAGE}
-          count={player.poison}
-          outOf={player.poison < POISON_TO_LOSE ? POISON_TO_LOSE : undefined}
-          label="Poison"
-        />
-        <TokenCount image={TREASURE_TOKEN_IMAGE} count={player.treasures} label="Treasure" />
-      </div>
+      {!hiddenInFight && (
+        <div className="scouting-pair">
+          <TokenCount
+            image={POISON_COUNTER_IMAGE}
+            count={player.poison}
+            outOf={player.poison < POISON_TO_LOSE ? POISON_TO_LOSE : undefined}
+            label="Poison"
+          />
+          <TokenCount image={TREASURE_TOKEN_IMAGE} count={player.treasures} label="Treasure" />
+        </div>
+      )}
       <div className="scouting-pair">
         <div className="scouting-cell">
           <div className="scouting-key">Last fight</div>
@@ -345,6 +348,8 @@ export function PlayerDetailPanel({
   onBack,
 }: PlayerDetailPanelProps) {
   const isViewingSelf = player.name === currentPlayer.name;
+  const viewerFighting = currentPlayer.phase === "battle";
+  const seenHidden = viewerFighting && !isViewingSelf;
   const upgradeDisplayScope = getUpgradeDisplayScope(isViewingSelf, currentPlayer.phase);
   const appliedUpgrades = getAppliedUpgrades(player.upgrades);
   const pendingUpgrades = getUnappliedUpgrades(currentPlayer.upgrades);
@@ -362,7 +367,7 @@ export function PlayerDetailPanel({
         player={player}
         players={players}
         isSelf={isViewingSelf}
-        viewerFighting={currentPlayer.phase === "battle"}
+        viewerFighting={viewerFighting}
       />
 
       {useUpgrades && allUpgrades.length === 0 && (
@@ -419,17 +424,19 @@ export function PlayerDetailPanel({
         </div>
       )}
 
-      <div className="flex justify-center px-4 pb-3 pt-3">
-        <SegmentedFilter
-          label="Scouting view"
-          options={DETAIL_TABS}
-          value={activeTab}
-          onChange={onTabChange}
-        />
-      </div>
+      {!seenHidden && (
+        <div className="flex justify-center px-4 pb-3 pt-3">
+          <SegmentedFilter
+            label="Scouting view"
+            options={DETAIL_TABS}
+            value={activeTab}
+            onChange={onTabChange}
+          />
+        </div>
+      )}
 
-      <div className="flex flex-col flex-1 min-h-0 px-4 pb-4">
-        {activeTab === "overview" ? overviewContent : seenContent}
+      <div className={`flex flex-col flex-1 min-h-0 px-4 pb-4 ${seenHidden ? "pt-3" : ""}`}>
+        {seenHidden || activeTab === "overview" ? overviewContent : seenContent}
       </div>
     </div>
   );
