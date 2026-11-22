@@ -20,7 +20,11 @@ vi.hoisted(() => {
 
 const toasts: string[] = []
 
-vi.mock('../api/client', () => ({ rejoinGame: vi.fn(), getServerStatus: vi.fn(async () => null) }))
+vi.mock('../api/client', () => ({
+  rejoinGame: vi.fn(),
+  getServerStatus: vi.fn(async () => null),
+  getCubeSummary: vi.fn(async () => ({ cube_name: 'Crucible', cube_image_uri: null })),
+}))
 vi.mock('../contexts', () => ({ useToast: () => ({ addToast: (message: string) => toasts.push(message) }) }))
 vi.mock('../contexts/authState', () => ({ useAuth: () => ({ user: null, loading: false }) }))
 

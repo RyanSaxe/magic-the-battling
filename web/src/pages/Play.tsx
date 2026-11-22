@@ -4,14 +4,20 @@ import { createGame, warmCubeCache } from "../api/client";
 import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
 import { useAuth } from "../contexts/authState";
+import { useCubeLook } from "../hooks/useCubeLook";
+import { useHotkeys } from "../hooks/useHotkeys";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
-import { InfoIcon } from "../components/icons/InfoIcon";
+import { Spinner } from "../components/icons/Spinner";
 import { AppHeader, HomeButton } from "../components/common/AppHeader";
 import { JoinGameModal } from "../components/home/JoinGameModal";
 import { PageFrame } from "../components/common/PageFrame";
-import { ResumeRows } from "../components/ResumeGame";
-import { useResumableGames } from "../hooks/useResumableGames";
+import { CloseSeatDialog, ResumeList, ResumeShelf } from "../components/ResumeGame";
+import { useResumableGames, type ResumableSeat } from "../hooks/useResumableGames";
 import { SurfaceCard } from "../components/common/SurfaceCard";
+import { Switch } from "../components/common/Switch";
+import { CubeBanner } from "../components/setup/CubeBanner";
+import { GuidedSwitch } from "../components/setup/GuidedSwitch";
+import { SegmentedFilter } from "../components/dashboard/SegmentedFilter";
 import { getLegendaryName } from "../utils/prefetchName";
 import { saveTabSession } from "../utils/tabSession";
 import {
@@ -25,9 +31,7 @@ import {
 } from "../utils/deviceIdentity";
 import type { LobbyState, PlayMode } from "../types";
 import { type AppError, getAppErrorMessage, unknownToAppError } from "../utils/appError";
-import { DIALOG_BACKDROP, OPTION_BOX, TEXT_INPUT } from "../components/common/styles";
-import { Dialog } from "../components/common/Dialog";
-import { DefaultOpponentsField } from "../components/dashboard/DefaultOpponentsField";
+import { DIALOG_BACKDROP } from "../components/common/styles";
 
 type SoloPhase =
   | "idle"
@@ -37,6 +41,7 @@ type SoloPhase =
   | "navigating";
 type OpponentCount = 1 | 3 | 5 | 7;
 type ActiveMode = "friends" | "solo";
+type PlayView = "setup" | "options" | "resume";
 const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
 
 function normalizeCreateGameError(error: unknown): string {
@@ -129,10 +134,10 @@ function useGuestName(): [string, (v: string) => void, boolean] {
   return [name, setName, loading];
 }
 
-function FriendsIcon({ className }: { className?: string }) {
+function FriendsIcon({ className }: { className: string }) {
   return (
     <svg
-      className={className ?? "w-7 h-7 text-amber-400"}
+      className={className}
       fill="none"
       stroke="currentColor"
       viewBox="0 0 24 24"
@@ -147,174 +152,31 @@ function FriendsIcon({ className }: { className?: string }) {
   );
 }
 
-function AdvancedOptionsModal({
-  title,
-  onClose,
-  children,
-}: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Dialog title={title} onClose={onClose}>
-      <div className="space-y-3">{children}</div>
-      <button
-        onClick={onClose}
-        className="btn btn-primary play-action-btn w-full py-2 mt-4"
-      >
-        Done
-      </button>
-    </Dialog>
-  );
-}
+const MODE_OPTIONS = [
+  { value: "solo" as const, label: <><GoldfishIcon className="setup-mode-icon" />Goldfish</> },
+  { value: "friends" as const, label: <><FriendsIcon className="setup-mode-icon" />Play with Friends</> },
+];
 
-function CubeIdInput({
-  cubeId,
-  setCubeId,
-}: {
-  cubeId: string;
-  setCubeId: (v: string) => void;
-}) {
+const PLAY_MODE_OPTIONS = [
+  { value: "limited" as const, label: "Limited" },
+  { value: "constructed" as const, label: "Constructed" },
+];
+
+const PITCHES: Record<ActiveMode, string> = {
+  solo: "Fight historically winning hands, played face up. Move their cards and decide who would have won.",
+  friends: "See who is the best drafter. Everybody starts with trash, and it's up to you to turn it into treasure!",
+};
+
+/** Both modes' pitches share one space, so switching between them moves nothing. */
+function ModePitch({ mode }: { mode: ActiveMode }) {
   return (
-    <div>
-      <label className="block text-white text-sm mb-1">CubeCobra ID</label>
-      <input
-        type="text"
-        value={cubeId}
-        onChange={(e) => setCubeId(e.target.value)}
-        className={TEXT_INPUT}
-        placeholder="auto"
-      />
+    <div className="setup-pitch">
+      {MODE_OPTIONS.map(({ value }) => (
+        <p key={value} className={value === mode ? "" : "invisible"} aria-hidden={value !== mode}>
+          {PITCHES[value]}
+        </p>
+      ))}
     </div>
-  );
-}
-
-function UpgradesCheckbox({
-  useUpgrades,
-  setUseUpgrades,
-}: {
-  useUpgrades: boolean;
-  setUseUpgrades: (v: boolean) => void;
-}) {
-  return (
-    <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
-      <input
-        type="checkbox"
-        checked={useUpgrades}
-        onChange={(e) => setUseUpgrades(e.target.checked)}
-        className="w-4 h-4 rounded bg-black/40 border-black/40"
-      />
-      <span className="text-white text-sm">Upgrades</span>
-      <span className="text-[var(--ivory-muted)] text-xs">
-        — upgrade a card every 3 rounds
-      </span>
-    </label>
-  );
-}
-
-function ConstructedCheckbox({
-  playMode,
-  setPlayMode,
-}: {
-  playMode: PlayMode;
-  setPlayMode: (mode: PlayMode) => void;
-}) {
-  const isConstructed = playMode === "constructed";
-  return (
-    <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
-      <input
-        type="checkbox"
-        checked={isConstructed}
-        onChange={(e) => setPlayMode(e.target.checked ? "constructed" : "limited")}
-        className="w-4 h-4 rounded bg-black/40 border-black/40"
-      />
-      <span className="text-white text-sm">Constructed</span>
-      <span className="text-[var(--ivory-muted)] text-xs">
-        — bring your own deck
-      </span>
-    </label>
-  );
-}
-
-function GuidedModeField({
-  enabled,
-  setEnabled,
-}: {
-  enabled: boolean;
-  setEnabled: (v: boolean) => void;
-}) {
-  const guidedModeHelpText =
-    "Guided Mode gives you a brief walkthrough the first time a new phase, action, or situation comes up.";
-  const [showGuidedModeHelp, setShowGuidedModeHelp] = useState(false);
-  const guidedModeHelpRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Node;
-      if (!guidedModeHelpRef.current?.contains(target)) {
-        setShowGuidedModeHelp(false);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    return () => window.removeEventListener("pointerdown", onPointerDown);
-  }, []);
-
-  return (
-    <div className="bg-black/40 border border-black/40 text-white rounded px-3 h-[42px] min-w-[118px] sm:min-w-[132px] flex items-center justify-end gap-2">
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={enabled}
-          onChange={(e) => setEnabled(e.target.checked)}
-          className="sr-only peer"
-          aria-label="Guided mode"
-        />
-        <span
-          className={`text-xs font-medium uppercase tracking-wide ${enabled ? "text-amber-300" : "text-[var(--ivory-muted)]"
-            }`}
-        >
-          {enabled ? "On" : "Off"}
-        </span>
-        <span className="switch-track relative inline-flex h-5 w-10 items-center rounded-full transition-colors">
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? "translate-x-5" : "translate-x-1"
-              }`}
-          />
-        </span>
-      </label>
-      <div ref={guidedModeHelpRef} className="relative group shrink-0">
-        <button
-          type="button"
-          className="touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]"
-          aria-label="What guided mode does"
-          aria-expanded={showGuidedModeHelp}
-          onClick={() => setShowGuidedModeHelp((v) => !v)}
-        >
-          <InfoIcon size="sm" />
-        </button>
-        <span
-          className={`absolute right-0 top-full mt-2 w-64 rounded-lg modal-chrome border gold-border shadow-xl p-2 text-left text-[11px] text-[var(--ivory)] transition-opacity z-50 ${showGuidedModeHelp
-            ? "opacity-100"
-            : "opacity-0 pointer-events-none group-hover:opacity-100 group-focus-within:opacity-100"
-            }`}
-        >
-          {guidedModeHelpText}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function GearButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="btn-secondary h-[42px] w-[42px] shrink-0 rounded-lg flex items-center justify-center text-base"
-      title="Advanced Options"
-    >
-      ⚙
-    </button>
   );
 }
 
@@ -329,9 +191,13 @@ export function Play() {
   const playerName = user ? user.username : guestName;
   const setPlayerName = user ? () => {} : setGuestName;
   const [showJoinModal, setShowJoinModal] = useState(false);
-  const [showFriendsAdvanced, setShowFriendsAdvanced] = useState(false);
-  const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
+  const [view, setView] = useState<PlayView>("setup");
+  const [seatToClose, setSeatToClose] = useState<ResumableSeat | null>(null);
+  const [closedIds, setClosedIds] = useState<string[]>([]);
+  const stripButtonRef = useRef<HTMLButtonElement>(null);
   const [cubeId, setCubeId] = useState(() => searchParams.get("cubeId") || "auto");
+  // The banner follows the ID when Change cube closes, rather than asking the server about each key typed.
+  const [bannerCubeId, setBannerCubeId] = useState(() => cubeId.trim());
   const [useUpgrades, setUseUpgrades] = useState(() => searchParams.get("useUpgrades") !== "false");
   const [playMode, setPlayMode] = useState<PlayMode>(() => (searchParams.get("playMode") === "constructed" ? "constructed" : "limited"));
   const [opponents, setOpponents] = useState<OpponentCount>(() => {
@@ -610,20 +476,38 @@ export function Play() {
     }
   };
 
-  const inactiveCard = (
-    mode: ActiveMode,
-    icon: React.ReactNode,
-    label: string,
-  ) => (
-    <button
-      onClick={() => setActiveMode(mode)}
-      className="shrink-0 bg-black/35 rounded-lg px-4 py-3 border border-black/40 flex items-center gap-3 w-full text-left hover:bg-black/30 transition-colors"
-    >
-      {icon}
-      <span className="text-white font-medium text-sm">{label}</span>
-      <span className="ml-auto text-[var(--ivory-muted)] text-xs">▶</span>
-    </button>
+  const cubeLook = useCubeLook(bannerCubeId || (playMode === "limited" ? "auto" : null));
+
+  const seats = resumableGames.filter((seat) => !closedIds.includes(seat.gameId));
+  // Closing the last game in the list leaves nothing to list.
+  const shownView = view === "resume" && seats.length === 0 ? "setup" : view;
+
+  const showView = (next: PlayView, byKeyboard = false) => {
+    if (view === "options") setBannerCubeId(cubeId.trim());
+    setView(next);
+    // The button a key pressed can leave with its view, and the strip's button is in all of them.
+    if (byKeyboard) stripButtonRef.current?.focus({ preventScroll: true });
+  };
+  useHotkeys(
+    { escape: () => showView("setup", true) },
+    shownView !== "setup" && !showJoinModal && !seatToClose,
   );
+
+  const stripLabel = {
+    setup: [
+      playMode === "constructed" ? "Constructed" : "Limited",
+      ...(activeMode === "solo" ? [`${opponents} ${opponents === 1 ? "opponent" : "opponents"}`] : []),
+      `Upgrades\u00a0${useUpgrades ? "On" : "Off"}`,
+    ].join(" · "),
+    options: activeMode === "solo" ? "Goldfish options" : "Friends options",
+    resume: `${seats.length} ${seats.length === 1 ? "game" : "games"} to resume`,
+  }[shownView];
+
+  const startLoading = activeMode === "solo" ? soloLoading : friendsLoading;
+  const startNewGame = () => {
+    if (activeMode === "solo") void handleStartSolo();
+    else void handleCreateLobby();
+  };
 
   return (
     <>
@@ -636,179 +520,140 @@ export function Play() {
           }
           home={<HomeButton />}
         />}
-        center
+        scroll={false}
+        contentClassName="setup-page"
         hints="play"
       >
-        <SurfaceCard as="section" className="overflow-hidden flex flex-col">
-          <div className="flex flex-col">
-            <ResumeRows seats={resumableGames} />
-            <div className="mb-4">
-              <div className="mb-1 flex items-center justify-between gap-3">
-                <label htmlFor="player-name" className="block text-[var(--ivory-muted)] text-sm">
-                  Your Name
-                </label>
-                <span className="block text-[var(--ivory-muted)] text-sm text-right shrink-0">
-                  Guided Mode
-                </span>
-              </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-stretch gap-2 sm:gap-3">
+        <CubeBanner look={cubeLook} playMode={playMode}>
+          <p className="setup-summary">{stripLabel}</p>
+          <button
+            ref={stripButtonRef}
+            type="button"
+            onClick={() => showView(shownView === "setup" ? "options" : "setup")}
+            className="btn btn-secondary btn-pill"
+          >
+            {shownView === "setup" ? "Change cube" : "Back"}
+          </button>
+        </CubeBanner>
+
+        {shownView === "setup" && (
+          <>
+            <div className="setup-felt play-felt">
+              <SegmentedFilter
+                label="How to play"
+                options={MODE_OPTIONS}
+                value={activeMode}
+                onChange={setActiveMode}
+                variant="field"
+              />
+              <ModePitch mode={activeMode} />
+              <div className="setup-row">
                 {user ? (
-                  <div className="w-full h-[42px] bg-black/20 border border-black/30 text-amber-100 rounded px-3 py-2 text-base flex items-center">
-                    {playerName}
+                  <div className="setup-field">
+                    <span className="setup-caption">Your name</span>
+                    <span className="setup-value">{playerName}</span>
                   </div>
                 ) : (
-                  <input
-                    id="player-name"
-                    type="text"
-                    value={nameLoading ? "" : playerName}
-                    onChange={(e) => setPlayerName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleNameEnter()}
-                    disabled={nameLoading}
-                    placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-                    className={`${TEXT_INPUT} disabled:opacity-50`}
-                  />
+                  <label className="setup-field">
+                    <span className="setup-caption">Your name</span>
+                    <input
+                      id="player-name"
+                      type="text"
+                      value={nameLoading ? "" : playerName}
+                      onChange={(e) => setPlayerName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleNameEnter()}
+                      disabled={nameLoading}
+                      placeholder={nameLoading ? "Generating name..." : "Enter your name"}
+                      className="setup-input"
+                    />
+                  </label>
                 )}
-                <GuidedModeField enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
+                <GuidedSwitch enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
               </div>
-            </div>
-
-            {/* Single active-mode card for all breakpoints */}
-            <div className="w-full max-w-md mx-auto flex flex-col gap-3">
-              {activeMode === "solo" ? (
-                <>
-                  {inactiveCard(
-                    "friends",
-                    <FriendsIcon className="w-5 h-5 text-amber-400 shrink-0" />,
-                    "Play with Friends",
-                  )}
-                  <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col">
-                    <div className="flex items-center gap-3 mb-2">
-                      <GoldfishIcon className="w-8 h-8 text-amber-400" />
-                      <h2 className="text-lg font-semibold text-white">Goldfish</h2>
-                    </div>
-                    <div className="flex-1 flex items-center justify-center">
-                      <p className="description-panel italic text-[var(--ivory)] text-base leading-relaxed px-4 py-3">
-                        <span className="block text-amber-400/70">
-                          Fight historically winning hands!
-                        </span>
-                        <span className="block">
-                          Their cards are face up in the fight. You can move them around to simulate the game and decide who would have won.
-                        </span>
-                      </p>
-                    </div>
-                    <div className="mt-auto flex gap-2 pt-4">
-                      <button
-                        onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
-                        disabled={soloLoading ? false : !nameValid}
-                        className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-                      >
-                        {soloLoading ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Loading...
-                          </>
-                        ) : (
-                          "Start Game"
-                        )}
-                      </button>
-                      <GearButton onClick={() => setShowSoloAdvanced(true)} />
-                    </div>
-                  </div>
-                </>
+              {startLoading ? (
+                <button
+                  onClick={soloLoading ? handleCancelSolo : handleCancelFriends}
+                  className="btn btn-secondary setup-next"
+                >
+                  <Spinner className="h-4 w-4" />
+                  Loading...
+                </button>
               ) : (
-                <>
-                  {inactiveCard(
-                    "solo",
-                    <GoldfishIcon className="w-5 h-5 text-amber-400 shrink-0" />,
-                    "Goldfish",
-                  )}
-                  <div className="bg-black/35 rounded-lg p-5 border border-black/40 flex flex-col">
-                    <div className="flex items-center gap-3 mb-2">
-                      <FriendsIcon className="w-8 h-8 text-amber-400" />
-                      <h2 className="text-lg font-semibold text-white">
-                        Play with Friends
-                      </h2>
-                    </div>
-                    <div className="flex-1 flex items-center justify-center">
-                      <p className="description-panel italic text-[var(--ivory)] text-base leading-relaxed px-4 py-3">
-                        <span className="block text-amber-400/70">
-                          Draft an unbeatable hand!
-                        </span>
-                        <span className="block">
-                          See who is the best drafter. Everybody starts with trash, and it's up to you to turn it into treasure!
-                        </span>
-                      </p>
-                    </div>
-                    <div className="mt-auto flex gap-2 pt-4">
-                      <button
-                        onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
-                        disabled={friendsLoading ? false : !nameValid}
-                        className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
-                      >
-                        {friendsLoading ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Loading...
-                          </>
-                        ) : (
-                          "Create Lobby"
-                        )}
-                      </button>
-                      <GearButton onClick={() => setShowFriendsAdvanced(true)} />
-                    </div>
-                  </div>
-                </>
+                <button onClick={startNewGame} disabled={!nameValid} className="btn btn-primary setup-next">
+                  {activeMode === "solo" ? "Start Game" : "Create Lobby"}
+                </button>
               )}
             </div>
+            <ResumeShelf
+              seats={seats}
+              onClose={setSeatToClose}
+              onShowAll={(byKeyboard) => showView("resume", byKeyboard)}
+            />
+          </>
+        )}
+
+        {shownView === "options" && (
+          <div className="setup-felt play-felt">
+            <label className="setup-field">
+              <span className="setup-caption">CubeCobra ID</span>
+              <input
+                type="text"
+                value={cubeId}
+                onChange={(e) => setCubeId(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && showView("setup", true)}
+                placeholder="auto"
+                className="setup-input"
+              />
+            </label>
+            <SegmentedFilter
+              label="Limited or Constructed"
+              options={PLAY_MODE_OPTIONS}
+              value={playMode}
+              onChange={setPlayMode}
+              variant="field"
+            />
+            {activeMode === "solo" ? (
+              <div className="setup-row">
+                <span className="setup-row-label">Opponents</span>
+                <SegmentedFilter
+                  label="Opponents"
+                  options={OPPONENT_OPTIONS.map((n) => ({ value: String(n), label: n }))}
+                  value={String(opponents)}
+                  onChange={(value) => setOpponents(Number(value) as OpponentCount)}
+                  variant="field"
+                />
+              </div>
+            ) : (
+              <Switch spread checked={autoApproveSpectators} onChange={setAutoApproveSpectators}>
+                Open Spectating · let anyone watch
+              </Switch>
+            )}
+            <Switch spread checked={useUpgrades} onChange={setUseUpgrades}>
+              Upgrades · upgrade a card every 3 rounds
+            </Switch>
+            <button
+              onClick={(event) => showView("setup", event.detail === 0)}
+              className="btn btn-primary setup-next"
+            >
+              Done
+            </button>
           </div>
-        </SurfaceCard>
+        )}
+
+        {shownView === "resume" && <ResumeList seats={seats} onClose={setSeatToClose} />}
       </PageFrame>
 
       {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
 
-      {showFriendsAdvanced && (
-        <AdvancedOptionsModal
-          title="Friends Options"
-          onClose={() => setShowFriendsAdvanced(false)}
-        >
-          <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
-          <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
-          <UpgradesCheckbox
-            useUpgrades={useUpgrades}
-            setUseUpgrades={setUseUpgrades}
-          />
-          <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
-            <input
-              type="checkbox"
-              checked={autoApproveSpectators}
-              onChange={(e) => setAutoApproveSpectators(e.target.checked)}
-              className="w-4 h-4 rounded bg-black/40 border-black/40"
-            />
-            <span className="text-white text-sm">Open Spectating</span>
-            <span className="text-[var(--ivory-muted)] text-xs">— let anyone watch</span>
-          </label>
-        </AdvancedOptionsModal>
-      )}
-
-      {showSoloAdvanced && (
-        <AdvancedOptionsModal
-          title="Solo Options"
-          onClose={() => setShowSoloAdvanced(false)}
-        >
-          <CubeIdInput cubeId={cubeId} setCubeId={setCubeId} />
-          <ConstructedCheckbox playMode={playMode} setPlayMode={setPlayMode} />
-          <UpgradesCheckbox
-            useUpgrades={useUpgrades}
-            setUseUpgrades={setUseUpgrades}
-          />
-          <DefaultOpponentsField label="Opponents" value={opponents} onChange={setOpponents} />
-        </AdvancedOptionsModal>
+      {seatToClose && (
+        <CloseSeatDialog
+          seat={seatToClose}
+          onKeep={() => setSeatToClose(null)}
+          onClosed={() => {
+            setClosedIds((ids) => [...ids, seatToClose.gameId]);
+            setSeatToClose(null);
+          }}
+        />
       )}
 
       {(soloLoading || friendsLoading) && (
