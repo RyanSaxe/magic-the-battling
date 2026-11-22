@@ -236,7 +236,12 @@ export function PhaseTimeline({
 
   return (
     <>
-      <div ref={stepsRowRef} className={`flex items-center flex-1 min-w-0 ${stepsOverflow ? "phase-timeline-scroll" : ""}`}>
+      {/* Below lg the top zone's label can sit under the current step, so the row rises 2px and the step's ring
+          turns inward. Every phase gets both, so the row stays put from phase to phase. */}
+      <div
+        ref={stepsRowRef}
+        className={`flex items-center flex-1 min-w-0 max-lg:-translate-y-0.5 ${stepsOverflow ? "phase-timeline-scroll" : ""}`}
+      >
         <div ref={stepsRef} className="flex items-center gap-1 sm:gap-1.5 shrink-0">
           <span
             className="text-xs sm:text-sm text-[#e2d8cb] font-mono"
@@ -258,7 +263,7 @@ export function PhaseTimeline({
                 onClick={() => handlePhaseClick(phase)}
                 data-guide-target={`timeline-phase-${phase}`}
                 className={`phase-step text-xs sm:text-sm font-medium capitalize transition-colors
-                  ${isActive || isEndReward ? `rounded-[4px] px-2.5 py-0.5 sm:px-3 sm:py-0.5 ${PHASE_ACTIVE_STYLE[phase]}` : "phase-step-idle"}
+                  ${isActive || isEndReward ? `rounded-[4px] px-2.5 py-0.5 sm:px-3 sm:py-0.5 max-lg:ring-inset ${PHASE_ACTIVE_STYLE[phase]}` : "phase-step-idle"}
                   ${isCompleted && !isEndReward ? "text-[var(--ivory-faint)] line-through decoration-[var(--gold-border-opaque)]" : ""}
                   ${isUpcoming ? "text-[var(--ivory-faint)]" : ""}
                 `}
