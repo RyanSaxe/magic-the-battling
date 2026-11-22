@@ -57,6 +57,7 @@ import { SIDE_PANEL_HEADER_HEIGHT, SidePanel, SidePanelFrame } from "../componen
 import { SidePanelHostContext } from "../components/common/sidePanelHost";
 import { SubmitPopover } from "../components/common/SubmitPopover";
 import { ZoneDivider } from "../components/common/ZoneDivider";
+import { useCardMiddleTap } from "../hooks/useCardMiddleTap";
 import { useHotkeys } from "../hooks/useHotkeys";
 import {
   comparePlayersForSidebar,
@@ -810,6 +811,7 @@ function GameGuideLayer({
 }
 
 function GameContent() {
+  useCardMiddleTap();
   const { gameId = "" } = useParams<{ gameId: string }>();
   const [searchParams] = useSearchParams();
   const isSpectateMode = searchParams.get("spectate") === "true";
