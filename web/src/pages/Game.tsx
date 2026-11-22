@@ -2275,7 +2275,12 @@ function GameContent() {
                 />
               </>
             }
-            helpers={<GuideButton onClick={() => openRulesPanel()} className={isEndPhase ? "hidden sm:inline-block" : ""} />}
+            helpers={
+              <GuideButton
+                onClick={() => openRulesPanel()}
+                className={`${isEndPhase ? "hidden sm:inline-block" : ""} ${guideMinimized ? "btn-dot-phone" : ""}`}
+              />
+            }
             home={<HomeButton className={isEndPhase ? "" : "hidden sm:inline-block"} />}
             account={usesOverlaySidebar ? (
               <button
