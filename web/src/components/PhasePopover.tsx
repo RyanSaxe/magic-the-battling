@@ -2,6 +2,7 @@ import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { getPhaseReferenceLabel, getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
 import type { Phase } from '../constants/phases'
+import { BoardBackdrop } from './common/BoardBackdrop'
 import { POPOVER_CHROME } from './common/styles'
 
 const PHASE_TITLE_COLOR: Record<Phase, string> = {
@@ -31,14 +32,26 @@ export function PhasePopover({
   onOpenControls,
 }: PhasePopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null)
+  const backdropRef = useRef<HTMLDivElement>(null)
   const arrowRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node
+      // A press on the bars closes at once and still clicks. Over the board, the backdrop waits for the click.
+      if (popoverRef.current && !popoverRef.current.contains(target) && !backdropRef.current?.contains(target)) {
+        onClose()
+      }
+    }
     window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
+    window.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      window.removeEventListener('keydown', handleEscape)
+      window.removeEventListener('mousedown', handleClickOutside)
+    }
   }, [onClose])
 
   const positionPopover = useCallback(() => {
@@ -72,11 +85,10 @@ export function PhasePopover({
 
   useLayoutEffect(positionPopover, [positionPopover])
 
-  return createPortal(
+  return (
     <>
-    {/* Covers the bars as well as the board, and waits for the click: closing on the press would uncover Roll or a
-        card in time to take the tap's click. */}
-    {!isClosing && <div className="fixed inset-0 z-[83]" aria-hidden="true" onClick={onClose} />}
+    {!isClosing && <BoardBackdrop ref={backdropRef} onTap={onClose} />}
+    {createPortal(
     <div
       ref={popoverRef}
       style={{
@@ -130,8 +142,9 @@ export function PhasePopover({
           </p>
         </div>
       </div>
-    </div>
-    </>,
+    </div>,
     document.body,
+    )}
+    </>
   )
 }
