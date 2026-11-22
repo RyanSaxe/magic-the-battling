@@ -113,9 +113,7 @@ function measureFrame(page: Page) {
         if (hidden || bottom - top <= 0 || element.getBoundingClientRect().width === 0) continue
         // Each zone label straddles its zone's top seam; the top zone's sits on the board's top edge, across the top bar.
         const crossesTop = top < headerBottom - 0.5 && !element.closest('[data-zone-label]')
-        // Known: Round Wrap-Up's progression note follows loot that fills the Loot zone, and the reward layout doesn't
-        // make room for it, so it runs under the bottom bar. Remove this once that layout sizes the zone for the note.
-        const crossesBottom = bottom > footerTop + 0.5 && !element.closest('[data-guide-target="reward-progression"]')
+        const crossesBottom = bottom > footerTop + 0.5
         if (crossesTop || crossesBottom) {
           const name = `${element.tagName.toLowerCase()}.${Array.from(element.classList).slice(0, 3).join('.')}`
           crossings.push(`${name} "${element.textContent?.trim().slice(0, 20) ?? ''}" spans y=${Math.round(top)}..${Math.round(bottom)}`)
