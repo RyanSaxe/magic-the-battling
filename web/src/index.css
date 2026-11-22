@@ -2869,6 +2869,23 @@ input:-webkit-autofill:focus {
   vertical-align: middle;
 }
 
+@media (width < 640px) {
+  .btn-dot-phone {
+    position: relative;
+  }
+
+  .btn-dot-phone::after {
+    content: "";
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-gold-bright);
+  }
+}
+
 .btn-success {
   background: var(--success);
   color: white;
