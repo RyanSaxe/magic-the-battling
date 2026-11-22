@@ -47,6 +47,7 @@ interface PhaseTimelineProps {
   autoOpenDurationMs?: number;
   onAutoOpenHandled?: (phase: Phase) => void;
   onOpenRules?: (target?: RulesPanelTarget) => void;
+  onStepClick?: () => void;
   title?: string;
 }
 
@@ -67,6 +68,7 @@ export function PhaseTimeline({
   autoOpenDurationMs = GUIDED_POPOVER_AUTO_CLOSE_MS,
   onAutoOpenHandled,
   onOpenRules,
+  onStepClick,
   title,
 }: PhaseTimelineProps) {
   const guideState = useContext(GuideStateContext);
@@ -174,12 +176,13 @@ export function PhaseTimeline({
     if (welcomeGuideActive) {
       return;
     }
+    onStepClick?.();
     if (popoverPhase === phase) {
       handleClosePopover();
       return;
     }
     openPopoverForPhase(phase);
-  }, [handleClosePopover, openPopoverForPhase, popoverPhase, welcomeGuideActive]);
+  }, [handleClosePopover, onStepClick, openPopoverForPhase, popoverPhase, welcomeGuideActive]);
 
   useEffect(() => {
     if (!autoOpenPhase) return;
