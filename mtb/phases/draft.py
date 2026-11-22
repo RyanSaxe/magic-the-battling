@@ -1,7 +1,7 @@
 import random
 
 from mtb.models.cards import Card
-from mtb.models.game import DraftState, Game, Player
+from mtb.models.game import Config, DraftState, Game, Player
 from mtb.models.types import CardDestination
 from mtb.phases import build
 
@@ -64,6 +64,12 @@ def _get_pack_queue(game: Game, player: Player) -> list[list[Card]]:
     if game.config.play_mode == "limited":
         return game.draft_state.packs
     return game.draft_state.player_packs.setdefault(player.name, [])
+
+
+def cards_needed_for_first_draft(config: Config, num_players: int) -> int:
+    # Everyone can be holding a pack at once, after their starting pool and the first fight's loot card.
+    loot_cards = 1
+    return num_players * (config.starting_pool_size + loot_cards + config.pack_size)
 
 
 def start(game: Game) -> None:

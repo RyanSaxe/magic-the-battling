@@ -1236,6 +1236,12 @@ class GameManager:
             battler = pending.battler
             if battler is None:
                 raise LobbyStartFailedError("The cube isn't loaded")
+            needed = draft.cards_needed_for_first_draft(config, len(pending.player_names))
+            if len(battler.cards) < needed:
+                raise LobbyStartFailedError(
+                    f"This cube has {len(battler.cards)} playable cards and needs at least {needed} "
+                    "to give everyone a pack."
+                )
             set_battler(game, _copy_for_dealing(battler))
             target_elo = battler.elo or 1200.0
         else:
