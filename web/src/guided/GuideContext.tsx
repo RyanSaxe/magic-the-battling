@@ -32,16 +32,8 @@ function isTimelinePhase(phase: string | undefined): phase is Phase {
   return phase === "draft" || phase === "build" || phase === "battle" || phase === "reward";
 }
 
-type GuideOverlayException =
-  | "rules"
-  | "upgrades"
-  | "actionMenu"
-  | "share"
-  | "buildSubmit"
-  | "battleSubmit"
-  | "battlePanel"
-  | "battleZoneModal"
-  | null;
+/** The submit choices a guide points at, which stay open while every other overlay closes. */
+type GuideOverlayException = "submitHand" | "submitResult";
 
 interface GuideProviderProps {
   gameId: string | undefined;
@@ -153,10 +145,10 @@ export function GuideProvider({
 
   const requestGuide = useCallback(
     (guideId: GuidedGuideId) => {
-      const overlayException =
-        guideId === "build_play_draw" ? "buildSubmit" as const
-        : guideId === "battle_result_submit" ? "battleSubmit" as const
-        : null;
+      const overlayException: GuideOverlayException | undefined =
+        guideId === "build_play_draw" ? "submitHand"
+        : guideId === "battle_result_submit" ? "submitResult"
+        : undefined;
       closeGameplayOverlays(overlayException);
       if (storageIdentity) {
         setActiveGuideForGame(storageIdentity, guideId, 0);

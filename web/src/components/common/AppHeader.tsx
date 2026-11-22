@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, type ReactNode, type Ref } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/authState'
+import { useHotkeys } from '../../hooks/useHotkeys'
 import { JoinGameModal } from '../home/JoinGameModal'
 import { BarLabel, BrandLockup, TopBar } from './FrameBar'
 
@@ -65,6 +66,7 @@ export function UserMenuButton() {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
+  useHotkeys({ escape: () => setOpen(false) }, open)
 
   return (
     <>
