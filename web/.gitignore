@@ -25,6 +25,5 @@ dist-ssr
 
 # Playwright
 test-results/
-e2e/layout-baseline/
 playwright-report/
 blob-report/
