@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { BoardBackdrop } from '../common/BoardBackdrop'
 
 export interface MoreMenuItem {
   label: string
@@ -20,6 +21,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const backdropRef = useRef<HTMLDivElement>(null)
 
   // A card near the bottom of the felt would open its menu past the felt's edge, behind the bottom bar.
   useLayoutEffect(() => {
@@ -40,7 +42,9 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (ref.current?.contains(target) || backdropRef.current?.contains(target)) return
+      setOpen(false)
     }
     const closeOnEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
@@ -65,6 +69,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
       >
         ⋯
       </button>
+      {open && <BoardBackdrop ref={backdropRef} onTap={() => setOpen(false)} />}
       {open && (
         <div
           ref={menuRef}
