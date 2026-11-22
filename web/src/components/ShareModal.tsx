@@ -89,7 +89,7 @@ export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
   )
 
   const handleCopyLink = useCallback(async () => {
-    await copyText(url)
+    if (!(await copyText(url))) return
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }, [url])
