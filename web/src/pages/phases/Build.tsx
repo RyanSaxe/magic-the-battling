@@ -334,18 +334,23 @@ export function BuildPhase({
   const isCardSelected = (cardId: string) =>
     selection?.type === "card" && selection.cardId === cardId;
 
-  const renderQuickUpgradeButton = (card: CardType) => {
+  const renderQuickUpgradeButton = (card: CardType, cardWidth: number, hasCompanionButton = false) => {
     if (!canQuickUpgrade) return null;
     const selected = isCardSelected(card.id);
     const visibilityClasses = selected
       ? "opacity-100 pointer-events-auto"
       : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto";
 
+    // A share of the card's height keeps the padding light on small cards. A companion's own button fills the edge below.
+    const bottom = hasCompanionButton ? "bottom-[max(8.5%,1.375rem)]" : "bottom-[8.5%]";
+    // The pill is 75px wide, so it shrinks with a card too narrow to hold it.
+    const scale = Math.min(1, cardWidth / 85);
+
     return (
       <button
         type="button"
-        // A card's art runs from about a ninth to five ninths of its height, so a third is its middle.
-        className={`absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold btn-game transition-opacity duration-150 ${visibilityClasses}`}
+        style={{ scale }}
+        className={`absolute ${bottom} left-1/2 -translate-x-1/2 origin-bottom z-20 px-3 py-1.5 rounded-full text-xs font-semibold btn-game transition-opacity duration-150 ${visibilityClasses}`}
         onClick={(e) => {
           e.stopPropagation();
           onQuickUpgrade?.(card.id);
@@ -396,7 +401,7 @@ export function BuildPhase({
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={getAppliedUpgrades(card.id)}
           />
-          {renderQuickUpgradeButton(card)}
+          {renderQuickUpgradeButton(card, handDims.width)}
         </div>
       );
     }
@@ -509,7 +514,7 @@ export function BuildPhase({
                   upgraded={upgradedCardIds.has(card.id)}
                   appliedUpgrades={getAppliedUpgrades(card.id)}
                 />
-                {renderQuickUpgradeButton(card)}
+                {renderQuickUpgradeButton(card, sbDims.width, cardIsCompanion)}
                 {cardIsCompanion && (
                   <button
                     disabled={locked}
