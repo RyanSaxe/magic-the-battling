@@ -34,6 +34,8 @@ interface SidebarProps {
   onScout: (player: string, tab: ScoutingTab) => void;
   onStopScouting: () => void;
   renderMicToggle?: (player: PlayerView) => ReactNode;
+  /** Shown under the player list. */
+  watchLink?: ReactNode;
 }
 
 export function Sidebar({
@@ -49,6 +51,7 @@ export function Sidebar({
   onScout,
   onStopScouting,
   renderMicToggle,
+  watchLink,
 }: SidebarProps) {
   // The scouting panel keeps showing the last player while it slides out.
   const [shownScouting, setShownScouting] = useState(scouting);
@@ -112,6 +115,7 @@ export function Sidebar({
             )}
             renderMicToggle={renderMicToggle}
           />
+          {watchLink}
         </div>
       )}
       {!scoutInline && (
