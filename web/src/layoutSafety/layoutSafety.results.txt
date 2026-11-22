@@ -205,25 +205,25 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   battle               1536x864    b5337708
   battle               1920x1080   8dcccc7c
   battle               2560x1440   4ecd1f02
-  battle-sudden-death  320x568     6a6bd6a2
-  battle-sudden-death  375x667     6412e454
-  battle-sudden-death  393x852     415b7022
-  battle-sudden-death  430x932     f4a1d384
-  battle-sudden-death  768x1024    ca6010e8
-  battle-sudden-death  820x1180    ab8070b8
-  battle-sudden-death  1024x768    a7a37054
-  battle-sudden-death  1024x500    2e31a034
-  battle-sudden-death  1180x820    945384b2
-  battle-sudden-death  1280x600    e644ac42
-  battle-sudden-death  1280x720    a9d8ef68
-  battle-sudden-death  1280x800    89dfddac
-  battle-sudden-death  1366x768    332d60b8
-  battle-sudden-death  1366x1024   9d115dee
-  battle-sudden-death  1440x600    a1c7bef8
-  battle-sudden-death  1440x900    dd2e16ae
-  battle-sudden-death  1536x864    bc38f25a
-  battle-sudden-death  1920x1080   e75084a8
-  battle-sudden-death  2560x1440   1b915c66
+  battle-sudden-death  320x568     88c12f7a
+  battle-sudden-death  375x667     1aca32f6
+  battle-sudden-death  393x852     1205aac0
+  battle-sudden-death  430x932     221ecdec
+  battle-sudden-death  768x1024    d59cd3ac
+  battle-sudden-death  820x1180    e464cd20
+  battle-sudden-death  1024x768    a8aee67a
+  battle-sudden-death  1024x500    53bc93a4
+  battle-sudden-death  1180x820    38c28ec6
+  battle-sudden-death  1280x600    1530bbbe
+  battle-sudden-death  1280x720    1fdc77d4
+  battle-sudden-death  1280x800    b5372602
+  battle-sudden-death  1366x768    64fd4bda
+  battle-sudden-death  1366x1024   e5527aa8
+  battle-sudden-death  1440x600    360431e4
+  battle-sudden-death  1440x900    005966ca
+  battle-sudden-death  1536x864    bd27ed56
+  battle-sudden-death  1920x1080   5f1ab176
+  battle-sudden-death  2560x1440   59226aee
   build                320x568     b95718eb
   build                375x667     7087740f
   build                393x852     891ac55f
@@ -289,17 +289,17 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   reward               820x1180    1b0de712
   reward               1024x768    24fb59cc
   reward               1024x500    901f0075
-  reward               1180x820    d7736bf0
-  reward               1280x600    0c355007
-  reward               1280x720    f3ffaad4
-  reward               1280x800    90c57da8
-  reward               1366x768    2a542270
-  reward               1366x1024   822112c2
-  reward               1440x600    fe2f7300
-  reward               1440x900    419c8b73
-  reward               1536x864    f1516c6f
-  reward               1920x1080   1f200b59
-  reward               2560x1440   46b6f7cd
+  reward               1180x820    ca9f3e4a
+  reward               1280x600    6f72550f
+  reward               1280x720    f8c71166
+  reward               1280x800    21ae1af7
+  reward               1366x768    597a8386
+  reward               1366x1024   70470e79
+  reward               1440x600    0e826270
+  reward               1440x900    62d0f4a2
+  reward               1536x864    338501f8
+  reward               1920x1080   d94004d0
+  reward               2560x1440   fed30d8c
   reward-stage-end     320x568     9e637b4d
   reward-stage-end     375x667     d1fa2cee
   reward-stage-end     393x852     4b783232
@@ -308,17 +308,17 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   reward-stage-end     820x1180    411659b1
   reward-stage-end     1024x768    5fc2d2a1
   reward-stage-end     1024x500    b63d4355
-  reward-stage-end     1180x820    20e5ffa1
+  reward-stage-end     1180x820    be7e4e41
   reward-stage-end     1280x600    150013fd
   reward-stage-end     1280x720    070ea8f5
-  reward-stage-end     1280x800    cd9ce698
-  reward-stage-end     1366x768    cc7f2d6f
-  reward-stage-end     1366x1024   ce08294f
+  reward-stage-end     1280x800    6c039494
+  reward-stage-end     1366x768    62aa3e75
+  reward-stage-end     1366x1024   2605d0c7
   reward-stage-end     1440x600    f7430b51
-  reward-stage-end     1440x900    31e5eb0f
-  reward-stage-end     1536x864    6ce5ae3b
-  reward-stage-end     1920x1080   fcae97e5
-  reward-stage-end     2560x1440   f33eddfb
+  reward-stage-end     1440x900    c8f9ad49
+  reward-stage-end     1536x864    058d5fe5
+  reward-stage-end     1920x1080   5891e0cd
+  reward-stage-end     2560x1440   66c0627f
   upgrade-apply        288x140     35a05b6a
   upgrade-apply        288x220     cc4934e1
   upgrade-apply        288x360     dcd8c8a8

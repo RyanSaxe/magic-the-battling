@@ -24,6 +24,7 @@ interface RewardPhaseProps {
   selectedPoolCardId: string | null;
   onPoolCardSelect: (cardId: string | null) => void;
   isMobile?: boolean;
+  isDesktop: boolean;
 }
 
 type RewardItem = { key: string; card: CardType };
@@ -77,6 +78,7 @@ export function RewardPhase({
   selectedPoolCardId,
   onPoolCardSelect,
   isMobile = false,
+  isDesktop,
 }: RewardPhaseProps) {
   void actions;
 
@@ -153,6 +155,7 @@ export function RewardPhase({
     hasUpgradeSection,
     upgradeCount: available_upgrades.length,
     poolCount,
+    isDesktop,
   });
 
   const { containerRef, dims, containerSize, zoneFrames, zoneRefs, dividerCallbacks } =
@@ -204,6 +207,9 @@ export function RewardPhase({
   } = rewardZoneStyles(zoneFrames, hasUpgradeSection);
 
   void last_battle_result;
+
+  // The desktop cap can leave cards shorter than their zone, so center them there as the loot is on its own.
+  const cappedZoneAlignment = isDesktop ? "flex flex-col justify-center" : "";
 
   return (
     <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
@@ -274,14 +280,6 @@ export function RewardPhase({
               ))}
             </CardGrid>
           )}
-          <div
-            data-guide-target="reward-progression"
-            className="mt-4 rounded-lg border border-amber-500/15 bg-black/25 px-3 py-2 text-center text-xs text-[var(--ivory-muted)]"
-          >
-            <span className="text-amber-300 font-medium">Round progression:</span>{" "}
-            the third round of each stage adds The Vanquisher, increases starting hand size by 1, and advances you to the next stage.
-            {hasUpgradeSection ? " This stage-end wrap-up also includes an upgrade choice." : ""}
-          </div>
         </div>
 
         {hasUpgradeSection && dividerCallbacks.topDivider && (
@@ -299,7 +297,7 @@ export function RewardPhase({
           >
             <div
               ref={setUpgradesNode}
-              className="zone-upgrades w-full px-3 pt-5 pb-3 relative"
+              className={`zone-upgrades w-full px-3 pt-5 pb-3 relative ${cappedZoneAlignment}`}
               style={upgradesStyle}
               data-guide-target="reward-upgrades"
             >
@@ -338,7 +336,7 @@ export function RewardPhase({
 
             <div
               ref={setPoolNode}
-                className="zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0"
+                className={`zone-sideboard w-full px-3 pt-5 pb-3 relative min-h-0 ${cappedZoneAlignment}`}
                 style={poolStyle}
               >
                 <ZoneLabel

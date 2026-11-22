@@ -2,7 +2,7 @@ import type { Page } from '@playwright/test'
 import { MIN_CARD_WIDTH } from '../src/hooks/cardSizeUtils'
 import type { ZoneConstraints } from '../src/hooks/computeConstrainedLayout'
 import { boardSizeBand } from '../src/hooks/useSavedLayout'
-import { expect, serveGame, test } from './helpers'
+import { expect, serveGame, serveSpectating, test } from './helpers'
 import { GAME_ID, type ScreenState } from './gameStates'
 
 /**
@@ -46,6 +46,7 @@ const TYPICAL: Record<string, ScreenState> = {
   draft: { phase: 'draft', counts: { pack: 5, sideboard: 10, upgrades: 2 } },
   build: { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 } },
   'build-with-upgrades': { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6, upgrades: 2 } },
+  'build-sudden-death': { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 }, suddenDeath: true },
   battle: { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 } },
   'battle-sudden-death': { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 }, suddenDeath: true },
   reward: { phase: 'reward', counts: { sideboard: 8 } },
@@ -76,6 +77,16 @@ const SAMPLE: Screen[] = [
     viewport: { width: 1024, height: 768 },
     state: TYPICAL.build,
     saved: { topFraction: 0.9 },
+  },
+  {
+    name: 'build-sudden-death 1280x800',
+    viewport: { width: 1280, height: 800 },
+    state: TYPICAL['build-sudden-death'],
+  },
+  {
+    name: 'build-sudden-death 375x667',
+    viewport: { width: 375, height: 667 },
+    state: TYPICAL['build-sudden-death'],
   },
   {
     name: 'reward-stage-end 1280x800',
@@ -176,8 +187,7 @@ function measureBoard({ zoneSelector, minCardWidth }: { zoneSelector: string; mi
     return !!rect && rect.width > 0 && rect.right > 0 && rect.x < innerWidth && rect.bottom > 0 && rect.y < innerHeight
   }
   const sidebar = document.querySelector('aside[data-guide-target="sidebar-panel"]')
-  const actionBar = Array.from(document.querySelectorAll('.frame-chrome')).find((element) => element.className.includes('z-40'))
-  const chrome = [document.querySelector('header'), sidebar, actionBar].filter(onScreen)
+  const chrome = [document.querySelector('header'), sidebar, document.querySelector('footer')].filter(onScreen)
 
   const groups = new Map<Element, number[]>()
   for (const card of Array.from(contentElement.querySelectorAll('.card'))) {
@@ -233,16 +243,14 @@ function measureBoard({ zoneSelector, minCardWidth }: { zoneSelector: string; mi
     }
   }
 
-  const suddenDeathBar = battle?.querySelector(':scope > .frame-chrome')
-  if (suddenDeathBar) {
-    const bar = suddenDeathBar.getBoundingClientRect()
-    const words = Array.from(suddenDeathBar.children)
-      .filter((child) => getComputedStyle(child).position !== 'absolute')
-      .map((child) => child.getBoundingClientRect())
+  const banner = document.querySelector('[data-banner] > .frame-chrome')
+  if (banner) {
+    const bar = banner.getBoundingClientRect()
+    const words = Array.from(banner.children).map((child) => child.getBoundingClientRect())
     const left = Math.min(...words.map((word) => word.left))
     const right = Math.max(...words.map((word) => word.right))
     if (left < bar.left - 0.5 || right > bar.right + 0.5) {
-      fail('text-cut-off', `the Sudden Death bar's text spans ${px(right - left)}px of its ${px(bar.width)}px`)
+      fail('text-cut-off', `the banner's text spans ${px(right - left)}px of its ${px(bar.width)}px`)
     }
   }
 
@@ -461,6 +469,38 @@ for (const screen of SCREENS) {
   })
 }
 
+// A banner spans the board and the sidebar, so both must move down together for the sidebar's lanes to meet the board's rows.
+const BANNER_FIGHTS = [
+  { banner: 'Sudden Death', open: (page: Page, baseURL: string) => serveGame(page, baseURL, TYPICAL['battle-sudden-death']), path: '' },
+  { banner: 'watching a player', open: serveSpectating('approved', TYPICAL.battle), path: '?spectate=true' },
+]
+
+for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+  test.describe(`${viewport.width}x${viewport.height}`, () => {
+    const isPhone = viewport.width < 640
+    test.use({ viewport, isMobile: isPhone, hasTouch: isPhone })
+
+    for (const { banner, open, path } of BANNER_FIGHTS) {
+      test(`a Fight under the ${banner} banner keeps the sidebar's lanes on the board's seams`, async ({ page, baseURL }) => {
+        await open(page, baseURL!)
+        await page.goto(`/game/${GAME_ID}/play${path}`, { waitUntil: 'domcontentloaded' })
+        await page.locator('[data-banner]').waitFor()
+        await expectGameShown(page)
+        if (isPhone) {
+          await page.locator('[data-guide-target="sidebar-toggle"]').click()
+          // The sidebar slides in over the board, so measure it once it stops.
+          await page.waitForFunction(() => document.getAnimations().length === 0)
+        }
+        await waitForStableLayout(page)
+
+        const { failures } = await measure(page)
+        expect(failures['sidebar-seams-off-board'], "sidebar seams away from the board's").toBeUndefined()
+        expect(await page.locator('aside[data-guide-target="sidebar-panel"] .zone-divider-line--horizontal').count(), 'sidebar lanes').toBe(2)
+      })
+    }
+  })
+}
+
 test.describe('a stylesheet that arrives after the game renders', () => {
   test.use({ viewport: { width: 1280, height: 800 } })
 
@@ -531,5 +571,58 @@ test.describe('a saved layout', () => {
 
     await page.setViewportSize({ width: 1920, height: 1080 })
     await expect.poll(handHeight).toBe(savedOnDesktop)
+  })
+})
+
+test.describe('the player cards', () => {
+  const longName = 'MAXIMILIAN VANDERBERGH-WOLVERTON'
+  const screen: ScreenState = {
+    phase: 'build',
+    counts: { hand: 3, handSize: 4, sideboard: 6 },
+    opponents: [{ name: longName, last_result: 'draw', pairing_probability: 0.4 }],
+  }
+
+  // The docked sidebar's cards are the narrowest, and on a phone the cards are in a drawer.
+  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
+    test(`keep a long name's last result whole on its line at ${viewport.width}x${viewport.height}`, async ({ page, baseURL }) => {
+      await page.setViewportSize(viewport)
+      await serveGame(page, baseURL!, screen)
+      await page.goto(`/game/${GAME_ID}/play`)
+      await expectGameShown(page)
+      const drawerToggle = page.locator('[data-guide-target="sidebar-toggle"]')
+      if (await drawerToggle.isVisible()) await drawerToggle.click()
+
+      const card = page.locator(`[data-guide-player-row="${longName}"]`)
+      // The phone's drawer slides in, so measure once it's whole on screen, and all in one frame.
+      await expect(card).toBeInViewport({ ratio: 1 })
+      const { card: cardBox, name, result } = await card.evaluate((element, longName) => {
+        const box = (target: Element) => {
+          const { left, right, top, bottom } = target.getBoundingClientRect()
+          return { left, right, middle: (top + bottom) / 2, cut: target.scrollWidth > target.clientWidth }
+        }
+        const byText = (text: string) => Array.from(element.querySelectorAll('span')).find((span) => span.textContent === text)!
+        return { card: box(element), name: box(byText(longName)), result: box(byText('Drew')) }
+      }, longName)
+
+      expect(name.cut, 'the name is cut short').toBe(true)
+      expect(result.cut, 'the result is cut short').toBe(false)
+      expect(result.left).toBeGreaterThanOrEqual(name.right)
+      expect(result.right).toBeLessThanOrEqual(cardBox.right)
+      expect(Math.abs(result.middle - name.middle)).toBeLessThan(3)
+    })
+  }
+
+  test('name the last fight the same way as the scouting Overview', async ({ page, baseURL }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await serveGame(page, baseURL!, { ...screen, opponents: [{ name: 'Bob', last_result: 'loss' }] })
+    await page.goto(`/game/${GAME_ID}/play`)
+    await expectGameShown(page)
+
+    const card = page.locator('[data-guide-player-row="Bob"]')
+    await expect(card.getByTitle('Last fight')).toHaveText('Lost')
+    await card.getByRole('button').click()
+    await page.getByRole('radio', { name: 'Overview' }).click()
+    const lastResult = page.locator('dl > div', { has: page.getByText('Last result', { exact: true }) }).locator('dd')
+    await expect(lastResult).toHaveText('Lost')
   })
 })

@@ -134,14 +134,15 @@ describe('findFollow', () => {
 
 const preset = (id: number) => ({ id, cube_id: `cube-${id}` }) as UserBattler
 
-/** Saved presets as GET /battlers pages them: in order of position, with a new one saved last. */
+/** Saved presets as GET /battlers pages them: newest first, so a new one goes to the front. */
 function serverPresets(count: number) {
   const ids = Array.from({ length: count }, (_, i) => i + 1)
   return {
     page: (offset: number) => ({ battlers: ids.slice(offset, offset + 20).map(preset), has_more: offset + 20 < ids.length }),
     save: () => {
-      ids.push(ids.length + 1)
-      return preset(ids.length)
+      const id = Math.max(0, ...ids) + 1
+      ids.unshift(id)
+      return preset(id)
     },
     remove: (id: number) => ids.splice(ids.indexOf(id), 1),
   }
@@ -169,19 +170,27 @@ describe('the dashboard library', () => {
     ])
   })
 
-  it('shows a preset saved before every preset has loaded once, and the next page skips none', () => {
+  it('puts a preset saved here first', () => {
+    const server = serverPresets(3)
+    let library = loadedLibrary(server.page(0), NO_FOLLOWING)
+
+    library = withAddedPreset(library, server.save())
+
+    expect(savedIds(library)).toEqual([4, 1, 2, 3])
+  })
+
+  it('shows a preset saved before every preset has loaded first, and the next page skips none', () => {
     const server = serverPresets(21)
     let library = loadedLibrary(server.page(0), NO_FOLLOWING)
 
     library = withAddedPreset(library, server.save())
-    expect(savedIds(library)).toContain(22)
     library = nextSavedPage(library, server)
 
-    expect(savedIds(library)).toEqual(Array.from({ length: 22 }, (_, i) => i + 1))
+    expect(savedIds(library)).toEqual([22, ...Array.from({ length: 21 }, (_, i) => i + 1)])
     expect(nextLibraryPage(library)).toBeNull()
   })
 
-  it('shows a preset once when the page that holds it lands before its save returns', () => {
+  it('shows each preset once when a save lands before a page it shifted', () => {
     const server = serverPresets(21)
     let library = loadedLibrary(server.page(0), NO_FOLLOWING)
 
@@ -189,7 +198,19 @@ describe('the dashboard library', () => {
     library = nextSavedPage(library, server)
     library = withAddedPreset(library, saved)
 
-    expect(savedIds(library)).toEqual(Array.from({ length: 22 }, (_, i) => i + 1))
+    expect(savedIds(library)).toEqual([22, ...Array.from({ length: 21 }, (_, i) => i + 1)])
+  })
+
+  it('keeps a preset saved while a page loads, and still waits for that page', () => {
+    const server = serverPresets(21)
+    let library = withLibraryPageRequested(loadedLibrary(server.page(0), NO_FOLLOWING))
+    const pageReadBeforeTheSave = server.page(20)
+
+    library = withAddedPreset(library, server.save())
+    expect(nextLibraryPage(library)).toBeNull()
+    library = withLibraryPage(library, { list: 'saved', page: pageReadBeforeTheSave })
+
+    expect(savedIds(library)).toEqual([22, ...Array.from({ length: 21 }, (_, i) => i + 1)])
   })
 
   it('asks for the next page one earlier after a loaded preset is deleted', () => {

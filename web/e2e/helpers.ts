@@ -380,6 +380,48 @@ function serveGameEndedWith(code: string) {
   })
 }
 
+const SPECTATE_REQUEST_ID = 'spectate-request-1'
+
+/** How the watched player has answered this tab's request to watch: not yet, no, too late, or yes. */
+export type SpectateAnswer = 'pending' | 'denied' | 'expired' | 'approved'
+
+/**
+ * Opens a game to watch, at /game/:id/play?spectate=true. With an answer, this tab has already asked to watch Alice,
+ * and the server gives that answer; an approved request watches Alice's Build.
+ */
+export function serveSpectating(answer?: SpectateAnswer, screen: ScreenState = { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 } }) {
+  return async (page: Page, baseURL: string) => {
+    await serveGame(page, baseURL, screen)
+    await page.route((url) => new URL(url).pathname.startsWith(`/api/games/${GAME_ID}/`), (route) => {
+      const { pathname } = new URL(route.request().url())
+      if (pathname.endsWith('/status')) {
+        return route.fulfill({
+          json: {
+            game_id: GAME_ID,
+            phase: 'build',
+            is_started: true,
+            auto_approve_spectators: false,
+            players: [
+              { name: PLAYER_NAME, is_connected: true, is_puppet: false, phase: 'build' },
+              { name: 'Bob', is_connected: true, is_puppet: false, phase: 'build' },
+              { name: 'Carol', is_connected: false, is_puppet: false, phase: 'eliminated' },
+              { name: 'Dave', is_connected: true, is_puppet: true, phase: 'build' },
+            ],
+          },
+        })
+      }
+      if (pathname.endsWith(`/spectate-request/${SPECTATE_REQUEST_ID}`)) {
+        return route.fulfill({ json: answer === 'approved' ? { status: answer, session_id: 'spectator-session' } : { status: answer } })
+      }
+      return route.fallback()
+    })
+    if (!answer) return
+    await page.addInitScript(({ key, target, requestId }) => {
+      sessionStorage.setItem(key, JSON.stringify({ target, requestId, sessionId: null }))
+    }, { key: `mtb_spectate:${GAME_ID}`, target: PLAYER_NAME, requestId: SPECTATE_REQUEST_ID })
+  }
+}
+
 export interface PageUnderTest {
   name: string
   path: string
@@ -437,13 +479,13 @@ export const PAGES: PageUnderTest[] = [
     name: 'battler',
     path: '/dashboard/list/1',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play Preset' }),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play', exact: true }),
   },
   {
     name: 'cube',
     path: '/cube/vintage-cube',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play Cube' }),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play', exact: true }),
   },
   {
     name: 'lobby',
@@ -495,6 +537,30 @@ export const PAGES: PageUnderTest[] = [
     path: `/game/${GAME_ID}/play`,
     serve: serveGameEndedWith('SERVER_CAPACITY'),
     primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Try again' }),
+  },
+  {
+    name: 'spectate: choose a player',
+    path: `/game/${GAME_ID}/play?spectate=true`,
+    serve: serveSpectating(),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Watch' }).first(),
+  },
+  {
+    name: 'spectate: waiting',
+    path: `/game/${GAME_ID}/play?spectate=true`,
+    serve: serveSpectating('pending'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Cancel' }),
+  },
+  {
+    name: 'spectate: denied',
+    path: `/game/${GAME_ID}/play?spectate=true`,
+    serve: serveSpectating('denied'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Try Again' }),
+  },
+  {
+    name: 'spectate: expired',
+    path: `/game/${GAME_ID}/play?spectate=true`,
+    serve: serveSpectating('expired'),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Try Again' }),
   },
 ]
 

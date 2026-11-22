@@ -1,11 +1,11 @@
 import { deckLayoutConfig } from "../components/common/deckLayout";
 import { upgradeApplyLayoutConfig, upgradeListLayoutConfig } from "../components/common/upgradeModalLayouts";
+import { GAME_BANNER_HEIGHT } from "../components/common/bannerSizes";
 import type { ZoneConstraints } from "../hooks/computeConstrainedLayout";
 import type { CardLayoutConfig } from "../hooks/useCardLayout";
-import { GAME_SHELL_SMALL_BREAKPOINT_PX } from "../hooks/useGameShellMode";
+import { computeGameShellMode, GAME_SHELL_SMALL_BREAKPOINT_PX } from "../hooks/useGameShellMode";
 import { MOBILE_BREAKPOINT_PX } from "../hooks/useViewportCardSizes";
 import {
-  SUDDEN_DEATH_BAR_HEIGHT,
   battleBoardMetrics,
   buildLayoutConfig,
   draftLayoutConfig,
@@ -114,6 +114,7 @@ const OFFERED_UPGRADE_COUNTS = [1, 2, 3, 4];
 export function zoneCases(viewport: Viewport): ZoneCase[] {
   const rails = hasUpgradeRail(viewport) ? RAIL_COUNTS : [0];
   const horizontal = !isMobileViewport(viewport);
+  const isDesktop = computeGameShellMode(viewport.width) === "big";
   const cases: ZoneCase[] = [];
   for (const pack of PACK_COUNTS) {
     for (const pool of DRAFT_POOL_COUNTS) {
@@ -150,7 +151,7 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
       phase: "reward",
       label: `rewards ${rewards}`,
       counts: { rewards },
-      config: rewardLayoutConfig({ rewardCount: rewards, hasUpgradeSection: false, upgradeCount: 0, poolCount: 0 }),
+      config: rewardLayoutConfig({ rewardCount: rewards, hasUpgradeSection: false, upgradeCount: 0, poolCount: 0, isDesktop }),
       allowHorizontalResize: false,
       hasDividers: true,
     });
@@ -161,7 +162,7 @@ export function zoneCases(viewport: Viewport): ZoneCase[] {
           phase: "reward-stage-end",
           label: `rewards ${rewards}, upgrades ${offered}, pool ${pool}`,
           counts: { rewards, offered, pool },
-          config: rewardLayoutConfig({ rewardCount: rewards, hasUpgradeSection: true, upgradeCount: offered, poolCount: pool }),
+          config: rewardLayoutConfig({ rewardCount: rewards, hasUpgradeSection: true, upgradeCount: offered, poolCount: pool, isDesktop }),
           allowHorizontalResize: false,
           hasDividers: true,
         });
@@ -327,11 +328,14 @@ export function battleCases(): BattleCase[] {
   return cases;
 }
 
-export function battleConfig(viewport: Viewport, battleCase: BattleCase, isSuddenDeath: boolean) {
-  const { fixedHeight, zoneColumnWidth } = battleBoardMetrics({
-    isMobile: isMobileViewport(viewport),
-    bannerHeight: isSuddenDeath ? SUDDEN_DEATH_BAR_HEIGHT : 0,
-  });
+/** Sudden Death's banner spans the board and the sidebar above them, so the board gives up the banner's height. */
+export function battleBoard(viewport: Viewport, isSuddenDeath: boolean): Box {
+  const { width, height } = viewport.battleBoard;
+  return isSuddenDeath ? { width, height: height - GAME_BANNER_HEIGHT } : viewport.battleBoard;
+}
+
+export function battleConfig(viewport: Viewport, battleCase: BattleCase) {
+  const { fixedHeight, zoneColumnWidth } = battleBoardMetrics({ isMobile: isMobileViewport(viewport) });
   // Defaults useBattleCardSizes applies to what Battle.tsx passes.
   return {
     ...battleCase,

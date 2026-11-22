@@ -64,7 +64,7 @@ export function BattlerView() {
 
   if (presetLoad.state.status === 'failed') {
     return (
-      <PageFrame header={<HomeHeader newGame />} center contentClassName="items-center">
+      <PageFrame header={<HomeHeader />} center contentClassName="items-center">
         <NoticeTile action={{ label: 'Retry', onClick: presetLoad.retry }}>This preset didn&apos;t load.</NoticeTile>
       </PageFrame>
     )
@@ -72,7 +72,7 @@ export function BattlerView() {
 
   if (authLoading || !user || !battler) {
     return (
-      <PageFrame header={<HomeHeader newGame />} center contentClassName="items-center">
+      <PageFrame header={<HomeHeader />} center contentClassName="items-center">
         <p className="text-amber-200/70">Loading...</p>
       </PageFrame>
     )
@@ -83,7 +83,7 @@ export function BattlerView() {
 
   return (
     <>
-      <DashboardFrame header={<HomeHeader newGame />}>
+      <DashboardFrame>
         <Breadcrumb to="/dashboard" label="Cubes & Decks" current={title} />
         <DetailHero
           imageUri={battler.cube_image_uri}
@@ -98,14 +98,14 @@ export function BattlerView() {
             </span>
             <HeroLink to={`/cube/${encodeURIComponent(battler.cube_id)}`}>View Public Cube Page →</HeroLink>
           </>}
-          chips={[
-            `Mode: ${mode === 'Deck' ? 'Deck (Constructed)' : 'Cube (Limited)'}`,
-            `Upgrades: ${battler.use_upgrades ? 'On' : 'Off'}`,
-            `Default Opponents: ${battler.puppet_count}`,
-            `Open Spectating: ${battler.auto_approve_spectators ? 'On' : 'Off'}`,
+          details={[
+            { label: 'Mode', value: mode === 'Deck' ? 'Deck (Constructed)' : 'Cube (Limited)' },
+            { label: 'Upgrades', value: battler.use_upgrades ? 'On' : 'Off' },
+            { label: 'Default Opponents', value: String(battler.puppet_count) },
+            { label: 'Open Spectating', value: battler.auto_approve_spectators ? 'On' : 'Off' },
           ]}
-          actions={[{ label: 'Edit Preset', onClick: () => setShowSettings(true) }]}
-          play={{ label: 'Play Preset', onClick: () => navigate(battlerPlayUrl(battler)) }}
+          actions={[{ label: 'Edit', onClick: () => setShowSettings(true) }]}
+          play={{ label: 'Play', onClick: () => navigate(battlerPlayUrl(battler)) }}
           stats={[
             { label: 'Your Games', value: battler.my_game_count },
             {

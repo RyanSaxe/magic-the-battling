@@ -206,6 +206,36 @@ def apply_bot_poison(game: Game, opponent: StaticOpponent, poison: int) -> None:
             break
 
 
+def _record_bot_result(
+    game: Game,
+    player: Player,
+    opponent: StaticOpponent,
+    *,
+    player_won: bool,
+    is_draw: bool,
+    poison_dealt: int,
+    poison_taken: int,
+) -> None:
+    winner_name: str | None
+    if player_won:
+        winner_name = player.name
+    elif is_draw:
+        winner_name = None
+    else:
+        winner_name = opponent.name
+
+    for fake in game.puppets:
+        if fake.player_history_id == opponent.source_player_history_id:
+            fake.last_battle_result = LastBattleResult(
+                opponent_name=player.name,
+                winner_name=winner_name,
+                is_draw=is_draw,
+                poison_dealt=poison_taken,
+                poison_taken=poison_dealt,
+            )
+            break
+
+
 def apply_poison_pvp(game: Game, player: Player, opponent: Player, is_draw: bool, winner_name: str | None) -> dict:
     """Apply poison for PvP battle. Returns poison info dict."""
     if is_draw:
@@ -230,7 +260,7 @@ def apply_poison_pvp(game: Game, player: Player, opponent: Player, is_draw: bool
 
 
 def apply_poison_static(game: Game, player: Player, opponent: StaticOpponent, player_won: bool, is_draw: bool) -> dict:
-    """Apply poison for static opponent battle. Returns poison info dict."""
+    """Apply poison and record the puppet's result for a static opponent battle. Returns poison info dict."""
     poison_dealt = 0
     poison_taken = 0
 
@@ -245,6 +275,16 @@ def apply_poison_static(game: Game, player: Player, opponent: StaticOpponent, pl
     else:
         poison_taken = calculate_damage(opponent, use_upgrades=game.config.use_upgrades)
         player.poison += poison_taken
+
+    _record_bot_result(
+        game,
+        player,
+        opponent,
+        player_won=player_won,
+        is_draw=is_draw,
+        poison_dealt=poison_dealt,
+        poison_taken=poison_taken,
+    )
 
     return {"poison_dealt": poison_dealt, "poison_taken": poison_taken}
 
@@ -355,17 +395,6 @@ def start_vs_static_rewards_only(
         poison_taken=poison_taken,
     )
 
-    for fake in game.puppets:
-        if fake.player_history_id == opponent.source_player_history_id:
-            fake.last_battle_result = LastBattleResult(
-                opponent_name=player.name,
-                winner_name=winner_name,
-                is_draw=is_draw,
-                poison_dealt=poison_taken,
-                poison_taken=poison_dealt,
-            )
-            break
-
 
 def set_last_battle_result_no_rewards(
     player: Player, opponent_name: str, *, winner_name: str | None, is_draw: bool, poison_dealt: int, poison_taken: int
@@ -425,16 +454,15 @@ def start_vs_static(game: Game, player: Player, opponent: StaticOpponent, result
         poison_taken=poison_taken,
     )
 
-    for fake in game.puppets:
-        if fake.player_history_id == opponent.source_player_history_id:
-            fake.last_battle_result = LastBattleResult(
-                opponent_name=player.name,
-                winner_name=winner_name,
-                is_draw=is_draw,
-                poison_dealt=poison_taken,
-                poison_taken=poison_dealt,
-            )
-            break
+    _record_bot_result(
+        game,
+        player,
+        opponent,
+        player_won=player_won,
+        is_draw=is_draw,
+        poison_dealt=poison_dealt,
+        poison_taken=poison_taken,
+    )
 
 
 def _start_with_result(game: Game, winner: Player, loser: Player) -> None:

@@ -5,10 +5,10 @@ import type { Phase } from '../constants/phases'
 import { POPOVER_CHROME } from './common/styles'
 
 const PHASE_TITLE_COLOR: Record<Phase, string> = {
-  draft: 'text-purple-300',
-  build: 'text-blue-300',
-  battle: 'text-red-300',
-  reward: 'text-amber-300',
+  draft: 'text-[var(--gold-pale)]',
+  build: 'text-[var(--gold-pale)]',
+  battle: 'text-[#fecaca]',
+  reward: 'text-[var(--gold-pale)]',
 }
 
 interface PhasePopoverProps {

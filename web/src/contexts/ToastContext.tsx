@@ -68,7 +68,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ addToast }}>
       {children}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none">
+      {/* Below the top bar, 8px clear of the felt's 2px gold edge, rather than over the bar's buttons. */}
+      <div className="fixed top-[calc(var(--frame-bar-height)+2px+0.5rem)] left-1/2 -translate-x-1/2 z-[100] flex flex-col items-center gap-2 pointer-events-none">
         {toasts.map(toast => {
           const config = variantConfig[toast.variant]
           return (
@@ -81,7 +82,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               </span>
               <div className="flex-1 min-w-0">
                 <div className="text-[10px] uppercase tracking-widest text-amber-300/80 mb-0.5">{config.label}</div>
-                <p className="text-sm text-[var(--ivory)] leading-snug">{toast.message}</p>
+                <p className="text-sm text-[var(--ivory)] leading-snug break-words">{toast.message}</p>
               </div>
               <button
                 onClick={() => removeToast(toast.id)}
