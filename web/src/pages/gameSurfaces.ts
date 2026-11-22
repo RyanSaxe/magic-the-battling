@@ -1,5 +1,6 @@
 import type { RulesPanelTarget } from "../components/RulesPanel";
 import type { ZoneOwner } from "../dnd/types";
+import type { BattleSelectedCard } from "./phases/Battle";
 
 export type PanelZone = "sideboard" | "graveyard" | "exile" | "library";
 export type UpgradesWindowMode = "auto" | "view" | "reveal";
@@ -71,6 +72,30 @@ export function reduceGameSurface(open: GameSurface | null, event: GameSurfaceEv
       return phase && phase !== event.phase ? null : open;
     }
   }
+}
+
+/** What's open over the board, and the card selected on it or in one of its panels. */
+export interface GameBoard {
+  open: GameSurface | null;
+  selectedCard: BattleSelectedCard | null;
+}
+
+export type GameBoardEvent = GameSurfaceEvent | { type: "select"; card: BattleSelectedCard | null };
+
+export function reduceGameBoard(board: GameBoard, event: GameBoardEvent): GameBoard {
+  if (event.type === "select") {
+    return event.card === board.selectedCard ? board : { ...board, selectedCard: event.card };
+  }
+  const open = reduceGameSurface(board.open, event);
+  if (open === board.open) return board;
+  return { open, selectedCard: closesSelectedCardsPanel(board, open) ? null : board.selectedCard };
+}
+
+function closesSelectedCardsPanel({ open, selectedCard }: GameBoard, next: GameSurface | null): boolean {
+  if (open?.kind !== "zone" || !selectedCard) return false;
+  // Actions takes the panel's place and still acts on the card, so only closing it or opening the player list counts.
+  if (next && !isDrawerOpen(next)) return false;
+  return open.zone === selectedCard.zone && open.owner === selectedCard.owner;
 }
 
 /** The player list is showing in the drawer, with or without a scouting panel beside it. */
