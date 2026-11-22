@@ -2217,6 +2217,7 @@ function GameContent() {
           : "Players"
         }
         onClose={() => setSidebarOpen(false)}
+        headerActions={isEndPhase ? undefined : <HomeButton className="side-panel-home sm:hidden" />}
         closeOnBoardTap
       >
         {sidebar}
