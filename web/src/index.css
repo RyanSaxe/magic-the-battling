@@ -346,8 +346,10 @@ input:-webkit-autofill:focus {
     color: var(--ivory-muted);
   }
 
-  .icon-target:hover {
-    color: var(--ivory);
+  @media (hover: hover) {
+    .icon-target:hover {
+      color: var(--ivory);
+    }
   }
 
   .icon-target:focus-visible {
@@ -1214,8 +1216,10 @@ input:-webkit-autofill:focus {
     min-height: 44px;
   }
 
-  .cube-banner-link:hover {
-    color: var(--color-gold-bright);
+  @media (hover: hover) {
+    .cube-banner-link:hover {
+      color: var(--color-gold-bright);
+    }
   }
 
   .cube-banner-link:focus-visible {
@@ -1440,9 +1444,11 @@ input:-webkit-autofill:focus {
     padding-right: 48px;
   }
 
-  .resume-open:hover {
-    background: var(--stone);
-    --ivory-muted: var(--ivory-soft);
+  @media (hover: hover) {
+    .resume-open:hover {
+      background: var(--stone);
+      --ivory-muted: var(--ivory-soft);
+    }
   }
 
   .resume-open:focus-visible {
@@ -1682,8 +1688,10 @@ input:-webkit-autofill:focus {
     inset: -1px 0 -1px -9px;
   }
 
-  .seat-add:hover:not(:disabled) .seat-status {
-    color: var(--color-gold-bright);
+  @media (hover: hover) {
+    .seat-add:hover:not(:disabled) .seat-status {
+      color: var(--color-gold-bright);
+    }
   }
 
   .seat-add:disabled {
