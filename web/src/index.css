@@ -1223,6 +1223,8 @@ input:-webkit-autofill:focus {
   justify-content: center;
   gap: 6px;
   padding: 8px 16px;
+  /* A hovered card rises over its neighbours, never over a window or panel. */
+  isolation: isolate;
 }
 
 .hand-zone> :hover {
