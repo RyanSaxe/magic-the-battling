@@ -9,6 +9,7 @@ from sqlalchemy import and_, case, distinct, func, or_
 from sqlalchemy.orm import Session, aliased
 
 from mtb.models.types import normalize_play_mode
+from mtb.utils.cubecobra import cube_exists_on_cubecobra
 from server.db import database
 from server.db.models import (
     BattlerFollow,
@@ -211,6 +212,14 @@ def create_battler(
     user: User = Depends(get_current_user),
     db: Session = Depends(_get_db),
 ):
+    try:
+        known = cube_exists_on_cubecobra(request.cube_id)
+    except Exception as error:
+        # When CubeCobra can't be asked, the preset saves as it did before this check.
+        logger.warning("Couldn't ask CubeCobra about cube %s, so saving it unchecked: %r", request.cube_id, error)
+        known = True
+    if not known:
+        raise api_error(404, ErrorCode.CUBE_NOT_FOUND, f"CubeCobra has no cube with the ID '{request.cube_id}'.")
     max_pos = db.query(func.max(UserBattler.position)).filter(UserBattler.user_id == user.id).scalar()
     battler = UserBattler(
         user_id=user.id,

@@ -59,7 +59,7 @@ export function AddCubeModal({
             value={cubeId}
             onChange={(e) => setCubeId(e.target.value)}
             className={TEXT_INPUT}
-            placeholder="e.g. auto"
+            placeholder="e.g. auto, or paste the cube's link"
             autoFocus
             required
           />

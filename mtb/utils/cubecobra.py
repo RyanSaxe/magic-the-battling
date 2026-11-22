@@ -2,10 +2,14 @@ import hashlib
 import os
 import random
 from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import unquote, urlsplit
 from uuid import uuid4
+
+from httpx import HTTPStatusError
 
 from mtb.models.cards import DEFAULT_UPGRADES_ID, DEFAULT_VANGUARD_ID, Card
 from mtb.models.types import UPGRADE_TYPE, VANGUARD_TYPE
+from mtb.utils import json_helpers
 from mtb.utils.json_helpers import revalidate_and_get
 from mtb.utils.scryfall import get_card_from_scryfall
 
@@ -79,12 +83,45 @@ def _mock_cube_data(cube_id: str) -> list[Card]:
     return [_mock_card(cube_id, idx, type_line="creature", rng=rng) for idx in range(MOCK_MAINBOARD_SIZE)]
 
 
+def cube_json_url(cube_id: str) -> str:
+    return f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
+
+
+def cube_id_from_input(text: str) -> str:
+    """The cube ID in what a player entered: the ID itself, or a link to one of the cube's pages on CubeCobra.
+
+    Raises ValueError for a link to anything else.
+    """
+    text = text.strip()
+    if "/" not in text:
+        return text
+    url = urlsplit(text if "://" in text else f"https://{text}")
+    host = url.hostname or ""
+    segments = [segment for segment in url.path.split("/") if segment]
+    # A cube's pages are /cube/<page>/<id>, such as /cube/list/vintage and /cube/overview/vintage.
+    if (host == "cubecobra.com" or host.endswith(".cubecobra.com")) and len(segments) >= 3 and segments[0] == "cube":
+        return unquote(segments[2])
+    raise ValueError(f"not a link to a cube on CubeCobra: {text}")
+
+
+def cube_exists_on_cubecobra(cube_id: str) -> bool:
+    """False when CubeCobra answers that it has no cube with this ID. Other failures to ask it are raised."""
+    if _env_flag_enabled(MOCK_CUBE_DATA_ENV):
+        return True
+    try:
+        json_helpers.get_json(cube_json_url(cube_id))
+    except HTTPStatusError as error:
+        if error.response.status_code == 404:
+            return False
+        raise
+    return True
+
+
 def get_cube_data(cube_id: str) -> list[Card]:
     if _env_flag_enabled(MOCK_CUBE_DATA_ENV):
         return _mock_cube_data(cube_id)
 
-    url = f"https://cubecobra.com/cube/api/cubejson/{cube_id}"
-    data = revalidate_and_get(url)
+    data = revalidate_and_get(cube_json_url(cube_id))
     cube = data["cards"]["mainboard"]
 
     results = list(_CARD_EXECUTOR.map(cubecobra_to_card, cube))

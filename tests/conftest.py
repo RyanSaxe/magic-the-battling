@@ -243,6 +243,16 @@ def reset_singletons():
     clear_registry()
 
 
+@pytest.fixture(autouse=True)
+def offline_cubecobra(monkeypatch):
+    """Fail every cached JSON fetch, such as CubeCobra's cube JSON, unless a test answers it."""
+
+    def _no_network(url: str):
+        raise LookupError(url)
+
+    monkeypatch.setattr("mtb.utils.json_helpers.get_json", _no_network)
+
+
 @pytest.fixture
 def mock_cube_data(card_factory, upgrade_factory, monkeypatch):
     """Mock cubecobra to avoid network calls."""
