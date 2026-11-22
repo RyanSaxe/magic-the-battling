@@ -317,9 +317,8 @@ export function Lobby() {
     );
   }, [hostName, selfName, addToast]);
 
-  const copyJoinCode = async () => {
-    if (!lobbyState?.join_code) return;
-    await copyText(lobbyState.join_code);
+  const copyJoinLink = async () => {
+    if (!(await copyText(`${window.location.origin}/game/${gameId}/lobby`))) return;
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -443,7 +442,7 @@ export function Lobby() {
             <span className="setup-caption join-code-caption">Join code</span>
             <span className="join-code">{lobbyState.join_code}</span>
           </div>
-          <button onClick={copyJoinCode} className={`btn btn-pill ${copyIsNext ? "btn-primary" : "btn-secondary"}`}>
+          <button onClick={copyJoinLink} className={`btn btn-pill ${copyIsNext ? "btn-primary" : "btn-secondary"}`}>
             {copied ? "Copied!" : "Copy"}
           </button>
           <div className="seat-stepper">
