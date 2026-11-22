@@ -114,7 +114,11 @@ export function BattlerView() {
               detail: battler.my_game_count > 0 ? `(${winRate(battler.my_win_count, battler.my_game_count)})` : undefined,
             },
             { label: 'Avg Finish', value: battler.my_average_placement?.toFixed(1) ?? '—' },
-            { label: 'All Cube Games', value: battler.game_count, detail: countLabel(battler.human_player_count, 'player') },
+            {
+              label: 'All Cube Games',
+              value: battler.game_count,
+              detail: <span className="block whitespace-nowrap">{countLabel(battler.human_player_count, 'player')}</span>,
+            },
           ]}
           caption={`Your games, wins and finish count your finished games on this cube in ${mode} mode with upgrades ${battler.use_upgrades ? 'on' : 'off'}.`}
         />
