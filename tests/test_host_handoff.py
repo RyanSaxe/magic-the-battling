@@ -125,3 +125,26 @@ def test_removing_the_host_seat_passes_the_role_on(client, ws_receive_json, dmit
         ws_module.game_manager.remove_player_from_pending(game_id, anya_id)
 
     assert _host(client, game_id) == expected_host
+
+
+def test_the_lobby_names_the_previous_host_until_the_role_passes_again(
+    client, short_grace, ws_receive_json, ws_receive_json_until
+):
+    game_id, seats = _lobby(client, ["Anya", "Boris"])
+
+    def previous_host_id() -> str | None:
+        return client.get(f"/api/games/{game_id}/lobby").json()["previous_host_id"]
+
+    assert previous_host_id() is None
+    with _connect(client, game_id, seats["Boris"]) as boris:
+        ws_receive_json(boris)
+        with _connect(client, game_id, seats["Anya"]) as anya:
+            ws_receive_json(anya)
+        ws_receive_json_until(boris, _hosted_by("Boris"), description="Boris as host")
+
+        with _connect(client, game_id, seats["Anya"]) as anya:
+            first_state = ws_receive_json(anya)
+            assert first_state["payload"]["previous_host_id"] == seats["Anya"]["player_id"]
+
+            ws_module.game_manager.remove_player_from_pending(game_id, seats["Boris"]["player_id"])
+            assert previous_host_id() == seats["Boris"]["player_id"]

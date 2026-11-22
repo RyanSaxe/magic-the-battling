@@ -354,6 +354,8 @@ export interface LobbyState {
   use_upgrades: boolean
   guided_mode_default: boolean
   voice_chat_enabled: boolean
+  auto_approve_spectators: boolean
+  previous_host_id: string | null
   play_mode: PlayMode
 }
 

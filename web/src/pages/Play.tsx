@@ -632,9 +632,16 @@ export function Play() {
                 )}
                 <GuidedSwitch enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
               </div>
-              <button onClick={startNewGame} disabled={!nameValid} className="btn btn-primary setup-next">
-                {activeMode === "solo" ? "Start Game" : "Create Lobby"}
-              </button>
+              <div className="play-actions">
+                {activeMode === "friends" && (
+                  <button onClick={() => setShowJoinModal(true)} className="btn btn-secondary setup-next play-join">
+                    Join Game
+                  </button>
+                )}
+                <button onClick={startNewGame} disabled={!nameValid} className="btn btn-primary setup-next">
+                  {activeMode === "solo" ? "Start Game" : "Create Lobby"}
+                </button>
+              </div>
             </div>
             <ResumeShelf
               seats={seats}
