@@ -490,7 +490,7 @@ export function Lobby() {
       }
     };
   }
-  useHotkeys(lobbyHotkeyMap, !!session && !guideTakesKeys);
+  useHotkeys(lobbyHotkeyMap, !!session);
 
   useEffect(() => {
     if (gameState) {
