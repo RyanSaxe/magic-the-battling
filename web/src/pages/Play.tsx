@@ -17,6 +17,8 @@ import { saveTabSession } from "../utils/tabSession";
 import {
   forgetSeatForGame,
   getDefaultNewPlayerPreference,
+  getRememberedGuestName,
+  rememberGuestName,
   rememberPlayerForGame,
   setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
@@ -105,11 +107,13 @@ function useSoloLobbyWatcher(
   return { reset };
 }
 
-function useRandomMtgName(): [string, (v: string) => void, boolean] {
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(true);
+function useGuestName(): [string, (v: string) => void, boolean] {
+  const [rememberedName] = useState(getRememberedGuestName);
+  const [name, setName] = useState(rememberedName ?? "");
+  const [loading, setLoading] = useState(rememberedName === null);
 
   useEffect(() => {
+    if (rememberedName !== null) return;
     let cancelled = false;
     getLegendaryName().then((n) => {
       if (!cancelled) {
@@ -120,7 +124,7 @@ function useRandomMtgName(): [string, (v: string) => void, boolean] {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [rememberedName]);
 
   return [name, setName, loading];
 }
@@ -321,9 +325,9 @@ export function Play() {
   const resumableGames = useResumableGames();
 
   const { user } = useAuth();
-  const [randomName, setRandomName, nameLoading] = useRandomMtgName();
-  const playerName = user ? user.username : randomName;
-  const setPlayerName = user ? () => {} : setRandomName;
+  const [guestName, setGuestName, nameLoading] = useGuestName();
+  const playerName = user ? user.username : guestName;
+  const setPlayerName = user ? () => {} : setGuestName;
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showFriendsAdvanced, setShowFriendsAdvanced] = useState(false);
   const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
@@ -508,6 +512,7 @@ export function Play() {
         playMode,
       });
       saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
+      if (!user) rememberGuestName(name);
       rememberPlayerForGame(response.game_id, name, {
         seatToken: response.seat_token,
         joinCode: response.join_code,
@@ -551,6 +556,7 @@ export function Play() {
         playMode,
       });
       saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
+      if (!user) rememberGuestName(name);
       rememberPlayerForGame(response.game_id, name, {
         seatToken: response.seat_token,
         joinCode: response.join_code,
