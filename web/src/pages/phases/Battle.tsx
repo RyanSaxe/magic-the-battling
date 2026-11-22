@@ -246,7 +246,7 @@ export function BattlePhase({
     )
   }
 
-  const { your_zones, opponent_zones, opponent_hand_count: oppHandCount, opponent_hand_revealed } = battle
+  const { your_zones, opponent_zones, opponent_hand_count: oppHandCount, opponent_hand_revealed, opponent_name } = battle
 
   const canManipulateOpponent = battle.can_manipulate_opponent
   const allowOpponentHandInteraction = canInteractWithBattleZone({
@@ -453,6 +453,7 @@ export function BattlePhase({
           <div className="flex flex-col shrink-0 battle-side-column battle-side-column-opponent" style={{ width: zoneColumnWidth }}>
             <CompactZoneDisplay
               title="Library"
+              panelTitle={`${opponent_name}'s Library`}
               zone="library"
               cards={opponent_zones.library}
               height={opponentTopZoneHeight}
@@ -493,6 +494,7 @@ export function BattlePhase({
             />
             <CompactZoneDisplay
               title="Graveyard"
+              panelTitle={`${opponent_name}'s Graveyard`}
               zone="graveyard"
               cards={opponent_zones.graveyard}
               height={opponentMidZoneHeight}
@@ -514,6 +516,7 @@ export function BattlePhase({
             />
             <CompactZoneDisplay
               title="Exile"
+              panelTitle={`${opponent_name}'s Exile`}
               zone="exile"
               cards={opponent_zones.exile}
               height={opponentBottomZoneHeight}
