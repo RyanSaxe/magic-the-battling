@@ -2464,12 +2464,20 @@ input:-webkit-autofill:focus {
   color: var(--ivory-muted);
 }
 
-/* Poison and treasure keep one width, so the label after them starts at the same place on every card */
+/* Poison and treasure keep one width, 34px and a 2px gap, so the label after them starts at the same place on every
+   card. They grow to it from their contents, so a crowded line takes their spare room before it shortens the label,
+   and the odds keep the card's padding. */
+.player-card-line:last-child {
+  gap: 2px;
+}
+
 .player-card-stat {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  min-width: 32px;
+  flex: 1 0 auto;
+  min-width: max-content;
+  max-width: 34px;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -2480,6 +2488,9 @@ input:-webkit-autofill:focus {
 }
 
 .player-card-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
