@@ -140,7 +140,8 @@ test.describe('a stylesheet that arrives after the game renders', () => {
     const crashed = page.getByRole('heading', { name: 'Something went wrong' })
     await expect(page.locator('main .card').first().or(crashed)).toBeAttached()
     await page.waitForTimeout(500)
-    await page.addStyleTag({ content: stylesheet })
+    // Shadows move no box, and painting them takes Linux WebKit seconds for each frame that waitForStableLayout waits on.
+    await page.addStyleTag({ content: `${stylesheet}\n*, ::before, ::after { box-shadow: none !important; }` })
 
     await expect(crashed).toHaveCount(0)
     await waitForStableLayout(page)
