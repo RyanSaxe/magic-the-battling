@@ -213,11 +213,11 @@ class ConnectionManager:
 
     async def close_spectators(self, game_id: str) -> None:
         for sockets in self._spectators.pop(game_id, {}).values():
-            await _close_spectator_sockets(sockets, GAME_ENDED_CLOSE_CODE, "Game ended")
+            await _close_sockets(sockets, GAME_ENDED_CLOSE_CODE, "Game ended")
 
     async def _close_spectators_of(self, game_id: str, target_player_name: str) -> None:
         sockets = self._spectators.get(game_id, {}).pop(target_player_name, [])
-        await _close_spectator_sockets(sockets, SPECTATE_TARGET_GONE_CLOSE_CODE, "Target player not found")
+        await _close_sockets(sockets, SPECTATE_TARGET_GONE_CLOSE_CODE, "Target player not found")
 
     async def send_spectate_requests(self, game_id: str, target_player_name: str) -> None:
         """Send a player every request still waiting on their answer, oldest first."""
@@ -245,6 +245,13 @@ class ConnectionManager:
         task = loop.create_task(work)
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
+
+    def end_seat_connection(self, game_id: str, player_id: str) -> None:
+        websocket = self._connections.get(game_id, {}).get(player_id)
+        if websocket is None:
+            return
+        self.disconnect(game_id, player_id, websocket)
+        self._run_soon(_close_sockets([websocket], GAME_ENDED_CLOSE_CODE, "Game ended"))
 
     async def send_to_player(self, game_id: str, player_id: str, message: dict):
         if game_id in self._connections and player_id in self._connections[game_id]:
@@ -412,12 +419,12 @@ def _game_is_loaded(game_id: str) -> bool:
     return game_manager.get_pending_game(game_id) is not None or game_manager.get_game(game_id) is not None
 
 
-async def _close_spectator_sockets(sockets: list[WebSocket], code: int, reason: str) -> None:
+async def _close_sockets(sockets: list[WebSocket], code: int, reason: str) -> None:
     for ws in sockets:
         try:
             await ws.close(code=code, reason=reason)
         except Exception:
-            logger.debug("Spectator socket was already closed", exc_info=True)
+            logger.debug("Socket was already closed", exc_info=True)
 
 
 async def _close_replaced_socket(websocket: WebSocket) -> None:

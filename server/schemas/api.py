@@ -81,6 +81,11 @@ class JoinGameResponse(BaseModel):
     seat_token: str
 
 
+class CloseSeatRequest(BaseModel):
+    player_name: str
+    seat_token: str
+
+
 class ResumableSeat(BaseModel):
     game_id: str
     player_name: str

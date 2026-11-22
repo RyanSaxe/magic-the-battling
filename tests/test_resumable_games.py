@@ -4,7 +4,7 @@ import pytest
 
 import server.routers.ws as ws_module
 from server.db import database
-from server.db.models import CubeMetadata
+from server.db.models import CubeMetadata, GameRecord
 
 
 def _resumable(client, *seats: tuple[str, str, str]) -> list[dict]:
@@ -63,6 +63,54 @@ def test_leaves_out_missing_games_and_finished_seats(start_lobby, client, game_w
     )
 
     assert [g["player_name"] for g in listed] == ["Alice"]
+
+
+def _close(client, game_id: str, name: str, seat_token: str):
+    return client.post(f"/api/games/{game_id}/close", json={"player_name": name, "seat_token": seat_token})
+
+
+def test_closing_a_game_with_one_human_ends_it_for_good(start_lobby, client, monkeypatch):
+    game_manager = ws_module.game_manager
+    monkeypatch.setattr(game_manager, "_count_available_bots", lambda pending: 1)
+    created = client.post(
+        "/api/games",
+        json={"player_name": "Alice", "cube_id": "test", "target_player_count": 2, "puppet_count": 1},
+    ).json()
+    game_id, seat_token = created["game_id"], created["seat_token"]
+    assert start_lobby(game_id, created["session_id"]).status_code == 200
+    game_manager.mark_game_dirty(game_id)
+    game_manager.persist_dirty_games()
+
+    assert _close(client, game_id, "Alice", seat_token).status_code == 204
+
+    assert _resumable(client, (game_id, "Alice", seat_token)) == []
+    rejoin = client.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Alice", "seat_token": seat_token})
+    assert rejoin.status_code == 404
+    with database.SessionLocal() as session:
+        record = session.get(GameRecord, game_id)
+        assert record is not None
+        assert record.ended_at is not None
+
+
+def test_a_game_with_other_players_cannot_be_closed(start_lobby, client, game_with_players):
+    game_id = game_with_players["game_id"]
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
+    seat_token = game_with_players["alice"]["seat_token"]
+
+    assert _close(client, game_id, "Alice", seat_token).status_code == 409
+
+    assert [g["player_name"] for g in _resumable(client, (game_id, "Alice", seat_token))] == ["Alice"]
+
+
+def test_only_the_seat_holder_can_leave_a_lobby(client, game_with_players):
+    game_id = game_with_players["game_id"]
+    alice, bob = game_with_players["alice"]["seat_token"], game_with_players["bob"]["seat_token"]
+
+    assert _close(client, game_id, "Alice", bob).status_code == 403
+    assert _close(client, game_id, "Alice", alice).status_code == 204
+
+    lobby = client.get(f"/api/games/{game_id}/lobby").json()
+    assert [player["name"] for player in lobby["players"]] == ["Bob"]
 
 
 @pytest.fixture
