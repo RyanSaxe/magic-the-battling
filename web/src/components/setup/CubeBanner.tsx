@@ -37,7 +37,7 @@ export function CubeBanner({
       <div className="cube-banner-top">
         {notice}
         {(name || href) && (
-          <div className="cube-banner-title">
+          <div className={`cube-banner-title ${name ? '' : 'is-unnamed'}`}>
             <h2 className={`cube-banner-name ${nameSize(name)}`}>
               {href ? (
                 <a

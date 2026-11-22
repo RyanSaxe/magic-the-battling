@@ -1230,6 +1230,11 @@ input:-webkit-autofill:focus {
     font-size: 11px;
   }
 
+  /* While the name is looked up the link keeps its place and label, without a lone arrow and tag to show for it */
+  .cube-banner-title.is-unnamed :is(.cube-banner-arrow, .tag) {
+    visibility: hidden;
+  }
+
   .cube-banner-action {
     display: flex;
     margin-left: auto;
