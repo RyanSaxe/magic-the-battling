@@ -215,4 +215,19 @@ describe('Game: what is open over the board', () => {
     fireEvent.click(guideButton)
     expect(screen.getByRole('button', { name: 'Minimize guide' })).toBeTruthy()
   })
+
+  it('goes back to a link\'s page when the same link is taken again', async () => {
+    vi.stubGlobal('innerWidth', 1280)
+    await openGame(gameBootstrap({ phase: 'draft', counts: { pack: 2, sideboard: 2 } }))
+    const followControlsLink = () => {
+      fireEvent.click(find('[data-guide-target="timeline-phase-draft"]'))
+      fireEvent.click(screen.getByRole('button', { name: 'Controls' }))
+    }
+    followControlsLink()
+    fireEvent.click(screen.getByRole('radio', { name: 'FAQ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
+
+    followControlsLink()
+    expect(screen.getByRole('radio', { name: 'Controls' }).getAttribute('aria-checked')).toBe('true')
+  })
 })
