@@ -15,25 +15,30 @@ function scryfallImage(id: string, size: CardImageSize): string {
 }
 
 /**
- * The final hand, overlapping like a fan. The cards grow to fill the box the card gives them, so a
- * game card stretched to match its row still looks full, and they shrink to fit the box's width.
+ * The final hand, overlapping like a fan, and shrinking to fit the box's width. Without a maxHeight the cards grow
+ * to fill the box the card gives them, so a game card stretched to match its row still looks full. With one, the
+ * box is as tall as the cards, up to maxHeight, so a narrow card leaves no gap around a hand that had to shrink.
  */
 function HandFan({
   scryfallIds,
   className = 'min-h-[60px] flex-1',
   imageSize = 'small',
   centered = false,
+  maxHeight,
 }: {
   scryfallIds: string[]
   className?: string
   imageSize?: CardImageSize
   centered?: boolean
+  maxHeight?: number
 }) {
   const cards = scryfallIds.slice(0, MAX_HAND_CARDS)
   if (cards.length === 0) return null
   const fitsWidth = `calc((100cqw + ${HAND_OVERLAP_PX * (cards.length - 1)}px) / ${cards.length} * 1.4)`
+  const height = maxHeight === undefined ? `min(100cqh, ${fitsWidth})` : `min(${maxHeight}px, ${fitsWidth})`
+  const container = maxHeight === undefined ? '[container-type:size]' : '[container-type:inline-size]'
   return (
-    <div className={`${className} [container-type:size]`}>
+    <div className={`${className} ${container}`}>
       <div className={`flex h-full items-center ${centered ? 'justify-center' : ''}`}>
         {cards.map((id, index) => (
           <img
@@ -42,7 +47,7 @@ function HandFan({
             alt=""
             loading="lazy"
             className="aspect-[5/7] rounded-[4px] border border-black/60 bg-black/60 object-cover"
-            style={{ height: `min(100cqh, ${fitsWidth})`, marginLeft: index === 0 ? 0 : -HAND_OVERLAP_PX }}
+            style={{ height, marginLeft: index === 0 ? 0 : -HAND_OVERLAP_PX }}
           />
         ))}
       </div>
@@ -131,10 +136,10 @@ export function RecapCard({ game }: { game: GameSummary }) {
   return (
     <SurfaceCard as="article" layout="tile" onClick={() => navigate(href)} className={GAME_CARD_CLASS}>
       <GameRank game={game} />
-      <div className="flex min-w-0 flex-1 flex-col gap-2 px-3 py-2.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
         <GameHeader title={game.best_human_name} href={href} game={game} />
         {game.hand_scryfall_ids.length > 0 && (
-          <HandFan scryfallIds={game.hand_scryfall_ids} className="h-[111px]" imageSize="normal" centered />
+          <HandFan scryfallIds={game.hand_scryfall_ids} className="" maxHeight={111} imageSize="normal" centered />
         )}
       </div>
     </SurfaceCard>
