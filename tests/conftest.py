@@ -67,6 +67,11 @@ def _disable_ws_compression(monkeypatch):
     monkeypatch.setattr("server.compression.WS_COMPRESSION_ENABLED", False)
 
 
+@pytest.fixture(autouse=True)
+def _no_default_cube_fetch_at_startup(monkeypatch):
+    monkeypatch.setattr(main_module, "start_loading_default_cube", lambda: None)
+
+
 def _unique_objects[T](objects: list[T]) -> list[T]:
     seen: set[int] = set()
     unique: list[T] = []
