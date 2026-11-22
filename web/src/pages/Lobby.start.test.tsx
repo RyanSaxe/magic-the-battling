@@ -135,3 +135,29 @@ describe('Lobby: starting the game', () => {
     expect(button('Start Game').disabled).toBe(false)
   })
 })
+
+describe('Lobby: a refused deck', () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    FakeWebSocket.instances = []
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it("doesn't head the lobby as if it had loaded", async () => {
+    const socket = await openLobbyAs('host')
+    const [host, guest] = lobby().players
+    const refused = { ...host, is_ready: false, battler_id: 'banned-deck', battler_status: 'error' as const, battler_error: 'A card is banned.' }
+    send(socket, { type: 'lobby_state', payload: lobby({ play_mode: 'constructed', can_start: false, players: [refused, guest] }) })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+
+    expect(screen.getByRole('heading', { name: 'No deck yet' })).toBeTruthy()
+  })
+})

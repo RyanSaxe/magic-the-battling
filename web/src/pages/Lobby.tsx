@@ -164,7 +164,9 @@ export function Lobby() {
   const hasLoadedBattler = battlerStatus === "ready";
   const isBattlerLoading = battlerStatus === "loading";
   const isStarting = lobbyState?.start_status === "starting";
-  const summaryBattlerId = (isConstructed ? currentPlayer?.battler_id : lobbyState?.cube_id) ?? null;
+  // A refused deck isn't the player's, though the field keeps its ID to correct.
+  const deckId = battlerStatus === "error" ? null : currentPlayer?.battler_id;
+  const summaryBattlerId = (isConstructed ? deckId : lobbyState?.cube_id) ?? null;
   const cubeLook = useCubeLook(summaryBattlerId);
   const readyActionDisabled =
     isStarting ||

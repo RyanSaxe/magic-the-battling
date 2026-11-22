@@ -47,13 +47,13 @@ export function CubeBanner({
                   aria-label={name ? undefined : 'Open on CubeCobra'}
                   className="cube-banner-link"
                 >
-                  <span>
+                  <span className="cube-banner-words">
                     {name}
                     <span aria-hidden="true" className="cube-banner-arrow">{'\u00a0'}↗</span>
                   </span>
                 </a>
               ) : (
-                name
+                <span className="cube-banner-words">{name}</span>
               )}
             </h2>
             <Tag tone="muted">{playMode === 'constructed' ? 'Deck' : 'Cube'}</Tag>
