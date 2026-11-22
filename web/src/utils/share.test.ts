@@ -4,6 +4,7 @@ import type { Card, ShareGameResponse, SharePlayerSnapshot } from '../types'
 import {
   buildGameSummaryData,
   buildSharePlayerViews,
+  getShareBoardSnapshot,
   getShareHiddenZones,
   getSharePlayerRowBadge,
   getShareRoundBand,
@@ -307,6 +308,15 @@ describe('share rounds with a Sudden Death', () => {
     expect(getSharePlayerRowBadge(carol, 'Bob', firstSuddenDeath)).toBe('alive')
     expect(getSharePlayerRowBadge(carol, 'Bob', secondSuddenDeath)).toBe('dead')
     expect(getSharePlayerRowBadge(bob, 'Carol', secondSuddenDeath)).toBe('alive')
+  })
+
+  it('shows an out player\'s last build in later rounds, and none for a survivor sitting out a Sudden Death', () => {
+    const [alice, , carol] = makeSuddenDeathShareData().players
+    const [, firstSuddenDeath, secondSuddenDeath] = carol.snapshots
+    const roundAfter = getShareRoundValue(alice.snapshots[1])
+
+    expect(getShareBoardSnapshot(carol, roundAfter)).toBe(secondSuddenDeath)
+    expect(getShareBoardSnapshot(alice, getShareRoundValue(firstSuddenDeath))).toBeNull()
   })
 
   it('bands a Sudden Death build, unless the round is hidden while the game goes on', () => {
