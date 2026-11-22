@@ -5,6 +5,8 @@ import { unknownToAppError } from '../../utils/appError'
 import { DefaultOpponentsField } from './DefaultOpponentsField'
 import { FIELD_LABEL, OPTION_BOX, TEXT_INPUT } from '../common/styles'
 import { Dialog } from '../common/Dialog'
+import { InfoTip } from '../common/InfoTip'
+import { UPGRADES_HELP } from '../../constants/rules'
 
 export function AddCubeModal({
   initialCubeId = '',
@@ -87,16 +89,18 @@ export function AddCubeModal({
           <span className="text-[var(--ivory-muted)] text-xs">— bring your own deck</span>
         </label>
 
-        <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
-          <input
-            type="checkbox"
-            checked={useUpgrades}
-            onChange={(e) => setUseUpgrades(e.target.checked)}
-            className="w-4 h-4"
-          />
-          <span className="text-white text-sm">Upgrades</span>
-          <span className="text-[var(--ivory-muted)] text-xs">— upgrade a card every 3 rounds</span>
-        </label>
+        <div className={`${OPTION_BOX} pl-3 pr-1 flex items-center`}>
+          <label className="flex items-center gap-2 py-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={useUpgrades}
+              onChange={(e) => setUseUpgrades(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <span className="text-white text-sm">Upgrades</span>
+          </label>
+          <InfoTip label="What upgrades are" text={UPGRADES_HELP} />
+        </div>
 
         <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />
       </div>
