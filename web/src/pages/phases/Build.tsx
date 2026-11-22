@@ -504,24 +504,26 @@ export function BuildPhase({
                 />
                 {renderQuickUpgradeButton(card, cardIsCompanion)}
                 {cardIsCompanion && (
-                  <button
-                    disabled={locked}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isActiveCompanion) {
-                        actions.buildRemoveCompanion();
-                      } else {
-                        actions.buildSetCompanion(card.id);
-                      }
-                    }}
-                    className={`absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg ${
-                      isActiveCompanion
-                        ? "bg-amber-500/90 text-black disabled:opacity-50 disabled:cursor-not-allowed"
-                        : "btn-game"
-                    }`}
-                  >
-                    {isActiveCompanion ? "Companion" : "Set Companion"}
-                  </button>
+                  <div className="card-overlay">
+                    <button
+                      disabled={locked}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isActiveCompanion) {
+                          actions.buildRemoveCompanion();
+                        } else {
+                          actions.buildSetCompanion(card.id);
+                        }
+                      }}
+                      className={`card-companion absolute bottom-0 left-0 right-0 text-center font-medium rounded-b-lg ${
+                        isActiveCompanion
+                          ? "bg-amber-500/90 text-black disabled:opacity-50 disabled:cursor-not-allowed"
+                          : "btn-game"
+                      }`}
+                    >
+                      {isActiveCompanion ? "Companion" : "Set Companion"}
+                    </button>
+                  </div>
                 )}
               </div>
             );

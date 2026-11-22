@@ -1495,6 +1495,7 @@ input:-webkit-autofill:focus {
   z-index: 20;
   container-type: size;
   pointer-events: none;
+  --companion-text: min(10px, 12.5cqw);
 }
 
 /* Upgrade and Apply. Full size from an 85px card up, with padding that stays light on the smallest one. */
@@ -1509,9 +1510,18 @@ input:-webkit-autofill:focus {
   white-space: nowrap;
 }
 
-/* A companion's own button fills the edge below. */
+/* One line at any size. Wrapped, it covered the card's middle and left Upgrade nowhere to sit. */
+.card-companion {
+  padding-block: 2px;
+  font-size: var(--companion-text);
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+/* Clears the companion's button by a pixel. */
 .card-pill-raised {
-  bottom: max(8.5cqh, 1.375rem);
+  bottom: max(8.5cqh, calc(var(--companion-text) * 1.5 + 5px));
 }
 
 /* Drag overlay */
