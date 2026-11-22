@@ -154,6 +154,43 @@ describe('Game: watching a player build', () => {
   })
 })
 
+describe("Game: watching a player's Round Wrap-Up", () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    // The board measures itself, and jsdom has no ResizeObserver.
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+    FakeWebSocket.instances = []
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it('enlarges an upgrade the spectator taps, and never selects it', async () => {
+    const { catalog, state } = gameBootstrap({ phase: 'reward', counts: { upgrades: 2 } })
+    const stageEnd = {
+      ...state,
+      available_upgrades: state.self_player.upgrades,
+      self_player: { ...state.self_player, upgrades: [], is_stage_increasing: true },
+    }
+    saveTabSpectate('game-1', { target: 'Alice', requestId: 'request-1', sessionId: 'spectator-session' })
+    renderGame()
+    await settle()
+    act(() => FakeWebSocket.latest().serverOpen())
+    await act(async () => {
+      FakeWebSocket.latest().serverMessage({ type: 'game_bootstrap', payload: { catalog, state: stageEnd } })
+    })
+
+    const upgrade = document.querySelector<HTMLElement>('[data-guide-target="reward-upgrades"] .card')!
+    fireEvent.click(upgrade)
+    expect(upgrade.classList.contains('selected')).toBe(false)
+    expect(document.querySelector('[data-card-preview-modal]')).not.toBeNull()
+  })
+})
+
 describe('Game: opening a game link', () => {
   beforeEach(() => {
     installMemoryLocalStorage()
