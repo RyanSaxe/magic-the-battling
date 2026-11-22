@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { InfoIcon } from '../icons/InfoIcon'
+import { BoardBackdrop } from './BoardBackdrop'
 import { POPOVER_CHROME } from './styles'
 
 const TIP_WIDTH = 256
@@ -15,27 +16,33 @@ function placeBeside(anchor: DOMRect): CSSProperties {
     : { left, width, top: anchor.bottom }
 }
 
-/** An ⓘ that explains the setting beside it on hover, focus or tap. */
+/** An ⓘ that explains the setting beside it on hover or focus, and until the next press when clicked or tapped. */
 export function InfoTip({ label, text }: { label: string; text: string }) {
   const id = useId()
   const buttonRef = useRef<HTMLButtonElement>(null)
-  const [placement, setPlacement] = useState<CSSProperties | null>(null)
-  const isOpen = placement !== null
+  const backdropRef = useRef<HTMLDivElement>(null)
+  const [tip, setTip] = useState<{ placement: CSSProperties; pinned: boolean } | null>(null)
+  const isOpen = tip !== null
 
-  const show = () => {
-    if (buttonRef.current) setPlacement(placeBeside(buttonRef.current.getBoundingClientRect()))
+  const show = (pinned: boolean) => {
+    const button = buttonRef.current
+    if (!button) return
+    const placement = placeBeside(button.getBoundingClientRect())
+    setTip((open) => ({ placement, pinned: pinned || !!open?.pinned }))
   }
-  const hide = () => setPlacement(null)
+  const hide = () => setTip(null)
 
   useEffect(() => {
     if (!isOpen) return
     const onPointerDown = (event: PointerEvent) => {
-      if (!buttonRef.current?.contains(event.target as Node)) hide()
+      const target = event.target as Node
+      if (buttonRef.current?.contains(target) || backdropRef.current?.contains(target)) return
+      hide()
     }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') hide()
     }
-    const follow = () => show()
+    const follow = () => show(false)
     window.addEventListener('pointerdown', onPointerDown)
     window.addEventListener('keydown', onKeyDown)
     window.addEventListener('resize', follow)
@@ -56,26 +63,31 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
         aria-label={label}
         aria-expanded={isOpen}
         aria-describedby={isOpen ? id : undefined}
-        onClick={show}
-        onFocus={show}
-        onBlur={hide}
+        onClick={() => (tip?.pinned ? hide() : show(true))}
+        onFocus={() => show(false)}
+        // Pressing the backdrop blurs the button to nothing. The backdrop closes the tip on the click that follows.
+        onBlur={(event) => {
+          if (!tip?.pinned || event.relatedTarget) hide()
+        }}
         onPointerEnter={(event) => {
-          if (event.pointerType === 'mouse') show()
+          if (event.pointerType === 'mouse') show(false)
         }}
         onPointerLeave={(event) => {
-          if (event.pointerType === 'mouse' && document.activeElement !== buttonRef.current) hide()
+          if (event.pointerType === 'mouse' && !tip?.pinned && document.activeElement !== buttonRef.current) hide()
         }}
         className="icon-target"
       >
         <InfoIcon size="md" className="h-3.5 w-3.5" />
       </button>
+      {/* Only a pinned tip covers the felt: over a hovered one, the cover would end the hover */}
+      {tip?.pinned && <BoardBackdrop ref={backdropRef} onTap={hide} />}
       {/* Out of the setup screens' scroll and zoom, which would clip and misplace it */}
-      {placement &&
+      {tip &&
         createPortal(
           <span
             id={id}
             role="tooltip"
-            style={placement}
+            style={tip.placement}
             className={`pointer-events-none fixed z-[60] p-2 text-left text-[11px] leading-4 text-[var(--ivory)] min-[1920px]:text-sm ${POPOVER_CHROME}`}
           >
             {text}
