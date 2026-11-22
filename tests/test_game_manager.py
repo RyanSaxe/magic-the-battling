@@ -463,7 +463,7 @@ class TestConstructedLobbyRules:
 
         assert success is False
         assert error is not None
-        assert "battler" in error.lower()
+        assert "deck" in error.lower()
 
     def test_can_start_constructed_game_once_all_battlers_are_loaded(self, game_manager, card_factory):
         pending = game_manager.create_game(player_name="Alice", player_id="alice_pid", play_mode="constructed")
