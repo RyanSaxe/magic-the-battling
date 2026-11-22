@@ -7,7 +7,7 @@ from typing import Any, Literal
 from pydantic import AliasChoices, BaseModel, Field, PrivateAttr, field_validator, model_serializer
 
 from mtb.models.card_registry import export_registry, import_registry
-from mtb.models.cards import Battler, Card
+from mtb.models.cards import Battler, Card, fold_card_name
 from mtb.models.types import Phase, PlayMode, ZoneName, normalize_play_mode
 
 
@@ -442,7 +442,7 @@ def set_player_battlers(game: Game, battlers_by_player: dict[str, Battler]) -> N
     first_battler = next(iter(battlers_by_player.values()))
     game.battler = first_battler if game.config.play_mode == "limited" else None
 
-    upgrades = sorted(first_battler.upgrades, key=lambda u: u.name)
+    upgrades = sorted(first_battler.upgrades, key=lambda u: fold_card_name(u.name))
     max_upgrades = game.config.max_available_upgrades
     game.available_upgrades = upgrades[:max_upgrades]
 

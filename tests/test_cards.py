@@ -114,12 +114,12 @@ def test_validate_constructed_battler_requires_100_cards(card_factory):
         validate_constructed_battler(battler)
 
 
-def test_validate_constructed_battler_requires_singleton(card_factory):
-    cards = [card_factory(f"c{i}") for i in range(99)]
-    cards.append(card_factory("c0"))
+@pytest.mark.parametrize(("first", "again"), [("c0", "c0"), ("Lórien Revealed", "lorien revealed")])
+def test_validate_constructed_battler_requires_singleton(card_factory, first, again):
+    cards = [card_factory(first), *(card_factory(f"c{i}") for i in range(1, 99)), card_factory(again)]
     battler = Battler(cards=cards, upgrades=[], vanguards=[], source_id="duplicates")
 
-    with pytest.raises(ValueError, match="not singleton because c0 appears more than once"):
+    with pytest.raises(ValueError, match=f"not singleton because {again} appears more than once"):
         validate_constructed_battler(battler)
 
 

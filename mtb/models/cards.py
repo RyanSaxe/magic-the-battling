@@ -284,7 +284,7 @@ def fold_card_name(name: str) -> str:
 
 
 def _normalize_card_name(name: str) -> str:
-    return name.strip().casefold().replace("\u2019", "'")
+    return fold_card_name(name.strip()).replace("\u2019", "'")
 
 
 def _get_banned_card_names(play_mode: PlayMode) -> set[str]:

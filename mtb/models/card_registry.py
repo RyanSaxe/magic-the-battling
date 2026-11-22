@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, TypedDict
 
 if TYPE_CHECKING:
@@ -63,8 +63,16 @@ def derive_scryfall_id(card_id: str) -> str:
     return card_id
 
 
+def _prefer_real_name(scryfall_id: str, name: str) -> None:
+    # Games share this registry, and those saved before cards kept their real names have them in lowercase.
+    known = _card_registry[scryfall_id]
+    if known.name == known.name.lower() and name != name.lower():
+        _card_registry[scryfall_id] = replace(known, name=name)
+
+
 def register_card_data(scryfall_id: str, data: dict) -> None:
     if scryfall_id in _card_registry:
+        _prefer_real_name(scryfall_id, data.get("name", ""))
         return
 
     raw_token_ids = data.get("token_scryfall_ids")
@@ -158,7 +166,7 @@ def import_registry(data: dict[str, dict]) -> None:
             token_ids = fields.get("token_scryfall_ids", ())
             if isinstance(token_ids, list):
                 token_ids = tuple(token_ids)
-            _card_registry[sid] = CardData(
+            saved = CardData(
                 name=fields.get("name", ""),
                 image_url=fields.get("image_url", ""),
                 type_line=fields.get("type_line", ""),
@@ -174,6 +182,9 @@ def import_registry(data: dict[str, dict]) -> None:
                 hand_modifier=fields.get("hand_modifier"),
                 token_scryfall_ids=token_ids,
             )
+            # A cube loading on another thread can have registered the card since the check above.
+            _card_registry.setdefault(sid, saved)
+        _prefer_real_name(sid, fields.get("name", ""))
 
 
 def clear_registry() -> None:

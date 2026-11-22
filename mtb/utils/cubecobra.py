@@ -135,7 +135,7 @@ def cubecobra_to_card(card_json: dict) -> Card:
         # NOTE: get_json is cached so this shouldn't be an issue for repeated tokens
         tokens = tuple(get_card_from_scryfall(token) for token in tokens)
     return Card(
-        name=card_json["name_lower"],
+        name=card_json["name"],
         image_url=card_json["image_normal"],
         png_url=card_json.get("image_large"),
         elo=card_json["elo"],
