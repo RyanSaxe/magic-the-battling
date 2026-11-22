@@ -24,6 +24,7 @@ from mtb.models.cards import (
     DEFAULT_VANGUARD_ID,
     Battler,
     Card,
+    IllegalBattlerError,
     build_battler,
     validate_battler,
 )
@@ -1048,11 +1049,11 @@ class GameManager:
             case BattlerReady():
                 return True, None
             case BattlerLoading():
-                return False, "Battler is still loading"
+                return False, "Your deck is still loading"
             case BattlerFailed(error=error):
                 return False, error
             case BattlerMissing():
-                return False, "Submit a valid battler before readying up"
+                return False, "Submit a valid deck before readying up"
 
     def set_player_ready(self, game_id: str, player_id: str, is_ready: bool) -> tuple[bool, str | None]:
         pending = self._pending_games.get(game_id)
@@ -1076,7 +1077,7 @@ class GameManager:
             return False, LOBBY_STARTING_MESSAGE
 
         if pending.play_mode != "constructed":
-            return False, "Battler submission is only available in constructed mode"
+            return False, "Deck submission is only available in constructed mode"
 
         if player_id not in pending.player_ids:
             return False, "Player not found"
@@ -1111,7 +1112,7 @@ class GameManager:
 
         if pending.play_mode == "constructed":
             if not all(isinstance(pending.player_battlers.get(pid), BattlerReady) for pid in pending.player_ids):
-                return "All players must submit a valid battler"
+                return "All players must submit a valid deck"
         elif pending.battler_error:
             return pending.battler_error
 
@@ -1218,7 +1219,7 @@ class GameManager:
             )
         except Exception as e:
             logger.warning("Failed to load cube %s for start: %s", pending.cube_id, e)
-            raise LobbyStartFailedError(self._normalize_battler_error(pending.cube_id, e)) from e
+            raise LobbyStartFailedError(self._normalize_battler_error(pending.cube_id, pending.play_mode, e)) from e
 
     def _create_started_game(self, pending: PendingGame, db: Session | None) -> Game:
         config = Config(
@@ -1438,19 +1439,20 @@ class GameManager:
     def _load_constructed_battler(self, battler_id: str, use_upgrades: bool, use_vanguards: bool) -> Battler:
         return self._load_battler(battler_id, use_upgrades, use_vanguards, play_mode="constructed")
 
-    def _normalize_battler_error(self, battler_id: str, error: Exception) -> str:
-        if isinstance(error, ValueError):
-            return str(error)
-        if isinstance(error, HTTPStatusError):
-            if error.response.status_code in {403, 404}:
-                return (
-                    f"Couldn't load battler '{battler_id}'. "
-                    "Check that the CubeCobra ID is correct and the battler is public."
-                )
-            return f"Couldn't load battler '{battler_id}' right now. Please try again."
-        if isinstance(error, RequestError):
-            return f"Couldn't load battler '{battler_id}' right now. Please try again."
-        return f"Couldn't load battler '{battler_id}'. Please try again."
+    def _normalize_battler_error(self, battler_id: str, play_mode: PlayMode, error: Exception) -> str:
+        noun = "deck" if play_mode == "constructed" else "cube"
+        if isinstance(error, IllegalBattlerError):
+            return f"{noun.capitalize()} '{battler_id}' is illegal: {error.problem}"
+        # CubeCobra answers an ID with a slash in it, such as a pasted link, with a web page and status 200.
+        if isinstance(error, json.JSONDecodeError) or (
+            isinstance(error, HTTPStatusError) and error.response.status_code in {403, 404}
+        ):
+            return (
+                f"Couldn't load {noun} '{battler_id}'. Check that the CubeCobra ID is correct and the {noun} is public."
+            )
+        if isinstance(error, HTTPStatusError | RequestError):
+            return f"Couldn't load {noun} '{battler_id}' right now. Please try again."
+        return f"Couldn't load {noun} '{battler_id}'. Please try again."
 
     async def _preload_battler(
         self, pending: PendingGame, on_complete: Callable[[], Coroutine[Any, Any, None]] | None = None
@@ -1471,7 +1473,7 @@ class GameManager:
             pending.battler = battler
         except Exception as e:
             logger.warning("Failed to preload battler %s: %s", pending.cube_id, e)
-            pending.battler_error = self._normalize_battler_error(pending.cube_id, e)
+            pending.battler_error = self._normalize_battler_error(pending.cube_id, pending.play_mode, e)
         finally:
             pending.battler_loading = False
             if on_complete:
@@ -1517,7 +1519,7 @@ class GameManager:
             loaded = BattlerReady(battler_id, battler)
         except Exception as e:
             logger.warning("Failed to preload player battler %s: %s", battler_id, e)
-            loaded = BattlerFailed(battler_id, self._normalize_battler_error(battler_id, e))
+            loaded = BattlerFailed(battler_id, self._normalize_battler_error(battler_id, "constructed", e))
 
         slot = pending.player_battlers.get(player_id)
         if isinstance(slot, BattlerLoading) and slot.task is _current_task():
@@ -1536,16 +1538,16 @@ class GameManager:
         if not pending.accepts_changes:
             return LOBBY_STARTING_MESSAGE
         if pending.play_mode != "constructed":
-            return "Battler submission is only available in constructed mode"
+            return "Deck submission is only available in constructed mode"
         if player_id not in pending.player_ids:
             return "Player not found"
         if not battler_id:
-            return "Please provide a battler ID"
+            return "Please enter your deck's CubeCobra ID"
 
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            return "Unable to load battler right now"
+            return "Unable to load your deck right now"
         task = loop.create_task(self._preload_player_battler(pending, player_id, battler_id, on_complete))
         self._set_player_battler(pending, player_id, BattlerLoading(battler_id, task))
         return None
@@ -1677,7 +1679,7 @@ class GameManager:
         for player_id, player_name in zip(pending.player_ids, pending.player_names, strict=False):
             player_battler = pending.player_battlers.get(player_id)
             if not isinstance(player_battler, BattlerReady):
-                raise LobbyStartFailedError("All players must submit a valid battler")
+                raise LobbyStartFailedError("All players must submit a valid deck")
             battlers_by_player[player_name] = player_battler.battler
         return battlers_by_player
 
