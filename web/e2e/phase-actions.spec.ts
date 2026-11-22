@@ -1,10 +1,9 @@
-import type { Locator, Page, WebSocketRoute } from '@playwright/test'
+import type { Page, WebSocketRoute } from '@playwright/test'
 import { expect, serveGame, test } from './helpers'
 import { GAME_ID, gameBootstrap, type ScreenState } from './gameStates'
 
 const BUILD: ScreenState = { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 } }
 const REWARD: ScreenState = { phase: 'reward', counts: { sideboard: 8 } }
-const FIGHT: ScreenState = { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 } }
 
 async function openGame(page: Page, baseURL: string, screen: ScreenState) {
   const actions: string[] = []
@@ -51,15 +50,14 @@ test('a double click on Continue sends one reward_done', async ({ page, baseURL 
   expect(game.sent('reward_done')).toBe(1)
 })
 
+const FIGHT: ScreenState = { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 } }
+
 // A locator click waits for two frames, and WebKit on Linux can go seconds between frames while a game first
 // renders. The menu tests send the click event, or click a position where what lies on top matters.
-async function middleOf(target: Locator) {
-  const { x, y, width, height } = (await target.boundingBox())!
-  return [x + width / 2, y + height / 2] as const
-}
 
 // A row that moves as its submenu opens puts a different row under the next tap.
-async function expectOpensInPlace(row: Locator) {
+async function expectOpensInPlace(page: Page, name: string) {
+  const row = page.getByRole('button', { name })
   const before = await row.boundingBox()
   await row.dispatchEvent('click')
   await expect(row).toHaveAttribute('aria-expanded', 'true')
@@ -68,17 +66,17 @@ async function expectOpensInPlace(row: Locator) {
 
 test("Move To opens in place in a hand card's menu", async ({ page, baseURL }) => {
   await openGame(page, baseURL!, FIGHT)
-  const [x, y] = await middleOf(page.locator('[data-guide-card-id^="battle-hand"]').first())
-  await page.mouse.click(x, y, { button: 'right' })
+  const card = (await page.locator('[data-guide-card-id^="battle-hand"]').first().boundingBox())!
+  await page.mouse.click(card.x + card.width / 2, card.y + card.height / 2, { button: 'right' })
 
-  await expectOpensInPlace(page.getByRole('button', { name: 'Move To' }))
+  await expectOpensInPlace(page, 'Move To')
 })
 
 test('Roll a Die opens in place in the Actions menu', async ({ page, baseURL }) => {
   await openGame(page, baseURL!, FIGHT)
   await page.getByRole('button', { name: 'Actions' }).dispatchEvent('click')
 
-  await expectOpensInPlace(page.getByRole('button', { name: 'Roll a Die' }))
+  await expectOpensInPlace(page, 'Roll a Die')
 })
 
 test('a card moved from the Actions menu is no longer selected', async ({ page, baseURL }) => {
@@ -100,8 +98,8 @@ test('a bar button acts on the first click while the Actions menu is open', asyn
   await page.getByRole('button', { name: 'Actions' }).dispatchEvent('click')
   await expect(page.getByRole('button', { name: 'Roll a Die' })).toBeVisible()
 
-  const [x, y] = await middleOf(page.getByRole('button', { name: 'Submit Result' }))
-  await page.mouse.click(x, y)
+  const submit = (await page.getByRole('button', { name: 'Submit Result' }).boundingBox())!
+  await page.mouse.click(submit.x + submit.width / 2, submit.y + submit.height / 2)
 
   await expect(page.locator('[data-guide-target="battle-submit-popover"]').getByRole('button', { name: 'I Won' })).toBeVisible()
 })
