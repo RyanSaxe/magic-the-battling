@@ -6,7 +6,7 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), selec
 
 /**
  * A dialog over a dimmed page: a walnut card with a title and a ✕ that closes it. Clicking the
- * dimmed page closes it too. When the dialog is taller than the screen, as on a landscape phone,
+ * dimmed page or pressing Escape closes it too. When the dialog is taller than the screen, as on a landscape phone,
  * its body scrolls under the title so ✕ stays in reach. Pass onSubmit to make the card a form.
  *
  * Opening it moves keyboard focus to its first control, and closing it returns focus to whatever
@@ -39,6 +39,17 @@ export function Dialog({
       if (opener instanceof HTMLElement && opener.isConnected) opener.focus()
     }
   }, [opener])
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+      // Handled, so a panel open under the dialog doesn't close with it.
+      event.preventDefault()
+      onClose()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [onClose])
 
   const cardProps = {
     role: 'dialog',
