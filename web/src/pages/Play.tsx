@@ -219,6 +219,7 @@ export function Play() {
   const [friendsLoading, setFriendsLoading] = useState(false);
   // Cancel can't recall a request, so each answer checks that its start is still the one wanted.
   const startAttemptRef = useRef(0);
+  const unfinishedStartRef = useRef<string | null>(null);
 
   const [soloPhase, setSoloPhase] = useState<SoloPhase>("idle");
   const soloPhaseRef = useRef<SoloPhase>("idle");
@@ -262,7 +263,21 @@ export function Play() {
   );
 
   useEffect(() => {
+    unfinishedStartRef.current = pendingGameId;
+  }, [pendingGameId]);
+
+  // Leaving Play gives up an unfinished start as Cancel does. A reload or closed tab never unmounts it, so ends nothing.
+  useEffect(
+    () => () => {
+      startAttemptRef.current += 1;
+      if (unfinishedStartRef.current) abandonStart(unfinishedStartRef.current);
+    },
+    [],
+  );
+
+  useEffect(() => {
     if (gameState?.game_id === pendingGameId && pendingGameId) {
+      unfinishedStartRef.current = null;
       const state: LoadingRouteState = { loadingSteps: goldfishSteps(playMode) };
       navigate(`/game/${pendingGameId}/play`, { state });
     }
@@ -275,6 +290,7 @@ export function Play() {
       lobbyState?.game_id === pendingGameId &&
       lobbyState.cube_loading_status === "ready"
     ) {
+      unfinishedStartRef.current = null;
       const state: LoadingRouteState = { loadingSteps: newLobbySteps(playMode) };
       navigate(`/game/${pendingGameId}/lobby`, { state });
     }
@@ -332,6 +348,7 @@ export function Play() {
       );
       // A seat that moved is still the player's, in the tab or on the device that took it.
       if (connectionError.code !== "SEAT_MOVED") abandonStart(pendingGameId);
+      unfinishedStartRef.current = null;
       startTransition(() => {
         setPendingGameId(null);
         setPendingSessionId(null);
