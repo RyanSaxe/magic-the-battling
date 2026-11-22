@@ -16,11 +16,11 @@ export function ResumeBanner({ seat }: { seat: ResumableSeat }) {
     >
       <div className="flex min-w-0 items-center gap-3">
         {seat.cubeImageUri && (
-          <img src={seat.cubeImageUri} alt="" className="h-[46px] w-[46px] shrink-0 rounded-[7px] border gold-border object-cover" />
+          <img src={seat.cubeImageUri} alt="" className="h-[46px] w-[46px] shrink-0 rounded-[6px] border gold-border object-cover" />
         )}
         <div className="min-w-0">
           <div
-            className={`flex items-center gap-1.5 text-[10.5px] leading-4 font-bold uppercase tracking-[0.1em] ${
+            className={`flex items-center gap-1.5 text-[10px] leading-4 font-bold uppercase tracking-[0.08em] ${
               inGame ? 'text-[#86efac]' : 'text-[var(--color-gold-bright)]'
             }`}
           >
@@ -32,7 +32,7 @@ export function ResumeBanner({ seat }: { seat: ResumableSeat }) {
             {resumeHeadline(seat)}
           </div>
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <span className="truncate text-[15px] leading-5 font-semibold text-[var(--ivory)]">{seat.cubeName ?? seat.cubeId}</span>
+            <span className="truncate text-[14px] leading-5 font-semibold text-[var(--ivory)]">{seat.cubeName ?? seat.cubeId}</span>
             <span className="text-xs text-[var(--ivory-muted)]">{resumeDetail(seat)}</span>
           </div>
         </div>

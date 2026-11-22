@@ -52,7 +52,7 @@ export function LayoutResetControl({
       <div className="relative">
         <button
           type="button"
-          className="btn-secondary rounded-md px-2.5 py-1 text-[10px] uppercase tracking-[0.18em]"
+          className="btn-secondary rounded-md px-2.5 py-1 text-[10px] uppercase tracking-[0.12em]"
           onClick={() => setConfirmOpen((open) => !open)}
         >
           Reset Layout
@@ -61,7 +61,7 @@ export function LayoutResetControl({
           <div
             className={`${popover} w-64 ${POPOVER_CHROME} px-3 py-2 text-left`}
           >
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-200">
               Reset {phaseLabel}
             </div>
             {isInherited && originStage != null && originRound != null && (

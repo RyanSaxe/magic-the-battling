@@ -34,14 +34,14 @@ export function Banner({ title, tone = 'gold', size = 'game', note, info }: Bann
       <div className="frame-chrome h-full flex items-center justify-center gap-2.5 whitespace-nowrap leading-none px-3">
         <span
           className={`min-w-0 truncate font-['Cinzel',serif] font-bold uppercase ${
-            compact ? 'text-[13px] tracking-[0.22em]' : 'text-[15px] tracking-[0.14em]'
+            compact ? 'text-[13px] tracking-[0.12em]' : 'text-[14px] tracking-[0.12em]'
           } ${TITLE_TONE[tone]}`}
         >
           {title}
         </span>
         {note && (
           <>
-            <span className="hero-sep text-[15px]">·</span>
+            <span className="hero-sep text-[14px]">·</span>
             <span className="text-[13px] text-[var(--color-gold-dark)]">{note}</span>
           </>
         )}

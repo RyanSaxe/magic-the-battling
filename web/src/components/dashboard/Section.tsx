@@ -5,7 +5,7 @@ import { SurfaceCard } from '../common/SurfaceCard'
 import { SECTION_TITLE_TYPE } from './typography'
 import { LINK } from '../common/styles'
 
-const SECTION_META_TYPE = 'text-[12.5px] leading-5'
+const SECTION_META_TYPE = 'text-[12px] leading-5'
 
 export function SectionTitle({ children }: { children: ReactNode }) {
   return <h2 className={`${SECTION_TITLE_TYPE} text-amber-200/80`}>{children}</h2>

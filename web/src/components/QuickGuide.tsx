@@ -424,7 +424,7 @@ function PhaseControlsContent({ phase }: { phase: Phase }) {
 
       {hotkeys.length > 0 && (
         <div>
-          <h2 className="text-[0.9375rem] font-semibold text-[var(--ivory)] tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
+          <h2 className="text-sm font-semibold text-[var(--ivory)] tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
             Keyboard Shortcuts
           </h2>
           <div className="space-y-1.5">
@@ -437,7 +437,7 @@ function PhaseControlsContent({ phase }: { phase: Phase }) {
 
       {hoverHotkeys.length > 0 && (
         <div>
-          <h2 className="text-[0.9375rem] font-semibold text-[var(--ivory)] tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
+          <h2 className="text-sm font-semibold text-[var(--ivory)] tracking-wide mt-5 mb-2 border-b border-amber-400/15 pb-1">
             When Hovering a Card
           </h2>
           <div className="space-y-1.5">
