@@ -55,6 +55,23 @@ const FIGHT: ScreenState = { phase: 'battle', counts: { hand: 5, lands: 4, nonla
 // A locator click waits for two frames, and WebKit on Linux can go seconds between frames while a game first
 // renders. The menu tests send the click event, or click a position where what lies on top matters.
 
+// A row that moves as its submenu opens puts a different row under the next tap.
+async function expectOpensInPlace(page: Page, name: string) {
+  const row = page.getByRole('button', { name })
+  const before = await row.boundingBox()
+  await row.dispatchEvent('click')
+  await expect(row).toHaveAttribute('aria-expanded', 'true')
+  expect(await row.boundingBox()).toEqual(before)
+}
+
+test("Move To opens in place in a hand card's menu", async ({ page, baseURL }) => {
+  await openGame(page, baseURL!, FIGHT)
+  const card = (await page.locator('[data-guide-card-id^="battle-hand"]').first().boundingBox())!
+  await page.mouse.click(card.x + card.width / 2, card.y + card.height / 2, { button: 'right' })
+
+  await expectOpensInPlace(page, 'Move To')
+})
+
 test('a card moved from the Actions menu is no longer selected', async ({ page, baseURL }) => {
   const game = await openGame(page, baseURL!, FIGHT)
   const creature = page.locator('[data-guide-card-id^="your-creature"]').first()
