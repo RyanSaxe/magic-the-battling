@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { authGetMe, authLogin, authLogout, authRegister, getResumableGames } from '../api/client'
 import { forgetAccountSeats } from '../utils/deviceIdentity'
+import { dropForgottenSessions } from '../utils/tabSession'
 import { AuthContext } from './authState'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -29,6 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const accountSeats = await getResumableGames([])
     await authLogout()
     forgetAccountSeats(accountSeats)
+    // Only other tabs hear that storage changed.
+    dropForgottenSessions()
     setUser(null)
   }, [])
 

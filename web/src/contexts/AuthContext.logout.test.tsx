@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { authLogout, closeSeat, getResumableGames, rejoinGame } from '../api/client'
 import { useGameSeat } from '../hooks/useGameSeat'
 import { installMemoryLocalStorage } from '../test/memoryStorage'
-import { getRememberedSeat, rememberPlayerForGame } from '../utils/deviceIdentity'
-import { readTabSession, saveTabSession } from '../utils/tabSession'
+import { forgetSeatForGame, getRememberedSeat, rememberPlayerForGame } from '../utils/deviceIdentity'
+import { readTabSession, saveTabSession, watchForForgottenSeats } from '../utils/tabSession'
 import { AuthProvider } from './AuthContext'
 import { useAuth } from './authState'
 
@@ -25,6 +25,13 @@ vi.mock('../api/client', () => ({
 }))
 
 const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{children}</AuthProvider>
+
+function tellOtherTabs(change: () => void) {
+  const key = 'mtb_game_player_map'
+  const oldValue = localStorage.getItem(key)
+  change()
+  window.dispatchEvent(new StorageEvent('storage', { key, oldValue, newValue: localStorage.getItem(key) }))
+}
 
 async function signedInBrowser() {
   rememberPlayerForGame('account-game', 'kess', { seatToken: 'account-token' })
@@ -63,9 +70,11 @@ describe('Log Out', () => {
     const openTab = renderHook(() => useGameSeat('account-game'))
     expect(openTab.result.current.seat.kind).toBe('held')
 
+    const before = localStorage.getItem('mtb_game_player_map')
     await act(() => auth.result.current.logout())
+    const newValue = localStorage.getItem('mtb_game_player_map')
     act(() => {
-      window.dispatchEvent(new StorageEvent('storage', { key: 'mtb_game_player_map' }))
+      window.dispatchEvent(new StorageEvent('storage', { key: 'mtb_game_player_map', oldValue: before, newValue }))
     })
 
     expect(auth.result.current.user).toBeNull()
@@ -84,6 +93,34 @@ describe('Log Out', () => {
     const resumed = renderHook(() => useGameSeat(seat.game_id))
     await waitFor(() => expect(resumed.result.current.seat.kind).toBe('held'))
     expect(rejoinGame).toHaveBeenLastCalledWith('account-game', 'kess', null)
+  })
+
+  it('a guest taking a seat in that game later brings back no session of the account', async () => {
+    const auth = await signedInBrowser()
+
+    await act(() => auth.result.current.logout())
+    rememberPlayerForGame('account-game', 'Norin', { seatToken: 'new-guest-token' })
+
+    expect(readTabSession('account-game')).toBeNull()
+  })
+
+  it('a tab on another page drops the session before anything remembers that game again', () => {
+    rememberPlayerForGame('account-game', 'kess', { seatToken: 'account-token' })
+    saveTabSession('account-game', { sessionId: 'account-game-session', playerId: 'account-game' })
+    const stopWatching = watchForForgottenSeats()
+
+    tellOtherTabs(() => forgetSeatForGame('account-game'))
+    rememberPlayerForGame('account-game', 'Norin', { seatToken: 'new-guest-token' })
+
+    expect(readTabSession('account-game')).toBeNull()
+    stopWatching()
+  })
+
+  it('a name remembered without its token brings back no session', () => {
+    rememberPlayerForGame('account-game', 'kess')
+    saveTabSession('account-game', { sessionId: 'restored-tab-session', playerId: 'account-game' })
+
+    expect(readTabSession('account-game')).toBeNull()
   })
 
   it.each([

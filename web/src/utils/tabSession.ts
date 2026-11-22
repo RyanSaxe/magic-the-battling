@@ -1,4 +1,4 @@
-import { hasForgottenSeat } from './deviceIdentity'
+import { hasForgottenSeat, onSeatsForgotten } from './deviceIdentity'
 
 const LEGACY_SESSION_KEY = 'mtb_session'
 const LEGACY_PLAYER_KEY = 'mtb_player'
@@ -56,6 +56,21 @@ export function saveTabSession(gameId: string, session: TabSession): void {
 
 export function clearTabSession(gameId: string): void {
   sessionStorage.removeItem(sessionKey(gameId))
+}
+
+/** Drops this tab's sessions for seats the browser has forgotten, before anything can remember those games again. */
+export function dropForgottenSessions(): void {
+  for (const key of Object.keys(sessionStorage)) {
+    if (!key.startsWith(SESSION_KEY_PREFIX)) continue
+    const gameId = key.slice(SESSION_KEY_PREFIX.length)
+    if (hasForgottenSeat(gameId)) clearTabSession(gameId)
+  }
+}
+
+/** Drops this tab's sessions as their seats are forgotten, whatever page it shows. */
+export function watchForForgottenSeats(): () => void {
+  dropForgottenSessions()
+  return onSeatsForgotten((gameIds) => gameIds.forEach(clearTabSession))
 }
 
 /** The request this tab made to watch a player in one game, with its spectator session once approved. */

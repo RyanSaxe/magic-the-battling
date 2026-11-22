@@ -40,8 +40,15 @@ function readTrackedPlayerMap(): TrackedPlayerMap {
   if (!canUseStorage()) return {};
 
   try {
-    const raw = window.localStorage.getItem(GAME_PLAYER_MAP_KEY);
-    if (!raw) return {};
+    return parseTrackedPlayerMap(window.localStorage.getItem(GAME_PLAYER_MAP_KEY));
+  } catch {
+    return {};
+  }
+}
+
+function parseTrackedPlayerMap(raw: string | null): TrackedPlayerMap {
+  if (!raw) return {};
+  try {
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") return {};
 
@@ -221,19 +228,21 @@ export function forgetAccountSeats(seats: { game_id: string; player_name: string
 }
 
 /**
- * Whether this browser let go of its seat in a game it played, as Log Out and closing do. Forgetting always writes the
- * remembered seats back, so a browser without them stored hasn't forgotten any.
+ * Whether this browser let go of its seat in a game it played, as Log Out and closing do. A name without a token holds
+ * no seat: Resume remembers one before the server agrees. Forgetting always writes the remembered seats back, so a
+ * browser without them stored hasn't forgotten any.
  */
 export function hasForgottenSeat(gameId: string): boolean {
   if (!canUseStorage() || window.localStorage.getItem(GAME_PLAYER_MAP_KEY) === null) return false;
-  return getRememberedSeat(gameId) === null;
+  return !getRememberedSeat(gameId)?.seatToken;
 }
 
-/** Calls `listener` when another tab changes the seats this browser remembers. */
-export function onRememberedSeatsChanged(listener: () => void): () => void {
+/** Calls `listener` with the games whose seats another tab forgot, even if one has been remembered again since. */
+export function onSeatsForgotten(listener: (gameIds: string[]) => void): () => void {
   const onStorage = (event: StorageEvent) => {
-    // A null key is another tab clearing all of storage.
-    if (event.key === GAME_PLAYER_MAP_KEY || event.key === null) listener();
+    if (event.key !== GAME_PLAYER_MAP_KEY) return;
+    const kept = parseTrackedPlayerMap(event.newValue);
+    listener(Object.keys(parseTrackedPlayerMap(event.oldValue)).filter((gameId) => !(gameId in kept)));
   };
   window.addEventListener("storage", onStorage);
   return () => window.removeEventListener("storage", onStorage);

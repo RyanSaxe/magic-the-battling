@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { rejoinGame } from '../api/client'
 import { type AppError, unknownToAppError } from '../utils/appError'
-import {
-  forgetSeatForGame,
-  getRememberedSeat,
-  hasForgottenSeat,
-  onRememberedSeatsChanged,
-  rememberPlayerForGame,
-} from '../utils/deviceIdentity'
+import { forgetSeatForGame, getRememberedSeat, onSeatsForgotten, rememberPlayerForGame } from '../utils/deviceIdentity'
 import { type TabSession, clearTabSession, readTabSession, saveTabSession } from '../utils/tabSession'
 
 /**
@@ -91,8 +85,8 @@ export function useGameSeat(gameId: string, { claimAutomatically = true }: { cla
 
   useEffect(() => {
     if (seat.kind !== 'held') return
-    return onRememberedSeatsChanged(() => {
-      if (!hasForgottenSeat(gameId)) return
+    return onSeatsForgotten((gameIds) => {
+      if (!gameIds.includes(gameId)) return
       clearTabSession(gameId)
       setSeat({ kind: 'none' })
     })
