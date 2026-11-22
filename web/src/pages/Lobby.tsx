@@ -323,6 +323,7 @@ export function Lobby() {
 
   const [copied, setCopied] = useState(false);
   const [showRulesPanel, setShowRulesPanel] = useState(false);
+  const [guideMinimized, setGuideMinimized] = useState(false);
   const [isGuidedMode, setIsGuidedMode] = useState(() =>
     getDefaultNewPlayerPreference(),
   );
@@ -452,11 +453,16 @@ export function Lobby() {
 
   const lobbyHotkeyMap: Record<string, () => void> = {
     "?": () => {
+      if (showRulesPanel) {
+        setShowRulesPanel(false);
+        return;
+      }
       setRulesPanelTarget(undefined);
       setShowRulesPanel(true);
     },
   };
-  if (lobbyState && currentPlayer && !showRulesPanel) {
+  const guideTakesKeys = showRulesPanel && !guideMinimized;
+  if (lobbyState && currentPlayer && !guideTakesKeys) {
     const isHost = currentPlayer.is_host;
     lobbyHotkeyMap["r"] = toggleReady;
     if (isConstructed) {
@@ -473,7 +479,7 @@ export function Lobby() {
       }
     };
   }
-  useHotkeys(lobbyHotkeyMap, !!session && !showRulesPanel);
+  useHotkeys(lobbyHotkeyMap, !!session && !guideTakesKeys);
 
   useEffect(() => {
     if (gameState) {
@@ -537,6 +543,7 @@ export function Lobby() {
   const rulesPanel = showRulesPanel && (
     <RulesPanel
       onClose={() => setShowRulesPanel(false)}
+      onMinimizedChange={setGuideMinimized}
       initialDocId={rulesPanelTarget?.docId}
       initialTab={rulesPanelTarget?.tab}
       gameId={gameId}
@@ -1053,6 +1060,7 @@ export function Lobby() {
       {showRulesPanel && (
         <RulesPanel
           onClose={() => setShowRulesPanel(false)}
+          onMinimizedChange={setGuideMinimized}
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
           gameId={gameId}

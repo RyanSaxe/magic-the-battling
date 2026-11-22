@@ -1060,6 +1060,7 @@ function GameContent() {
 
   const rulesPanel = openSurface?.kind === "guide" ? openSurface : null;
   const rulesPanelOpen = rulesPanel !== null;
+  const [guideMinimized, setGuideMinimized] = useState(false);
   const shareOpen = openSurface?.kind === "share";
 
   // Hover tracking for hotkeys
@@ -1328,7 +1329,7 @@ function GameContent() {
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
   // A zone panel sits beside the board rather than over it, so the Fight's hotkeys keep working while one is open.
   const modalOpen =
-    rulesPanelOpen ||
+    (rulesPanelOpen && !guideMinimized) ||
     showUpgradesModal ||
     actionMenuOpen ||
     shareOpen ||
@@ -2624,6 +2625,7 @@ function GameContent() {
       {rulesPanel && (
         <RulesPanel
           onClose={() => closeSurface("guide")}
+          onMinimizedChange={setGuideMinimized}
           initialDocId={rulesPanel.target?.docId}
           initialTab={rulesPanel.target?.tab}
           gameId={gameId}
