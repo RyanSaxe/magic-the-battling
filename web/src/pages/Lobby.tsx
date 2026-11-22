@@ -330,6 +330,7 @@ export function Lobby() {
       helpers={
         <GuideButton
           onClick={() => openGuide()}
+          className={showRulesPanel && guideMinimized ? "btn-dot-phone" : ""}
         />
       }
       home={<HomeButton />}

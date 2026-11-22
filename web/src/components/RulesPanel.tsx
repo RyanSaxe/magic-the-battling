@@ -60,7 +60,7 @@ const MOBILE_PANEL_TOP_GAP_PX = 48
 const MOBILE_PANEL_BOTTOM_GAP_PX = 24
 const MOBILE_PANEL_MIN_HEIGHT_PX = 280
 const MOBILE_PANEL_MAX_WIDTH_PX = 720
-const MOBILE_COLLAPSED_LABEL_FALLBACK = 'Rules'
+const COLLAPSED_LABEL_FALLBACK = 'Rules'
 
 function isDesktopViewport(): boolean {
   return typeof window !== 'undefined' && window.innerWidth >= DESKTOP_BREAKPOINT_PX
@@ -122,16 +122,6 @@ function resolveInitialDesktopWindowState(): DesktopWindowState | null {
   )
 }
 
-function defaultMobileCollapsedOrigin(viewport: ViewportBox, collapsedHeight: number) {
-  const panel = collapsedPanelSize(viewport, collapsedHeight)
-  return clampDesktopPanelOrigin(
-    Math.round(viewport.left + (viewport.width - panel.width) / 2),
-    viewport.top + WINDOW_MARGIN_PX,
-    panel,
-    viewport,
-  )
-}
-
 export function RulesPanel({
   onClose,
   minimized: isCollapsed,
@@ -149,8 +139,7 @@ export function RulesPanel({
   const [desktopWindow, setDesktopWindow] = useState<DesktopWindowState | null>(() =>
     resolveInitialDesktopWindowState(),
   )
-  const [navigationHint, setNavigationHint] = useState(MOBILE_COLLAPSED_LABEL_FALLBACK)
-  const [mobileCollapsedOrigin, setMobileCollapsedOrigin] = useState<{ x: number; y: number } | null>(null)
+  const [navigationHint, setNavigationHint] = useState(COLLAPSED_LABEL_FALLBACK)
   const [interaction, setInteraction] = useState<InteractionState>(null)
   const [collapsedPanelHeight, setCollapsedPanelHeight] = useState(DEFAULT_COLLAPSED_PANEL_HEIGHT_PX)
   const collapsedPanelRef = useRef<HTMLDivElement | null>(null)
@@ -172,17 +161,6 @@ export function RulesPanel({
     ? getDesktopPanelRect(resolvedDesktopWindow, desktopViewport, isCollapsed, collapsedPanelHeight)
     : null
   const mobileViewport = !isDesktop ? currentViewportBox() : null
-  const mobileCollapsedRect = mobileViewport
-    ? (() => {
-        const panel = collapsedPanelSize(mobileViewport, collapsedPanelHeight)
-        const origin = mobileCollapsedOrigin ?? defaultMobileCollapsedOrigin(mobileViewport, collapsedPanelHeight)
-        return {
-          width: panel.width,
-          height: panel.height,
-          ...clampDesktopPanelOrigin(origin.x, origin.y, panel, mobileViewport),
-        }
-      })()
-    : null
 
   const syncDesktopWindow = useCallback((collapsed: boolean) => {
     if (!isDesktopViewport()) {
@@ -222,22 +200,7 @@ export function RulesPanel({
   }, [onMinimizedChange, stopInteraction])
 
   const beginDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    if (isDesktop) {
-      if (!desktopPanel) {
-        return
-      }
-      event.preventDefault()
-      setInteraction({
-        type: 'drag',
-        startPointerX: event.clientX,
-        startPointerY: event.clientY,
-        startX: desktopPanel.x,
-        startY: desktopPanel.y,
-      })
-      return
-    }
-
-    if (!isCollapsed || !mobileCollapsedRect) {
+    if (!desktopPanel) {
       return
     }
     event.preventDefault()
@@ -245,10 +208,10 @@ export function RulesPanel({
       type: 'drag',
       startPointerX: event.clientX,
       startPointerY: event.clientY,
-      startX: mobileCollapsedRect.x,
-      startY: mobileCollapsedRect.y,
+      startX: desktopPanel.x,
+      startY: desktopPanel.y,
     })
-  }, [desktopPanel, isCollapsed, isDesktop, mobileCollapsedRect])
+  }, [desktopPanel])
 
   const beginResize = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
     if (!isDesktop || !desktopPanel || isCollapsed) {
@@ -328,7 +291,7 @@ export function RulesPanel({
     return () => {
       observer.disconnect()
     }
-  }, [isCollapsed, navigationHint])
+  }, [isCollapsed, isDesktop, navigationHint])
 
   useEffect(() => {
     if (!desktopWindow) {
@@ -348,7 +311,7 @@ export function RulesPanel({
   }, [desktopWindow, isCollapsed])
 
   useEffect(() => {
-    if (!interaction || (!isDesktop && !isCollapsed)) {
+    if (!interaction || !isDesktop) {
       return
     }
 
@@ -358,20 +321,6 @@ export function RulesPanel({
     document.body.style.cursor = interaction.type === 'drag' ? 'grabbing' : 'se-resize'
 
     const handlePointerMove = (event: PointerEvent) => {
-      if (!isDesktop) {
-        if (interaction.type !== 'drag') {
-          return
-        }
-        const viewport = currentViewportBox()
-        const panel = collapsedPanelSize(viewport, collapsedPanelHeight)
-        const nextX = interaction.startX + (event.clientX - interaction.startPointerX)
-        const nextY = interaction.startY + (event.clientY - interaction.startPointerY)
-        setMobileCollapsedOrigin(
-          clampDesktopPanelOrigin(nextX, nextY, panel, viewport),
-        )
-        return
-      }
-
       setDesktopWindow((previous) => {
         const viewport = currentViewportBox()
         const current = previous ?? defaultDesktopWindowState(viewport)
@@ -448,17 +397,17 @@ export function RulesPanel({
     )
     const expandedWidth = Math.min(MOBILE_PANEL_MAX_WIDTH_PX, mobileViewport.width - WINDOW_MARGIN_PX * 2)
     const expandedLeft = mobileViewport.left + Math.round((mobileViewport.width - expandedWidth) / 2)
-    const collapsedLocation = navigationHint || MOBILE_COLLAPSED_LABEL_FALLBACK
+    const collapsedLocation = navigationHint || COLLAPSED_LABEL_FALLBACK
 
     return (
-      <div className="fixed inset-0 z-50 pointer-events-none">
+      // Minimized, a phone's Guide is the dot on its button. It stays laid out, so it opens at the same place.
+      <div className="fixed inset-0 z-50 pointer-events-none" style={{ visibility: isCollapsed ? 'hidden' : undefined }}>
         <FloatingWindow
-          ref={isCollapsed ? collapsedPanelRef : null}
           name="guide"
           title="Guide"
-          collapsed={isCollapsed}
-          draggable={isCollapsed}
-          dragging={interaction?.type === 'drag'}
+          collapsed={false}
+          draggable={false}
+          dragging={false}
           onDragStart={beginDrag}
           onMinimize={handleCollapse}
           onRestore={handleRestore}
@@ -466,12 +415,12 @@ export function RulesPanel({
           onClose={onClose}
           collapsedCaption="Current section"
           collapsedText={collapsedLocation}
-          instant={!!interaction}
+          instant={false}
           style={{
-            left: isCollapsed ? mobileCollapsedRect?.x : expandedLeft,
-            top: isCollapsed ? mobileCollapsedRect?.y : mobileViewport.top + MOBILE_PANEL_TOP_GAP_PX,
-            width: isCollapsed ? mobileCollapsedRect?.width : expandedWidth,
-            height: isCollapsed ? undefined : expandedHeight,
+            left: expandedLeft,
+            top: mobileViewport.top + MOBILE_PANEL_TOP_GAP_PX,
+            width: expandedWidth,
+            height: expandedHeight,
             maxHeight: mobileViewport.height - WINDOW_MARGIN_PX * 2,
           }}
         >
@@ -496,7 +445,7 @@ export function RulesPanel({
     return null
   }
 
-  const collapsedLocation = navigationHint || MOBILE_COLLAPSED_LABEL_FALLBACK
+  const collapsedLocation = navigationHint || COLLAPSED_LABEL_FALLBACK
 
   return (
     <div className="fixed inset-0 z-50 pointer-events-none">
