@@ -9,10 +9,12 @@ export async function copyText(text: string): Promise<boolean> {
     textarea.value = text
     textarea.style.position = 'fixed'
     textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
+    // An open dialog takes focus back from anything outside it, which would empty the selection before it is copied.
+    const host = Array.from(document.querySelectorAll('[role="dialog"]')).pop() ?? document.body
+    host.appendChild(textarea)
     textarea.select()
     const copied = document.execCommand('copy')
-    document.body.removeChild(textarea)
+    textarea.remove()
     return copied
   }
 }

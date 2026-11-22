@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { Card, SharePlayerSnapshot } from '../../types'
 import { CardPreviewContext } from '../card/CardPreviewContext'
+import { PageFrame } from '../common/PageFrame'
 import { ShareRoundDetail } from './ShareRoundDetail'
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has neither it nor ResizeObserver.
@@ -76,4 +77,16 @@ it('magnifies an upgrade after a tap on either of its cards, or on one not appli
   expect(setPreviewCard).toHaveBeenLastCalledWith(unapplied, undefined)
   magnify('Adriana’s Valor')
   expect(setPreviewCard).toHaveBeenLastCalledWith(target, [applied])
+})
+
+it("leaves the board's gold edge to the page's frame", () => {
+  const snapshot = makeSnapshot([makeCard('Battlegate Mimic')], [])
+
+  const { container } = render(
+    <PageFrame header={null} scroll={false} footer={<footer />}>
+      <ShareRoundDetail player={makePlayer(snapshot)} snapshot={snapshot} useUpgrades />
+    </PageFrame>,
+  )
+
+  expect(container.querySelectorAll('main .zone-divider-bg[class*="p-[2px]"], main.zone-divider-bg[class*="p-[2px]"]')).toHaveLength(1)
 })

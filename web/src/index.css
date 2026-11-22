@@ -894,6 +894,13 @@ input:-webkit-autofill:focus {
   background-color: var(--seam-stroke);
 }
 
+/* Felt inside the board's gold edge, so a screen without zones, or a board dimmed while waiting, isn't left on gold */
+.frame-board {
+  background-image: radial-gradient(ellipse at center, var(--table-felt-light) 0%, var(--table-felt) 50%, var(--table-dark) 100%), none;
+  background-origin: content-box, padding-box;
+  background-clip: content-box, border-box;
+}
+
 /* Page content centers with auto margins rather than justify-content: center,
    so content taller than its column starts at the top and can be scrolled to. */
 .page-center > :first-child {

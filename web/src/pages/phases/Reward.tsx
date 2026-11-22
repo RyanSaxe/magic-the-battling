@@ -212,7 +212,7 @@ export function RewardPhase({
   const cappedZoneAlignment = isDesktop ? "flex flex-col justify-center" : "";
 
   return (
-    <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
+    <div className="zone-divider-bg flex-1 min-h-0 flex flex-col">
       <div
         ref={containerRef}
         className="relative flex flex-col flex-1 min-h-0"
