@@ -6,6 +6,7 @@ import { useToast } from "../contexts";
 import { useAuth } from "../contexts/authState";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { InfoIcon } from "../components/icons/InfoIcon";
+import { BoardBackdrop } from "../components/common/BoardBackdrop";
 import { AppHeader, HomeButton } from "../components/common/AppHeader";
 import { JoinGameModal } from "../components/home/JoinGameModal";
 import { LoadingScreen } from "../components/common/LoadingScreen";
@@ -249,13 +250,13 @@ function GuidedModeField({
     "Guided Mode gives you a brief walkthrough the first time a new phase, action, or situation comes up.";
   const [showGuidedModeHelp, setShowGuidedModeHelp] = useState(false);
   const guidedModeHelpRef = useRef<HTMLDivElement>(null);
+  const guidedModeHelpBackdropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!guidedModeHelpRef.current?.contains(target)) {
-        setShowGuidedModeHelp(false);
-      }
+      if (guidedModeHelpRef.current?.contains(target) || guidedModeHelpBackdropRef.current?.contains(target)) return;
+      setShowGuidedModeHelp(false);
     };
     window.addEventListener("pointerdown", onPointerDown);
     return () => window.removeEventListener("pointerdown", onPointerDown);
@@ -285,6 +286,7 @@ function GuidedModeField({
         </span>
       </label>
       <div ref={guidedModeHelpRef} className="relative group shrink-0">
+        {showGuidedModeHelp && <BoardBackdrop ref={guidedModeHelpBackdropRef} onTap={() => setShowGuidedModeHelp(false)} />}
         <button
           type="button"
           className="touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]"

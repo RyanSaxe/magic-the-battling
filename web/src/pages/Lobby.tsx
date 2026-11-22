@@ -6,6 +6,7 @@ import { useVoiceChat } from "../hooks/useVoiceChat";
 import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { InfoIcon } from "../components/icons/InfoIcon";
+import { BoardBackdrop } from "../components/common/BoardBackdrop";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { MicToggle } from "../components/sidebar/MicToggle";
 import { useToast } from "../contexts";
@@ -46,15 +47,15 @@ function GuidedModeSwitch({
     "Guided Mode gives you a brief walkthrough the first time a new phase, action, or situation comes up.";
   const [showGuidedModeHelp, setShowGuidedModeHelp] = useState(false);
   const guidedModeHelpRef = useRef<HTMLDivElement>(null);
+  const guidedModeHelpBackdropRef = useRef<HTMLDivElement>(null);
   const [popupAnchorX, setPopupAnchorX] = useState<"right" | "left" | "center">("right");
   const [popupAnchorY, setPopupAnchorY] = useState<"top" | "bottom">("top");
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!guidedModeHelpRef.current?.contains(target)) {
-        setShowGuidedModeHelp(false);
-      }
+      if (guidedModeHelpRef.current?.contains(target) || guidedModeHelpBackdropRef.current?.contains(target)) return;
+      setShowGuidedModeHelp(false);
     };
     window.addEventListener("pointerdown", onPointerDown);
     return () => window.removeEventListener("pointerdown", onPointerDown);
@@ -116,6 +117,7 @@ function GuidedModeSwitch({
         </span>
       </label>
       <div ref={guidedModeHelpRef} className="relative group shrink-0">
+        {showGuidedModeHelp && <BoardBackdrop ref={guidedModeHelpBackdropRef} onTap={() => setShowGuidedModeHelp(false)} />}
         <button
           type="button"
           className="touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]"
@@ -161,15 +163,15 @@ function VoiceChatSwitch({
     "Voice chat may not work for all players. If it doesn't connect, use Discord instead.";
   const [showVoiceHelp, setShowVoiceHelp] = useState(false);
   const voiceHelpRef = useRef<HTMLDivElement>(null);
+  const voiceHelpBackdropRef = useRef<HTMLDivElement>(null);
   const [popupAnchorX, setPopupAnchorX] = useState<"right" | "left" | "center">("right");
   const [popupAnchorY, setPopupAnchorY] = useState<"top" | "bottom">("top");
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!voiceHelpRef.current?.contains(target)) {
-        setShowVoiceHelp(false);
-      }
+      if (voiceHelpRef.current?.contains(target) || voiceHelpBackdropRef.current?.contains(target)) return;
+      setShowVoiceHelp(false);
     };
     window.addEventListener("pointerdown", onPointerDown);
     return () => window.removeEventListener("pointerdown", onPointerDown);
@@ -238,6 +240,7 @@ function VoiceChatSwitch({
         </span>
       </label>
       <div ref={voiceHelpRef} className="relative group shrink-0">
+        {showVoiceHelp && <BoardBackdrop ref={voiceHelpBackdropRef} onTap={() => setShowVoiceHelp(false)} />}
         <button
           type="button"
           className={`touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]${dimmed}`}
