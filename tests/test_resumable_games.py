@@ -219,7 +219,7 @@ def test_an_account_lists_its_seat_on_every_device(start_lobby, client, state):
     stranger.post("/api/auth/register", json={**account, "username": "stranger", "email": "stranger@test.com"})
 
     [on_phone] = _resumable(phone)
-    assert (on_phone["game_id"], on_phone["player_name"], on_phone["can_close"]) == (game_id, "Kess", False)
+    assert (on_phone["game_id"], on_phone["player_name"], on_phone["can_close"]) == (game_id, "Kess", state == "lobby")
     assert _resumable(stranger) == []
     assert _resumable(TestClient(app)) == []
 
@@ -227,9 +227,44 @@ def test_an_account_lists_its_seat_on_every_device(start_lobby, client, state):
     assert rejoined.status_code == 200
 
     [on_first] = _resumable(client, (game_id, "Kess", first_token))
-    assert (on_first["game_id"], on_first["can_close"]) == (game_id, False)
+    assert (on_first["game_id"], on_first["can_close"]) == (game_id, state == "lobby")
     [held] = _resumable(phone, (game_id, "Kess", rejoined.json()["seat_token"]))
     assert held["can_close"] is (state == "lobby")
+
+
+@pytest.mark.parametrize("state", ["lobby", "goldfish", "paused goldfish", "shared"])
+def test_an_account_closes_its_seat_without_the_token(start_lobby, client, monkeypatch, state):
+    account = {"username": "seat_owner", "password": "password123"}
+    client.post("/api/auth/register", json={**account, "email": "seat_owner@test.com"})
+    game_manager = ws_module.game_manager
+    monkeypatch.setattr(game_manager, "_count_available_bots", lambda pending: 1)
+    puppets = 1 if "goldfish" in state else 0
+    created = client.post(
+        "/api/games", json={"player_name": "Kess", "cube_id": "test", "target_player_count": 2, "puppet_count": puppets}
+    ).json()
+    game_id = created["game_id"]
+    if state == "shared":
+        TestClient(app).post("/api/games/join", json={"join_code": created["join_code"], "player_name": "Bob"})
+    if state != "lobby":
+        assert start_lobby(game_id, created["session_id"]).status_code == 200
+    if state == "paused goldfish":
+        game_manager.mark_game_dirty(game_id)
+        game_manager.persist_dirty_games()
+        game_manager._cleanup_game(game_id, preserve_snapshot=True)
+    phone, stranger = TestClient(app), TestClient(app)
+    assert phone.post("/api/auth/login", json=account).status_code == 200
+    stranger.post("/api/auth/register", json={**account, "username": "stranger", "email": "stranger@test.com"})
+
+    for caller in (stranger, TestClient(app)):
+        refused = _close(caller, game_id, "Kess", "")
+        assert (refused.status_code, refused.json()["code"]) == (403, "SEAT_CLAIM_REQUIRED")
+    [listed] = _resumable(phone)
+    assert listed["can_close"] is (state != "shared")
+
+    closed = _close(phone, game_id, "Kess", "")
+
+    assert closed.status_code == (409 if state == "shared" else 204)
+    assert len(_resumable(phone)) == (1 if state == "shared" else 0)
 
 
 def test_refuses_more_than_ten_seats(client):

@@ -116,6 +116,7 @@ from server.services.seat_tokens import (
     SeatClaimRefusal,
     SeatClaimRefusedError,
     hash_seat_token,
+    holds_seat,
     new_seat_token,
     seat_claim_refusal,
     seat_token_matches,
@@ -360,7 +361,7 @@ def _running_seat_in_snapshot(
     )
 
 
-def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame, *, holds_token: bool) -> ResumableGame:
+def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame) -> ResumableGame:
     return ResumableGame(
         game_id=seat.game_id,
         player_name=seat.player_name,
@@ -369,13 +370,11 @@ def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame, *, holds_to
         play_mode=pending.play_mode,
         use_upgrades=pending.use_upgrades,
         player_count=len(pending.player_names) + pending.puppet_count,
-        can_close=holds_token and pending.accepts_changes,
+        can_close=pending.accepts_changes,
     )
 
 
-def _resumable_game_seat(
-    seat: ResumableSeat, running: _RunningSeat, last_active_at: datetime | None, *, holds_token: bool
-) -> ResumableGame:
+def _resumable_game_seat(seat: ResumableSeat, running: _RunningSeat, last_active_at: datetime | None) -> ResumableGame:
     return ResumableGame(
         game_id=seat.game_id,
         player_name=seat.player_name,
@@ -385,7 +384,7 @@ def _resumable_game_seat(
         play_mode=running.config.play_mode,
         use_upgrades=running.config.use_upgrades,
         player_count=running.player_count,
-        can_close=holds_token and running.can_close,
+        can_close=running.can_close,
         stage=running.stage,
         round=running.round,
         poison=running.poison,
@@ -1926,7 +1925,7 @@ class GameManager:
     def find_resumable_seats(self, seats: list[ResumableSeat], *, user_id: str | None = None) -> list[ResumableGame]:
         """The seats a caller can still return to: those its browser holds tokens for, and those its account took.
 
-        One seat per game, the browser's first. A login alone can't close a seat, so only a token sets can_close.
+        One seat per game, the browser's first. Either proof closes a seat, so can_close follows the game's own rule.
         Never restores a snapshot."""
         session = db.SessionLocal()
         try:
@@ -1972,7 +1971,7 @@ class GameManager:
                 if pending is not None and not pending.is_started:
                     holds_token = seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name))
                     if holds_token or key in account_seats:
-                        resumable.append(_resumable_lobby_seat(seat, pending, holds_token=holds_token))
+                        resumable.append(_resumable_lobby_seat(seat, pending))
                         listed_game_ids.add(seat.game_id)
                     continue
 
@@ -1995,7 +1994,7 @@ class GameManager:
                     continue
                 if running is None or running.phase in FINISHED_PLAYER_PHASES:
                     continue
-                resumable.append(_resumable_game_seat(seat, running, last_active_at, holds_token=holds_token))
+                resumable.append(_resumable_game_seat(seat, running, last_active_at))
                 listed_game_ids.add(seat.game_id)
 
             if user_id:
@@ -2119,15 +2118,15 @@ class GameManager:
         pending.seat_token_hashes[player_name] = hash_seat_token(claimed_token)
         return SeatClaim(player_id=player_id, seat_token=claimed_token)
 
-    def close_seat(self, game_id: str, player_name: str, *, seat_token: str) -> str | None:
-        """End the named seat for good, for a caller holding its token. Returns the player id it had.
+    def close_seat(self, game_id: str, player_name: str, *, seat_token: str, user_id: str | None) -> str | None:
+        """End the named seat for good, for a caller with its token or its account. Returns the player id it had.
 
         A lobby seat leaves the lobby. A started game is retired, so only a game with no other human can close:
         with others in it, every round would wait on the seat that left. Raises SeatClaimRefusedError when the
         caller doesn't hold such a seat, and SeatCloseRefusedError when it can't end now."""
         pending = self._pending_games.get(game_id)
         if pending is not None and not pending.is_started:
-            return self._close_lobby_seat(pending, player_name, seat_token=seat_token)
+            return self._close_lobby_seat(pending, player_name, seat_token=seat_token, user_id=user_id)
 
         if game_id not in self._active_games:
             self.restore_game_from_snapshot(game_id)
@@ -2149,7 +2148,12 @@ class GameManager:
                 )
                 .first()
             )
-            if not seat_token_matches(seat_token, cast(str | None, record.seat_token_hash) if record else None):
+            if not holds_seat(
+                stored_hash=cast(str | None, record.seat_token_hash) if record else None,
+                owner_user_id=cast(str | None, record.user_id) if record else None,
+                seat_token=seat_token,
+                user_id=user_id,
+            ):
                 raise SeatClaimRefusedError(SeatClaimRefusal.TOKEN_REQUIRED)
             if not _game_can_close(len(game.players)):
                 raise SeatCloseRefusedError(SEAT_SHARED_MESSAGE)
@@ -2161,14 +2165,19 @@ class GameManager:
         self._cleanup_game(game_id)
         return player_id
 
-    def _close_lobby_seat(self, pending: PendingGame, player_name: str, *, seat_token: str) -> str:
+    def _close_lobby_seat(self, pending: PendingGame, player_name: str, *, seat_token: str, user_id: str | None) -> str:
         if player_name not in pending.player_names:
             raise SeatClaimRefusedError(SeatClaimRefusal.SEAT_NOT_FOUND)
-        if not seat_token_matches(seat_token, pending.seat_token_hashes.get(player_name)):
+        player_id = pending.player_ids[pending.player_names.index(player_name)]
+        if not holds_seat(
+            stored_hash=pending.seat_token_hashes.get(player_name),
+            owner_user_id=pending.player_user_ids.get(player_id),
+            seat_token=seat_token,
+            user_id=user_id,
+        ):
             raise SeatClaimRefusedError(SeatClaimRefusal.TOKEN_REQUIRED)
         if not pending.accepts_changes:
             raise SeatCloseRefusedError(LOBBY_STARTING_MESSAGE)
-        player_id = pending.player_ids[pending.player_names.index(player_name)]
         self._remove_lobby_seat(pending, player_id)
         return player_id
 

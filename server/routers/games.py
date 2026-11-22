@@ -437,8 +437,14 @@ async def rejoin_game(
 
 
 @router.post("/{game_id}/close", status_code=204)
-async def close_seat(game_id: str, request: CloseSeatRequest) -> Response:
-    """End the caller's seat for good. Only the seat's token proves the caller, so a login alone doesn't."""
+async def close_seat(
+    game_id: str,
+    request: CloseSeatRequest,
+    current_user: User | None = Depends(get_optional_user),  # noqa: B008
+) -> Response:
+    """End the caller's seat for good. The seat's token or the account that took it proves the caller.
+
+    A caller logged in as that account can send an empty token."""
     if ops_manager.is_maintenance():
         raise api_error(503, ErrorCode.SERVER_MAINTENANCE, "Server maintenance in progress. Try again shortly.")
     if not (
@@ -450,7 +456,12 @@ async def close_seat(game_id: str, request: CloseSeatRequest) -> Response:
 
     async with game_manager.get_action_lock(game_id):
         try:
-            player_id = game_manager.close_seat(game_id, request.player_name, seat_token=request.seat_token)
+            player_id = game_manager.close_seat(
+                game_id,
+                request.player_name,
+                seat_token=request.seat_token,
+                user_id=str(current_user.id) if current_user else None,
+            )
         except SeatClaimRefusedError as refused:
             status, code, detail = _SEAT_REFUSAL_ERRORS[refused.refusal]
             raise api_error(status, code, detail) from None
