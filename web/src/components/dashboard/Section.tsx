@@ -67,7 +67,7 @@ export function NoticeTile({
     >
       <p>{children}</p>
       {action && (
-        <button type="button" onClick={action.onClick} className="btn btn-primary px-5 py-1.5 text-sm font-semibold">
+        <button type="button" onClick={action.onClick} className="btn btn-primary notice-tile-action px-5 py-1.5 text-sm font-semibold">
           {action.label}
         </button>
       )}

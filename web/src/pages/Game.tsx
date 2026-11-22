@@ -122,7 +122,7 @@ import {
   hasBattleResultConflict,
 } from "../utils/battleInteraction";
 import { getVoicePeerNames } from "../utils/voiceChat";
-import { DIALOG_BACKDROP, LINK, OPTION_BOX, POPOVER_CHROME, TEXT_INPUT } from "../components/common/styles";
+import { DIALOG_BACKDROP, FIELD_ERROR, LINK, OPTION_BOX, POPOVER_CHROME, TEXT_INPUT } from "../components/common/styles";
 
 // Each area stops 3px into the life number, short of its middle even for one digit, so - and + never overlap.
 const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_+_5px_-_44px)]";
@@ -422,9 +422,9 @@ function PlayerSelectionModal({
         <h2 className="text-xl font-bold text-white mb-5">{accountSeatName ? "Join Game" : "Watch a game"}</h2>
 
         {shownError && (
-          <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
+          <p role="alert" className={`${FIELD_ERROR} mb-4`}>
             {shownError}
-          </div>
+          </p>
         )}
 
         {!selectedPlayer && (

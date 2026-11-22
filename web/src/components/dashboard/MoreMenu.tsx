@@ -21,6 +21,7 @@ function visibleArea(element: HTMLElement): { top: number; bottom: number } {
 export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[] }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const backdropRef = useRef<HTMLDivElement>(null)
 
@@ -61,6 +62,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
   return (
     <div ref={ref} className="relative" onClick={(e) => e.stopPropagation()}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(!open)}
         aria-label={label}
@@ -84,6 +86,8 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
               role="menuitem"
               disabled={item.disabled}
               onClick={() => {
+                // Return focus to the staying trigger before the menu unmounts, so any dialog opened next knows where to return focus.
+                triggerRef.current?.focus()
                 setOpen(false)
                 item.onSelect()
               }}
