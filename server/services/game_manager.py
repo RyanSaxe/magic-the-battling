@@ -36,7 +36,6 @@ from mtb.models.game import (
     BattleSnapshotData,
     Config,
     Game,
-    LastBattleResult,
     PendingRevealAnimation,
     Player,
     Puppet,
@@ -3508,13 +3507,6 @@ class GameManager:
                 poison_dealt=poison_dealt,
                 poison_taken=poison_taken,
             )
-            fake_player.last_battle_result = LastBattleResult(
-                opponent_name=player.name,
-                winner_name=winner_name,
-                is_draw=is_draw,
-                poison_dealt=poison_taken,
-                poison_taken=poison_dealt,
-            )
             player.phase = "build"
             return None
 
@@ -3543,13 +3535,6 @@ class GameManager:
                 is_draw=is_draw,
                 poison_dealt=poison_dealt,
                 poison_taken=poison_taken,
-            )
-            fake_player.last_battle_result = LastBattleResult(
-                opponent_name=player.name,
-                winner_name=winner_name,
-                is_draw=is_draw,
-                poison_dealt=poison_taken,
-                poison_taken=poison_dealt,
             )
             player.poison = game.config.poison_to_lose - 1
             fake_player.poison = game.config.poison_to_lose - 1
@@ -3584,13 +3569,6 @@ class GameManager:
                 is_draw=is_draw,
                 poison_dealt=poison_dealt,
                 poison_taken=poison_taken,
-            )
-            fake_player.last_battle_result = LastBattleResult(
-                opponent_name=player.name,
-                winner_name=winner_name,
-                is_draw=is_draw,
-                poison_dealt=poison_taken,
-                poison_taken=poison_dealt,
             )
             eliminate_player(game, player, player.round, player.stage)
             self._persist_player_placement(db, game_id, player)
@@ -3629,13 +3607,6 @@ class GameManager:
                 is_draw=is_draw,
                 poison_dealt=poison_dealt,
                 poison_taken=poison_taken,
-            )
-            fake_player.last_battle_result = LastBattleResult(
-                opponent_name=player.name,
-                winner_name=winner_name,
-                is_draw=is_draw,
-                poison_dealt=poison_taken,
-                poison_taken=poison_dealt,
             )
             winner.phase = "winner"
             winner.placement = 1
