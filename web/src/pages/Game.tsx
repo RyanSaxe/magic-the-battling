@@ -1785,6 +1785,9 @@ function GameContent() {
   const needsUpgrade =
     isStageIncreasing && gameState.available_upgrades.length > 0;
   const canContinue = !needsUpgrade || !!selectedUpgradeId;
+  // A spectator's selection would pass for the player's pick, and without one touch screens show no magnifier.
+  const enlargeUpgrade = (id: string | null) =>
+    setPreviewCard(gameState.available_upgrades.find((upgrade) => upgrade.id === id) ?? null);
   const hasPendingBuildUpgrades =
     currentPhase === "build" && self_player.upgrades.some((u) => !u.upgrade_target);
   const hasUnrevealedBattleUpgrades =
@@ -2490,7 +2493,7 @@ function GameContent() {
                   gameState={gameState}
                   actions={actions}
                   selectedUpgradeId={selectedUpgradeId}
-                  onUpgradeSelect={setSelectedUpgradeId}
+                  onUpgradeSelect={isSpectator ? enlargeUpgrade : setSelectedUpgradeId}
                   selectedPoolCardId={selectedPoolCardId}
                   onPoolCardSelect={setSelectedPoolCardId}
                   isMobile={sizes.isMobile}

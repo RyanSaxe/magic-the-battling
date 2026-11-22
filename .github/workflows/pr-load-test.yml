@@ -3,7 +3,7 @@ name: PR Load Test
 on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize]
-    branches: [main, develop]
+    branches: [main]
 
 permissions:
   contents: read

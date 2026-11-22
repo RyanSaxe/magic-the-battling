@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type TagTone = 'gold' | 'stone' | 'crimson' | 'emerald'
+export type TagTone = 'gold' | 'stone' | 'muted' | 'crimson' | 'emerald'
 
 /**
  * A small rimmed label: what a cube is, a feature's status or a player's state.
