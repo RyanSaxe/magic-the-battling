@@ -14,7 +14,9 @@ export function CardSlot({ label, dimensions, selected = false, onClick }: CardS
       style={{ width: dimensions.width, height: dimensions.height }}
       onClick={onClick}
     >
-      <span className="text-[9px] text-[var(--ivory-muted)] text-center leading-tight px-1">
+      <span className={`text-[9px] text-[var(--ivory-muted)] text-center leading-tight ${
+        label.startsWith('+') ? 'whitespace-pre-line first-line:text-[16px]' : 'px-1'
+      }`}>
         {label}
       </span>
     </div>

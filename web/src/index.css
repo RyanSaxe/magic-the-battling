@@ -3003,6 +3003,11 @@ input:-webkit-autofill:focus {
     width: var(--touch-area-w, 44px);
     height: var(--touch-area-h, 44px);
   }
+
+  /* The life buttons' areas reach outward over a mic beside them, which keeps its own taps. */
+  .mobile-life-bar button:not(.touch-area) {
+    z-index: 2;
+  }
 }
 
 /* Hero page styles */

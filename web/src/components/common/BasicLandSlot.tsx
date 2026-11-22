@@ -96,7 +96,7 @@ export function BasicLandSlot({
   };
 
   const emptyLabel = isMobile
-    ? "Tap to pick basic land"
+    ? "+\nLand"
     : "Click to pick basic land";
 
   return (
