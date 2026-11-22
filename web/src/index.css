@@ -1077,6 +1077,8 @@ input:-webkit-autofill:focus {
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
+    /* A field scrolled into view over a keyboard brings its label and edge along */
+    scroll-padding-block: 24px 16px;
     color: var(--ivory);
     font-size: 12px;
     line-height: 16px;
@@ -1630,16 +1632,34 @@ input:-webkit-autofill:focus {
 
   .seat-add + .icon-target {
     position: relative;
-    margin-left: -12px;
   }
 
   .seat-add:has(+ .icon-target) {
     padding-right: 0;
   }
 
+  /* The whole seat adds a puppet except ?'s own 44px, the blank beyond it too */
+  .seat-add:has(+ .icon-target)::before {
+    right: -88px;
+  }
+
   .seat-add:has(+ .icon-target) .seat-status {
     letter-spacing: 0.01em;
     text-wrap: balance;
+  }
+
+  @media (width < 375px) {
+    /* Open seat stays on one line beside ?, so its caption has room for two */
+    .lobby-felt .seat-add:has(+ .icon-target) .seat-name {
+      font-size: 11px;
+      line-height: 13px;
+      white-space: nowrap;
+    }
+
+    .seat-add:has(+ .icon-target) .seat-status {
+      margin-top: 1px;
+      line-height: 11px;
+    }
   }
 
   .seat-ready {
@@ -1655,11 +1675,11 @@ input:-webkit-autofill:focus {
     align-self: stretch;
   }
 
-  /* Over the seat's 1px edge, which the 44px targets share */
+  /* Out to the seat's edges, which the 44px targets share */
   .seat-add::before {
     content: "";
     position: absolute;
-    inset: -1px 0;
+    inset: -1px 0 -1px -9px;
   }
 
   .seat-add:hover:not(:disabled) .seat-status {
@@ -1830,9 +1850,17 @@ input:-webkit-autofill:focus {
       letter-spacing: 0.03em;
     }
 
-    /* Out to the seat's edge, so the part ? doesn't cover is still 44px */
     .seat-add::before {
       left: -5px;
+    }
+
+    .lobby-felt .seat-add:has(+ .icon-target) .seat-name {
+      font-size: 10.5px;
+      letter-spacing: -0.02em;
+    }
+
+    .lobby-felt .seat-open:has(> .seat-add + .icon-target) {
+      padding-left: 4px;
     }
 
     .cube-banner-strip {
@@ -1948,6 +1976,10 @@ input:-webkit-autofill:focus {
     .lobby-felt .seat {
       min-height: 64px;
       padding-left: 14px;
+    }
+
+    .seat-add::before {
+      left: -14px;
     }
 
     .lobby-felt .seat-name {
