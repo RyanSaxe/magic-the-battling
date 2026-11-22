@@ -18,7 +18,7 @@ const DIALOGS: DialogUnderTest[] = [
   {
     name: 'Settings',
     path: '/dashboard/list/1',
-    open: (page) => page.getByRole('button', { name: 'Edit Preset' }).click(),
+    open: (page) => page.getByRole('button', { name: 'Edit', exact: true }).click(),
     submit: (dialog) => dialog.getByRole('button', { name: 'Save' }),
   },
 ]
@@ -53,7 +53,7 @@ for (const dialogUnderTest of DIALOGS) {
 test('a dialog takes keyboard focus when it opens and gives it back when it closes', async ({ page, baseURL }) => {
   await serveSignedIn(page, baseURL!)
   await page.goto('/dashboard/list/1')
-  const opener = page.getByRole('button', { name: 'Edit Preset' })
+  const opener = page.getByRole('button', { name: 'Edit', exact: true })
   await opener.focus()
   await page.keyboard.press('Enter')
 

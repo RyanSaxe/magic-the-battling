@@ -17,7 +17,7 @@ interface Holds {
   firstPage?: Promise<void>
 }
 
-/** Serves the player's saved presets from a list, paged as the server pages them, with a new one saved last. */
+/** Serves the player's saved presets from a list, paged as the server pages them: newest first. */
 async function servePresets(page: Page, presets: UserBattler[], holds: Holds = {}) {
   let firstPageHeld = false
   await page.route(
@@ -27,7 +27,7 @@ async function servePresets(page: Page, presets: UserBattler[], holds: Holds = {
       if (request.method() === 'POST') {
         const body = request.postDataJSON()
         const preset = battler(presets.length + 1, body.cube_id, body.display_name)
-        presets.push(preset)
+        presets.unshift(preset)
         await holds.save
         return route.fulfill({ json: preset })
       }
@@ -117,7 +117,7 @@ test('a cube whose details fail to load says so, and Retry loads them', async ({
   failing = false
   await page.getByRole('button', { name: 'Retry' }).click()
 
-  await expect(page.getByRole('button', { name: '+ Follow' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Follow', exact: true })).toBeVisible()
   await expect(page.getByText("This cube's details didn't load.")).toBeHidden()
 })
 
@@ -136,6 +136,20 @@ test.describe('on a phone held upright', () => {
     await expect(page.getByRole('button', { name: 'Load more' })).toBeHidden()
 
     expect(await presetTitles(page)).toEqual(PRESETS_1_TO_22)
+  })
+
+  test('a newly added preset is the first card, and stays first after a reload', async ({ page, baseURL }) => {
+    await serveSignedIn(page, baseURL!)
+    await servePresets(page, presetsNamed(3))
+    await page.goto('/dashboard')
+    const firstCard = page.getByTestId('dashboard-board').getByRole('heading', { level: 3 }).first()
+    await expect(firstCard).toHaveText('Preset 1')
+
+    await addPreset(page, 'cube-4', 'Preset 4')
+    await expect(firstCard).toHaveText('Preset 4')
+    await page.reload()
+
+    await expect(firstCard).toHaveText('Preset 4')
   })
 
   test('a page that lands after a preset is added keeps the new preset', async ({ page, baseURL }) => {

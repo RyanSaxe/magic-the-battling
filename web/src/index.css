@@ -1083,6 +1083,25 @@ input:-webkit-autofill:focus {
   flex: 0 0 var(--timeline-fade);
 }
 
+/* A step that isn't the current one borrows padding from the gap around it, so its hover fill doesn't move the
+   row. */
+.phase-step-idle {
+  padding: 0.125rem 0.25rem;
+  margin: -0.125rem -0.25rem;
+  border-radius: 4px;
+}
+
+/* Tapping a step opens its help, so where there's a pointer the step lights up like a menu item. */
+@media (hover: hover) {
+  .phase-step:enabled {
+    cursor: pointer;
+  }
+
+  .phase-step:enabled:hover {
+    background-color: var(--stone);
+  }
+}
+
 @keyframes fade-hint {
   0% {
     opacity: 0;
