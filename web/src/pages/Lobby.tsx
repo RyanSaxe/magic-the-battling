@@ -8,9 +8,12 @@ import { useHotkeys } from "../hooks/useHotkeys";
 import { usePanelHoldsEnter } from "../utils/enterKey";
 import { useCubeLook } from "../hooks/useCubeLook";
 import { useBoardDesktop } from "../hooks/useBoardDesktop";
+import type { ResumableSeat } from "../hooks/useResumableGames";
+import { CloseSeatDialog } from "../components/ResumeGame";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
 import { AppHeader, GuideButton, HomeButton } from "../components/common/AppHeader";
+import { BarLabel } from "../components/common/FrameBar";
 import { PageFrame } from "../components/common/PageFrame";
 import { ZoneLabel } from "../components/common/ZoneLabel";
 import { InfoTip } from "../components/common/InfoTip";
@@ -36,6 +39,7 @@ import {
 } from "../utils/deviceIdentity";
 import { DIALOG_BACKDROP, POPOVER_CHROME } from "../components/common/styles";
 import { copyText } from "../utils/clipboard";
+import { clearTabSession } from "../utils/tabSession";
 
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 const VOICE_HELP = "Voice chat may not work for all players. If it doesn't connect, use Discord instead.";
@@ -154,6 +158,7 @@ export function Lobby() {
   const [battlerIdInput, setBattlerIdInput] = useState("");
   const [editingDeck, setEditingDeck] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [leavingSeat, setLeavingSeat] = useState<ResumableSeat | null>(null);
   const [closedHostChange, setClosedHostChange] = useState<string | null>(null);
   const isBoard = useBoardDesktop();
   const [rulesPanelTarget, setRulesPanelTarget] = useState<
@@ -323,7 +328,7 @@ export function Lobby() {
   const removing = currentPlayer?.is_host
     ? lobbyState?.players.find((p) => p.player_id === removingId && !p.is_host)
     : undefined;
-  useHotkeys(lobbyHotkeyMap, !!session && !removing);
+  useHotkeys(lobbyHotkeyMap, !!session && !removing && !leavingSeat);
   usePanelHoldsEnter(guideTakesKeys);
 
   useEffect(() => {
@@ -379,15 +384,56 @@ export function Lobby() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const canLeaveLobby = seat.kind === "held" && !!gameId && !!lobbyState && !!currentPlayer && !isStarting;
+  const openLeaveDialog = () => {
+    if (!gameId || !lobbyState || !currentPlayer) return;
+    setLeavingSeat({
+      gameId,
+      playerName: currentPlayer.name,
+      kind: "lobby",
+      lastActiveAt: null,
+      joinCode: lobbyState.join_code,
+      cubeId: summaryBattlerId ?? lobbyState.cube_id,
+      cubeName: cubeLook?.name || null,
+      cubeImageUri: cubeLook?.imageUri ?? null,
+      playMode: lobbyState.play_mode,
+      useUpgrades: lobbyState.use_upgrades,
+      playerCount: lobbyState.players.length + lobbyState.puppet_count,
+      canClose: true,
+      stage: null,
+      round: null,
+      poison: null,
+    });
+  };
+
   const header = (
     <AppHeader
       helpers={
-        <GuideButton
-          onClick={() => openGuide()}
-          className={showRulesPanel && guideMinimized ? "btn-dot-phone" : ""}
-        />
+        <>
+          {canLeaveLobby && (
+            <button type="button" onClick={openLeaveDialog} className="btn btn-secondary">
+              <BarLabel desktop="Leave Lobby" phone="Leave" />
+            </button>
+          )}
+          <GuideButton
+            onClick={() => openGuide()}
+            className={showRulesPanel && guideMinimized ? "btn-dot-phone" : ""}
+          />
+        </>
       }
       home={<HomeButton />}
+    />
+  );
+
+  const leaveDialog = leavingSeat && (
+    <CloseSeatDialog
+      seat={leavingSeat}
+      onKeep={() => setLeavingSeat(null)}
+      onClosed={() => {
+        clearTabSession(leavingSeat.gameId);
+        setLeavingSeat(null);
+        navigate("/", { replace: true });
+      }}
     />
   );
 
@@ -415,6 +461,7 @@ export function Lobby() {
             onTakeBack={takeBack}
           />
         </PageFrame>
+        {leaveDialog}
         {rulesPanel}
       </>
     );
@@ -763,6 +810,7 @@ export function Lobby() {
           }}
         />
       )}
+      {leaveDialog}
       {spectateRequests[0] && (
         <SpectateRequestModal request={spectateRequests[0]} onRespond={actions.spectateResponse} />
       )}

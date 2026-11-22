@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { CubeLook } from '../../hooks/useCubeLook'
 import type { ResumableSeat } from '../../hooks/useResumableGames'
 import type { useVoiceChat } from '../../hooks/useVoiceChat'
@@ -265,13 +265,11 @@ const HEAD_HEIGHT = 34
  */
 export function BoardPlayGames({
   seats,
-  open,
-  onToggle,
+  onShowAll,
   onClose,
 }: {
   seats: ResumableSeat[]
-  open: boolean
-  onToggle: () => void
+  onShowAll: () => void
   onClose: (seat: ResumableSeat) => void
 }) {
   const boxRef = useRef<HTMLDivElement>(null)
@@ -286,33 +284,23 @@ export function BoardPlayGames({
     const observer = new ResizeObserver(measure)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [open])
-
-  // Close the unfolded list automatically if all games were closed.
-  useEffect(() => {
-    if (open && seats.length === 0) onToggle()
-  }, [open, seats.length, onToggle])
+  }, [])
 
   const rowStep = typeof window !== 'undefined' && window.innerHeight < SHORT_WINDOW_HEIGHT
     ? ROW_STEP_SHORT
     : ROW_STEP_NORMAL
-  const headed = open || boxHeight === 0 || boxHeight >= HEAD_HEIGHT + rowStep + 4
+  const headed = boxHeight === 0 || boxHeight >= HEAD_HEIGHT + rowStep + 4
   const availableForRows = Math.max(0, boxHeight - (headed ? HEAD_HEIGHT : 0) - 8)
   const shown = boxHeight === 0 ? 1 : Math.max(1, Math.floor(availableForRows / rowStep))
-  const folds = !open && seats.length > shown
+  const folds = seats.length > shown
   const visibleSeats = folds ? seats.slice(0, shown - 1) : seats
   const hiddenCount = seats.length - visibleSeats.length
 
   return (
-    <div ref={boxRef} className={`board-games ${open ? 'is-open' : ''} ${headed ? '' : 'is-bare'}`}>
+    <div ref={boxRef} className={`board-games ${headed ? '' : 'is-bare'}`}>
       {headed && (
         <div className="board-rail-head-row">
           <p className="board-rail-head setup-caption">In progress</p>
-          {open && (
-            <button type="button" onClick={onToggle} className="btn btn-secondary btn-pill board-games-back">
-              Back
-            </button>
-          )}
         </div>
       )}
       {seats.length > 0 ? (
@@ -323,7 +311,7 @@ export function BoardPlayGames({
             ))}
             {folds && (
               <li className="board-game">
-                <button type="button" className="board-game-open" onClick={onToggle}>
+                <button type="button" className="board-game-open" onClick={onShowAll}>
                   <span aria-hidden="true" className="resume-stage">
                     <span className="resume-stage-number">
                       {visibleSeats.length ? `+${hiddenCount}` : seats.length}

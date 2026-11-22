@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../test/fakeWebSocket'
 import { installMemoryLocalStorage } from '../test/memoryStorage'
 import type { LobbyState } from '../types'
-import { saveTabSession } from '../utils/tabSession'
+import { readTabSession, saveTabSession } from '../utils/tabSession'
 import { Lobby } from './Lobby'
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
@@ -19,9 +19,11 @@ vi.hoisted(() => {
 })
 
 const toasts: string[] = []
+const closeSeat = vi.hoisted(() => vi.fn(async () => {}))
 
 vi.mock('../api/client', () => ({
   rejoinGame: vi.fn(),
+  closeSeat,
   getServerStatus: vi.fn(async () => null),
   getCubeSummary: vi.fn(async () => ({ cube_name: 'Crucible', cube_image_uri: null })),
 }))
@@ -62,6 +64,7 @@ async function openLobbyAs(playerId: string): Promise<FakeWebSocket> {
     <MemoryRouter initialEntries={['/game/game-1/lobby']}>
       <Routes>
         <Route path="/game/:gameId/lobby" element={<Lobby />} />
+        <Route path="/" element={<div>Home</div>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -291,5 +294,21 @@ describe('Lobby: the host, a seat and a deck', () => {
     fireEvent.change(field, { target: { value: 'second-deck' } })
     fireEvent.click(button('Submit'))
     expect(sentActions(socket)).toContain('submit_battler')
+  })
+
+  it('lets the host leave the lobby through the close dialog and returns Home', async () => {
+    closeSeat.mockClear()
+    const socket = await openLobbyAs('host')
+    send(socket, { type: 'lobby_state', payload: lobby() })
+
+    fireEvent.click(screen.getByRole('button', { name: /Leave/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Leave this lobby?' })
+    fireEvent.keyDown(document.body, { key: 'r' })
+    expect(sentActions(socket)).not.toContain('set_ready')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Leave Lobby' }))
+    expect(await screen.findByText('Home')).toBeTruthy()
+    expect(closeSeat).toHaveBeenCalledWith('game-1', 'Anya', '')
+    expect(readTabSession('game-1')).toBeNull()
   })
 })
