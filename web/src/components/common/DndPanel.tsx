@@ -122,7 +122,8 @@ export function DndPanel({
             validFromZones={validFromZones}
             idPrefix="panel"
             disabled={steppedAside}
-            className={isBattleTone ? 'w-full h-full overflow-auto' : 'flex flex-wrap gap-1.5 justify-center content-center w-full h-full'}
+            // The zone's border sits in the padding, so the cards get all the room they were sized for.
+            className={`w-full h-full shrink-0 box-content ${isBattleTone ? 'overflow-auto' : 'flex flex-wrap gap-1.5 justify-center content-center'}`}
           >
             {count === 0 ? (
               <p className="h-full flex items-center justify-center text-sm text-[var(--ivory-muted)]">{title} is empty</p>
