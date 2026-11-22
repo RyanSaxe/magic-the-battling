@@ -16,17 +16,22 @@ const zoneFrames = {
 
 describe("rewardZoneStyles", () => {
   it("lets the Loot zone fill the phase when there is no upgrade section", () => {
-    expect(rewardZoneStyles(zoneFrames, false).rewards).toEqual({
+    expect(rewardZoneStyles(zoneFrames, false, 0).rewards).toEqual({
       minHeight: 568,
       flex: "1 1 auto",
     });
   });
 
   it("holds the Loot zone at its height above an upgrade section and lets the pool fill", () => {
-    const styles = rewardZoneStyles(zoneFrames, true);
+    const styles = rewardZoneStyles(zoneFrames, true, 0);
 
     expect(styles.rewards).toEqual({ height: 568, flex: "0 0 auto" });
     expect(styles.upgrades).toEqual({ height: 200, flex: "0 0 auto" });
     expect(styles.pool).toEqual({ minHeight: 300, flex: "1 1 auto" });
+  });
+
+  it("makes the Loot zone taller by the round progression note it holds", () => {
+    expect(rewardZoneStyles(zoneFrames, false, 60).rewards).toEqual({ minHeight: 628, flex: "1 1 auto" });
+    expect(rewardZoneStyles(zoneFrames, true, 60).rewards).toEqual({ height: 628, flex: "0 0 auto" });
   });
 });

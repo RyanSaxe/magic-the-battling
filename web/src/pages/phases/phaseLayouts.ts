@@ -67,12 +67,15 @@ export function rewardLayoutConfig({
   hasUpgradeSection,
   upgradeCount,
   poolCount,
+  progressionNoteHeight = 0,
 }: {
   rewardCount: number;
   /** The stage-end screen, where the player picks an upgrade and sees their pool. */
   hasUpgradeSection: boolean;
   upgradeCount: number;
   poolCount: number;
+  /** Height of the round progression note under the loot, which the zones leave room for. */
+  progressionNoteHeight?: number;
 }): CardLayoutConfig {
   return {
     zones: {
@@ -91,6 +94,7 @@ export function rewardLayoutConfig({
     layout: { top: ["rewards"], bottomLeft: ["upgrades", "pool"] },
     ...ZONE_LAYOUT_PADDING,
     maxTopFraction: hasUpgradeSection ? 0.2 : undefined,
+    fixedHeight: progressionNoteHeight,
   };
 }
 

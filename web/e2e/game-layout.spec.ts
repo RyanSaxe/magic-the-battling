@@ -626,3 +626,24 @@ test.describe('the player cards', () => {
     await expect(lastResult).toHaveText('Lost')
   })
 })
+
+// The round progression note under the loot sits on the board, so the bottom bar never covers it.
+const PROGRESSION_SCREENS: Screen[] = [
+  { name: 'reward 390x844', viewport: { width: 390, height: 844 }, state: TYPICAL.reward },
+  { name: 'reward 1280x800', viewport: { width: 1280, height: 800 }, state: TYPICAL.reward },
+  { name: 'reward-stage-end 1280x800', viewport: { width: 1280, height: 800 }, state: TYPICAL['reward-stage-end'] },
+]
+for (const screen of PROGRESSION_SCREENS) {
+  test.describe(`the round progression note in ${screen.name}`, () => {
+    const isPhone = Math.min(screen.viewport.width, screen.viewport.height) <= 430
+    test.use({ viewport: screen.viewport, isMobile: isPhone, hasTouch: isPhone })
+
+    test('sits on the board', async ({ page, baseURL }) => {
+      await openScreen(page, baseURL!, screen)
+      const { board } = await measure(page)
+      const note = (await page.locator('[data-guide-target="reward-progression"]').boundingBox())!
+      expect(note.y + note.height, `note ends at ${note.y + note.height}px, board at ${board.y + board.height}px`)
+        .toBeLessThanOrEqual(board.y + board.height + 0.5)
+    })
+  })
+}
