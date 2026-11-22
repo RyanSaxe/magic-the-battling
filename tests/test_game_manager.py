@@ -972,38 +972,6 @@ class TestRoundTablePairing:
         session.close()
 
 
-def test_a_puppets_row_shows_the_furthest_rounds_treasures_and_the_cards_seen_in_your_round(game_manager, card_factory):
-    game = create_game(["Alice", "Bob"], num_players=2)
-    alice, bob = game.players
-    alice.phase, alice.round = "draft", 2
-    bob.phase, bob.round = "draft", 3
-    game.puppets = [
-        Puppet(
-            name="Bot",
-            player_history_id=1,
-            snapshots={
-                f"3_{round_num}": StaticOpponent(
-                    name="Bot",
-                    hand=[card_factory(f"hand-{round_num}")],
-                    sideboard=[card_factory(f"sideboard-{round_num}")],
-                    treasures=round_num + 1,
-                )
-                for round_num in (1, 2, 3)
-            },
-        )
-    ]
-    game_manager._active_games["g1"] = game
-    game_manager._player_to_game["pid_alice"] = "g1"
-    game_manager._player_id_to_name["pid_alice"] = "Alice"
-
-    state = game_manager.get_game_state("g1", "pid_alice")
-
-    row = next(player for player in state.players if player.name == "Bot")
-    assert row.treasures == 4
-    assert [card.id for card in row.most_recently_revealed_cards] == ["hand-1"]
-    assert [card.id for card in row.full_sideboard] == ["sideboard-2"]
-
-
 def test_an_out_puppets_row_stops_at_the_round_it_went_out(game_manager, card_factory):
     game = create_game(["Alice"], num_players=1)
     alice = game.players[0]
@@ -1042,3 +1010,35 @@ def test_an_out_puppets_row_stops_at_the_round_it_went_out(game_manager, card_fa
 
     row = next(player for player in state.players if player.name == "Out")
     assert (row.treasures, row.last_result) == (2, "loss")
+
+
+def test_a_puppets_row_shows_the_furthest_rounds_treasures_and_the_cards_seen_in_your_round(game_manager, card_factory):
+    game = create_game(["Alice", "Bob"], num_players=2)
+    alice, bob = game.players
+    alice.phase, alice.round = "draft", 2
+    bob.phase, bob.round = "draft", 3
+    game.puppets = [
+        Puppet(
+            name="Bot",
+            player_history_id=1,
+            snapshots={
+                f"3_{round_num}": StaticOpponent(
+                    name="Bot",
+                    hand=[card_factory(f"hand-{round_num}")],
+                    sideboard=[card_factory(f"sideboard-{round_num}")],
+                    treasures=round_num + 1,
+                )
+                for round_num in (1, 2, 3)
+            },
+        )
+    ]
+    game_manager._active_games["g1"] = game
+    game_manager._player_to_game["pid_alice"] = "g1"
+    game_manager._player_id_to_name["pid_alice"] = "Alice"
+
+    state = game_manager.get_game_state("g1", "pid_alice")
+
+    row = next(player for player in state.players if player.name == "Bot")
+    assert row.treasures == 4
+    assert [card.id for card in row.most_recently_revealed_cards] == ["hand-1"]
+    assert [card.id for card in row.full_sideboard] == ["sideboard-2"]
