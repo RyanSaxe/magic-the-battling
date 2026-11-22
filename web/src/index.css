@@ -1495,10 +1495,9 @@ input:-webkit-autofill:focus {
   z-index: 20;
   container-type: size;
   pointer-events: none;
-  --companion-text: min(10px, 12.5cqw);
 }
 
-/* Upgrade and Apply. Full size from an 85px card up, with padding that stays light on the smallest one. */
+/* Upgrade, Apply and Set Companion. Full size from an 85px card up, with padding that stays light on the smallest one. */
 .card-pill {
   position: absolute;
   bottom: 8.5cqh;
@@ -1510,18 +1509,48 @@ input:-webkit-autofill:focus {
   white-space: nowrap;
 }
 
-/* One line at any size. Wrapped, it covered the card's middle and left Upgrade nowhere to sit. */
-.card-companion {
-  padding-block: 2px;
-  font-size: var(--companion-text);
-  line-height: 1.5;
-  white-space: nowrap;
-  pointer-events: auto;
+/* A companion's card stacks two pills, so both are tighter, and Upgrade clears the one below. */
+.card-pill-raised {
+  bottom: calc(4cqh + min(0.75rem, 14.1cqw) * 1.8333 + max(2px, 1.5cqh));
+  padding: 0.25em 0.8em;
 }
 
-/* Clears the companion's button by a pixel. */
-.card-pill-raised {
-  bottom: max(8.5cqh, calc(var(--companion-text) * 1.5 + 5px));
+.card-pill-companion {
+  bottom: 4cqh;
+  padding: 0.25em 0.65em;
+  letter-spacing: normal;
+}
+
+/* The purple of the companion's ring, deep enough for ivory text. */
+.card-pill-companion.is-set {
+  background: #6b21a8;
+  color: var(--ivory);
+}
+
+.card-pill-companion.is-set:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.card-pill-companion .label-long {
+  display: none;
+}
+
+/* Without the tighter tracking, "Companion" leaves a 45px card. */
+@container (max-width: 84px) {
+  .card-pill-companion {
+    padding-inline: 0.38em;
+    letter-spacing: -0.045em;
+  }
+}
+
+@container (min-width: 110px) {
+  .card-pill-companion .label-long {
+    display: inline;
+  }
+
+  .card-pill-companion .label-short {
+    display: none;
+  }
 }
 
 /* Drag overlay */
