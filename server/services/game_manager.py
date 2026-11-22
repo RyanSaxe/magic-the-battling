@@ -316,10 +316,15 @@ class _RunningSeat:
 
     config: Config
     player_count: int
+    can_close: bool
     stage: int
     round: int
     poison: int
     phase: str
+
+
+def _game_can_close(human_count: int) -> bool:
+    return human_count == 1
 
 
 def _running_seat_in_game(game: Game, player_name: str) -> _RunningSeat | None:
@@ -329,6 +334,7 @@ def _running_seat_in_game(game: Game, player_name: str) -> _RunningSeat | None:
     return _RunningSeat(
         config=game.config,
         player_count=len(game.players) + len(game.puppets),
+        can_close=_game_can_close(len(game.players)),
         stage=player.stage,
         round=player.round,
         poison=player.poison,
@@ -345,6 +351,7 @@ def _running_seat_in_snapshot(
     return _RunningSeat(
         config=Config.model_validate(config),
         player_count=len(players) + puppet_count,
+        can_close=_game_can_close(len(players)),
         stage=player["stage"],
         round=player["round"],
         poison=player["poison"],
@@ -361,6 +368,7 @@ def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame) -> Resumabl
         play_mode=pending.play_mode,
         use_upgrades=pending.use_upgrades,
         player_count=len(pending.player_names) + pending.puppet_count,
+        can_close=pending.accepts_changes,
     )
 
 
@@ -374,6 +382,7 @@ def _resumable_game_seat(seat: ResumableSeat, running: _RunningSeat, last_active
         play_mode=running.config.play_mode,
         use_upgrades=running.config.use_upgrades,
         player_count=running.player_count,
+        can_close=running.can_close,
         stage=running.stage,
         round=running.round,
         poison=running.poison,
@@ -2085,7 +2094,7 @@ class GameManager:
             )
             if not seat_token_matches(seat_token, cast(str | None, record.seat_token_hash) if record else None):
                 raise SeatClaimRefusedError(SeatClaimRefusal.TOKEN_REQUIRED)
-            if len(game.players) > 1:
+            if not _game_can_close(len(game.players)):
                 raise SeatCloseRefusedError(SEAT_SHARED_MESSAGE)
 
             player_id = self.get_player_id_by_name(game_id, player_name)

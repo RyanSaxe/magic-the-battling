@@ -10,6 +10,7 @@ import { CubeArt } from './dashboard/CubeArt'
 import { CrossIcon } from './icons/CrossIcon'
 
 const ROWS_SHOWN = 2
+const CLOSE_COLUMN = 'w-11 shrink-0'
 // A longer cube name takes two lines in a shelf row, whose height is fixed.
 const ONE_LINE_TITLE = 24
 
@@ -74,7 +75,15 @@ function SeatSummary({ seat, lead }: { seat: ResumableSeat; lead?: string }) {
   )
 }
 
-function ResumeRow({ seat, onClose }: { seat: ResumableSeat; onClose: (seat: ResumableSeat) => void }) {
+function ResumeRow({
+  seat,
+  hasCloseColumn,
+  onClose,
+}: {
+  seat: ResumableSeat
+  hasCloseColumn: boolean
+  onClose: (seat: ResumableSeat) => void
+}) {
   const navigate = useNavigate()
   return (
     <li className={`resume-row ${seatTitle(seat).length > ONE_LINE_TITLE ? 'is-long' : ''}`}>
@@ -88,14 +97,18 @@ function ResumeRow({ seat, onClose }: { seat: ResumableSeat; onClose: (seat: Res
         <SeatSummary seat={seat} lead={`${actionWord(seat)} as`} />
         <span aria-hidden="true" className="resume-chevron">›</span>
       </button>
-      <button
-        type="button"
-        onClick={() => onClose(seat)}
-        aria-label={`${seat.kind === 'game' ? 'Close' : 'Leave'} ${seatTitle(seat)} as ${seat.playerName}`}
-        className="icon-target self-center"
-      >
-        <CrossIcon />
-      </button>
+      {seat.canClose ? (
+        <button
+          type="button"
+          onClick={() => onClose(seat)}
+          aria-label={`${seat.kind === 'game' ? 'Close' : 'Leave'} ${seatTitle(seat)} as ${seat.playerName}`}
+          className="icon-target self-center"
+        >
+          <CrossIcon />
+        </button>
+      ) : (
+        hasCloseColumn && <span aria-hidden="true" className={CLOSE_COLUMN} />
+      )}
     </li>
   )
 }
@@ -175,13 +188,14 @@ export function ResumeShelf({
 }) {
   const hasMore = seats.length > ROWS_SHOWN
   const shown = hasMore ? seats.slice(0, 1) : seats
+  const hasCloseColumn = seats.some((seat) => seat.canClose)
   return (
     <div className="resume-space">
       {seats.length > 0 && (
         <section aria-label="In progress" className="resume-shelf">
           <ul className="resume-items">
             {shown.map((seat) => (
-              <ResumeRow key={seat.gameId} seat={seat} onClose={onClose} />
+              <ResumeRow key={seat.gameId} seat={seat} hasCloseColumn={hasCloseColumn} onClose={onClose} />
             ))}
             {hasMore && (
               <li className="resume-row">
@@ -192,7 +206,7 @@ export function ResumeShelf({
                     <span className="resume-detail">Show all {seats.length} games to resume</span>
                   </span>
                   <span aria-hidden="true" className="resume-chevron">›</span>
-                  <span className="w-11 shrink-0" />
+                  {hasCloseColumn && <span className={CLOSE_COLUMN} />}
                 </button>
               </li>
             )}
@@ -205,11 +219,12 @@ export function ResumeShelf({
 
 /** Every game and lobby this browser can go back to, in place of the setup for a new game. */
 export function ResumeList({ seats, onClose }: { seats: ResumableSeat[]; onClose: (seat: ResumableSeat) => void }) {
+  const hasCloseColumn = seats.some((seat) => seat.canClose)
   return (
     <section aria-label="In progress" className="resume-all">
       <ul className="resume-items">
         {seats.map((seat) => (
-          <ResumeRow key={seat.gameId} seat={seat} onClose={onClose} />
+          <ResumeRow key={seat.gameId} seat={seat} hasCloseColumn={hasCloseColumn} onClose={onClose} />
         ))}
       </ul>
     </section>
