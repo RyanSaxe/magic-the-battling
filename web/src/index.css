@@ -300,6 +300,19 @@ input:-webkit-autofill:focus {
     cursor: default;
   }
 
+  .switch-with-tip {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+  }
+
+  .switch-label-group {
+    display: inline-flex;
+    align-items: center;
+  }
+
   .switch-spread {
     justify-content: space-between;
     white-space: normal;

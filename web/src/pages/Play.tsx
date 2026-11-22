@@ -19,7 +19,9 @@ import { PLAYER_ROW_STACK_CLASS } from "../components/PlayerList";
 import { CloseSeatDialog, ResumeGamesDialog, ResumeShelf } from "../components/ResumeGame";
 import { useResumableGames, type ResumableSeat } from "../hooks/useResumableGames";
 import { SurfaceCard } from "../components/common/SurfaceCard";
+import { InfoTip } from "../components/common/InfoTip";
 import { Switch } from "../components/common/Switch";
+import { UPGRADES_HELP } from "../constants/rules";
 import { BoardArt, BoardCubeTitle, BoardDrawerHead, BoardPlayGames, SeatLead } from "../components/setup/BoardParts";
 import { CubeBanner } from "../components/setup/CubeBanner";
 import { GuidedSwitch } from "../components/setup/GuidedSwitch";
@@ -686,8 +688,13 @@ export function Play() {
           Open Spectating · let anyone watch
         </Switch>
       )}
-      <Switch spread checked={useUpgrades} onChange={setUseUpgrades}>
-        Upgrades · upgrade a card every 3 rounds
+      <Switch
+        spread
+        checked={useUpgrades}
+        onChange={setUseUpgrades}
+        tip={<InfoTip label="What upgrades are" text={UPGRADES_HELP} />}
+      >
+        Upgrades
       </Switch>
       <button
         onClick={(event) => showView("setup", event.detail === 0)}
