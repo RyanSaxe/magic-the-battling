@@ -3,6 +3,7 @@ import logging
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from server.db import database
@@ -46,12 +47,12 @@ def _set_auth_cookie(response: JSONResponse, token: str) -> None:
 
 @router.post("/register", response_model=UserResponse)
 def register(request: RegisterRequest, db: Session = Depends(_get_db)):
-    existing = db.query(User).filter(User.username == request.username).first()
+    existing = db.query(User).filter(func.lower(User.username) == func.lower(request.username)).first()
     if existing:
         raise api_error(409, ErrorCode.USERNAME_TAKEN, "Username already taken")
 
     if request.email:
-        email_exists = db.query(User).filter(User.email == request.email).first()
+        email_exists = db.query(User).filter(func.lower(User.email) == func.lower(request.email)).first()
         if email_exists:
             raise api_error(409, ErrorCode.EMAIL_IN_USE, "Email already in use")
 
@@ -70,7 +71,7 @@ def register(request: RegisterRequest, db: Session = Depends(_get_db)):
 
 @router.post("/login", response_model=UserResponse)
 def login(request: LoginRequest, db: Session = Depends(_get_db)):
-    user = db.query(User).filter(User.username == request.username).first()
+    user = db.query(User).filter(func.lower(User.username) == func.lower(request.username)).first()
     if not user or not verify_password(request.password, str(user.password_hash)):
         raise api_error(401, ErrorCode.INVALID_CREDENTIALS, "Invalid username or password")
 
