@@ -105,17 +105,16 @@ for (const { name, viewport, isMobile } of MENU_SCREENS) {
 
 test('a card moved from the Actions menu is no longer selected', async ({ page, baseURL }) => {
   const game = await openGame(page, baseURL!, FIGHT)
-  await page.locator('[data-guide-card-id^="your-creature"]').first().click()
+  const creature = page.locator('[data-guide-card-id^="your-creature"]').first()
+  await creature.click()
+  await expect(creature).toHaveClass(/\bselected\b/)
   await page.getByRole('button', { name: 'Actions' }).click()
   await page.getByRole('button', { name: 'Move To' }).click()
   await page.locator('.menu-submenu').getByRole('button', { name: 'Graveyard', exact: true }).click()
+
   await expect.poll(() => game.sent('battle_move')).toBe(1)
-
-  // While a card is selected, a tap on a pile moves it there.
-  await page.locator('.battle-side-dropzone', { has: page.locator('.battle-side-label', { hasText: /^Exile$/ }) }).last().click()
-  await settle(page)
-
-  expect(game.sent('battle_move')).toBe(1)
+  // A card left selected moves again on the next tap on a pile.
+  await expect(creature).not.toHaveClass(/\bselected\b/)
 })
 
 for (const { name, viewport, isMobile } of MENU_SCREENS) {
