@@ -2428,6 +2428,7 @@ function GameContent() {
                   selectedPoolCardId={selectedPoolCardId}
                   onPoolCardSelect={setSelectedPoolCardId}
                   isMobile={sizes.isMobile}
+                  isDesktop={shellMode === "big"}
                 />
               )}
               {currentPhase === "awaiting_elimination" && (
