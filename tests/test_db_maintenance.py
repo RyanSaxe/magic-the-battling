@@ -4,7 +4,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
+
 from server.db.maintenance import apply_db_maintenance, inspect_db_maintenance
+from server.db.models import Base, User, UserBattler
 from server.db.snapshot_migration import backup_db
 
 MAINTAIN_DB_SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "maintain_db.py"
@@ -172,3 +177,59 @@ def test_maintain_db_has_nothing_to_do_on_a_fresh_volume(tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert not db_path.exists()
+
+
+def _init_presets_as_before_autoincrement(db_path: Path) -> None:
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE user_battlers (
+                id INTEGER NOT NULL,
+                user_id VARCHAR NOT NULL,
+                cube_id VARCHAR NOT NULL,
+                display_name VARCHAR,
+                use_upgrades BOOLEAN,
+                use_vanguards BOOLEAN,
+                play_mode VARCHAR,
+                puppet_count INTEGER,
+                target_player_count INTEGER,
+                auto_approve_spectators BOOLEAN,
+                guided_mode_default BOOLEAN,
+                position INTEGER,
+                created_at DATETIME,
+                updated_at DATETIME,
+                PRIMARY KEY (id),
+                FOREIGN KEY(user_id) REFERENCES users (id)
+            );
+            CREATE INDEX ix_user_battlers_user_id ON user_battlers (user_id);
+            CREATE INDEX ix_user_battlers_cube_id ON user_battlers (cube_id);
+            """
+        )
+
+
+@pytest.mark.parametrize("database", ["existing", "new"])
+def test_a_deleted_presets_id_is_never_reused(tmp_path, database):
+    db_path = tmp_path / "mtb.db"
+    if database == "existing":
+        _init_presets_as_before_autoincrement(db_path)
+    engine = create_engine(f"sqlite:///{db_path}")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(User(id="u1", username="alice", password_hash="hash"))
+        db.add_all(UserBattler(id=preset_id, user_id="u1", cube_id=f"cube-{preset_id}") for preset_id in (1, 2, 5))
+        db.commit()
+        presets = db.execute(select(UserBattler.__table__).order_by(UserBattler.id)).all()
+    engine.dispose()
+
+    apply_db_maintenance(db_path)
+
+    assert not inspect_db_maintenance(db_path).changes_required
+    with Session(engine) as db:
+        assert db.execute(select(UserBattler.__table__).order_by(UserBattler.id)).all() == presets
+        db.delete(db.get(UserBattler, 5))
+        db.commit()
+        replacement = UserBattler(user_id="u1", cube_id="cube-new")
+        db.add(replacement)
+        db.commit()
+        assert replacement.id == 6
+    engine.dispose()

@@ -157,6 +157,8 @@ class UserBattler(Base):
     __table_args__ = (
         Index("ix_user_battlers_user_id", "user_id"),
         Index("ix_user_battlers_cube_id", "cube_id"),
+        # Without AUTOINCREMENT SQLite gives the next preset one more than the highest id left, so deleted ids return.
+        {"sqlite_autoincrement": True},
     )
 
 

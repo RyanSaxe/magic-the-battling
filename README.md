@@ -54,7 +54,7 @@ Start the dev server and visit [`/docs`](http://localhost:8000/docs) for the aut
 
 Deployed to [Fly.io](https://fly.io) via Docker — see `fly.toml` and `Dockerfile`.
 
-On container startup, deploys run `scripts/maintain_db.py --apply` against `/data/mtb.db` before booting the server. If pending DB maintenance exists, the script first copies the database to `/data/mtb.db.bak` and then applies the migration to the live DB. A fresh volume with no database needs no maintenance, and a maintenance failure is logged without stopping the server from starting. Run `uv run python scripts/maintain_db.py --db-path <copy of mtb.db>` to see what a deploy would change: `active_game_snapshots.failed` counts the games in progress that the new code cannot restore. If any row fails, `--apply` changes nothing and makes no backup.
+On container startup, deploys run `scripts/maintain_db.py --apply` against `/data/mtb.db` before booting the server. If pending DB maintenance exists, the script first copies the database to `/data/mtb.db.bak` and then applies the migration to the live DB. Maintenance compacts old snapshots and, once, rebuilds the presets table so a deleted preset's ID is never reused. A fresh volume with no database needs no maintenance, and a maintenance failure is logged without stopping the server from starting. Run `uv run python scripts/maintain_db.py --db-path <copy of mtb.db>` to see what a deploy would change: `active_game_snapshots.failed` counts the games in progress that the new code cannot restore. If any row fails, `--apply` changes nothing and makes no backup.
 
 When the server starts, it moves any active game snapshot it cannot restore to the `quarantined_game_snapshots` table, with the error, and logs the game id, instead of deleting it.
 
