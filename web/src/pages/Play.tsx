@@ -7,9 +7,10 @@ import { useAuth } from "../contexts/authState";
 import { useCubeLook } from "../hooks/useCubeLook";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
-import { Spinner } from "../components/icons/Spinner";
 import { AppHeader, HomeButton } from "../components/common/AppHeader";
 import { JoinGameModal } from "../components/home/JoinGameModal";
+import { LoadingScreen } from "../components/common/LoadingScreen";
+import { type LoadingRouteState, goldfishSteps, loadStep, newLobbySteps } from "../components/common/loadingSteps";
 import { PageFrame } from "../components/common/PageFrame";
 import { CloseSeatDialog, ResumeList, ResumeShelf } from "../components/ResumeGame";
 import { useResumableGames, type ResumableSeat } from "../hooks/useResumableGames";
@@ -211,6 +212,8 @@ export function Play() {
   );
 
   const [friendsLoading, setFriendsLoading] = useState(false);
+  // Cancel can't recall a request, so each answer checks that its start is still the one wanted.
+  const startAttemptRef = useRef(0);
 
   const [soloPhase, setSoloPhase] = useState<SoloPhase>("idle");
   const soloPhaseRef = useRef<SoloPhase>("idle");
@@ -256,9 +259,10 @@ export function Play() {
 
   useEffect(() => {
     if (gameState?.game_id === pendingGameId && pendingGameId) {
-      navigate(`/game/${pendingGameId}/play`);
+      const state: LoadingRouteState = { loadingSteps: goldfishSteps(playMode) };
+      navigate(`/game/${pendingGameId}/play`, { state });
     }
-  }, [gameState?.game_id, navigate, pendingGameId]);
+  }, [gameState?.game_id, navigate, pendingGameId, playMode]);
 
   useEffect(() => {
     if (
@@ -267,9 +271,10 @@ export function Play() {
       lobbyState?.game_id === pendingGameId &&
       lobbyState.cube_loading_status === "ready"
     ) {
-      navigate(`/game/${pendingGameId}/lobby`);
+      const state: LoadingRouteState = { loadingSteps: newLobbySteps(playMode) };
+      navigate(`/game/${pendingGameId}/lobby`, { state });
     }
-  }, [friendsLoading, lobbyState?.cube_loading_status, lobbyState?.game_id, navigate, pendingGameId]);
+  }, [friendsLoading, lobbyState?.cube_loading_status, lobbyState?.game_id, navigate, pendingGameId, playMode]);
 
   useEffect(() => {
     const nextError =
@@ -369,6 +374,7 @@ export function Play() {
     }
     lastLobbyErrorRef.current = null;
     setFriendsLoading(true);
+    const attempt = ++startAttemptRef.current;
     try {
       const response = await createGame(name, {
         cubeId: submittedCubeId || "auto",
@@ -377,6 +383,7 @@ export function Play() {
         guidedModeDefault: isGuidedMode,
         playMode,
       });
+      if (attempt !== startAttemptRef.current) return;
       saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
       if (!user) rememberGuestName(name);
       rememberPlayerForGame(response.game_id, name, {
@@ -391,6 +398,7 @@ export function Play() {
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
+      if (attempt !== startAttemptRef.current) return;
       addToast(normalizeCreateGameError(err), "error");
       setFriendsLoading(false);
     }
@@ -411,6 +419,7 @@ export function Play() {
     lastLobbyErrorRef.current = null;
     updateSoloPhase("loading");
     resetWatcher();
+    const attempt = ++startAttemptRef.current;
     try {
       const targetCount = count + 1;
       const response = await createGame(name, {
@@ -421,6 +430,7 @@ export function Play() {
         guidedModeDefault: isGuidedMode,
         playMode,
       });
+      if (attempt !== startAttemptRef.current) return;
       saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
       if (!user) rememberGuestName(name);
       rememberPlayerForGame(response.game_id, name, {
@@ -435,12 +445,14 @@ export function Play() {
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
+      if (attempt !== startAttemptRef.current) return;
       addToast(normalizeCreateGameError(err), "error");
       updateSoloPhase("idle");
     }
   };
 
   const handleCancelFriends = () => {
+    startAttemptRef.current += 1;
     if (pendingGameId) forgetSeatForGame(pendingGameId);
     setFriendsLoading(false);
     setPendingGameId(null);
@@ -449,6 +461,7 @@ export function Play() {
   };
 
   const handleCancelSolo = () => {
+    startAttemptRef.current += 1;
     if (pendingGameId) forgetSeatForGame(pendingGameId);
     updateSoloPhase("idle");
     setPendingGameId(null);
@@ -503,11 +516,31 @@ export function Play() {
     resume: `${seats.length} ${seats.length === 1 ? "game" : "games"} to resume`,
   }[shownView];
 
-  const startLoading = activeMode === "solo" ? soloLoading : friendsLoading;
   const startNewGame = () => {
     if (activeMode === "solo") void handleStartSolo();
     else void handleCreateLobby();
   };
+
+  if (soloLoading) {
+    return (
+      <LoadingScreen
+        steps={goldfishSteps(playMode)}
+        current={soloPhase === "loading" ? loadStep(playMode) : "Deal cards"}
+        onCancel={handleCancelSolo}
+      />
+    );
+  }
+
+  if (friendsLoading) {
+    return (
+      <LoadingScreen
+        title="Opening lobby"
+        steps={newLobbySteps(playMode)}
+        current={loadStep(playMode)}
+        onCancel={handleCancelFriends}
+      />
+    );
+  }
 
   return (
     <>
@@ -570,19 +603,9 @@ export function Play() {
                 )}
                 <GuidedSwitch enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
               </div>
-              {startLoading ? (
-                <button
-                  onClick={soloLoading ? handleCancelSolo : handleCancelFriends}
-                  className="btn btn-secondary setup-next"
-                >
-                  <Spinner className="h-4 w-4" />
-                  Loading...
-                </button>
-              ) : (
-                <button onClick={startNewGame} disabled={!nameValid} className="btn btn-primary setup-next">
-                  {activeMode === "solo" ? "Start Game" : "Create Lobby"}
-                </button>
-              )}
+              <button onClick={startNewGame} disabled={!nameValid} className="btn btn-primary setup-next">
+                {activeMode === "solo" ? "Start Game" : "Create Lobby"}
+              </button>
             </div>
             <ResumeShelf
               seats={seats}
@@ -660,13 +683,6 @@ export function Play() {
             setClosedIds((ids) => [...ids, seatToClose.gameId]);
             setSeatToClose(null);
           }}
-        />
-      )}
-
-      {(soloLoading || friendsLoading) && (
-        <div
-          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-[1px]"
-          onClick={soloLoading ? handleCancelSolo : handleCancelFriends}
         />
       )}
 

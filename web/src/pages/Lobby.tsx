@@ -10,9 +10,10 @@ import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
 import { AppHeader, GuideButton, HomeButton } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
-import { BusyNotice } from "../components/common/StatusNotice";
 import { InfoTip } from "../components/common/InfoTip";
 import { Switch } from "../components/common/Switch";
+import { LoadingScreen } from "../components/common/LoadingScreen";
+import { type LoadingRouteState, START_STEPS, useHandedOnSteps } from "../components/common/loadingSteps";
 import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
 import { LobbySeats } from "../components/lobby/LobbySeats";
 import { CubeBanner } from "../components/setup/CubeBanner";
@@ -56,6 +57,7 @@ function startBlocker(lobby: LobbyState, needsDeck: boolean): string {
 export function Lobby() {
   const { gameId = "" } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
+  const openingSteps = useHandedOnSteps(["Open lobby"]);
   const { seat, claim, adopt, connectionOpened, connectionEnded, takeBack } = useGameSeat(gameId);
   const session = seat.kind === "held" ? seat.session : null;
   const { addToast } = useToast();
@@ -263,7 +265,8 @@ export function Lobby() {
 
   useEffect(() => {
     if (gameState) {
-      navigate(`/game/${gameId}/play`);
+      const state: LoadingRouteState = { loadingSteps: START_STEPS };
+      navigate(`/game/${gameId}/play`, { state });
     }
   }, [gameState, gameId, navigate]);
 
@@ -348,12 +351,37 @@ export function Lobby() {
     );
   }
 
+  // The game arrives before the route changes, and takes the lobby's state with it.
+  if (gameState) {
+    return <LoadingScreen steps={START_STEPS} current="Open board" />;
+  }
+
   if (!lobbyState) {
     return (
       <>
-        <PageFrame header={header} center contentClassName="items-center">
-          <BusyNotice label="Loading lobby..." />
-        </PageFrame>
+        <LoadingScreen title="Opening lobby" steps={openingSteps} current="Open lobby" />
+        {rulesPanel}
+      </>
+    );
+  }
+
+  const reconnecting = !isConnected && (
+    <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
+      <div className={`${POPOVER_CHROME} px-5 py-3 flex items-center gap-3`}>
+        <Spinner className="h-4 w-4 shrink-0 text-[var(--color-gold)]" />
+        <span className="text-sm text-[var(--ivory)]">Reconnecting...</span>
+      </div>
+    </div>
+  );
+
+  if (isStarting) {
+    return (
+      <>
+        {reconnecting}
+        <LoadingScreen steps={START_STEPS} current="Deal cards" />
+        {spectateRequests[0] && (
+          <SpectateRequestModal request={spectateRequests[0]} onRespond={actions.spectateResponse} />
+        )}
         {rulesPanel}
       </>
     );
@@ -369,27 +397,19 @@ export function Lobby() {
     playerCapIndex >= 0 && playerCapIndex < EVEN_PLAYER_CAP_OPTIONS.length - 1
       ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex + 1]
       : null;
-  const canDecreasePlayerCap =
-    isHost && !isStarting && previousPlayerCap !== null && previousPlayerCap >= occupiedSlots;
-  const canIncreasePlayerCap = isHost && !isStarting && nextPlayerCap !== null;
+  const canDecreasePlayerCap = isHost && previousPlayerCap !== null && previousPlayerCap >= occupiedSlots;
+  const canIncreasePlayerCap = isHost && nextPlayerCap !== null;
   const canBrowseCards = !isConstructed || hasLoadedBattler;
   const needsDeck = isConstructed && !!currentPlayer && !hasLoadedBattler;
   // Inviting is the host's next step until the seats are full, unless their own deck comes first.
-  const copyIsNext = isHost && !isStarting && !needsDeck && occupiedSlots < playerCap;
-  const startWaits = !isStarting && !lobbyState.can_start;
+  const copyIsNext = isHost && !needsDeck && occupiedSlots < playerCap;
+  const startWaits = !lobbyState.can_start;
   const startReason = startWaits ? startBlocker(lobbyState, needsDeck) : "";
 
   const openGuide = (target: RulesPanelTarget) => {
     setRulesPanelTarget(target);
     setShowRulesPanel(true);
   };
-
-  const startingLabel = (
-    <span className="flex items-center justify-center gap-2">
-      <Spinner className="h-5 w-5" />
-      Starting...
-    </span>
-  );
 
   const seatingState = [
     playerCap > 6 || isConstructed ? "is-compact" : "",
@@ -398,14 +418,7 @@ export function Lobby() {
 
   return (
     <>
-      {!isConnected && (
-        <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
-          <div className={`${POPOVER_CHROME} px-5 py-3 flex items-center gap-3`}>
-            <Spinner className="h-4 w-4 shrink-0 text-[var(--color-gold)]" />
-            <span className="text-sm text-[var(--ivory)]">Reconnecting...</span>
-          </div>
-        </div>
-      )}
+      {reconnecting}
       <PageFrame header={header} scroll={false} contentClassName="setup-page" hints="game">
         <CubeBanner
           look={cubeLook}
@@ -480,19 +493,19 @@ export function Lobby() {
                     value={battlerIdInput}
                     onChange={(event) => setBattlerIdInput(event.target.value)}
                     onKeyDown={(event) => {
-                      if (event.key === "Enter" && !isBattlerLoading && !isStarting) {
+                      if (event.key === "Enter" && !isBattlerLoading) {
                         submitBattler();
                       }
                     }}
                     placeholder="Enter deck list"
-                    disabled={isBattlerLoading || isStarting}
+                    disabled={isBattlerLoading}
                     className="setup-input"
                   />
                 </label>
               )}
               <button
                 onClick={handleBattlerButtonClick}
-                disabled={isBattlerLoading || isStarting}
+                disabled={isBattlerLoading}
                 className={`btn setup-submit ${hasLoadedBattler ? "btn-secondary" : "btn-primary"}`}
               >
                 {hasLoadedBattler ? "Change" : isBattlerLoading ? "Loading..." : "Submit"}
@@ -541,7 +554,7 @@ export function Lobby() {
               disabled={readyActionDisabled}
               className={`btn setup-next ${isReady ? "btn-secondary" : "btn-success"}`}
             >
-              {isStarting && !isHost ? startingLabel : isReady ? "Unready" : "Ready"}
+              {isReady ? "Unready" : "Ready"}
             </button>
             {isHost && (
               <button
@@ -549,7 +562,7 @@ export function Lobby() {
                 disabled={!lobbyState.can_start || startAwaitingServer}
                 className={`btn setup-next ${startWaits ? "setup-waiting" : "btn-primary"}`}
               >
-                {isStarting ? startingLabel : "Start Game"}
+                Start Game
                 {startReason && <small>{startReason}</small>}
               </button>
             )}

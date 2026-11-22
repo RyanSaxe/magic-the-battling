@@ -107,11 +107,9 @@ export function LobbySeats({
   onPuppetHelp: () => void
 }) {
   const { players, puppet_count: puppets, target_player_count: seats, available_puppet_count: available } = lobby
-  const isStarting = lobby.start_status === 'starting'
   const isHost = players.some((player) => player.player_id === selfId && player.is_host)
-  const canEdit = isHost && !isStarting
   const openSeats = Math.max(0, seats - players.length - puppets)
-  const canAddPuppet = canEdit && available !== null && puppets < available
+  const canAddPuppet = isHost && available !== null && puppets < available
 
   const puppetHelp = (
     <button
@@ -137,7 +135,7 @@ export function LobbySeats({
             status={<PlayerStatus player={player} isSelf={isSelf} />}
           >
             <PlayerMic player={player} isSelf={isSelf} voiceChat={voiceChat} />
-            {canEdit && !player.is_host && (
+            {isHost && !player.is_host && (
               <button
                 type="button"
                 onClick={() => actions.kickPlayer(player.player_id)}
@@ -158,7 +156,7 @@ export function LobbySeats({
           status={<PuppetStatus index={index} available={available} />}
         >
           {index === 0 && puppetHelp}
-          {canEdit && (
+          {isHost && (
             <button
               type="button"
               onClick={actions.removePuppet}

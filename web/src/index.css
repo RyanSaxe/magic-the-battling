@@ -3226,6 +3226,224 @@ input:-webkit-autofill:focus {
     inset 0 -1px 0 rgba(0, 0, 0, 0.42);
 }
 
+/* The loading screen: an opening hand on the felt, over the steps of the wait */
+.loading-table {
+  --loading-card: 100px;
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: 30px;
+}
+
+.loading-hand {
+  position: relative;
+  flex-shrink: 0;
+  width: calc(var(--loading-card) * 2.5);
+  height: calc(var(--loading-card) * 1.62);
+}
+
+.loading-hand::before {
+  content: "";
+  position: absolute;
+  inset: -28% -18%;
+  background: radial-gradient(closest-side, rgba(250, 230, 150, 0.2), transparent);
+}
+
+.loading-slot {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  width: var(--loading-card);
+  height: calc(var(--loading-card) * 1.4);
+  margin-left: calc(var(--loading-card) / -2);
+}
+
+.loading-slot:nth-child(1) {
+  transform: translate(-70%, 8%) rotate(-13deg);
+}
+
+.loading-slot:nth-child(2) {
+  z-index: 2;
+}
+
+.loading-slot:nth-child(3) {
+  transform: translate(70%, 8%) rotate(13deg);
+}
+
+.loading-card {
+  position: relative;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--color-gold-dark);
+  border-radius: calc(var(--loading-card) * 0.09);
+  background: radial-gradient(ellipse at 50% 38%, var(--chrome-modal), var(--chrome) 78%);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 236, 181, 0.28);
+  animation: loading-lift 2.4s ease-in-out infinite both;
+}
+
+.loading-slot:nth-child(2) .loading-card {
+  animation-delay: 0.3s;
+}
+
+.loading-slot:nth-child(3) .loading-card {
+  animation-delay: 0.6s;
+}
+
+.loading-card::before {
+  content: "";
+  position: absolute;
+  inset: 6%;
+  border: 1px solid var(--gold-border-opaque);
+  border-radius: calc(var(--loading-card) * 0.05);
+}
+
+.loading-card .loading-mark {
+  width: 50%;
+  height: auto;
+}
+
+.loading-title {
+  /* On the narrowest phones 27px would wrap the title onto a second line. */
+  font-size: min(27px, 6.9vw);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.loading-steps {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  width: min(100%, 380px);
+}
+
+.loading-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  color: var(--ivory-felt);
+  font-size: 12px;
+  text-align: center;
+}
+
+.loading-step + .loading-step::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--gold-border-opaque);
+}
+
+.loading-step + .loading-step-done::before,
+.loading-step + .loading-step-current::before {
+  background: var(--color-gold);
+}
+
+.loading-dot {
+  position: relative;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--gold-border-opaque);
+  border-radius: 50%;
+  background: var(--chrome);
+  color: var(--chrome);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.loading-step-done .loading-dot {
+  border-color: var(--color-gold);
+  background: var(--color-gold);
+}
+
+.loading-step-current {
+  color: var(--gold-pale);
+  font-weight: 600;
+}
+
+.loading-step-current .loading-dot {
+  border-color: var(--color-gold-bright);
+  box-shadow: 0 0 0 4px rgba(245, 215, 110, 0.18);
+}
+
+.loading-step-current .loading-dot::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-gold-bright);
+  animation: loading-pulse 1.2s ease-in-out infinite;
+}
+
+@media (width >= 640px) {
+  .loading-table {
+    --loading-card: 150px;
+    gap: 42px;
+  }
+
+  .loading-title {
+    font-size: 40px;
+  }
+
+  .loading-steps {
+    width: 520px;
+    max-width: 100%;
+  }
+
+  .loading-step {
+    font-size: 14px;
+  }
+}
+
+@media (height <= 600px) {
+  .loading-table {
+    --loading-card: 78px;
+    gap: 20px;
+  }
+
+  .loading-title {
+    font-size: min(23px, 6.9vw);
+  }
+}
+
+@keyframes loading-lift {
+  0%, 45%, 100% {
+    translate: 0 0;
+    border-color: var(--color-gold-dark);
+  }
+
+  20% {
+    translate: 0 -16px;
+    border-color: var(--color-gold-bright);
+  }
+}
+
+@keyframes loading-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-card,
+  .loading-step-current .loading-dot::after {
+    animation: none;
+  }
+}
+
 /* Hints banner crossfade */
 .hint-fade-in {
   opacity: 1;

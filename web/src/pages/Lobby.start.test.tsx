@@ -113,7 +113,10 @@ describe('Lobby: starting the game', () => {
     const socket = await openLobbyAs('guest')
     send(socket, { type: 'lobby_state', payload: lobby({ start_status: 'starting', can_start: false }) })
 
-    expect(button('Starting...').disabled).toBe(true)
+    expect(screen.getByRole('heading', { name: 'Setting the table' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^(Ready|Unready)$/ })).toBeNull()
+    act(() => void document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', bubbles: true })))
+    expect(sentActions(socket)).not.toContain('set_ready')
   })
 
   it('tells everyone why a start failed and lets the host start again', async () => {

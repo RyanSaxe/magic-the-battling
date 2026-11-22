@@ -3,6 +3,8 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
 import { NoticeFrame } from "../components/common/NoticeFrame";
+import { LoadingScreen } from "../components/common/LoadingScreen";
+import { START_STEPS, useHandedOnSteps } from "../components/common/loadingSteps";
 import { Banner } from "../components/common/Banner";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { FrameFelt, FrameSidebar } from "../components/common/PageFrame";
@@ -864,6 +866,7 @@ function GameContent() {
   }, []);
 
   const navigate = useNavigate();
+  const loadingSteps = useHandedOnSteps(START_STEPS);
   const { status, gameState, isConnected, send, actions, spectateRequests, serverNotice } = useGame(
     gameId || null,
     watching ? watching.sessionId : isSpectateMode ? null : session?.sessionId ?? null,
@@ -1667,11 +1670,7 @@ function GameContent() {
         </NoticeFrame>
       );
     }
-    return (
-      <div className="game-table flex items-center justify-center">
-        <div className="text-white">{isConnected ? 'Loading game...' : 'Connecting...'}</div>
-      </div>
-    );
+    return <LoadingScreen steps={loadingSteps} current="Open board" />;
   }
 
   const currentPhase = gameState.self_player.phase;
