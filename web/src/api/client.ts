@@ -347,13 +347,13 @@ export async function authGetMe(): Promise<AuthUser | null> {
 
 export async function getBattlers(offset = 0): Promise<{ battlers: UserBattler[]; has_more: boolean }> {
   const response = await fetch(`${API_BASE}/battlers?offset=${offset}`, { credentials: 'include' })
-  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load battlers')
+  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load presets')
   return response.json()
 }
 
 export async function getBattler(id: number): Promise<UserBattler> {
   const response = await fetch(`${API_BASE}/battlers/${id}`, { credentials: 'include' })
-  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load battler')
+  if (!response.ok) await throwResponseError(response, 'default', 'Failed to load preset')
   return response.json()
 }
 
@@ -376,7 +376,7 @@ export async function createBattler(data: CreateBattlerRequest): Promise<UserBat
     credentials: 'include',
     body: JSON.stringify(data),
   })
-  if (!response.ok) await throwResponseError(response, 'create-battler', 'Failed to create battler')
+  if (!response.ok) await throwResponseError(response, 'create-battler', 'Failed to create preset')
   return response.json()
 }
 
@@ -387,7 +387,7 @@ export async function updateBattler(id: number, data: Partial<CreateBattlerReque
     credentials: 'include',
     body: JSON.stringify(data),
   })
-  if (!response.ok) await throwResponseError(response, 'update-battler', 'Failed to update battler')
+  if (!response.ok) await throwResponseError(response, 'update-battler', 'Failed to update preset')
   return response.json()
 }
 
@@ -397,7 +397,7 @@ export async function deleteBattler(id: number): Promise<void> {
     credentials: 'include',
   })
   // A preset already deleted, such as from another tab, is gone, which is what the caller asked for.
-  if (!response.ok && response.status !== 404) await throwResponseError(response, 'delete-battler', 'Failed to delete battler')
+  if (!response.ok && response.status !== 404) await throwResponseError(response, 'delete-battler', 'Failed to delete preset')
 }
 
 export interface CubeGamesPage {

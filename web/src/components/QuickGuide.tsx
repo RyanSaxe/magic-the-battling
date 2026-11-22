@@ -15,6 +15,7 @@ import { HotkeyRow } from './HotkeyRow'
 import { canHover } from '../utils/inputMode'
 import { DocNavContext } from '../contexts/DocNavContext'
 import { CubeCobraPrimerLink } from './common/CubeCobraPrimerLink'
+import { SegmentedFilter, type SegmentOption } from './dashboard/SegmentedFilter'
 
 type HeaderTab = 'guide' | 'controls' | 'tips' | 'browse' | 'faq'
 type CardType = 'cards' | 'upgrades' | 'vanguards'
@@ -566,12 +567,12 @@ export function QuickGuide({
     },
   }), [applyTarget])
 
-  const headerTabs: { id: HeaderTab; label: string }[] = [
-    { id: 'guide', label: 'Rules' },
-    { id: 'controls', label: 'Controls' },
-    { id: 'tips', label: 'Tips' },
-    { id: 'browse', label: 'Cards' },
-    { id: 'faq', label: 'FAQ' },
+  const headerTabs: SegmentOption<HeaderTab>[] = [
+    { value: 'guide', label: 'Rules' },
+    { value: 'controls', label: 'Controls' },
+    { value: 'tips', label: 'Tips' },
+    { value: 'browse', label: 'Cards' },
+    { value: 'faq', label: 'FAQ' },
   ]
 
   const cardTypes: { id: CardType; label: string; visible: boolean }[] = [
@@ -607,24 +608,14 @@ export function QuickGuide({
   return (
     <DocNavContext.Provider value={docNav}>
       <div className="flex h-full flex-col flex-1 min-h-0 overflow-hidden">
-        <div className="shrink-0 border-b border-[rgba(212,175,55,0.24)] bg-black/20">
-          <div className="overflow-x-auto overscroll-contain px-3 py-2.5 sm:px-4">
-            <div className="flex min-w-max gap-1.5">
-              {headerTabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`rounded-full px-3 py-1.5 text-[0.78rem] font-medium transition-colors ${
-                    tab.id === activeTab
-                      ? 'bg-amber-400/14 text-amber-200 ring-1 ring-amber-300/25'
-                      : 'text-[var(--ivory-muted)] hover:bg-white/5 hover:text-[var(--ivory)]'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="shrink-0 overflow-x-auto overscroll-contain px-3 py-3">
+          <SegmentedFilter
+            label="Guide tab"
+            options={headerTabs}
+            value={activeTab}
+            onChange={setActiveTab}
+            className="min-w-max"
+          />
         </div>
 
         {activeTab === 'guide' && (

@@ -75,6 +75,7 @@ export function ZoneLabel({
   return (
     <span
       className={wrapClasses}
+      data-zone-label
       data-drag-handle={dragCallbacks ? "true" : undefined}
       style={dragCallbacks ? { touchAction: "none", cursor: "row-resize" } : undefined}
       {...dragBindings}

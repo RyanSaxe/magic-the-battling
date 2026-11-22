@@ -49,3 +49,22 @@ test('a double click on Continue sends one reward_done', async ({ page, baseURL 
 
   expect(game.sent('reward_done')).toBe(1)
 })
+
+const FIGHT: ScreenState = { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 } }
+
+// A locator click waits for two frames, and WebKit on Linux can go seconds between frames while a game first
+// renders. The menu tests send the click event, or click a position where what lies on top matters.
+
+test('a card moved from the Actions menu is no longer selected', async ({ page, baseURL }) => {
+  const game = await openGame(page, baseURL!, FIGHT)
+  const creature = page.locator('[data-guide-card-id^="your-creature"]').first()
+  await creature.dispatchEvent('click')
+  await expect(creature).toHaveClass(/\bselected\b/)
+  await page.getByRole('button', { name: 'Actions' }).dispatchEvent('click')
+  await page.getByRole('button', { name: 'Move To' }).dispatchEvent('click')
+  await page.locator('.menu-submenu').getByRole('button', { name: 'Graveyard', exact: true }).dispatchEvent('click')
+
+  await expect.poll(() => game.sent('battle_move')).toBe(1)
+  // A card left selected moves again on the next tap on a pile.
+  await expect(creature).not.toHaveClass(/\bselected\b/)
+})

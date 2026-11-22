@@ -201,6 +201,18 @@ describe('the dashboard library', () => {
     expect(savedIds(library)).toEqual([22, ...Array.from({ length: 21 }, (_, i) => i + 1)])
   })
 
+  it('keeps a preset saved while a page loads, and still waits for that page', () => {
+    const server = serverPresets(21)
+    let library = withLibraryPageRequested(loadedLibrary(server.page(0), NO_FOLLOWING))
+    const pageReadBeforeTheSave = server.page(20)
+
+    library = withAddedPreset(library, server.save())
+    expect(nextLibraryPage(library)).toBeNull()
+    library = withLibraryPage(library, { list: 'saved', page: pageReadBeforeTheSave })
+
+    expect(savedIds(library)).toEqual([22, ...Array.from({ length: 21 }, (_, i) => i + 1)])
+  })
+
   it('asks for the next page one earlier after a loaded preset is deleted', () => {
     const server = serverPresets(25)
     let library = loadedLibrary(server.page(0), NO_FOLLOWING)
