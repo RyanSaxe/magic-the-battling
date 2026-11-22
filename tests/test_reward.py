@@ -1,7 +1,7 @@
 import pytest
 
 from mtb.models.cards import Battler
-from mtb.models.game import Puppet, StaticOpponent, create_game, set_battler
+from mtb.models.game import Config, DraftState, Puppet, StaticOpponent, create_game, set_battler
 from mtb.phases import draft, reward
 
 
@@ -74,6 +74,32 @@ def test_award_random_card(card_factory):
     assert card in player.sideboard
     assert card not in game.battler.cards
     assert len(game.battler.cards) == 4
+
+
+@pytest.mark.parametrize("play_mode", ["limited", "constructed"])
+def test_loot_is_drawn_from_every_undealt_card_the_player_could_get(card_factory, play_mode):
+    cards = [card_factory(f"c{i}") for i in range(17)]
+    loose, undealt, dealt, riley_undealt = cards[:2], cards[2:7], cards[7:12], cards[12:]
+    drawn = set()
+    for _ in range(300):
+        game = create_game(["Riley", "Sam"], num_players=2, config=Config(play_mode=play_mode))
+        riley, sam = game.players
+        sam.battler = Battler(cards=loose.copy(), upgrades=[], vanguards=[])
+        draft_state = DraftState(packs=[], current_packs={riley.name: dealt.copy()})
+        if play_mode == "limited":
+            game.battler = sam.battler
+            draft_state.packs = [undealt.copy()]
+        else:
+            draft_state.player_packs = {sam.name: [undealt.copy()], riley.name: [riley_undealt.copy()]}
+        game.draft_state = draft_state
+
+        card = reward.award_random_card(game, sam)
+
+        assert card is not None
+        drawn.add(card.id)
+        packs = draft_state.packs if play_mode == "limited" else draft_state.player_packs[sam.name]
+        assert [len(pack) for pack in packs] == [game.config.pack_size]
+    assert drawn == {card.id for card in [*loose, *undealt]}
 
 
 def test_second_to_finish_gets_a_card_when_every_undealt_card_is_packed(card_factory):

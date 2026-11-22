@@ -137,6 +137,11 @@ class DraftState(BaseModel):
     discard: list[Card] = Field(default_factory=list)
     current_packs: dict[str, list[Card]] = Field(default_factory=dict)
 
+    def undealt_packs(self, player: "Player") -> list[list[Card]]:
+        if player.game.config.play_mode == "limited":
+            return self.packs
+        return self.player_packs.setdefault(player.name, [])
+
 
 class LastBattleResult(BaseModel):
     opponent_name: str
