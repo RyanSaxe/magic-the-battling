@@ -5,6 +5,7 @@ import { HandZone, BattlefieldZone } from '../../components/zones'
 import { CompactZoneDisplay } from '../../components/zones/CompactZoneDisplay'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
 import { ZoneDivider } from '../../components/common/ZoneDivider'
+import { usePanelHoldsEnter } from '../../utils/enterKey'
 import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
 import { battleBoardMetrics } from './phaseLayouts'
 import { buildAppliedUpgradeMap, buildHiddenAppliedUpgradeMap } from '../../utils/upgrades'
@@ -100,6 +101,7 @@ function ZoneActionMenu({
     node.style.top = `${y}px`
   }, [position])
 
+  usePanelHoldsEnter()
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return

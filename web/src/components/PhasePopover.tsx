@@ -2,6 +2,7 @@ import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { getPhaseReferenceLabel, getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
 import type { Phase } from '../constants/phases'
+import { usePanelHoldsEnter } from '../utils/enterKey'
 import { BoardBackdrop } from './common/BoardBackdrop'
 import { POPOVER_CHROME } from './common/styles'
 
@@ -34,6 +35,7 @@ export function PhasePopover({
   const popoverRef = useRef<HTMLDivElement>(null)
   const backdropRef = useRef<HTMLDivElement>(null)
   const arrowRef = useRef<HTMLDivElement>(null)
+  usePanelHoldsEnter(!isClosing)
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

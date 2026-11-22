@@ -1,4 +1,5 @@
 import type { SpectateRequest } from '../hooks/useWebSocket'
+import { usePanelHoldsEnter } from '../utils/enterKey'
 import { DIALOG_BACKDROP } from './common/styles'
 import { SurfaceCard } from './common/SurfaceCard'
 
@@ -9,6 +10,7 @@ export function SpectateRequestModal({
   request: SpectateRequest
   onRespond: (requestId: string, allowed: boolean) => void
 }) {
+  usePanelHoldsEnter()
   // A spectator is waiting on this answer, so it sits above the guide and any menu or card preview.
   return (
     <div className={`fixed inset-0 ${DIALOG_BACKDROP} flex items-center justify-center z-[102] p-4`}>

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { InfoIcon } from '../icons/InfoIcon'
+import { usePanelHoldsEnter } from '../../utils/enterKey'
 import { BoardBackdrop } from './BoardBackdrop'
 import { POPOVER_CHROME } from './styles'
 
@@ -23,6 +24,7 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
   const backdropRef = useRef<HTMLDivElement>(null)
   const [tip, setTip] = useState<{ placement: CSSProperties; pinned: boolean } | null>(null)
   const isOpen = tip !== null
+  usePanelHoldsEnter(!!tip?.pinned)
 
   const show = (pinned: boolean) => {
     const button = buttonRef.current

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { enterPressesControl } from '../utils/enterKey'
+import { enterMayAdvance, enterPressesControl } from '../utils/enterKey'
 
 type HotkeyMap = Record<string, () => void>
 
@@ -29,6 +29,7 @@ export function useHotkeys(hotkeys: HotkeyMap, enabled = true) {
       const action = hotkeysRef.current[hotkeyFor(e.key)]
       if (action) {
         e.preventDefault()
+        if (e.key === 'Enter' && !enterMayAdvance(e)) return
         action()
       }
     }
