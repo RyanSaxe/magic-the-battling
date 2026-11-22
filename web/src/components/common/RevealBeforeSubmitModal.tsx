@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Card as CardType } from '../../types'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { CardGrid } from './CardGrid'
 import { useCardLayout } from '../../hooks/useCardLayout'
 import { upgradeListLayoutConfig } from './upgradeModalLayouts'
+import { enterPressesControl } from '../../utils/enterKey'
 
 interface RevealBeforeSubmitModalProps {
   upgrades: CardType[]
@@ -30,8 +31,10 @@ export function RevealBeforeSubmitModal({
     )
   }, [])
 
+  const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (enterPressesControl(e, dialogRef.current)) return
       if (e.key === 'Escape') {
         e.preventDefault()
         e.stopPropagation()
@@ -56,6 +59,7 @@ export function RevealBeforeSubmitModal({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         className="modal-chrome border gold-border rounded-lg flex flex-col w-full max-w-xl overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
