@@ -1012,6 +1012,36 @@ def test_an_out_puppets_row_stops_at_the_round_it_went_out(game_manager, card_fa
     assert (row.treasures, row.last_result) == (2, "loss")
 
 
+def test_a_puppets_ghost_fights_with_the_build_it_went_out_with(game_manager, card_factory):
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    alice.phase, alice.round = "build", 3
+    game.puppets = [
+        Puppet(
+            name=name,
+            player_history_id=history_id,
+            snapshots={
+                f"3_{round_num}": StaticOpponent(name=name, hand=[card_factory(f"{name}-{round_num}")])
+                for round_num in (1, 2, 3)
+            },
+            last_played_round=(3, 1),
+        )
+        for history_id, name in enumerate(["Out", "Bot", "Other"], start=1)
+    ]
+    eliminate_puppet(game, game.puppets[0])
+    game_manager._active_games["g1"] = game
+    game_manager._player_to_game["pid_alice"] = "g1"
+    game_manager._player_id_to_name["pid_alice"] = "Alice"
+
+    seats = battle.get_round_table(game).seats
+    state = game_manager.get_game_state("g1", "pid_alice")
+
+    assert [card.id for card in seats["Out"].hand] == ["Out-1"]
+    assert [card.id for card in seats["Bot"].hand] == ["Bot-3"]
+    scouted = next(player for player in state.players if player.name == "Out")
+    assert [card.id for card in scouted.most_recently_revealed_cards] == ["Out-1"]
+
+
 def test_a_puppets_row_shows_the_furthest_rounds_treasures_and_the_cards_seen_in_your_round(game_manager, card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players

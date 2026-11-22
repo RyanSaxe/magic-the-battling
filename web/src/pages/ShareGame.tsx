@@ -5,6 +5,7 @@ import type { ShareGameResponse, SharePlayerSnapshot, Card as CardType } from '.
 import { ShareRoundDetail } from '../components/share/ShareRoundDetail'
 import {
   buildSharePlayerViews,
+  getShareBoardSnapshot,
   getSharePlayerRowBadge,
   getShareRoundLabel,
   getShareRoundValue,
@@ -222,7 +223,7 @@ export function ShareGame() {
 
   const currentPlayerData = data.players.find((p) => p.name === selectedPlayer)
   const currentSnapshot = currentPlayerData
-    ? currentPlayerData.snapshots.find((s) => getShareRoundValue(s) === effectiveSelectedRound)
+    ? getShareBoardSnapshot(currentPlayerData, effectiveSelectedRound)
     : null
   const currentIndex = roundOptions.findIndex((o) => o.value === effectiveSelectedRound)
   const hasPrev = currentIndex > 0

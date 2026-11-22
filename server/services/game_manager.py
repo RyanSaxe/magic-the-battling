@@ -2770,11 +2770,9 @@ class GameManager:
         most_recent_ghost_puppet_name: str | None = None,
     ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
-        # The odds come from the furthest round's table, so the treasures do too, until a puppet is out and its row
-        # stops at the round it went out. The cards stay from the viewer's round, or a player who is behind would see a
-        # hand early.
-        out_round = fake.last_played_round if fake.is_eliminated else None
-        table_snapshot = fake.get_opponent_for_round(*(out_round or get_furthest_round(viewer.game)))
+        # The odds come from the furthest round's table, so the treasures do too. The cards stay from the viewer's
+        # round, or a player who is behind would see a hand early. Both stop at the round a puppet went out.
+        table_snapshot = fake.get_opponent_for_round(*get_furthest_round(viewer.game))
 
         if viewer.in_sudden_death:
             revealed_cards = (snapshot.hand + snapshot.command_zone) if snapshot else []
