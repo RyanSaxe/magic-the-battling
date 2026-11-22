@@ -1,4 +1,5 @@
 import type {
+  Card,
   ShareGameResponse,
   SelfPlayerView,
   PlayerView,
@@ -19,6 +20,11 @@ const HIDDEN_ZONES: Record<ShareSnapshotVisibility, ShareHiddenZone[]> = {
 
 export function getShareHiddenZones(snapshot: SharePlayerSnapshot): ShareHiddenZone[] {
   return HIDDEN_ZONES[snapshot.visibility]
+}
+
+// Builds saved before the full list existed read it back as [], with only their applied upgrades filled in.
+export function getShareUpgrades(snapshot: SharePlayerSnapshot): Card[] {
+  return snapshot.upgrades?.length ? snapshot.upgrades : snapshot.applied_upgrades
 }
 
 /** The band under a round: why the server hid it while the game goes on, else whether it was a Sudden Death build. */
@@ -182,9 +188,7 @@ export function buildSharePlayerViews(
       sideboard_count: displaySnapshot?.sideboard.length ?? 0,
       hand_size: displaySnapshot?.hand.length ?? 0,
       is_stage_increasing: false,
-      upgrades: displaySnapshot?.upgrades?.length
-        ? displaySnapshot.upgrades
-        : (displaySnapshot?.applied_upgrades ?? []),
+      upgrades: displaySnapshot ? getShareUpgrades(displaySnapshot) : [],
       vanguard: displaySnapshot?.vanguard ?? null,
       chosen_basics: displaySnapshot?.basic_lands ?? [],
       most_recently_revealed_cards: [],
@@ -225,7 +229,7 @@ export function buildGameSummaryData(
     sideboard_count: lastSnap.sideboard.length,
     hand_size: lastSnap.hand.length,
     is_stage_increasing: false,
-    upgrades: lastSnap.upgrades?.length ? lastSnap.upgrades : lastSnap.applied_upgrades,
+    upgrades: getShareUpgrades(lastSnap),
     vanguard: lastSnap.vanguard,
     chosen_basics: lastSnap.basic_lands,
     most_recently_revealed_cards: [],
@@ -270,7 +274,7 @@ export function buildGameSummaryData(
       sideboard_count: snap?.sideboard.length ?? 0,
       hand_size: snap?.hand.length ?? 0,
       is_stage_increasing: false,
-      upgrades: snap?.upgrades?.length ? snap.upgrades : (snap?.applied_upgrades ?? []),
+      upgrades: snap ? getShareUpgrades(snap) : [],
       vanguard: snap?.vanguard ?? null,
       chosen_basics: snap?.basic_lands ?? [],
       most_recently_revealed_cards: [],
