@@ -30,7 +30,7 @@ export function HourglassIcon({ size = 'md', className = '' }: HourglassIconProp
       <rect x="5" y="20" width="14" height="2" rx="0.5" fill="#D97706" />
       <path
         d="M9 5H15L12 8L9 5Z"
-        fill="#1F2937"
+        fill="#1C1714"
       />
     </svg>
   )
