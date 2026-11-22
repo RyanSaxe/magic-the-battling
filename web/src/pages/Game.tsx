@@ -125,6 +125,9 @@ import { DIALOG_BACKDROP, LINK, OPTION_BOX, POPOVER_CHROME, TEXT_INPUT } from ".
 const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_+_5px_-_44px)]";
 const LIFE_PLUS_TOUCH_AREA = "touch-area [--touch-area-left:-5px]";
 
+const NO_BASICS: string[] = [];
+const ignoreBasicsPick = () => {};
+
 const STATIC_DIVIDER_CALLBACKS = {
   onDragStart: () => {},
   onDrag: () => {},
@@ -972,7 +975,9 @@ function GameContent() {
   const buildReadyPending = isPhaseActionPending(pendingPhaseAction, "build_ready");
 
   // Lifted state from Build phase
-  const [selectedBasics, setSelectedBasics] = useState<string[]>([]);
+  const [pickedBasics, setPickedBasics] = useState<string[]>([]);
+  // A spectator makes no picks, so their lands follow the watched player's.
+  const selectedBasics = isSpectator ? (gameState?.self_player.chosen_basics ?? NO_BASICS) : pickedBasics;
   const upgradesWindow = openSurface?.kind === "upgrades" ? openSurface : null;
   const showUpgradesModal = upgradesWindow !== null;
   const handSlotsRef = useRef<(string | null)[]>([]);
@@ -2459,7 +2464,7 @@ function GameContent() {
                   gameState={gameState}
                   actions={actions}
                   selectedBasics={selectedBasics}
-                  onBasicsChange={setSelectedBasics}
+                  onBasicsChange={isSpectator ? ignoreBasicsPick : setPickedBasics}
                   onHandSlotsChange={(slots) => { handSlotsRef.current = slots; }}
                   onCardHover={handleCardHover}
                   onCardHoverEnd={handleCardHoverEnd}
