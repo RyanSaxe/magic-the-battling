@@ -549,13 +549,15 @@ export function BuildPhase({
   );
 }
 
-/** A pill on a card's bottom edge. It shows while the card is hovered, or always while pinned. */
+/** A pill on a card's bottom edge. It shows while the card is hovered or the keyboard is on it, or always while pinned. */
 function CardPill({
   pinned = false,
   className,
   ...button
 }: ComponentProps<"button"> & { pinned?: boolean }) {
-  const visibility = pinned
+  // Read as focus arrives, because a clicked pill also matches :focus-visible once any key is down.
+  const [hasKeyboardFocus, setHasKeyboardFocus] = useState(false);
+  const visibility = pinned || hasKeyboardFocus
     ? "opacity-100 pointer-events-auto"
     : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto";
 
@@ -564,6 +566,8 @@ function CardPill({
       <button
         type="button"
         className={`card-pill rounded-full font-semibold transition-opacity duration-150 ${visibility} ${className}`}
+        onFocus={(event) => setHasKeyboardFocus(event.currentTarget.matches(":focus-visible"))}
+        onBlur={() => setHasKeyboardFocus(false)}
         {...button}
       />
     </div>
