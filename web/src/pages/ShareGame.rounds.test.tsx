@@ -22,6 +22,8 @@ vi.mock('../contexts/authState', () => ({ useAuth: () => ({ user: null, loading:
 beforeEach(() => {
   // The page measures itself, and jsdom has no ResizeObserver.
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  // The round list scrolls to the chosen round, and jsdom has no scrollIntoView.
+  Element.prototype.scrollIntoView = () => {}
 })
 
 afterEach(() => {
