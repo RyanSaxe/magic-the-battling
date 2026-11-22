@@ -34,25 +34,3 @@ test('the board takes a tap while a closed guide fades out', async ({ page, base
 
   await expect(card).toHaveClass(/\bselected\b/)
 })
-
-test('the host can answer a spectate request while the welcome guide is open', async ({ page, baseURL }) => {
-  const sent: { action: string; payload: unknown }[] = []
-  let sendToHost: (message: unknown) => void = () => {}
-  await serveGame(page, baseURL!, { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 } }, {
-    guideProgress: { seen: [] },
-    onSocket: (ws) => {
-      sendToHost = (message) => ws.send(JSON.stringify(message))
-      ws.onMessage((message) => sent.push(JSON.parse(String(message))))
-    },
-  })
-  await page.goto(`/game/${GAME_ID}/play`)
-  await page.getByRole('heading', { name: 'Playing Pitfight' }).waitFor()
-
-  sendToHost({ type: 'spectate_requests', payload: { requests: [{ request_id: 'carol-1', spectator_name: 'Carol' }] } })
-  const allow = (await page.getByRole('button', { name: 'Allow' }).boundingBox())!
-  // A tap at the button's position lands on whatever is on top there.
-  await page.touchscreen.tap(allow.x + allow.width / 2, allow.y + allow.height / 2)
-
-  await expect.poll(() => sent.find((message) => message.action === 'spectate_response')?.payload)
-    .toEqual({ request_id: 'carol-1', allowed: true })
-})

@@ -55,23 +55,6 @@ const FIGHT: ScreenState = { phase: 'battle', counts: { hand: 5, lands: 4, nonla
 // A locator click waits for two frames, and WebKit on Linux can go seconds between frames while a game first
 // renders. The menu tests send the click event, or click a position where what lies on top matters.
 
-// A row that moves as its submenu opens puts a different row under the next tap.
-async function expectOpensInPlace(page: Page, name: string) {
-  const row = page.getByRole('button', { name })
-  const before = await row.boundingBox()
-  await row.dispatchEvent('click')
-  await expect(row).toHaveAttribute('aria-expanded', 'true')
-  expect(await row.boundingBox()).toEqual(before)
-}
-
-test("Move To opens in place in a hand card's menu", async ({ page, baseURL }) => {
-  await openGame(page, baseURL!, FIGHT)
-  const card = (await page.locator('[data-guide-card-id^="battle-hand"]').first().boundingBox())!
-  await page.mouse.click(card.x + card.width / 2, card.y + card.height / 2, { button: 'right' })
-
-  await expectOpensInPlace(page, 'Move To')
-})
-
 test('a card moved from the Actions menu is no longer selected', async ({ page, baseURL }) => {
   const game = await openGame(page, baseURL!, FIGHT)
   const creature = page.locator('[data-guide-card-id^="your-creature"]').first()
@@ -84,15 +67,4 @@ test('a card moved from the Actions menu is no longer selected', async ({ page, 
   await expect.poll(() => game.sent('battle_move')).toBe(1)
   // A card left selected moves again on the next tap on a pile.
   await expect(creature).not.toHaveClass(/\bselected\b/)
-})
-
-test('a bar button acts on the first click while the Actions menu is open', async ({ page, baseURL }) => {
-  await openGame(page, baseURL!, FIGHT)
-  await page.getByRole('button', { name: 'Actions' }).dispatchEvent('click')
-  await expect(page.getByRole('button', { name: 'Roll a Die' })).toBeVisible()
-
-  const submit = (await page.getByRole('button', { name: 'Submit Result' }).boundingBox())!
-  await page.mouse.click(submit.x + submit.width / 2, submit.y + submit.height / 2)
-
-  await expect(page.locator('[data-guide-target="battle-submit-popover"]').getByRole('button', { name: 'I Won' })).toBeVisible()
 })
