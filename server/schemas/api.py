@@ -299,6 +299,8 @@ class LobbyStateResponse(BaseModel):
     use_upgrades: bool = True
     guided_mode_default: bool = False
     voice_chat_enabled: bool = False
+    auto_approve_spectators: bool = False
+    previous_host_id: str | None = None
     play_mode: PlayMode = "limited"
 
 

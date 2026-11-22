@@ -278,6 +278,7 @@ class PendingGame:
     player_user_ids: dict[str, str] = field(default_factory=dict)
     seat_token_hashes: dict[str, str] = field(default_factory=dict)
     host_away_since: datetime | None = None
+    previous_host_id: str | None = None
     _loading_task: asyncio.Task | None = field(default=None, repr=False)
 
     def has_player_named(self, name: str) -> bool:
@@ -2296,7 +2297,7 @@ class GameManager:
         )
         if successor is None:
             return False
-        pending.host_player_id = successor
+        self._pass_host(pending, successor)
         pending.host_away_since = None
         self._cancel_host_handoff(pending.game_id)
         return True
@@ -2305,14 +2306,18 @@ class GameManager:
         connected = self._connected_player_ids(pending.game_id)
         successor = next((pid for pid in pending.player_ids if pid in connected), None)
         if successor is not None:
-            pending.host_player_id = successor
+            self._pass_host(pending, successor)
             pending.host_away_since = None
             self._cancel_host_handoff(pending.game_id)
             return
         # Nobody is here to take over: the next in line holds the role while away, and the first player to
         # connect can take it at once, since the removed host has been gone longer than the grace period.
-        pending.host_player_id = pending.player_ids[0]
+        self._pass_host(pending, pending.player_ids[0])
         pending.host_away_since = datetime.now(UTC) - timedelta(seconds=HOST_HANDOFF_GRACE_SECONDS)
+
+    def _pass_host(self, pending: PendingGame, successor: str) -> None:
+        pending.previous_host_id = pending.host_player_id
+        pending.host_player_id = successor
 
     def _cancel_host_handoff(self, game_id: str) -> None:
         if task := self._host_handoff_tasks.pop(game_id, None):
@@ -2565,6 +2570,8 @@ class GameManager:
             use_upgrades=pending.use_upgrades,
             guided_mode_default=pending.guided_mode_default,
             voice_chat_enabled=pending.voice_chat_enabled,
+            auto_approve_spectators=pending.auto_approve_spectators,
+            previous_host_id=pending.previous_host_id,
             play_mode=pending.play_mode,
         )
 

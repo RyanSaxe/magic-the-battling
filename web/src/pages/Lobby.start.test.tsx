@@ -49,6 +49,8 @@ function lobby(overrides: Partial<LobbyState> = {}): LobbyState {
     use_upgrades: true,
     guided_mode_default: false,
     voice_chat_enabled: false,
+    auto_approve_spectators: false,
+    previous_host_id: null,
     play_mode: 'limited',
     ...overrides,
   }
@@ -226,5 +228,68 @@ describe('Lobby: inviting', () => {
 
     expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/game/game-1/lobby`)
     expect(button('Copied!')).toBeTruthy()
+  })
+})
+
+describe('Lobby: the host, a seat and a deck', () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    FakeWebSocket.instances = []
+    toasts.length = 0
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it('tells the new host who is away, and the old host after a reload', async () => {
+    const [anya, boris] = lobby().players
+    const players = [{ ...anya, is_host: false, is_connected: false }, { ...boris, is_host: true }]
+    const newHost = await openLobbyAs('guest')
+    send(newHost, { type: 'lobby_state', payload: lobby() })
+    send(newHost, { type: 'lobby_state', payload: lobby({ previous_host_id: 'host', players }) })
+    expect(screen.getByText("You're the host now. Anya is away.")).toBeTruthy()
+    expect(toasts).toEqual([])
+
+    cleanup()
+    const oldHost = await openLobbyAs('host')
+    send(oldHost, { type: 'lobby_state', payload: lobby({ previous_host_id: 'host', players }) })
+    expect(screen.getByText('You were away, so Boris is the host now.')).toBeTruthy()
+  })
+
+  it('asks before removing a player, with the shortcuts off meanwhile', async () => {
+    const socket = await openLobbyAs('host')
+    send(socket, { type: 'lobby_state', payload: lobby() })
+
+    fireEvent.click(button('Remove Boris'))
+    fireEvent.keyDown(document.body, { key: 'r' })
+    expect(sentActions(socket)).not.toContain('kick_player')
+    expect(sentActions(socket)).not.toContain('set_ready')
+
+    fireEvent.click(button('Remove'))
+    expect(sentActions(socket)).toContain('kick_player')
+  })
+
+  it('keeps the deck and Ready until another deck is submitted', async () => {
+    const [anya, boris] = lobby().players
+    const socket = await openLobbyAs('host')
+    const players = [{ ...anya, battler_id: 'first-deck', battler_status: 'ready' as const }, boris]
+    send(socket, { type: 'lobby_state', payload: lobby({ play_mode: 'constructed', players }) })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    fireEvent.click(button('Change'))
+    const field = screen.getByDisplayValue('first-deck')
+    expect(button('Submit').disabled).toBe(true)
+    expect(button('Unready')).toBeTruthy()
+    expect(sentActions(socket)).not.toContain('clear_battler')
+
+    fireEvent.change(field, { target: { value: 'second-deck' } })
+    fireEvent.click(button('Submit'))
+    expect(sentActions(socket)).toContain('submit_battler')
   })
 })

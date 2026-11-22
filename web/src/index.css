@@ -1335,6 +1335,14 @@ input:-webkit-autofill:focus {
     min-height: 44px;
   }
 
+  .play-actions {
+    display: grid;
+    flex: none;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+
   .setup-row-label {
     flex: none;
     width: 84px;
@@ -1544,6 +1552,33 @@ input:-webkit-autofill:focus {
   .lobby-summary b {
     color: var(--ivory);
     font-weight: 600;
+  }
+
+  .lobby-spectating {
+    color: var(--ivory);
+  }
+
+  .lobby-spectating::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin: 0 5px 1px 9px;
+    border-radius: 50%;
+    background: var(--color-gold-bright);
+  }
+
+  /* On narrow phones Open Spectating takes the seated count's place */
+  @media (width < 390px) {
+    .setup-page:has(.lobby-deck) .lobby-summary:has(.lobby-spectating) b {
+      display: none;
+    }
+  }
+
+  @media (width < 360px) {
+    .lobby-summary:has(.lobby-spectating) b {
+      display: none;
+    }
   }
 
   .lobby-deck {
@@ -2626,6 +2661,13 @@ input:-webkit-autofill:focus {
   font-size: 11px;
   font-weight: 400;
   line-height: 14px;
+}
+
+/* Join Game is in the top bar from 640px */
+@media (width >= 640px) {
+  .btn.play-join {
+    display: none;
+  }
 }
 
 .btn.setup-submit {
