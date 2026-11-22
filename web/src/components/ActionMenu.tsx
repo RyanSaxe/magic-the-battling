@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
 import { useFaceDown } from '../contexts/faceDownState'
@@ -73,6 +73,15 @@ export function ActionMenu({
   onClose,
 }: ActionMenuProps) {
   const [submenu, setSubmenu] = useState<SubmenuType>('none')
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // The menu sits on the Actions button and grows upward, so a submenu would move every row above the one clicked.
+  // Keeping the size it opened with makes a submenu push the rows below it down, inside the menu's scroll.
+  useLayoutEffect(() => {
+    const node = menuRef.current
+    if (!node) return
+    node.style.height = `${node.getBoundingClientRect().height}px`
+  }, [])
 
   const isYourTurn = battle.current_turn_name === playerName
 
@@ -120,8 +129,8 @@ export function ActionMenu({
     <>
       <div className="fixed inset-0 z-[86]" onClick={onClose} />
       <div
-        className="fixed bottom-16 left-[calc(var(--bar-inline)+0.5rem)] modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-[87]"
-        style={{ maxWidth: 280 }}
+        ref={menuRef}
+        className="fixed bottom-16 left-[calc(var(--bar-inline)+0.5rem)] modal-chrome border gold-border rounded-lg shadow-xl py-1 w-[280px] max-h-[70vh] overflow-auto z-[87]"
       >
         {card && (
           <>
@@ -289,6 +298,44 @@ export function ActionMenu({
           </>
         )}
 
+        <MenuItem
+          label="Roll a Die"
+          hasSubmenu
+          open={submenu === 'rollDie'}
+          onClick={() => setSubmenu(submenu === 'rollDie' ? 'none' : 'rollDie')}
+        />
+        {submenu === 'rollDie' && (
+          <Submenu>
+            <div className="menu-submenu-grid grid grid-cols-4 pr-3">
+              {DIE_SIDES.map(sides => (
+                <DieButton
+                  key={sides}
+                  label={`d${sides}`}
+                  onClick={() => {
+                    onRollDie(sides)
+                    onClose()
+                  }}
+                />
+              ))}
+              <DieButton
+                label="Custom…"
+                onClick={() => {
+                  const input = prompt('Number of sides:')
+                  if (input) {
+                    const sides = parseInt(input, 10)
+                    if (sides > 0) {
+                      onRollDie(sides)
+                      onClose()
+                    }
+                  }
+                }}
+              />
+            </div>
+          </Submenu>
+        )}
+
+        <MenuDivider />
+
         <MenuItem label="Untap Your Permanents" onClick={() => handleGeneralAction(onUntapAll)} />
         <MenuItem label="Untap Opponent's Permanents" onClick={() => handleGeneralAction(onUntapOpponentAll)} />
 
@@ -320,41 +367,6 @@ export function ActionMenu({
           disabled={!isYourTurn}
         />
 
-        <MenuDivider />
-
-        <MenuItem
-          label="Roll a Die"
-          hasSubmenu
-          open={submenu === 'rollDie'}
-          onClick={() => setSubmenu(submenu === 'rollDie' ? 'none' : 'rollDie')}
-        />
-        {submenu === 'rollDie' && (
-          <Submenu>
-            {DIE_SIDES.map(sides => (
-              <MenuItem
-                key={sides}
-                label={`d${sides}`}
-                onClick={() => {
-                  onRollDie(sides)
-                  onClose()
-                }}
-              />
-            ))}
-            <MenuItem
-              label="Custom..."
-              onClick={() => {
-                const input = prompt('Number of sides:')
-                if (input) {
-                  const sides = parseInt(input, 10)
-                  if (sides > 0) {
-                    onRollDie(sides)
-                    onClose()
-                  }
-                }
-              }}
-            />
-          </Submenu>
-        )}
       </div>
     </>
   )
@@ -388,6 +400,14 @@ function MenuItem({
     >
       <span>{label}</span>
       {hasSubmenu && <span className="text-[var(--ivory-muted)]">›</span>}
+    </button>
+  )
+}
+
+function DieButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button className="menu-item rounded py-1.5 text-sm text-center text-white whitespace-nowrap" onClick={onClick}>
+      {label}
     </button>
   )
 }

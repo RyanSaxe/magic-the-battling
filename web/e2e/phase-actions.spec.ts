@@ -49,3 +49,56 @@ test('a double click on Continue sends one reward_done', async ({ page, baseURL 
 
   expect(game.sent('reward_done')).toBe(1)
 })
+
+const FIGHT: ScreenState = { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 } }
+const MENU_SCREENS = [
+  { name: '1280×800 laptop', viewport: { width: 1280, height: 800 }, isMobile: false },
+  { name: 'iPhone 15', viewport: { width: 390, height: 844 }, isMobile: true },
+]
+const CARD_MENUS = [
+  {
+    menu: "a hand card's menu",
+    open: async (page: Page) => {
+      const card = (await page.locator('[data-guide-card-id^="battle-hand"]').first().boundingBox())!
+      await page.mouse.click(card.x + card.width / 2, card.y + card.height / 2, { button: 'right' })
+    },
+    row: 'Move To',
+    item: 'Graveyard',
+  },
+  {
+    menu: 'the Actions menu for a creature',
+    open: async (page: Page) => {
+      await page.locator('[data-guide-card-id^="your-creature"]').first().click()
+      await page.getByRole('button', { name: 'Actions' }).click()
+    },
+    row: 'Move To',
+    item: 'Graveyard',
+  },
+  {
+    menu: 'the Actions menu',
+    open: (page: Page) => page.getByRole('button', { name: 'Actions' }).click(),
+    row: 'Roll a Die',
+    item: 'Custom…',
+  },
+]
+
+for (const { name, viewport, isMobile } of MENU_SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    for (const { menu, open, row, item } of CARD_MENUS) {
+      // Opening a submenu once moved the whole menu, so the next tap landed on a different row.
+      test(`${row} in ${menu} opens without moving the menu`, async ({ page, baseURL }) => {
+        await openGame(page, baseURL!, FIGHT)
+        await open(page)
+        const submenuRow = page.getByRole('button', { name: row })
+        const before = await submenuRow.boundingBox()
+
+        await submenuRow.click()
+
+        await expect(page.locator('.menu-submenu').getByRole('button', { name: item, exact: true })).toBeInViewport({ ratio: 0.99 })
+        expect(await submenuRow.boundingBox()).toEqual(before)
+      })
+    }
+  })
+}
