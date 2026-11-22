@@ -3,7 +3,8 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useGameSeat } from "../hooks/useGameSeat";
 import { useAuth } from "../contexts/authState";
 import { NoticeFrame } from "../components/common/NoticeFrame";
-import { FrameSidebar } from "../components/common/PageFrame";
+import { Banner } from "../components/common/Banner";
+import { FrameFelt, FrameSidebar } from "../components/common/PageFrame";
 import { GuideButton, HomeButton } from "../components/common/AppHeader";
 import { BottomBar, BrandMark, TopBar } from "../components/common/FrameBar";
 import { BusyNotice, StatusNotice } from "../components/common/StatusNotice";
@@ -1681,9 +1682,27 @@ function GameContent() {
   const actionBarPhase = displayBattleResolution ? "battle" : currentPhase;
   const actionBarBattle = battleViewForDisplay;
   const canManipulateOpponent = battleViewForDisplay?.can_manipulate_opponent ?? false;
+  const showsBattle = (currentPhase === "battle" || displayBattleResolution) && !!battleViewForDisplay;
+  const inSuddenDeath = showsBattle
+    ? !!battleViewForDisplay?.is_sudden_death
+    : currentPhase === "build" && self_player.in_sudden_death;
+  const banner = isSpectator && spectatePlayer ? (
+    <Banner
+      title={`Watching ${spectatePlayer}`}
+      tone={inSuddenDeath ? "sudden-death" : "gold"}
+      note={inSuddenDeath ? "Sudden Death" : undefined}
+    />
+  ) : inSuddenDeath ? (
+    <Banner
+      tone="sudden-death"
+      title="Sudden Death"
+      note="Loser is eliminated"
+      info="Multiple players reached lethal poison. The two with the lowest poison are reset to 9 and face off. A draw causes both players to rebuild. Play continues until one is eliminated."
+    />
+  ) : null;
   // The drawer's lanes line up with the board's rows, which start under the life bar while the drawer's start under
   // its header.
-  const overlaySidebarTopInset = usesOverlaySidebar && (currentPhase === "battle" || displayBattleResolution) && battleViewForDisplay
+  const overlaySidebarTopInset = usesOverlaySidebar && showsBattle
     ? battleLifeRailHeight - SIDE_PANEL_HEADER_HEIGHT
     : 0;
 
@@ -1750,10 +1769,6 @@ function GameContent() {
   };
 
   const renderActionButtons = (): { left: ReactNode; right: ReactNode } | null => {
-    if (isSpectator) {
-      return null;
-    }
-
     let left: ReactNode = null;
     let right: ReactNode = null;
 
@@ -2155,12 +2170,6 @@ function GameContent() {
             inGame
           />
         )}
-        {/* Spectator Banner */}
-        {isSpectator && spectatePlayer && (
-          <div className="bg-purple-900/80 text-purple-200 text-center py-2">
-            Watching {spectatePlayer}'s game (spectator mode)
-          </div>
-        )}
         <div ref={guideRootRef} className="relative flex flex-col flex-1 min-h-0">
         <GuideProvider
           gameId={gameId}
@@ -2214,16 +2223,13 @@ function GameContent() {
         </div>
 
         {/* Main content */}
-        {(currentPhase === "battle" || displayBattleResolution) && battleViewForDisplay ? (
+        {showsBattle ? (
           <FaceDownProvider value={{ faceDownCardIds: allFaceDownIds }}>
           <GameDndProvider
             onCardMove={handleCardMove}
             validDropZones={getValidDropZones}
           >
-            <div className="flex-1 flex min-h-0 game-surface">
-              {shellMode === "mobile" && (
-                <div className="w-[4px] shrink-0 frame-chrome" />
-              )}
+            <FrameFelt banner={banner} sidePanels={<SidePanelFrame ref={setSidePanelHost} />}>
               <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
                   {usesOverlaySidebar && battleViewForDisplay && (
@@ -2312,9 +2318,7 @@ function GameContent() {
                   </div>
               </main>
               {renderSidebar()}
-              <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-              <SidePanelFrame ref={setSidePanelHost} />
-            </div>
+            </FrameFelt>
             {current_battle && (
               <>
                 <DndPanel
@@ -2384,10 +2388,7 @@ function GameContent() {
           </GameDndProvider>
           </FaceDownProvider>
         ) : (
-          <div className="flex-1 flex min-h-0 game-surface">
-            {shellMode === "mobile" && (
-              <div className="w-[4px] shrink-0 frame-chrome" />
-            )}
+          <FrameFelt banner={banner} sidePanels={<SidePanelFrame ref={setSidePanelHost} />}>
             <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
               {currentPhase === "draft" && (
                 <DraftPhase
@@ -2472,12 +2473,10 @@ function GameContent() {
               )}
             </main>
             {renderSidebar()}
-            <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
-            <SidePanelFrame ref={setSidePanelHost} />
-          </div>
+          </FrameFelt>
         )}
         {/* Bottom Action Bar */}
-        {!isSpectator && (() => {
+        {(() => {
           const endOfGame = isEndPhase && gameId && !displayBattleResolution;
           const groups = endOfGame ? null : renderActionButtons();
           // Above the docked sidebar's z-[45], so the popovers over Submit Hand and Submit Result show over it.
@@ -2485,6 +2484,8 @@ function GameContent() {
             <BottomBar
               className="relative z-[46]"
               guideTarget="phase-action-bar"
+              // A spectator watches the player's screen, so sees the player's bar without being able to use it.
+              inert={isSpectator}
               secondary={endOfGame ? (
                 <>
                   <button

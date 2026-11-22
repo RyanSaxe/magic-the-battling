@@ -2,7 +2,7 @@ import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { SidePanelHostContext } from './sidePanelHost'
 
-/** Placed inside the felt, it marks the box between the gold edges where side panels open. */
+/** Placed over the board and its sidebar, it marks the box between their gold edges where side panels open. */
 export function SidePanelFrame({ ref }: { ref: (element: HTMLDivElement | null) => void }) {
   return <div ref={ref} className="side-panel-frame" />
 }
@@ -31,7 +31,7 @@ interface SidePanelProps {
 }
 
 /**
- * The one panel that opens over the board: inside the felt's gold edge and between the top and bottom bars, so the
+ * The one panel that opens over the board: inside its gold edge, under any banner and between the bars, so the
  * bars and their buttons always show. From 1120px wide it covers the docked sidebar's column, from 640px the same
  * column over the board, and on phones the whole board. It slides in from the right, and × or Escape closes it.
  *
@@ -80,10 +80,10 @@ export function SidePanel({
 
   useEffect(() => {
     if (!open || !closeOnBoardTap || !host) return
-    const felt = host.parentElement
+    const board = host.parentElement
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Node | null
-      if (target && felt?.contains(target) && !host.contains(target)) onClose()
+      if (target && board?.contains(target) && !host.contains(target)) onClose()
     }
     document.addEventListener('pointerdown', handlePointerDown)
     return () => document.removeEventListener('pointerdown', handlePointerDown)

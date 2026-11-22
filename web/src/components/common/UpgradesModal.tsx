@@ -4,6 +4,7 @@ import { Card } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { CardGrid } from './CardGrid'
 import { useCardLayout } from '../../hooks/useCardLayout'
+import { upgradeApplyLayoutConfig, upgradeListLayoutConfig } from './upgradeModalLayouts'
 import { useElementHeight } from '../../hooks/useElementHeight'
 import { applyUpgradeWithModalClose, revealUpgradeWithModalClose } from './upgradeModalFlow'
 import { getAppliedUpgrades, getUnappliedUpgrades, getUnrevealedAppliedUpgrades } from '../../utils/upgrades'
@@ -131,25 +132,17 @@ export function UpgradesModal({
   const isRevealMode = mode === 'reveal'
 
   const [separatorRef, separatorHeight] = useElementHeight()
-  const [applyRef, applyDims] = useCardLayout({
-    zones: {
-      upgrades: { count: isApplyMode ? upgrades.length : 0, maxCardWidth: 200 },
-      targets: { count: isApplyMode ? targets.length : 0, maxCardWidth: 200 },
-    },
-    layout: { top: ['upgrades'], bottomLeft: ['targets'] },
-    fixedHeight: separatorHeight,
-  })
+  const [applyRef, applyDims] = useCardLayout(upgradeApplyLayoutConfig({
+    upgradeCount: isApplyMode ? upgrades.length : 0,
+    targetCount: isApplyMode ? targets.length : 0,
+    separatorHeight,
+  }))
 
-  const [viewRef, viewDims] = useCardLayout({
-    zones: {
-      upgrades: {
-        count: !isApplyMode
-          ? (isRevealMode ? revealedApplied.length + hiddenApplied.length : upgrades.length)
-          : 0,
-      },
-    },
-    layout: { top: ['upgrades'] },
-  })
+  const [viewRef, viewDims] = useCardLayout(upgradeListLayoutConfig(
+    !isApplyMode
+      ? (isRevealMode ? revealedApplied.length + hiddenApplied.length : upgrades.length)
+      : 0,
+  ))
 
   const upgradeDims = isApplyMode
     ? { width: applyDims.upgrades.width, height: applyDims.upgrades.height }

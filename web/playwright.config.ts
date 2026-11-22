@@ -18,7 +18,13 @@ export default defineConfig({
     },
     { name: 'iPhone 15 landscape', testIgnore: ['game-layout.spec.ts', 'frame-bar.spec.ts', 'phase-actions.spec.ts', 'side-panels.spec.ts'], use: { ...devices['iPhone 15 landscape'] } },
     // The game layout, frame and side panel specs set each screen's viewport themselves, so each runs once.
-    { name: 'game layout', testMatch: 'game-layout.spec.ts', use: { ...devices['Desktop Safari'] } },
+    {
+      name: 'game layout',
+      testMatch: 'game-layout.spec.ts',
+      // The baseline that LAYOUT_COMPARE compares with, recorded from another build.
+      snapshotPathTemplate: '{testDir}/layout-baseline/{arg}{ext}',
+      use: { ...devices['Desktop Safari'] },
+    },
     {
       name: 'frame bars',
       testMatch: 'frame-bar.spec.ts',

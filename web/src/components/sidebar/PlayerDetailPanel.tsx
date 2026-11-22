@@ -12,7 +12,7 @@ import {
   POISON_COUNTER_IMAGE,
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
-import { getPlayerPhaseStatusLabel } from "../../utils/format";
+import { getLastResultWord, getPlayerPhaseStatusLabel } from "../../utils/format";
 import { SegmentedFilter, type SegmentOption } from "../dashboard/SegmentedFilter";
 import { buildAppliedUpgradeMap, getAppliedUpgrades, getUpgradeDisplayScope, getUnappliedUpgrades } from "../../utils/upgrades";
 
@@ -38,10 +38,8 @@ function getLastResultLabel(
   inSuddenDeath: boolean,
 ): string {
   if (inSuddenDeath) return "Sudden death";
-  if (result === "win") return "Win";
-  if (result === "draw") return "Draw";
-  if (result === "loss") return "Loss";
-  return "No result yet";
+  if (result === null) return "No result yet";
+  return getLastResultWord(result);
 }
 
 function getPlayerStatus(player: PlayerView): string {
