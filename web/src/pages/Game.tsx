@@ -1862,7 +1862,7 @@ function GameContent() {
                 onClose={() => closeSurface("submitHand")}
                 guideTarget="build-submit-popover"
                 closeOnOutsideClick
-                ignoreOutsideClickSelector={buildSubmitGuideActive ? "[data-guided-tooltip='true']" : undefined}
+                ignoreOutsideClickSelector={buildSubmitGuideActive ? "[data-guided-tooltip='true']" : "[data-guide-target='build-submit']"}
               />
             )}
           </div>
@@ -1962,7 +1962,7 @@ function GameContent() {
                 onClose={() => closeSurface("submitResult")}
                 guideTarget="battle-submit-popover"
                 closeOnOutsideClick
-                ignoreOutsideClickSelector={battleSubmitGuideActive ? "[data-guided-tooltip='true']" : undefined}
+                ignoreOutsideClickSelector={battleSubmitGuideActive ? "[data-guided-tooltip='true']" : "[data-guide-target='battle-submit']"}
               />
             )}
           </div>
