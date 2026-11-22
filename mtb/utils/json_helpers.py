@@ -78,6 +78,9 @@ class _JsonService:
     def revalidate_and_get(self, url: str) -> Any:
         return self._runtime.run(self._revalidate_and_get(url))
 
+    def refresh(self, url: str) -> None:
+        self._runtime.run(self._refresh(url))
+
     async def _get_json(self, url: str) -> Any:
         async with self._lock:
             entry = self._cache.get(url)
@@ -115,6 +118,20 @@ class _JsonService:
                 self._inflight_revalidations.pop(url, None)
 
     async def _do_revalidate(self, url: str, etag: str) -> None:
+        try:
+            await self._update_from_site(url, etag)
+        except Exception:
+            pass
+
+    async def _refresh(self, url: str) -> None:
+        async with self._lock:
+            entry = self._cache.get(url)
+        if entry is not None and entry.etag:
+            await self._update_from_site(url, entry.etag)
+        else:
+            await self._fetch_and_store(url)
+
+    async def _update_from_site(self, url: str, etag: str) -> None:
         async with self._rate_lock:
             now = time.monotonic()
             wait = _MIN_INTERVAL - (now - self._last_call)
@@ -122,17 +139,14 @@ class _JsonService:
                 await asyncio.sleep(wait)
             self._last_call = time.monotonic()
 
-        try:
-            response = await self._client.get(url, headers={"If-None-Match": etag})
-            if response.status_code == 304:
-                return
-            response.raise_for_status()
-            new_entry = _CacheEntry(data=response.json(), etag=response.headers.get("etag"))
-            async with self._lock:
-                self._cache[url] = new_entry
-                self._cache.move_to_end(url)
-        except Exception:
-            pass
+        response = await self._client.get(url, headers={"If-None-Match": etag})
+        if response.status_code == 304:
+            return
+        response.raise_for_status()
+        new_entry = _CacheEntry(data=response.json(), etag=response.headers.get("etag"))
+        async with self._lock:
+            self._cache[url] = new_entry
+            self._cache.move_to_end(url)
 
     async def _revalidate_and_get(self, url: str) -> Any:
         await self._revalidate(url)
@@ -210,6 +224,13 @@ def revalidate_json(url: str) -> None:
 
 def revalidate_and_get(url: str) -> Any:
     return _get_service().revalidate_and_get(url)
+
+
+def get_fresh_json(url: str) -> Any:
+    """The URL's JSON as the site has it now. Unlike revalidate_and_get, raises when the site can't be asked."""
+    if is_cached(url):
+        _get_service().refresh(url)
+    return get_json(url)
 
 
 def is_cached(url: str) -> bool:

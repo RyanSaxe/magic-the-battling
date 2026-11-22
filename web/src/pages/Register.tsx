@@ -23,16 +23,26 @@ function reasonsNotReady(username: string, email: string, password: string, conf
   }
 }
 
+type RegisterField = 'username' | 'email' | 'password' | 'confirmPassword'
+
+function fieldForRegisterError(code: string, message: string): RegisterField {
+  if (code === 'EMAIL_IN_USE' || /\bemail\b/i.test(message)) return 'email'
+  if (code === 'USERNAME_TAKEN' || /\busername\b/i.test(message)) return 'username'
+  if (/\bpassword\b/i.test(message)) return 'password'
+  return 'confirmPassword'
+}
+
 type FieldProps = ComponentPropsWithoutRef<'input'> & {
   id: string
   label: string
   hint?: string
   /** Shown in place of the hint, and marks the field invalid. */
   reason: string | null
+  alert?: boolean
   wrapperClassName: string
 }
 
-function Field({ id, label, hint, reason, wrapperClassName, ...inputProps }: FieldProps) {
+function Field({ id, label, hint, reason, alert, wrapperClassName, ...inputProps }: FieldProps) {
   const message = reason ?? hint
   return (
     <div className={wrapperClassName}>
@@ -44,7 +54,11 @@ function Field({ id, label, hint, reason, wrapperClassName, ...inputProps }: Fie
         aria-describedby={message ? `${id}-message` : undefined}
         {...inputProps}
       />
-      {message && <p id={`${id}-message`} className={reason ? FIELD_ERROR : FIELD_HINT}>{message}</p>}
+      {message && (
+        <p id={`${id}-message`} role={alert && reason ? 'alert' : undefined} className={reason ? FIELD_ERROR : FIELD_HINT}>
+          {message}
+        </p>
+      )}
     </div>
   )
 }
@@ -58,7 +72,7 @@ export function Register() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [email, setEmail] = useState('')
-  const [error, setError] = useState('')
+  const [serverError, setServerError] = useState<{ field: RegisterField; message: string } | null>(null)
   const [loading, setLoading] = useState(false)
   // How many fields, from the top, the player has left or skipped past. An empty field explains itself only after
   // that, so a new form isn't covered in reasons.
@@ -72,16 +86,21 @@ export function Register() {
   })
   const shownReason = (index: number, value: string, reason: string | null) =>
     value || index < fieldsPassed ? reason : null
+  const serverReason = (field: RegisterField) => (serverError?.field === field ? serverError.message : null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
+    setServerError(null)
     setLoading(true)
     try {
       await register(username, password, email)
       navigate(returnTo)
     } catch (err) {
-      setError(unknownToAppError(err, 'register', 'Registration failed').message)
+      const appError = unknownToAppError(err, 'register', 'Registration failed')
+      setServerError({
+        field: fieldForRegisterError(appError.code, appError.message),
+        message: appError.message,
+      })
     } finally {
       setLoading(false)
     }
@@ -93,18 +112,15 @@ export function Register() {
       center
       contentClassName="items-center"
     >
-      <SurfaceCard as="form" onSubmit={handleSubmit} onChange={() => setError('')}>
+      <SurfaceCard as="form" onSubmit={handleSubmit} onChange={() => setServerError(null)}>
         <h2 className="text-xl font-bold text-white mb-5">Create Account</h2>
-
-        {error && (
-          <p className="text-red-400 text-sm mb-4 bg-red-900/20 border border-red-800/40 rounded px-3 py-2">{error}</p>
-        )}
 
         <Field
           id="username"
           label="Username"
           hint={USERNAME_HINT}
-          reason={shownReason(0, username, reasons.username)}
+          reason={shownReason(0, username, reasons.username) ?? serverReason('username')}
+          alert={serverError?.field === 'username'}
           wrapperClassName="mb-4"
           type="text"
           value={username}
@@ -118,7 +134,8 @@ export function Register() {
         <Field
           id="email"
           label="Email"
-          reason={shownReason(1, email, reasons.email)}
+          reason={shownReason(1, email, reasons.email) ?? serverReason('email')}
+          alert={serverError?.field === 'email'}
           wrapperClassName="mb-4"
           type="email"
           value={email}
@@ -131,7 +148,8 @@ export function Register() {
           id="password"
           label="Password"
           hint={PASSWORD_HINT}
-          reason={shownReason(2, password, reasons.password)}
+          reason={shownReason(2, password, reasons.password) ?? serverReason('password')}
+          alert={serverError?.field === 'password'}
           wrapperClassName="mb-4"
           type="password"
           value={password}
@@ -143,7 +161,8 @@ export function Register() {
         <Field
           id="confirm-password"
           label="Confirm Password"
-          reason={shownReason(3, confirmPassword, reasons.confirmPassword)}
+          reason={shownReason(3, confirmPassword, reasons.confirmPassword) ?? serverReason('confirmPassword')}
+          alert={serverError?.field === 'confirmPassword'}
           wrapperClassName="mb-6"
           type="password"
           value={confirmPassword}

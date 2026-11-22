@@ -55,7 +55,9 @@ export function MicToggle({ muted, onClick, variant = 'default', audioLevelKey, 
   }, [audioLevelKey])
 
   const iconEl = visual.icon === 'warning'
-    ? <MicWarningIcon className="w-3.5 h-3.5" />
+    ? connectionState === 'failed' && variant !== 'seat'
+      ? <WarningTriangleIcon className="w-3.5 h-3.5" />
+      : <MicWarningIcon className="w-3.5 h-3.5" />
     : visual.icon === 'off'
       ? <MicOffIcon className="w-3.5 h-3.5" />
       : <MicIcon className="w-3.5 h-3.5" />
@@ -107,6 +109,18 @@ export function MicWarningIcon({ className }: { className?: string }) {
       <line x1="12" x2="12" y1="19" y2="22" />
       <path d="M20 16l-1.5 3h3L20 16Z" fill="currentColor" stroke="none" />
       <circle cx="20" cy="20.5" r="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  )
+}
+
+function WarningTriangleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z"
+      />
     </svg>
   )
 }

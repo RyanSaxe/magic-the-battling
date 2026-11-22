@@ -62,7 +62,7 @@ export function LobbySeatNotice({
             </>
           }
         >
-          This lobby is now open in another tab or window. Only one can hold your seat at a time.
+          This lobby is now open in another tab or on another device. Only one can hold your seat at a time.
         </StatusNotice>
       )
     case 'PLAYER_NOT_IN_GAME':

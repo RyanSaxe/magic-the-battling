@@ -6,8 +6,8 @@ export function comparePlayersForSidebar(
 ): number {
   if (a.placement === 0 && b.placement === 0) {
     const poisonDiff = a.poison - b.poison;
-    if (poisonDiff !== 0) return poisonDiff;
-    return a.name.localeCompare(b.name);
+    // A tie keeps the server's order, which is the Lobby's: people as they joined, then puppets.
+    return poisonDiff;
   }
 
   if (a.placement === 0) return -1;

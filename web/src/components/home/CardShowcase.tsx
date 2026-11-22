@@ -1,16 +1,16 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { SHOWCASE_STAGES } from "../../constants/showcaseCards";
 import type { Card as CardType } from "../../types";
 import { Card } from "../card/Card";
 import { BasicLandCard } from "../common/BasicLandCard";
 import { TreasureCard } from "../common/TreasureCard";
 import { UpgradeStack } from "../sidebar/UpgradeStack";
+import { computeShowcaseSizes } from "./showcaseSizes";
 
 const CYCLE_INTERVAL = 4000;
 const FADE_DURATION = 400;
-const MAX_HAND_SIZE = 5;
-const CARD_GAP = 12;
-const MOBILE_OVERLAP = 0.25;
+const FALLBACK_CHROME_HEIGHT = 80;
+const STACK_GAPS_HEIGHT = 40;
 
 type UpgradePhase =
   | "hidden"
@@ -30,60 +30,46 @@ const UPGRADE_TIMINGS = {
   shrinkDuration: 500,
 };
 
-function computeShowcaseSizes(
-  containerWidth: number,
-  viewportWidth: number,
-  viewportHeight: number,
-) {
-  const isMobile = viewportWidth < 640;
-  const availableWidth = Math.max(1, containerWidth - (isMobile ? 0 : 32));
-  const effectiveSlots = isMobile
-    ? MAX_HAND_SIZE - (MAX_HAND_SIZE - 1) * MOBILE_OVERLAP
-    : MAX_HAND_SIZE;
-  const maxWidthFromContainer = Math.floor(
-    Math.max(1, availableWidth - (isMobile ? 0 : CARD_GAP * (MAX_HAND_SIZE - 1))) /
-      effectiveSlots,
-  );
-  const maxHeightFromViewport = Math.round(
-    viewportHeight * (isMobile ? 0.28 : 0.38),
-  );
-  const cardHeight = Math.max(
-    1,
-    Math.min(
-      maxHeightFromViewport,
-      Math.round((maxWidthFromContainer * 7) / 5),
-    ),
-  );
-  const cardWidth = Math.round((cardHeight * 5) / 7);
-  const handGap = isMobile ? -Math.round(cardWidth * MOBILE_OVERLAP) : CARD_GAP;
-  const fieldHeight = Math.round(cardHeight * 0.55);
-  const fieldWidth = Math.round((fieldHeight * 5) / 7);
-
-  return {
-    hand: { width: cardWidth, height: cardHeight },
-    field: { width: fieldWidth, height: fieldHeight },
-    handGap,
-  };
+interface ShowcaseBounds {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
 }
 
 function useShowcaseSizes() {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const taglineRef = useRef<HTMLParagraphElement | null>(null);
+  const dotsRef = useRef<HTMLDivElement | null>(null);
 
   const calculateSizes = useCallback(() => {
     const viewportWidth = window.innerWidth;
-    const containerWidth = containerRef.current?.clientWidth ?? viewportWidth;
+    const container = containerRef.current;
+    const containerWidth = container?.clientWidth || viewportWidth;
+    const containerHeight = container?.clientHeight || window.innerHeight;
+    const taglineHeight = taglineRef.current?.offsetHeight ?? 28;
+    const dotsHeight = dotsRef.current?.offsetHeight ?? 10;
+    const chromeHeight = container
+      ? taglineHeight + dotsHeight + STACK_GAPS_HEIGHT
+      : FALLBACK_CHROME_HEIGHT;
     return computeShowcaseSizes(
       containerWidth,
+      containerHeight,
       viewportWidth,
-      window.innerHeight,
+      chromeHeight,
     );
   }, []);
 
   const [sizes, setSizes] = useState(() =>
-    computeShowcaseSizes(window.innerWidth, window.innerWidth, window.innerHeight),
+    computeShowcaseSizes(
+      window.innerWidth,
+      window.innerHeight,
+      window.innerWidth,
+      FALLBACK_CHROME_HEIGHT,
+    ),
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const updateSizes = () => setSizes(calculateSizes());
     updateSizes();
 
@@ -101,7 +87,7 @@ function useShowcaseSizes() {
     };
   }, [calculateSizes]);
 
-  return { sizes, containerRef };
+  return { sizes, containerRef, taglineRef, dotsRef };
 }
 
 function UpgradeSourceCard({
@@ -109,23 +95,33 @@ function UpgradeSourceCard({
   dimensions,
   phase,
   targetPosition,
+  bounds,
 }: {
   card: CardType;
   dimensions: { width: number; height: number };
   phase: UpgradePhase;
   targetPosition: { centerY: number; right: number } | null;
+  bounds: ShowcaseBounds | null;
 }) {
   const isVisible = phase === "slide-in" || phase === "linger";
   const isFading = phase === "glow";
 
   const enlargedWidth = Math.round(dimensions.width * 1.5);
   const enlargedHeight = Math.round(dimensions.height * 1.5);
+  const gap = window.innerWidth < 640 ? 8 : 16;
 
   const centerY = targetPosition?.centerY ?? window.innerHeight / 2;
-  const top = centerY - enlargedHeight / 2;
-  const left = targetPosition
-    ? targetPosition.right + 16
+  const rawTop = centerY - enlargedHeight / 2;
+  const rawLeft = targetPosition
+    ? targetPosition.right + gap
     : window.innerWidth / 2;
+
+  const top = bounds
+    ? Math.max(bounds.top, Math.min(rawTop, bounds.bottom - enlargedHeight))
+    : rawTop;
+  const left = bounds
+    ? Math.max(bounds.left, Math.min(rawLeft, bounds.right - enlargedWidth))
+    : rawLeft;
 
   const style: React.CSSProperties = {
     top,
@@ -177,9 +173,29 @@ export function CardShowcase() {
     centerY: number;
     right: number;
   } | null>(null);
+  const [bounds, setBounds] = useState<ShowcaseBounds | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const targetCardRef = useRef<HTMLDivElement | null>(null);
-  const { sizes, containerRef } = useShowcaseSizes();
+  const { sizes, containerRef, taglineRef, dotsRef } = useShowcaseSizes();
+
+  const measureUpgradeGeometry = useCallback(() => {
+    const rect = targetCardRef.current?.getBoundingClientRect();
+    if (rect) {
+      setTargetPosition({
+        centerY: rect.top + rect.height / 2,
+        right: rect.right,
+      });
+    }
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    if (containerRect) {
+      setBounds({
+        top: containerRect.top,
+        right: containerRect.right,
+        bottom: containerRect.bottom,
+        left: containerRect.left,
+      });
+    }
+  }, [containerRef]);
 
   const runUpgradeSequence = useCallback(() => {
     const {
@@ -201,13 +217,7 @@ export function CardShowcase() {
     setTimeout(() => {
       // Measure AFTER the enlarge CSS transition completes —
       // getBoundingClientRect includes transforms, so no manual math needed
-      const rect = targetCardRef.current?.getBoundingClientRect();
-      if (rect) {
-        setTargetPosition({
-          centerY: rect.top + rect.height / 2,
-          right: rect.right,
-        });
-      }
+      measureUpgradeGeometry();
       setUpgradePhase("slide-in");
     }, t2);
     setTimeout(() => setUpgradePhase("linger"), t3);
@@ -217,7 +227,7 @@ export function CardShowcase() {
     }, t4);
     setTimeout(() => setUpgradePhase("shrink"), t5);
     setTimeout(() => setUpgradePhase("done"), t6);
-  }, []);
+  }, [measureUpgradeGeometry]);
 
   const goTo = useCallback(
     (index: number) => {
@@ -272,12 +282,18 @@ export function CardShowcase() {
     upgradePhase === "shrink" ||
     upgradePhase === "done";
 
+  useEffect(() => {
+    if (!showSourceCard) return;
+    window.addEventListener("resize", measureUpgradeGeometry);
+    return () => window.removeEventListener("resize", measureUpgradeGeometry);
+  }, [showSourceCard, measureUpgradeGeometry]);
+
   return (
     <div
       ref={containerRef}
-      className="w-full max-w-full flex flex-col items-center gap-4 flex-1 justify-center"
+      className="w-full max-w-full flex flex-col items-center gap-3 flex-1 min-h-0 justify-center"
     >
-      <p className="text-amber-200/80 text-lg sm:text-xl italic font-medium tracking-wide">
+      <p ref={taglineRef} className="shrink-0 text-amber-200/80 text-lg sm:text-xl italic font-medium tracking-wide">
         {stage.tagline}
       </p>
 
@@ -358,7 +374,7 @@ export function CardShowcase() {
         </div>
       </div>
 
-      <div className="flex gap-2">
+      <div ref={dotsRef} className="shrink-0 flex gap-2">
         {SHOWCASE_STAGES.map((_, i) => (
           <button
             key={i}
@@ -379,6 +395,7 @@ export function CardShowcase() {
           dimensions={sizes.hand}
           phase={upgradePhase}
           targetPosition={targetPosition}
+          bounds={bounds}
         />
       )}
     </div>

@@ -46,7 +46,7 @@ export function CubeTile({ title, cubeId, imageUri, badge, chips, footer, href, 
           {badge}
         </CubeBadge>
         <div className="absolute inset-x-0 bottom-0 px-3.5 pb-2 min-w-0">
-          <h3 className="truncate font-['Cinzel',serif] text-[15px] leading-5 font-bold text-[var(--ivory)] drop-shadow-md">
+          <h3 className="truncate font-['Cinzel',serif] text-[14px] leading-5 font-bold text-[var(--ivory)] drop-shadow-md">
             <Link to={href} onClick={(e) => e.stopPropagation()}>{title}</Link>
           </h3>
           <a
@@ -54,7 +54,7 @@ export function CubeTile({ title, cubeId, imageUri, badge, chips, footer, href, 
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="text-[11.5px] leading-4 text-amber-400/90 hover:text-amber-300 transition-colors"
+            className="text-[11px] leading-4 text-amber-400/90 hover:text-amber-300 transition-colors"
           >
             {cubeId} ↗
           </a>

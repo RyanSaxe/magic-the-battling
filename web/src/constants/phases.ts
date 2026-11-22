@@ -23,6 +23,15 @@ const PHASE_DISPLAY_NAMES: Record<Phase, string> = {
   reward: 'Round Wrap-Up',
 }
 
+const PLAYER_STATE_DISPLAY_NAMES: Record<string, string> = {
+  ...PHASE_DISPLAY_NAMES,
+  lobby: 'Lobby',
+  awaiting_elimination: 'Waiting',
+  eliminated: 'Out',
+  winner: 'Winner',
+  game_over: 'Game Over',
+}
+
 const PHASE_SUMMARY_ROWS: Record<Phase, PhaseSummaryRow[]> = {
   draft: [
     { text: 'Click any two cards to swap them.', touch: 'Tap any two cards to swap them.' },
@@ -59,6 +68,10 @@ export function getPhaseTip(phase: Phase): string {
 
 export function getPhaseDisplayName(phase: Phase): string {
   return PHASE_DISPLAY_NAMES[phase]
+}
+
+export function getPlayerStateDisplayName(phase: string): string {
+  return PLAYER_STATE_DISPLAY_NAMES[phase] ?? phase
 }
 
 export function getPhaseReferenceLabel(phase: Phase): string {

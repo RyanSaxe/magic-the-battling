@@ -22,6 +22,7 @@ const PHASE_ACTIVE_STYLE: Record<Phase, string> = {
   battle: "bg-[#441f1e] text-[#fecaca] ring-1 ring-[#d9534f]",
   reward: STEP_HERE,
 };
+const STEP_ARROW = "max-[360px]:hidden text-[var(--gold-border-opaque)] text-xs";
 const GUIDED_POPOVER_AUTO_CLOSE_MS = 10_000;
 const PHASE_POPOVER_FADE_OUT_MS = 220;
 
@@ -245,7 +246,7 @@ export function PhaseTimeline({
         ref={stepsRowRef}
         className={`flex items-center flex-1 min-w-0 max-lg:-translate-y-0.5 ${stepsOverflow ? "phase-timeline-scroll" : ""}`}
       >
-        <div ref={stepsRef} className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+        <div ref={stepsRef} className="flex items-center gap-1 sm:gap-1.5 max-[360px]:gap-[7px] shrink-0">
           <span
             className="text-xs sm:text-sm text-[#e2d8cb] font-mono"
             data-guide-target="timeline-stage-round"
@@ -284,14 +285,14 @@ export function PhaseTimeline({
             if (phase === "reward") {
               return (
                 <div key={phase} ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
-                  <span className="text-[var(--gold-border-opaque)] text-xs">→</span>
+                  <span className={STEP_ARROW}>→</span>
                   <div
                     className="flex items-center gap-1 sm:gap-1.5 whitespace-nowrap"
                     data-guide-target="timeline-next-stage-round"
                   >
                     {phaseButton}
                     {!isEnd && !endsInWinner && (
-                      <span className="text-xs sm:text-sm text-[var(--ivory-faint)]">
+                      <span className="max-[400px]:hidden text-xs sm:text-sm text-[var(--ivory-faint)]">
                         to <span className="font-mono">{nextStage}-{nextRound}</span>
                       </span>
                     )}
@@ -302,7 +303,7 @@ export function PhaseTimeline({
 
             return (
               <div key={phase} ref={stepRef} className="flex items-center gap-1 sm:gap-1.5">
-                <span className="text-[var(--gold-border-opaque)] text-xs">→</span>
+                <span className={STEP_ARROW}>→</span>
                 {phaseButton}
               </div>
             );

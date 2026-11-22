@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../test/fakeWebSocket'
 import { installMemoryLocalStorage } from '../test/memoryStorage'
 import type { LobbyState } from '../types'
-import { saveTabSession } from '../utils/tabSession'
+import { readTabSession, saveTabSession } from '../utils/tabSession'
 import { Lobby } from './Lobby'
 
 // utils/inputMode reads matchMedia when it is imported, and jsdom has none.
@@ -19,9 +19,11 @@ vi.hoisted(() => {
 })
 
 const toasts: string[] = []
+const closeSeat = vi.hoisted(() => vi.fn(async () => {}))
 
 vi.mock('../api/client', () => ({
   rejoinGame: vi.fn(),
+  closeSeat,
   getServerStatus: vi.fn(async () => null),
   getCubeSummary: vi.fn(async () => ({ cube_name: 'Crucible', cube_image_uri: null })),
 }))
@@ -49,6 +51,8 @@ function lobby(overrides: Partial<LobbyState> = {}): LobbyState {
     use_upgrades: true,
     guided_mode_default: false,
     voice_chat_enabled: false,
+    auto_approve_spectators: false,
+    previous_host_id: null,
     play_mode: 'limited',
     ...overrides,
   }
@@ -60,6 +64,7 @@ async function openLobbyAs(playerId: string): Promise<FakeWebSocket> {
     <MemoryRouter initialEntries={['/game/game-1/lobby']}>
       <Routes>
         <Route path="/game/:gameId/lobby" element={<Lobby />} />
+        <Route path="/" element={<div>Home</div>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -226,5 +231,84 @@ describe('Lobby: inviting', () => {
 
     expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/game/game-1/lobby`)
     expect(button('Copied!')).toBeTruthy()
+  })
+})
+
+describe('Lobby: the host, a seat and a deck', () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    FakeWebSocket.instances = []
+    toasts.length = 0
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it('tells the new host who is away, and the old host after a reload', async () => {
+    const [anya, boris] = lobby().players
+    const players = [{ ...anya, is_host: false, is_connected: false }, { ...boris, is_host: true }]
+    const newHost = await openLobbyAs('guest')
+    send(newHost, { type: 'lobby_state', payload: lobby() })
+    send(newHost, { type: 'lobby_state', payload: lobby({ previous_host_id: 'host', players }) })
+    expect(screen.getByText("You're the host now. Anya is away.")).toBeTruthy()
+    expect(toasts).toEqual([])
+
+    cleanup()
+    const oldHost = await openLobbyAs('host')
+    send(oldHost, { type: 'lobby_state', payload: lobby({ previous_host_id: 'host', players }) })
+    expect(screen.getByText('You were away, so Boris is the host now.')).toBeTruthy()
+  })
+
+  it('asks before removing a player, with the shortcuts off meanwhile', async () => {
+    const socket = await openLobbyAs('host')
+    send(socket, { type: 'lobby_state', payload: lobby() })
+
+    fireEvent.click(button('Remove Boris'))
+    fireEvent.keyDown(document.body, { key: 'r' })
+    expect(sentActions(socket)).not.toContain('kick_player')
+    expect(sentActions(socket)).not.toContain('set_ready')
+
+    fireEvent.click(button('Remove'))
+    expect(sentActions(socket)).toContain('kick_player')
+  })
+
+  it('keeps the deck and Ready until another deck is submitted', async () => {
+    const [anya, boris] = lobby().players
+    const socket = await openLobbyAs('host')
+    const players = [{ ...anya, battler_id: 'first-deck', battler_status: 'ready' as const }, boris]
+    send(socket, { type: 'lobby_state', payload: lobby({ play_mode: 'constructed', players }) })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    fireEvent.click(button('Change'))
+    const field = screen.getByDisplayValue('first-deck')
+    expect(button('Submit').disabled).toBe(true)
+    expect(button('Unready')).toBeTruthy()
+    expect(sentActions(socket)).not.toContain('clear_battler')
+
+    fireEvent.change(field, { target: { value: 'second-deck' } })
+    fireEvent.click(button('Submit'))
+    expect(sentActions(socket)).toContain('submit_battler')
+  })
+
+  it('lets the host leave the lobby through the close dialog and returns Home', async () => {
+    closeSeat.mockClear()
+    const socket = await openLobbyAs('host')
+    send(socket, { type: 'lobby_state', payload: lobby() })
+
+    fireEvent.click(screen.getByRole('button', { name: /Leave/ }))
+    const dialog = screen.getByRole('dialog', { name: 'Leave this lobby?' })
+    fireEvent.keyDown(document.body, { key: 'r' })
+    expect(sentActions(socket)).not.toContain('set_ready')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Leave Lobby' }))
+    expect(await screen.findByText('Home')).toBeTruthy()
+    expect(closeSeat).toHaveBeenCalledWith('game-1', 'Anya', '')
+    expect(readTabSession('game-1')).toBeNull()
   })
 })

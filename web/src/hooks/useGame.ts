@@ -40,10 +40,6 @@ export function useGame(
     send('submit_battler', { battler_id: battlerId })
   }, [send])
 
-  const clearBattler = useCallback(() => {
-    send('clear_battler')
-  }, [send])
-
   const draftSwap = useCallback((packCardId: string, playerCardId: string, destination: CardDestination) => {
     send('draft_swap', { pack_card_id: packCardId, player_card_id: playerCardId, destination })
   }, [send])
@@ -56,8 +52,8 @@ export function useGame(
     send('draft_done')
   }, [send])
 
-  const buildMove = useCallback((cardId: string, source: BuildSource, destination: BuildSource) => {
-    send('build_move', { card_id: cardId, source, destination })
+  const buildMove = useCallback((cardId: string, source: BuildSource, destination: BuildSource, slot?: number) => {
+    send('build_move', { card_id: cardId, source, destination, slot })
   }, [send])
 
   const buildSwap = useCallback((
@@ -162,7 +158,6 @@ export function useGame(
       startGame,
       setReady,
       submitBattler,
-      clearBattler,
       addPuppet,
       removePuppet,
       setTargetPlayerCount,

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { PlayerView } from "../types";
 import { MoneyBagIcon, PoisonIcon } from "./icons";
+import { PlayerCard } from "./PlayerCard";
 import { StandingsRank } from "./common/StandingsRank";
 import { getLastResultWord, getPlayerActivity } from "../utils/format";
 import {
@@ -75,10 +76,6 @@ function Outlook({
   return <span title="Chance you face them next">{Math.round(player.pairing_probability * 100)}%</span>;
 }
 
-/**
- * A player's card. The card is one button that selects the player, and an optional control such as the mic sits
- * beside it, over a space kept free at the start of the name line, because a button can't hold another button.
- */
 export function PlayerRow({
   player,
   players,
@@ -106,52 +103,43 @@ export function PlayerRow({
   const hiddenInFight = viewerFighting && !isSelf;
   const standing = getShownStanding(player, variant === "share" ? shareStatus : undefined);
   const rank = showPlacement ? getSidebarPlacementRank(player, players) : null;
-  const cardClassName = [
-    "player-card",
-    rank === null && "is-unranked",
-    isSelf && "is-self",
-    standing !== "alive" && "is-out",
-    micToggle && "has-control",
-  ].filter(Boolean).join(" ");
 
   return (
-    <div className={cardClassName} data-guide-player-row={player.name}>
-      <button type="button" className="player-card-button" aria-pressed={isSelected} onClick={onClick}>
-        {rank !== null && <StandingsRank rank={rank} isLast={isSidebarLastPlace(player, players)} />}
-        <span className="player-card-body">
-          <span className="player-card-line">
-            <span className="player-card-name">{player.name}</span>
-            {player.last_result && (
-              <span className={`player-card-result player-card-result-${player.last_result}`} title="Last fight">
-                {getLastResultWord(player.last_result)}
-              </span>
-            )}
-          </span>
-          <span className="player-card-line">
-            {!hiddenInFight && (
-              <>
-                <span className="player-card-stat" title="Poison">
-                  <PoisonIcon size="sm" />
-                  {player.poison}
-                </span>
-                <span className="player-card-stat" title="Treasures">
-                  <MoneyBagIcon size="sm" />
-                  {player.treasures}
-                </span>
-              </>
-            )}
-            <StatusLabel player={player} standing={standing} variant={variant} isSelected={isSelected} />
-            <span className="player-card-outlook">
-              {/* The server has no odds during a Fight and sends 0 for everyone, except in Sudden Death. */}
-              {(!hiddenInFight || player.in_sudden_death) && (
-                <Outlook player={player} standing={standing} variant={variant} isSelf={isSelf} />
-              )}
-            </span>
-          </span>
+    <PlayerCard
+      guideName={player.name}
+      lead={rank === null ? undefined : <StandingsRank rank={rank} isLast={isSidebarLastPlace(player, players)} />}
+      name={player.name}
+      nameEnd={player.last_result && (
+        <span className={`player-card-result player-card-result-${player.last_result}`} title="Last fight">
+          {getLastResultWord(player.last_result)}
         </span>
-      </button>
-      {micToggle && <span className="player-card-control">{micToggle}</span>}
-    </div>
+      )}
+      control={micToggle}
+      isSelf={isSelf}
+      isOut={standing !== "alive"}
+      selected={isSelected}
+      onSelect={onClick}
+    >
+      {!hiddenInFight && (
+        <>
+          <span className="player-card-stat" title="Poison">
+            <PoisonIcon size="sm" />
+            {player.poison}
+          </span>
+          <span className="player-card-stat" title="Treasures">
+            <MoneyBagIcon size="sm" />
+            {player.treasures}
+          </span>
+        </>
+      )}
+      <StatusLabel player={player} standing={standing} variant={variant} isSelected={isSelected} />
+      <span className="player-card-outlook">
+        {/* The server has no odds during a Fight and sends 0 for everyone, except in Sudden Death. */}
+        {(!hiddenInFight || player.in_sudden_death) && (
+          <Outlook player={player} standing={standing} variant={variant} isSelf={isSelf} />
+        )}
+      </span>
+    </PlayerCard>
   );
 }
 

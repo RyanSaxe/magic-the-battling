@@ -215,6 +215,7 @@ class PlayerView(BaseModel):
 
 class SelfPlayerView(PlayerView):
     hand: list[CardRef]
+    hand_slots: list[str | None]
     sideboard: list[CardRef]
     command_zone: list[CardRef] = Field(default_factory=list)
     current_pack: list[CardRef] | None = None
@@ -299,6 +300,8 @@ class LobbyStateResponse(BaseModel):
     use_upgrades: bool = True
     guided_mode_default: bool = False
     voice_chat_enabled: bool = False
+    auto_approve_spectators: bool = False
+    previous_host_id: str | None = None
     play_mode: PlayMode = "limited"
 
 
@@ -322,6 +325,7 @@ class BuildMoveAction(BaseModel):
     card_id: str
     source: BuildSource
     destination: BuildSource
+    slot: int | None = None
 
 
 class BuildSubmitAction(BaseModel):

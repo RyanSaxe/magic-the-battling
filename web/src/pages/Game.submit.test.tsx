@@ -78,6 +78,7 @@ function buildState(bob: Partial<CompactPlayerView> = {}): CompactGameState {
   const alice = {
     ...player('Alice'),
     hand: [],
+    hand_slots: [],
     sideboard: [],
     command_zone: [],
     current_pack: null,

@@ -5,9 +5,11 @@ import { useToast } from '../contexts'
 import { AppHeader, UserMenuButton } from '../components/common/AppHeader'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { JoinGameModal } from '../components/home/JoinGameModal'
+import { CloseSeatDialog } from '../components/ResumeGame'
 import { AddCubeModal } from '../components/dashboard/AddCubeModal'
 import { CubeTile } from '../components/dashboard/CubeTile'
 import { DashboardFrame } from '../components/dashboard/DashboardFrame'
+import { DeletePresetDialog } from '../components/dashboard/DeletePresetDialog'
 import { GameTile } from '../components/dashboard/GameTile'
 import { JoinCodeBox } from '../components/dashboard/JoinCodeBox'
 import { ResumeBanner } from '../components/dashboard/ResumeBanner'
@@ -16,7 +18,7 @@ import { Count, NoticeTile, PlayIcon, SectionCounts, SectionLink, SectionTitle, 
 import { SegmentedFilter } from '../components/dashboard/SegmentedFilter'
 import { deleteBattler, getBattlers, getFollowing, getMyGames, unfollowCube } from '../api/client'
 import { useFirstLoad } from '../hooks/useFirstLoad'
-import { useResumableGames } from '../hooks/useResumableGames'
+import { useResumableGames, type ResumableSeat } from '../hooks/useResumableGames'
 import type { GameSummary } from '../types'
 import { battlerPlayUrl } from '../utils/battlerPlayUrl'
 import { countLabel, cubeTitle, formatWhen, upgradesLabel } from '../utils/accountFormat'
@@ -76,13 +78,17 @@ export function Dashboard() {
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
   const { addToast } = useToast()
-  const [resumable] = useResumableGames(1)
+  const resumableGames = useResumableGames()
+  const [closedSeatIds, setClosedSeatIds] = useState<string[]>([])
+  const [closingSeat, setClosingSeat] = useState<ResumableSeat | null>(null)
+  const resumable = resumableGames.find((seat) => !closedSeatIds.includes(seat.gameId))
 
   const libraryLoad = useFirstLoad(loadLibrary, !!user)
   const myGamesLoad = useFirstLoad(loadMyGames, !!user)
   const [phoneSection, setPhoneSection] = useState<BoardSection>('library')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState<Extract<LibraryEntry, { kind: 'saved' }> | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/login?returnTo=/dashboard', { replace: true })
@@ -110,9 +116,8 @@ export function Dashboard() {
     }
   }
 
-  const remove = async (entry: LibraryEntry) => {
+  const performRemove = async (entry: LibraryEntry) => {
     if (!library || !canRemove(library, entry)) return
-    if (entry.kind === 'saved' && !window.confirm(`Delete "${cubeTitle(entry.preset)}"?`)) return
     updateLibrary((current) => withRemovalStarted(current, entry))
     try {
       await (entry.kind === 'saved' ? deleteBattler(entry.preset.id) : unfollowCube(entry.follow.id))
@@ -123,12 +128,22 @@ export function Dashboard() {
     }
   }
 
+  const remove = (entry: LibraryEntry) => {
+    if (!library || !canRemove(library, entry)) return
+    if (entry.kind === 'saved') {
+      setConfirmingDelete(entry)
+      return
+    }
+    void performRemove(entry)
+  }
+
   if (authLoading || !user) return null
 
   const entries = library ? libraryEntries(library) : []
   const hasMore = !!library && libraryHasMore(library)
   const allCount = library ? `${entries.length}${hasMore ? '+' : ''}` : ''
-  const libraryRows = Math.max(1, Math.ceil(entries.length / 2))
+  const isLibraryEmpty = !!library && entries.length === 0
+  const libraryRows = Math.max(1, Math.ceil((entries.length + 1) / 2))
   const recentGames = myGames?.games.slice(0, RECENT_GAME_COUNT) ?? []
   // Below 1280px the sections stack, so a switch shows one at a time instead of a long scroll past every cube.
   const libraryCell = `${GRID_CELL} ${phoneSection === 'library' ? '' : 'max-xl:hidden'}`
@@ -137,7 +152,7 @@ export function Dashboard() {
   return (
     <>
       <DashboardFrame header={<AppHeader account={<UserMenuButton />} />}>
-        {resumable && <ResumeBanner seat={resumable} />}
+        {resumable && <ResumeBanner seat={resumable} onClose={setClosingSeat} />}
 
         <SurfaceCard
           as="section"
@@ -195,45 +210,45 @@ export function Dashboard() {
           <div
             data-testid="library-header"
             style={gridCell(1, 1)}
-            className={`col-span-full ${libraryCell} xl:col-span-2 ${SECTION_HEADER}`}
+            className={`max-xl:hidden ${GRID_CELL} xl:col-span-2 ${SECTION_HEADER}`}
           >
-            <div className="max-xl:hidden">
-              <SectionTitle>{SECTION_NAMES.library}</SectionTitle>
-            </div>
-            <div className="flex w-full items-center gap-3 sm:ml-auto sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setShowAddModal(true)}
-                className="btn btn-secondary flex-1 py-1.5 px-3 text-xs font-semibold sm:flex-none"
-              >
-                + Add Cube / Deck
-              </button>
-              <SectionLink to="/dashboard/discover">Discover cubes →</SectionLink>
-            </div>
+            <SectionTitle>{SECTION_NAMES.library}</SectionTitle>
+          </div>
+
+          <div
+            data-testid="library-add-slot"
+            style={gridCell(2, 1)}
+            className={`dashboard-add-slot ${isLibraryEmpty ? libraryNotice : libraryCell}`}
+          >
+            {isLibraryEmpty && (
+              <p className="max-w-sm text-sm text-[var(--ivory-felt)]">
+                Save a cube or deck with your settings to play it again in one click.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              className="btn btn-secondary py-2 px-4 text-sm font-semibold"
+            >
+              + Add Cube / Deck
+            </button>
+            <SectionLink to="/dashboard/discover">Discover cubes / decks →</SectionLink>
           </div>
 
           {libraryLoad.state.status === 'failed' ? (
-            <NoticeTile style={gridCell(2, 1)} className={libraryNotice} action={{ label: 'Retry', onClick: libraryLoad.retry }}>
+            <NoticeTile style={gridCell(2, 2)} className={libraryCell} action={{ label: 'Retry', onClick: libraryLoad.retry }}>
               Your cubes and decks didn&apos;t load.
             </NoticeTile>
           ) : !library ? (
-            <NoticeTile style={gridCell(2, 1)} className={libraryNotice}>
+            <NoticeTile style={gridCell(2, 2)} className={libraryCell}>
               Loading...
-            </NoticeTile>
-          ) : entries.length === 0 ? (
-            <NoticeTile
-              style={gridCell(2, 1)}
-              className={libraryNotice}
-              action={{ label: 'Add Cube / Deck', onClick: () => setShowAddModal(true) }}
-            >
-              Save a cube or deck with your settings to play it again in one click.
             </NoticeTile>
           ) : (
             entries.map((entry, index) => (
               <LibraryTile
                 key={libraryEntryKey(entry)}
                 entry={entry}
-                style={gridCell(2 + Math.floor(index / 2), 1 + (index % 2))}
+                style={gridCell(2 + Math.floor((index + 1) / 2), 1 + ((index + 1) % 2))}
                 className={libraryCell}
                 removable={canRemove(library, entry)}
                 onRemove={remove}
@@ -289,6 +304,28 @@ export function Dashboard() {
         />
       )}
       {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
+      {closingSeat && (
+        <CloseSeatDialog
+          seat={closingSeat}
+          onKeep={() => setClosingSeat(null)}
+          onClosed={() => {
+            setClosedSeatIds((ids) => [...ids, closingSeat.gameId])
+            setClosingSeat(null)
+          }}
+        />
+      )}
+      {confirmingDelete && (
+        <DeletePresetDialog
+          title={cubeTitle(confirmingDelete.preset)}
+          imageUri={confirmingDelete.preset.cube_image_uri}
+          onKeep={() => setConfirmingDelete(null)}
+          onDelete={() => {
+            const entry = confirmingDelete
+            setConfirmingDelete(null)
+            void performRemove(entry)
+          }}
+        />
+      )}
     </>
   )
 }

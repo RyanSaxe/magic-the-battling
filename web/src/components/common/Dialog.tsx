@@ -18,8 +18,15 @@ function focusFirst(controls: HTMLElement[]) {
 
 // Not inert on the page: that would also switch off clicks on toasts and the other layers drawn over a dialog.
 function keepFocusInside(dialog: HTMLElement, controls: () => HTMLElement[]) {
-  // A request to watch can open over the dialog, and Tab has to reach it.
-  const isOnTop = () => dialog.contains(document.elementFromPoint(0, 0))
+  // A request to watch or a second dialog can open over this one, and Tab/focus must stay in the top layer.
+  const isOnTop = () => {
+    const dialogs = document.querySelectorAll('[role="dialog"]')
+    const topDialog = dialogs[dialogs.length - 1]
+    if (topDialog && !dialog.contains(topDialog)) return false
+    return typeof document.elementFromPoint === 'function'
+      ? dialog.contains(document.elementFromPoint(0, 0))
+      : true
+  }
 
   const handleTab = (event: KeyboardEvent) => {
     if (event.key !== 'Tab' || event.isComposing || !isOnTop()) return
@@ -85,6 +92,10 @@ export function Dialog({
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+      // When one dialog opens over another, only the top one answers Escape.
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const topDialog = dialogs[dialogs.length - 1]
+      if (topDialog && !dialogRef.current?.contains(topDialog)) return
       // Handled, so a panel open under the dialog doesn't close with it.
       event.preventDefault()
       onClose()
