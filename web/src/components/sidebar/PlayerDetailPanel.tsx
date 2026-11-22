@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Card as CardType, LastResult, PlayerView } from "../../types";
-import type { RevealedPlayerTab } from "../../contexts/contextStripState";
-import { useContextStrip } from "../../contexts";
+import type { ScoutingTab } from "../../pages/gameSurfaces";
 import {
   CARD_ASPECT_RATIO,
   bestFitNoClip,
@@ -21,11 +20,10 @@ interface PlayerDetailPanelProps {
   player: PlayerView;
   currentPlayer: PlayerView;
   useUpgrades: boolean;
-  isMobile: boolean;
-  activeTab: RevealedPlayerTab;
-  onTabChange: (tab: RevealedPlayerTab) => void;
-  onClose: () => void;
-  isOpen?: boolean;
+  activeTab: ScoutingTab;
+  onTabChange: (tab: ScoutingTab) => void;
+  /** Inside a phone's drawer, where scouting takes the list's place, a Back button returns to the list. */
+  onBack?: () => void;
 }
 
 const DEFAULT_CARD_DIMS: ZoneDims = {
@@ -352,25 +350,20 @@ function AdaptiveCardSection({
   );
 }
 
-const DETAIL_TABS: SegmentOption<RevealedPlayerTab>[] = [
+const DETAIL_TABS: SegmentOption<ScoutingTab>[] = [
   { value: "seen", label: "Seen in Fight" },
   { value: "overview", label: "Overview" },
 ];
 
+/** What a player has shown: the cards seen in their last fight, or an overview of their state. */
 export function PlayerDetailPanel({
   player,
   currentPlayer,
   useUpgrades,
-  isMobile,
   activeTab,
   onTabChange,
-  onClose,
-  isOpen = true,
+  onBack,
 }: PlayerDetailPanelProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const { state } = useContextStrip();
-  const [renderOpen, setRenderOpen] = useState(false);
-
   const isViewingSelf = player.name === currentPlayer.name;
   const upgradeDisplayScope = getUpgradeDisplayScope(isViewingSelf, currentPlayer.phase);
   const appliedUpgrades = getAppliedUpgrades(player.upgrades);
@@ -391,41 +384,6 @@ export function PlayerDetailPanel({
     lastResultLabel,
     showPairingChance,
   });
-
-  useEffect(() => {
-    if (isMobile || !isOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      const panel = panelRef.current;
-      if (!panel || !target) return;
-      if (target.closest("[data-card-preview-modal='true']")) return;
-      if (panel.contains(target)) return;
-      const sidebarRoot = panel.closest("[data-guide-target='sidebar-panel']");
-      if (sidebarRoot instanceof HTMLElement && sidebarRoot.contains(target)) return;
-      onClose();
-    };
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && state.previewCard === null) onClose();
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, [isMobile, isOpen, onClose, state.previewCard]);
-
-  useEffect(() => {
-    if (isMobile) return;
-
-    const frame = requestAnimationFrame(() => {
-      setRenderOpen(isOpen);
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [isMobile, isOpen]);
 
   const overviewContent = (
     <div className="flex h-full flex-col gap-3">
@@ -459,32 +417,29 @@ export function PlayerDetailPanel({
       emptyText="Nothing was revealed in a fight yet."
       guideTarget="sidebar-seen-in-battle"
       maxWidth={104}
-      minColumns={isMobile ? 1 : 2}
-      measureKey={`${player.name}:${activeTab}:${isOpen ? "open" : "closed"}`}
+      minColumns={onBack ? 1 : 2}
+      measureKey={`${player.name}:${activeTab}`}
     />
   );
 
-  const shell = (
-    <div className="flex h-full flex-col overflow-hidden" data-guide-target="sidebar-revealed-details">
-      <div className="border-b gold-divider px-4 pb-3 pt-4">
-        <div className="flex items-center gap-3">
-          {isMobile && (
+  return (
+    <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden" data-guide-target="sidebar-revealed-details">
+      {onBack && (
+        <div className="border-b gold-divider px-4 pb-3 pt-4">
+          <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={onBack}
               className="shrink-0 text-sm text-[var(--ivory-muted)] hover:text-white"
             >
               &larr; Back
             </button>
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-base font-medium text-amber-50">
-              <span className="text-[var(--ivory-muted)]">scouting </span>
-              <span className="text-[var(--color-gold)]">{player.name}</span>
+            <div className="min-w-0 flex-1 truncate text-base font-medium text-[var(--color-gold)]">
+              {player.name}
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="flex justify-center px-4 pb-3 pt-3">
         <SegmentedFilter
@@ -498,31 +453,6 @@ export function PlayerDetailPanel({
       <div className="flex flex-col flex-1 min-h-0 px-4 pb-4">
         {activeTab === "overview" ? overviewContent : seenContent}
       </div>
-    </div>
-  );
-
-  if (isMobile) {
-    return <div className="flex-1 min-h-0">{shell}</div>;
-  }
-
-  return (
-    <div
-      ref={panelRef}
-      data-guide-target="sidebar-detail-drawer"
-      aria-hidden={!isOpen}
-      className={`absolute inset-y-0 z-[30] overflow-hidden border-l-2 border-r-0 border-t-0 border-b-0 border-[var(--gold-border-opaque)] frame-chrome ${
-        isOpen ? "pointer-events-auto" : "pointer-events-none"
-      }`}
-      style={{
-        right: "calc(100% - 8px)",
-        width: "var(--sidebar-width)",
-        boxShadow: renderOpen ? "-6px 0 12px -2px rgba(0, 0, 0, 0.3)" : "none",
-        clipPath: "inset(0 0 0 -20px)",
-        transform: renderOpen ? "translateX(0)" : "translateX(calc(100% - 8px))",
-        transition: "transform 220ms ease-out, box-shadow 220ms ease-out",
-      }}
-    >
-      {shell}
     </div>
   );
 }

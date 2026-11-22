@@ -229,6 +229,15 @@ DEFAULT_UPGRADES_ID = "default_mtb_upgrades"
 DEFAULT_VANGUARD_ID = "default_mtb_vanguards"
 
 
+class IllegalBattlerError(ValueError):
+    """A card list that can't be played. `problem` is worded for players, so it never says battler."""
+
+    def __init__(self, battler_id: str, problem: str) -> None:
+        super().__init__(f"Battler '{battler_id}' is illegal: {problem}")
+        self.battler_id = battler_id
+        self.problem = problem
+
+
 def build_battler(
     battler_id: str = DEFAULT_BATTLER_ID,
     upgrades_id: str | None = None,
@@ -243,16 +252,17 @@ def build_battler(
     if source_vanguards or source_upgrades:
         # Temporary guard: battlers cannot supply their own Conspiracies/Vanguards yet.
         # The only supported path right now is the separate default MTB supplemental cubes.
-        raise ValueError(
-            f"Battler '{battler_id}' is illegal: battler-defined Conspiracy and Vanguard cards "
-            "are not supported right now. Use the default MTB upgrades/vanguards instead."
+        raise IllegalBattlerError(
+            battler_id,
+            "its own Conspiracy and Vanguard cards are not supported right now. "
+            "Use the default upgrades and vanguards instead.",
         )
 
     vanguards = get_cube_data(vanguards_id) if vanguards_id is not None else []
 
     upgrades = get_cube_data(upgrades_id) if upgrades_id is not None else []
     if not cards:
-        raise ValueError(f"Battler '{battler_id}' is illegal: it has no playable cards.")
+        raise IllegalBattlerError(battler_id, "it has no playable cards.")
 
     elo = sum(card.elo for card in cards) / len(cards)
     return Battler(
@@ -286,11 +296,8 @@ def validate_battler(battler: Battler, play_mode: PlayMode = "constructed") -> N
     playable_cards = battler.cards
     if len(playable_cards) < CONSTRUCTED_MIN_CARDS:
         battler_id = battler.source_id or "unknown"
-        msg = (
-            f"Battler '{battler_id}' is illegal: it has {len(playable_cards)} playable cards "
-            f"and needs at least {CONSTRUCTED_MIN_CARDS}."
-        )
-        raise ValueError(msg)
+        problem = f"it has {len(playable_cards)} playable cards and needs at least {CONSTRUCTED_MIN_CARDS}."
+        raise IllegalBattlerError(battler_id, problem)
 
     seen_names: set[str] = set()
     duplicate_name: str | None = None
@@ -303,22 +310,20 @@ def validate_battler(battler: Battler, play_mode: PlayMode = "constructed") -> N
 
     if duplicate_name is not None:
         battler_id = battler.source_id or "unknown"
-        raise ValueError(
-            f"Battler '{battler_id}' is illegal: it is not singleton because {duplicate_name} appears more than once."
-        )
+        raise IllegalBattlerError(battler_id, f"it is not singleton because {duplicate_name} appears more than once.")
 
     for card in playable_cards:
         normalized_name = _normalize_card_name(card.name)
         if normalized_name in _get_banned_card_names(play_mode):
             battler_id = battler.source_id or "unknown"
-            raise ValueError(f"Battler '{battler_id}' is illegal: {card.name} is banned.")
+            raise IllegalBattlerError(battler_id, f"{card.name} is banned.")
 
         keywords = {keyword.strip().casefold() for keyword in card.keywords}
         banned_keywords = sorted(_get_banned_keywords(play_mode) & keywords)
         if banned_keywords:
             battler_id = battler.source_id or "unknown"
             keyword = banned_keywords[0]
-            raise ValueError(f"Battler '{battler_id}' is illegal: {card.name} has the banned keyword {keyword}.")
+            raise IllegalBattlerError(battler_id, f"{card.name} has the banned keyword {keyword}.")
 
 
 def validate_constructed_battler(battler: Battler) -> None:

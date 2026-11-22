@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { QuickGuide } from './QuickGuide'
+import { FloatingWindow } from './common/FloatingWindow'
 import {
   DESKTOP_BREAKPOINT_PX,
   DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
@@ -47,23 +48,6 @@ type InteractionState =
       startHeight: number
     }
   | null
-
-interface WindowControlButtonProps {
-  ariaLabel: string
-  title: string
-  colorClassName: string
-  touchAreaClassName: string
-  onClick: () => void
-  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void
-  disabled?: boolean
-}
-
-// The dots are 8px apart, so each area stops halfway into the gap next to it. Offsets count
-// from inside the dot's 1px border, and every area starts at the header's top edge because
-// the window clips anything above it.
-const CLOSE_TOUCH_AREA = '[--touch-area-w:35px] [--touch-area-left:-18px] [--touch-area-top:-13px]'
-const MINIMIZE_TOUCH_AREA = '[--touch-area-w:22px] [--touch-area-top:-13px]'
-const RESET_TOUCH_AREA = '[--touch-area-left:-5px] [--touch-area-top:-13px]'
 
 const WINDOW_STORAGE_KEY = 'mtb_rules_panel_window:v2'
 const LEGACY_WINDOW_STORAGE_KEY = 'mtb_rules_panel_window:v1'
@@ -144,30 +128,6 @@ function defaultMobileCollapsedOrigin(viewport: ViewportBox, collapsedHeight: nu
     viewport.top + WINDOW_MARGIN_PX,
     panel,
     viewport,
-  )
-}
-
-function WindowControlButton({
-  ariaLabel,
-  title,
-  colorClassName,
-  touchAreaClassName,
-  onClick,
-  onPointerDown,
-  disabled = false,
-}: WindowControlButtonProps) {
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      title={title}
-      onClick={onClick}
-      onPointerDown={onPointerDown}
-      disabled={disabled}
-      className={`touch-area ${touchAreaClassName} h-3.5 w-3.5 rounded-full border border-black/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-opacity ${
-        disabled ? `${colorClassName} cursor-default opacity-45` : `${colorClassName} hover:opacity-90`
-      }`}
-    />
   )
 }
 
@@ -256,18 +216,6 @@ export function RulesPanel({
     }
     setDesktopWindow(defaultDesktopWindowState(currentViewportBox()))
   }, [stopInteraction])
-
-  const handleGreenControl = useCallback(() => {
-    if (isCollapsed) {
-      handleRestore()
-      return
-    }
-    resetWindow()
-  }, [handleRestore, isCollapsed, resetWindow])
-
-  const handleControlPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    event.stopPropagation()
-  }, [])
 
   const beginDrag = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (isDesktop) {
@@ -500,11 +448,21 @@ export function RulesPanel({
 
     return (
       <div className="fixed inset-0 z-50 pointer-events-none">
-        <div
+        <FloatingWindow
           ref={isCollapsed ? collapsedPanelRef : null}
-          className={`absolute pointer-events-auto modal-chrome felt-raised-panel border gold-border rounded-2xl shadow-[0_24px_60px_rgba(0,0,0,0.55)] flex flex-col overflow-hidden ${
-            interaction ? 'transition-none' : 'transition-[left,top,width,height] duration-200 ease-out'
-          }`}
+          name="guide"
+          title="Guide"
+          collapsed={isCollapsed}
+          draggable={isCollapsed}
+          dragging={interaction?.type === 'drag'}
+          onDragStart={beginDrag}
+          onMinimize={handleCollapse}
+          onRestore={handleRestore}
+          onReset={resetWindow}
+          onClose={onClose}
+          collapsedCaption="Current section"
+          collapsedText={collapsedLocation}
+          instant={!!interaction}
           style={{
             left: isCollapsed ? mobileCollapsedRect?.x : expandedLeft,
             top: isCollapsed ? mobileCollapsedRect?.y : mobileViewport.top + MOBILE_PANEL_TOP_GAP_PX,
@@ -513,150 +471,6 @@ export function RulesPanel({
             maxHeight: mobileViewport.height - WINDOW_MARGIN_PX * 2,
           }}
         >
-          <div
-            className={`relative flex items-center gap-3 px-4 py-3 shrink-0 select-none border-b border-[rgba(212,175,55,0.3)] bg-black/30 ${
-              isCollapsed
-                ? interaction?.type === 'drag'
-                  ? 'cursor-grabbing'
-                  : 'cursor-grab'
-                : ''
-            }`}
-            onPointerDown={beginDrag}
-            style={{ touchAction: isCollapsed ? 'none' : undefined }}
-          >
-            <div className="flex items-center gap-2 shrink-0">
-              <WindowControlButton
-                ariaLabel="Close guide"
-                title="Close"
-                colorClassName="bg-[#ff5f57]"
-                touchAreaClassName={CLOSE_TOUCH_AREA}
-                onClick={onClose}
-                onPointerDown={handleControlPointerDown}
-              />
-              <WindowControlButton
-                ariaLabel="Minimize guide"
-                title="Minimize"
-                colorClassName="bg-[#febc2e]"
-                touchAreaClassName={MINIMIZE_TOUCH_AREA}
-                onClick={handleCollapse}
-                onPointerDown={handleControlPointerDown}
-                disabled={isCollapsed}
-              />
-              <WindowControlButton
-                ariaLabel={isCollapsed ? 'Open guide' : 'Reset guide window'}
-                title={isCollapsed ? 'Open' : 'Reset'}
-                colorClassName="bg-[#28c840]"
-                touchAreaClassName={RESET_TOUCH_AREA}
-                onClick={handleGreenControl}
-                onPointerDown={handleControlPointerDown}
-              />
-            </div>
-            <div className="absolute inset-x-0 flex justify-center pointer-events-none px-20">
-              <span className="truncate text-[0.7rem] uppercase tracking-[0.2em] text-amber-100/70">
-                Guide
-              </span>
-            </div>
-          </div>
-
-          {isCollapsed ? (
-            <div className="flex flex-1 min-h-0 flex-col justify-center px-4 pb-3 pt-2">
-              <span className="text-[0.58rem] uppercase tracking-[0.18em] text-amber-200/45">
-                Current section
-              </span>
-              <span className="mt-1 text-sm font-medium leading-snug text-amber-50/95 break-words">
-                {collapsedLocation}
-              </span>
-            </div>
-          ) : (
-            <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-              <QuickGuide
-                key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
-                initialDocId={initialDocId}
-                initialTab={initialTab}
-                gameId={gameId}
-                playerName={playerName}
-                useUpgrades={useUpgrades}
-                useVanguards={useVanguards}
-                onLocationChange={setNavigationHint}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  if (!desktopViewport || !desktopPanel) {
-    return null
-  }
-
-  const collapsedLocation = navigationHint || MOBILE_COLLAPSED_LABEL_FALLBACK
-
-  return (
-    <div className="fixed inset-0 z-50 pointer-events-none">
-      <div
-        ref={isCollapsed ? collapsedPanelRef : null}
-        className={`absolute pointer-events-auto modal-chrome felt-raised-panel border gold-border rounded-2xl flex flex-col overflow-hidden shadow-[0_36px_96px_rgba(0,0,0,0.72),0_14px_40px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,236,181,0.08)] ${
-          interaction ? 'transition-none' : 'transition-[left,top,width,height] duration-200 ease-out'
-        }`}
-        style={{
-          left: desktopPanel.x,
-          top: desktopPanel.y,
-          width: desktopPanel.width,
-          height: isCollapsed ? undefined : desktopPanel.height,
-          maxWidth: Math.max(1, desktopViewport.width - WINDOW_MARGIN_PX * 2),
-          maxHeight: Math.max(1, desktopViewport.height - WINDOW_MARGIN_PX * 2),
-        }}
-      >
-        <div
-          className={`relative flex items-center gap-3 px-4 py-3 shrink-0 select-none border-b border-[rgba(212,175,55,0.3)] bg-black/30 ${interaction?.type === 'drag' ? 'cursor-grabbing' : 'cursor-grab'}`}
-          onPointerDown={beginDrag}
-          style={{ touchAction: 'none' }}
-        >
-          <div className="flex items-center gap-2 shrink-0">
-            <WindowControlButton
-              ariaLabel="Close guide"
-              title="Close"
-              colorClassName="bg-[#ff5f57]"
-              touchAreaClassName={CLOSE_TOUCH_AREA}
-              onClick={onClose}
-              onPointerDown={handleControlPointerDown}
-            />
-            <WindowControlButton
-              ariaLabel="Minimize guide"
-              title="Minimize"
-              colorClassName="bg-[#febc2e]"
-              touchAreaClassName={MINIMIZE_TOUCH_AREA}
-              onClick={handleCollapse}
-              onPointerDown={handleControlPointerDown}
-              disabled={isCollapsed}
-            />
-            <WindowControlButton
-              ariaLabel={isCollapsed ? 'Open guide' : 'Reset guide window'}
-              title={isCollapsed ? 'Open' : 'Reset'}
-              colorClassName="bg-[#28c840]"
-              touchAreaClassName={RESET_TOUCH_AREA}
-              onClick={handleGreenControl}
-              onPointerDown={handleControlPointerDown}
-            />
-          </div>
-          <div className="absolute inset-x-0 flex justify-center pointer-events-none px-28">
-            <span className="truncate text-[0.7rem] uppercase tracking-[0.2em] text-amber-100/70">
-              Guide
-            </span>
-          </div>
-        </div>
-
-        {isCollapsed ? (
-          <div className="flex flex-1 min-h-0 flex-col justify-center px-4 pb-3 pt-2">
-            <span className="text-[0.58rem] uppercase tracking-[0.18em] text-amber-200/45">
-              Current section
-            </span>
-            <span className="mt-1 text-sm font-medium leading-snug text-amber-50/95 break-words">
-              {collapsedLocation}
-            </span>
-          </div>
-        ) : (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             <QuickGuide
               key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
@@ -669,7 +483,55 @@ export function RulesPanel({
               onLocationChange={setNavigationHint}
             />
           </div>
-        )}
+        </FloatingWindow>
+      </div>
+    )
+  }
+
+  if (!desktopViewport || !desktopPanel) {
+    return null
+  }
+
+  const collapsedLocation = navigationHint || MOBILE_COLLAPSED_LABEL_FALLBACK
+
+  return (
+    <div className="fixed inset-0 z-50 pointer-events-none">
+      <FloatingWindow
+        ref={isCollapsed ? collapsedPanelRef : null}
+        name="guide"
+        title="Guide"
+        collapsed={isCollapsed}
+        draggable
+        dragging={interaction?.type === 'drag'}
+        onDragStart={beginDrag}
+        onMinimize={handleCollapse}
+        onRestore={handleRestore}
+        onReset={resetWindow}
+        onClose={onClose}
+        collapsedCaption="Current section"
+        collapsedText={collapsedLocation}
+        instant={!!interaction}
+        style={{
+          left: desktopPanel.x,
+          top: desktopPanel.y,
+          width: desktopPanel.width,
+          height: isCollapsed ? undefined : desktopPanel.height,
+          maxWidth: Math.max(1, desktopViewport.width - WINDOW_MARGIN_PX * 2),
+          maxHeight: Math.max(1, desktopViewport.height - WINDOW_MARGIN_PX * 2),
+        }}
+      >
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+          <QuickGuide
+            key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
+            initialDocId={initialDocId}
+            initialTab={initialTab}
+            gameId={gameId}
+            playerName={playerName}
+            useUpgrades={useUpgrades}
+            useVanguards={useVanguards}
+            onLocationChange={setNavigationHint}
+          />
+        </div>
 
         {!isCollapsed && (
           <button
@@ -680,7 +542,7 @@ export function RulesPanel({
             className="absolute right-0 bottom-0 h-5 w-5 cursor-se-resize bg-transparent"
           />
         )}
-      </div>
+      </FloatingWindow>
     </div>
   )
 }

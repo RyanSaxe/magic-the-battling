@@ -62,23 +62,28 @@ export function buildLayoutConfig({
   };
 }
 
+const LOOT_MAX_CARD_WIDTH = 300;
+
 export function rewardLayoutConfig({
   rewardCount,
   hasUpgradeSection,
   upgradeCount,
   poolCount,
+  isDesktop,
 }: {
   rewardCount: number;
   /** The stage-end screen, where the player picks an upgrade and sees their pool. */
   hasUpgradeSection: boolean;
   upgradeCount: number;
   poolCount: number;
+  /** The widest shell, with the docked sidebar. */
+  isDesktop: boolean;
 }): CardLayoutConfig {
   return {
     zones: {
       rewards: {
         count: rewardCount,
-        maxCardWidth: 300,
+        maxCardWidth: LOOT_MAX_CARD_WIDTH,
         priority: "fill",
         maxRows: 1,
       },
@@ -91,6 +96,9 @@ export function rewardLayoutConfig({
     layout: { top: ["rewards"], bottomLeft: ["upgrades", "pool"] },
     ...ZONE_LAYOUT_PADDING,
     maxTopFraction: hasUpgradeSection ? 0.2 : undefined,
+    // The second layout pass grows cards past their zones' maximums, up to 500px. That fills a phone or tablet,
+    // but it's far too big on a desktop.
+    pass2MaxCardWidth: isDesktop ? LOOT_MAX_CARD_WIDTH : undefined,
   };
 }
 
