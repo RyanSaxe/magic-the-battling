@@ -338,7 +338,8 @@ export async function authLogin(username: string, password: string): Promise<Aut
 }
 
 export async function authLogout(): Promise<void> {
-  await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' })
+  const response = await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' })
+  if (!response.ok) await throwResponseError(response, 'default', 'Something went wrong.')
   rememberSignedIn(false)
 }
 
