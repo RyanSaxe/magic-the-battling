@@ -213,6 +213,32 @@ export function forgetSeatForGame(gameId: string): void {
   writeTrackedPlayerMap(map);
 }
 
+/** Forgets an account's seats as it logs out, but not a guest's seat in the same game. The seats stay in play. */
+export function forgetAccountSeats(seats: { game_id: string; player_name: string }[]): void {
+  for (const seat of seats) {
+    if (getRememberedSeat(seat.game_id)?.name === seat.player_name) forgetSeatForGame(seat.game_id);
+  }
+}
+
+/**
+ * Whether this browser let go of its seat in a game it played, as Log Out and closing do. Forgetting always writes the
+ * remembered seats back, so a browser without them stored hasn't forgotten any.
+ */
+export function hasForgottenSeat(gameId: string): boolean {
+  if (!canUseStorage() || window.localStorage.getItem(GAME_PLAYER_MAP_KEY) === null) return false;
+  return getRememberedSeat(gameId) === null;
+}
+
+/** Calls `listener` when another tab changes the seats this browser remembers. */
+export function onRememberedSeatsChanged(listener: () => void): () => void {
+  const onStorage = (event: StorageEvent) => {
+    // A null key is another tab clearing all of storage.
+    if (event.key === GAME_PLAYER_MAP_KEY || event.key === null) listener();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}
+
 /** The name this browser last played under without an account. An account's name always comes before it. */
 export function getRememberedGuestName(): string | null {
   if (!canUseStorage()) return null;

@@ -17,6 +17,7 @@ vi.hoisted(() => {
   })) as unknown as typeof window.matchMedia
 })
 
+vi.mock('../../contexts', () => ({ useToast: () => ({ addToast: () => {} }) }))
 vi.mock('../../contexts/authState', () => ({ useAuth: () => ({ user: { username: 'tester' }, loading: false }) }))
 
 afterEach(() => {

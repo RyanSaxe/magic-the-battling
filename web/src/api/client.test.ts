@@ -72,4 +72,12 @@ describe("authGetMe", () => {
     expect(await authGetMe()).toBeNull();
     expect(meRequests(fetchMock)).toBe(0);
   });
+
+  it("doesn't count a logout the server failed", async () => {
+    await authLogin("alice", "secret");
+    fetchMock.mockResolvedValueOnce(new Response("{}", { status: 500 }));
+
+    await expect(authLogout()).rejects.toThrow();
+    expect(await authGetMe()).toEqual(USER);
+  });
 });

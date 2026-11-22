@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode, type Ref } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useToast } from '../../contexts'
 import { useAuth } from '../../contexts/authState'
 import { useHotkeys } from '../../hooks/useHotkeys'
 import { JoinGameModal } from '../home/JoinGameModal'
@@ -56,6 +57,7 @@ export function HomeButton({
 export function UserMenuButton() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
+  const { addToast } = useToast()
   const [open, setOpen] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -132,6 +134,8 @@ export function UserMenuButton() {
                 try {
                   await logout()
                   navigate('/')
+                } catch {
+                  addToast('Something went wrong.', 'error')
                 } finally {
                   setLoggingOut(false)
                 }

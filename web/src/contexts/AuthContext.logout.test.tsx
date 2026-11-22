@@ -1,0 +1,101 @@
+// @vitest-environment jsdom
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { authLogout, closeSeat, getResumableGames, rejoinGame } from '../api/client'
+import { useGameSeat } from '../hooks/useGameSeat'
+import { installMemoryLocalStorage } from '../test/memoryStorage'
+import { getRememberedSeat, rememberPlayerForGame } from '../utils/deviceIdentity'
+import { readTabSession, saveTabSession } from '../utils/tabSession'
+import { AuthProvider } from './AuthContext'
+import { useAuth } from './authState'
+
+const KESS = { user_id: 'user-1', username: 'kess' }
+const server = vi.hoisted(() => ({ signedIn: true }))
+vi.mock('../api/client', () => ({
+  authGetMe: vi.fn(async () => (server.signedIn ? KESS : null)),
+  authLogin: vi.fn(async () => {
+    server.signedIn = true
+    return KESS
+  }),
+  authLogout: vi.fn(),
+  closeSeat: vi.fn(),
+  getResumableGames: vi.fn(),
+  rejoinGame: vi.fn(),
+}))
+
+const wrapper = ({ children }: { children: ReactNode }) => <AuthProvider>{children}</AuthProvider>
+
+async function signedInBrowser() {
+  rememberPlayerForGame('account-game', 'kess', { seatToken: 'account-token' })
+  rememberPlayerForGame('guest-game', 'Norin', { seatToken: 'guest-token' })
+  for (const game of ['account-game', 'guest-game']) saveTabSession(game, { sessionId: `${game}-session`, playerId: game })
+  const auth = renderHook(() => useAuth(), { wrapper })
+  await waitFor(() => expect(auth.result.current.user).toEqual(KESS))
+  return auth
+}
+
+describe('Log Out', () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    vi.resetAllMocks()
+    server.signedIn = true
+    vi.mocked(authLogout).mockImplementation(async () => {
+      server.signedIn = false
+    })
+    // With no tokens sent, only a login's own seats answer.
+    vi.mocked(getResumableGames).mockImplementation(async () =>
+      (server.signedIn ? [{ game_id: 'account-game', player_name: 'kess' }] : []) as Awaited<ReturnType<typeof getResumableGames>>)
+    vi.mocked(rejoinGame).mockImplementation(async (gameId, _name, token) => {
+      if (!server.signedIn && !token) throw new Error('not yours')
+      return { game_id: gameId, session_id: 'session-2', player_id: 'player-2', seat_token: 'token-2' }
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it("lets go of the account's seats in every tab without ending them, and logging back in resumes them", async () => {
+    const auth = await signedInBrowser()
+    const openTab = renderHook(() => useGameSeat('account-game'))
+    expect(openTab.result.current.seat.kind).toBe('held')
+
+    await act(() => auth.result.current.logout())
+    act(() => {
+      window.dispatchEvent(new StorageEvent('storage', { key: 'mtb_game_player_map' }))
+    })
+
+    expect(auth.result.current.user).toBeNull()
+    expect(getRememberedSeat('account-game')).toBeNull()
+    expect(openTab.result.current.seat.kind).toBe('none')
+    expect(getRememberedSeat('guest-game')?.seatToken).toBe('guest-token')
+    expect(readTabSession('guest-game')?.sessionId).toBe('guest-game-session')
+    expect(closeSeat).not.toHaveBeenCalled()
+
+    saveTabSession('account-game', { sessionId: 'restored-tab-session', playerId: 'account-game' })
+    expect(renderHook(() => useGameSeat('account-game')).result.current.seat.kind).toBe('none')
+
+    await act(() => auth.result.current.login('kess', 'password'))
+    const [seat] = await getResumableGames([])
+    rememberPlayerForGame(seat.game_id, seat.player_name)
+    const resumed = renderHook(() => useGameSeat(seat.game_id))
+    await waitFor(() => expect(resumed.result.current.seat.kind).toBe('held'))
+    expect(rejoinGame).toHaveBeenLastCalledWith('account-game', 'kess', null)
+  })
+
+  it.each([
+    ['finding the seats', () => vi.mocked(getResumableGames).mockRejectedValue(new Error('Failed to fetch'))],
+    ['logging out', () => vi.mocked(authLogout).mockRejectedValue(new Error('Failed to fetch'))],
+  ])('stays signed in with every seat when %s fails', async (_step, fail) => {
+    const auth = await signedInBrowser()
+    fail()
+
+    await act(() => expect(auth.result.current.logout()).rejects.toThrow())
+
+    expect(auth.result.current.user).toEqual(KESS)
+    expect(getRememberedSeat('account-game')?.seatToken).toBe('account-token')
+  })
+})

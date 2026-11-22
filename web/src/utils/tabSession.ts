@@ -1,3 +1,5 @@
+import { hasForgottenSeat } from './deviceIdentity'
+
 const LEGACY_SESSION_KEY = 'mtb_session'
 const LEGACY_PLAYER_KEY = 'mtb_player'
 const SESSION_KEY_PREFIX = 'mtb_session:'
@@ -39,8 +41,13 @@ function adoptLegacySession(gameId: string): TabSession | null {
   return session
 }
 
+/** This tab's session for the game, until the browser forgets the seat, which can happen in another tab. */
 export function readTabSession(gameId: string): TabSession | null {
-  return parseSession(sessionStorage.getItem(sessionKey(gameId))) ?? adoptLegacySession(gameId)
+  const session = parseSession(sessionStorage.getItem(sessionKey(gameId)))
+  if (!session) return adoptLegacySession(gameId)
+  if (!hasForgottenSeat(gameId)) return session
+  clearTabSession(gameId)
+  return null
 }
 
 export function saveTabSession(gameId: string, session: TabSession): void {
