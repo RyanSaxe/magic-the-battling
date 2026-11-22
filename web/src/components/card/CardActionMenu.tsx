@@ -1,7 +1,8 @@
-import { useRef, useLayoutEffect, useEffect } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../../types'
 import { useFaceDown } from '../../contexts/faceDownState'
 import { useOpenSubmenus } from '../../hooks/useOpenSubmenus'
+import { MenuPrompt } from '../common/MenuPrompt'
 import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../../utils/battleInteraction'
 import { clampMenuToViewport, menuMaxHeight } from '../../utils/menuPosition'
 
@@ -23,7 +24,9 @@ interface CardActionMenuProps {
 
 type Submenu = 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo'
 
-const COUNTER_TYPES = ['+1/+1', '-1/-1', 'Loyalty', 'Charge', 'Custom']
+const COUNTER_TYPES = ['+1/+1', '-1/-1', 'Loyalty', 'Charge']
+// Custom's field is taller than the row it replaces, so it takes the room of two.
+const ADD_COUNTER_ROWS = COUNTER_TYPES.length + 2
 const ATTACH_TO_MAX_HEIGHT = 200
 const MOVE_TARGETS: { zone: ZoneName; label: string }[] = [
   { zone: 'hand', label: 'Hand' },
@@ -50,6 +53,7 @@ export function CardActionMenu({
 }: CardActionMenuProps) {
   const isFaceDown = useFaceDown(card.id)
   const { isOpen, toggle } = useOpenSubmenus<Submenu>()
+  const [namingCounter, setNamingCounter] = useState(false)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -58,7 +62,7 @@ export function CardActionMenu({
   const attachableCards = battlefieldCards.filter(c => c.id !== card.id)
   const tallestSubmenuRows = Math.max(
     moveTargets.length,
-    onBattlefield ? COUNTER_TYPES.length : 0,
+    onBattlefield ? ADD_COUNTER_ROWS : 0,
     onBattlefield ? Object.keys(counters).length : 0,
     onBattlefield ? card.tokens.length : 0,
   )
@@ -172,19 +176,21 @@ export function CardActionMenu({
                 {COUNTER_TYPES.map(type => (
                   <MenuItem
                     key={type}
-                    label={type === 'Custom' ? 'Custom...' : type}
-                    onClick={() => {
-                      if (type === 'Custom') {
-                        const name = prompt('Enter counter name:')
-                        if (name) {
-                          handleAction('counter', { counter_type: name, delta: 1 })
-                        }
-                      } else {
-                        handleAction('counter', { counter_type: type, delta: 1 })
-                      }
-                    }}
+                    label={type}
+                    onClick={() => handleAction('counter', { counter_type: type, delta: 1 })}
                   />
                 ))}
+                {namingCounter ? (
+                  <MenuPrompt
+                    label="Counter name"
+                    placeholder="Name"
+                    action="Add"
+                    onSubmit={(name) => handleAction('counter', { counter_type: name, delta: 1 })}
+                    onCancel={() => setNamingCounter(false)}
+                  />
+                ) : (
+                  <MenuItem label="Custom..." onClick={() => setNamingCounter(true)} />
+                )}
               </Submenu>
             )}
 
