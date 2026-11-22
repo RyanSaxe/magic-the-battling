@@ -16,7 +16,7 @@ import { PageFrame } from "../components/common/PageFrame";
 import { ZoneLabel } from "../components/common/ZoneLabel";
 import { PlayerCard } from "../components/PlayerCard";
 import { PLAYER_ROW_STACK_CLASS } from "../components/PlayerList";
-import { CloseSeatDialog, ResumeList, ResumeShelf } from "../components/ResumeGame";
+import { CloseSeatDialog, ResumeGamesDialog, ResumeShelf } from "../components/ResumeGame";
 import { useResumableGames, type ResumableSeat } from "../hooks/useResumableGames";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { Switch } from "../components/common/Switch";
@@ -48,7 +48,7 @@ type SoloPhase =
   | "navigating";
 type OpponentCount = 1 | 3 | 5 | 7;
 type ActiveMode = "friends" | "solo";
-type PlayView = "setup" | "options" | "resume";
+type PlayView = "setup" | "options";
 const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
 
 function normalizeCreateGameError(error: unknown): string {
@@ -203,7 +203,7 @@ export function Play() {
   const setPlayerName = user ? () => {} : setGuestName;
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [view, setView] = useState<PlayView>("setup");
-  const [gamesUnfolded, setGamesUnfolded] = useState(false);
+  const [showAllGames, setShowAllGames] = useState(false);
   const [seatToClose, setSeatToClose] = useState<ResumableSeat | null>(null);
   const [closedIds, setClosedIds] = useState<string[]>([]);
   const stripButtonRef = useRef<HTMLButtonElement>(null);
@@ -528,8 +528,6 @@ export function Play() {
   const cubeLook = useCubeLook(bannerCubeId || (playMode === "limited" ? "auto" : null));
 
   const seats = resumableGames.filter((seat) => !closedIds.includes(seat.gameId));
-  // Closing the last game in the list leaves nothing to list.
-  const shownView = view === "resume" && seats.length === 0 ? "setup" : view;
 
   const showView = (next: PlayView, byKeyboard = false) => {
     if (view === "options") setBannerCubeId(cubeId.trim());
@@ -544,11 +542,10 @@ export function Play() {
     if (!restoreStripFocusRef.current) return;
     restoreStripFocusRef.current = false;
     stripButtonRef.current?.focus({ preventScroll: true });
-  }, [shownView, bannerCubeId]);
-  const toggleGamesUnfolded = useCallback(() => setGamesUnfolded((was) => !was), []);
+  }, [view, bannerCubeId]);
   useHotkeys(
     { escape: () => showView("setup", true) },
-    shownView !== "setup" && !showJoinModal && !seatToClose,
+    view !== "setup" && !showJoinModal && !showAllGames && !seatToClose,
   );
 
   const stripLabel = {
@@ -559,8 +556,7 @@ export function Play() {
       `Upgrades\u00a0${useUpgrades ? "On" : "Off"}`,
     ].join("\u00a0· "),
     options: activeMode === "solo" ? "Goldfish options" : "Friends options",
-    resume: `${seats.length} ${seats.length === 1 ? "game" : "games"} to resume`,
-  }[shownView];
+  }[view];
 
   const startNewGame = () => {
     if (activeMode === "solo") void handleStartSolo();
@@ -603,13 +599,13 @@ export function Play() {
     <button
       ref={stripButtonRef}
       type="button"
-      onClick={() => showView(shownView === "setup" ? "options" : "setup", false)}
+      onClick={() => showView(view === "setup" ? "options" : "setup", false)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") restoreStripFocusRef.current = true;
       }}
       className="btn btn-secondary btn-pill"
     >
-      {shownView !== "setup" ? "Back" : playMode === "constructed" ? "Change deck" : "Change cube"}
+      {view !== "setup" ? "Back" : playMode === "constructed" ? "Change deck" : "Change cube"}
     </button>
   );
 
@@ -707,8 +703,7 @@ export function Play() {
     isGoldfish ? `Puppet\u00a0${i + 1}` : "Open seat",
   );
   const noDeck = cubeLook === null;
-  const boardView = shownView === "options" ? "options" : "setup";
-  const boardGamesOpen = seats.length > 0 && gamesUnfolded;
+  const boardView = view;
 
   return (
     <>
@@ -721,29 +716,26 @@ export function Play() {
           aside={
             <aside aria-label="At the table" className="board-aside frame-chrome">
               <BoardDrawerHead />
-              {!boardGamesOpen && (
-                <div className="board-seats">
-                  <div className={PLAYER_ROW_STACK_CLASS}>
-                    <PlayerCard isSelf lead={<SeatLead who="person" />} name={playerName || "\u00a0"}>
-                      {!isGoldfish && <span className="player-card-label">Host</span>}
+              <div className="board-seats">
+                <div className={PLAYER_ROW_STACK_CLASS}>
+                  <PlayerCard isSelf lead={<SeatLead who="person" />} name={playerName || "\u00a0"}>
+                    {!isGoldfish && <span className="player-card-label">Host</span>}
+                  </PlayerCard>
+                  {previewOthers.map((name, index) => (
+                    <PlayerCard
+                      key={index}
+                      isOpen={!isGoldfish}
+                      lead={<SeatLead who={isGoldfish ? "puppet" : "open"} />}
+                      name={name}
+                    >
+                      {isGoldfish && <span className="player-card-label">Puppet</span>}
                     </PlayerCard>
-                    {previewOthers.map((name, index) => (
-                      <PlayerCard
-                        key={index}
-                        isOpen={!isGoldfish}
-                        lead={<SeatLead who={isGoldfish ? "puppet" : "open"} />}
-                        name={name}
-                      >
-                        {isGoldfish && <span className="player-card-label">Puppet</span>}
-                      </PlayerCard>
-                    ))}
-                  </div>
+                  ))}
                 </div>
-              )}
+              </div>
               <BoardPlayGames
                 seats={seats}
-                open={boardGamesOpen}
-                onToggle={toggleGamesUnfolded}
+                onShowAll={() => setShowAllGames(true)}
                 onClose={setSeatToClose}
               />
             </aside>
@@ -812,7 +804,7 @@ export function Play() {
             {changeButton}
           </CubeBanner>
 
-          {shownView === "setup" && (
+          {view === "setup" && (
             <>
               <div className="setup-felt play-felt">
                 {modeSwitch}
@@ -829,13 +821,14 @@ export function Play() {
               </div>
               <ResumeShelf
                 seats={seats}
-                onClose={setSeatToClose}
-                onShowAll={(byKeyboard) => showView("resume", byKeyboard)}
+                reserveSpace
+                onCloseSeat={setSeatToClose}
+                onShowAll={() => setShowAllGames(true)}
               />
             </>
           )}
 
-          {shownView === "options" && (
+          {view === "options" && (
             <div
               className="setup-felt play-felt"
               // Hotkeys skip keys from inputs, which every field and switch here is.
@@ -848,12 +841,18 @@ export function Play() {
               {optionsFields}
             </div>
           )}
-
-          {shownView === "resume" && <ResumeList seats={seats} onClose={setSeatToClose} />}
         </PageFrame>
       )}
 
       {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
+
+      {showAllGames && (
+        <ResumeGamesDialog
+          seats={seats}
+          onClose={() => setShowAllGames(false)}
+          onCloseSeat={setSeatToClose}
+        />
+      )}
 
       {seatToClose && (
         <CloseSeatDialog

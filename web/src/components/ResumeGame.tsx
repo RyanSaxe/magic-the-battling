@@ -1,5 +1,4 @@
-import { useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { ResumableSeat } from '../hooks/useResumableGames'
 import { useResumeSeat } from '../hooks/useResumeSeat'
 import { countLabel } from '../utils/accountFormat'
@@ -11,7 +10,6 @@ import { Dialog } from './common/Dialog'
 import { CubeArt } from './dashboard/CubeArt'
 import { CrossIcon } from './icons/CrossIcon'
 
-const ROWS_SHOWN = 2
 const CLOSE_COLUMN = 'w-11 shrink-0'
 // A longer cube name takes two lines in a shelf row, whose height is fixed.
 const ONE_LINE_TITLE = 24
@@ -228,83 +226,70 @@ export function CloseSeatDialog({
 }
 
 /**
- * Play's shelf of the games and lobbies this browser can go back to: two of them, or the first and a way to the rest.
- * It keeps their room when there are fewer, so nothing above it moves as they load or close.
+ * One-row shelf pinned under Home and non-Board Play: the most recent game or lobby, with × when it is the
+ * only one and can close, or "+N more" opening the In progress modal on the same page.
  */
 export function ResumeShelf({
   seats,
-  onClose,
+  reserveSpace = false,
+  onCloseSeat,
   onShowAll,
 }: {
   seats: ResumableSeat[]
-  onClose: (seat: ResumableSeat) => void
-  onShowAll: (byKeyboard: boolean) => void
+  /** Keeps the shelf's one-row height when empty, so Play's setup never shifts as games load or close. */
+  reserveSpace?: boolean
+  onCloseSeat: (seat: ResumableSeat) => void
+  onShowAll: () => void
 }) {
-  const hasMore = seats.length > ROWS_SHOWN
-  const shown = hasMore ? seats.slice(0, 1) : seats
-  const hasCloseColumn = seats.some((seat) => seat.canClose)
-  return (
-    <div className="resume-space">
-      {seats.length > 0 && (
-        <section aria-label="In progress" className="resume-shelf">
-          <ul className={`resume-items ${hasCloseColumn ? '' : 'has-no-close'}`}>
-            {shown.map((seat) => (
-              <ResumeRow key={seat.gameId} seat={seat} hasCloseColumn={hasCloseColumn} onClose={onClose} />
-            ))}
-            {hasMore && (
-              <li className="resume-row">
-                <button
-                  type="button"
-                  onClick={(event) => onShowAll(event.detail === 0)}
-                  className={`resume-open ${hasCloseColumn ? 'has-close-space' : ''}`}
-                >
-                  <span aria-hidden="true" className="resume-stage">
-                    <span className="resume-stage-number">+{seats.length - 1}</span>
-                  </span>
-                  <SeatArt seat={seats[1]} />
-                  <span className="resume-summary">
-                    <span className="resume-title">{seats.length - 1} more games</span>
-                    <span className="resume-detail">Show all {seats.length} games to resume</span>
-                  </span>
-                  <span aria-hidden="true" className="resume-chevron">›</span>
-                </button>
-              </li>
-            )}
-          </ul>
-        </section>
-      )}
-    </div>
-  )
-}
-
-/** Every game and lobby this browser can go back to, in place of the setup for a new game. */
-export function ResumeList({ seats, onClose }: { seats: ResumableSeat[]; onClose: (seat: ResumableSeat) => void }) {
-  const hasCloseColumn = seats.some((seat) => seat.canClose)
-  return (
-    <section aria-label="In progress" className="resume-all">
-      <ul className={`resume-items ${hasCloseColumn ? '' : 'has-no-close'}`}>
-        {seats.map((seat) => (
-          <ResumeRow key={seat.gameId} seat={seat} hasCloseColumn={hasCloseColumn} onClose={onClose} />
-        ))}
-      </ul>
-    </section>
-  )
-}
-
-/** Home's shelf, pinned under its felt: the most recent game or lobby, and the way to Play's list of the others. */
-export function HomeResumeShelf({ seats }: { seats: ResumableSeat[] }) {
-  const navigate = useNavigate()
-  if (seats.length === 0) return null
-  return (
+  const first = seats[0]
+  const shelf = first ? (
     <section aria-label="In progress" className="resume-shelf home-shelf">
       <div className="home-shelf-row">
-        <ResumeButton seat={seats[0]} />
-        {seats.length > 1 && (
-          <button type="button" onClick={() => navigate('/play')} className="home-shelf-more">
+        <ResumeButton seat={first} />
+        {seats.length > 1 ? (
+          <button type="button" onClick={onShowAll} className="home-shelf-more">
             +{seats.length - 1} more
           </button>
+        ) : (
+          first.canClose && (
+            <button
+              type="button"
+              onClick={() => onCloseSeat(first)}
+              aria-label={`${first.kind === 'game' ? 'Close' : 'Leave'} ${seatTitle(first)} as ${first.playerName}`}
+              className="icon-target self-center mr-1"
+            >
+              <CrossIcon />
+            </button>
+          )
         )}
       </div>
     </section>
+  ) : null
+  return reserveSpace ? <div className="resume-space">{shelf}</div> : shelf
+}
+
+/** Every game and lobby this browser or account can return to, in a modal over the page you're on. */
+export function ResumeGamesDialog({
+  seats,
+  onClose,
+  onCloseSeat,
+}: {
+  seats: ResumableSeat[]
+  onClose: () => void
+  onCloseSeat: (seat: ResumableSeat) => void
+}) {
+  useEffect(() => {
+    if (seats.length === 0) onClose()
+  }, [seats.length, onClose])
+  if (seats.length === 0) return null
+  const hasCloseColumn = seats.some((seat) => seat.canClose)
+  return (
+    <Dialog title="In progress" onClose={onClose}>
+      <ul className={`resume-items resume-modal-items ${hasCloseColumn ? '' : 'has-no-close'}`}>
+        {seats.map((seat) => (
+          <ResumeRow key={seat.gameId} seat={seat} hasCloseColumn={hasCloseColumn} onClose={onCloseSeat} />
+        ))}
+      </ul>
+    </Dialog>
   )
 }
