@@ -39,6 +39,7 @@ from mtb.models.game import (
     PendingRevealAnimation,
     Player,
     Puppet,
+    ReturnedBuild,
     StaticOpponent,
     Zones,
     create_game,
@@ -2458,6 +2459,7 @@ class GameManager:
         all_players.extend(
             self._make_fake_player_view(fp, player, probabilities, most_recent_ghost_puppet_name) for fp in game.puppets
         )
+        shown_build = player.returned_build or player
 
         state = GameStateResponse(
             game_id=game_id,
@@ -2485,8 +2487,8 @@ class GameManager:
                 chosen_basics=player.chosen_basics,
                 most_recently_revealed_cards=cards_to_refs(player.most_recently_revealed_cards),
                 last_result=self._get_last_result(player),
-                hand=cards_to_refs(player.hand),
-                sideboard=cards_to_refs(player.sideboard),
+                hand=cards_to_refs(shown_build.hand),
+                sideboard=cards_to_refs(shown_build.sideboard),
                 command_zone=cards_to_refs(player.command_zone),
                 current_pack=cards_to_refs(current_pack) if current_pack is not None else None,
                 last_battle_result=last_battle_result_to_view(player.last_battle_result),
@@ -3181,6 +3183,9 @@ class GameManager:
 
         for player in game.players:
             if player.phase == "eliminated" and player.name != ghost_name and player.battler is not None:
+                # Every later round passes here again, with the player's zones already empty.
+                if player.hand or player.sideboard:
+                    player.returned_build = ReturnedBuild(hand=player.hand, sideboard=player.sideboard)
                 player.battler.cards.extend(player.hand)
                 player.battler.cards.extend(player.sideboard)
                 # Clear to prevent double-returning
