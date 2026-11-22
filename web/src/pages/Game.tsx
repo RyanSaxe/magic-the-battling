@@ -2687,8 +2687,7 @@ function GameContent() {
           minimized={guideMinimized}
           onMinimizedChange={setGuideMinimized}
           behindPanel={openSurface?.kind !== "guide"}
-          initialDocId={rulesPanel.target?.docId}
-          initialTab={rulesPanel.target?.tab}
+          target={rulesPanel.target}
           gameId={gameId}
           playerName={gameState?.self_player.name}
           useUpgrades={gameState.use_upgrades}
