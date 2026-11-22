@@ -312,7 +312,10 @@ for (const { name, viewport } of SCREENS.filter((screen) => screen.viewport.widt
 
     test('scouting opens beside the player list, over a board that stays put, and follows the player clicked', async ({ page, baseURL }) => {
       await openGame(page, baseURL!, DRAFT)
-      if (viewport.width < DOCKED_SIDEBAR_FROM) await page.getByRole('button', { name: '☰' }).click()
+      if (viewport.width < DOCKED_SIDEBAR_FROM) {
+        await page.getByRole('button', { name: '☰' }).click()
+        await settled(sidePanel(page, 'Players'))
+      }
       const board = await boardBox(page)
 
       await page.getByRole('button', { name: /Bob/ }).click()
