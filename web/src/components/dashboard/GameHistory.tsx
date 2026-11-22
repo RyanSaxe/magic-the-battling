@@ -2,7 +2,8 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { CubeGamesPage } from '../../api/client'
 import { useToast } from '../../contexts'
 import type { GameSummary, PlayMode } from '../../types'
-import { countLabel } from '../../utils/accountFormat'
+import { countLabel, modeLabel, upgradesLabel } from '../../utils/accountFormat'
+import { FilterGroup, FilterMenu } from './FilterMenu'
 import { RecapCard } from './GameTile'
 import { LoadMoreButton } from './ResultList'
 import { NoticeTile } from './Section'
@@ -34,6 +35,14 @@ function upgradesChoice(useUpgrades: boolean | null): UpgradesChoice {
   return useUpgrades ? 'on' : 'off'
 }
 
+/** What the filter button says: "All games", "Deck", "Cube · Upgrades On". */
+function shownGames({ playMode, useUpgrades }: GameFilters): string {
+  const narrowed: string[] = []
+  if (playMode !== null) narrowed.push(modeLabel(playMode))
+  if (useUpgrades !== null) narrowed.push(upgradesLabel(useUpgrades))
+  return narrowed.join(' · ') || 'All games'
+}
+
 interface GameHistoryProps {
   loadGames: LoadGames
   initialFilters: GameFilters
@@ -43,7 +52,7 @@ interface GameHistoryProps {
   title?: (totalGames: number | null) => ReactNode
 }
 
-/** A cube's finished games with explicit All choices for mode and upgrades, newest first. */
+/** A cube's finished games, newest first, with one menu to narrow them by mode and upgrades. */
 export function GameHistory({ loadGames, initialFilters, scoped = false, title }: GameHistoryProps) {
   const { addToast } = useToast()
   const [filters, setFilters] = useState<GameFilters>(initialFilters)
@@ -91,46 +100,52 @@ export function GameHistory({ loadGames, initialFilters, scoped = false, title }
 
   return (
     <section aria-label="Game history" className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="flex min-w-0 items-baseline gap-3">
-          {scoped && (
-            <SegmentedFilter
-              label="Whose games"
-              value={filters.mineOnly ? 'mine' : 'everyone'}
-              onChange={(value) => change({ mineOnly: value === 'mine' })}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {scoped && (
+          <SegmentedFilter
+            label="Whose games"
+            variant="heading"
+            className="w-full sm:w-auto"
+            value={filters.mineOnly ? 'mine' : 'everyone'}
+            onChange={(value) => change({ mineOnly: value === 'mine' })}
+            options={[
+              { value: 'mine', label: 'My Games' },
+              { value: 'everyone', label: 'All Players' },
+            ]}
+          />
+        )}
+        {title?.(current?.totalGames ?? null)}
+        {scoped && current && (
+          <span className="text-xs tabular-nums text-[var(--ivory-muted)]">{countLabel(current.totalGames, 'game')}</span>
+        )}
+        <FilterMenu shown={shownGames(filters)}>
+          <FilterGroup title="Mode">
+            <SegmentedFilter<ModeChoice>
+              label="Mode"
+              className="w-full"
+              value={filters.playMode ?? 'all'}
+              onChange={(value) => change({ playMode: value === 'all' ? null : value })}
               options={[
-                { value: 'mine', label: 'My Games' },
-                { value: 'everyone', label: 'All Players' },
+                { value: 'all', label: 'All' },
+                { value: 'limited', label: 'Cube' },
+                { value: 'constructed', label: 'Deck' },
               ]}
             />
-          )}
-          {title?.(current?.totalGames ?? null)}
-          {scoped && current && (
-            <span className="text-xs tabular-nums text-amber-100/60">{countLabel(current.totalGames, 'game')}</span>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <SegmentedFilter<ModeChoice>
-            label="Mode"
-            value={filters.playMode ?? 'all'}
-            onChange={(value) => change({ playMode: value === 'all' ? null : value })}
-            options={[
-              { value: 'all', label: 'All Modes' },
-              { value: 'limited', label: 'Cube' },
-              { value: 'constructed', label: 'Deck' },
-            ]}
-          />
-          <SegmentedFilter<UpgradesChoice>
-            label="Upgrades"
-            value={upgradesChoice(filters.useUpgrades)}
-            onChange={(value) => change({ useUpgrades: UPGRADES_CHOICE[value] })}
-            options={[
-              { value: 'all', label: 'All Upgrades' },
-              { value: 'on', label: 'On' },
-              { value: 'off', label: 'Off' },
-            ]}
-          />
-        </div>
+          </FilterGroup>
+          <FilterGroup title="Upgrades">
+            <SegmentedFilter<UpgradesChoice>
+              label="Upgrades"
+              className="w-full"
+              value={upgradesChoice(filters.useUpgrades)}
+              onChange={(value) => change({ useUpgrades: UPGRADES_CHOICE[value] })}
+              options={[
+                { value: 'all', label: 'All' },
+                { value: 'on', label: 'On' },
+                { value: 'off', label: 'Off' },
+              ]}
+            />
+          </FilterGroup>
+        </FilterMenu>
       </div>
 
       {failed ? (
