@@ -1,6 +1,8 @@
 import { OPTION_BOX } from '../common/styles'
+import { SegmentedFilter } from './SegmentedFilter'
 
 const OPPONENT_COUNTS = [1, 3, 5, 7] as const
+const OPPONENT_OPTIONS = OPPONENT_COUNTS.map((count) => ({ value: String(count), label: String(count) }))
 
 /** The choice of how many puppet opponents a game, or a saved cube or deck by default, starts with. */
 export function DefaultOpponentsField({
@@ -15,18 +17,13 @@ export function DefaultOpponentsField({
   return (
     <div className={`${OPTION_BOX} p-3`}>
       <label className="block text-amber-100/70 text-sm mb-2">{label}</label>
-      <div className="flex gap-1.5">
-        {OPPONENT_COUNTS.map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange(n)}
-            className={`btn ${value === n ? 'btn-primary' : 'btn-secondary'} px-3 py-1.5 text-sm font-medium`}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
+      <SegmentedFilter
+        label={label}
+        options={OPPONENT_OPTIONS}
+        value={String(value)}
+        onChange={(count) => onChange(Number(count) as (typeof OPPONENT_COUNTS)[number])}
+        className="h-9"
+      />
     </div>
   )
 }

@@ -88,10 +88,8 @@ function RoundPopover({
             onSelect(opt.value)
             onClose()
           }}
-          className={`text-sm py-1.5 px-3 rounded text-left transition-colors ${
-            opt.value === selectedRound
-              ? 'bg-amber-600/80 text-white'
-              : 'menu-item text-[var(--ivory-muted)]'
+          className={`menu-item text-sm py-1.5 px-3 rounded text-left transition-colors ${
+            opt.value === selectedRound ? 'text-[var(--gold-pale)]' : 'text-[var(--ivory-muted)]'
           }`}
         >
           {opt.label}
