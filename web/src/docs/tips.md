@@ -26,7 +26,7 @@ order: 6
 
 ## Battle
 
-- Because [draws count as losses](doc:battle#magic rule modifications) for both players, be very mindful of just trading resources.
+- Because [draws count as losses](doc:battle#magic-rule-modifications) for both players, be very mindful of just trading resources.
 - Using [treasures](doc:game-pieces#treasures) to win fights is much better in later stages than in early stages.
 - If you have a repeatable [treasure](doc:game-pieces#treasures) producer, try to keep it alive while exhausting your opponents resources.
 

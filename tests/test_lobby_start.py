@@ -1,4 +1,5 @@
 import asyncio
+import json
 import threading
 
 import pytest
@@ -182,6 +183,23 @@ def test_a_start_that_fails_after_dealing_leaves_the_cube_and_decks_whole(
         db.close()
 
     assert card_counts() == before
+
+
+def test_a_cube_id_cubecobra_answers_with_a_web_page_fails_the_start_in_players_words(test_db, monkeypatch):
+    def answered_with_a_web_page(cube_id: str):
+        raise json.JSONDecodeError("Expecting value", "<!doctype html>", 0)
+
+    monkeypatch.setattr("mtb.utils.cubecobra.get_cube_data", answered_with_a_web_page)
+    manager = GameManager()
+    pending = _two_player_lobby(manager)
+    _ready_everyone(manager, pending)
+
+    with pytest.raises(LobbyStartFailedError) as failed:
+        asyncio.run(manager.start_lobby(pending.game_id, "pid-alice", None, on_change=_no_broadcast))
+
+    assert str(failed.value) == (
+        "Couldn't load cube 'test'. Check that the CubeCobra ID is correct and the cube is public."
+    )
 
 
 def test_a_lobby_closed_while_it_waits_to_start_does_not_become_a_game(mock_cube_data, test_db):

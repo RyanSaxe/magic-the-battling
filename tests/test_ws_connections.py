@@ -1,9 +1,11 @@
 """How player sockets come and go: replaced sockets, late closes and failing actions."""
 
+import asyncio
+import threading
 import time
 
 import pytest
-from starlette.websockets import WebSocketDisconnect
+from starlette.websockets import WebSocket, WebSocketDisconnect
 
 import server.routers.ws as ws_module
 
@@ -64,6 +66,32 @@ def test_a_second_socket_for_the_same_session_replaces_the_first(
 
     assert not _is_connected(client, game_id, "Alice")
     assert _unloads_once_idle(monkeypatch, game_id)
+
+
+def test_a_replaced_socket_that_is_slow_to_close_does_not_delay_the_new_one(
+    start_lobby, client, game_with_players, ws_receive_json, monkeypatch
+):
+    game_id = game_with_players["game_id"]
+    assert start_lobby(game_id, game_with_players["alice"]["session_id"]).status_code == 200
+    url = _player_url(game_id, game_with_players["alice"])
+
+    old_socket_may_close = threading.Event()
+    close = WebSocket.close
+
+    async def close_once_allowed(websocket, code=1000, reason=None):
+        if code == ws_module.SEAT_MOVED_CLOSE_CODE:
+            await asyncio.to_thread(old_socket_may_close.wait)
+        await close(websocket, code, reason)
+
+    monkeypatch.setattr(WebSocket, "close", close_once_allowed)
+
+    with client.websocket_connect(url) as first:
+        ws_receive_json(first)
+        with client.websocket_connect(url) as second:
+            try:
+                assert ws_receive_json(second)["type"] == "game_bootstrap"
+            finally:
+                old_socket_may_close.set()
 
 
 def test_a_late_close_from_a_replaced_socket_keeps_the_lobby_player_ready(client, game_with_players, ws_receive_json):
