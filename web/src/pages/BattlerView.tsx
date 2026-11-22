@@ -64,7 +64,7 @@ export function BattlerView() {
 
   if (presetLoad.state.status === 'failed') {
     return (
-      <PageFrame header={<HomeHeader newGame />} center contentClassName="items-center">
+      <PageFrame header={<HomeHeader />} center contentClassName="items-center">
         <NoticeTile action={{ label: 'Retry', onClick: presetLoad.retry }}>This preset didn&apos;t load.</NoticeTile>
       </PageFrame>
     )
@@ -72,7 +72,7 @@ export function BattlerView() {
 
   if (authLoading || !user || !battler) {
     return (
-      <PageFrame header={<HomeHeader newGame />} center contentClassName="items-center">
+      <PageFrame header={<HomeHeader />} center contentClassName="items-center">
         <p className="text-amber-200/70">Loading...</p>
       </PageFrame>
     )
@@ -83,7 +83,7 @@ export function BattlerView() {
 
   return (
     <>
-      <DashboardFrame header={<HomeHeader newGame />}>
+      <DashboardFrame>
         <Breadcrumb to="/dashboard" label="Cubes & Decks" current={title} />
         <DetailHero
           imageUri={battler.cube_image_uri}

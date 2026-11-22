@@ -170,6 +170,26 @@ for (const { name, viewport, isMobile } of SCREENS) {
   })
 }
 
+// The page's own Play Preset or Play Cube is its one gold button, which leaves room for Home on phones.
+const ACCOUNT_DETAIL_PAGES = ['battler', 'cube']
+
+for (const { name, viewport, isMobile } of SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    for (const detailPage of ACCOUNT_DETAIL_PAGES) {
+      test(`the ${detailPage} page has one gold button and Home in the top bar`, async ({ page, baseURL }) => {
+        await openPage(page, baseURL!, PAGES.find((pageUnderTest) => pageUnderTest.name === detailPage)!)
+
+        const goldButtons = await page.locator('.btn-primary').evaluateAll((buttons) =>
+          buttons.filter((button) => button.getBoundingClientRect().width > 0).length)
+        expect.soft(goldButtons, 'gold buttons on the page').toBeLessThanOrEqual(1)
+        await expect.soft(page.getByRole('banner').getByRole('button', { name: 'Home' })).toBeVisible()
+      })
+    }
+  })
+}
+
 const GAME_OVER_BARS = [
   { phase: 'over', left: ['Review'] },
   { phase: 'eliminated', left: ['Review', 'Spectate'] },
