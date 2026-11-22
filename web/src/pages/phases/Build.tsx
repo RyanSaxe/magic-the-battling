@@ -328,7 +328,7 @@ export function BuildPhase({
   };
 
   const emptySlotLabel = isMobile
-    ? "Tap here and a card below to add that card to your hand"
+    ? "+\nCard"
     : "Click here and a card below to add that card to your hand";
 
   const isCardSelected = (cardId: string) =>

@@ -124,9 +124,11 @@ import {
 import { getVoicePeerNames } from "../utils/voiceChat";
 import { DIALOG_BACKDROP, LINK, OPTION_BOX, POPOVER_CHROME, TEXT_INPUT } from "../components/common/styles";
 
-// Each area stops 3px into the life number, short of its middle even for one digit, so - and + never overlap.
-const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_+_5px_-_44px)]";
-const LIFE_PLUS_TOUCH_AREA = "touch-area [--touch-area-left:-5px]";
+// Each area ends at its button's edge beside the life number and reaches outward, so the number takes no taps.
+const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_-_44px)]";
+const LIFE_PLUS_TOUCH_AREA = "touch-area [--touch-area-left:0px]";
+// A click handler makes the number a tap target of its own. Without one WebKit moves a tap on it to - or +.
+const ignoreLifeNumberTap = () => {};
 
 const NO_BASICS: string[] = [];
 const ignoreBasicsPick = () => {};
@@ -2340,7 +2342,7 @@ function GameContent() {
                         })()}
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
                           <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>-</button>
-                          <span className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
+                          <span onClick={ignoreLifeNumberTap} className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
                           <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>+</button>
                         </div>
                       </div>
@@ -2356,7 +2358,7 @@ function GameContent() {
                       <div className="flex items-center gap-1">
                         <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
                           <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>-</button>
-                          <span className="text-white font-bold">{battleViewForDisplay.your_life}</span>
+                          <span onClick={ignoreLifeNumberTap} className="text-white font-bold">{battleViewForDisplay.your_life}</span>
                           <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>+</button>
                         </div>
                         {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
