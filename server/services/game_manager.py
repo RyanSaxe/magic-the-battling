@@ -2755,9 +2755,11 @@ class GameManager:
         most_recent_ghost_puppet_name: str | None = None,
     ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
-        # The odds come from the furthest round's table, so the treasures do too. The cards stay from the viewer's
-        # round, or a player who is behind would see a hand early.
-        table_snapshot = fake.get_opponent_for_round(*get_furthest_round(viewer.game))
+        # The odds come from the furthest round's table, so the treasures do too, until a puppet is out and its row
+        # stops at the round it went out. The cards stay from the viewer's round, or a player who is behind would see a
+        # hand early.
+        out_round = fake.last_played_round if fake.is_eliminated else None
+        table_snapshot = fake.get_opponent_for_round(*(out_round or get_furthest_round(viewer.game)))
 
         if viewer.in_sudden_death:
             revealed_cards = (snapshot.hand + snapshot.command_zone) if snapshot else []
@@ -3347,15 +3349,18 @@ class GameManager:
             player.phase = "battle"
             player.build_ready = False
 
+        live_puppets = get_live_puppets(game)
+        for fp in live_puppets:
+            fp.last_played_round = (stage, round_num)
+
         snapshots_by_player: dict[str, BattleSnapshot] = {}
         if db is not None and game_id is not None:
             for player in live_players:
                 battler_elo = player.battler.elo if player.battler is not None else 1200.0
                 snapshots_by_player[player.name] = self._record_snapshot(db, game_id, player, battler_elo)
             battler_elo = self._get_game_target_elo(game)
-            for fp in game.puppets:
-                if not fp.is_eliminated:
-                    self._record_bot_poison(db, game_id, fp, battler_elo=battler_elo, stage=stage, round_num=round_num)
+            for fp in live_puppets:
+                self._record_bot_poison(db, game_id, fp, battler_elo=battler_elo, stage=stage, round_num=round_num)
 
         paired_bot_names: set[str] = set()
         for player, opponent in battle.get_round_table(game).draw_battles():
