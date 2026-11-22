@@ -29,8 +29,8 @@ interface RulesPanelProps {
   onMinimizedChange: (minimized: boolean) => void
   /** A panel is open over the minimized window, so Escape closes that panel and not the Guide. */
   behindPanel?: boolean
-  initialDocId?: string
-  initialTab?: string
+  /** A new object each time a link is taken, so the same link again goes back to its page. */
+  target?: RulesPanelTarget
   gameId?: string
   playerName?: string
   useUpgrades?: boolean
@@ -137,13 +137,14 @@ export function RulesPanel({
   minimized: isCollapsed,
   onMinimizedChange,
   behindPanel = false,
-  initialDocId,
-  initialTab,
+  target,
   gameId,
   playerName,
   useUpgrades,
   useVanguards,
 }: RulesPanelProps) {
+  const [visit, setVisit] = useState({ target, count: 0 })
+  if (target !== visit.target) setVisit({ target, count: visit.count + 1 })
   const [isDesktop, setIsDesktop] = useState(() => isDesktopViewport())
   const [desktopWindow, setDesktopWindow] = useState<DesktopWindowState | null>(() =>
     resolveInitialDesktopWindowState(),
@@ -476,9 +477,9 @@ export function RulesPanel({
         >
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             <QuickGuide
-              key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
-              initialDocId={initialDocId}
-              initialTab={initialTab}
+              key={visit.count}
+              initialDocId={target?.docId}
+              initialTab={target?.tab}
               gameId={gameId}
               playerName={playerName}
               useUpgrades={useUpgrades}
@@ -525,9 +526,9 @@ export function RulesPanel({
       >
         <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
           <QuickGuide
-            key={`${initialDocId ?? ''}:${initialTab ?? ''}`}
-            initialDocId={initialDocId}
-            initialTab={initialTab}
+            key={visit.count}
+            initialDocId={target?.docId}
+            initialTab={target?.tab}
             gameId={gameId}
             playerName={playerName}
             useUpgrades={useUpgrades}
