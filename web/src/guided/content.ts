@@ -512,7 +512,10 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         mobileCardPlacement: "top-center",
         primaryActionLabel: "Next",
         content: {
-          summary: "To make a pick, click a card in the pack and a card in your pool to swap them.",
+          summary: textForInput({
+            text: "To make a pick, click a card in the pack and a card in your pool to swap them.",
+            touch: "To make a pick, tap a card in the pack and a card in your pool to swap them.",
+          }),
           detail: "You can do this as many times as you want.",
         },
       },
@@ -531,7 +534,10 @@ function buildDraftGuide(ctx: GuidedWalkthroughContext): GuideDefinition {
         },
         content: {
           summary: "This sidebar shows key info about each opponent, including how likely you are to face them.",
-          detail: "Click a player to inspect their revealed cards and other details.",
+          detail: textForInput({
+            text: "Click a player to inspect their revealed cards and other details.",
+            touch: "Tap a player to inspect their revealed cards and other details.",
+          }),
         },
       },
       {
