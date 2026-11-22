@@ -98,10 +98,15 @@ export function HintsBanner({ place, variant = "default" }: { place: HintPlace; 
       >
         ‹
       </button>
+      {/* The tips share one grid cell, so the rail is always as tall as the tallest and the felt stays put. */}
       <p
-        className={`flex-1 text-center leading-tight ${tipTextClass} ${visible ? "hint-fade-in" : "hint-fade-out"}`}
+        className={`grid flex-1 items-center text-center leading-tight ${tipTextClass} ${visible ? "hint-fade-in" : "hint-fade-out"}`}
       >
-        {textForInput(hints[index])}
+        {hints.map((hint, i) => (
+          <span key={hint.text} className={`col-start-1 row-start-1 ${i === index ? "" : "invisible"}`}>
+            {textForInput(hint)}
+          </span>
+        ))}
       </p>
       <button
         onClick={next}
