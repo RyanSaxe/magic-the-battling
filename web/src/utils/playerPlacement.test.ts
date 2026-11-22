@@ -4,6 +4,7 @@ import {
   comparePlayersForSidebar,
   getSidebarPlacementRank,
   getSidebarPlayerOrder,
+  isSidebarLastPlace,
   suddenDeathDecidesGame,
 } from "./playerPlacement";
 
@@ -85,6 +86,25 @@ describe("player placement ordering", () => {
     expect(players.map((player) => getSidebarPlacementRank(player, players))).toEqual([
       1, 1, 3, 3, 5,
     ]);
+  });
+});
+
+describe("isSidebarLastPlace", () => {
+  it("marks every player tied for the bottom rank as last", () => {
+    const players = [
+      makePlayer({ name: "Alpha", poison: 1 }),
+      makePlayer({ name: "Bravo", poison: 2 }),
+      makePlayer({ name: "Charlie", poison: 4 }),
+      makePlayer({ name: "Delta", poison: 4 }),
+    ];
+
+    expect(players.map((player) => isSidebarLastPlace(player, players))).toEqual([false, false, true, true]);
+  });
+
+  it("marks no one last while every player is tied", () => {
+    const players = [makePlayer({ name: "Alpha" }), makePlayer({ name: "Bravo" }), makePlayer({ name: "Charlie" })];
+
+    expect(players.map((player) => isSidebarLastPlace(player, players))).toEqual([false, false, false]);
   });
 });
 

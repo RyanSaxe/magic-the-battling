@@ -30,6 +30,7 @@ interface DroppableZoneDisplayProps {
 const VALID_FROM_ZONES: ZoneName[] = ['hand', 'battlefield', 'graveyard', 'exile', 'sideboard', 'command_zone', 'library']
 
 export function ZoneModal({
+  open,
   title,
   zone,
   cards,
@@ -43,13 +44,13 @@ export function ZoneModal({
   selectedCardId,
   forceFaceDown = false,
   tone = 'default',
-  hideTitle = false,
   headerActions,
   upgradedCardIds,
   appliedUpgradesByCardId,
   hiddenUpgradesByCardId,
   onRevealHiddenUpgrades,
 }: {
+  open: boolean
   title: string
   zone: ZoneName
   cards: CardType[]
@@ -63,7 +64,6 @@ export function ZoneModal({
   selectedCardId?: string
   forceFaceDown?: boolean
   tone?: 'default' | 'battle'
-  hideTitle?: boolean
   headerActions?: React.ReactNode
   upgradedCardIds?: Set<string>
   appliedUpgradesByCardId?: Map<string, CardType[]>
@@ -80,11 +80,11 @@ export function ZoneModal({
   if (allowZoneInteraction) {
     return (
       <DndPanel
+        open={open}
         title={title}
         count={cards.length}
         onClose={handleClose}
         tone={tone}
-        hideTitle={hideTitle}
         headerActions={headerActions}
         zone={zone}
         zoneOwner={zoneOwner}
@@ -118,6 +118,8 @@ export function ZoneModal({
     )
   }
 
+  if (!open) return null
+
   return (
     <div
       className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
@@ -128,7 +130,7 @@ export function ZoneModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
-          {hideTitle ? <div /> : <h3 className="text-white font-medium">{title}</h3>}
+          <h3 className="text-white font-medium">{title}</h3>
           <div className="flex items-center gap-2">
             {headerActions}
             <button
@@ -244,19 +246,18 @@ export function DroppableZoneDisplay({
         </button>
       </DroppableZone>
 
-      {showModal && (
-        <ZoneModal
-          title={title}
-          zone={zone}
-          cards={cards}
-          allowZoneInteraction={allowZoneInteraction}
-          allowCardInteraction={allowZoneInteraction}
-          isOpponent={isOpponent}
-          onClose={() => setShowModal(false)}
-          upgradedCardIds={upgradedCardIds}
-          appliedUpgradesByCardId={appliedUpgradesByCardId}
-        />
-      )}
+      <ZoneModal
+        open={showModal}
+        title={title}
+        zone={zone}
+        cards={cards}
+        allowZoneInteraction={allowZoneInteraction}
+        allowCardInteraction={allowZoneInteraction}
+        isOpponent={isOpponent}
+        onClose={() => setShowModal(false)}
+        upgradedCardIds={upgradedCardIds}
+        appliedUpgradesByCardId={appliedUpgradesByCardId}
+      />
     </>
   )
 }

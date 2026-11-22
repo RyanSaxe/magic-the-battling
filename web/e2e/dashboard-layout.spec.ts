@@ -1,7 +1,8 @@
 import type { Locator, Page } from '@playwright/test'
-import { PAGES, battler, expect, openPage, test } from './helpers'
+import { PAGES, battler, expect, gameSummary, openPage, test } from './helpers'
 
 const dashboard = PAGES.find((pageUnderTest) => pageUnderTest.name === 'dashboard')!
+const cubePage = PAGES.find((pageUnderTest) => pageUnderTest.name === 'cube')!
 
 const SCREENS = [
   { name: '1280×800 laptop', viewport: { width: 1280, height: 800 } },
@@ -102,5 +103,33 @@ test.describe('1280×800 laptop with many cubes', () => {
     const titleTop = (await recentTitle.boundingBox())!.y
     expect(titleTop).toBeGreaterThanOrEqual(feltTop)
     expect(titleTop).toBeLessThan(feltTop + 60)
+  })
+})
+
+test.describe('a game card on a phone', () => {
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true })
+
+  test("cuts a long name short before the date and settings", async ({ page, baseURL }) => {
+    const longName = 'Maximilian Vanderbergh the Third'
+    const games = [{ ...gameSummary(1), best_human_name: longName }]
+    await openPage(page, baseURL!, {
+      ...cubePage,
+      serve: async (p, url) => {
+        await cubePage.serve(p, url)
+        await p.route('**/api/battlers/cube/vintage-cube/games*', (route) => route.fulfill({ json: { games, has_more: false } }))
+      },
+    })
+
+    const card = page.getByRole('article').filter({ hasText: longName })
+    const name = card.getByRole('heading', { name: longName })
+    const settings = card.getByText('Cube · Upgrades On', { exact: true })
+    await expect(settings).toBeVisible()
+    const nameBox = (await name.boundingBox())!
+    const settingsBox = (await settings.boundingBox())!
+    const cardBox = (await card.boundingBox())!
+
+    expect(await name.evaluate((element) => element.scrollWidth > element.clientWidth), 'the name is cut short').toBe(true)
+    expect(nameBox.x + nameBox.width).toBeLessThanOrEqual(settingsBox.x)
+    expect(settingsBox.x + settingsBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width)
   })
 })

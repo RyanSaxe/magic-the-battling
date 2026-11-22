@@ -1,6 +1,7 @@
 import type { SharePlayerData, SharePlayerSnapshot } from '../../types'
 import { getShareHiddenZones, getShareRoundBand } from '../../utils/share'
 import { DeckDisplay } from '../common'
+import { Banner } from '../common/Banner'
 import type { DeckDisplayResizeState } from '../common/DeckDisplay'
 
 interface ShareRoundDetailProps {
@@ -51,11 +52,7 @@ export function ShareRoundDetail({
           message: 'This resets the current deck layout for this view on this device.',
         } : undefined}
       />
-      {band && (
-        <div className="share-round-band shrink-0">
-          <span className="share-round-band-title">{band}</span>
-        </div>
-      )}
+      {band && <Banner size="compact" title={band} tone={band === 'Sudden Death' ? 'sudden-death' : 'gold'} />}
     </div>
   )
 }

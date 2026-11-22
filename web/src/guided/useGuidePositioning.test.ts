@@ -1,5 +1,6 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
-import { computeScrollDeltaForVisibility } from "./useGuidePositioning";
+import { computeScrollDeltaForVisibility, scrollTargetIntoVisibleArea } from "./useGuidePositioning";
 
 describe("computeScrollDeltaForVisibility", () => {
   const container = {
@@ -51,5 +52,38 @@ describe("computeScrollDeltaForVisibility", () => {
         left: 260,
       }),
     ).toEqual({ top: 0, left: 42 });
+  });
+});
+
+describe("scrollTargetIntoVisibleArea", () => {
+  it("never scrolls the phase timeline up or down, or past either end", () => {
+    const rect = (left: number, top: number, width: number, height: number) =>
+      ({ left, top, right: left + width, bottom: top + height }) as DOMRect;
+    const row = document.body.appendChild(document.createElement("div"));
+    row.style.overflowX = "auto";
+    row.style.overflowY = "auto";
+    row.getBoundingClientRect = () => rect(0, 10, 200, 22);
+    Object.defineProperties(row, {
+      clientWidth: { value: 200 },
+      scrollWidth: { value: 294 },
+      clientHeight: { value: 22 },
+      scrollHeight: { value: 22 },
+      scrollTop: { value: 0, writable: true },
+      scrollLeft: { value: 0, writable: true },
+    });
+    // Unlike desktop browsers, iOS can keep a scroll past a box's end, so this row doesn't clamp.
+    row.scrollBy = ((options: ScrollToOptions) => {
+      row.scrollTop += options.top ?? 0;
+      row.scrollLeft += options.left ?? 0;
+    }) as typeof row.scrollBy;
+    const step = row.appendChild(document.createElement("span"));
+
+    step.getBoundingClientRect = () => rect(0, 13, 24, 16);
+    scrollTargetIntoVisibleArea(step, row);
+    expect([row.scrollLeft, row.scrollTop]).toEqual([0, 0]);
+
+    step.getBoundingClientRect = () => rect(204, 13, 90, 16);
+    scrollTargetIntoVisibleArea(step, row);
+    expect([row.scrollLeft, row.scrollTop]).toEqual([94, 0]);
   });
 });

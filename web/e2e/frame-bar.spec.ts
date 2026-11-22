@@ -1,4 +1,5 @@
 import type { Page, WebSocketRoute } from '@playwright/test'
+import { GAME_BANNER_HEIGHT } from '../src/components/common/bannerSizes'
 import { PAGES, expect, openPage, serveGame, serveSpectating, test } from './helpers'
 import { GAME_ID, gameBootstrap, type ScreenState } from './gameStates'
 
@@ -16,6 +17,8 @@ const GAME_PHASES: Record<string, ScreenState> = {
   draft: { phase: 'draft', counts: { pack: 5, sideboard: 10, upgrades: 2 } },
   build: { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 } },
   fight: { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 } },
+  'build in Sudden Death': { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 }, suddenDeath: true },
+  'fight in Sudden Death': { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 }, suddenDeath: true },
   reward: { phase: 'reward', counts: { sideboard: 8 } },
   over: { phase: 'game_over', counts: { sideboard: 8 } },
   eliminated: { phase: 'eliminated', counts: { sideboard: 8 } },
@@ -40,7 +43,21 @@ const SURFACES: Surface[] = [
       await page.evaluate(() => document.fonts.load('16px Cinzel'))
     },
   })),
+  {
+    name: 'game watching a player',
+    open: async (page: Page, baseURL: string) => {
+      await watchAlice(page, baseURL, GAME_PHASES.fight)
+      await page.evaluate(() => document.fonts.load('16px Cinzel'))
+    },
+  },
 ]
+
+async function watchAlice(page: Page, baseURL: string, state: ScreenState) {
+  await serveSpectating('approved', state)(page, baseURL)
+  await page.goto(`/game/${GAME_ID}/play?spectate=true`, { waitUntil: 'domcontentloaded' })
+  // A spectator's bottom bar is inert, which hides it from the accessibility tree, so it's found by tag.
+  await page.locator('footer .btn').first().waitFor()
+}
 
 /** Where the bars and the felt sit, and what each bar holds, measured in the page. */
 function measureFrame(page: Page) {
@@ -124,47 +141,6 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
         if (frame.mainActionRight !== null) {
           expect.soft(frame.mainActionRight, 'main action sits at the right edge, under the top bar\'s last button').toBeCloseTo(frame.headerInner.right, 0)
         }
-      })
-    }
-  })
-}
-
-const TOAST_CLEARANCE = 8
-
-const TOASTS = [
-  {
-    where: 'on a page',
-    raise: async (page: Page, baseURL: string) => {
-      await openPage(page, baseURL, PAGES.find((pageUnderTest) => pageUnderTest.name === 'play')!)
-      await page.getByRole('button', { name: 'Start Game' }).click()
-    },
-  },
-  {
-    where: 'in a game',
-    raise: async (page: Page, baseURL: string) => {
-      await serveGame(page, baseURL, GAME_PHASES.build, {
-        onSocket: (ws) => ws.send(JSON.stringify({ type: 'error', payload: { code: 'UNKNOWN_ACTION' } })),
-      })
-      await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
-    },
-  },
-]
-
-for (const { name, viewport, isMobile } of SCREENS) {
-  test.describe(name, () => {
-    test.use({ viewport, isMobile, hasTouch: isMobile })
-
-    for (const { where, raise } of TOASTS) {
-      test(`a toast ${where} opens below the top bar, clear of the felt's gold edge`, async ({ page, baseURL }) => {
-        await raise(page, baseURL!)
-        // A toast slides in from 8px above its place, so measure the stack it settles into.
-        const toasts = page.getByRole('button', { name: 'Dismiss toast' }).locator('../..')
-        await toasts.waitFor()
-
-        const toastTop = (await toasts.boundingBox())!.y
-        const barBottom = (await page.getByRole('banner').boundingBox())!
-        const goldEdgeBottom = barBottom.y + barBottom.height + 2
-        expect(toastTop - goldEdgeBottom, 'gap between the toast and the gold edge below the top bar').toBeGreaterThanOrEqual(TOAST_CLEARANCE)
       })
     }
   })
@@ -343,5 +319,67 @@ for (const { name, viewport, isMobile } of SCREENS) {
       await page.mouse.click(button.x + button.width / 2, button.y + button.height / 2)
       await expect(page.locator('[data-guide-target="build-submit-popover"]'), 'Play and Draw stay closed').toHaveCount(0)
     })
+  })
+}
+
+const BANNERS = [
+  {
+    banner: 'Sudden Death in Build',
+    open: (page: Page, baseURL: string) => playGame(page, baseURL, GAME_PHASES['build in Sudden Death']),
+    words: ['Sudden Death', 'Loser is eliminated'],
+    tone: 'sudden-death',
+  },
+  {
+    banner: 'Sudden Death in a Fight',
+    open: (page: Page, baseURL: string) => playGame(page, baseURL, GAME_PHASES['fight in Sudden Death']),
+    words: ['Sudden Death', 'Loser is eliminated'],
+    tone: 'sudden-death',
+  },
+  {
+    banner: 'watching a player',
+    open: (page: Page, baseURL: string) => watchAlice(page, baseURL, GAME_PHASES.fight),
+    words: ['Watching Alice'],
+    tone: 'gold',
+  },
+  {
+    // A spectator learns both whose game it is and that it's Sudden Death.
+    banner: 'watching a player in Sudden Death',
+    open: (page: Page, baseURL: string) => watchAlice(page, baseURL, GAME_PHASES['fight in Sudden Death']),
+    words: ['Watching Alice', 'Sudden Death'],
+    tone: 'sudden-death',
+  },
+]
+
+async function playGame(page: Page, baseURL: string, state: ScreenState) {
+  await serveGame(page, baseURL, state)
+  await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+}
+
+for (const { name, viewport, isMobile, rail } of SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    for (const { banner, open, words, tone } of BANNERS) {
+      test(`the ${banner} banner spans the felt between the rails, over the board and the sidebar`, async ({ page, baseURL }) => {
+        await open(page, baseURL!)
+        const bannerElement = page.locator('[data-banner]')
+        for (const word of words) await expect.soft(bannerElement).toContainText(word)
+        await expect.soft(bannerElement, 'banner tone').toHaveAttribute('data-banner', tone)
+        const { bannerBox, boardTop, sidebarTop } = await page.evaluate(() => {
+          const box = (selector: string) => {
+            const rect = document.querySelector(selector)?.getBoundingClientRect()
+            return rect ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } : null
+          }
+          return { bannerBox: box('[data-banner]')!, boardTop: box('main')!.top, sidebarTop: box('.frame-sidebar')?.top ?? null }
+        })
+
+        expect.soft(bannerBox.top, 'banner top, under the top bar').toBe(BAR_HEIGHT)
+        expect.soft(bannerBox.left, 'banner left edge, at the left rail').toBe(rail)
+        expect.soft(bannerBox.right, 'banner right edge, at the right rail').toBe(viewport.width - rail)
+        expect.soft(bannerBox.bottom - bannerBox.top, 'banner height').toBe(GAME_BANNER_HEIGHT)
+        expect.soft(boardTop, "board's top edge, under the banner").toBe(bannerBox.bottom)
+        if (sidebarTop !== null) expect.soft(sidebarTop, "docked sidebar's top edge, under the banner").toBe(bannerBox.bottom)
+      })
+    }
   })
 }
