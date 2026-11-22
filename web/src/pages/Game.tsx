@@ -25,7 +25,7 @@ import { RewardPhase } from "./phases/Reward";
 import { Sidebar, type FightSidebarView, type Scouting } from "../components/sidebar";
 import { CopyWatchLink } from "../components/sidebar/CopyWatchLink";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
-import { MicToggle } from "../components/sidebar/MicToggle";
+import { MicBlockedIndicator, MicToggle } from "../components/sidebar/MicToggle";
 import { GameSummary } from "../components/GameSummary";
 import { ShareModal } from "../components/ShareModal";
 import { ActionMenu } from "../components/ActionMenu";
@@ -121,7 +121,7 @@ import {
   canUseBattleFlipAction,
   hasBattleResultConflict,
 } from "../utils/battleInteraction";
-import { getVoicePeerNames } from "../utils/voiceChat";
+import { getVoicePeerNames, isVoiceMicBlocked } from "../utils/voiceChat";
 import { DIALOG_BACKDROP, LINK, OPTION_BOX, POPOVER_CHROME, TEXT_INPUT } from "../components/common/styles";
 
 // Each area stops 3px into the life number, short of its middle even for one digit, so - and + never overlap.
@@ -923,7 +923,18 @@ function GameContent() {
     }
     if (!voiceTargetNames.has(player.name)) return null
     const peer = voiceChat.state.peers.find(p => p.name === player.name)
-    if (!peer) return null
+    if (!peer) {
+      if (!voiceChat.state.isAvailable) return null
+      return (
+        <MicToggle
+          muted={voiceChat.state.mutedPeers.has(player.name)}
+          connectionState="connecting"
+          audioLevelKey={player.name}
+          variant="player-row"
+          onClick={() => voiceChat.togglePeerMute(player.name)}
+        />
+      )
+    }
     return (
       <MicToggle
         muted={voiceChat.state.mutedPeers.has(player.name)}
@@ -2190,6 +2201,8 @@ function GameContent() {
   };
 
   const renderSidebar = (): ReactNode => {
+    const micBlocked = isVoiceMicBlocked(voiceTargetsAvailable, voiceChat.state);
+    const showWatchLink = !isSpectator && (!isEndPhase || canSpectate);
     const sidebar = (
       <Sidebar
         players={gameState.players}
@@ -2204,7 +2217,18 @@ function GameContent() {
         onScout={setScouting}
         onStopScouting={() => setScouting(null)}
         renderMicToggle={renderMicToggle}
-        watchLink={!isSpectator && (!isEndPhase || canSpectate) ? <CopyWatchLink url={watchUrl} /> : undefined}
+        watchLink={
+          micBlocked || showWatchLink ? (
+            <>
+              {micBlocked && (
+                <div className="pt-3">
+                  <MicBlockedIndicator />
+                </div>
+              )}
+              {showWatchLink && <CopyWatchLink url={watchUrl} />}
+            </>
+          ) : undefined
+        }
       />
     );
     if (!usesOverlaySidebar) return <FrameSidebar>{sidebar}</FrameSidebar>;

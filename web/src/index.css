@@ -4160,20 +4160,20 @@ input:-webkit-autofill:focus {
   min-width: 0;
 }
 
-/* Room at the start of the name line for the control that sits over it */
+/* The mic sits in the poison icon's column, the name in its number's. The level bar moves into the card's padding. */
 .player-card.has-control .player-card-line:first-child {
-  padding-left: 24px;
+  padding-left: 16px;
 }
 
 .player-card-control {
   position: absolute;
   top: 7px;
-  left: calc(var(--player-card-rank-width) + 11px);
+  left: calc(var(--player-card-rank-width) + 7px);
   display: flex;
 }
 
 .player-card.is-unranked .player-card-control {
-  left: 11px;
+  left: 7px;
 }
 
 .player-card-name {
@@ -4259,6 +4259,530 @@ input:-webkit-autofill:focus {
 .player-card.is-out .player-card-stat,
 .player-card.is-out .player-card-outlook {
   color: var(--ivory-muted);
+}
+
+/* A card that only shows someone, such as a seat, doesn't light up under the pointer */
+div.player-card-button:hover {
+  border-color: var(--gold-border);
+}
+
+/* A seat nobody has taken */
+.player-card.is-open .player-card-button {
+  border-style: dashed;
+  border-color: #756a62;
+  background: none;
+  box-shadow: none;
+}
+
+@media (hover: hover) {
+  .player-card.is-open button.player-card-button:enabled:hover {
+    border-color: var(--color-gold-dark);
+  }
+}
+
+.player-card.is-open .standings-rank {
+  border-right-style: dashed;
+  border-right-color: #756a62;
+  background: none;
+}
+
+.player-card.is-open .player-card-name {
+  color: var(--ivory-muted);
+}
+
+/* Actions sit where the odds do, so the name keeps the width it has in a game.
+   pointer-events: none lets a tap on the blank beside ? still reach the open seat button underneath. */
+.player-card-actions {
+  position: absolute;
+  top: 19px;
+  right: 1px;
+  display: flex;
+  pointer-events: none;
+}
+
+.player-card-actions > button {
+  pointer-events: auto;
+}
+
+.player-card-actions > .icon-target,
+.board-cross-space {
+  width: 32px;
+}
+
+.player-card.has-actions .player-card-line:last-child {
+  padding-right: 22px;
+}
+
+.player-card.has-actions:has(.player-card-actions > :nth-child(2)) .player-card-line:last-child {
+  padding-right: 54px;
+}
+
+/* Board on desktop (1024x640+): Play and the Lobby share the game's board and sidebar */
+.board-who {
+  width: 20px;
+  height: 20px;
+}
+
+.player-card.is-self .standings-rank > .board-who {
+  color: var(--color-gold-bright);
+}
+
+.player-card:not(.is-self) .standings-rank > .board-who {
+  color: var(--ivory-soft);
+}
+
+.board-ready {
+  color: var(--win-text);
+}
+
+@media (min-width: 1120px) {
+  .board-drawer-head {
+    display: none;
+  }
+}
+
+.setup-page.board-page {
+  padding: 0;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.board-page .btn-secondary,
+.board-aside .btn-secondary {
+  --btn-secondary-fill: var(--stone);
+  --btn-secondary-fill-hover: var(--stone-light);
+}
+
+.board-layout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.board-cube {
+  --words: 270px;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 40px;
+  min-height: 0;
+  padding: 28px 32px;
+  container-type: size;
+}
+
+/* An art crop is about 630px wide, so it stops there */
+.board-art {
+  flex: none;
+  width: min(100cqw - var(--words) - 40px, 150cqh, 630px);
+  aspect-ratio: 3 / 2;
+  border-radius: 10px;
+}
+
+.board-picture {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--art-fade);
+}
+
+.board-picture > img {
+  max-width: none;
+  filter: brightness(0.68) saturate(0.78);
+}
+
+.board-art.board-picture {
+  box-shadow: 0 0 0 1px var(--gold-border-opaque), 0 10px 28px rgba(0, 0, 0, 0.35);
+}
+
+.board-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #74917a;
+}
+
+.board-slot-entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 380px;
+  padding: 0 16px;
+}
+
+.board-slot-entry > .setup-caption {
+  color: var(--ivory-felt);
+}
+
+.board-words {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  width: 270px;
+}
+
+.board-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.board-title h2 {
+  min-width: 0;
+  color: #fffbeb;
+  font: 700 26px/30px "Cinzel", serif;
+  overflow-wrap: anywhere;
+  text-wrap: balance;
+}
+
+.board-title h2.is-long {
+  max-width: 14.5em;
+  font-size: 19px;
+  line-height: 22px;
+}
+
+.board-title-link > span {
+  font: 700 16px/1 system-ui;
+}
+
+@media (hover: hover) {
+  .board-title-link:hover {
+    color: var(--color-gold-bright);
+  }
+}
+
+.board-summary {
+  color: var(--ivory-soft);
+  text-wrap: balance;
+}
+
+.board-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 30px;
+  font-size: 11px;
+  line-height: 14px;
+  text-align: left;
+}
+
+.board-notice > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.board-code {
+  display: flex;
+  flex: none;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.board-code > div {
+  min-width: 0;
+}
+
+.board-code > .btn-pill {
+  margin-bottom: 1px;
+}
+
+.board-cube-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.board-deck {
+  width: 100%;
+  gap: 6px;
+}
+
+.board-setup {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: max(236px, 34%);
+  padding: 24px 28px;
+  border-top: 2px solid var(--gold-border-opaque);
+}
+
+.board-two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px 32px;
+  width: 100%;
+  max-width: 860px;
+}
+
+.board-layout.is-lobby .board-two {
+  min-height: 104px;
+}
+
+.board-options {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 32px;
+  align-items: center;
+  width: 100%;
+}
+
+.board-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.board-stack > .setup-pitch {
+  min-height: 38px;
+  line-height: 19px;
+}
+
+.board-page .setup-next {
+  width: 100%;
+}
+
+.board-lobby-options {
+  align-items: center;
+}
+
+.board-lobby-options > .seat-stepper {
+  height: 44px;
+  margin: 0;
+}
+
+.board-page .seat-count {
+  font-size: 13px;
+}
+
+.board-page .lobby-settings {
+  justify-content: center;
+  gap: 18px;
+  height: 44px;
+  margin: 0;
+}
+
+.board-lobby-start .lobby-actions {
+  grid-template-columns: minmax(0, 1fr);
+  align-self: stretch;
+  gap: 12px;
+  width: 100%;
+}
+
+.board-lobby-start .lobby-actions.is-guest {
+  width: 100%;
+}
+
+/* Board's right sidebar, matching the game's 242px width and card padding */
+.board-aside {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-width);
+  height: 100%;
+  min-height: 0;
+}
+
+.board-seats {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 12px 0;
+}
+
+.board-aside.is-lobby > .board-seats {
+  flex: 1;
+  padding-bottom: 12px;
+}
+
+.board-games {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 70px;
+  padding: 2px 12px 0;
+}
+
+.board-games.is-open {
+  min-height: 0;
+  padding-bottom: 10px;
+}
+
+.board-games.is-bare {
+  padding-top: 8px;
+}
+
+.board-rail-head-row {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.board-rail-head {
+  flex: none;
+  padding: 10px 0 7px;
+}
+
+.board-games-back {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.board-rail-games {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.board-game-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.board-game {
+  position: relative;
+  display: flex;
+  flex: none;
+  min-width: 0;
+  height: 60px;
+  overflow: hidden;
+  border: 1px solid #5a4d46;
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--stone), #473d37);
+  box-shadow: 0 1px 0 #0000004d, inset 0 1px 0 #ffecb51a;
+}
+
+.board-game-open {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .board-game-open:hover {
+    background: var(--stone-light);
+  }
+}
+
+.board-game-art {
+  align-self: stretch;
+  flex: none;
+  width: 40px;
+  border-right: 1px solid var(--gold-border-opaque);
+}
+
+.board-game-words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 28px 0 8px;
+  color: var(--ivory-muted);
+  font-size: 11px;
+  line-height: 13px;
+}
+
+.board-game-words b {
+  margin-bottom: 2px;
+  color: var(--ivory);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 14px;
+  text-wrap: balance;
+}
+
+.board-game-words b.is-long {
+  font-size: 12px;
+  line-height: 12px;
+}
+
+.board-game-close {
+  position: absolute;
+  top: 50%;
+  right: -5px;
+  margin-top: -22px;
+}
+
+.board-rail-none {
+  padding: 14px 10px;
+  border: 1px dashed #756a62;
+  border-radius: 8px;
+  color: var(--ivory-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* At 1024 a 32-character name gets its own line in Board */
+@media (width < 1200px) {
+  .board-setup .board-stack {
+    gap: 8px;
+  }
+
+  .board-setup .board-stack > .setup-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  .board-setup .board-stack > .setup-row > .setup-field {
+    flex-basis: 100%;
+  }
+}
+
+@media (max-height: 719px) {
+  .board-cube {
+    padding-block: 18px;
+  }
+
+  .board-setup {
+    height: 216px;
+    padding-block: 18px 12px;
+  }
+
+  .board-rail-head {
+    padding: 6px 0 4px;
+  }
+
+  .board-game-list {
+    gap: 4px;
+  }
+
+  .board-game {
+    height: 54px;
+  }
+}
+
+@media (min-width: 1920px) {
+  .board-words,
+  .board-two,
+  .board-slot-entry {
+    zoom: 1.3;
+  }
+
+  .board-cube {
+    --words: 352px;
+    gap: 56px;
+  }
 }
 
 .rotate-prompt {
