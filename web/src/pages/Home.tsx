@@ -54,8 +54,8 @@ export function Home() {
             </button>
           }
         />}
-        center
-        contentClassName="items-center pb-6"
+        scroll={false}
+        contentClassName="items-center justify-center p-4 overflow-hidden"
         shelf={
           <ResumeShelf
             seats={seats}
@@ -65,9 +65,8 @@ export function Home() {
         }
       >
         <CardShowcase />
-        {/* Phones only, where the bar has no room for Log in. mt-10 rather than mt-6 offsets the column's top
-            padding, so the showcase stays centered. */}
-        <p className="sm:hidden text-[var(--ivory-muted)] text-sm mt-10">
+        {/* Phones only, where the bar has no room for Log in. */}
+        <p className="sm:hidden shrink-0 text-[var(--ivory-muted)] text-sm mt-3 text-center">
           <Link to="/login" className={LINK}>
             Log in
           </Link>
