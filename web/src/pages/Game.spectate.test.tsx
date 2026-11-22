@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { gameBootstrap } from '../../e2e/gameStates'
 import { cancelSpectateRequest } from '../api/client'
+import { BASIC_LANDS } from '../constants/assets'
 import { FakeWebSocket } from '../test/fakeWebSocket'
 import { installMemoryLocalStorage } from '../test/memoryStorage'
 import { readTabSpectate, saveTabSpectate } from '../utils/tabSession'
@@ -103,6 +105,52 @@ describe('Game: leaving a game you watch', () => {
 
     expect(cancelRequest).toHaveBeenCalledWith('game-1', 'request-1')
     expect(screen.getByRole('button', { name: 'Open the game link' })).toBeTruthy()
+  })
+})
+
+describe('Game: watching a player build', () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    // The board measures itself, and jsdom has no ResizeObserver.
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+    FakeWebSocket.instances = []
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it("shows the player's lands as they change, whatever the spectator picks", async () => {
+    const { catalog, state } = gameBootstrap({ phase: 'build', counts: {} })
+    const withLands = (chosen_basics: string[]) => ({ ...state, self_player: { ...state.self_player, chosen_basics } })
+    const shownLands = () =>
+      screen
+        .getAllByRole<HTMLImageElement>('img')
+        .filter((image) => !image.closest('button') && BASIC_LANDS.some(({ name }) => name === image.alt))
+        .map((image) => image.alt)
+
+    saveTabSpectate('game-1', { target: 'Alice', requestId: 'request-1', sessionId: 'spectator-session' })
+    renderGame()
+    await settle()
+    act(() => FakeWebSocket.latest().serverOpen())
+    await act(async () => {
+      FakeWebSocket.latest().serverMessage({
+        type: 'game_bootstrap',
+        payload: { catalog, state: withLands(['Forest', 'Island', 'Plains']) },
+      })
+    })
+
+    fireEvent.click(screen.getByAltText('Forest'))
+    fireEvent.click(screen.getByRole('button', { name: /Swamp/ }))
+    expect(shownLands()).toEqual(['Forest', 'Island', 'Plains'])
+
+    await act(async () => {
+      FakeWebSocket.latest().serverMessage({ type: 'game_state', payload: withLands(['Mountain', 'Island', 'Plains']) })
+    })
+    expect(shownLands()).toEqual(['Mountain', 'Island', 'Plains'])
   })
 })
 

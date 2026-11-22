@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { closeSeat } from '../api/client'
 import type { ResumableSeat } from '../hooks/useResumableGames'
 import { useResumeSeat } from '../hooks/useResumeSeat'
 import { unknownToAppError, type AppError } from '../utils/appError'
-import { forgetSeatForGame, getRememberedSeat } from '../utils/deviceIdentity'
+import { getRememberedSeat } from '../utils/deviceIdentity'
+import { endSeat } from '../utils/endSeat'
 import { formatTimeSince } from '../utils/format'
 import { Dialog } from './common/Dialog'
 import { CubeArt } from './dashboard/CubeArt'
@@ -127,17 +127,12 @@ export function CloseSeatDialog({
   const close = async () => {
     setClosing(true)
     try {
-      await closeSeat(seat.gameId, seat.playerName, getRememberedSeat(seat.gameId)?.seatToken ?? '')
+      await endSeat(seat.gameId, seat.playerName, getRememberedSeat(seat.gameId)?.seatToken ?? '')
     } catch (error) {
-      const appError = unknownToAppError(error, 'default', "Couldn't close it. Try again.")
-      // A game or seat that's already gone is as closed as this could make it.
-      if (appError.code !== 'GAME_NOT_FOUND' && appError.code !== 'PLAYER_NOT_IN_GAME') {
-        setFailure(appError)
-        setClosing(false)
-        return
-      }
+      setFailure(unknownToAppError(error, 'default', "Couldn't close it. Try again."))
+      setClosing(false)
+      return
     }
-    forgetSeatForGame(seat.gameId)
     onClosed()
   }
 
