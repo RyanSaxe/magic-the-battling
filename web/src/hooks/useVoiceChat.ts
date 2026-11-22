@@ -103,6 +103,45 @@ function browserSupportsVoice(): boolean {
   return typeof navigator.mediaDevices?.getUserMedia === 'function' && typeof RTCPeerConnection !== 'undefined'
 }
 
+interface MicrophoneReply {
+  granted: (stream: MediaStream) => void
+  refused: () => void
+}
+
+class MicrophoneRequest {
+  private status: 'unasked' | 'asking' | 'refused' = 'unasked'
+  private reply: MicrophoneReply | null = null
+
+  ask(reply: MicrophoneReply) {
+    if (this.status === 'refused') return
+    this.reply = reply
+    if (this.status === 'asking') return
+    this.status = 'asking'
+    navigator.mediaDevices
+      .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false })
+      .then(
+        (stream) => {
+          this.status = 'unasked'
+          if (this.reply) this.reply.granted(stream)
+          else stream.getTracks().forEach(t => t.stop())
+        },
+        () => {
+          // A refusal nobody was waiting for was never shown, so the next need asks again.
+          this.status = this.reply ? 'refused' : 'unasked'
+          this.reply?.refused()
+        },
+      )
+  }
+
+  withdraw() {
+    this.reply = null
+  }
+
+  forgetRefusal() {
+    if (this.status === 'refused') this.status = 'unasked'
+  }
+}
+
 function createAudioLevelDetector(
   stream: MediaStream,
   onLevel: (level: number, speaking: boolean) => void,
@@ -161,6 +200,7 @@ export function useVoiceChat(
 
   const peersRef = useRef<Map<string, PeerState>>(new Map())
   const localStreamRef = useRef<MediaStream | null>(null)
+  const [microphone] = useState(() => new MicrophoneRequest())
   const mutedPeersRef = useRef<Set<string>>(getPersistedMutedPeers())
 
   const retryCountRef = useRef<Map<string, number>>(new Map())
@@ -406,6 +446,8 @@ export function useVoiceChat(
   }, [handleSignal, voiceSignalRef])
 
   useEffect(() => {
+    // Only a missing name means Voice is off: a fight against a puppet has no peers either.
+    if (!selfPlayerName) microphone.forgetRefusal()
     if (peerNames.length === 0 || !selfPlayerName) {
       for (const name of peersRef.current.keys()) {
         destroyPeer(name)
@@ -426,36 +468,7 @@ export function useVoiceChat(
       return
     }
 
-    let cancelled = false
-
-    async function reconcile() {
-      if (!localStreamRef.current) {
-        let stream: MediaStream
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true },
-            video: false,
-          })
-        } catch {
-          if (!cancelled) {
-            setState(s => ({ ...s, isAvailable: false }))
-            onPermissionDeniedRef.current?.()
-          }
-          return
-        }
-        if (cancelled) {
-          stream.getTracks().forEach(t => t.stop())
-          return
-        }
-        localStreamRef.current = stream
-        if (getPersistedMute()) {
-          const track = stream.getAudioTracks()[0]
-          if (track) track.enabled = false
-        }
-        startSpeakingDetection(stream)
-      }
-
-      const stream = localStreamRef.current!
+    function connectPeers(stream: MediaStream) {
       const currentNames = new Set(peersRef.current.keys())
       const desiredNames = new Set(peerNames)
 
@@ -473,10 +486,28 @@ export function useVoiceChat(
       }
     }
 
-    reconcile()
+    if (localStreamRef.current) {
+      connectPeers(localStreamRef.current)
+      return
+    }
 
-    return () => { cancelled = true }
-  }, [peerNames, selfPlayerName, createPeerConnection, destroyPeer, startSpeakingDetection, stopSpeakingDetection])
+    microphone.ask({
+      granted: (stream) => {
+        localStreamRef.current = stream
+        if (getPersistedMute()) {
+          const track = stream.getAudioTracks()[0]
+          if (track) track.enabled = false
+        }
+        startSpeakingDetection(stream)
+        connectPeers(stream)
+      },
+      refused: () => {
+        setState(s => ({ ...s, isAvailable: false }))
+        onPermissionDeniedRef.current?.()
+      },
+    })
+    return () => microphone.withdraw()
+  }, [microphone, peerNames, selfPlayerName, createPeerConnection, destroyPeer, startSpeakingDetection, stopSpeakingDetection])
 
   useEffect(() => {
     const timers = retryTimerRef.current

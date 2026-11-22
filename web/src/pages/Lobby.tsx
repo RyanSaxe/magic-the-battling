@@ -324,7 +324,8 @@ export function Lobby() {
     addToast(`Voice connection to ${peerName} failed.`, "warning")
   }, [addToast])
 
-  const voiceChat = useVoiceChat(send, peerNames, selfName, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
+  const voiceName = lobbyState?.voice_chat_enabled ? selfName : null
+  const voiceChat = useVoiceChat(send, peerNames, voiceName, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
 
   const [copied, setCopied] = useState(false);
   const [showRulesPanel, setShowRulesPanel] = useState(false);
