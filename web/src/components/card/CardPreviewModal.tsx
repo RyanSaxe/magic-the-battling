@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
 import type { Card as CardType } from '../../types'
+import { formatCounter } from '../../utils/counters'
 
 interface CardPreviewModalProps {
   card: CardType
   appliedUpgrades: CardType[]
+  counters?: Record<string, number>
   onClose: () => void
 }
 
-export function CardPreviewModal({ card, appliedUpgrades, onClose }: CardPreviewModalProps) {
+export function CardPreviewModal({ card, appliedUpgrades, counters = {}, onClose }: CardPreviewModalProps) {
   const [isFlipped, setIsFlipped] = useState(false)
+  const counterEntries = Object.entries(counters)
+  const imageHeight = counterEntries.length > 0 ? 'max-h-[72vh]' : 'max-h-[80vh]'
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -30,7 +34,7 @@ export function CardPreviewModal({ card, appliedUpgrades, onClose }: CardPreview
   return (
     <div
       data-card-preview-modal="true"
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-[101]"
+      className="fixed inset-0 bg-black/60 flex flex-col items-center justify-center z-[101]"
       onClick={onClose}
     >
       <div
@@ -40,7 +44,7 @@ export function CardPreviewModal({ card, appliedUpgrades, onClose }: CardPreview
         <img
           src={getImageUrl(card, isFlipped)}
           alt={card.name}
-          className="max-h-[80vh] min-w-0 shrink shadow-2xl"
+          className={`${imageHeight} min-w-0 shrink shadow-2xl`}
           style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw`, borderRadius: 'var(--card-border-radius)' }}
         />
         {appliedUpgrades.length > 0 && (
@@ -51,7 +55,7 @@ export function CardPreviewModal({ card, appliedUpgrades, onClose }: CardPreview
                 key={upgrade.id}
                 src={getImageUrl(upgrade, isFlipped)}
                 alt={upgrade.name}
-                className="max-h-[80vh] min-w-0 shrink shadow-2xl"
+                className={`${imageHeight} min-w-0 shrink shadow-2xl`}
                 style={{ maxWidth: `${Math.floor(90 / (1 + appliedUpgrades.length))}vw`, borderRadius: 'var(--card-border-radius)' }}
               />
             ))}
@@ -73,6 +77,13 @@ export function CardPreviewModal({ card, appliedUpgrades, onClose }: CardPreview
           </button>
         )}
       </div>
+      {counterEntries.length > 0 && (
+        <div className="preview-counters" onClick={(e) => e.stopPropagation()}>
+          {counterEntries.map(([type, count]) => (
+            <span key={type} className="counter-chip">{formatCounter(type, count)}</span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

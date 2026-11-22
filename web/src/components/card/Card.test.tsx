@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import type { Card as CardType } from '../../types'
 import { Card } from './Card'
 import { CardPreviewContext } from './CardPreviewContext'
+import { CardPreviewModal } from './CardPreviewModal'
 
 // A touch screen: utils/inputMode reads matchMedia when it is imported, and jsdom has none.
 vi.hoisted(() => {
@@ -41,7 +42,10 @@ function BattlefieldCard({ onTap, onPreview }: { onTap: () => void; onPreview: (
   )
 }
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
 
 it("taps a card on a double tap whose second tap lands on the magnifier the first tap revealed", () => {
   const onTap = vi.fn()
@@ -58,4 +62,33 @@ it("taps a card on a double tap whose second tap lands on the magnifier the firs
   expect(onTap).toHaveBeenCalledTimes(1)
   expect(card.classList.contains('selected')).toBe(false)
   expect(onPreview).not.toHaveBeenCalled()
+})
+
+function CardWithItsZoom({ counters }: { counters: Record<string, number> }) {
+  const [zoomed, setZoomed] = useState<{ card: CardType; counters?: Record<string, number> } | null>(null)
+  return (
+    <CardPreviewContext.Provider value={{ setPreviewCard: (card, _upgrades, counters) => setZoomed(card && { card, counters }) }}>
+      <Card card={ANCIENT_TOMB} dimensions={{ width: 40, height: 56 }} selected counters={counters} />
+      {zoomed && <CardPreviewModal {...zoomed} appliedUpgrades={[]} onClose={() => setZoomed(null)} />}
+    </CardPreviewContext.Provider>
+  )
+}
+
+it("shows a name too long for the card as its number, and every counter in full in the zoom", () => {
+  // jsdom has no canvas, so every character here is half as wide as the text is tall.
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    font: '',
+    measureText(this: { font: string }, text: string) {
+      return { width: (text.length * parseFloat(this.font.replace(/^600 /, ''))) / 2 }
+    },
+  } as unknown as CanvasRenderingContext2D)
+  render(<CardWithItsZoom counters={{ '-1/-1': 1, 'Indestructible Shield': 3 }} />)
+
+  expect(screen.queryByText('3')).not.toBeNull()
+  expect(screen.queryByText('3 Indestructible Shield')).toBeNull()
+  expect(screen.getAllByText('\u22121/\u22121')).toHaveLength(1)
+
+  fireEvent.click(screen.getByTitle('Preview card'))
+  expect(screen.getAllByText('\u22121/\u22121')).toHaveLength(2)
+  expect(screen.queryByText('3 Indestructible Shield')).not.toBeNull()
 })
