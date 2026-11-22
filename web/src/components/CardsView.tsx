@@ -22,6 +22,10 @@ function colorSortKey(colors: string[]): number {
   return colors.length * 10 + (minIndex >= 0 ? minIndex : 9)
 }
 
+function withoutCaseOrAccents(text: string): string {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+}
+
 export function CardsView({
   gameId,
   which,
@@ -81,12 +85,12 @@ export function CardsView({
   }
 
   const allCards = which === 'cards' ? data?.cards ?? [] : data?.upgrades ?? []
-  const nameLower = searchName.toLowerCase()
+  const nameSought = withoutCaseOrAccents(searchName)
   const typeLower = searchType.toLowerCase()
   const textLower = searchText.toLowerCase()
 
   const filtered = allCards.filter((card) => {
-    if (nameLower && !card.name.toLowerCase().includes(nameLower)) return false
+    if (nameSought && !withoutCaseOrAccents(card.name).includes(nameSought)) return false
     if (typeLower && !card.type_line.toLowerCase().includes(typeLower)) return false
     if (textLower && !(card.oracle_text?.toLowerCase().includes(textLower) ?? false)) return false
     if (selectedColors.size > 0) {

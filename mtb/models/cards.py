@@ -1,4 +1,5 @@
 import random
+import unicodedata
 from typing import TYPE_CHECKING, Any, Required, Unpack
 
 from pydantic import BaseModel, Field, PrivateAttr, computed_field, model_serializer, model_validator
@@ -274,6 +275,12 @@ def build_battler(
         original_cards=list(cards),
         original_upgrades=list(upgrades),
     )
+
+
+def fold_card_name(name: str) -> str:
+    """The name without case or accents, the form CubeCobra's name_lower has."""
+    decomposed = unicodedata.normalize("NFD", name)
+    return "".join(char for char in decomposed if not "\u0300" <= char <= "\u036f").lower()
 
 
 def _normalize_card_name(name: str) -> str:
