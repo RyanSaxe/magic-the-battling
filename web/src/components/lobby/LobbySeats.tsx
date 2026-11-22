@@ -83,8 +83,8 @@ function PuppetStatus({ index, available }: { index: number; available: number |
   if (available === null) {
     return (
       <>
-        <Spinner className="mr-1 inline h-2.5 w-2.5" />
-        Searching
+        <Spinner className="mr-1 inline h-2.5 w-2.5 max-[390px]:hidden" />
+        Finding
       </>
     )
   }

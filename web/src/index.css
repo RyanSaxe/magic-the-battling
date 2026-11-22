@@ -1046,6 +1046,9 @@ input:-webkit-autofill:focus {
    one height at every width and state, and the rows below keep room for their fullest state, so nothing moves. */
 @layer components {
   .setup-page {
+    /* Above the tips rail's enlarged arrows, which would take taps meant for the bottom row */
+    position: relative;
+    z-index: 2;
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -1108,7 +1111,7 @@ input:-webkit-autofill:focus {
     display: flex;
     align-items: center;
     gap: 9px;
-    max-width: calc(100% - 100px);
+    max-width: calc(100% - 84px);
     height: 44px;
   }
 
@@ -1147,7 +1150,8 @@ input:-webkit-autofill:focus {
   }
 
   .cube-banner-arrow {
-    font: 13px system-ui;
+    font-family: system-ui;
+    font-size: 13px;
   }
 
   .is-long .cube-banner-arrow,
@@ -1456,6 +1460,7 @@ input:-webkit-autofill:focus {
     display: grid;
     flex: 0 1 auto;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: max-content;
     align-content: start;
     gap: 4px 6px;
     min-height: 0;
@@ -1467,7 +1472,6 @@ input:-webkit-autofill:focus {
     align-items: center;
     min-width: 0;
     min-height: 50px;
-    overflow: hidden;
     padding-left: 9px;
     border-radius: 8px;
   }
@@ -1524,8 +1528,19 @@ input:-webkit-autofill:focus {
   }
 
   .seat-add {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
     align-self: stretch;
-    min-height: 44px;
+  }
+
+  /* Over the seat's 1px edge, which the 44px targets share */
+  .seat-add::before {
+    content: "";
+    position: absolute;
+    inset: -1px 0;
   }
 
   .seat-add:hover:not(:disabled) .seat-status {
@@ -1544,8 +1559,8 @@ input:-webkit-autofill:focus {
     outline-offset: -2px;
   }
 
-  .seat > .icon-target + .icon-target {
-    margin-left: -2px;
+  .seat > button:not(.seat-add) {
+    margin-block: -1px;
   }
 
   .is-compact .seat,
@@ -1627,7 +1642,8 @@ input:-webkit-autofill:focus {
     }
   }
 
-  @media (max-width: 374px) {
+  /* Six characters of code, "Copied!" and the stepper share one row */
+  @media (max-width: 389px) {
     .join-code {
       letter-spacing: 0.04em;
     }
@@ -1638,7 +1654,24 @@ input:-webkit-autofill:focus {
     }
   }
 
+  @media (max-width: 374px) {
+    .cube-banner-name.is-long {
+      font-size: 14px;
+      line-height: 14px;
+    }
+  }
+
   @media (max-width: 359px) {
+    /* The narrowest band has room for the longest names or their tag */
+    .cube-banner-title:has(.is-longest) .tag {
+      display: none;
+    }
+
+    .cube-banner-name.is-longest {
+      font-size: 9.5px;
+      line-height: 10px;
+    }
+
     .cube-banner-strip {
       gap: 4px;
       padding-left: 8px;
@@ -2332,9 +2365,15 @@ input:-webkit-autofill:focus {
   cursor: default;
 }
 
-@media (max-width: 359px) {
+@media (max-width: 374px) {
   .cube-banner-strip .btn.btn-pill:not(.btn-pill-square) {
     padding: 0 7px;
+  }
+}
+
+@media (max-width: 359px) {
+  .btn.btn-pill-square {
+    margin-inline: 5px;
   }
 
   .setup-next small {

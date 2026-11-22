@@ -67,7 +67,7 @@ export function InfoTip({ label, text }: { label: string; text: string }) {
         }}
         className="icon-target"
       >
-        <InfoIcon size="md" />
+        <InfoIcon size="md" className="h-3.5 w-3.5" />
       </button>
       {/* Out of the setup screens' scroll and zoom, which would clip and misplace it */}
       {placement &&

@@ -27,7 +27,7 @@ import {
   setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
 } from "../utils/deviceIdentity";
-import { DIALOG_BACKDROP } from "../components/common/styles";
+import { DIALOG_BACKDROP, POPOVER_CHROME } from "../components/common/styles";
 
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 const PUPPET_HELP: RulesPanelTarget = { docId: "faq", tab: "why-are-my-opponents-cards-face-up" };
@@ -400,7 +400,7 @@ export function Lobby() {
     <>
       {!isConnected && (
         <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
-          <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
+          <div className={`${POPOVER_CHROME} px-5 py-3 flex items-center gap-3`}>
             <Spinner className="h-4 w-4 shrink-0 text-[var(--color-gold)]" />
             <span className="text-sm text-[var(--ivory)]">Reconnecting...</span>
           </div>
