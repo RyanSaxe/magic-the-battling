@@ -20,7 +20,11 @@ vi.hoisted(() => {
 
 const toasts: string[] = []
 
-vi.mock('../api/client', () => ({ rejoinGame: vi.fn(), getServerStatus: vi.fn(async () => null) }))
+vi.mock('../api/client', () => ({
+  rejoinGame: vi.fn(),
+  getServerStatus: vi.fn(async () => null),
+  getCubeSummary: vi.fn(async () => ({ cube_name: 'Crucible', cube_image_uri: null })),
+}))
 vi.mock('../contexts', () => ({ useToast: () => ({ addToast: (message: string) => toasts.push(message) }) }))
 vi.mock('../contexts/authState', () => ({ useAuth: () => ({ user: null, loading: false }) }))
 
@@ -132,6 +136,32 @@ describe('Lobby: starting the game', () => {
   })
 })
 
+describe('Lobby: a refused deck', () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    FakeWebSocket.instances = []
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it("doesn't head the lobby as if it had loaded", async () => {
+    const socket = await openLobbyAs('host')
+    const [host, guest] = lobby().players
+    const refused = { ...host, is_ready: false, battler_id: 'banned-deck', battler_status: 'error' as const, battler_error: 'A card is banned.' }
+    send(socket, { type: 'lobby_state', payload: lobby({ play_mode: 'constructed', can_start: false, players: [refused, guest] }) })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+
+    expect(screen.getByRole('heading', { name: 'No deck yet' })).toBeTruthy()
+  })
+})
+
 describe('Lobby: hotkeys beside the Guide', () => {
   beforeEach(() => {
     installMemoryLocalStorage()
@@ -167,5 +197,31 @@ describe('Lobby: hotkeys beside the Guide', () => {
     fireEvent.click(button('Minimize guide'))
     press('?')
     expect(screen.queryByRole('button', { name: 'Open guide' })).toBeNull()
+  })
+})
+
+describe('Lobby: inviting', () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    FakeWebSocket.instances = []
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it('copies the link to join this lobby', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const socket = await openLobbyAs('host')
+    send(socket, { type: 'lobby_state', payload: lobby() })
+
+    await act(async () => fireEvent.click(button('Copy')))
+
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/game/game-1/lobby`)
+    expect(button('Copied!')).toBeTruthy()
   })
 })

@@ -21,7 +21,7 @@ export function BrandLockup() {
             an MtG format
           </span>
         </div>
-        <p className="hero-tagline !text-[8px] sm:!text-[9px] !tracking-[0.12em] truncate max-[359px]:hidden">
+        <p className="hero-tagline !text-[8px] sm:!text-[9px] !tracking-[0.12em] max-[390px]:!tracking-[0.06em] max-[375px]:!tracking-[0.02em] truncate max-[360px]:hidden">
           Inspired by Roguelikes and Autobattlers
         </p>
       </div>

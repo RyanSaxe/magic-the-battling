@@ -4,7 +4,7 @@ import { type VoicePeer, getAudioLevel } from '../../hooks/useVoiceChat'
 interface MicToggleProps {
   muted: boolean
   onClick: (e: React.MouseEvent) => void
-  variant?: 'default' | 'player-row'
+  variant?: 'default' | 'player-row' | 'seat'
   audioLevelKey?: string
   connectionState?: VoicePeer['connectionState']
   remoteMuted?: boolean
@@ -31,8 +31,13 @@ function getMicVisual(props: Pick<MicToggleProps, 'muted' | 'connectionState' | 
   return { icon: 'mic', color: 'text-[var(--color-gold)] hover:text-[var(--color-gold-bright)]', animation: '', title: 'Mute' }
 }
 
+function sizeClasses(variant: MicToggleProps['variant'], showsLevel: boolean) {
+  if (variant === 'seat') return 'h-11 w-11 -ml-2 shrink-0 justify-center gap-0.5 py-2.5 focus-visible:-outline-offset-4'
+  if (variant === 'player-row') return `h-6 shrink-0 justify-start ${showsLevel ? 'w-5 gap-0.5' : 'w-4'}`
+  return `h-6 justify-center ${showsLevel ? 'w-7 gap-0.5' : 'w-6'}`
+}
+
 export function MicToggle({ muted, onClick, variant = 'default', audioLevelKey, connectionState, remoteMuted }: MicToggleProps) {
-  const isPlayerRow = variant === 'player-row'
   const visual = getMicVisual({ muted, connectionState, remoteMuted })
   const barRef = useRef<HTMLSpanElement>(null)
 
@@ -62,11 +67,7 @@ export function MicToggle({ muted, onClick, variant = 'default', audioLevelKey, 
         e.stopPropagation()
         onClick(e)
       }}
-      className={`relative inline-flex items-center rounded transition-colors ${
-        isPlayerRow
-          ? `h-6 shrink-0 justify-start ${audioLevelKey ? 'w-5 gap-0.5' : 'w-4'}`
-          : `h-6 justify-center ${audioLevelKey ? 'w-7 gap-0.5' : 'w-6'}`
-      } ${visual.color}${visual.animation ? ` ${visual.animation}` : ''}`}
+      className={`relative inline-flex items-center rounded transition-colors ${sizeClasses(variant, !!audioLevelKey)} ${visual.color}${visual.animation ? ` ${visual.animation}` : ''}`}
       title={visual.title}
     >
       {audioLevelKey && <span ref={barRef} className="mic-level-bar" />}

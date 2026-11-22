@@ -6,10 +6,13 @@ import { getRememberedSeat } from '../utils/deviceIdentity'
 import { endSeat } from '../utils/endSeat'
 import { formatTimeSince } from '../utils/format'
 import { Dialog } from './common/Dialog'
+import { CubeArt } from './dashboard/CubeArt'
+import { CrossIcon } from './icons/CrossIcon'
 
 const ROWS_SHOWN = 2
-const CLOSE_COLUMN = '-mr-2 ml-1.5 w-11 shrink-0'
-const SECTION_CAPTION = 'text-[10px] leading-4 font-bold uppercase tracking-[0.12em] text-[var(--ivory-muted)]'
+const CLOSE_COLUMN = 'w-11 shrink-0'
+// A longer cube name takes two lines in a shelf row, whose height is fixed.
+const ONE_LINE_TITLE = 24
 
 function StatusDot({ kind }: { kind: ResumableSeat['kind'] }) {
   return (
@@ -36,35 +39,33 @@ function closeWords(seat: ResumableSeat) {
 }
 
 function SeatArt({ seat }: { seat: ResumableSeat }) {
-  return (
-    <span className="h-10 w-10 shrink-0 overflow-hidden rounded-md border gold-border bg-[var(--art-fade)] max-[359px]:hidden">
-      {seat.cubeImageUri && <img src={seat.cubeImageUri} alt="" className="h-full w-full object-cover" />}
-    </span>
-  )
+  return <span className="resume-art">{seat.cubeImageUri && <CubeArt src={seat.cubeImageUri} />}</span>
 }
 
-/**
- * The cube, then one line that never wraps: the player's name is cut first, and the word Stage goes on a narrow
- * line, so the stage and time always show whole.
- */
-function SeatSummary({ seat }: { seat: ResumableSeat }) {
+/** The cube, then whose seat it is and where it stands. A line that doesn't fit wraps between those, never inside. */
+function SeatSummary({ seat, lead }: { seat: ResumableSeat; lead?: string }) {
   return (
-    <span className="@container block min-w-0 flex-1 text-left">
-      <span className="block truncate text-sm leading-5 font-semibold text-[var(--ivory)]">{seatTitle(seat)}</span>
-      <span className="flex min-w-0 whitespace-nowrap text-xs leading-4 text-[var(--ivory-muted)]">
-        <span className="min-w-0 truncate">{seat.playerName}</span>
-        <span className="shrink-0">
-          <span className="whitespace-pre"> · </span>
-          {seat.kind === 'lobby' ? (
-            seat.joinCode ? `Lobby ${seat.joinCode}` : 'Lobby'
-          ) : (
-            <>
-              <span className="whitespace-pre @max-[184px]:hidden">Stage </span>
-              {seat.stage}-{seat.round}
-              {seat.lastActiveAt && <span className="whitespace-pre"> · {formatTimeSince(seat.lastActiveAt)}</span>}
-            </>
-          )}
-        </span>
+    <span className="resume-summary">
+      <span className="resume-title">{seatTitle(seat)}</span>
+      <span className="resume-detail">
+        {lead && `${lead} `}
+        {seat.playerName}
+        {' · '}
+        {seat.kind === 'lobby' ? (
+          <span className="whitespace-nowrap">{seat.joinCode ? `Lobby ${seat.joinCode}` : 'Lobby'}</span>
+        ) : (
+          <>
+            <span className="whitespace-nowrap">
+              Stage {seat.stage}-{seat.round}
+            </span>
+            {seat.lastActiveAt && (
+              <>
+                {' · '}
+                <span className="whitespace-nowrap">{formatTimeSince(seat.lastActiveAt)}</span>
+              </>
+            )}
+          </>
+        )}
       </span>
     </span>
   )
@@ -77,32 +78,29 @@ function ResumeRow({
 }: {
   seat: ResumableSeat
   hasCloseColumn: boolean
-  onClose: () => void
+  onClose: (seat: ResumableSeat) => void
 }) {
   const resume = useResumeSeat()
   return (
-    <li className="flex items-stretch border-t gold-divider first:border-t-0">
+    <li className={`resume-row ${seatTitle(seat).length > ONE_LINE_TITLE ? 'is-long' : ''}`}>
       <button
         type="button"
         onClick={() => resume(seat)}
         aria-label={`${actionWord(seat)} ${seatTitle(seat)} as ${seat.playerName}`}
-        className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2.5 rounded py-1.5 hover:bg-[var(--stone)] hover:[--ivory-muted:var(--ivory-soft)]"
+        className="resume-open"
       >
         <SeatArt seat={seat} />
-        <SeatSummary seat={seat} />
-        <span className="shrink-0 text-xs font-semibold text-[var(--ivory)]">
-          <span className="max-sm:hidden">{actionWord(seat)} </span>
-          <span aria-hidden="true" className="text-base leading-none">›</span>
-        </span>
+        <SeatSummary seat={seat} lead={`${actionWord(seat)} as`} />
+        <span aria-hidden="true" className="resume-chevron">›</span>
       </button>
       {seat.canClose ? (
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => onClose(seat)}
           aria-label={`${seat.kind === 'game' ? 'Close' : 'Leave'} ${seatTitle(seat)} as ${seat.playerName}`}
-          className={`${CLOSE_COLUMN} relative flex items-center justify-center text-sm text-[var(--ivory-muted)] before:absolute before:inset-y-3 before:left-0 before:w-px before:bg-[var(--gold-border)] before:opacity-40 hover:text-[var(--ivory)]`}
+          className="icon-target self-center"
         >
-          ✕
+          <CrossIcon />
         </button>
       ) : (
         hasCloseColumn && <span aria-hidden="true" className={CLOSE_COLUMN} />
@@ -112,7 +110,7 @@ function ResumeRow({
 }
 
 /** Asks before this browser's seat ends for good, and says why when it can't. */
-function CloseSeatDialog({
+export function CloseSeatDialog({
   seat,
   onKeep,
   onClosed,
@@ -166,51 +164,63 @@ function CloseSeatDialog({
   )
 }
 
-/** The lobbies and games this browser or its account can go back to, a line each, above the setup for a new game. */
-export function ResumeRows({ seats }: { seats: ResumableSeat[] }) {
-  const [showsAll, setShowsAll] = useState(false)
-  const [confirming, setConfirming] = useState<ResumableSeat | null>(null)
-  const [closedIds, setClosedIds] = useState<string[]>([])
-  const open = seats.filter((seat) => !closedIds.includes(seat.gameId))
-  if (open.length === 0) return null
-
-  const shown = showsAll ? open : open.slice(0, ROWS_SHOWN)
-  const hasCloseColumn = open.some((seat) => seat.canClose)
+/**
+ * Play's shelf of the games and lobbies this browser can go back to: two of them, or the first and a way to the rest.
+ * It keeps their room when there are fewer, so nothing above it moves as they load or close.
+ */
+export function ResumeShelf({
+  seats,
+  onClose,
+  onShowAll,
+}: {
+  seats: ResumableSeat[]
+  onClose: (seat: ResumableSeat) => void
+  onShowAll: (byKeyboard: boolean) => void
+}) {
+  const hasMore = seats.length > ROWS_SHOWN
+  const shown = hasMore ? seats.slice(0, 1) : seats
+  const hasCloseColumn = seats.some((seat) => seat.canClose)
   return (
-    <section aria-label="In progress" className="mb-3">
-      <h2 className={SECTION_CAPTION}>In progress</h2>
-      <ul>
-        {shown.map((seat) => (
-          <ResumeRow
-            key={seat.gameId}
-            seat={seat}
-            hasCloseColumn={hasCloseColumn}
-            onClose={() => setConfirming(seat)}
-          />
+    <div className="resume-space">
+      {seats.length > 0 && (
+        <section aria-label="In progress" className="resume-shelf">
+          <ul className={`resume-items ${hasCloseColumn ? '' : 'has-no-close'}`}>
+            {shown.map((seat) => (
+              <ResumeRow key={seat.gameId} seat={seat} hasCloseColumn={hasCloseColumn} onClose={onClose} />
+            ))}
+            {hasMore && (
+              <li className="resume-row">
+                <button
+                  type="button"
+                  onClick={(event) => onShowAll(event.detail === 0)}
+                  className={`resume-open ${hasCloseColumn ? 'has-close-space' : ''}`}
+                >
+                  <SeatArt seat={seats[1]} />
+                  <span className="resume-summary">
+                    <span className="resume-title">{seats.length - 1} more games</span>
+                    <span className="resume-detail">Show all {seats.length} games to resume</span>
+                  </span>
+                  <span aria-hidden="true" className="resume-chevron">›</span>
+                </button>
+              </li>
+            )}
+          </ul>
+        </section>
+      )}
+    </div>
+  )
+}
+
+/** Every game and lobby this browser can go back to, in place of the setup for a new game. */
+export function ResumeList({ seats, onClose }: { seats: ResumableSeat[]; onClose: (seat: ResumableSeat) => void }) {
+  const hasCloseColumn = seats.some((seat) => seat.canClose)
+  return (
+    <section aria-label="In progress" className="resume-all">
+      <ul className={`resume-items ${hasCloseColumn ? '' : 'has-no-close'}`}>
+        {seats.map((seat) => (
+          <ResumeRow key={seat.gameId} seat={seat} hasCloseColumn={hasCloseColumn} onClose={onClose} />
         ))}
       </ul>
-      {shown.length < open.length && (
-        <button
-          type="button"
-          onClick={() => setShowsAll(true)}
-          className="flex h-9 w-full items-center justify-between border-t gold-divider text-xs font-semibold text-[var(--ivory)] max-sm:h-11"
-        >
-          {open.length - shown.length} more <span aria-hidden="true" className="text-base leading-none">▾</span>
-        </button>
-      )}
-      <div className="border-t gold-border pt-3">
-        <h2 className={SECTION_CAPTION}>New game</h2>
-      </div>
-      {confirming && (
-        <CloseSeatDialog
-          seat={confirming}
-          onKeep={() => setConfirming(null)}
-          onClosed={() => {
-            setClosedIds((ids) => [...ids, confirming.gameId])
-            setConfirming(null)
-          }}
-        />
-      )}
     </section>
   )
 }
