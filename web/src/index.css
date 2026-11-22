@@ -1566,6 +1566,14 @@ input:-webkit-autofill:focus {
   animation-composition: add;
 }
 
+/* Paused part way, rather than switched off, so the glow still shows over the button's raise. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-gentle-glow {
+    animation-delay: -0.75s;
+    animation-play-state: paused;
+  }
+}
+
 .mic-level-bar {
   width: 2px;
   align-self: stretch;
