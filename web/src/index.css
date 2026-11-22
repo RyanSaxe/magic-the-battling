@@ -695,6 +695,13 @@ input:-webkit-autofill:focus {
   color: var(--ivory);
 }
 
+.btn.side-panel-home {
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  line-height: 1;
+}
+
 .side-panel-body {
   flex: 1;
   min-height: 0;
