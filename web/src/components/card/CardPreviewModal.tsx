@@ -57,8 +57,9 @@ export function CardPreviewModal({ card, appliedUpgrades, onClose }: CardPreview
             ))}
           </>
         )}
+        {/* The box pads the image by 16px, so right-0 centres the × on the image's corner, as -top-4 does above it. */}
         <button
-          className="absolute -top-4 -right-4 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/80"
+          className="absolute -top-4 right-0 bg-black/60 text-white rounded-full w-8 h-8 flex items-center justify-center hover:bg-black/80"
           onClick={onClose}
         >
           &times;
