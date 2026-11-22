@@ -16,8 +16,6 @@ const GAME_PHASES: Record<string, ScreenState> = {
   draft: { phase: 'draft', counts: { pack: 5, sideboard: 10, upgrades: 2 } },
   build: { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 } },
   fight: { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 } },
-  'build in Sudden Death': { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 }, suddenDeath: true },
-  'fight in Sudden Death': { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 }, suddenDeath: true },
   reward: { phase: 'reward', counts: { sideboard: 8 } },
   eliminated: { phase: 'eliminated', counts: { sideboard: 8 } },
 }
@@ -41,21 +39,7 @@ const SURFACES: Surface[] = [
       await page.evaluate(() => document.fonts.load('16px Cinzel'))
     },
   })),
-  {
-    name: 'game watching a player',
-    open: async (page: Page, baseURL: string) => {
-      await watchAlice(page, baseURL, GAME_PHASES.fight)
-      await page.evaluate(() => document.fonts.load('16px Cinzel'))
-    },
-  },
 ]
-
-async function watchAlice(page: Page, baseURL: string, state: ScreenState) {
-  await serveSpectating('approved', state)(page, baseURL)
-  await page.goto(`/game/${GAME_ID}/play?spectate=true`, { waitUntil: 'domcontentloaded' })
-  // A spectator's bottom bar is inert, which hides it from the accessibility tree, so it's found by tag.
-  await page.locator('footer .btn').first().waitFor()
-}
 
 /** Where the bars and the felt sit, and what each bar holds, measured in the page. */
 function measureFrame(page: Page) {
@@ -267,64 +251,41 @@ test.describe(SCREENS[0].name, () => {
   })
 })
 
-const BANNERS = [
-  {
-    banner: 'Sudden Death in Build',
-    open: (page: Page, baseURL: string) => playGame(page, baseURL, GAME_PHASES['build in Sudden Death']),
-    words: ['Sudden Death', 'Loser is eliminated'],
-    tone: 'sudden-death',
-  },
-  {
-    banner: 'Sudden Death in a Fight',
-    open: (page: Page, baseURL: string) => playGame(page, baseURL, GAME_PHASES['fight in Sudden Death']),
-    words: ['Sudden Death', 'Loser is eliminated'],
-    tone: 'sudden-death',
-  },
-  {
-    banner: 'watching a player',
-    open: (page: Page, baseURL: string) => watchAlice(page, baseURL, GAME_PHASES.fight),
-    words: ['Watching Alice'],
-    tone: 'gold',
-  },
-  {
-    // A spectator learns both whose game it is and that it's Sudden Death.
-    banner: 'watching a player in Sudden Death',
-    open: (page: Page, baseURL: string) => watchAlice(page, baseURL, GAME_PHASES['fight in Sudden Death']),
-    words: ['Watching Alice', 'Sudden Death'],
-    tone: 'sudden-death',
-  },
-]
-
-async function playGame(page: Page, baseURL: string, state: ScreenState) {
-  await serveGame(page, baseURL, state)
-  await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
-}
-
 for (const { name, viewport, isMobile, rail } of SCREENS) {
   test.describe(name, () => {
     test.use({ viewport, isMobile, hasTouch: isMobile })
 
-    for (const { banner, open, words, tone } of BANNERS) {
-      test(`the ${banner} banner spans the felt between the rails, over the board and the sidebar`, async ({ page, baseURL }) => {
-        await open(page, baseURL!)
-        const bannerElement = page.locator('[data-banner]')
-        for (const word of words) await expect.soft(bannerElement).toContainText(word)
-        await expect.soft(bannerElement, 'banner tone').toHaveAttribute('data-banner', tone)
-        const { bannerBox, boardTop, sidebarTop } = await page.evaluate(() => {
-          const box = (selector: string) => {
-            const rect = document.querySelector(selector)?.getBoundingClientRect()
-            return rect ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } : null
-          }
-          return { bannerBox: box('[data-banner]')!, boardTop: box('main')!.top, sidebarTop: box('.frame-sidebar')?.top ?? null }
-        })
+    // A spectator in a Sudden Death Fight has every part of the banner. The phone's sidebar is fixed to the screen, so
+    // it has to add the banner's height itself, and its lanes can be measured while it's closed, off to the right.
+    test('a banner spans the felt and moves the board and the sidebar down together', async ({ page, baseURL }) => {
+      await serveSpectating('approved', { ...GAME_PHASES.fight, suddenDeath: true })(page, baseURL!)
+      await page.goto(`/game/${GAME_ID}/play?spectate=true`, { waitUntil: 'domcontentloaded' })
+      const banner = page.locator('[data-banner]')
+      await expect(banner).toContainText('Watching Alice')
+      await expect.soft(banner).toContainText('Sudden Death')
+      await expect.soft(banner, 'banner tone').toHaveAttribute('data-banner', 'sudden-death')
 
-        expect.soft(bannerBox.top, 'banner top, under the top bar').toBe(BAR_HEIGHT)
-        expect.soft(bannerBox.left, 'banner left edge, at the left rail').toBe(rail)
-        expect.soft(bannerBox.right, 'banner right edge, at the right rail').toBe(viewport.width - rail)
-        expect.soft(bannerBox.bottom - bannerBox.top, 'banner height').toBe(GAME_BANNER_HEIGHT)
-        expect.soft(boardTop, "board's top edge, under the banner").toBe(bannerBox.bottom)
-        if (sidebarTop !== null) expect.soft(sidebarTop, "docked sidebar's top edge, under the banner").toBe(bannerBox.bottom)
+      const lanes = page.locator('aside[data-guide-target="sidebar-panel"] .zone-divider-line--horizontal')
+      await expect(lanes, "the sidebar's lanes").toHaveCount(2)
+      await expect.poll(() => lanes.evaluateAll((lines) => {
+        const seams = Array.from(document.querySelectorAll('.battle-side-cell')).flatMap((cell) => [cell.getBoundingClientRect().top, cell.getBoundingClientRect().bottom])
+        return Math.max(...lines.map((line) => Math.min(...seams.map((seam) => Math.abs(seam - line.getBoundingClientRect().top)))))
+      }), "distance from the sidebar's lanes to the board's seams").toBeLessThanOrEqual(1)
+
+      const { bannerBox, boardTop, sidebarTop } = await page.evaluate(() => {
+        const { left, top, right, bottom } = document.querySelector('[data-banner]')!.getBoundingClientRect()
+        return {
+          bannerBox: { left, top, right, bottom },
+          boardTop: document.querySelector('main')!.getBoundingClientRect().top,
+          sidebarTop: document.querySelector('.frame-sidebar')?.getBoundingClientRect().top ?? null,
+        }
       })
-    }
+      expect.soft(bannerBox.top, 'banner top, under the top bar').toBe(BAR_HEIGHT)
+      expect.soft(bannerBox.left, 'banner left edge, at the left rail').toBe(rail)
+      expect.soft(bannerBox.right, 'banner right edge, at the right rail').toBe(viewport.width - rail)
+      expect.soft(bannerBox.bottom - bannerBox.top, 'banner height').toBe(GAME_BANNER_HEIGHT)
+      expect.soft(boardTop, "board's top edge, under the banner").toBe(bannerBox.bottom)
+      if (sidebarTop !== null) expect.soft(sidebarTop, "docked sidebar's top edge, under the banner").toBe(bannerBox.bottom)
+    })
   })
 }

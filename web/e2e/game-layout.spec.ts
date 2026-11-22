@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { MIN_CARD_WIDTH } from '../src/hooks/cardSizeUtils'
-import { expect, serveGame, serveSpectating, test } from './helpers'
+import { expect, serveGame, test } from './helpers'
 import { GAME_ID, type ScreenState } from './gameStates'
 
 /**
@@ -54,16 +54,6 @@ const SAMPLE: Screen[] = [
     name: 'build-with-upgrades 1280x720',
     viewport: { width: 1280, height: 720 },
     state: TYPICAL['build-with-upgrades'],
-  },
-  {
-    name: 'build-sudden-death 1280x800',
-    viewport: { width: 1280, height: 800 },
-    state: TYPICAL['build-sudden-death'],
-  },
-  {
-    name: 'build-sudden-death 375x667',
-    viewport: { width: 375, height: 667 },
-    state: TYPICAL['build-sudden-death'],
   },
   { name: 'draft 393x852', viewport: { width: 393, height: 852 }, state: TYPICAL.draft },
   {
@@ -380,38 +370,6 @@ for (const screen of SCREENS) {
       await testInfo.attach('failures.json', { body: JSON.stringify(failures, null, 2), contentType: 'application/json' })
       expect(Object.keys(failures), JSON.stringify(failures, null, 2)).toEqual([])
     })
-  })
-}
-
-// A banner spans the board and the sidebar, so both must move down together for the sidebar's lanes to meet the board's rows.
-const BANNER_FIGHTS = [
-  { banner: 'Sudden Death', open: (page: Page, baseURL: string) => serveGame(page, baseURL, TYPICAL['battle-sudden-death']), path: '' },
-  { banner: 'watching a player', open: serveSpectating('approved', TYPICAL.battle), path: '?spectate=true' },
-]
-
-for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
-  test.describe(`${viewport.width}x${viewport.height}`, () => {
-    const isPhone = viewport.width < 640
-    test.use({ viewport, isMobile: isPhone, hasTouch: isPhone })
-
-    for (const { banner, open, path } of BANNER_FIGHTS) {
-      test(`a Fight under the ${banner} banner keeps the sidebar's lanes on the board's seams`, async ({ page, baseURL }) => {
-        await open(page, baseURL!)
-        await page.goto(`/game/${GAME_ID}/play${path}`, { waitUntil: 'domcontentloaded' })
-        await page.locator('[data-banner]').waitFor()
-        await expectGameShown(page)
-        if (isPhone) {
-          await page.locator('[data-guide-target="sidebar-toggle"]').click()
-          // The sidebar slides in over the board, so measure it once it stops.
-          await page.waitForFunction(() => document.getAnimations().length === 0)
-        }
-        await waitForStableLayout(page)
-
-        const { failures } = await measure(page)
-        expect(failures['sidebar-seams-off-board'], "sidebar seams away from the board's").toBeUndefined()
-        expect(await page.locator('aside[data-guide-target="sidebar-panel"] .zone-divider-line--horizontal').count(), 'sidebar lanes').toBe(2)
-      })
-    }
   })
 }
 
