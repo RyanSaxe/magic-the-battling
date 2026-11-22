@@ -2546,7 +2546,10 @@ function GameContent() {
           sideboardCount={current_battle.your_zones.sideboard.length}
           opponentSideboardCount={current_battle.opponent_full_sideboard?.length ?? 0}
           onAction={(action, cardId, data) => actions.battleUpdateCardState(action, cardId, data)}
-          onMove={(cardId, fromZone, toZone, fromOwner, toOwner) => actions.battleMove(cardId, fromZone, toZone, fromOwner, toOwner)}
+          onMove={(cardId, fromZone, toZone, fromOwner, toOwner) => {
+            actions.battleMove(cardId, fromZone, toZone, fromOwner, toOwner)
+            setBattleSelectedCard(null)
+          }}
           onUntapAll={handleUntapAll}
           onUntapOpponentAll={handleUntapOpponentAll}
           onShowSideboard={() => toggleZonePanel('sideboard', 'player')}
