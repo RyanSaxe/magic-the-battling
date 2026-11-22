@@ -46,6 +46,10 @@ function getLatestRoundValue(rounds: SharePlayerSnapshot[]): string {
   return latest ? getShareRoundValue(latest) : ''
 }
 
+function scrollToCenter(option: HTMLButtonElement | null) {
+  option?.scrollIntoView({ block: 'center' })
+}
+
 function RoundPopover({
   options,
   selectedRound,
@@ -79,11 +83,12 @@ function RoundPopover({
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-4 left-2 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 w-max min-w-[180px] max-h-[300px] overflow-y-auto"
+      className="absolute bottom-full mb-4 left-2 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 w-max min-w-[180px] max-h-[calc(100dvh-2*var(--frame-bar-height)-1rem)] overflow-y-auto"
     >
       {options.map((opt) => (
         <button
           key={opt.value}
+          ref={opt.value === selectedRound ? scrollToCenter : undefined}
           onClick={() => {
             onSelect(opt.value)
             onClose()
