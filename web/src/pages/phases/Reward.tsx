@@ -8,6 +8,7 @@ import {
   THE_VANQUISHER_IMAGE,
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
+import { useElementHeight } from "../../hooks/useElementHeight";
 import { usePersistedConstraints, type BoardSize } from "../../hooks/usePersistedConstraints";
 import { useResizableLayout } from "../../hooks/useResizableLayout";
 import type { GameState, Card as CardType } from "../../types";
@@ -148,11 +149,13 @@ export function RewardPhase({
   );
 
   const activeConstraints = hasUpgradeSection ? constraints : null;
+  const [progressionRef, progressionNoteHeight] = useElementHeight();
   const layoutConfig = rewardLayoutConfig({
     rewardCount: rewardsCount,
     hasUpgradeSection,
     upgradeCount: available_upgrades.length,
     poolCount,
+    progressionNoteHeight,
   });
 
   const { containerRef, dims, containerSize, zoneFrames, zoneRefs, dividerCallbacks } =
@@ -201,7 +204,7 @@ export function RewardPhase({
     rewards: rewardsStyle,
     upgrades: upgradesStyle,
     pool: poolStyle,
-  } = rewardZoneStyles(zoneFrames, hasUpgradeSection);
+  } = rewardZoneStyles(zoneFrames, hasUpgradeSection, progressionNoteHeight);
 
   void last_battle_result;
 
@@ -227,20 +230,20 @@ export function RewardPhase({
 
         <div
           ref={setRewardsNode}
-          className="zone-pack w-full px-3 pt-5 pb-3 relative"
+          className="zone-pack w-full px-3 pt-5 pb-3 relative flex flex-col"
           style={rewardsStyle}
           data-guide-target="reward-summary"
         >
           <ZoneLabel>Loot</ZoneLabel>
           {rewardItems.length === 0 ? (
-            <div className="flex items-center justify-center min-h-full">
+            <div className="flex flex-1 min-h-0 items-center justify-center">
               <EmptyZoneTile
                 dimensions={rewardsDims}
                 label="No loot this round"
               />
             </div>
           ) : !hasUpgradeSection ? (
-            <div className="flex items-center justify-center min-h-full">
+            <div className="flex flex-1 min-h-0 items-center justify-center">
               <CardGrid columns={dims.rewards.columns} cardWidth={rewardsDims.width}>
                 {rewardItems.map((item) => (
                   <Card
@@ -274,13 +277,15 @@ export function RewardPhase({
               ))}
             </CardGrid>
           )}
-          <div
-            data-guide-target="reward-progression"
-            className="mt-4 rounded-lg border border-amber-500/15 bg-black/25 px-3 py-2 text-center text-xs text-[var(--ivory-muted)]"
-          >
-            <span className="text-amber-300 font-medium">Round progression:</span>{" "}
-            the third round of each stage adds The Vanquisher, increases starting hand size by 1, and advances you to the next stage.
-            {hasUpgradeSection ? " This stage-end wrap-up also includes an upgrade choice." : ""}
+          <div ref={progressionRef} className="shrink-0 pt-4">
+            <div
+              data-guide-target="reward-progression"
+              className="rounded-lg border border-amber-500/15 bg-black/25 px-3 py-2 text-center text-xs text-[var(--ivory-muted)]"
+            >
+              <span className="text-amber-300 font-medium">Round progression:</span>{" "}
+              the third round of each stage adds The Vanquisher, increases starting hand size by 1, and advances you to the next stage.
+              {hasUpgradeSection ? " This stage-end wrap-up also includes an upgrade choice." : ""}
+            </div>
           </div>
         </div>
 

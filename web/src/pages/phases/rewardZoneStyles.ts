@@ -14,16 +14,18 @@ const fillStyle = (height: number): CSSProperties => ({
 /**
  * Styles for the Round Wrap-Up zones. The lowest zone grows into whatever height
  * the layout leaves over, so no strip of the seam colour shows below it: the pool
- * under an upgrade section, and otherwise the Loot zone on its own.
+ * under an upgrade section, and otherwise the Loot zone on its own. The Loot zone
+ * also holds the round progression note under its cards, which the layout leaves
+ * room for outside the zones' frames.
  */
 export function rewardZoneStyles(
   zoneFrames: ZoneFrameResult,
   hasUpgradeSection: boolean,
+  progressionNoteHeight: number,
 ): Record<"rewards" | "upgrades" | "pool", CSSProperties> {
+  const rewardsHeight = zoneFrames.rewards.outerHeight + progressionNoteHeight;
   return {
-    rewards: hasUpgradeSection
-      ? fixedStyle(zoneFrames.rewards.outerHeight)
-      : fillStyle(zoneFrames.rewards.outerHeight),
+    rewards: hasUpgradeSection ? fixedStyle(rewardsHeight) : fillStyle(rewardsHeight),
     upgrades: fixedStyle(zoneFrames.upgrades.outerHeight),
     pool: fillStyle(zoneFrames.pool.outerHeight),
   };
