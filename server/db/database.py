@@ -3,11 +3,12 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Any, cast
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import ColumnElement, Index, create_engine, func, select, text
 from sqlalchemy.orm import sessionmaker
 
-from server.db.models import Base
+from server.db.models import LOWERCASE_UNIQUE_USER_INDEXES, Base
 
 if db_path := os.getenv("DATABASE_PATH"):
     DATA_DIR = Path(db_path).parent
@@ -70,8 +71,39 @@ def init_db():
         _migrate(conn, "battle_snapshots", "opponent_name", "TEXT")
         _migrate(conn, "battle_snapshots", "sudden_death_build", "INTEGER")
 
+    _add_lowercase_user_indexes()
     _backfill_game_cube_ids()
     _backfill_cube_metadata()
+
+
+def _add_lowercase_user_indexes() -> None:
+    """Add every index in LOWERCASE_UNIQUE_USER_INDEXES that's missing, or none if some accounts break one of them."""
+    with engine.connect() as conn:
+        existing = set(conn.execute(text("SELECT name FROM sqlite_master WHERE type = 'index'")).scalars())
+        missing = [index for index in LOWERCASE_UNIQUE_USER_INDEXES if index.name not in existing]
+        if not missing:
+            return
+        # pysqlite opens a transaction only before INSERT, UPDATE or DELETE, so without this the check and each
+        # CREATE INDEX would commit on their own.
+        conn.exec_driver_sql("BEGIN IMMEDIATE")
+        clashes = {index.name: _count_case_clashes(conn, index) for index in missing}
+        if any(clashes.values()):
+            conn.rollback()
+            logging.getLogger(__name__).error(
+                "Did not create %s: some accounts differ only by case (%s). Sign-up and login still ignore case.",
+                " or ".join(str(name) for name in clashes),
+                ", ".join(f"{name}: {count} group(s)" for name, count in clashes.items()),
+            )
+            return
+        for index in missing:
+            index.create(conn)
+        conn.commit()
+
+
+def _count_case_clashes(conn, index: Index) -> int:
+    lowered = cast(ColumnElement[Any], index.expressions[0])
+    clashing = select(lowered).group_by(lowered).having(func.count(lowered) > 1).subquery()
+    return conn.execute(select(func.count()).select_from(clashing)).scalar_one()
 
 
 def _backfill_game_cube_ids() -> None:

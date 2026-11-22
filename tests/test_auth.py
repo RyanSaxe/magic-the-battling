@@ -1,10 +1,17 @@
 import importlib
+import logging
 
 import pytest
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 
+import server.db.database as db_module
 import server.routers.auth as auth_router
 import server.services.auth as auth_service
 from server import runtime_config
+from server.db.models import Base
+
+LOWERCASE_INDEXES = {"ix_users_username_lower", "ix_users_email_lower"}
 
 
 def _register(client, username: str, email: str):
@@ -126,3 +133,61 @@ class TestCaseInsensitiveAccounts:
             assert response.status_code == 200
             assert response.json()["username"] == "Jace_Fan"
             assert response.json()["email"] == "Jace.Fan@Test.com"
+
+    def test_the_database_rejects_accounts_that_differ_only_by_case(self, test_db):
+        db = db_module.SessionLocal()
+        try:
+            auth_service.create_user(db, "jace_fan", "password123", "jace@test.com")
+            with pytest.raises(IntegrityError):
+                auth_service.create_user(db, "JACE_FAN", "password123", "other@test.com")
+            db.rollback()
+            with pytest.raises(IntegrityError):
+                auth_service.create_user(db, "someone_else", "password123", "JACE@test.com")
+        finally:
+            db.close()
+
+
+def _database_from_before_the_indexes(tmp_path, accounts: list[tuple[str, str]]):
+    engine = create_engine(f"sqlite:///{tmp_path / 'old.db'}")
+    Base.metadata.create_all(bind=engine)
+    with engine.begin() as conn:
+        for name in LOWERCASE_INDEXES:
+            conn.execute(text(f"DROP INDEX {name}"))
+        for number, (username, email) in enumerate(accounts):
+            conn.execute(
+                text("INSERT INTO users (id, username, email, password_hash) VALUES (:id, :username, :email, 'x')"),
+                {"id": f"user-{number}", "username": username, "email": email},
+            )
+    return engine
+
+
+def _index_names(engine) -> set[str]:
+    with engine.connect() as conn:
+        return set(conn.execute(text("SELECT name FROM sqlite_master WHERE type = 'index'")).scalars())
+
+
+def test_init_db_adds_the_lowercase_indexes_to_an_existing_database(tmp_path, monkeypatch):
+    engine = _database_from_before_the_indexes(tmp_path, [("jace_fan", "jace@test.com")])
+    monkeypatch.setattr(db_module, "engine", engine)
+
+    db_module.init_db()
+    db_module.init_db()
+
+    assert _index_names(engine) >= LOWERCASE_INDEXES
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(text("INSERT INTO users (id, username, password_hash) VALUES ('user-new', 'Jace_Fan', 'x')"))
+
+
+def test_init_db_adds_neither_index_while_accounts_differ_only_by_case(tmp_path, monkeypatch, caplog):
+    accounts = [("jace_fan", "jace@test.com"), ("someone_else", "JACE@test.com")]
+    engine = _database_from_before_the_indexes(tmp_path, accounts)
+    monkeypatch.setattr(db_module, "engine", engine)
+
+    with caplog.at_level(logging.ERROR, logger="server.db.database"):
+        db_module.init_db()
+
+    assert not LOWERCASE_INDEXES & _index_names(engine)
+    assert "ix_users_username_lower: 0 group(s)" in caplog.text
+    assert "ix_users_email_lower: 1 group(s)" in caplog.text
+    with engine.connect() as conn:
+        assert conn.execute(text("SELECT COUNT(*) FROM users")).scalar_one() == len(accounts)
