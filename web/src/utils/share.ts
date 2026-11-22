@@ -22,7 +22,10 @@ export function getShareHiddenZones(snapshot: SharePlayerSnapshot): ShareHiddenZ
 }
 
 /** The band under a round: why the server hid it while the game goes on, else whether it was a Sudden Death build. */
-export function getShareRoundBand(player: SharePlayerData, snapshot: SharePlayerSnapshot): string | null {
+export function getShareRoundBand(
+  player: SharePlayerData,
+  snapshot: SharePlayerSnapshot,
+): 'Still Fighting' | 'Game in Progress' | 'Sudden Death' | null {
   if (snapshot.visibility === 'hidden') {
     return player.final_placement === null ? 'Still Fighting' : 'Game in Progress'
   }

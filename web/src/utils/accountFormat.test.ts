@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { GameSummary } from '../types'
 import type { ResumableSeat } from '../hooks/useResumableGames'
-import { cubeTitle, formatWhen, gameMeta, resumeDetail, resumeHeadline, seatsLabel, winsLabel } from './accountFormat'
+import { cubeTitle, formatWhen, modeLabel, resumeDetail, resumeHeadline, seatsLabel, winsLabel } from './accountFormat'
 
 const now = Date.parse('2026-11-21T12:00:00Z')
 
@@ -32,25 +31,14 @@ describe('seatsLabel', () => {
   })
 })
 
-describe('gameMeta', () => {
-  const game: GameSummary = {
-    game_id: 'g1',
-    created_at: '2026-11-19T12:00:00Z',
-    player_count: 4,
-    human_count: 1,
-    best_human_name: 'kestrel',
-    best_human_placement: 1,
-    cube_id: 'vintage',
-    play_mode: 'constructed',
-    hand_scryfall_ids: [],
-  }
-
-  it('names the mode as players see it, the table and the date', () => {
-    expect(gameMeta(game, now)).toBe('Deck · 1 human, 3 puppets · Nov 19')
+describe('modeLabel', () => {
+  it('names the mode as players see it', () => {
+    expect(modeLabel('constructed')).toBe('Deck')
+    expect(modeLabel('limited')).toBe('Cube')
   })
 
   it('treats a game saved without a mode as a Cube game', () => {
-    expect(gameMeta({ ...game, play_mode: undefined }, now)).toBe('Cube · 1 human, 3 puppets · Nov 19')
+    expect(modeLabel(undefined)).toBe('Cube')
   })
 })
 

@@ -333,9 +333,9 @@ export type SpectateAnswer = 'pending' | 'denied' | 'expired' | 'approved'
  * Opens a game to watch, at /game/:id/play?spectate=true. With an answer, this tab has already asked to watch Alice,
  * and the server gives that answer; an approved request watches Alice's Build.
  */
-export function serveSpectating(answer?: SpectateAnswer) {
+export function serveSpectating(answer?: SpectateAnswer, screen: ScreenState = { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 } }) {
   return async (page: Page, baseURL: string) => {
-    await serveGame(page, baseURL, { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 } })
+    await serveGame(page, baseURL, screen)
     await page.route((url) => new URL(url).pathname.startsWith(`/api/games/${GAME_ID}/`), (route) => {
       const { pathname } = new URL(route.request().url())
       if (pathname.endsWith('/status')) {

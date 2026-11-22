@@ -1,18 +1,10 @@
 import type { ReactNode } from "react";
-import type { LastResult, PlayerView } from "../types";
-import {
-  GhostIcon,
-  HourglassIcon,
-  MoneyBagIcon,
-  PoisonIcon,
-  PuppetIcon,
-  SkullIcon,
-} from "./icons";
+import type { Phase, PlayerView } from "../types";
+import { MoneyBagIcon, PoisonIcon } from "./icons";
 import { useContextStrip } from "../contexts";
-import { PlacementTag, Tag } from "./common/Tag";
-import { getSidebarPlacementRank } from "../utils/playerPlacement";
-import { getSidebarPlayerOrder } from "../utils/playerPlacement";
-import { getPlayerPhaseStatusLabel } from "../utils/format";
+import { StandingsRank } from "./common/StandingsRank";
+import { getLastResultWord } from "../utils/format";
+import { getSidebarPlacementRank, getSidebarPlayerOrder, isSidebarLastPlace } from "../utils/playerPlacement";
 
 interface PlayerListProps {
   players: PlayerView[];
@@ -24,94 +16,74 @@ export const PLAYER_ROW_STACK_CLASS = "space-y-3";
 
 type ShareResultStatus = "viewing" | "alive" | "dead";
 
-function ResultBadge({
-  result,
-  inSuddenDeath,
-  shareStatus,
-}: {
-  result: LastResult | null;
-  inSuddenDeath: boolean;
-  shareStatus?: ShareResultStatus;
-}) {
-  const resultClassName = "min-w-[1.25rem]";
+/** Alive, fighting on as the Ghost (the most recently eliminated player), or out of the game. */
+type Standing = "alive" | "ghost" | "out";
 
-  if (shareStatus === "viewing") {
-    return <Tag tone="gold" small quiet dot>Viewing</Tag>;
-  }
+const ACTIVITY_WORDS: Partial<Record<Phase, string>> = {
+  draft: "Drafting",
+  build: "Building",
+  battle: "Fighting",
+  reward: "Wrap-Up",
+  awaiting_elimination: "Waiting",
+  winner: "Winner",
+};
 
-  if (shareStatus === "alive") {
-    return <Tag tone="emerald" small quiet dot>Alive</Tag>;
-  }
-
-  if (shareStatus === "dead") {
-    return <Tag tone="crimson" small quiet dot>Dead</Tag>;
-  }
-
-  if (inSuddenDeath) {
-    return <Tag tone="crimson" small quiet title="Sudden Death" className={resultClassName}>SD</Tag>;
-  }
-
-  if (result === null) {
-    return <Tag tone="stone" small quiet className={resultClassName}>-</Tag>;
-  }
-
-  if (result === "win") {
-    return <Tag tone="emerald" small quiet className={resultClassName}>W</Tag>;
-  }
-
-  if (result === "draw") {
-    return <Tag tone="gold" small quiet className={resultClassName}>D</Tag>;
-  }
-
-  return <Tag tone="crimson" small quiet className={resultClassName}>L</Tag>;
+function getStanding(player: PlayerView, shareStatus: ShareResultStatus | undefined): Standing {
+  if (shareStatus) return shareStatus === "dead" ? "out" : "alive";
+  if (!player.is_ghost) return "alive";
+  return player.is_most_recent_ghost ? "ghost" : "out";
 }
 
-function PairingProbability({ probability }: { probability: number }) {
-  return (
-    <span className="text-[10px] text-[var(--ivory-muted)]">
-      {Math.round(probability * 100)}%
-    </span>
-  );
-}
-
-function StatusLine({
+/** Who a player is when that matters, or else what they're doing now. */
+function StatusLabel({
   player,
+  standing,
   variant,
+  isSelected,
 }: {
   player: PlayerView;
+  standing: Standing;
   variant: "game" | "share";
+  isSelected: boolean;
 }) {
-  const iconWrapClassName = "inline-flex h-4 w-[1.25rem] items-center justify-center";
-
-  if (variant === "share") {
-    return player.is_puppet
-      ? <span className={iconWrapClassName}><PuppetIcon size="sm" /></span>
-      : <span className="block truncate text-right">{player.stage}-{player.round}</span>;
+  if (standing === "out") {
+    // A shared game shows the round each player went out in, since the viewer moves between rounds.
+    const round = variant === "share" ? ` at ${player.stage}-${player.round}` : "";
+    return <span className="player-card-label player-card-label-out">Out{round}</span>;
   }
+  if (standing === "ghost") return <span className="player-card-label">Ghost</span>;
+  if (player.is_puppet) return <span className="player-card-label">Puppet</span>;
 
-  if (player.is_ghost && !player.is_most_recent_ghost) {
-    return <span className={iconWrapClassName}><SkullIcon size="sm" /></span>;
-  }
-
-  if (player.is_most_recent_ghost) {
-    return <span className={iconWrapClassName}><GhostIcon size="sm" /></span>;
-  }
-
-  if (player.phase === "awaiting_elimination") {
-    return <span className={iconWrapClassName}><HourglassIcon size="sm" /></span>;
-  }
-
-  if (player.is_puppet) {
-    return <span className={iconWrapClassName}><PuppetIcon size="sm" /></span>;
-  }
-
-  return (
-    <span className="block truncate text-right">
-      {player.stage}-{player.round} @ {getPlayerPhaseStatusLabel(player.phase, player.build_ready)}
-    </span>
-  );
+  const activity = player.phase === "build" && player.build_ready ? "Ready" : ACTIVITY_WORDS[player.phase];
+  if (variant === "game" && activity) return <span className="player-card-label">{activity}</span>;
+  if (isSelected) return <span className="player-card-label player-card-label-viewing">Viewing</span>;
+  return null;
 }
 
+/** The end of the stats line: Sudden Death, which fixes the next pairing, or else the chance of facing this player. */
+function Outlook({
+  player,
+  standing,
+  variant,
+  isSelf,
+}: {
+  player: PlayerView;
+  standing: Standing;
+  variant: "game" | "share";
+  isSelf: boolean;
+}) {
+  if (variant === "share") return null;
+  if (player.in_sudden_death) {
+    return <span className="player-card-label player-card-label-out" title="Sudden Death">SD</span>;
+  }
+  if (isSelf || standing === "out" || player.pairing_probability === null) return null;
+  return <span title="Chance you face them next">{Math.round(player.pairing_probability * 100)}%</span>;
+}
+
+/**
+ * A player's card. The card is one button that selects the player, and an optional control such as the mic sits
+ * beside it, over a space kept free at the start of the name line, because a button can't hold another button.
+ */
 export function PlayerRow({
   player,
   players,
@@ -133,70 +105,48 @@ export function PlayerRow({
   micToggle?: ReactNode;
   showPlacement?: boolean;
 }) {
-  const isSelf = player.name === currentPlayerName;
-  const showPairingProbability =
-    variant !== "share" && !isSelf && (!player.is_ghost || player.is_most_recent_ghost);
-  const showLeadingMicToggle = variant === "game" && !!micToggle;
+  const isSelf = variant === "game" && player.name === currentPlayerName;
+  const standing = getStanding(player, variant === "share" ? shareStatus : undefined);
+  const rank = showPlacement ? getSidebarPlacementRank(player, players) : null;
+  const cardClassName = [
+    "player-card",
+    rank === null && "is-unranked",
+    isSelf && "is-self",
+    standing !== "alive" && "is-out",
+    micToggle && "has-control",
+  ].filter(Boolean).join(" ");
 
   return (
-    <button
-      type="button"
-      className={`relative grid w-full appearance-none overflow-hidden border-none bg-transparent grid-cols-[minmax(0,1fr)_max-content] grid-rows-2 items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2.5 text-left transition-colors player-row-etched ${
-        isSelected ? "ring-1 ring-[var(--color-gold)]/60" : ""
-      } ${player.is_ghost ? "opacity-50" : ""}`}
-      data-guide-player-row={player.name}
-      onClick={onClick}
-    >
-      <div className="min-w-0 self-end">
-        <div className="flex items-center gap-1.5">
-          {showPlacement && (
-            <PlacementTag rank={getSidebarPlacementRank(player, players)} total={players.length} />
-          )}
-          {showLeadingMicToggle ? micToggle : null}
-          <span className="block truncate text-sm font-medium text-amber-50">
-            {player.name}
+    <div className={cardClassName} data-guide-player-row={player.name}>
+      <button type="button" className="player-card-button" aria-pressed={isSelected} onClick={onClick}>
+        {rank !== null && <StandingsRank rank={rank} isLast={isSidebarLastPlace(player, players)} />}
+        <span className="player-card-body">
+          <span className="player-card-line">
+            <span className="player-card-name">{player.name}</span>
+            {player.last_result && (
+              <span className={`player-card-result player-card-result-${player.last_result}`} title="Last fight">
+                {getLastResultWord(player.last_result)}
+              </span>
+            )}
           </span>
-          {!showLeadingMicToggle ? micToggle : null}
-        </div>
-      </div>
-
-      <div className="justify-self-end self-end max-w-[8.5rem] text-xs text-[var(--ivory-muted)]">
-        <ResultBadge
-          result={player.last_result}
-          inSuddenDeath={player.in_sudden_death}
-          shareStatus={variant === "share" ? shareStatus : undefined}
-        />
-      </div>
-
-      <div className="min-w-0 self-start">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-          <span
-            className="inline-flex items-center gap-1 text-purple-300/90"
-            title="Poison"
-          >
-            <PoisonIcon size="sm" /> {player.poison}
+          <span className="player-card-line">
+            <span className="player-card-stat" title="Poison">
+              <PoisonIcon size="sm" />
+              {player.poison}
+            </span>
+            <span className="player-card-stat" title="Treasures">
+              <MoneyBagIcon size="sm" />
+              {player.treasures}
+            </span>
+            <StatusLabel player={player} standing={standing} variant={variant} isSelected={isSelected} />
+            <span className="player-card-outlook">
+              <Outlook player={player} standing={standing} variant={variant} isSelf={isSelf} />
+            </span>
           </span>
-          <span
-            className="inline-flex items-center gap-1 text-amber-300/90"
-            title="Treasures"
-          >
-            <MoneyBagIcon size="sm" /> {player.treasures}
-          </span>
-          {variant !== "share" && isSelf && (
-            <Tag tone="gold" small>You</Tag>
-          )}
-          {showPairingProbability && player.pairing_probability !== null && (
-            <PairingProbability probability={player.pairing_probability} />
-          )}
-        </div>
-      </div>
-
-      <div className="justify-self-end self-start max-w-[8.5rem] min-w-0 text-xs text-[var(--ivory-muted)]">
-        <div className="text-right">
-          <StatusLine player={player} variant={variant} />
-        </div>
-      </div>
-    </button>
+        </span>
+      </button>
+      {micToggle && <span className="player-card-control">{micToggle}</span>}
+    </div>
   );
 }
 
