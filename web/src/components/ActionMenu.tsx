@@ -1,8 +1,9 @@
-import { useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
 import { useFaceDown } from '../contexts/faceDownState'
 import { useOpenSubmenus } from '../hooks/useOpenSubmenus'
+import { MenuPrompt } from './common/MenuPrompt'
 import type { BattleSelectedCard } from '../pages/phases/Battle'
 import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../utils/battleInteraction'
 
@@ -49,7 +50,7 @@ interface ActionMenuProps {
 
 type SubmenuType = 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo' | 'rollDie'
 
-const COUNTER_TYPES = ['+1/+1', '-1/-1', 'Loyalty', 'Charge', 'Custom']
+const COUNTER_TYPES = ['+1/+1', '-1/-1', 'Loyalty', 'Charge']
 const DIE_SIDES = [2, 4, 6, 8, 10, 12, 20]
 
 export function ActionMenu({
@@ -74,6 +75,8 @@ export function ActionMenu({
   onClose,
 }: ActionMenuProps) {
   const { isOpen, toggle } = useOpenSubmenus<SubmenuType>()
+  const [namingCounter, setNamingCounter] = useState(false)
+  const [sizingDie, setSizingDie] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   // The menu sits on the Actions button and grows upward, so a submenu would move every row above the one clicked.
@@ -195,17 +198,20 @@ export function ActionMenu({
                     {COUNTER_TYPES.map(type => (
                       <MenuItem
                         key={type}
-                        label={type === 'Custom' ? 'Custom...' : type}
-                        onClick={() => {
-                          if (type === 'Custom') {
-                            const name = prompt('Enter counter name:')
-                            if (name) handleAction('counter', { counter_type: name, delta: 1 })
-                          } else {
-                            handleAction('counter', { counter_type: type, delta: 1 })
-                          }
-                        }}
+                        label={type}
+                        onClick={() => handleAction('counter', { counter_type: type, delta: 1 })}
                       />
                     ))}
+                    {namingCounter ? (
+                      <MenuPrompt
+                        label="Counter name"
+                        action="Add"
+                        onSubmit={(name) => handleAction('counter', { counter_type: name, delta: 1 })}
+                        onCancel={() => setNamingCounter(false)}
+                      />
+                    ) : (
+                      <MenuItem label="Custom..." onClick={() => setNamingCounter(true)} />
+                    )}
                   </Submenu>
                 )}
 
@@ -321,20 +327,20 @@ export function ActionMenu({
                   }}
                 />
               ))}
-              <DieButton
-                label="Custom…"
-                onClick={() => {
-                  const input = prompt('Number of sides:')
-                  if (input) {
-                    const sides = parseInt(input, 10)
-                    if (sides > 0) {
-                      onRollDie(sides)
-                      onClose()
-                    }
-                  }
-                }}
-              />
+              <DieButton label="Custom…" onClick={() => setSizingDie(true)} />
             </div>
+            {sizingDie && (
+              <MenuPrompt
+                label="Number of sides"
+                action="Roll"
+                numeric
+                onSubmit={(sides) => {
+                  onRollDie(parseInt(sides, 10))
+                  onClose()
+                }}
+                onCancel={() => setSizingDie(false)}
+              />
+            )}
           </Submenu>
         )}
 
