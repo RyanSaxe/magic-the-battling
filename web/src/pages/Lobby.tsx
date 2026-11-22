@@ -32,7 +32,6 @@ import { DIALOG_BACKDROP, POPOVER_CHROME } from "../components/common/styles";
 import { copyText } from "../utils/clipboard";
 
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
-const PUPPET_HELP: RulesPanelTarget = { docId: "faq", tab: "why-are-my-opponents-cards-face-up" };
 const VOICE_HELP = "Voice chat may not work for all players. If it doesn't connect, use Discord instead.";
 
 function cubeCobraUrl(battlerId: string) {
@@ -341,8 +340,7 @@ export function Lobby() {
       onClose={() => setShowRulesPanel(false)}
       minimized={guideMinimized}
       onMinimizedChange={setGuideMinimized}
-      initialDocId={rulesPanelTarget?.docId}
-      initialTab={rulesPanelTarget?.tab}
+      target={rulesPanelTarget}
       gameId={gameId}
       playerName={currentPlayer?.name}
       useUpgrades={undefined}
@@ -528,7 +526,7 @@ export function Lobby() {
             selfId={session?.playerId}
             voiceChat={voiceChat}
             actions={actions}
-            onPuppetHelp={() => openGuide(PUPPET_HELP)}
+            onPuppetHelp={() => openGuide({ docId: "faq", tab: "why-are-my-opponents-cards-face-up" })}
           />
 
           {/* Shown instead of the banner's, where a short phone needs the banner for the deck */}
@@ -577,8 +575,7 @@ export function Lobby() {
           onClose={() => setShowRulesPanel(false)}
           minimized={guideMinimized}
           onMinimizedChange={setGuideMinimized}
-          initialDocId={rulesPanelTarget?.docId}
-          initialTab={rulesPanelTarget?.tab}
+          target={rulesPanelTarget}
           gameId={gameId}
           playerName={currentPlayer?.name}
           useUpgrades={lobbyState?.use_upgrades}
