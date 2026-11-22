@@ -7,6 +7,7 @@ import { StandingsRank } from '../common/StandingsRank'
 
 const MAX_HAND_CARDS = 7
 const HAND_OVERLAP_PX = 8
+const HAND_MAX_HEIGHT_PX = 111
 
 type CardImageSize = 'small' | 'normal'
 
@@ -14,32 +15,40 @@ function scryfallImage(id: string, size: CardImageSize): string {
   return `https://cards.scryfall.io/${size}/front/${id[0]}/${id[1]}/${id}.jpg`
 }
 
+interface HandSizing {
+  box: string
+  row: string
+}
+
 /**
- * The final hand, overlapping like a fan, and shrinking to fit the box's width. Without a maxHeight the cards grow
- * to fill the box the card gives them, so a game card stretched to match its row still looks full. With one, the
- * box is as tall as the cards, up to maxHeight, so a narrow card leaves no gap around a hand that had to shrink.
+ * The short sizing: the box is as tall as the cards, up to HAND_MAX_HEIGHT_PX, so a narrow card leaves no gap around
+ * a hand that had to shrink.
  */
+const SHORT_HAND: HandSizing = { box: '[container-type:inline-size]', row: 'justify-center' }
+
+/** A game tile's hand is as tall as the box its card gives it, or takes the short sizing beside the cubes. */
+const TILE_HAND: HandSizing = {
+  box: 'min-h-[60px] flex-1 [container-type:size] [--hand-room:100cqh] beside-cubes:min-h-0 beside-cubes:flex-none beside-cubes:[container-type:inline-size] beside-cubes:[--hand-room:initial]',
+  row: 'beside-cubes:justify-center',
+}
+
+/** The final hand, overlapping like a fan, and shrinking to fit the box's width. */
 function HandFan({
   scryfallIds,
-  className = 'min-h-[60px] flex-1',
+  sizing,
   imageSize = 'small',
-  centered = false,
-  maxHeight,
 }: {
   scryfallIds: string[]
-  className?: string
+  sizing: HandSizing
   imageSize?: CardImageSize
-  centered?: boolean
-  maxHeight?: number
 }) {
   const cards = scryfallIds.slice(0, MAX_HAND_CARDS)
   if (cards.length === 0) return null
   const fitsWidth = `calc((100cqw + ${HAND_OVERLAP_PX * (cards.length - 1)}px) / ${cards.length} * 1.4)`
-  const height = maxHeight === undefined ? `min(100cqh, ${fitsWidth})` : `min(${maxHeight}px, ${fitsWidth})`
-  const container = maxHeight === undefined ? '[container-type:size]' : '[container-type:inline-size]'
+  const height = `min(var(--hand-room, ${HAND_MAX_HEIGHT_PX}px), ${fitsWidth})`
   return (
-    <div className={`${className} ${container}`}>
-      <div className={`flex h-full items-center ${centered ? 'justify-center' : ''}`}>
+    <div className={sizing.box}>
+      <div className={`flex h-full items-center ${sizing.row}`}>
         {cards.map((id, index) => (
           <img
             key={`${id}-${index}`}
@@ -121,9 +130,9 @@ export function GameTile({ game, className, style }: GameTileProps) {
       className={`${GAME_CARD_CLASS} ${className ?? ''}`}
     >
       <GameRank game={game} />
-      <div className="flex min-w-0 flex-1 flex-col gap-2 px-3 py-2.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 px-3 py-2.5 beside-cubes:py-3">
         <GameHeader title={cubeTitle(game)} href={href} game={game} />
-        <HandFan scryfallIds={game.hand_scryfall_ids} />
+        <HandFan scryfallIds={game.hand_scryfall_ids} sizing={TILE_HAND} />
       </div>
     </SurfaceCard>
   )
@@ -139,7 +148,7 @@ export function RecapCard({ game }: { game: GameSummary }) {
       <div className="flex min-w-0 flex-1 flex-col gap-2 p-3">
         <GameHeader title={game.best_human_name} href={href} game={game} />
         {game.hand_scryfall_ids.length > 0 && (
-          <HandFan scryfallIds={game.hand_scryfall_ids} className="" maxHeight={111} imageSize="normal" centered />
+          <HandFan scryfallIds={game.hand_scryfall_ids} sizing={SHORT_HAND} imageSize="normal" />
         )}
       </div>
     </SurfaceCard>

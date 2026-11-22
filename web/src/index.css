@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+/* Recent Games beside cube cards on a wide dashboard. Anywhere else, a game tile is already shorter than the short sizing. */
+@custom-variant beside-cubes {
+  @media (width >= 80rem) {
+    &:where([data-beside-cubes] *) {
+      @slot;
+    }
+  }
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
