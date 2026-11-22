@@ -402,13 +402,21 @@ def list_cube_games(
     return _query_cube_games(db, cube_id, play_mode=play_mode, use_upgrades=use_upgrades, offset=offset)
 
 
-@router.get("/cube/{cube_id}")
+def _save_unnamed_cube(cube_id: str) -> None:
+    """Runs before the route's sessions open, so a slow CubeCobra doesn't hold one of the pool's few connections."""
+    with database.SessionLocal() as db:
+        named = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first() is not None
+    if not named:
+        database.save_cube_metadata(cube_id)
+
+
+@router.get("/cube/{cube_id}", dependencies=[Depends(_save_unnamed_cube)])
 def get_cube_summary(
     cube_id: str,
     current_user: User | None = Depends(get_optional_user),
     db: Session = Depends(_get_db),
 ) -> CubeSummaryResponse:
-    meta = _load_cube_metadata(db, cube_id)
+    meta = db.query(CubeMetadata).filter(CubeMetadata.cube_id == cube_id).first()
     follow = None
     if current_user is not None:
         follow = (
