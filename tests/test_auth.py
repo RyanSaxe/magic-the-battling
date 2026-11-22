@@ -7,6 +7,10 @@ import server.services.auth as auth_service
 from server import runtime_config
 
 
+def _register(client, username: str, email: str):
+    return client.post("/api/auth/register", json={"username": username, "password": "password123", "email": email})
+
+
 class TestAuthCookies:
     def test_register_sets_secure_cookie_outside_local_dev(self, client, monkeypatch):
         monkeypatch.setattr(auth_router, "AUTH_COOKIE_SECURE", True)
@@ -89,3 +93,36 @@ class TestRuntimeConfig:
         assert claims is not None
         assert claims["user_id"] == "user-123"
         assert claims["username"] == "alice"
+
+
+class TestCaseInsensitiveAccounts:
+    def test_sign_up_rejects_a_username_that_differs_only_by_case(self, client):
+        assert _register(client, "jace_fan", "jace@test.com").status_code == 200
+
+        exact = _register(client, "jace_fan", "exact@test.com")
+        other_case = _register(client, "Jace_Fan", "other@test.com")
+
+        assert other_case.status_code == 409
+        assert other_case.json() == exact.json()
+        assert other_case.json()["code"] == "USERNAME_TAKEN"
+
+    def test_sign_up_rejects_an_email_that_differs_only_by_case(self, client):
+        assert _register(client, "jace_fan", "jace.fan@test.com").status_code == 200
+
+        exact = _register(client, "exact_case", "jace.fan@test.com")
+        other_case = _register(client, "other_case", "Jace.Fan@Test.com")
+
+        assert other_case.status_code == 409
+        assert other_case.json() == exact.json()
+        assert other_case.json()["code"] == "EMAIL_IN_USE"
+
+    def test_login_accepts_any_case_and_keeps_the_name_as_typed(self, client):
+        assert _register(client, "Jace_Fan", "Jace.Fan@Test.com").status_code == 200
+        client.post("/api/auth/logout")
+
+        for typed in ("jace_fan", "JACE_FAN"):
+            response = client.post("/api/auth/login", json={"username": typed, "password": "password123"})
+
+            assert response.status_code == 200
+            assert response.json()["username"] == "Jace_Fan"
+            assert response.json()["email"] == "Jace.Fan@Test.com"
