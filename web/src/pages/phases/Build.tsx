@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, type ComponentProps } from "react";
 import type {
   GameState,
   Card as CardType,
@@ -334,17 +334,13 @@ export function BuildPhase({
   const isCardSelected = (cardId: string) =>
     selection?.type === "card" && selection.cardId === cardId;
 
-  const renderQuickUpgradeButton = (card: CardType) => {
+  const renderQuickUpgradeButton = (card: CardType, hasCompanionButton = false) => {
     if (!canQuickUpgrade) return null;
-    const selected = isCardSelected(card.id);
-    const visibilityClasses = selected
-      ? "opacity-100 pointer-events-auto"
-      : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto";
 
     return (
-      <button
-        type="button"
-        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold btn-game transition-opacity duration-150 ${visibilityClasses}`}
+      <CardPill
+        pinned={isCardSelected(card.id)}
+        className={hasCompanionButton ? "card-pill-raised btn-game" : "btn-game"}
         onClick={(e) => {
           e.stopPropagation();
           onQuickUpgrade?.(card.id);
@@ -353,7 +349,7 @@ export function BuildPhase({
         title="Upgrade (U)"
       >
         Upgrade
-      </button>
+      </CardPill>
     );
   };
 
@@ -361,9 +357,8 @@ export function BuildPhase({
     if (locked || upgrade.upgrade_target || !onQuickApplyUpgrade) return null;
 
     return (
-      <button
-        type="button"
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold btn-game opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-150"
+      <CardPill
+        className="btn-game"
         onClick={(e) => {
           e.stopPropagation();
           onQuickApplyUpgrade(upgrade.id);
@@ -372,7 +367,7 @@ export function BuildPhase({
         title="Apply"
       >
         Apply
-      </button>
+      </CardPill>
     );
   };
 
@@ -508,10 +503,16 @@ export function BuildPhase({
                   upgraded={upgradedCardIds.has(card.id)}
                   appliedUpgrades={getAppliedUpgrades(card.id)}
                 />
-                {renderQuickUpgradeButton(card)}
+                {renderQuickUpgradeButton(card, cardIsCompanion)}
                 {cardIsCompanion && (
-                  <button
+                  <CardPill
+                    pinned
                     disabled={locked}
+                    className={`card-pill-companion ${
+                      isActiveCompanion
+                        ? "is-set disabled:opacity-50 disabled:cursor-not-allowed"
+                        : "btn-game"
+                    }`}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (isActiveCompanion) {
@@ -520,14 +521,13 @@ export function BuildPhase({
                         actions.buildSetCompanion(card.id);
                       }
                     }}
-                    className={`absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg ${
-                      isActiveCompanion
-                        ? "bg-amber-500/90 text-black disabled:opacity-50 disabled:cursor-not-allowed"
-                        : "btn-game"
-                    }`}
+                    aria-pressed={isActiveCompanion}
+                    aria-label="Set as companion"
+                    title="Set as companion"
                   >
-                    {isActiveCompanion ? "Companion" : "Set Companion"}
-                  </button>
+                    <span className="label-short">Companion</span>
+                    <span className="label-long">{isActiveCompanion ? "✓ Companion" : "Set Companion"}</span>
+                  </CardPill>
                 )}
               </div>
             );
@@ -546,5 +546,26 @@ export function BuildPhase({
         ) : null
       }
     />
+  );
+}
+
+/** A pill on a card's bottom edge. It shows while the card is hovered, or always while pinned. */
+function CardPill({
+  pinned = false,
+  className,
+  ...button
+}: ComponentProps<"button"> & { pinned?: boolean }) {
+  const visibility = pinned
+    ? "opacity-100 pointer-events-auto"
+    : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto";
+
+  return (
+    <div className="card-overlay">
+      <button
+        type="button"
+        className={`card-pill rounded-full font-semibold transition-opacity duration-150 ${visibility} ${className}`}
+        {...button}
+      />
+    </div>
   );
 }

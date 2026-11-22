@@ -79,12 +79,8 @@ export function UpgradesModal({
       if (e.key === 'Escape') {
         e.preventDefault()
         e.stopPropagation()
-        if (mode === 'apply' && selectedTargetId) {
-          setSelectedTargetId(null)
-        } else if (mode === 'reveal' && selectedRevealUpgradeIds.length > 0) {
+        if (mode === 'reveal' && selectedRevealUpgradeIds.length > 0) {
           setSelectedRevealUpgradeIds([])
-        } else if (selectedUpgradeId) {
-          setSelectedUpgradeId(null)
         } else {
           onClose()
         }

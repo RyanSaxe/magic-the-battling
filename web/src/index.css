@@ -1498,6 +1498,71 @@ input:-webkit-autofill:focus {
   box-shadow: none;
 }
 
+/* The controls over a Build card are sized against the card, so they shrink with one too narrow to hold them. */
+.card-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  container-type: size;
+  pointer-events: none;
+}
+
+/* Upgrade, Apply and Set Companion. Full size from an 85px card up, with padding that stays light on the smallest one. */
+.card-pill {
+  position: absolute;
+  bottom: 8.5cqh;
+  left: 50%;
+  translate: -50% 0;
+  padding: 0.5em 1em;
+  font-size: min(0.75rem, 14.1cqw);
+  line-height: 1.3333;
+  white-space: nowrap;
+}
+
+/* A companion's card stacks two pills, so both are tighter, and Upgrade clears the one below. */
+.card-pill-raised {
+  bottom: calc(4cqh + min(0.75rem, 14.1cqw) * 1.8333 + max(2px, 1.5cqh));
+  padding: 0.25em 0.8em;
+}
+
+.card-pill-companion {
+  bottom: 4cqh;
+  padding: 0.25em 0.65em;
+  letter-spacing: normal;
+}
+
+/* The purple of the companion's ring, deep enough for ivory text. */
+.card-pill-companion.is-set {
+  background: #6b21a8;
+  color: var(--ivory);
+}
+
+.card-pill-companion.is-set:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.card-pill-companion .label-long {
+  display: none;
+}
+
+/* Without the tighter tracking, "Companion" leaves a 45px card. */
+@container (max-width: 84px) {
+  .card-pill-companion {
+    padding-inline: 0.38em;
+    letter-spacing: -0.045em;
+  }
+}
+
+@container (min-width: 110px) {
+  .card-pill-companion .label-long {
+    display: inline;
+  }
+
+  .card-pill-companion .label-short {
+    display: none;
+  }
+}
+
 /* Drag overlay */
 .drag-overlay {
   cursor: grabbing;
