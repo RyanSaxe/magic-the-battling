@@ -242,6 +242,8 @@ export function DeckDisplay({
           upgrades={upgrades}
           fallbackDims={czDims}
           frame={zoneFrames.commandZone}
+          selectedId={selectedCardId}
+          onSelect={handleCardClick}
         />
       )}
     />
