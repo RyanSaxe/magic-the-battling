@@ -49,6 +49,8 @@ const DECAY_ALPHA = 0.15
 const MAX_RETRIES = 3
 const BASE_RETRY_DELAY = 1000
 const DISCONNECTED_GRACE = 4000
+const BASE_OFFER_REPEAT_DELAY = 2000
+const MAX_OFFER_REPEAT_DELAY = 10000
 const MAX_PENDING_SIGNALS = 50
 
 const MUTE_STORAGE_KEY = 'mtb_voice_muted'
@@ -336,9 +338,16 @@ export function useVoiceChat(
     }
 
     if (isOfferer) {
+      // The server drops signals to a player whose socket isn't back yet, as after a restart. The local description
+      // gains candidates as they're found, so a repeated offer also replaces any that were dropped.
+      const sendOfferUntilAnswered = (delay: number) => {
+        if (pc.signalingState !== 'have-local-offer') return
+        sendSignalTo(peerName, 'offer', pc.localDescription)
+        setTimeout(() => sendOfferUntilAnswered(Math.min(delay * 2, MAX_OFFER_REPEAT_DELAY)), delay)
+      }
       pc.createOffer().then(offer => {
         return pc.setLocalDescription(offer).then(() => {
-          sendSignalTo(peerName, 'offer', offer)
+          sendOfferUntilAnswered(BASE_OFFER_REPEAT_DELAY)
         })
       }).catch(err => console.error('Voice offer error:', err))
     }
@@ -393,7 +402,9 @@ export function useVoiceChat(
     const fromPeer = payload.from_player
     const ps = peersRef.current.get(fromPeer)
     if (!ps) {
-      const buf = pendingSignalsRef.current.get(fromPeer) ?? []
+      const waiting = pendingSignalsRef.current.get(fromPeer) ?? []
+      // Offers repeat while this player's microphone prompt waits, and only the newest needs an answer.
+      const buf = payload.signal_type === 'offer' ? waiting.filter(sig => sig.signal_type === 'mute_state') : waiting
       if (buf.length < MAX_PENDING_SIGNALS) {
         buf.push(payload)
         pendingSignalsRef.current.set(fromPeer, buf)
