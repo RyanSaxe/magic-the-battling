@@ -27,6 +27,7 @@ import { CopyWatchLink } from "../components/sidebar/CopyWatchLink";
 import { BattleSidebarContent } from "../components/sidebar/BattleSidebarContent";
 import { MicToggle } from "../components/sidebar/MicToggle";
 import { GameSummary } from "../components/GameSummary";
+import { PoisonCard } from "../components/common/PoisonCard";
 import { ShareModal } from "../components/ShareModal";
 import { ActionMenu } from "../components/ActionMenu";
 import { PhaseTimeline } from "../components/PhaseTimeline";
@@ -1020,6 +1021,7 @@ function GameContent() {
     nonce: number;
   } | null>(null);
   const [dismissedServerNoticeAt, setDismissedServerNoticeAt] = useState<string | null>(null);
+  const [deckSeen, setDeckSeen] = useState(false);
   const [cachedBattleForResolution, setCachedBattleForResolution] = useState<BattleView | null>(null);
   const [activeBattleResolutionId, setActiveBattleResolutionId] = useState<string | null>(null);
   const [shownBattleResolutionIds, setShownBattleResolutionIds] = useState<Set<string>>(new Set());
@@ -1785,6 +1787,9 @@ function GameContent() {
   );
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
   const isWinner = selfPlacement === 1;
+  const showsOutTitle = !isSpectator && currentPhase === "eliminated" && !displayBattleResolution;
+  const showsOutScreen = showsOutTitle && !deckSeen;
+  const outPlace = `${getOrdinal(selfPlacement)} of ${gameState.players.length}`;
 
   const shareUrl = gameId
     ? `${window.location.origin}/game/${gameId}/share/${encodeURIComponent(self_player.name)}`
@@ -2277,19 +2282,29 @@ function GameContent() {
             lead={
               <>
                 <BrandMark className="hidden sm:block mr-2" />
-                <PhaseTimeline
-                  currentPhase={timelinePhase}
-                  stage={self_player.stage}
-                  round={self_player.round}
-                  nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
-                  nextRound={isStageIncreasing ? 1 : self_player.round + 1}
-                  inSuddenDeath={self_player.in_sudden_death}
-                  suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
-                  useUpgrades={gameState.use_upgrades}
-                  onOpenRules={openRulesPanel}
-                  onStepClick={() => closeSurface("actions")}
-                  title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
-                />
+                {showsOutTitle ? (
+                  <div className="flex flex-1 min-w-0 items-center gap-2 max-lg:-translate-y-0.5 whitespace-nowrap">
+                    <span className="text-xs sm:text-sm text-[#e2d8cb] font-mono">
+                      {self_player.stage}-{self_player.round}
+                    </span>
+                    <span className="out-title text-[13px] sm:text-[15px]">You’re out</span>
+                    <span className="min-w-0 truncate text-xs sm:text-sm text-[var(--ivory-muted)]">{outPlace}</span>
+                  </div>
+                ) : (
+                  <PhaseTimeline
+                    currentPhase={timelinePhase}
+                    stage={self_player.stage}
+                    round={self_player.round}
+                    nextStage={isStageIncreasing ? self_player.stage + 1 : self_player.stage}
+                    nextRound={isStageIncreasing ? 1 : self_player.round + 1}
+                    inSuddenDeath={self_player.in_sudden_death}
+                    suddenDeathDecidesGame={suddenDeathDecidesGame(gameState.players)}
+                    useUpgrades={gameState.use_upgrades}
+                    onOpenRules={openRulesPanel}
+                    onStepClick={() => closeSurface("actions")}
+                    title={isEndPhase && !displayBattleResolution ? `${getOrdinal(selfPlacement)} Place` : undefined}
+                  />
+                )}
               </>
             }
             helpers={
@@ -2553,9 +2568,21 @@ function GameContent() {
                   </div>
                 </div>
               )}
-              {(currentPhase === "eliminated" ||
-                currentPhase === "winner" ||
-                currentPhase === "game_over") && (
+              {showsOutScreen && (
+                <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
+                  <div className="out-felt page-center flex-1 min-h-0 overflow-y-auto flex flex-col items-center p-4 text-center">
+                    <h2 className="out-title text-[30px] leading-[1.15]">You’re out</h2>
+                    <p className="mt-2 mb-6 text-[17px] text-[var(--ivory-felt)]">{outPlace}</p>
+                    <div className="shrink-0">
+                      <PoisonCard count={self_player.poison} dimensions={{ width: 120, height: 168 }} />
+                    </div>
+                    <button onClick={() => setDeckSeen(true)} className="btn btn-secondary shrink-0 mt-7">
+                      See your deck
+                    </button>
+                  </div>
+                </div>
+              )}
+              {isEndPhase && !showsOutScreen && (
                 <GameSummary
                   player={self_player}
                   useUpgrades={gameState.use_upgrades}
