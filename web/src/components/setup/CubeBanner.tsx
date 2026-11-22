@@ -30,11 +30,17 @@ export function CubeBanner({
     <div className={`cube-banner ${look?.imageUri ? 'has-art' : ''}`}>
       <div className="cube-banner-art">{look?.imageUri && <CubeBandArt src={look.imageUri} />}</div>
       <div className="cube-banner-top">
-        {name ? (
+        {name || href ? (
           <div className="cube-banner-title">
             <h2 className={`cube-banner-name ${nameSize(name)}`}>
               {href ? (
-                <a href={href} target="_blank" rel="noopener noreferrer" className="cube-banner-link">
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={name ? undefined : 'Open on CubeCobra'}
+                  className="cube-banner-link"
+                >
                   <span>
                     {name}
                     <span aria-hidden="true" className="cube-banner-arrow">{'\u00a0'}↗</span>

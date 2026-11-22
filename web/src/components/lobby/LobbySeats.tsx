@@ -95,20 +95,22 @@ function PuppetStatus({ index, available }: { index: number; available: number |
 /** The lobby's seats: its players, then its puppets, then the seats still open. */
 export function LobbySeats({
   lobby,
+  isHost,
+  openSeats,
   selfId,
   voiceChat,
   actions,
   onPuppetHelp,
 }: {
   lobby: LobbyState
+  isHost: boolean
+  openSeats: number
   selfId: string | undefined
   voiceChat: VoiceChat
   actions: SeatActions
   onPuppetHelp: () => void
 }) {
   const { players, puppet_count: puppets, target_player_count: seats, available_puppet_count: available } = lobby
-  const isHost = players.some((player) => player.player_id === selfId && player.is_host)
-  const openSeats = Math.max(0, seats - players.length - puppets)
   const canAddPuppet = isHost && available !== null && puppets < available
 
   const puppetHelp = (

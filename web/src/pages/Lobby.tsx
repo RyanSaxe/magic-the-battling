@@ -38,14 +38,13 @@ function cubeCobraUrl(battlerId: string) {
   return `https://cubecobra.com/cube/overview/${encodeURIComponent(battlerId)}`;
 }
 
-/** What Start Game is waiting on, in the order the server checks it. */
-function startBlocker(lobby: LobbyState, needsDeck: boolean): string {
+/** What Start Game is waiting on. The player's own deck comes first, as their next step. */
+function startBlocker(lobby: LobbyState, openSeats: number, needsDeck: boolean): string {
   if (needsDeck) return "Submit your deck first";
   const { players, puppet_count: puppets, available_puppet_count: available } = lobby;
-  const open = lobby.target_player_count - players.length - puppets;
   const notReady = players.filter((player) => !player.is_ready).length;
   const waitingOn = [];
-  if (open > 0) waitingOn.push(`${open} open ${open === 1 ? "seat" : "seats"}`);
+  if (openSeats > 0) waitingOn.push(`${openSeats} open ${openSeats === 1 ? "seat" : "seats"}`);
   if (notReady > 0) waitingOn.push(`${notReady} not ready`);
   if (waitingOn.length > 0) return waitingOn.join(" · ");
   if (lobby.play_mode === "limited" && lobby.cube_loading_status === "error") return "Couldn't load the cube";
@@ -391,6 +390,7 @@ export function Lobby() {
   const isReady = currentPlayer?.is_ready ?? false;
   const playerCap = lobbyState.target_player_count;
   const occupiedSlots = lobbyState.players.length + lobbyState.puppet_count;
+  const openSeats = Math.max(0, playerCap - occupiedSlots);
   const playerCapIndex = EVEN_PLAYER_CAP_OPTIONS.findIndex((value) => value === playerCap);
   const previousPlayerCap = playerCapIndex > 0 ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex - 1] : null;
   const nextPlayerCap =
@@ -402,9 +402,9 @@ export function Lobby() {
   const canBrowseCards = !isConstructed || hasLoadedBattler;
   const needsDeck = isConstructed && !!currentPlayer && !hasLoadedBattler;
   // Inviting is the host's next step until the seats are full, unless their own deck comes first.
-  const copyIsNext = isHost && !needsDeck && occupiedSlots < playerCap;
+  const copyIsNext = isHost && !needsDeck && openSeats > 0;
   const startWaits = !lobbyState.can_start;
-  const startReason = startWaits ? startBlocker(lobbyState, needsDeck) : "";
+  const startReason = startWaits ? startBlocker(lobbyState, openSeats, needsDeck) : "";
 
   const openGuide = (target: RulesPanelTarget) => {
     setRulesPanelTarget(target);
@@ -527,6 +527,8 @@ export function Lobby() {
             )}
             <LobbySeats
               lobby={lobbyState}
+              isHost={isHost}
+              openSeats={openSeats}
               selfId={session?.playerId}
               voiceChat={voiceChat}
               actions={actions}

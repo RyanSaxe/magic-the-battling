@@ -565,7 +565,7 @@ export function Play() {
             onClick={() => showView(shownView === "setup" ? "options" : "setup")}
             className="btn btn-secondary btn-pill"
           >
-            {shownView === "setup" ? "Change cube" : "Back"}
+            {shownView !== "setup" ? "Back" : playMode === "constructed" ? "Change deck" : "Change cube"}
           </button>
         </CubeBanner>
 
@@ -620,7 +620,7 @@ export function Play() {
             className="setup-felt play-felt"
             // Hotkeys skip keys from inputs, which every field and switch here is.
             onKeyDown={(event) => {
-              if (event.key !== "Escape") return;
+              if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
               event.stopPropagation();
               showView("setup", true);
             }}

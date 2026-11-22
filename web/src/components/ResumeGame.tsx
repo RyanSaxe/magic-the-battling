@@ -199,14 +199,17 @@ export function ResumeShelf({
             ))}
             {hasMore && (
               <li className="resume-row">
-                <button type="button" onClick={(event) => onShowAll(event.detail === 0)} className="resume-open">
+                <button
+                  type="button"
+                  onClick={(event) => onShowAll(event.detail === 0)}
+                  className={`resume-open ${hasCloseColumn ? 'has-close-space' : ''}`}
+                >
                   <SeatArt seat={seats[1]} />
                   <span className="resume-summary">
                     <span className="resume-title">{seats.length - 1} more games</span>
                     <span className="resume-detail">Show all {seats.length} games to resume</span>
                   </span>
                   <span aria-hidden="true" className="resume-chevron">›</span>
-                  {hasCloseColumn && <span className={CLOSE_COLUMN} />}
                 </button>
               </li>
             )}

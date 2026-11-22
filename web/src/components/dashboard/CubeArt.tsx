@@ -14,14 +14,13 @@ function cropBelowArch(img: HTMLImageElement) {
 }
 
 /** A cube's art, filling the nearest positioned box, which clips it. */
-export function CubeArt({ src, className = '', lazy = false }: { src: string; className?: string; lazy?: boolean }) {
+export function CubeArt({ src }: { src: string }) {
   return (
     <img
       src={src}
       alt=""
-      loading={lazy ? 'lazy' : undefined}
       onLoad={(event) => cropBelowArch(event.currentTarget)}
-      className={`absolute inset-0 h-full w-full object-cover ${className}`}
+      className="absolute inset-0 h-full w-full object-cover"
     />
   )
 }

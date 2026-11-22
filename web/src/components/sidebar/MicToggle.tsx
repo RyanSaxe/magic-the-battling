@@ -32,7 +32,7 @@ function getMicVisual(props: Pick<MicToggleProps, 'muted' | 'connectionState' | 
 }
 
 function sizeClasses(variant: MicToggleProps['variant'], showsLevel: boolean) {
-  if (variant === 'seat') return 'h-11 w-11 -ml-2 shrink-0 justify-center gap-0.5 py-2.5'
+  if (variant === 'seat') return 'h-11 w-11 -ml-2 shrink-0 justify-center gap-0.5 py-2.5 focus-visible:-outline-offset-4'
   if (variant === 'player-row') return `h-6 shrink-0 justify-start ${showsLevel ? 'w-5 gap-0.5' : 'w-4'}`
   return `h-6 justify-center ${showsLevel ? 'w-7 gap-0.5' : 'w-6'}`
 }
