@@ -49,7 +49,6 @@ export function ZoneModal({
   appliedUpgradesByCardId,
   hiddenUpgradesByCardId,
   onRevealHiddenUpgrades,
-  onEmptyClick,
 }: {
   open: boolean
   title: string
@@ -70,7 +69,6 @@ export function ZoneModal({
   appliedUpgradesByCardId?: Map<string, CardType[]>
   hiddenUpgradesByCardId?: Map<string, CardType[]>
   onRevealHiddenUpgrades?: (cardId: string) => void
-  onEmptyClick?: () => void
 }) {
   const zoneOwner = isOpponent ? 'opponent' : 'player' as const
 
@@ -88,7 +86,6 @@ export function ZoneModal({
         onClose={handleClose}
         tone={tone}
         headerActions={headerActions}
-        onEmptyClick={onEmptyClick}
         zone={zone}
         zoneOwner={zoneOwner}
         validFromZones={VALID_FROM_ZONES}

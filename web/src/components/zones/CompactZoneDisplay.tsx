@@ -185,7 +185,6 @@ export function CompactZoneDisplay({
         appliedUpgradesByCardId={upgradesByCardId}
         hiddenUpgradesByCardId={hiddenUpgradesByCardId}
         onRevealHiddenUpgrades={onRevealHiddenUpgrades}
-        onEmptyClick={selectedCardId ? onZoneClick : undefined}
       />
     </>
   )

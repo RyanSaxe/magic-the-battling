@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { SidePanelHostContext } from './sidePanelHost'
 
@@ -27,15 +27,27 @@ interface SidePanelProps {
  */
 export function SidePanel({ open, title, count, onClose, headerActions, children }: SidePanelProps) {
   const host = useContext(SidePanelHostContext)
+  const panelRef = useRef<HTMLElement>(null)
   const [present, setPresent] = useState(open)
   if (open && !present) setPresent(true)
+
+  // A panel closed before it was ever drawn has no slide to end, so it drops its content at once.
+  useEffect(() => {
+    if (open || !present) return
+    const frame = requestAnimationFrame(() => {
+      if (!panelRef.current?.getAnimations().length) setPresent(false)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [open, present])
 
   useEffect(() => {
     if (!open) return
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      // Escape closes a card preview opened from the panel before the panel itself.
-      if (document.querySelector("[data-card-preview-modal='true']")) return
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      const target = event.target as HTMLElement | null
+      // Escape first cancels typing in a field, and closes a dialog or card preview open over the panel.
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      if (document.querySelector("[aria-modal='true'], [data-card-preview-modal='true']")) return
       onClose()
     }
     window.addEventListener('keydown', handleKey)
@@ -45,6 +57,7 @@ export function SidePanel({ open, title, count, onClose, headerActions, children
   if (!present || !host) return null
   return createPortal(
     <section
+      ref={panelRef}
       className={`side-panel frame-chrome${open ? ' side-panel--open' : ''}`}
       aria-label={title}
       inert={!open}

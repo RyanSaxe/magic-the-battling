@@ -114,8 +114,6 @@
   --sidebar-width: 16rem;
   /* Docked inside the felt's gold edge, the sidebar is narrower, so with the right rail back the board loses 28px. */
   --frame-sidebar-width: 242px;
-  /* From the board's gold edge to the screen's right edge: the docked sidebar, its 2px edge and the rail. */
-  --frame-dock-width: calc(var(--frame-sidebar-width) + 2px + var(--frame-rail-width));
   --bar-inline: 6px;
 }
 

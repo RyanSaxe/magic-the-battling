@@ -26,7 +26,8 @@ export type GameSurfaceEvent =
   | { type: "toggle"; surface: GameSurface }
   /** Closes the surface of this kind, and leaves any other open one alone. */
   | { type: "close"; kind: GameSurfaceKind }
-  | { type: "closeAll"; except?: GameSurfaceKind }
+  /** Closes the open menu, panel or window, except the drawer and the surface of kind `except`. */
+  | { type: "closeOverlays"; except?: GameSurfaceKind }
   | { type: "phaseChanged"; phase: string | undefined };
 
 /** The surfaces that only make sense in one phase, which close when the player leaves it. */
@@ -50,8 +51,8 @@ export function reduceGameSurface(open: GameSurface | null, event: GameSurfaceEv
       return open && isSameSurface(open, event.surface) ? null : event.surface;
     case "close":
       return open?.kind === event.kind ? null : open;
-    case "closeAll":
-      return open && open.kind === event.except ? open : null;
+    case "closeOverlays":
+      return open && (open.kind === event.except || open.kind === "players") ? open : null;
     case "phaseChanged": {
       const phase = open ? PHASE_OF[open.kind] : undefined;
       return phase && phase !== event.phase ? null : open;

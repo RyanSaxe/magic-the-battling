@@ -18,10 +18,11 @@ describe("reduceGameSurface", () => {
     expect(reduceGameSurface({ kind: "players" }, { type: "close", kind: "zone" })).toEqual({ kind: "players" });
   });
 
-  it("keeps only the surface a guide points at when it closes the rest", () => {
+  it("keeps the surface a guide points at, and the drawer, when it closes the overlays", () => {
     const choices: GameSurface = { kind: "submitResult" };
-    expect(reduceGameSurface(choices, { type: "closeAll", except: "submitResult" })).toEqual(choices);
-    expect(reduceGameSurface(graveyard, { type: "closeAll", except: "submitResult" })).toBeNull();
+    expect(reduceGameSurface(choices, { type: "closeOverlays", except: "submitResult" })).toEqual(choices);
+    expect(reduceGameSurface(graveyard, { type: "closeOverlays", except: "submitResult" })).toBeNull();
+    expect(reduceGameSurface({ kind: "players" }, { type: "closeOverlays" })).toEqual({ kind: "players" });
   });
 
   it("closes a Fight's panels and menus when the Fight ends, and keeps the rest", () => {

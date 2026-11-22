@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test'
+import type { Locator, Page, WebSocketRoute } from '@playwright/test'
 import { PAGES, expect, openPage, serveGame, test } from './helpers'
 import { GAME_ID, type ScreenState } from './gameStates'
 
@@ -25,10 +25,15 @@ interface Panel {
   open: (page: Page, baseURL: string) => Promise<Locator>
 }
 
+/** Opens a mocked game and returns the actions the page sends its server. */
 async function openGame(page: Page, baseURL: string, state: ScreenState) {
-  await serveGame(page, baseURL, state)
+  const sent: string[] = []
+  await serveGame(page, baseURL, state, {
+    onSocket: (ws: WebSocketRoute) => ws.onMessage((message) => sent.push(JSON.parse(String(message)).action)),
+  })
   await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
   await page.getByRole('contentinfo').waitFor()
+  return sent
 }
 
 const sidePanel = (page: Page, title: string) => page.getByRole('region', { name: title, exact: true })
@@ -80,9 +85,14 @@ const PANELS: Panel[] = [
   },
 ]
 
+/** Waits for the panel to finish sliding in. */
+async function settled(panel: Locator) {
+  await expect.poll(() => panel.evaluate((element) => getComputedStyle(element).transform)).toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/)
+}
+
 /** The panel's box once it has slid in, and whether the panel shows anywhere along either bar. */
 async function measure(page: Page, panel: Locator) {
-  await expect.poll(() => panel.evaluate((element) => getComputedStyle(element).transform)).toMatch(/^(none|matrix\(1, 0, 0, 1, 0, 0\))$/)
+  await settled(panel)
   const box = (await panel.boundingBox())!
   const bars = await page.evaluate(() => {
     const panelOver = (bar: Element) => {
@@ -174,6 +184,20 @@ test.describe('one panel at a time', () => {
     await expect(sidePanel(page, 'Graveyard')).toHaveCount(0)
   })
 
+  test('a click on empty space in a pile\'s panel moves the selected card there once', async ({ page, baseURL }) => {
+    const sent = await openGame(page, baseURL!, FIGHT)
+    await page.locator('.battle-side-column-player .battle-side-cell').filter({ hasText: 'Exile' }).click()
+    const exile = sidePanel(page, 'Exile')
+    await settled(exile)
+    await page.locator('[data-guide-target="battle-battlefield"] .card').first().click()
+
+    const body = (await exile.locator('.side-panel-body').boundingBox())!
+    await page.mouse.click(body.x + body.width / 2, body.y + body.height - 20)
+    await expect.poll(() => sent.filter((action) => action === 'battle_move').length).toBe(1)
+    await page.waitForTimeout(300)
+    expect(sent.filter((action) => action === 'battle_move')).toHaveLength(1)
+  })
+
   test("the opponent's piles open under the opponent's name", async ({ page, baseURL }) => {
     await openGame(page, baseURL!, FIGHT)
 
@@ -199,5 +223,27 @@ test.describe('one panel at a time', () => {
       await page.keyboard.press('Escape')
       await expect(showSideboard).toHaveCount(0)
     })
+
+    test('Escape in the drawer\'s life total cancels the edit and leaves the drawer open', async ({ page, baseURL }) => {
+      await openGame(page, baseURL!, FIGHT)
+      await page.getByRole('button', { name: '☰' }).click()
+      const drawer = sidePanel(page, 'Fight')
+      await drawer.getByRole('button', { name: '20', exact: true }).first().click()
+      await drawer.getByRole('spinbutton').fill('18')
+      await page.keyboard.press('Escape')
+
+      await expect(drawer.getByRole('spinbutton')).toHaveCount(0)
+      await expect(drawer).toBeVisible()
+    })
   })
+})
+
+test('Escape closes the account menu', async ({ page, baseURL }) => {
+  await openPage(page, baseURL!, PAGES.find((pageUnderTest) => pageUnderTest.name === 'dashboard')!)
+  await page.getByRole('button', { name: 'Menu' }).click()
+  const dashboardItem = page.getByRole('banner').getByRole('button', { name: 'Dashboard' })
+  await expect(dashboardItem).toBeVisible()
+
+  await page.keyboard.press('Escape')
+  await expect(dashboardItem).toHaveCount(0)
 })

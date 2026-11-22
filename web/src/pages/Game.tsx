@@ -1113,7 +1113,7 @@ function GameContent() {
     window.open(url.toString(), "_blank", "noopener");
   };
 
-  // Changing a submitted result is given up whenever anything but its choices opens.
+  // Changing a submitted result is given up whenever a menu, panel or window other than its choices opens.
   const openGameSurface = useCallback((surface: GameSurface) => {
     if (surface.kind !== "submitResult") setIsChangingResult(false);
     dispatchSurface({ type: "open", surface });
@@ -1121,7 +1121,7 @@ function GameContent() {
 
   const closeGameplayOverlays = useCallback((except?: GameSurfaceKind) => {
     if (except !== "submitResult") setIsChangingResult(false);
-    dispatchSurface({ type: "closeAll", except });
+    dispatchSurface({ type: "closeOverlays", except });
   }, []);
 
   useEffect(() => {
