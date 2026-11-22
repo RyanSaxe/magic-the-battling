@@ -28,7 +28,7 @@ function getMicVisual(props: Pick<MicToggleProps, 'muted' | 'connectionState' | 
   if (remoteMuted) {
     return { icon: 'off', color: 'text-[var(--ivory-muted)]', animation: '', title: 'Player muted' }
   }
-  return { icon: 'mic', color: 'text-indigo-300 hover:text-indigo-200', animation: '', title: 'Mute' }
+  return { icon: 'mic', color: 'text-[var(--color-gold)] hover:text-[var(--color-gold-bright)]', animation: '', title: 'Mute' }
 }
 
 export function MicToggle({ muted, onClick, variant = 'default', audioLevelKey, connectionState, remoteMuted }: MicToggleProps) {

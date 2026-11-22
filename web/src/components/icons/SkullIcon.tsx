@@ -26,11 +26,11 @@ export function SkullIcon({ size = 'md', className = '' }: SkullIconProps) {
         stroke="#DC2626"
         strokeWidth="1.5"
       />
-      <circle cx="9" cy="11" r="2" fill="#1F2937" />
-      <circle cx="15" cy="11" r="2" fill="#1F2937" />
+      <circle cx="9" cy="11" r="2" fill="#1C1714" />
+      <circle cx="15" cy="11" r="2" fill="#1C1714" />
       <path
         d="M10 17V19M12 17V19M14 17V19"
-        stroke="#1F2937"
+        stroke="#1C1714"
         strokeWidth="1.5"
         strokeLinecap="round"
       />
