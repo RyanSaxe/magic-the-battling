@@ -35,7 +35,7 @@ export const PHASE_HOTKEYS: Record<string, HotkeyEntry[]> = {
     ]},
   ],
   battle: [
-    { key: 'U', description: 'Untap all permanents' },
+    { key: 'U', description: 'Untap all your permanents' },
     { key: 'P', description: 'Pass turn' },
     { key: 'T', description: 'Create treasure' },
     {
