@@ -158,12 +158,23 @@ input:-webkit-autofill:focus {
 /* Walnut-themed scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #1c1714 transparent;
+  scrollbar-color: var(--stone-light) transparent;
+}
+
+/*
+ * Chrome and Safari ignore ::-webkit-scrollbar while either property above is set, and those rules alone can make a
+ * bar 4px. Bars that overlay the page keep the properties, as iOS takes the colour only from them.
+ */
+@supports selector(::-webkit-scrollbar) {
+  :where([data-scrollbars="classic"], [data-scrollbars="classic"] *) {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -171,12 +182,8 @@ input:-webkit-autofill:focus {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--chrome);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #2a2320;
+  background: var(--stone-light);
+  border-radius: 2px;
 }
 
 /* Game table background - classic felt */
