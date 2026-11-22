@@ -3822,9 +3822,8 @@ class GameManager:
 
         fake_player = self._get_fake_player_for_opponent(game, opponent)
         player_display_end_poison = player.poison
-        opponent_display_end_poison = (
-            fake_player.poison if fake_player is not None else opponent_start_poison + poison_dealt
-        )
+        # A ghost's damage still plays, though its total no longer moves.
+        opponent_display_end_poison = opponent_start_poison + poison_dealt
 
         player_at_lethal = player.poison >= game.config.poison_to_lose
 
