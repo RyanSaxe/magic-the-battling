@@ -41,6 +41,15 @@ def token_after_claim(seat_token: str | None, stored_hash: str | None) -> str:
     return new_seat_token()
 
 
+def holds_seat(
+    *, stored_hash: str | None, owner_user_id: str | None, seat_token: str | None, user_id: str | None
+) -> bool:
+    """Whether the caller has the seat's token or is logged in as the account that took it."""
+    if owner_user_id is not None and user_id == owner_user_id:
+        return True
+    return seat_token_matches(seat_token, stored_hash)
+
+
 def seat_claim_refusal(
     *,
     stored_hash: str | None,
@@ -48,9 +57,7 @@ def seat_claim_refusal(
     seat_token: str | None,
     user_id: str | None,
 ) -> SeatClaimRefusal | None:
-    if owner_user_id is not None and user_id == owner_user_id:
-        return None
-    if seat_token_matches(seat_token, stored_hash):
+    if holds_seat(stored_hash=stored_hash, owner_user_id=owner_user_id, seat_token=seat_token, user_id=user_id):
         return None
     # Seats taken before seat tokens existed have no hash. Their first claim issues one, so this closes over time.
     if stored_hash is None and owner_user_id is None:

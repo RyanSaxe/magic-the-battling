@@ -185,6 +185,7 @@ export async function closeSeat(gameId: string, playerName: string, seatToken: s
   const response = await fetch(`${API_BASE}/games/${gameId}/close`, {
     method: 'POST',
     headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
+    credentials: 'include',
     body: JSON.stringify({ player_name: playerName, seat_token: seatToken }),
   })
   if (!response.ok) {
