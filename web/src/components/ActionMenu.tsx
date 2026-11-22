@@ -83,17 +83,6 @@ export function ActionMenu({
     node.style.height = `${node.getBoundingClientRect().height}px`
   }, [])
 
-  useLayoutEffect(() => {
-    const node = menuRef.current
-    if (!node) return
-    const markRowsBelow = () => {
-      node.dataset.rowsBelow = String(node.scrollTop + node.clientHeight < node.scrollHeight - 1)
-    }
-    markRowsBelow()
-    node.addEventListener('scroll', markRowsBelow)
-    return () => node.removeEventListener('scroll', markRowsBelow)
-  }, [submenu])
-
   const isYourTurn = battle.current_turn_name === playerName
 
   const handleAction = (action: CardStateAction, data?: Record<string, unknown>) => {
@@ -142,7 +131,7 @@ export function ActionMenu({
       <div className="fixed inset-x-0 top-[var(--frame-bar-height)] bottom-[var(--frame-bar-height)] z-[86]" onClick={onClose} />
       <div
         ref={menuRef}
-        className="menu-scroll fixed bottom-16 left-[calc(var(--bar-inline)+0.5rem)] modal-chrome border gold-border rounded-lg shadow-xl py-1 w-[280px] max-h-[70vh] overflow-auto z-[87]"
+        className="fixed bottom-16 left-[calc(var(--bar-inline)+0.5rem)] modal-chrome border gold-border rounded-lg shadow-xl py-1 w-[280px] max-h-[70vh] overflow-auto z-[87]"
       >
         {card && (
           <>
@@ -378,7 +367,7 @@ export function ActionMenu({
           onClick={() => handleGeneralAction(onPassTurn)}
           disabled={!isYourTurn}
         />
-        <div aria-hidden="true" className="menu-scroll-fade" />
+
       </div>
     </>
   )
