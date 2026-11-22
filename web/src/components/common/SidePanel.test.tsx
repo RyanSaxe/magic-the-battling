@@ -36,6 +36,16 @@ describe('SidePanel', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('leaves Escape to a dialog open over it', () => {
+    const { onClose } = openPanel()
+    const dialog = document.body.appendChild(document.createElement('div'))
+    dialog.setAttribute('aria-modal', 'true')
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('closes on a tap on the board outside it when asked to, and not on a tap inside it', () => {
     const { host, lifeField, onClose } = openPanel({ closeOnBoardTap: true })
 

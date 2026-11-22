@@ -429,8 +429,8 @@ input:-webkit-autofill:focus {
   z-index: 45;
 }
 
-/* Even empty, this layer slowed every click by up to a second in WebKit on Linux, so it shows only with a panel in
-   it. */
+/* Even empty, this layer made one measured click, a dialog's submit, about 0.8s slower in WebKit on Linux, so it
+   shows only with a panel in it. */
 .side-panel-frame:empty {
   display: none;
 }
