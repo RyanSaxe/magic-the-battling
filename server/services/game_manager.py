@@ -50,7 +50,7 @@ from mtb.models.game import (
 )
 from mtb.models.types import BuildSource, CardDestination, PlayMode, ZoneName, normalize_play_mode
 from mtb.phases import battle, build, draft, reward
-from mtb.phases.battle import get_pairing_probabilities
+from mtb.phases.battle import get_furthest_round, get_pairing_probabilities
 from mtb.phases.elimination import (
     check_game_over,
     eliminate_player,
@@ -2623,6 +2623,9 @@ class GameManager:
         most_recent_ghost_puppet_name: str | None = None,
     ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
+        # The odds come from the furthest round's table, so the treasures do too. The cards stay from the viewer's
+        # round, or a player who is behind would see a hand early.
+        table_snapshot = fake.get_opponent_for_round(*get_furthest_round(viewer.game))
 
         if viewer.in_sudden_death:
             revealed_cards = (snapshot.hand + snapshot.command_zone) if snapshot else []
@@ -2644,10 +2647,10 @@ class GameManager:
 
         last_result = self._get_fake_player_last_result(fake)
 
-        if snapshot:
+        if snapshot and table_snapshot:
             return PlayerView(
                 name=fake.name,
-                treasures=snapshot.treasures,
+                treasures=table_snapshot.treasures,
                 poison=fake.poison,
                 phase="battle",
                 round=viewer.round,
