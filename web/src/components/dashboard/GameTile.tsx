@@ -1,10 +1,9 @@
 import type { CSSProperties } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import type { GameSummary } from '../../types'
-import { cubeTitle, formatWhen, gameMeta, modeLabel, seatsLabel, upgradesLabel } from '../../utils/accountFormat'
+import { cubeTitle, formatWhen, modeLabel, seatsLabel, upgradesLabel } from '../../utils/accountFormat'
 import { SurfaceCard } from '../common/SurfaceCard'
-import { PlacementTag } from '../common/Tag'
-import { DetailLine } from './Details'
+import { StandingsRank } from '../common/StandingsRank'
 
 const MAX_HAND_CARDS = 7
 const HAND_OVERLAP_PX = 8
@@ -55,13 +54,48 @@ function recapPath(game: GameSummary): string {
   return `/game/${game.game_id}/share/${encodeURIComponent(game.best_human_name)}`
 }
 
+/** The rank down a game card's left edge, red for last place, where the card shows a placement. */
+function GameRank({ game }: { game: GameSummary }) {
+  if (game.best_human_placement === null) return null
+  return (
+    <StandingsRank
+      rank={game.best_human_placement}
+      isLast={game.best_human_placement === game.player_count}
+      className="w-9 shrink-0"
+    />
+  )
+}
+
+/** Who played and the table on the left; when and the settings on the right, so each side reads as two lines. */
+function GameHeader({ title, href, game }: { title: string; href: string; game: GameSummary }) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h3 className="truncate text-sm leading-5 font-semibold text-amber-50">
+          <Link to={href} onClick={(e) => e.stopPropagation()}>{title}</Link>
+        </h3>
+        <p className="truncate text-[11px] leading-4 text-amber-100/60">
+          {seatsLabel(game.human_count, game.player_count - game.human_count)}
+        </p>
+      </div>
+      <div className="shrink-0 text-right text-[11px] text-amber-100/60">
+        <p className="leading-5">{formatWhen(game.created_at)}</p>
+        <p className="leading-4">{modeLabel(game.play_mode)} · {upgradesLabel(game.use_upgrades ?? true)}</p>
+      </div>
+    </div>
+  )
+}
+
+const GAME_CARD_CLASS =
+  'flex overflow-hidden cursor-pointer transition-shadow hover:shadow-[inset_0_0_0_1px_rgba(255,236,181,0.58)]'
+
 interface GameTileProps {
   game: GameSummary
   className?: string
   style?: CSSProperties
 }
 
-/** A finished game: the cube, the table, the date, the player's placement and final hand. Opens its recap. */
+/** A finished game: the player's placement, the cube, the table, the date, the settings and final hand. Opens its recap. */
 export function GameTile({ game, className, style }: GameTileProps) {
   const navigate = useNavigate()
   const href = recapPath(game)
@@ -71,57 +105,30 @@ export function GameTile({ game, className, style }: GameTileProps) {
       layout="tile"
       onClick={() => navigate(href)}
       style={style}
-      className={`flex flex-col gap-2 px-3 py-2.5 cursor-pointer transition-shadow hover:shadow-[inset_0_0_0_1px_rgba(255,236,181,0.58)] ${className ?? ''}`}
+      className={`${GAME_CARD_CLASS} ${className ?? ''}`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="truncate text-[13px] leading-5 font-semibold text-amber-50">
-            <Link to={href} onClick={(e) => e.stopPropagation()}>{cubeTitle(game)}</Link>
-          </h3>
-          <p className="truncate text-[11px] leading-4 text-amber-100/60">{gameMeta(game)}</p>
-        </div>
-        {game.best_human_placement !== null && (
-          <PlacementTag rank={game.best_human_placement} total={game.player_count} />
-        )}
+      <GameRank game={game} />
+      <div className="flex min-w-0 flex-1 flex-col gap-2 px-3 py-2.5">
+        <GameHeader title={cubeTitle(game)} href={href} game={game} />
+        <HandFan scryfallIds={game.hand_scryfall_ids} />
       </div>
-      <HandFan scryfallIds={game.hand_scryfall_ids} />
     </SurfaceCard>
   )
 }
 
-/** A game in a cube's history, shown by one seat: its placement, name, table, final hand and settings. */
+/** A game in a cube's history, shown by one seat: its placement, name, table, date, settings and final hand. */
 export function RecapCard({ game }: { game: GameSummary }) {
   const navigate = useNavigate()
   const href = recapPath(game)
   return (
-    <SurfaceCard
-      as="article"
-      layout="tile"
-      onClick={() => navigate(href)}
-      className="flex flex-col gap-2.5 p-3 cursor-pointer transition-shadow hover:shadow-[inset_0_0_0_1px_rgba(255,236,181,0.58)]"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2.5">
-          {game.best_human_placement !== null && (
-            <PlacementTag rank={game.best_human_placement} total={game.player_count} />
-          )}
-          <div className="min-w-0">
-            <h3 className="truncate text-sm font-semibold text-amber-50">
-              <Link to={href} onClick={(e) => e.stopPropagation()}>{game.best_human_name}</Link>
-            </h3>
-            <p className="truncate text-[11px] leading-4 text-amber-100/60">
-              {seatsLabel(game.human_count, game.player_count - game.human_count)}
-            </p>
-          </div>
-        </div>
-        <span className="shrink-0 text-[11px] leading-4 text-amber-100/60">{formatWhen(game.created_at)}</span>
-      </div>
-      {game.hand_scryfall_ids.length > 0 && (
-        <HandFan scryfallIds={game.hand_scryfall_ids} className="h-[111px]" imageSize="normal" centered />
-      )}
-      <div className="mt-auto flex items-center justify-between gap-2">
-        <DetailLine items={[modeLabel(game.play_mode), upgradesLabel(game.use_upgrades ?? true)]} />
-        <span className="shrink-0 text-xs font-semibold text-amber-400">View Recap →</span>
+    <SurfaceCard as="article" layout="tile" onClick={() => navigate(href)} className={GAME_CARD_CLASS}>
+      <GameRank game={game} />
+      <div className="flex min-w-0 flex-1 flex-col gap-2.5 p-3">
+        <GameHeader title={game.best_human_name} href={href} game={game} />
+        {game.hand_scryfall_ids.length > 0 && (
+          <HandFan scryfallIds={game.hand_scryfall_ids} className="h-[111px]" imageSize="normal" centered />
+        )}
+        <span className="mt-auto self-end text-xs font-semibold text-amber-400">View Recap →</span>
       </div>
     </SurfaceCard>
   )

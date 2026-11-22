@@ -257,7 +257,7 @@ input:-webkit-autofill:focus {
   outline-offset: 2px;
 }
 
-/* A small rimmed label: what a cube is, a placement, a feature's status or a player's state. Each tone is a dark
+/* A small rimmed label: what a cube is, a feature's status or a player's state. Each tone is a dark
    tinted fill, a 1px rim and light text. Small quiet tags, for statuses, sit on a near-black fill with a softer rim
    and can lead with a dot. In the components layer so positioning classes can move a tag. */
 @layer components {
@@ -314,14 +314,6 @@ input:-webkit-autofill:focus {
     --tag-rim-quiet: #4a423c;
     --tag-text: #e2d8cb;
     --tag-dot: var(--ivory-muted);
-  }
-
-  .tag-bronze {
-    --tag-fill: #422d1a;
-    --tag-rim: #7e552f;
-    --tag-rim-quiet: #553a22;
-    --tag-text: #e8be92;
-    --tag-dot: #b0733b;
   }
 
   .tag-crimson {
