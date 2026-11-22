@@ -26,6 +26,8 @@ interface RulesPanelProps {
   onClose: () => void
   /** Hears whether the window is minimized, which leaves the page's hotkeys on, and false when it closes. */
   onMinimizedChange: (minimized: boolean) => void
+  /** A panel is open over the minimized window, so Escape closes that panel and not the Guide. */
+  behindPanel?: boolean
   initialDocId?: string
   initialTab?: string
   gameId?: string
@@ -136,6 +138,7 @@ function defaultMobileCollapsedOrigin(viewport: ViewportBox, collapsedHeight: nu
 export function RulesPanel({
   onClose,
   onMinimizedChange,
+  behindPanel = false,
   initialDocId,
   initialTab,
   gameId,
@@ -271,13 +274,13 @@ export function RulesPanel({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !event.defaultPrevented && !behindPanel) {
         onClose()
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  }, [behindPanel, onClose])
 
   useEffect(() => {
     const syncViewport = () => {

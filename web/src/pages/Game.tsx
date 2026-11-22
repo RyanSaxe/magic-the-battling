@@ -103,9 +103,10 @@ import {
 } from "./pendingPhaseAction";
 import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
 import {
+  guideShowing,
   isDrawerOpen,
   isZonePanelOpen,
-  reduceGameSurface,
+  reduceGameBoard,
   type GameSurface,
   type GameSurfaceKind,
   type PanelZone,
@@ -833,17 +834,20 @@ function GameContent() {
 
   const sizes = useViewportCardSizes();
   const shellMode = useGameShellMode();
-  const [openSurface, dispatchSurface] = useReducer(reduceGameSurface, null);
+  const [{ open: openSurface, selectedCard: battleSelectedCard }, dispatchBoard] = useReducer(reduceGameBoard, {
+    open: null,
+    selectedCard: null,
+  });
   const sidebarOpen = isDrawerOpen(openSurface);
   const setSidebarOpen = useCallback((open: boolean) => {
-    dispatchSurface(open ? { type: "open", surface: { kind: "players" } } : { type: "close", kind: "players" });
+    dispatchBoard(open ? { type: "open", surface: { kind: "players" } } : { type: "close", kind: "players" });
   }, []);
   const scouting = useMemo<Scouting | null>(
     () => (openSurface?.kind === "scouting" ? { player: openSurface.player, tab: openSurface.tab } : null),
     [openSurface],
   );
   const setScouting = useCallback((player: string | null, tab: ScoutingTab = "seen") => {
-    dispatchSurface(player ? { type: "scout", player, tab } : { type: "close", kind: "scouting" });
+    dispatchBoard(player ? { type: "scout", player, tab } : { type: "close", kind: "scouting" });
   }, []);
   const [fightSidebarView, setFightSidebarView] = useState<FightSidebarView>("fight");
   const [battleSidebarLayout, setBattleSidebarLayout] = useState<BattleSidebarLayout>(null);
@@ -986,13 +990,16 @@ function GameContent() {
   const [selectedPoolCardId, setSelectedPoolCardId] = useState<string | null>(null);
 
   // Lifted state from Battle phase
-  const [battleSelectedCard, setBattleSelectedCard] = useState<BattleSelectedCard | null>(null);
+  const setBattleSelectedCard = useCallback(
+    (card: BattleSelectedCard | null) => dispatchBoard({ type: "select", card }),
+    [],
+  );
   const [battleCardMenu, setBattleCardMenu] = useState<BattleCardMenu | null>(null);
   const [isChangingResult, setIsChangingResult] = useState(false);
   const actionMenuOpen = openSurface?.kind === "actions";
   const showSubmitHandPopover = openSurface?.kind === "submitHand";
   const showSubmitResultPopover = openSurface?.kind === "submitResult";
-  const closeSurface = useCallback((kind: GameSurfaceKind) => dispatchSurface({ type: "close", kind }), []);
+  const closeSurface = useCallback((kind: GameSurfaceKind) => dispatchBoard({ type: "close", kind }), []);
   const [pendingBattleResult, setPendingBattleResult] = useState<string | null>(null);
   const [pendingPostRevealSubmit, setPendingPostRevealSubmit] = useState<string | null>(null);
   const [visibleGuideStep, setVisibleGuideStep] = useState<VisibleGuideStep | null>(null);
@@ -1073,15 +1080,19 @@ function GameContent() {
 
   useEffect(() => {
     queueMicrotask(() => {
-      dispatchSurface({ type: "phaseChanged", phase: selfPhase });
+      dispatchBoard({ type: "phaseChanged", phase: selfPhase });
       setFightSidebarView("fight");
       if (selfPhase !== "battle") setIsChangingResult(false);
     });
   }, [selfPhase]);
 
-  const rulesPanel = openSurface?.kind === "guide" ? openSurface : null;
+  const rulesPanel = guideShowing(openSurface) ?? null;
   const rulesPanelOpen = rulesPanel !== null;
-  const [guideMinimized, setGuideMinimized] = useState(false);
+  const guideMinimized = !!rulesPanel?.minimized;
+  const setGuideMinimized = useCallback(
+    (minimized: boolean) => dispatchBoard({ type: "guideMinimized", minimized }),
+    [],
+  );
   const shareOpen = openSurface?.kind === "share";
 
   // Hover tracking for hotkeys
@@ -1129,10 +1140,18 @@ function GameContent() {
     queueMicrotask(() => setHoveredCard(card));
   }, [currentBattle]);
 
+  const moveBattleCard = useCallback<typeof actions.battleMove>(
+    (cardId, ...move) => {
+      actions.battleMove(cardId, ...move);
+      dispatchBoard({ type: "cardMoved", cardId });
+    },
+    [actions],
+  );
+
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
     phase: gameState?.self_player?.phase ?? "draft",
-    battleMove: actions.battleMove,
+    battleMove: moveBattleCard,
   });
 
   const handleYourLifeChange = (life: number) => {
@@ -1156,12 +1175,12 @@ function GameContent() {
   // Changing a submitted result is given up whenever a menu, panel or window other than its choices opens.
   const openGameSurface = useCallback((surface: GameSurface) => {
     if (surface.kind !== "submitResult") setIsChangingResult(false);
-    dispatchSurface({ type: "open", surface });
+    dispatchBoard({ type: "open", surface });
   }, []);
 
   const closeGameplayOverlays = useCallback((except?: GameSurfaceKind) => {
     if (except !== "submitResult") setIsChangingResult(false);
-    dispatchSurface({ type: "closeOverlays", except });
+    dispatchBoard({ type: "closeOverlays", except });
   }, []);
 
   useEffect(() => {
@@ -1486,7 +1505,7 @@ function GameContent() {
           };
           const moveHotkeys = buildCardMoveHotkeys({
             hoveredCard,
-            moveCard: (card, toZone) => actions.battleMove(card.id, card.zone, toZone, card.owner, card.owner),
+            moveCard: (card, toZone) => moveBattleCard(card.id, card.zone, toZone, card.owner, card.owner),
             clearHoveredCard: () => setHoveredCard(null),
           });
           for (const [key, action] of Object.entries(moveHotkeys)) {
@@ -2660,6 +2679,7 @@ function GameContent() {
         <RulesPanel
           onClose={() => closeSurface("guide")}
           onMinimizedChange={setGuideMinimized}
+          behindPanel={openSurface?.kind !== "guide"}
           initialDocId={rulesPanel.target?.docId}
           initialTab={rulesPanel.target?.tab}
           gameId={gameId}

@@ -2,6 +2,7 @@ import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { getPhaseReferenceLabel, getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
 import type { Phase } from '../constants/phases'
+import { BoardBackdrop } from './common/BoardBackdrop'
 import { POPOVER_CHROME } from './common/styles'
 
 const PHASE_TITLE_COLOR: Record<Phase, string> = {
@@ -31,6 +32,7 @@ export function PhasePopover({
   onOpenControls,
 }: PhasePopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null)
+  const backdropRef = useRef<HTMLDivElement>(null)
   const arrowRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -38,7 +40,9 @@ export function PhasePopover({
       if (e.key === 'Escape') onClose()
     }
     const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      // A press on the bars closes at once and still clicks. Over the board, the backdrop waits for the click.
+      if (popoverRef.current && !popoverRef.current.contains(target) && !backdropRef.current?.contains(target)) {
         onClose()
       }
     }
@@ -81,7 +85,10 @@ export function PhasePopover({
 
   useLayoutEffect(positionPopover, [positionPopover])
 
-  return createPortal(
+  return (
+    <>
+    {!isClosing && <BoardBackdrop ref={backdropRef} onTap={onClose} />}
+    {createPortal(
     <div
       ref={popoverRef}
       style={{
@@ -137,5 +144,7 @@ export function PhasePopover({
       </div>
     </div>,
     document.body,
+    )}
+    </>
   )
 }
