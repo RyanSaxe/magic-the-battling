@@ -68,3 +68,14 @@ test('a card moved from the Actions menu is no longer selected', async ({ page, 
   // A card left selected moves again on the next tap on a pile.
   await expect(creature).not.toHaveClass(/\bselected\b/)
 })
+
+test('a bar button acts on the first click while the Actions menu is open', async ({ page, baseURL }) => {
+  await openGame(page, baseURL!, FIGHT)
+  await page.getByRole('button', { name: 'Actions' }).dispatchEvent('click')
+  await expect(page.getByRole('button', { name: 'Roll a Die' })).toBeVisible()
+
+  const submit = (await page.getByRole('button', { name: 'Submit Result' }).boundingBox())!
+  await page.mouse.click(submit.x + submit.width / 2, submit.y + submit.height / 2)
+
+  await expect(page.locator('[data-guide-target="battle-submit-popover"]').getByRole('button', { name: 'I Won' })).toBeVisible()
+})

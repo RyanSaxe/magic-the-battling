@@ -1886,7 +1886,7 @@ function GameContent() {
             </button>
           )}
           <button
-            onClick={openActionMenu}
+            onClick={actionMenuOpen ? () => closeSurface("actions") : openActionMenu}
             className="btn btn-secondary"
             data-guide-target="battle-actions"
           >
