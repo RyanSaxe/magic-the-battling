@@ -793,6 +793,18 @@ input:-webkit-autofill:focus {
   box-shadow: -14px 0 28px rgba(0, 0, 0, 0.56), -4px 0 10px rgba(0, 0, 0, 0.4);
 }
 
+/* Closing the drawer closes scouting with it, so the edge scouting slides under has to leave with the drawer.
+   From 1120px that edge is the docked sidebar's, which stays. */
+@media (640px <= width < 1120px) {
+  .side-panel-beside {
+    transition: transform var(--transition-normal);
+  }
+
+  .side-panel-frame:not(:has(> .side-panel--open)) > .side-panel-beside {
+    transform: translateX(calc(var(--frame-sidebar-width) + 2px));
+  }
+}
+
 /* Zone-specific backgrounds */
 .zone-hand {
   background: radial-gradient(ellipse at center, #306842, #1a3a25);
