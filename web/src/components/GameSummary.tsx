@@ -51,7 +51,7 @@ export function GameSummary({
           poison={frozenPlayer.poison}
           upgrades={upgrades}
           companionIds={companionIds}
-          className={compact ? 'zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col' : undefined}
+          className={compact ? 'flex-1 min-h-0 flex flex-col' : undefined}
           enableResize={enableResize}
           isMobile={isMobile}
           layoutStateKey={layoutStateKey}
