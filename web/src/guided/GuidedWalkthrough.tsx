@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
   GuideStepDefinition,
   GuidedGuideId,
@@ -26,6 +26,23 @@ function spotlightDistance(a: SpotlightRect | null, b: SpotlightRect | null): nu
 function computeMorphDuration(distance: number): number {
   if (distance < 20) return 0;
   return Math.min(420, Math.max(260, 280 + (distance - 100) * 0.2));
+}
+
+function makeInertExcept(root: Element, usable: Element[]): () => void {
+  const madeInert: Element[] = [];
+  const visit = (parent: Element) => {
+    for (const child of parent.children) {
+      if (usable.includes(child)) continue;
+      if (usable.some((element) => child.contains(element))) {
+        visit(child);
+      } else if (!child.hasAttribute("inert")) {
+        child.setAttribute("inert", "");
+        madeInert.push(child);
+      }
+    }
+  };
+  visit(root);
+  return () => madeInert.forEach((element) => element.removeAttribute("inert"));
 }
 
 interface DisplayState {
@@ -123,6 +140,13 @@ export function GuidedWalkthrough({
   const isCurrentStepDisplayed =
     requestActive && displayState?.stepKey === stepKey && animPhase === "idle";
 
+  const getUsableTarget = useCallback(() => {
+    const root = rootRef.current;
+    return root && step?.allowTargetInteraction
+      ? resolveTarget(root, step.targetId, resolvedTargetSelector)
+      : null;
+  }, [resolvedTargetSelector, rootRef, step]);
+
   useEffect(() => {
     if (guide.phase && context.currentPhase && context.currentPhase !== guide.phase) {
       finishGuide();
@@ -174,11 +198,7 @@ export function GuidedWalkthrough({
 
       if (!handled) return;
       if (!isCurrentStepDisplayed) return;
-      const root = rootRef.current;
-      const spotlighted = root && step?.allowTargetInteraction
-        ? resolveTarget(root, step.targetId, resolvedTargetSelector)
-        : null;
-      if (enterPressesControl(event, walkthroughRef.current, spotlighted)) {
+      if (enterPressesControl(event, walkthroughRef.current, getUsableTarget())) {
         // A dialog can be open under the guide, and its Enter would confirm.
         event.stopImmediatePropagation();
         return;
@@ -199,7 +219,7 @@ export function GuidedWalkthrough({
 
     window.addEventListener("keydown", handleKey, true);
     return () => window.removeEventListener("keydown", handleKey, true);
-  }, [finishGuide, isCurrentStepDisplayed, onAdvanceStep, onBackStep, resolvedTargetSelector, rootRef, step, stepIndex]);
+  }, [finishGuide, getUsableTarget, isCurrentStepDisplayed, onAdvanceStep, onBackStep, stepIndex]);
 
   const layout = useGuidePositioning(
     rootRef,
@@ -468,6 +488,16 @@ export function GuidedWalkthrough({
   const buttonsDisabled = animPhase !== "idle" || !isCurrentStepDisplayed;
   // A closed guide stays mounted while it fades out, and the board under it must keep taking taps.
   const takesTaps = requestActive && animPhase !== "exiting";
+
+  // The overlay keeps taps from the board, and inert keeps keys from it. This runs after every render, so that it
+  // also covers what that render added.
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const walkthrough = walkthroughRef.current;
+    if (!takesTaps || !root || !walkthrough) return;
+    const target = displayState?.stepKey === stepKey ? getUsableTarget() : null;
+    return makeInertExcept(root, target ? [walkthrough, target] : [walkthrough]);
+  });
 
   if (!step) return null;
 
