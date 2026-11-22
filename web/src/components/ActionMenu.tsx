@@ -127,7 +127,8 @@ export function ActionMenu({
 
   return (
     <>
-      <div className="fixed inset-0 z-[86]" onClick={onClose} />
+      {/* Stops at the bars, so a bar button takes the first click instead of only closing the menu. */}
+      <div className="fixed inset-x-0 top-[var(--frame-bar-height)] bottom-[var(--frame-bar-height)] z-[86]" onClick={onClose} />
       <div
         ref={menuRef}
         className="fixed bottom-16 left-[calc(var(--bar-inline)+0.5rem)] modal-chrome border gold-border rounded-lg shadow-xl py-1 w-[280px] max-h-[70vh] overflow-auto z-[87]"

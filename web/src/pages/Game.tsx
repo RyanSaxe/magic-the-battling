@@ -1955,7 +1955,7 @@ function GameContent() {
             </button>
           )}
           <button
-            onClick={openActionMenu}
+            onClick={actionMenuOpen ? () => setActionMenuOpen(false) : openActionMenu}
             className="btn btn-secondary"
             data-guide-target="battle-actions"
           >

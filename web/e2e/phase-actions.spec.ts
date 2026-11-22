@@ -117,3 +117,28 @@ test('a card moved from the Actions menu is no longer selected', async ({ page, 
 
   expect(game.sent('battle_move')).toBe(1)
 })
+
+for (const { name, viewport, isMobile } of MENU_SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    // The menu's backdrop once covered the bars, so the first click on a bar button only closed the menu.
+    test('a bar button acts on the first click while the Actions menu is open', async ({ page, baseURL }) => {
+      await openGame(page, baseURL!, FIGHT)
+      const actions = page.getByRole('button', { name: 'Actions' })
+      await actions.click()
+      const roll = page.getByRole('button', { name: 'Roll a Die' })
+      await expect(roll).toBeVisible()
+
+      await page.getByRole('button', { name: 'Submit Result' }).click()
+
+      await expect(page.locator('[data-guide-target="battle-submit-popover"]').getByRole('button', { name: 'I Won' })).toBeVisible()
+      await expect(roll).toBeHidden()
+
+      await actions.click()
+      await expect(roll).toBeVisible()
+      await actions.click()
+      await expect(roll).toBeHidden()
+    })
+  })
+}
