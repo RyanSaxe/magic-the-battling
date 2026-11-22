@@ -1575,6 +1575,15 @@ input:-webkit-autofill:focus {
     margin-left: -12px;
   }
 
+  .seat-add:has(+ .icon-target) {
+    padding-right: 0;
+  }
+
+  .seat-add:has(+ .icon-target) .seat-status {
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+  }
+
   .seat-ready {
     color: var(--ready-text);
   }
@@ -1753,6 +1762,11 @@ input:-webkit-autofill:focus {
 
     .seat.is-self .seat-status {
       letter-spacing: 0.03em;
+    }
+
+    /* Out to the seat's edge, so the part ? doesn't cover is still 44px */
+    .seat-add::before {
+      left: -5px;
     }
 
     .cube-banner-strip {
