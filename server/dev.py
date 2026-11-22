@@ -127,7 +127,7 @@ def _start_backend(
         "uvicorn",
         "server.main:app",
         "--host",
-        "0.0.0.0",
+        "127.0.0.1",
         "--port",
         str(backend_port),
     ]

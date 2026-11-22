@@ -33,7 +33,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     port: frontendPort,
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     https: loadLocalCerts(),
     proxy: {
       '/api': backendHttpTarget,
