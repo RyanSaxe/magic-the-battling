@@ -177,7 +177,8 @@ function SettingsModal({
   const handleSave = async () => {
     setSaving(true)
     await onSave({
-      display_name: displayName.trim() || null,
+      // The server takes a null as unchanged, so an empty name is how to clear it.
+      display_name: displayName.trim(),
       use_upgrades: useUpgrades,
       play_mode: playMode,
       puppet_count: puppetCount,
