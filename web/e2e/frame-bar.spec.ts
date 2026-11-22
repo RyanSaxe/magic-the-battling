@@ -74,7 +74,39 @@ function measureFrame(page: Page) {
       const items = slot ? Array.from(slot.children).filter(visible) : []
       return items.length ? Math.max(...items.map((element) => element.getBoundingClientRect().right)) : null
     }
+    // Felt content that shows across a bar, after clipping by its scrolling or clipped ancestors.
+    const headerBottom = header.getBoundingClientRect().bottom
+    const footerTop = footer.getBoundingClientRect().top
+    const crossings: string[] = []
+    for (const root of [main, document.querySelector('.frame-sidebar')]) {
+      if (!root) continue
+      for (const element of Array.from(root.querySelectorAll('*'))) {
+        let top = element.getBoundingClientRect().top
+        let bottom = element.getBoundingClientRect().bottom
+        let hidden = false
+        for (let ancestor: Element | null = element; ancestor && ancestor !== root.parentElement; ancestor = ancestor.parentElement) {
+          const style = getComputedStyle(ancestor)
+          if (style.position === 'fixed' || style.opacity === '0' || style.visibility === 'hidden') hidden = true
+          if (ancestor !== element && (style.overflowX !== 'visible' || style.overflowY !== 'visible')) {
+            const clip = ancestor.getBoundingClientRect()
+            top = Math.max(top, clip.top)
+            bottom = Math.min(bottom, clip.bottom)
+          }
+        }
+        if (hidden || bottom - top <= 0 || element.getBoundingClientRect().width === 0) continue
+        // Each zone label straddles its zone's top seam; the top zone's sits on the board's top edge, across the top bar.
+        const crossesTop = top < headerBottom - 0.5 && !element.closest('[data-zone-label]')
+        // Known: Round Wrap-Up's progression note follows loot that fills the Loot zone, and the reward layout doesn't
+        // make room for it, so it runs under the bottom bar. Remove this once that layout sizes the zone for the note.
+        const crossesBottom = bottom > footerTop + 0.5 && !element.closest('[data-guide-target="reward-progression"]')
+        if (crossesTop || crossesBottom) {
+          const name = `${element.tagName.toLowerCase()}.${Array.from(element.classList).slice(0, 3).join('.')}`
+          crossings.push(`${name} "${element.textContent?.trim().slice(0, 20) ?? ''}" spans y=${Math.round(top)}..${Math.round(bottom)}`)
+        }
+      }
+    }
     return {
+      crossings,
       headerHeight: header.getBoundingClientRect().height,
       headerBottom: header.getBoundingClientRect().bottom,
       footerHeight: footer.getBoundingClientRect().height,
@@ -105,6 +137,7 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
         expect.soft(frame.footerTop, 'bottom bar top edge').toBe(viewport.height - BAR_HEIGHT)
         expect.soft(frame.feltLeft, 'felt left edge').toBe(rail)
         expect.soft(frame.feltRight, 'felt right edge').toBe(viewport.width - rail)
+        expect.soft(frame.crossings, 'felt content showing across a bar').toEqual([])
 
         for (const button of [...frame.topButtons, ...frame.bottomButtons]) {
           expect.soft(button.height, `"${button.label}" height`).toBe(BAR_BUTTON_HEIGHT)
@@ -345,3 +378,64 @@ for (const { name, viewport, isMobile } of SCREENS) {
     })
   })
 }
+
+for (const { name, viewport, isMobile } of SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    test("the card zoom's × sits on the card's corner, on the screen", async ({ page, baseURL }) => {
+      await serveGame(page, baseURL!, GAME_PHASES.build)
+      await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+      const card = page.locator('main .zone-sideboard .card').first()
+      const preview = page.getByTitle('Preview card').first()
+      if (isMobile) {
+        await card.tap()
+        await preview.tap()
+      } else {
+        await card.hover()
+        await preview.click()
+      }
+      const zoom = page.locator('[data-card-preview-modal]')
+      const close = zoom.getByRole('button', { name: '×' })
+      await expect(zoom.getByRole('img')).toBeVisible()
+      await expect(async () => expect((await zoom.getByRole('img').boundingBox())!.width).toBeGreaterThan(100)).toPass()
+
+      const closeBox = (await close.boundingBox())!
+      const image = (await zoom.getByRole('img').boundingBox())!
+      expect.soft(closeBox.x, "×'s left edge").toBeGreaterThanOrEqual(0)
+      expect.soft(closeBox.x + closeBox.width, "×'s right edge").toBeLessThanOrEqual(viewport.width)
+      expect.soft(closeBox.y, "×'s top edge").toBeGreaterThanOrEqual(0)
+      expect.soft(closeBox.x + closeBox.width / 2, "×'s centre, on the card's right edge").toBeCloseTo(image.x + image.width, 0)
+      expect.soft(closeBox.y + closeBox.height / 2, "×'s centre, on the card's top edge").toBeCloseTo(image.y, 0)
+    })
+  })
+}
+
+test.describe('iPhone 15', () => {
+  const { viewport } = SCREENS[0]
+  test.use({ viewport, isMobile: true, hasTouch: true })
+
+  // A touch screen widens each life button's tap area beyond the button, which must stay inside the life bar.
+  test("the life bar's buttons can't be tapped through the top bar or the opponent's hand", async ({ page, baseURL }) => {
+    await serveGame(page, baseURL!, GAME_PHASES.fight)
+    await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+    await page.locator('.mobile-life-bar').waitFor()
+
+    const taps = await page.evaluate(() => {
+      const header = document.querySelector('header')!.getBoundingClientRect()
+      const bar = document.querySelector('.mobile-life-bar')!.getBoundingClientRect()
+      return Array.from(document.querySelectorAll('.mobile-life-bar button')).map((button) => {
+        const rect = button.getBoundingClientRect()
+        const x = rect.left + rect.width / 2
+        const lands = (y: number) => button.contains(document.elementFromPoint(x, y))
+        return { label: button.textContent, aboveBar: lands(header.bottom - 1), belowBar: lands(bar.bottom + 1), onButton: lands(rect.top + rect.height / 2) }
+      })
+    })
+    expect(taps.length, 'life buttons').toBe(4)
+    for (const tap of taps) {
+      expect.soft(tap.onButton, `"${tap.label}" takes a tap on itself`).toBe(true)
+      expect.soft(tap.aboveBar, `"${tap.label}" takes a tap in the top bar`).toBe(false)
+      expect.soft(tap.belowBar, `"${tap.label}" takes a tap below the life bar`).toBe(false)
+    }
+  })
+})
