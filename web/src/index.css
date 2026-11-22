@@ -1192,7 +1192,7 @@ input:-webkit-autofill:focus {
 
   .join-code {
     display: block;
-    font: 700 28px/30px ui-monospace, monospace;
+    font: 700 28px/30px var(--font-mono);
     letter-spacing: 0.08em;
     white-space: nowrap;
   }

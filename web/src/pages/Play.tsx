@@ -593,14 +593,21 @@ export function Play() {
         )}
 
         {shownView === "options" && (
-          <div className="setup-felt play-felt">
+          <div
+            className="setup-felt play-felt"
+            // Hotkeys skip keys from inputs, which every field and switch here is.
+            onKeyDown={(event) => {
+              if (event.key !== "Escape") return;
+              event.stopPropagation();
+              showView("setup", true);
+            }}
+          >
             <label className="setup-field">
               <span className="setup-caption">CubeCobra ID</span>
               <input
                 type="text"
                 value={cubeId}
                 onChange={(e) => setCubeId(e.target.value)}
-                onKeyDown={(e) => e.key === "Escape" && showView("setup", true)}
                 placeholder="auto"
                 className="setup-input"
               />
