@@ -343,6 +343,8 @@ export function Play() {
   );
 
   const [friendsLoading, setFriendsLoading] = useState(false);
+  // Cancel can't recall a request, so each answer checks that its start is still the one wanted.
+  const startAttemptRef = useRef(0);
 
   const [soloPhase, setSoloPhase] = useState<SoloPhase>("idle");
   const soloPhaseRef = useRef<SoloPhase>("idle");
@@ -503,6 +505,7 @@ export function Play() {
     }
     lastLobbyErrorRef.current = null;
     setFriendsLoading(true);
+    const attempt = ++startAttemptRef.current;
     try {
       const response = await createGame(name, {
         cubeId: submittedCubeId || "auto",
@@ -511,6 +514,7 @@ export function Play() {
         guidedModeDefault: isGuidedMode,
         playMode,
       });
+      if (attempt !== startAttemptRef.current) return;
       saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
       rememberPlayerForGame(response.game_id, name, {
         seatToken: response.seat_token,
@@ -524,6 +528,7 @@ export function Play() {
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
+      if (attempt !== startAttemptRef.current) return;
       addToast(normalizeCreateGameError(err), "error");
       setFriendsLoading(false);
     }
@@ -544,6 +549,7 @@ export function Play() {
     lastLobbyErrorRef.current = null;
     updateSoloPhase("loading");
     resetWatcher();
+    const attempt = ++startAttemptRef.current;
     try {
       const targetCount = count + 1;
       const response = await createGame(name, {
@@ -554,6 +560,7 @@ export function Play() {
         guidedModeDefault: isGuidedMode,
         playMode,
       });
+      if (attempt !== startAttemptRef.current) return;
       saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
       rememberPlayerForGame(response.game_id, name, {
         seatToken: response.seat_token,
@@ -567,12 +574,14 @@ export function Play() {
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
+      if (attempt !== startAttemptRef.current) return;
       addToast(normalizeCreateGameError(err), "error");
       updateSoloPhase("idle");
     }
   };
 
   const handleCancelFriends = () => {
+    startAttemptRef.current += 1;
     if (pendingGameId) forgetSeatForGame(pendingGameId);
     setFriendsLoading(false);
     setPendingGameId(null);
@@ -581,6 +590,7 @@ export function Play() {
   };
 
   const handleCancelSolo = () => {
+    startAttemptRef.current += 1;
     if (pendingGameId) forgetSeatForGame(pendingGameId);
     updateSoloPhase("idle");
     setPendingGameId(null);
