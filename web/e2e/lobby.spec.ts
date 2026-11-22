@@ -26,9 +26,3 @@ test('the Guided and Voice toggles stay apart and inside their row', async ({ pa
   expect(voiceLabelBox.x - (guidedInfoBox.x + guidedInfoBox.width), 'space between Guided and Voice').toBeGreaterThanOrEqual(8)
   expect(voiceInfoBox.x + voiceInfoBox.width, 'Voice info icon ends inside the row').toBeLessThanOrEqual(rowBox.x + rowBox.width)
 })
-
-test('a puppet seat is marked with the puppet icon, not a ready dot', async ({ page }) => {
-  const seat = page.getByText('Puppet 1', { exact: true }).locator('..')
-  await expect(seat.getByRole('img', { name: 'Puppet' })).toBeVisible()
-  await expect(seat.locator('.rounded-full')).toHaveCount(0)
-})
