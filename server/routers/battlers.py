@@ -195,7 +195,7 @@ def list_battlers(
     battlers = (
         db.query(UserBattler)
         .filter(UserBattler.user_id == user.id)
-        .order_by(UserBattler.position, UserBattler.created_at)
+        .order_by(UserBattler.created_at.desc(), UserBattler.id.desc())
         .offset(offset)
         .limit(BATTLERS_PAGE_SIZE + 1)
         .all()

@@ -228,12 +228,33 @@ class TestPresetStats:
         assert updated["cube_name"] == "Vintage Cube"
 
 
+class TestPresetOrder:
+    def test_lists_your_newest_preset_first(self, client, vintage_cube, kestrel):
+        for name in ("Oldest", "Middle", "Newest"):
+            _save_preset(client, display_name=name)
+
+        names = [preset["display_name"] for preset in client.get("/api/battlers").json()["battlers"]]
+
+        assert names == ["Newest", "Middle", "Oldest"]
+
+    def test_pages_from_your_newest_preset_to_your_oldest(self, client, vintage_cube, kestrel):
+        for n in range(1, 22):
+            _save_preset(client, display_name=f"Preset {n}")
+
+        first = client.get("/api/battlers").json()
+        second = client.get("/api/battlers", params={"offset": 20}).json()
+
+        assert [p["display_name"] for p in first["battlers"]][:2] == ["Preset 21", "Preset 20"]
+        assert first["has_more"]
+        assert ([p["display_name"] for p in second["battlers"]], second["has_more"]) == (["Preset 1"], False)
+
+
 class TestOnePreset:
     def test_opens_any_of_your_presets_as_the_list_shows_it(self, client, vintage_cube, kestrel):
         presets = [_save_preset(client, display_name=f"Preset {n}") for n in range(1, 22)]
         second_page = client.get("/api/battlers", params={"offset": 20}).json()["battlers"]
 
-        response = client.get(f"/api/battlers/{presets[20]['id']}")
+        response = client.get(f"/api/battlers/{presets[0]['id']}")
 
         assert response.status_code == 200
         assert response.json() == second_page[0]
