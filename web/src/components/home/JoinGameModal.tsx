@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/authState'
 import { unknownToAppError } from '../../utils/appError'
+import { getRememberedGuestName, rememberGuestName } from '../../utils/deviceIdentity'
 import { joinLobbyByCode } from '../../utils/joinLobby'
 import { TEXT_INPUT } from '../common/styles'
 import { Dialog } from '../common/Dialog'
@@ -14,7 +15,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  const [manualName, setManualName] = useState('')
+  const [manualName, setManualName] = useState(() => getRememberedGuestName() ?? '')
   const playerName = user ? user.username : manualName
   const [joinCode, setJoinCode] = useState('')
   const [error, setError] = useState('')
@@ -44,7 +45,9 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
     setError('')
 
     try {
-      navigate(await joinLobbyByCode(code, name))
+      const lobbyPath = await joinLobbyByCode(code, name)
+      if (!user) rememberGuestName(name)
+      navigate(lobbyPath)
     } catch (err) {
       setError(unknownToAppError(err, 'join-game', 'Failed to join game').message)
     } finally {

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../test/fakeWebSocket'
@@ -158,6 +158,27 @@ describe('Play: starting a Goldfish game', () => {
     expect(toasts).toHaveLength(1)
     expect(screen.getByRole('button', { name: 'Start Game' })).toBeTruthy()
     expect(getRememberedSeat('game-1')).toBeNull()
+  })
+
+  it("fills in the name a guest last played under", async () => {
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+    fireEvent.change(screen.getByPlaceholderText('Enter your name'), { target: { value: 'Kellogg' } })
+    await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
+    cleanup()
+
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+
+    expect(screen.getByPlaceholderText<HTMLInputElement>('Enter your name').value).toBe('Kellogg')
   })
 
   it('does not offer a failed start for resuming', async () => {
