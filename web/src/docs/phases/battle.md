@@ -32,6 +32,7 @@ The fight phase is where you play a quick mini-game of magic with a few modified
 
 :::pointer
 - You can drag and drop cards between any zones, including your opponent's zones in order to make casting cards like Reanimate easier to resolve.
+- Click a card, then click empty space in another zone to move it there.
 - Click "actions" on the bottom left to see what actions you can take.
   - If a card is selected, some extra actions will appear.
   - Right clicking on a card will also bring up the action options for that card.
@@ -40,6 +41,7 @@ The fight phase is where you play a quick mini-game of magic with a few modified
 
 :::touch
 - Press and hold a card, then drag it to any zone, including your opponent's zones, to make cards like Reanimate easier to resolve.
+- Tap a card, then tap empty space in another zone to move it there.
 - Double-tap a card to tap or untap it.
 - Tap “Actions” at the bottom left to see what actions you can take.
   - Tap a card first to add its own actions: Tap/Untap, Flip, Move To and more.
