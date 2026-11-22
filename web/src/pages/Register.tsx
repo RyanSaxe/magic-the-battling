@@ -7,12 +7,17 @@ import { SurfaceCard } from '../components/common/SurfaceCard'
 import { unknownToAppError } from '../utils/appError'
 import { FIELD_ERROR, FIELD_HINT, FIELD_LABEL, LINK, TEXT_INPUT } from '../components/common/styles'
 
+// The server's rule, USERNAME_RE in server/schemas/auth.py.
+const USERNAME_PATTERN = /^[a-zA-Z0-9_]{3,30}$/
+const USERNAME_HINT = '3-30 characters: letters, numbers, underscores'
+const PASSWORD_HINT = 'At least 8 characters'
+
 /** Why each field keeps Create Account disabled, or null when the field is ready. */
 function reasonsNotReady(username: string, email: string, password: string, confirmPassword: string) {
   return {
-    username: username ? null : 'Enter a username',
+    username: !username ? 'Enter a username' : USERNAME_PATTERN.test(username) ? null : USERNAME_HINT,
     email: email ? null : 'Enter your email',
-    password: password.length >= 8 ? null : 'At least 8 characters',
+    password: password.length >= 8 ? null : PASSWORD_HINT,
     confirmPassword:
       confirmPassword === password ? null : confirmPassword ? "Passwords don't match" : 'Enter your password again',
   }
@@ -98,7 +103,7 @@ export function Register() {
         <Field
           id="username"
           label="Username"
-          hint="3-30 characters: letters, numbers, underscores"
+          hint={USERNAME_HINT}
           reason={shownReason(0, username, reasons.username)}
           wrapperClassName="mb-4"
           type="text"
@@ -107,10 +112,7 @@ export function Register() {
           {...tracksPassing(0)}
           autoFocus
           required
-          minLength={3}
           maxLength={30}
-          pattern="[a-zA-Z0-9_]+"
-          title="Letters, numbers, and underscores only"
         />
 
         <Field
@@ -128,7 +130,7 @@ export function Register() {
         <Field
           id="password"
           label="Password"
-          hint="At least 8 characters"
+          hint={PASSWORD_HINT}
           reason={shownReason(2, password, reasons.password)}
           wrapperClassName="mb-4"
           type="password"
@@ -136,7 +138,6 @@ export function Register() {
           onChange={(e) => setPassword(e.target.value)}
           {...tracksPassing(2)}
           required
-          minLength={8}
         />
 
         <Field
@@ -149,7 +150,6 @@ export function Register() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           {...tracksPassing(3)}
           required
-          minLength={8}
         />
 
         <button

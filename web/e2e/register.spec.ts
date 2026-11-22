@@ -29,6 +29,21 @@ test('an empty username asks for one once the player moves on', async ({ page })
   await expect(createAccount(page)).toBeDisabled()
 })
 
+test("a username that doesn't fit says what fits until it does", async ({ page }) => {
+  await field(page, 'Email').fill('kestrel@example.com')
+  await field(page, 'Password').fill('password1')
+  await field(page, 'Confirm Password').fill('password1')
+  for (const username of ['jace-fan', 'JF', 'two words']) {
+    await field(page, 'Username').fill(username)
+    await expectReason(field(page, 'Username'), '3-30 characters: letters, numbers, underscores')
+    await expect(createAccount(page)).toBeDisabled()
+  }
+
+  await field(page, 'Username').fill('jace_fan')
+  await expect(field(page, 'Username')).not.toHaveAttribute('aria-invalid')
+  await expect(createAccount(page)).toBeEnabled()
+})
+
 test('an empty email asks for one when the player skips it', async ({ page }) => {
   await field(page, 'Username').fill('kestrel')
   await field(page, 'Password').focus()
