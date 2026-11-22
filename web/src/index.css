@@ -2519,14 +2519,6 @@ input:-webkit-autofill:focus {
   border: none;
 }
 
-.btn-dark-border {
-  border: 1px solid #000 !important;
-}
-
-.play-action-btn {
-  border: 1px solid #000 !important;
-}
-
 /* A 30px button in a 44px target, for the rows of controls in a cube's banner */
 .btn.btn-pill {
   position: relative;
