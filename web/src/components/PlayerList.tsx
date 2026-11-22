@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import type { Phase, PlayerView } from "../types";
 import { MoneyBagIcon, PoisonIcon } from "./icons";
 import { useContextStrip } from "../contexts";
-import { getLastResultWord, getOrdinal } from "../utils/format";
+import { StandingsRank } from "./common/StandingsRank";
+import { getLastResultWord } from "../utils/format";
 import { getSidebarPlacementRank, getSidebarPlayerOrder, isSidebarLastPlace } from "../utils/playerPlacement";
 
 interface PlayerListProps {
@@ -107,7 +108,6 @@ export function PlayerRow({
   const isSelf = variant === "game" && player.name === currentPlayerName;
   const standing = getStanding(player, variant === "share" ? shareStatus : undefined);
   const rank = showPlacement ? getSidebarPlacementRank(player, players) : null;
-  const ordinal = rank === null ? null : getOrdinal(rank);
   const cardClassName = [
     "player-card",
     rank === null && "is-unranked",
@@ -119,12 +119,7 @@ export function PlayerRow({
   return (
     <div className={cardClassName} data-guide-player-row={player.name}>
       <button type="button" className="player-card-button" aria-pressed={isSelected} onClick={onClick}>
-        {rank !== null && (
-          <span className={`player-card-rank ${isSidebarLastPlace(player, players) ? "is-last" : ""}`} title={`${ordinal} place`}>
-            <span className="player-card-rank-number">{rank}</span>
-            <span className="player-card-rank-suffix">{ordinal?.slice(-2)}</span>
-          </span>
-        )}
+        {rank !== null && <StandingsRank rank={rank} isLast={isSidebarLastPlace(player, players)} />}
         <span className="player-card-body">
           <span className="player-card-line">
             <span className="player-card-name">{player.name}</span>

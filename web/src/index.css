@@ -47,6 +47,9 @@
   --ivory-muted: #b8aea3;
   --ivory-faint: #94897f;
 
+  /* A lost fight and last place, on walnut */
+  --loss-text: #f2b4aa;
+
   /* Quiet text on the felt: muted ivory a step lighter, so it holds 4.5:1 on the felt's lightest centre */
   --ivory-felt: #e0d6c8;
 
@@ -254,7 +257,7 @@ input:-webkit-autofill:focus {
   outline-offset: 2px;
 }
 
-/* A small rimmed label: what a cube is, a placement, a feature's status or a player's state. Each tone is a dark
+/* A small rimmed label: what a cube is, a feature's status or a player's state. Each tone is a dark
    tinted fill, a 1px rim and light text. Small quiet tags, for statuses, sit on a near-black fill with a softer rim
    and can lead with a dot. In the components layer so positioning classes can move a tag. */
 @layer components {
@@ -311,14 +314,6 @@ input:-webkit-autofill:focus {
     --tag-rim-quiet: #4a423c;
     --tag-text: #e2d8cb;
     --tag-dot: var(--ivory-muted);
-  }
-
-  .tag-bronze {
-    --tag-fill: #422d1a;
-    --tag-rim: #7e552f;
-    --tag-rim-quiet: #553a22;
-    --tag-text: #e8be92;
-    --tag-dot: #b0733b;
   }
 
   .tag-crimson {
@@ -2080,13 +2075,45 @@ input:-webkit-autofill:focus {
   }
 }
 
+/* A place down a card's left edge, as a standings table shows it, behind a gold seam. Last place is red. */
+.standings-rank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-right: 1px solid var(--gold-border);
+  background: linear-gradient(180deg, #3a302c 0%, #2e2623 100%);
+  color: var(--ivory);
+}
+
+.standings-rank-number {
+  font-family: 'Cinzel', serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.standings-rank-suffix {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ivory-muted);
+}
+
+.standings-rank.is-last .standings-rank-number,
+.standings-rank.is-last .standings-rank-suffix {
+  color: var(--loss-text);
+}
+
 /* A player's card in the game sidebar, the phone drawer and the share page: raised walnut with a gold edge, and the
    rank down its left edge. The edge turns solid gold for the player being viewed, your own rank column is gold, and
    the card goes flat and dark once its player is out. */
 .player-card {
   --player-card-rank-width: 2.25rem;
   --player-card-win: #86efac;
-  --player-card-loss: #f2b4aa;
   position: relative;
 }
 
@@ -2142,52 +2169,21 @@ input:-webkit-autofill:focus {
     inset 0 -1px 0 rgba(0, 0, 0, 0.44);
 }
 
-.player-card-rank {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  border-right: 1px solid var(--gold-border);
-  background: linear-gradient(180deg, #3a302c 0%, #2e2623 100%);
-}
-
-.player-card-rank-number {
-  font-family: 'Cinzel', serif;
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.player-card-rank-suffix {
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ivory-muted);
-}
-
-.player-card-rank.is-last .player-card-rank-number,
-.player-card-rank.is-last .player-card-rank-suffix {
-  color: var(--player-card-loss);
-}
-
-.player-card.is-out .player-card-rank {
+.player-card.is-out .standings-rank {
   border-right-color: rgba(212, 175, 55, 0.22);
   background: #241e1b;
 }
 
-.player-card.is-self .player-card-rank {
+.player-card.is-self .standings-rank {
   border-right-color: var(--color-gold);
   background: linear-gradient(180deg, #4a3a18 0%, #3a2c12 100%);
 }
 
-.player-card.is-self .player-card-rank-number {
+.player-card.is-self .standings-rank-number {
   color: var(--color-gold-bright);
 }
 
-.player-card.is-self .player-card-rank-suffix {
+.player-card.is-self .standings-rank-suffix {
   color: var(--color-gold);
 }
 
@@ -2242,7 +2238,7 @@ input:-webkit-autofill:focus {
 }
 
 .player-card-result-loss {
-  color: var(--player-card-loss);
+  color: var(--loss-text);
 }
 
 .player-card-result-draw {
@@ -2274,7 +2270,7 @@ input:-webkit-autofill:focus {
 }
 
 .player-card-label-out {
-  color: var(--player-card-loss);
+  color: var(--loss-text);
 }
 
 .player-card-label-viewing {
