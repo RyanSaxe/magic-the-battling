@@ -120,13 +120,6 @@ def register_card_data(scryfall_id: str, data: dict) -> None:
     )
 
 
-def lowercase_names(saved_registry: dict[str, dict]) -> dict[str, str]:
-    """The names a game saved in lowercase, by card. It keeps them, whatever the shared registry has."""
-    return {
-        sid: name for sid, fields in saved_registry.items() if (name := fields.get("name", "")) and name == name.lower()
-    }
-
-
 def get_card_data(scryfall_id: str, saved_names: Mapping[str, str] | None = None) -> CardData:
     try:
         card_data = _card_registry[scryfall_id]

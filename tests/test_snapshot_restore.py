@@ -11,7 +11,7 @@ import server.db.database as db
 import server.routers.games as games_module
 from mtb.models.card_registry import clear_registry
 from mtb.models.game import Game, restore_game_from_snapshot
-from server.db.models import ActiveGameSnapshot, GameRecord, QuarantinedGameSnapshot
+from server.db.models import ActiveGameSnapshot, GameRecord, PlayerGameHistory, QuarantinedGameSnapshot
 from server.main import app
 from server.services.game_manager import GameManager
 
@@ -99,6 +99,9 @@ def test_a_game_saved_in_lowercase_keeps_its_names_beside_a_newer_game_with_real
     saved = _saved_names(game_id)
     for card in newer_json["card_registry"].values():
         card["name"] = card["name"].title()
+    restore_game_from_snapshot(json.dumps(newer_json))
+    games_module.game_manager.persist_all_games()
+    assert _saved_names(game_id) == saved  # nor once a newer game has loaded, before any restart
 
     clear_registry()  # a restart
     manager = GameManager()
@@ -107,10 +110,11 @@ def test_a_game_saved_in_lowercase_keeps_its_names_beside_a_newer_game_with_real
     old = manager.get_game(game_id)
     assert old is not None
     newer = restore_game_from_snapshot(json.dumps(newer_json))
+    _ready_and_copy_a_card(manager, "newer", newer)
     _ready_and_copy_a_card(manager, game_id, old)
     manager.persist_all_games()
     saved_with_copy = _saved_names(game_id)
-    _ready_and_copy_a_card(manager, "newer", newer)
+    assert all(name.islower() for sid, name in saved_with_copy.items() if sid.startswith("token-copy-"))
 
     manager.persist_all_games()
     now = _saved_names(game_id)
@@ -120,9 +124,12 @@ def test_a_game_saved_in_lowercase_keeps_its_names_beside_a_newer_game_with_real
     assert bootstrap is not None
     for catalog in (bootstrap.catalog, bootstrap.state.catalog_delta):
         assert {sid: card.name for sid, card in catalog.items() if saved.get(sid, card.name) != card.name} == {}
-    pool = client.get(f"/api/games/{game_id}/cards").json()["cards"]
-    assert all(card["name"].startswith("card") for card in pool)
+    guide = client.get(f"/api/games/{game_id}/cards").json()
+    assert all(card["name"].startswith(("card", "upgrade")) for card in guide["cards"] + guide["upgrades"])
     with db.SessionLocal() as session:
+        history = session.query(PlayerGameHistory).filter_by(game_id=game_id, player_name="Alice").one()
+        puppet = manager._load_fake_player(session, history, set())
+        assert all(card.name.startswith("Card") for build in puppet.snapshots.values() for card in build.hand)
         record = session.get(GameRecord, game_id)
         assert record is not None
         record.ended_at = datetime.now(UTC)  # ty: ignore[invalid-assignment]

@@ -17,6 +17,7 @@ CARD_NAMES = {
     "crown": "Sprouting Crown",
     "lorien": "Lórien Revealed",
     "troll": "troll of khazad-dum",
+    "vial": "Æther Vial",
 }
 
 
@@ -563,7 +564,9 @@ class TestGameSearch:
         assert self._search(client, "LIGHTNING") == (["limited"], 1, 1)
 
     def test_finds_a_card_with_or_without_its_accents(self, client, kestrel):
-        _add_game("real", cube_id="vintage", played_on=_day(10), seats=[Seat("kestrel", 1, kestrel, hand=("lorien",))])
+        _add_game(
+            "real", cube_id="vintage", played_on=_day(10), seats=[Seat("kestrel", 1, kestrel, hand=("lorien", "vial"))]
+        )
         _add_game(
             "old", cube_id="vintage", played_on=_day(11), seats=[Seat("kestrel", 2, kestrel, upgrades=("troll",))]
         )
@@ -571,6 +574,7 @@ class TestGameSearch:
         assert self._search(client, "lorien") == (["real"], 1, 1)
         assert self._search(client, "LÓRIEN") == (["real"], 1, 1)
         assert self._search(client, "khazad-dûm") == (["old"], 1, 0)
+        assert self._search(client, "æther") == (["real"], 1, 1)
 
     def test_finds_games_by_a_basic_land_or_an_applied_upgrade(self, client, kestrels_games):
         assert self._search(client, "island") == (["legacy"], 1, 1)

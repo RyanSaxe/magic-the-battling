@@ -20,9 +20,10 @@ def contains_text(column: ColumnElement[str] | QueryableAttribute[str], search: 
 
 
 def _without_accents(column: str) -> str:
-    # In SQL, since a function in Python would wait for the GIL at each name. These are Latin-1's accented letters.
+    # In SQL, since a function in Python would wait for the GIL at each name, and LIKE ignores case only in ASCII.
+    # These are Latin-1's letters with an accent or a lowercase.
     for letter in map(chr, range(0xC0, 0x100)):
-        if (plain := fold_card_name(letter)).isascii():
+        if (plain := fold_card_name(letter)) != letter:
             column = f"replace({column}, '{letter}', '{plain}')"
     return column
 
