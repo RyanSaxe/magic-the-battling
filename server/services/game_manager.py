@@ -360,7 +360,7 @@ def _running_seat_in_snapshot(
     )
 
 
-def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame) -> ResumableGame:
+def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame, *, holds_token: bool) -> ResumableGame:
     return ResumableGame(
         game_id=seat.game_id,
         player_name=seat.player_name,
@@ -369,11 +369,13 @@ def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame) -> Resumabl
         play_mode=pending.play_mode,
         use_upgrades=pending.use_upgrades,
         player_count=len(pending.player_names) + pending.puppet_count,
-        can_close=pending.accepts_changes,
+        can_close=holds_token and pending.accepts_changes,
     )
 
 
-def _resumable_game_seat(seat: ResumableSeat, running: _RunningSeat, last_active_at: datetime | None) -> ResumableGame:
+def _resumable_game_seat(
+    seat: ResumableSeat, running: _RunningSeat, last_active_at: datetime | None, *, holds_token: bool
+) -> ResumableGame:
     return ResumableGame(
         game_id=seat.game_id,
         player_name=seat.player_name,
@@ -383,11 +385,15 @@ def _resumable_game_seat(seat: ResumableSeat, running: _RunningSeat, last_active
         play_mode=running.config.play_mode,
         use_upgrades=running.config.use_upgrades,
         player_count=running.player_count,
-        can_close=running.can_close,
+        can_close=holds_token and running.can_close,
         stage=running.stage,
         round=running.round,
         poison=running.poison,
     )
+
+
+def _lobbies_then_latest_game(game: ResumableGame) -> tuple[bool, datetime]:
+    return game.kind == "lobby", _utc_or_default(game.last_active_at, datetime.min.replace(tzinfo=UTC))
 
 
 def _with_cube_metadata(session: Session, games: list[ResumableGame]) -> list[ResumableGame]:
@@ -1917,11 +1923,22 @@ class GameManager:
             return not is_player_connected(game_id, player_id)
         return True
 
-    def find_resumable_seats(self, seats: list[ResumableSeat]) -> list[ResumableGame]:
-        """The seats a browser can still return to, given the tokens it holds. Never restores a snapshot."""
-        stored_game_ids = [seat.game_id for seat in seats if seat.game_id not in self._pending_games]
+    def find_resumable_seats(self, seats: list[ResumableSeat], *, user_id: str | None = None) -> list[ResumableGame]:
+        """The seats a caller can still return to: those its browser holds tokens for, and those its account took.
+
+        One seat per game, the browser's first. A login alone can't close a seat, so only a token sets can_close.
+        Never restores a snapshot."""
         session = db.SessionLocal()
         try:
+            account_seats = self._account_seats(session, user_id) if user_id else set()
+            seats = [
+                *seats,
+                *(
+                    ResumableSeat(game_id=game_id, player_name=name, seat_token="")
+                    for game_id, name in sorted(account_seats)
+                ),
+            ]
+            stored_game_ids = [seat.game_id for seat in seats if seat.game_id not in self._pending_games]
             stored_hashes = {
                 (cast(str, row.game_id), cast(str, row.player_name)): cast(str | None, row.seat_token_hash)
                 for row in session.query(GamePlayerRecord).filter(
@@ -1946,14 +1963,21 @@ class GameManager:
             }
 
             resumable: list[ResumableGame] = []
+            listed_game_ids: set[str] = set()
             for seat in seats:
+                if seat.game_id in listed_game_ids:
+                    continue
+                key = (seat.game_id, seat.player_name)
                 pending = self._pending_games.get(seat.game_id)
                 if pending is not None and not pending.is_started:
-                    if seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name)):
-                        resumable.append(_resumable_lobby_seat(seat, pending))
+                    holds_token = seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name))
+                    if holds_token or key in account_seats:
+                        resumable.append(_resumable_lobby_seat(seat, pending, holds_token=holds_token))
+                        listed_game_ids.add(seat.game_id)
                     continue
 
-                if not seat_token_matches(seat.seat_token, stored_hashes.get((seat.game_id, seat.player_name))):
+                holds_token = seat_token_matches(seat.seat_token, stored_hashes.get(key))
+                if not holds_token and key not in account_seats:
                     continue
                 game = self._active_games.get(seat.game_id)
                 if game is not None:
@@ -1971,11 +1995,37 @@ class GameManager:
                     continue
                 if running is None or running.phase in FINISHED_PLAYER_PHASES:
                     continue
-                resumable.append(_resumable_game_seat(seat, running, last_active_at))
+                resumable.append(_resumable_game_seat(seat, running, last_active_at, holds_token=holds_token))
+                listed_game_ids.add(seat.game_id)
 
+            if user_id:
+                # Each device saw different seats last, so an account's list goes by the games' own activity.
+                resumable.sort(key=_lobbies_then_latest_game, reverse=True)
             return _with_cube_metadata(session, resumable)
         finally:
             session.close()
+
+    def _account_seats(self, session: Session, user_id: str) -> set[tuple[str, str]]:
+        # This runs off the event loop, so it reads copies of the dicts that games are added to and removed from.
+        lobby_seats = {
+            (game_id, name)
+            for game_id, pending in list(self._pending_games.items())
+            if not pending.is_started
+            for player_id, name in zip(pending.player_ids, pending.player_names, strict=False)
+            if pending.player_user_ids.get(player_id) == user_id
+        }
+        # game_players has no index on user_id, so only games still in play are searched, by their id.
+        game_ids = set(self._active_games.copy())
+        game_ids.update(cast(str, row.game_id) for row in session.query(ActiveGameSnapshot.game_id))
+        game_seats = {
+            (cast(str, row.game_id), cast(str, row.player_name))
+            for row in session.query(GamePlayerRecord.game_id, GamePlayerRecord.player_name).filter(
+                GamePlayerRecord.game_id.in_(game_ids),
+                GamePlayerRecord.user_id == user_id,
+                GamePlayerRecord.is_puppet.is_(False),
+            )
+        }
+        return lobby_seats | game_seats
 
     def issue_lobby_seat_token(self, game_id: str, player_name: str) -> str:
         """Give the named lobby seat a fresh token, replacing any earlier one."""

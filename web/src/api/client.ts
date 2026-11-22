@@ -196,6 +196,7 @@ export async function getResumableGames(seats: ResumableSeat[]): Promise<Resumab
   const response = await fetch(`${API_BASE}/games/resumable`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ seats }),
   })
   if (!response.ok) {

@@ -303,9 +303,13 @@ class WarmCubeRequest(BaseModel):
 
 
 @router.post("/resumable", response_model=ResumableResponse)
-def find_resumable_games(request: ResumableRequest):
-    """List the lobbies and games the caller can return to, given the seat tokens their browser holds."""
-    return ResumableResponse(games=game_manager.find_resumable_seats(request.seats))
+def find_resumable_games(
+    request: ResumableRequest,
+    current_user: User | None = Depends(get_optional_user),  # noqa: B008
+):
+    """List the lobbies and games the caller can return to, by their browser's seat tokens or their login."""
+    user_id = str(current_user.id) if current_user else None
+    return ResumableResponse(games=game_manager.find_resumable_seats(request.seats, user_id=user_id))
 
 
 @router.post("/cubes/warm")

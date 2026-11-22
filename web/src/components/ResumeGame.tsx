@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { closeSeat } from '../api/client'
 import type { ResumableSeat } from '../hooks/useResumableGames'
+import { useResumeSeat } from '../hooks/useResumeSeat'
 import { unknownToAppError, type AppError } from '../utils/appError'
 import { forgetSeatForGame, getRememberedSeat } from '../utils/deviceIdentity'
 import { formatTimeSince } from '../utils/format'
@@ -10,10 +10,6 @@ import { Dialog } from './common/Dialog'
 const ROWS_SHOWN = 2
 const CLOSE_COLUMN = '-mr-2 ml-1.5 w-11 shrink-0'
 const SECTION_CAPTION = 'text-[10px] leading-4 font-bold uppercase tracking-[0.12em] text-[var(--ivory-muted)]'
-
-function seatPath(seat: ResumableSeat): string {
-  return `/game/${seat.gameId}/${seat.kind === 'lobby' ? 'lobby' : 'play'}`
-}
 
 function StatusDot({ kind }: { kind: ResumableSeat['kind'] }) {
   return (
@@ -83,12 +79,12 @@ function ResumeRow({
   hasCloseColumn: boolean
   onClose: () => void
 }) {
-  const navigate = useNavigate()
+  const resume = useResumeSeat()
   return (
     <li className="flex items-stretch border-t gold-divider first:border-t-0">
       <button
         type="button"
-        onClick={() => navigate(seatPath(seat))}
+        onClick={() => resume(seat)}
         aria-label={`${actionWord(seat)} ${seatTitle(seat)} as ${seat.playerName}`}
         className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2.5 rounded py-1.5 hover:bg-[var(--stone)] hover:[--ivory-muted:var(--ivory-soft)]"
       >
@@ -175,7 +171,7 @@ function CloseSeatDialog({
   )
 }
 
-/** The lobbies and games this browser can go back to, a line each, above the setup for a new game. */
+/** The lobbies and games this browser or its account can go back to, a line each, above the setup for a new game. */
 export function ResumeRows({ seats }: { seats: ResumableSeat[] }) {
   const [showsAll, setShowsAll] = useState(false)
   const [confirming, setConfirming] = useState<ResumableSeat | null>(null)
@@ -226,7 +222,7 @@ export function ResumeRows({ seats }: { seats: ResumableSeat[] }) {
 
 /** One line for the most recent lobby or game, for pages without room for a card. */
 export function ResumeGameStrip({ seat }: { seat: ResumableSeat }) {
-  const navigate = useNavigate()
+  const resume = useResumeSeat()
   const since = seat.kind === 'game' && seat.lastActiveAt ? ` · last played ${formatTimeSince(seat.lastActiveAt)}` : ''
   return (
     <div className="mb-4 flex w-full max-w-[30rem] shrink-0 items-center gap-2.5 rounded-lg border gold-border bg-black/35 py-1.5 pl-3 pr-1.5">
@@ -236,7 +232,7 @@ export function ResumeGameStrip({ seat }: { seat: ResumableSeat }) {
         <b className="font-semibold text-white">{seat.playerName}</b>
         <span className="hidden sm:inline">{since}</span>
       </span>
-      <button onClick={() => navigate(seatPath(seat))} className="btn btn-primary shrink-0 px-3 py-1 text-sm">
+      <button onClick={() => resume(seat)} className="btn btn-primary shrink-0 px-3 py-1 text-sm">
         {seat.kind === 'game' ? 'Resume' : 'Return'}
       </button>
     </div>
