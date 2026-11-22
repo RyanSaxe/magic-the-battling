@@ -124,8 +124,6 @@
   --sidebar-width: 16rem;
   /* Docked inside the felt's gold edge, the sidebar is narrower, so with the right rail back the board loses 28px. */
   --frame-sidebar-width: 242px;
-  /* From the board's gold edge to the screen's right edge: the docked sidebar, its 2px edge and the rail. */
-  --frame-dock-width: calc(var(--frame-sidebar-width) + 2px + var(--frame-rail-width));
   --bar-inline: 6px;
 }
 
@@ -421,13 +419,103 @@ input:-webkit-autofill:focus {
   color: #fecaca;
 }
 
-.battle-panel-chrome {
-  background: var(--chrome);
+/* Where side panels open: the board and its sidebar, inside their gold edge, so panels never cover the bars or a
+   banner. */
+.side-panel-frame {
+  position: absolute;
+  inset: 2px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 45;
 }
 
-.dnd-panel-header-battle {
-  background: var(--chrome);
-  border-bottom: 0;
+/* Even empty, this layer slowed every click by up to a second in WebKit on Linux, so it shows only with a panel in
+   it. */
+.side-panel-frame:empty {
+  display: none;
+}
+
+/* One panel for every zone, drawer and player list: below 640px it covers the board, from 640px the column the
+   docked sidebar takes on wide screens, with that column's gold edge. */
+.side-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  transform: translateX(100%);
+  transition: transform var(--transition-normal);
+}
+
+.side-panel--open {
+  transform: translateX(0);
+}
+
+.side-panel--open.side-panel--aside {
+  transform: translateX(100%);
+}
+
+@starting-style {
+  .side-panel--open {
+    transform: translateX(100%);
+  }
+}
+
+.side-panel-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgba(0, 0, 0, 0.22);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.22);
+}
+
+.side-panel-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ivory);
+}
+
+.side-panel-count {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ivory-muted);
+}
+
+/* A zone's label straddles the felt's top edge, so above a phone's panel, which covers the whole board, it would
+   show cut in half. */
+@media (width < 640px) {
+  .game-surface:has(.side-panel--open) [data-zone-label] {
+    visibility: hidden;
+  }
+}
+
+/* .btn sets a padding that would squeeze the icon out of this square. */
+.btn.side-panel-close {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ivory);
+}
+
+.side-panel-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Desktop left chrome strip — game pages only */
@@ -453,8 +541,17 @@ input:-webkit-autofill:focus {
     z-index: 2;
   }
 
-  .dnd-panel-header-battle {
-    position: relative;
+  .side-panel {
+    width: calc(var(--frame-sidebar-width) + 2px);
+    border-left: 2px solid var(--seam-stroke);
+  }
+}
+
+/* From 1120px the panel covers exactly the docked sidebar, whose gold edge the board already draws. */
+@media (min-width: 1120px) {
+  .side-panel {
+    width: var(--frame-sidebar-width);
+    border-left: 0;
   }
 }
 
