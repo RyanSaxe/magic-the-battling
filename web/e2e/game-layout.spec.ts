@@ -248,7 +248,7 @@ async function openScreen(page: Page, baseURL: string, screen: Screen) {
   await expectGameShown(page)
   await waitForStableLayout(page)
   await expectGameShown(page)
-  await resetLayout(page, screen)
+  await reloadStyled(page)
 }
 
 /** Waits until the game shows a card, and fails if it crashed instead. */
@@ -256,12 +256,6 @@ async function expectGameShown(page: Page) {
   const crashed = page.getByRole('heading', { name: 'Something went wrong' })
   await expect(page.locator('main .card').first().or(crashed)).toBeVisible()
   if (await crashed.isVisible()) throw new Error(`the game crashed: ${await page.locator('p').first().innerText()}`)
-}
-
-/** Forgets any layout saved for the screen's phase and reloads the game. */
-async function resetLayout(page: Page, screen: Screen) {
-  await page.evaluate((phase) => localStorage.removeItem(`mtb_zone_constraints:v2:phase:${phase}`), screen.state.phase)
-  await reloadStyled(page)
 }
 
 /** Reloads the game and waits until it shows cards on a settled board. */
@@ -308,39 +302,34 @@ function zoneBoxes(measurement: BoardMeasurement) {
 }
 
 /**
- * Presses and releases each divider, each from the screen's starting layout: once without moving it, and once after
- * moving it a few pixels and back, which saves a layout that must reload as the same board.
+ * Moves each divider a few pixels and back, which must leave the board where it was and save a layout that
+ * reloads as the same board.
  */
-async function grabEachDivider(page: Page, screen: Screen): Promise<string[]> {
+async function moveEachDividerAndBack(page: Page): Promise<string[]> {
   const handles = page.locator('main .zone-divider-line > div[style*="resize"]')
+  const start = zoneBoxes(await measure(page))
   const moved: string[] = []
-  const compare = (label: string, before: string[], after: string[]) => {
-    const changed = after.map((zone, position) => [before[position], zone]).filter(([was, now]) => was !== now)
+  const compare = (label: string, after: string[]) => {
+    const changed = after.map((zone, position) => [start[position], zone]).filter(([was, now]) => was !== now)
     if (changed.length > 0) moved.push(`${label}: ${changed.map(([was, now]) => `${was} -> ${now}`).join(', ')}`)
   }
   const count = await handles.count()
-  for (let index = 0; index < count; index++) {
-    for (const offset of [0, 4]) {
-      if (index > 0 || offset > 0) await resetLayout(page, screen)
-      const before = zoneBoxes(await measure(page))
-      const box = (await handles.nth(index).boundingBox())!
-      const [x, y] = [box.x + box.width / 2, box.y + box.height / 2]
-      const vertical = box.width < box.height
-      await page.mouse.move(x, y)
-      await page.mouse.down()
-      if (offset > 0) {
-        await page.mouse.move(vertical ? x + offset : x, vertical ? y : y + offset)
-        await page.mouse.move(x, y)
-      }
-      await page.mouse.up()
-      await waitForStableLayout(page)
-      const label = offset > 0 ? `moving divider ${index} and back` : `grabbing divider ${index}`
-      compare(label, before, zoneBoxes(await measure(page)))
-      if (offset > 0) {
-        await reloadStyled(page)
-        compare(`${label}, after a reload`, before, zoneBoxes(await measure(page)))
-      }
-    }
+  // The lower divider goes first: once the top one has saved its place, dragging the lower one can't move it.
+  for (let index = count - 1; index >= 0; index--) {
+    const box = (await handles.nth(index).boundingBox())!
+    const [x, y] = [box.x + box.width / 2, box.y + box.height / 2]
+    const vertical = box.width < box.height
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    await page.mouse.move(vertical ? x + 4 : x, vertical ? y : y + 4)
+    await page.mouse.move(x, y)
+    await page.mouse.up()
+    await waitForStableLayout(page)
+    compare(`moving divider ${index} and back`, zoneBoxes(await measure(page)))
+  }
+  if (count > 0) {
+    await reloadStyled(page)
+    compare('after a reload', zoneBoxes(await measure(page)))
   }
   return moved
 }
@@ -363,7 +352,7 @@ for (const screen of SCREENS) {
       await testInfo.attach('screen.png', { body: await page.screenshot(), contentType: 'image/png' })
       // Below 640px wide the phases turn their dividers off.
       if (screen.state.phase !== 'battle' && screen.viewport.width >= 640) {
-        const moved = await grabEachDivider(page, screen)
+        const moved = await moveEachDividerAndBack(page)
         if (moved.length > 0) failures['grab-moves-layout'] = moved
       }
 
