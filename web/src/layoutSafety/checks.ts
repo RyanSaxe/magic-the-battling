@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook } from "@testing-library/react";
 import { MIN_CARD_WIDTH, type ZoneDims } from "../hooks/cardSizeUtils";
 import {
   MIN_ZONE_CARD,
@@ -58,6 +58,11 @@ function renderedDims(zoneCase: ZoneCase, layout: ContainerLayout, zoneId: strin
   return zoneId === zoneCase.railZone
     ? getUpgradeGridDims(count, layout.frames[zoneId], layout.dims[zoneId])
     : layout.dims[zoneId];
+}
+
+// Testing Library keeps every rendered hook until cleanup, and the sweep renders tens of thousands.
+function releaseRenderedHooks() {
+  cleanup();
 }
 
 function frameText(frame: ZoneFrame) {
@@ -191,7 +196,7 @@ function grabEachDivider(
 ): string[] {
   const { config } = zoneCase;
   const writes: ZoneConstraints[] = [];
-  const { result, unmount } = renderHook(() =>
+  const { result } = renderHook(() =>
     useZoneDividers({
       containerHeight: rendered.containerSize.height,
       containerWidth: rendered.containerSize.width,
@@ -216,7 +221,7 @@ function grabEachDivider(
     }),
   );
   const callbacks: DividerCallbacks = result.current;
-  unmount();
+  releaseRenderedHooks();
 
   const moved: string[] = [];
   const grabs = DIVIDERS.flatMap((divider) => [
@@ -323,14 +328,14 @@ function sizesPerMeasurement<T>(
   Object.defineProperty(element, "clientHeight", { value: Math.round(box.height + 2 * padding) });
   document.body.appendChild(element);
   try {
-    const { result, rerender, unmount } = renderHook(useSizing);
+    const { result, rerender } = renderHook(useSizing);
     act(() => result.current[0](element));
     const sizes = [result.current[1]];
     act(() => resize([{ contentRect: box }]));
     sizes.push(result.current[1]);
     rerender();
     sizes.push(result.current[1]);
-    unmount();
+    releaseRenderedHooks();
     return sizes;
   } finally {
     element.remove();
