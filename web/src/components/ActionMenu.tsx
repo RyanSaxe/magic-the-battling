@@ -205,6 +205,7 @@ export function ActionMenu({
                     {namingCounter ? (
                       <MenuPrompt
                         label="Counter name"
+                        placeholder="Name"
                         action="Add"
                         onSubmit={(name) => handleAction('counter', { counter_type: name, delta: 1 })}
                         onCancel={() => setNamingCounter(false)}
@@ -332,6 +333,7 @@ export function ActionMenu({
             {sizingDie && (
               <MenuPrompt
                 label="Number of sides"
+                placeholder="Sides"
                 action="Roll"
                 numeric
                 onSubmit={(sides) => {

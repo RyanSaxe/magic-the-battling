@@ -180,6 +180,7 @@ export function CardActionMenu({
                 {namingCounter ? (
                   <MenuPrompt
                     label="Counter name"
+                    placeholder="Name"
                     action="Add"
                     onSubmit={(name) => handleAction('counter', { counter_type: name, delta: 1 })}
                     onCancel={() => setNamingCounter(false)}
