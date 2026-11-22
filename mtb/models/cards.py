@@ -86,8 +86,9 @@ class Card(BaseModel):
     def model_post_init(self, __context: Any) -> None:
         if not self.scryfall_id:
             return
+        saved_names = __context.get("saved_names") if __context else None
         try:
-            self._card_data = get_card_data(self.scryfall_id)
+            self._card_data = get_card_data(self.scryfall_id, saved_names)
         except KeyError:
             self._card_data = None
 

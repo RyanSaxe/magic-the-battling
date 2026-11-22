@@ -6,7 +6,7 @@ from typing import Any, Literal
 
 from pydantic import AliasChoices, BaseModel, Field, PrivateAttr, field_validator, model_serializer
 
-from mtb.models.card_registry import export_registry, import_registry
+from mtb.models.card_registry import export_registry, import_registry, lowercase_names
 from mtb.models.cards import Battler, Card, fold_card_name
 from mtb.models.types import Phase, PlayMode, ZoneName, normalize_play_mode
 
@@ -308,8 +308,16 @@ class Game(BaseModel):
     )
     stage: int = 3
     round: int = 1
+    _saved_names: dict[str, str] = PrivateAttr(default_factory=dict)
+
+    @property
+    def saved_names(self) -> dict[str, str]:
+        """The lowercase card names this game was saved with, which it keeps showing and saving."""
+        return self._saved_names
 
     def model_post_init(self, _context: Any) -> None:
+        if _context:
+            self._saved_names = _context.get("saved_names", {})
         for player in self.players:
             player.game_ref = weakref.ref(self)
         self.normalize_player_battlers()
@@ -320,7 +328,7 @@ class Game(BaseModel):
             context["exclude_shared_battler"] = True
         game_data = self.model_dump(context=context)
         referenced = _collect_scryfall_ids(game_data)
-        registry_data = export_registry(referenced)
+        registry_data = export_registry(referenced, self._saved_names)
         return json.dumps({"data": game_data, "card_registry": registry_data})
 
     def get_draft_state(self) -> DraftState:
@@ -495,20 +503,22 @@ def restore_game_from_snapshot(json_str: str) -> Game:
     data = json.loads(json_str)
     if "card_registry" in data:
         import_registry(data["card_registry"])
-        return Game(**data["data"])
+        context = {"saved_names": lowercase_names(data["card_registry"])}
+        return Game.model_validate(data["data"], context=context)
     return Game(**data)
 
 
-def slim_snapshot_dump(snapshot_data: BattleSnapshotData) -> str:
+def slim_snapshot_dump(snapshot_data: BattleSnapshotData, saved_names: dict[str, str] | None = None) -> str:
     slim_data = snapshot_data.model_dump(context={"slim_cards": True})
     referenced = _collect_scryfall_ids(slim_data)
-    registry_data = export_registry(referenced)
+    registry_data = export_registry(referenced, saved_names)
     return json.dumps({"data": slim_data, "card_registry": registry_data})
 
 
-def restore_snapshot_data(json_str: str) -> BattleSnapshotData:
+def restore_snapshot_data(json_str: str, *, keep_saved_names: bool = True) -> BattleSnapshotData:
     data = json.loads(json_str)
     if "card_registry" in data:
         import_registry(data["card_registry"])
-        return BattleSnapshotData(**data["data"])
+        context = {"saved_names": lowercase_names(data["card_registry"])} if keep_saved_names else None
+        return BattleSnapshotData.model_validate(data["data"], context=context)
     return BattleSnapshotData(**data)

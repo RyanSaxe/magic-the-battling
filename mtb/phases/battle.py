@@ -819,7 +819,8 @@ def _handle_copy_token(zones: Zones, card_id: str, _data: dict) -> bool:
     if source is None or not source.name:
         return False
 
-    sid_seed = source.scryfall_id or source.name or source.id
+    # The name too, so a copy in a game saved in lowercase doesn't share its data with a copy of the real name.
+    sid_seed = f"{source.scryfall_id}{source.name}"
     token = Card(
         id=f"token-{uuid4().hex[:8]}",
         scryfall_id=f"token-copy-{hashlib.md5(sid_seed.encode()).hexdigest()[:12]}",

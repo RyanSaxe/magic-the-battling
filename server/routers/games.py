@@ -493,9 +493,10 @@ def get_game_cards(game_id: str, player_name: str | None = None):
     if not battler:
         raise api_error(404, ErrorCode.CARD_POOL_NOT_AVAILABLE, "Card pool not available")
 
+    saved_names = game.saved_names if game else None
     return GameCardsResponse(
-        cards=catalog_entries_for_cards(battler.original_cards or battler.cards),
-        upgrades=catalog_entries_for_cards(battler.original_upgrades or battler.upgrades),
+        cards=catalog_entries_for_cards(battler.original_cards or battler.cards, saved_names),
+        upgrades=catalog_entries_for_cards(battler.original_upgrades or battler.upgrades, saved_names),
     )
 
 

@@ -1697,7 +1697,8 @@ class GameManager:
             if snapshot.sudden_death_build is not None:
                 continue
             key = f"{snapshot.stage}_{snapshot.round}"
-            snapshot_data = restore_snapshot_data(snapshot.full_state_json)
+            # A puppet joins a new game, so it takes the names that game's cards have.
+            snapshot_data = restore_snapshot_data(snapshot.full_state_json, keep_saved_names=False)
             static_opp = StaticOpponent.from_snapshot(snapshot_data, bot_name, history_id)
             snapshots_dict[key] = static_opp
 
@@ -1809,7 +1810,7 @@ class GameManager:
             play_draw_preference=player.play_draw_preference,
             opponent_name=opponent_name,
             sudden_death_build=sudden_death_build,
-            full_state_json=slim_snapshot_dump(snapshot_data),
+            full_state_json=slim_snapshot_dump(snapshot_data, player.game.saved_names),
         )
         db.add(snapshot)
         db.commit()
@@ -2632,7 +2633,7 @@ class GameManager:
             cube_id=game.config.cube_id,
             play_mode=game.config.play_mode,
         )
-        state.catalog_delta = build_catalog_from_state_refs(state)
+        state.catalog_delta = build_catalog_from_state_refs(state, game.saved_names)
         return state
 
     def get_game_bootstrap(self, game_id: str, player_id: str) -> GameBootstrapResponse | None:

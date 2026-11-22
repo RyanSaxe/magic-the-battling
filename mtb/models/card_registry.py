@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -120,11 +120,21 @@ def register_card_data(scryfall_id: str, data: dict) -> None:
     )
 
 
-def get_card_data(scryfall_id: str) -> CardData:
+def lowercase_names(saved_registry: dict[str, dict]) -> dict[str, str]:
+    """The names a game saved in lowercase, by card. It keeps them, whatever the shared registry has."""
+    return {
+        sid: name for sid, fields in saved_registry.items() if (name := fields.get("name", "")) and name == name.lower()
+    }
+
+
+def get_card_data(scryfall_id: str, saved_names: Mapping[str, str] | None = None) -> CardData:
     try:
-        return _card_registry[scryfall_id]
+        card_data = _card_registry[scryfall_id]
     except KeyError:
         raise KeyError(f"No CardData registered for scryfall_id={scryfall_id!r}") from None
+    if saved_names and (name := saved_names.get(scryfall_id)) and name != card_data.name:
+        return replace(card_data, name=name)
+    return card_data
 
 
 def _expand_scryfall_ids(scryfall_ids: set[str]) -> set[str]:
@@ -145,13 +155,15 @@ def _expand_scryfall_ids(scryfall_ids: set[str]) -> set[str]:
     return expanded
 
 
-def export_registry(scryfall_ids: set[str] | None = None) -> dict[str, dict]:
+def export_registry(
+    scryfall_ids: set[str] | None = None, saved_names: Mapping[str, str] | None = None
+) -> dict[str, dict]:
     from dataclasses import asdict  # noqa: PLC0415
 
     if scryfall_ids is None:
         return {sid: asdict(cd) for sid, cd in _card_registry.items()}
     expanded = _expand_scryfall_ids(scryfall_ids)
-    return {sid: asdict(_card_registry[sid]) for sid in expanded if sid in _card_registry}
+    return {sid: asdict(get_card_data(sid, saved_names)) for sid in expanded if sid in _card_registry}
 
 
 def import_registry(data: dict[str, dict]) -> None:

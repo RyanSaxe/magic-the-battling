@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from pydantic import BaseModel
@@ -97,7 +98,7 @@ def last_battle_result_to_view(result: LastBattleResult | None) -> LastBattleRes
     )
 
 
-def catalog_entry_for_scryfall_id(scryfall_id: str) -> CardCatalogEntry:
+def catalog_entry_for_scryfall_id(scryfall_id: str, saved_names: Mapping[str, str] | None = None) -> CardCatalogEntry:
     if scryfall_id == "__scrubbed__":
         return CardCatalogEntry(
             scryfall_id=scryfall_id,
@@ -110,7 +111,7 @@ def catalog_entry_for_scryfall_id(scryfall_id: str) -> CardCatalogEntry:
     if synthetic is not None:
         return synthetic
 
-    card_data = get_card_data(scryfall_id)
+    card_data = get_card_data(scryfall_id, saved_names)
     oracle_text = card_data.oracle_text
     return CardCatalogEntry(
         scryfall_id=scryfall_id,
@@ -133,9 +134,9 @@ def catalog_entry_for_scryfall_id(scryfall_id: str) -> CardCatalogEntry:
     )
 
 
-def catalog_entry_for_card(card: Card) -> CardCatalogEntry:
+def catalog_entry_for_card(card: Card, saved_names: Mapping[str, str] | None = None) -> CardCatalogEntry:
     try:
-        return catalog_entry_for_scryfall_id(card.scryfall_id)
+        return catalog_entry_for_scryfall_id(card.scryfall_id, saved_names)
     except KeyError:
         try:
             token_scryfall_ids = [token.scryfall_id for token in card.tokens]
@@ -163,8 +164,10 @@ def catalog_entry_for_card(card: Card) -> CardCatalogEntry:
         )
 
 
-def catalog_entries_for_cards(cards: list[Card]) -> list[CardCatalogEntry]:
-    return [catalog_entry_for_card(card) for card in cards]
+def catalog_entries_for_cards(
+    cards: list[Card], saved_names: Mapping[str, str] | None = None
+) -> list[CardCatalogEntry]:
+    return [catalog_entry_for_card(card, saved_names) for card in cards]
 
 
 def build_catalog_from_battler(battler: Battler) -> dict[str, CardCatalogEntry]:
@@ -176,12 +179,14 @@ def build_catalog_from_battler(battler: Battler) -> dict[str, CardCatalogEntry]:
 def build_catalog_from_game(game: Game) -> dict[str, CardCatalogEntry]:
     cards_by_scryfall_id: dict[str, Card] = {}
     _collect_cards(game, cards_by_scryfall_id, set())
-    return build_catalog_from_cards(cards_by_scryfall_id)
+    return build_catalog_from_cards(cards_by_scryfall_id, game.saved_names)
 
 
-def build_catalog_from_scryfall_ids(scryfall_ids: set[str]) -> dict[str, CardCatalogEntry]:
+def build_catalog_from_scryfall_ids(
+    scryfall_ids: set[str], saved_names: Mapping[str, str] | None = None
+) -> dict[str, CardCatalogEntry]:
     registry_data = export_registry(scryfall_ids)
-    catalog = {scryfall_id: catalog_entry_for_scryfall_id(scryfall_id) for scryfall_id in registry_data}
+    catalog = {scryfall_id: catalog_entry_for_scryfall_id(scryfall_id, saved_names) for scryfall_id in registry_data}
     for scryfall_id in scryfall_ids:
         if scryfall_id in catalog:
             continue
@@ -191,19 +196,23 @@ def build_catalog_from_scryfall_ids(scryfall_ids: set[str]) -> dict[str, CardCat
     return catalog
 
 
-def build_catalog_from_cards(cards_by_scryfall_id: dict[str, Card]) -> dict[str, CardCatalogEntry]:
-    catalog = build_catalog_from_scryfall_ids(set(cards_by_scryfall_id))
+def build_catalog_from_cards(
+    cards_by_scryfall_id: dict[str, Card], saved_names: Mapping[str, str] | None = None
+) -> dict[str, CardCatalogEntry]:
+    catalog = build_catalog_from_scryfall_ids(set(cards_by_scryfall_id), saved_names)
     for scryfall_id, card in cards_by_scryfall_id.items():
         if scryfall_id in catalog:
             continue
-        catalog[scryfall_id] = catalog_entry_for_card(card)
+        catalog[scryfall_id] = catalog_entry_for_card(card, saved_names)
     return catalog
 
 
-def build_catalog_from_state_refs(state: GameStateResponse) -> dict[str, CardCatalogEntry]:
+def build_catalog_from_state_refs(
+    state: GameStateResponse, saved_names: Mapping[str, str] | None = None
+) -> dict[str, CardCatalogEntry]:
     scryfall_ids: set[str] = set()
     _collect_ref_scryfall_ids(state, scryfall_ids, set())
-    return build_catalog_from_scryfall_ids(scryfall_ids)
+    return build_catalog_from_scryfall_ids(scryfall_ids, saved_names)
 
 
 def _collect_cards(obj: Any, cards_by_scryfall_id: dict[str, Card], seen: set[int]) -> None:
