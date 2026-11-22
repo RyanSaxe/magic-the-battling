@@ -181,6 +181,13 @@ class BattleResolution(BaseModel):
     opponent_side: BattleResolutionSide
 
 
+class ReturnedBuild(BaseModel):
+    """The last build of an eliminated player whose cards went back to the cube, kept to show on their end screen."""
+
+    hand: list[Card]
+    sideboard: list[Card]
+
+
 class Player(BaseModel):
     name: str
     most_recently_revealed_cards: list[Card] = Field(default_factory=list)
@@ -196,6 +203,7 @@ class Player(BaseModel):
     placement: int = 0
     elimination_round: int = 0
     elimination_stage: int = 0
+    returned_build: ReturnedBuild | None = None
 
     phase: Phase = "build"
     round: int = 1
