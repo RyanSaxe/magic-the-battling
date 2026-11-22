@@ -3,6 +3,7 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, expect, it, vi } from 'vitest'
 import { installMemoryLocalStorage } from '../../test/memoryStorage'
+import { createAppError } from '../../utils/appError'
 import { rememberGuestName } from '../../utils/deviceIdentity'
 import { LobbySeatNotice } from './LobbySeatNotice'
 
@@ -34,4 +35,15 @@ it("offers a guest's remembered name until the login check finds an account, who
   rerender(notice())
 
   expect(name.value).toBe('Jaya')
+})
+
+it('says a moved seat is open somewhere else, which holds for another tab and another device', () => {
+  const moved = createAppError({ code: 'SEAT_MOVED', context: 'lobby-connection', fallbackMessage: 'Seat opened elsewhere' })
+  render(
+    <MemoryRouter>
+      <LobbySeatNotice gameId="game-1" seat={{ kind: 'lost', error: moved }} onJoined={() => {}} onClaim={() => {}} onTakeBack={() => {}} />
+    </MemoryRouter>,
+  )
+
+  expect(screen.getByText('Open somewhere else')).toBeTruthy()
 })
