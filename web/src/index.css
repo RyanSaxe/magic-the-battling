@@ -1113,7 +1113,7 @@ input:-webkit-autofill:focus {
     align-items: center;
     gap: 9px;
     max-width: calc(100% - 84px);
-    height: 44px;
+    min-height: 44px;
   }
 
   .cube-banner-name {
@@ -1156,7 +1156,7 @@ input:-webkit-autofill:focus {
     display: flex;
     align-items: center;
     min-width: 44px;
-    height: 44px;
+    min-height: 44px;
   }
 
   .cube-banner-link:hover {
@@ -1567,6 +1567,11 @@ input:-webkit-autofill:focus {
   }
 
   .seat:has(.is-long-name) > .seat-text + .icon-target {
+    margin-left: -12px;
+  }
+
+  .seat-add + .icon-target {
+    position: relative;
     margin-left: -12px;
   }
 

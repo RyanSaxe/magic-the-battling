@@ -191,7 +191,13 @@ export function LobbySeats({
               <span className="seat-name">Open seat</span>
             </span>
           )}
-          {isHost && puppets === 0 && index === 0 && puppetHelp}
+          {isHost && puppets === 0 && index === 0 && (
+            <>
+              {puppetHelp}
+              {/* Where the ✕ lands once this seat has a puppet, so a second tap on ? can't remove it */}
+              <span aria-hidden="true" className="w-11 shrink-0" />
+            </>
+          )}
         </li>
       ))}
     </ul>
