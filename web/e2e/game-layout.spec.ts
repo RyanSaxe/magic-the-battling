@@ -575,7 +575,7 @@ test.describe('a saved layout', () => {
 })
 
 test.describe('the player cards', () => {
-  const longName = 'Maximilian Vanderbergh'
+  const longName = 'MAXIMILIAN VANDERBERGH-WOLVERTON'
   const screen: ScreenState = {
     phase: 'build',
     counts: { hand: 3, handSize: 4, sideboard: 6 },

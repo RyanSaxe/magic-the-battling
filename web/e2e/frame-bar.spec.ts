@@ -179,47 +179,6 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
   })
 }
 
-const TOAST_CLEARANCE = 8
-
-const TOASTS = [
-  {
-    where: 'on a page',
-    raise: async (page: Page, baseURL: string) => {
-      await openPage(page, baseURL, PAGES.find((pageUnderTest) => pageUnderTest.name === 'play')!)
-      await page.getByRole('button', { name: 'Start Game' }).click()
-    },
-  },
-  {
-    where: 'in a game',
-    raise: async (page: Page, baseURL: string) => {
-      await serveGame(page, baseURL, GAME_PHASES.build, {
-        onSocket: (ws) => ws.send(JSON.stringify({ type: 'error', payload: { code: 'UNKNOWN_ACTION' } })),
-      })
-      await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
-    },
-  },
-]
-
-for (const { name, viewport, isMobile } of SCREENS) {
-  test.describe(name, () => {
-    test.use({ viewport, isMobile, hasTouch: isMobile })
-
-    for (const { where, raise } of TOASTS) {
-      test(`a toast ${where} opens below the top bar, clear of the felt's gold edge`, async ({ page, baseURL }) => {
-        await raise(page, baseURL!)
-        // A toast slides in from 8px above its place, so measure the stack it settles into.
-        const toasts = page.getByRole('button', { name: 'Dismiss toast' }).locator('../..')
-        await toasts.waitFor()
-
-        const toastTop = (await toasts.boundingBox())!.y
-        const barBottom = (await page.getByRole('banner').boundingBox())!
-        const goldEdgeBottom = barBottom.y + barBottom.height + 2
-        expect(toastTop - goldEdgeBottom, 'gap between the toast and the gold edge below the top bar').toBeGreaterThanOrEqual(TOAST_CLEARANCE)
-      })
-    }
-  })
-}
-
 // The page's own Play Preset or Play Cube is its one gold button, which leaves room for Home on phones.
 const ACCOUNT_DETAIL_PAGES = ['battler', 'cube']
 

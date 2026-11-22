@@ -148,17 +148,20 @@ export function computeScrollDeltaForVisibility(
   return top !== 0 || left !== 0 ? { top, left } : null;
 }
 
-function isScrollableElement(element: HTMLElement): boolean {
-  const style = window.getComputedStyle(element);
-  const overflowY = style.overflowY;
-  const overflowX = style.overflowX;
-  const allowsScroll = (value: string) =>
-    value === "auto" || value === "scroll" || value === "overlay";
+function getScrollLimits(element: HTMLElement): { top: number; left: number } {
+  const { overflowX, overflowY } = window.getComputedStyle(element);
+  const limit = (overflow: string, hiddenSize: number) =>
+    (overflow === "auto" || overflow === "scroll" || overflow === "overlay") && hiddenSize > 1 ? hiddenSize : 0;
 
-  return (
-    (allowsScroll(overflowY) && element.scrollHeight > element.clientHeight + 1)
-    || (allowsScroll(overflowX) && element.scrollWidth > element.clientWidth + 1)
-  );
+  return {
+    top: limit(overflowY, element.scrollHeight - element.clientHeight),
+    left: limit(overflowX, element.scrollWidth - element.clientWidth),
+  };
+}
+
+function isScrollableElement(element: HTMLElement): boolean {
+  const { top, left } = getScrollLimits(element);
+  return top > 0 || left > 0;
 }
 
 function findNearestScrollableAncestor(
@@ -180,7 +183,7 @@ function findNearestScrollableAncestor(
   return isScrollableElement(root) ? root : null;
 }
 
-function scrollTargetIntoVisibleArea(target: HTMLElement, root: HTMLElement): void {
+export function scrollTargetIntoVisibleArea(target: HTMLElement, root: HTMLElement): void {
   const scrollContainer = findNearestScrollableAncestor(target, root);
   if (!scrollContainer) {
     return;
@@ -194,11 +197,15 @@ function scrollTargetIntoVisibleArea(target: HTMLElement, root: HTMLElement): vo
     return;
   }
 
-  scrollContainer.scrollBy({
-    top: delta.top,
-    left: delta.left,
-    behavior: "smooth",
-  });
+  // iOS can keep a scroll past a box's ends, so only ask each axis for the room it has.
+  const limits = getScrollLimits(scrollContainer);
+  const top = clamp(delta.top, -scrollContainer.scrollTop, limits.top - scrollContainer.scrollTop);
+  const left = clamp(delta.left, -scrollContainer.scrollLeft, limits.left - scrollContainer.scrollLeft);
+  if (top === 0 && left === 0) {
+    return;
+  }
+
+  scrollContainer.scrollBy({ top, left, behavior: "smooth" });
 }
 
 function placementOrder(preferred: GuidePlacement): GuidePlacement[] {

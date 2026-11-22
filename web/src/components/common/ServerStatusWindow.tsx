@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import type { ServerNoticeStatus } from "../../types";
+import { FloatingWindow } from "./FloatingWindow";
 import {
   DESKTOP_BREAKPOINT_PX,
   DEFAULT_COLLAPSED_PANEL_HEIGHT_PX,
@@ -45,15 +46,6 @@ type InteractionState =
       startY: number;
     }
   | null;
-
-interface WindowControlButtonProps {
-  ariaLabel: string;
-  title: string;
-  colorClassName: string;
-  onClick: () => void;
-  onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => void;
-  disabled?: boolean;
-}
 
 function isDesktopViewport(): boolean {
   return typeof window !== "undefined" && window.innerWidth >= DESKTOP_BREAKPOINT_PX;
@@ -215,29 +207,6 @@ function drainingMessageWithEasternTime(message: string, easternTime: string | n
   return message.replace(SCHEDULED_UTC_IN_TEXT_RE, `scheduled for ${easternTime}`);
 }
 
-function WindowControlButton({
-  ariaLabel,
-  title,
-  colorClassName,
-  onClick,
-  onPointerDown,
-  disabled = false,
-}: WindowControlButtonProps) {
-  return (
-    <button
-      type="button"
-      aria-label={ariaLabel}
-      title={title}
-      onClick={onClick}
-      onPointerDown={onPointerDown}
-      disabled={disabled}
-      className={`h-3.5 w-3.5 rounded-full border border-black/25 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-opacity ${
-        disabled ? `${colorClassName} cursor-default opacity-45` : `${colorClassName} hover:opacity-90`
-      }`}
-    />
-  );
-}
-
 export function ServerStatusWindow({
   status,
   hidden,
@@ -307,32 +276,12 @@ export function ServerStatusWindow({
     setIsCollapsed(false);
   }, [stopInteraction, syncDesktopWindow]);
 
-  const resetWindow = useCallback(() => {
-    stopInteraction();
-    setIsCollapsed(false);
-    if (!isDesktopViewport()) {
-      return;
-    }
-    setDesktopWindow(defaultServerWindowState(currentViewportBox()));
-  }, [stopInteraction]);
-
-  const handleGreenControl = useCallback(() => {
-    if (isCollapsed) {
-      handleRestore();
-      return;
-    }
-    resetWindow();
-  }, [handleRestore, isCollapsed, resetWindow]);
-
   const handleDismiss = useCallback(() => {
     stopInteraction();
     onDismiss();
   }, [onDismiss, stopInteraction]);
 
-  const handleControlPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-  }, []);
-
+  const badge = isDraining ? "Update" : "Maintenance";
   const desktopViewport = isDesktop ? currentViewportBox() : null;
   const resolvedDesktopWindow = isDesktop && desktopViewport
     ? clampServerWindowForMode(
@@ -561,84 +510,36 @@ export function ServerStatusWindow({
 
     return (
       <div className="fixed inset-0 pointer-events-none" style={{ zIndex }}>
-        <div
+        <FloatingWindow
           ref={isCollapsed ? collapsedPanelRef : expandedPanelRef}
-          className={`absolute pointer-events-auto modal-chrome felt-raised-panel border gold-border rounded-2xl shadow-[0_24px_60px_rgba(0,0,0,0.55)] flex flex-col overflow-hidden ${
-            interaction ? "transition-none" : "transition-[left,top,width,height] duration-200 ease-out"
-          }`}
+          name="server notice"
+          title="Server Notice"
+          badge={badge}
+          collapsed={isCollapsed}
+          draggable={isCollapsed}
+          dragging={interaction?.type === "drag"}
+          onDragStart={beginDrag}
+          onMinimize={handleCollapse}
+          onRestore={handleRestore}
+          onClose={handleDismiss}
+          closeLabel="Dismiss"
+          collapsedCaption="Current notice"
+          collapsedText={collapsedLabel}
+          instant={!!interaction}
           style={{
             left: isCollapsed ? mobileCollapsedRect?.x : expandedLeft,
             top: isCollapsed ? mobileCollapsedRect?.y : mobileViewport.top + MOBILE_PANEL_TOP_GAP_PX,
             width: isCollapsed ? mobileCollapsedRect?.width : expandedWidth,
-            height: undefined,
             maxHeight: mobileViewport.height - WINDOW_MARGIN_PX * 2,
           }}
         >
-          <div
-            className={`relative flex items-center gap-3 px-4 py-3 shrink-0 select-none border-b border-[rgba(212,175,55,0.3)] bg-black/30 ${
-              isCollapsed
-                ? interaction?.type === "drag"
-                  ? "cursor-grabbing"
-                  : "cursor-grab"
-                : ""
-            }`}
-            onPointerDown={beginDrag}
-            style={{ touchAction: isCollapsed ? "none" : undefined }}
-          >
-            <div className="flex items-center gap-2 shrink-0">
-              <WindowControlButton
-                ariaLabel="Close server notice"
-                title="Close"
-                colorClassName="bg-[#ff5f57]"
-                onClick={handleDismiss}
-                onPointerDown={handleControlPointerDown}
-              />
-              <WindowControlButton
-                ariaLabel="Minimize server notice"
-                title="Minimize"
-                colorClassName="bg-[#febc2e]"
-                onClick={handleCollapse}
-                onPointerDown={handleControlPointerDown}
-                disabled={isCollapsed}
-              />
-              <WindowControlButton
-                ariaLabel={isCollapsed ? "Open server notice" : "Reset server notice window"}
-                title={isCollapsed ? "Open" : "Reset"}
-                colorClassName="bg-[#28c840]"
-                onClick={handleGreenControl}
-                onPointerDown={handleControlPointerDown}
-              />
-            </div>
-            <div className="absolute inset-x-0 flex justify-center pointer-events-none px-20">
-              <span className="truncate text-[0.7rem] uppercase tracking-[0.2em] text-amber-100/70">
-                Server Notice
-              </span>
+          <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+            <div className="px-4 py-4 overflow-y-auto">
+              <h2 className="text-base font-semibold text-[var(--ivory)]">{heading}</h2>
+              <div className="mt-3">{body}</div>
             </div>
           </div>
-
-          {isCollapsed ? (
-            <div className="flex flex-1 min-h-0 flex-col justify-center px-4 pb-3 pt-2">
-              <span className="text-[0.58rem] uppercase tracking-[0.18em] text-amber-200/45">
-                Current notice
-              </span>
-              <span className="mt-1 text-sm font-medium leading-snug text-amber-50/95 break-words">
-                {collapsedLabel}
-              </span>
-            </div>
-          ) : (
-            <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-              <div className="px-4 py-4 overflow-y-auto">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center justify-center rounded-full border gold-border text-amber-200 text-[10px] uppercase tracking-wide px-2 py-0.5">
-                    {isDraining ? "Update" : "Maintenance"}
-                  </span>
-                  <h2 className="text-base font-semibold text-amber-200">{heading}</h2>
-                </div>
-                <div className="mt-3">{body}</div>
-              </div>
-            </div>
-          )}
-        </div>
+        </FloatingWindow>
       </div>
     );
   }
@@ -649,79 +550,37 @@ export function ServerStatusWindow({
 
   return (
     <div className="fixed inset-0 pointer-events-none" style={{ zIndex }}>
-      <div
+      <FloatingWindow
         ref={isCollapsed ? collapsedPanelRef : expandedPanelRef}
-        className={`absolute pointer-events-auto modal-chrome felt-raised-panel border gold-border rounded-2xl flex flex-col overflow-hidden shadow-[0_36px_96px_rgba(0,0,0,0.72),0_14px_40px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,236,181,0.08)] ${
-          interaction ? "transition-none" : "transition-[left,top,width,height] duration-200 ease-out"
-        }`}
+        name="server notice"
+        title="Server Notice"
+        badge={badge}
+        collapsed={isCollapsed}
+        draggable
+        dragging={interaction?.type === "drag"}
+        onDragStart={beginDrag}
+        onMinimize={handleCollapse}
+        onRestore={handleRestore}
+        onClose={handleDismiss}
+        closeLabel="Dismiss"
+        collapsedCaption="Current notice"
+        collapsedText={collapsedLabel}
+        instant={!!interaction}
         style={{
           left: desktopPanel.x,
           top: desktopPanel.y,
           width: desktopPanel.width,
-          height: undefined,
           maxWidth: Math.max(1, desktopViewport.width - WINDOW_MARGIN_PX * 2),
           maxHeight: Math.max(1, desktopViewport.height - WINDOW_MARGIN_PX * 2),
         }}
       >
-        <div
-          className={`relative flex items-center gap-3 px-4 py-3 shrink-0 select-none border-b border-[rgba(212,175,55,0.3)] bg-black/30 ${interaction?.type === "drag" ? "cursor-grabbing" : "cursor-grab"}`}
-          onPointerDown={beginDrag}
-          style={{ touchAction: "none" }}
-        >
-          <div className="flex items-center gap-2 shrink-0">
-            <WindowControlButton
-              ariaLabel="Close server notice"
-              title="Close"
-              colorClassName="bg-[#ff5f57]"
-              onClick={handleDismiss}
-              onPointerDown={handleControlPointerDown}
-            />
-            <WindowControlButton
-              ariaLabel="Minimize server notice"
-              title="Minimize"
-              colorClassName="bg-[#febc2e]"
-              onClick={handleCollapse}
-              onPointerDown={handleControlPointerDown}
-              disabled={isCollapsed}
-            />
-            <WindowControlButton
-              ariaLabel={isCollapsed ? "Open server notice" : "Reset server notice window"}
-              title={isCollapsed ? "Open" : "Reset"}
-              colorClassName="bg-[#28c840]"
-              onClick={handleGreenControl}
-              onPointerDown={handleControlPointerDown}
-            />
-          </div>
-          <div className="absolute inset-x-0 flex justify-center pointer-events-none px-20">
-            <span className="truncate text-[0.7rem] uppercase tracking-[0.2em] text-amber-100/70">
-              Server Notice
-            </span>
+        <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+          <div className="px-4 py-4 overflow-y-auto">
+            <h2 className="text-lg font-semibold text-[var(--ivory)]">{heading}</h2>
+            <div className="mt-3">{body}</div>
           </div>
         </div>
-
-        {isCollapsed ? (
-          <div className="flex flex-1 min-h-0 flex-col justify-center px-4 pb-3 pt-2">
-            <span className="text-[0.58rem] uppercase tracking-[0.18em] text-amber-200/45">
-              Current notice
-            </span>
-            <span className="mt-1 text-sm font-medium leading-snug text-amber-50/95 break-words">
-              {collapsedLabel}
-            </span>
-          </div>
-        ) : (
-          <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-            <div className="px-4 py-4 overflow-y-auto">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center justify-center rounded-full border gold-border text-amber-200 text-[10px] uppercase tracking-wide px-2 py-0.5">
-                  {isDraining ? "Update" : "Maintenance"}
-                </span>
-                <h2 className="text-lg font-semibold text-amber-200">{heading}</h2>
-              </div>
-              <div className="mt-3">{body}</div>
-            </div>
-          </div>
-        )}
-      </div>
+      </FloatingWindow>
     </div>
   );
 }

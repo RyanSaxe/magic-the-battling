@@ -110,7 +110,7 @@ class Puppet(BaseModel):
             opponent.poison = self.poison
             return opponent
 
-        available_keys = sorted(self.snapshots.keys())
+        available_keys = sorted(self.snapshots, key=lambda k: tuple(map(int, k.split("_"))))
         target = (stage, round_num)
         best_key = None
         for k in available_keys:
