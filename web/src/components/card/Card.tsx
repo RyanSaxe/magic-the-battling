@@ -1,10 +1,11 @@
-import { useState, useContext, useEffect, useRef, useMemo } from 'react'
+import { useState, useCallback, useContext, useEffect, useRef, useMemo } from 'react'
 import type { Card as CardType } from '../../types'
 import { CardPreviewContext } from './CardPreviewContext'
 import { useFaceDown } from '../../contexts/faceDownState'
 import { CARD_BACK_IMAGE, BASIC_LANDS } from '../../constants/assets'
 import { canHover } from '../../utils/inputMode'
 import { registerTap } from '../../utils/doubleTap'
+import { fitCounters } from '../../utils/counters'
 
 interface CardProps {
   card: CardType
@@ -57,6 +58,10 @@ const isBasicLandOrTreasureToken = (card: CardType) =>
   BASIC_LAND_NAMES.has(card.name) ||
   (card.type_line.toLowerCase().includes('treasure') &&
     !card.type_line.toLowerCase().includes('land'))
+
+const COUNTERS_BOTTOM = 1
+const COUNTERS_BOTTOM_OVER_FLIP = 22
+const COUNTERS_BOTTOM_OVER_REVEAL = 30
 
 const isCopiedToken = (card: CardType) =>
   card.scryfall_id?.startsWith('token-copy-') ?? false
@@ -120,23 +125,24 @@ export function Card({
   const showRevealHiddenUpgradeButton =
     hiddenUpgradeCount > 0 && !effectiveFaceDown && !!onRevealHiddenUpgrades && (isHovered || selected)
 
+  const openPreview = useCallback(() => {
+    const shown = card.upgrade_target ?? card
+    const upgrades = card.upgrade_target ? [card] : appliedUpgrades
+    if (counters) previewContext?.setPreviewCard(shown, upgrades, counters)
+    else previewContext?.setPreviewCard(shown, upgrades)
+  }, [previewContext, card, appliedUpgrades, counters])
+
   useEffect(() => {
     if (!isHovered || !previewContext || !showZoom) return
     if (effectiveFaceDown && !canPeekFaceDown) return
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
-      if (e.key === 'z' || e.key === 'Z') {
-        if (card.upgrade_target) {
-          previewContext.setPreviewCard(card.upgrade_target, [card])
-        } else {
-          previewContext.setPreviewCard(card, appliedUpgrades)
-        }
-      }
+      if (e.key === 'z' || e.key === 'Z') openPreview()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isHovered, previewContext, card, appliedUpgrades, effectiveFaceDown, canPeekFaceDown, showZoom])
+  }, [isHovered, previewContext, openPreview, effectiveFaceDown, canPeekFaceDown, showZoom])
 
   const effectiveFlip = flipped !== showFlip
   const normalUrl = effectiveFaceDown
@@ -167,9 +173,11 @@ export function Card({
   const showFlipButton = !!card.flip_image_url && !effectiveFaceDown && (isHovered || !!selected)
   // Under 88px the magnifier and Flip overlap side by side. The Copy badge and Reveal Upgrade need the top and bottom.
   const stacksButtons = dims.width < 88 && !showCopyBadge && !showRevealHiddenUpgradeButton
-  const countersPosition = showRevealHiddenUpgradeButton
-    ? 'bottom-8'
-    : stacksButtons && showFlipButton ? 'bottom-[22px]' : 'bottom-1'
+  const countersBottom = showRevealHiddenUpgradeButton
+    ? Math.min(COUNTERS_BOTTOM_OVER_REVEAL, dims.height / 2)
+    : stacksButtons && showFlipButton
+      ? Math.min(COUNTERS_BOTTOM_OVER_FLIP, dims.height / 2)
+      : COUNTERS_BOTTOM
   const interactiveTransform = [
     interactiveStyle?.transform,
     dragging ? 'scale(1.05)' : '',
@@ -269,6 +277,15 @@ export function Card({
           onError={() => setIsLoading(false)}
           draggable={false}
         />
+        {counters && Object.keys(counters).length > 0 && (
+          <div className="card-counters" style={{ bottom: countersBottom }}>
+            {fitCounters(counters, dims.width, dims.height - countersBottom).map(({ type, text, fontSize, paddingInline }) => (
+              <span key={type} className="counter-chip" style={{ fontSize, paddingInline }}>
+                {text}
+              </span>
+            ))}
+          </div>
+        )}
         {showFlipButton && (
           <button
             className={`absolute ${stacksButtons ? 'inset-x-0.5 bottom-0.5 h-[18px] rounded-[3px] text-[11px]' : 'top-1 right-1 rounded px-2 py-0.5 text-xs'} bg-black/60 text-white hover:bg-black/80 transition-colors`}
@@ -285,11 +302,7 @@ export function Card({
             className={`absolute ${stacksButtons ? 'inset-x-0.5 top-0.5 flex h-[18px] items-center justify-center rounded-[3px]' : `${showCopyBadge ? 'top-8' : 'top-1'} left-1 rounded p-1`} bg-black/60 text-white hover:bg-black/80 transition-colors`}
             onClick={(e) => {
               e.stopPropagation()
-              if (card.upgrade_target) {
-                previewContext.setPreviewCard(card.upgrade_target, [card])
-              } else {
-                previewContext.setPreviewCard(card, appliedUpgrades)
-              }
+              openPreview()
             }}
             title="Preview card"
           >
@@ -318,18 +331,6 @@ export function Card({
           >
             {hiddenUpgradeCount > 1 ? 'Reveal Upgrades' : 'Reveal Upgrade'}
           </button>
-        )}
-        {counters && Object.keys(counters).length > 0 && (
-          <div className={`pointer-events-none absolute left-1 flex flex-wrap-reverse gap-1 ${countersPosition}`}>
-            {Object.entries(counters).map(([type, count]) => (
-              <div
-                key={type}
-                className="bg-black/80 text-white text-xs px-1.5 py-0.5 rounded border border-amber-500"
-              >
-                {type === '+1/+1' ? `+${count}/+${count}` : `${count} ${type}`}
-              </div>
-            ))}
-          </div>
         )}
       </div>
     </div>
