@@ -429,6 +429,12 @@ input:-webkit-autofill:focus {
   z-index: 45;
 }
 
+/* Even empty, this layer slowed every click by up to a second in WebKit on Linux, so it shows only with a panel in
+   it. */
+.side-panel-frame:empty {
+  display: none;
+}
+
 /* One panel for every zone, drawer and player list: below 640px it covers the board, from 640px the column the
    docked sidebar takes on wide screens, with that column's gold edge. */
 .side-panel {
