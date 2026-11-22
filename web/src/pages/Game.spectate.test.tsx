@@ -38,7 +38,10 @@ vi.mock('../contexts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../contexts')>()),
   useToast: () => ({ addToast: () => {} }),
 }))
-vi.mock('../contexts/authState', () => ({ useAuth: () => ({ user: { username: 'Bob' }, loading: false }) }))
+const auth = vi.hoisted(() => ({ loading: false }))
+vi.mock('../contexts/authState', () => ({
+  useAuth: () => ({ user: auth.loading ? null : { username: 'Bob' }, loading: auth.loading }),
+}))
 
 function HomePage() {
   const navigate = useNavigate()
@@ -100,5 +103,26 @@ describe('Game: leaving a game you watch', () => {
 
     expect(cancelRequest).toHaveBeenCalledWith('game-1', 'request-1')
     expect(screen.getByRole('button', { name: 'Open the game link' })).toBeTruthy()
+  })
+})
+
+describe('Game: opening a game link', () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    auth.loading = true
+  })
+
+  afterEach(() => {
+    cleanup()
+    auth.loading = false
+  })
+
+  it('waits for the login check before it decides whether the visitor has a seat', async () => {
+    renderGame()
+    await settle()
+
+    expect(screen.queryByText('Watch a game')).toBeNull()
+    expect(screen.getByText('Loading game...')).toBeTruthy()
   })
 })
