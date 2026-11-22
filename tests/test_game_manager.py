@@ -1001,3 +1001,32 @@ def test_a_puppets_row_shows_the_furthest_rounds_treasures_and_the_cards_seen_in
     assert row.treasures == 4
     assert [card.id for card in row.most_recently_revealed_cards] == ["hand-1"]
     assert [card.id for card in row.full_sideboard] == ["sideboard-2"]
+
+
+def test_a_puppet_that_is_out_takes_no_more_poison(game_manager):
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice)
+    puppets = [
+        Puppet(
+            name=name,
+            player_history_id=history_id,
+            snapshots={"3_1": StaticOpponent(name=name, hand=[], source_player_history_id=history_id)},
+        )
+        for history_id, name in enumerate(["Ghost", "Bot", "Other"], start=1)
+    ]
+    ghost = puppets[0]
+    ghost.poison = 10
+    ghost.is_eliminated = True
+    game.puppets.extend(puppets)
+    game.most_recent_ghost_puppet = ghost
+    opponent = ghost.get_opponent_for_round(3, 1)
+    assert opponent is not None
+    battle.start(game, alice, opponent)
+
+    game_manager.handle_battle_submit_result(game, alice, alice.name, "g1")
+
+    assert ghost.poison == 10
+    assert alice.battle_resolution is not None
+    shown = alice.battle_resolution.opponent_side
+    assert (shown.starting_poison, shown.ending_poison) == (10, 11)
