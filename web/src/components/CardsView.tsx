@@ -5,15 +5,16 @@ import { CardPreviewModal } from './card/CardPreviewModal'
 import type { Card } from '../types'
 import { unknownToAppError } from '../utils/appError'
 import { TEXT_INPUT } from './common/styles'
+import { ManaSymbol } from './icons/ManaSymbol'
 
-const COLOR_CHIPS: { code: string; label: string; bg: string; text: string; ring: string }[] = [
-  { code: 'W', label: 'W', bg: 'bg-amber-100', text: 'text-amber-900', ring: 'ring-amber-300' },
-  { code: 'U', label: 'U', bg: 'bg-blue-500', text: 'text-white', ring: 'ring-blue-400' },
-  { code: 'B', label: 'B', bg: 'bg-purple-900', text: 'text-gray-200', ring: 'ring-purple-500' },
-  { code: 'R', label: 'R', bg: 'bg-red-600', text: 'text-white', ring: 'ring-red-400' },
-  { code: 'G', label: 'G', bg: 'bg-green-600', text: 'text-white', ring: 'ring-green-400' },
-  { code: 'C', label: 'C', bg: 'bg-gray-500', text: 'text-white', ring: 'ring-gray-400' },
-]
+const COLOR_CHIPS = [
+  { code: 'W', label: 'White' },
+  { code: 'U', label: 'Blue' },
+  { code: 'B', label: 'Black' },
+  { code: 'R', label: 'Red' },
+  { code: 'G', label: 'Green' },
+  { code: 'C', label: 'Colorless' },
+] as const
 
 const COLOR_ORDER = ['W', 'U', 'B', 'R', 'G']
 
@@ -155,15 +156,16 @@ export function CardsView({
           </div>
 
           <div className="cards-view-colors flex items-center gap-1.5 flex-wrap">
-            {COLOR_CHIPS.map(({ code, label, bg, text, ring }) => (
+            {COLOR_CHIPS.map(({ code, label }) => (
               <button
                 key={code}
+                type="button"
+                aria-label={label}
+                aria-pressed={selectedColors.has(code)}
                 onClick={() => toggleColor(code)}
-                className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all ${bg} ${text} ${
-                  selectedColors.has(code) ? `ring-2 ${ring} scale-110` : 'opacity-50 hover:opacity-75'
-                }`}
+                className={`mana-filter-btn ${selectedColors.size === 0 ? '' : selectedColors.has(code) ? 'is-on' : 'is-off'}`}
               >
-                {label}
+                <ManaSymbol symbol={code} size="md" />
               </button>
             ))}
           </div>

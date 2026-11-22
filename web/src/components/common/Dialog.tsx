@@ -85,6 +85,10 @@ export function Dialog({
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+      // When one dialog opens over another, only the top one answers Escape.
+      const dialogs = document.querySelectorAll('[role="dialog"]')
+      const topDialog = dialogs[dialogs.length - 1]
+      if (topDialog && !dialogRef.current?.contains(topDialog)) return
       // Handled, so a panel open under the dialog doesn't close with it.
       event.preventDefault()
       onClose()

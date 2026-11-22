@@ -5,6 +5,7 @@ import { useToast } from '../contexts'
 import { PageFrame } from '../components/common/PageFrame'
 import { DashboardFrame } from '../components/dashboard/DashboardFrame'
 import { DefaultOpponentsField } from '../components/dashboard/DefaultOpponentsField'
+import { DeletePresetDialog } from '../components/dashboard/DeletePresetDialog'
 import { DetailHero, HeroLink } from '../components/dashboard/DetailHero'
 import { GameHistory, type LoadGames } from '../components/dashboard/GameHistory'
 import { HomeHeader } from '../components/dashboard/HomeHeader'
@@ -172,6 +173,8 @@ function SettingsModal({
   const [playMode, setPlayMode] = useState<PlayMode>(battler.play_mode)
   const [puppetCount, setPuppetCount] = useState(battler.puppet_count)
   const [saving, setSaving] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -188,62 +191,77 @@ function SettingsModal({
   }
 
   return (
-    <Dialog title="Settings" onClose={onClose} onSubmit={handleSave}>
+    <>
+      <Dialog title="Settings" onClose={onClose} onSubmit={handleSave}>
 
-      <div className="space-y-3">
-        <div>
-          <label className={FIELD_LABEL}>Display Name</label>
-          <input
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            className={TEXT_INPUT}
-            placeholder={battler.cube_id}
-          />
+        <div className="space-y-3">
+          <div>
+            <label className={FIELD_LABEL}>Display Name</label>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className={TEXT_INPUT}
+              placeholder={battler.cube_id}
+            />
+          </div>
+
+          <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
+            <input
+              type="checkbox"
+              checked={playMode === 'constructed'}
+              onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
+              className="w-4 h-4"
+            />
+            <span className="text-white text-sm">Constructed</span>
+            <span className="text-[var(--ivory-muted)] text-xs">— bring your own deck</span>
+          </label>
+
+          <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
+            <input
+              type="checkbox"
+              checked={useUpgrades}
+              onChange={(e) => setUseUpgrades(e.target.checked)}
+              className="w-4 h-4"
+            />
+            <span className="text-white text-sm">Upgrades</span>
+          </label>
+
+          <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />
         </div>
 
-        <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
-          <input
-            type="checkbox"
-            checked={playMode === 'constructed'}
-            onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
-            className="w-4 h-4"
-          />
-          <span className="text-white text-sm">Constructed</span>
-          <span className="text-[var(--ivory-muted)] text-xs">— bring your own deck</span>
-        </label>
+        <div className="flex gap-2 mt-4">
+          <button
+            type="submit"
+            disabled={saving}
+            className="btn btn-primary flex-1 py-2 font-semibold disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+            className="btn btn-secondary btn-destructive py-2 px-4"
+          >
+            Delete
+          </button>
+        </div>
+      </Dialog>
 
-        <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
-          <input
-            type="checkbox"
-            checked={useUpgrades}
-            onChange={(e) => setUseUpgrades(e.target.checked)}
-            className="w-4 h-4"
-          />
-          <span className="text-white text-sm">Upgrades</span>
-        </label>
-
-        <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />
-      </div>
-
-      <div className="flex gap-2 mt-4">
-        <button
-          type="submit"
-          disabled={saving}
-          className="btn btn-primary flex-1 py-2 font-semibold disabled:opacity-50"
-        >
-          {saving ? 'Saving...' : 'Save'}
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (window.confirm(`Delete "${battler.display_name || battler.cube_id}"?`)) onDelete()
+      {confirmingDelete && (
+        <DeletePresetDialog
+          title={cubeTitle(battler)}
+          imageUri={battler.cube_image_uri}
+          deleting={deleting}
+          onKeep={() => setConfirmingDelete(false)}
+          onDelete={async () => {
+            setDeleting(true)
+            await onDelete()
+            setDeleting(false)
+            setConfirmingDelete(false)
           }}
-          className="btn btn-secondary btn-destructive py-2 px-4"
-        >
-          Delete
-        </button>
-      </div>
-    </Dialog>
+        />
+      )}
+    </>
   )
 }

@@ -123,7 +123,7 @@ import {
   hasBattleResultConflict,
 } from "../utils/battleInteraction";
 import { getVoicePeerNames, isVoiceMicBlocked } from "../utils/voiceChat";
-import { DIALOG_BACKDROP, LINK, OPTION_BOX, POPOVER_CHROME, TEXT_INPUT } from "../components/common/styles";
+import { DIALOG_BACKDROP, FIELD_ERROR, LINK, OPTION_BOX, POPOVER_CHROME, TEXT_INPUT } from "../components/common/styles";
 
 // Each area ends at its button's edge beside the life number and reaches outward, so the number takes no taps.
 const LIFE_MINUS_TOUCH_AREA = "touch-area [--touch-area-left:calc(100%_-_44px)]";
@@ -425,9 +425,9 @@ function PlayerSelectionModal({
         <h2 className="text-xl font-bold text-white mb-5">{accountSeatName ? "Join Game" : "Watch a game"}</h2>
 
         {shownError && (
-          <div className="bg-red-900/50 text-red-200 p-3 rounded mb-4">
+          <p role="alert" className={`${FIELD_ERROR} mb-4`}>
             {shownError}
-          </div>
+          </p>
         )}
 
         {!selectedPlayer && (
@@ -2312,7 +2312,7 @@ function GameContent() {
                     <span className="text-xs sm:text-sm text-[#e2d8cb] font-mono">
                       {self_player.stage}-{self_player.round}
                     </span>
-                    <span className="out-title text-[13px] sm:text-[15px]">{isSpectator ? "Out" : "You’re out"}</span>
+                    <span className="out-title text-[13px] sm:text-[14px]">{isSpectator ? "Out" : "You’re out"}</span>
                     <span className="min-w-0 truncate text-xs sm:text-sm text-[var(--ivory-muted)]">{outPlace}</span>
                   </div>
                 ) : (
@@ -2597,7 +2597,7 @@ function GameContent() {
                 <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
                   <div className="out-felt page-center flex-1 min-h-0 overflow-y-auto flex flex-col items-center p-4 text-center">
                     <h2 className="out-title text-[30px] leading-[1.15]">You’re out</h2>
-                    <p className="mt-2 mb-6 text-[17px] text-[var(--ivory-felt)]">{outPlace}</p>
+                    <p className="mt-2 mb-6 text-[16px] text-[var(--ivory-felt)]">{outPlace}</p>
                     <div className="shrink-0">
                       <PoisonCard count={self_player.poison} dimensions={{ width: 120, height: 168 }} />
                     </div>

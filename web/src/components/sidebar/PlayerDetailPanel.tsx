@@ -154,7 +154,7 @@ function SectionHeading({
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--ivory-muted)]">
+      <span className="text-[10px] uppercase tracking-[0.12em] text-[var(--ivory-muted)]">
         {title}
       </span>
       {count !== undefined && (

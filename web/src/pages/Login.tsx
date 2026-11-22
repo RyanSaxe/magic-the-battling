@@ -5,7 +5,7 @@ import { AppHeader, HomeButton } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { unknownToAppError } from '../utils/appError'
-import { FIELD_LABEL, LINK, TEXT_INPUT } from '../components/common/styles'
+import { FIELD_ERROR, FIELD_LABEL, LINK, TEXT_INPUT } from '../components/common/styles'
 
 export function Login() {
   const navigate = useNavigate()
@@ -37,12 +37,8 @@ export function Login() {
       center
       contentClassName="items-center"
     >
-      <SurfaceCard as="form" onSubmit={handleSubmit}>
+      <SurfaceCard as="form" onSubmit={handleSubmit} onChange={() => setError('')}>
         <h2 className="text-xl font-bold text-white mb-5">Log In</h2>
-
-        {error && (
-          <p className="text-red-400 text-sm mb-4 bg-red-900/20 border border-red-800/40 rounded px-3 py-2">{error}</p>
-        )}
 
         <div className="mb-4">
           <label htmlFor="username" className={FIELD_LABEL}>Username</label>
@@ -67,6 +63,7 @@ export function Login() {
             className={TEXT_INPUT}
             required
           />
+          {error && <p role="alert" className={FIELD_ERROR}>{error}</p>}
         </div>
 
         <button

@@ -8,6 +8,7 @@ import { JoinGameModal } from '../components/home/JoinGameModal'
 import { AddCubeModal } from '../components/dashboard/AddCubeModal'
 import { CubeTile } from '../components/dashboard/CubeTile'
 import { DashboardFrame } from '../components/dashboard/DashboardFrame'
+import { DeletePresetDialog } from '../components/dashboard/DeletePresetDialog'
 import { GameTile } from '../components/dashboard/GameTile'
 import { JoinCodeBox } from '../components/dashboard/JoinCodeBox'
 import { ResumeBanner } from '../components/dashboard/ResumeBanner'
@@ -83,6 +84,7 @@ export function Dashboard() {
   const [phoneSection, setPhoneSection] = useState<BoardSection>('library')
   const [showAddModal, setShowAddModal] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState<Extract<LibraryEntry, { kind: 'saved' }> | null>(null)
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/login?returnTo=/dashboard', { replace: true })
@@ -110,9 +112,8 @@ export function Dashboard() {
     }
   }
 
-  const remove = async (entry: LibraryEntry) => {
+  const performRemove = async (entry: LibraryEntry) => {
     if (!library || !canRemove(library, entry)) return
-    if (entry.kind === 'saved' && !window.confirm(`Delete "${cubeTitle(entry.preset)}"?`)) return
     updateLibrary((current) => withRemovalStarted(current, entry))
     try {
       await (entry.kind === 'saved' ? deleteBattler(entry.preset.id) : unfollowCube(entry.follow.id))
@@ -121,6 +122,15 @@ export function Dashboard() {
       updateLibrary((current) => withRemovalFailed(current, entry))
       addToast(entry.kind === 'saved' ? 'Failed to delete' : 'Failed to unfollow', 'error')
     }
+  }
+
+  const remove = (entry: LibraryEntry) => {
+    if (!library || !canRemove(library, entry)) return
+    if (entry.kind === 'saved') {
+      setConfirmingDelete(entry)
+      return
+    }
+    void performRemove(entry)
   }
 
   if (authLoading || !user) return null
@@ -289,6 +299,18 @@ export function Dashboard() {
         />
       )}
       {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
+      {confirmingDelete && (
+        <DeletePresetDialog
+          title={cubeTitle(confirmingDelete.preset)}
+          imageUri={confirmingDelete.preset.cube_image_uri}
+          onKeep={() => setConfirmingDelete(null)}
+          onDelete={() => {
+            const entry = confirmingDelete
+            setConfirmingDelete(null)
+            void performRemove(entry)
+          }}
+        />
+      )}
     </>
   )
 }

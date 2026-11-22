@@ -24,6 +24,8 @@ const preset = vi.hoisted(() => ({
   puppet_count: 3,
 }))
 
+const deleteBattler = vi.hoisted(() => vi.fn(async () => {}))
+
 vi.mock('../api/client', () => ({
   getBattler: async () => preset,
   getBattlerGames: async () => ({ games: [], has_more: false, total_games: 0 }),
@@ -32,11 +34,15 @@ vi.mock('../api/client', () => ({
     ...preset,
     ...Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== null)),
   }),
+  deleteBattler,
 }))
 vi.mock('../contexts', () => ({ useToast: () => ({ addToast: () => {} }) }))
 vi.mock('../contexts/authState', () => ({ useAuth: () => ({ user: { username: 'tester' }, loading: false }) }))
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  deleteBattler.mockClear()
+})
 
 it('saves an emptied Display Name as no name when Enter is pressed', async () => {
   render(
@@ -57,4 +63,36 @@ it('saves an emptied Display Name as no name when Enter is pressed', async () =>
   fireEvent.click(submitButtons[0])
 
   expect(await screen.findByRole('heading', { name: 'Powered Cube' })).toBeTruthy()
+})
+
+it('confirms preset deletion over Settings, keeping edits when Escape cancels it', async () => {
+  render(
+    <MemoryRouter initialEntries={['/dashboard/list/7']}>
+      <Routes>
+        <Route path="/dashboard/list/:listId" element={<BattlerView />} />
+        <Route path="/dashboard" element={<div>Dashboard</div>} />
+      </Routes>
+    </MemoryRouter>,
+  )
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
+  const settings = screen.getByRole('dialog', { name: 'Settings' })
+  const name = within(settings).getByDisplayValue<HTMLInputElement>('Vintage Pod')
+  fireEvent.change(name, { target: { value: 'Draft Night' } })
+
+  fireEvent.click(within(settings).getByRole('button', { name: 'Delete' }))
+  const confirm = screen.getByRole('dialog', { name: 'Delete this preset?' })
+  expect(within(confirm).getByText('Your finished games stay in Recent Games.')).toBeTruthy()
+
+  fireEvent.keyDown(window, { key: 'Escape' })
+  expect(screen.queryByRole('dialog', { name: 'Delete this preset?' })).toBeNull()
+  expect(screen.getByRole('dialog', { name: 'Settings' })).toBeTruthy()
+  expect(within(settings).getByDisplayValue('Draft Night')).toBeTruthy()
+  expect(deleteBattler).not.toHaveBeenCalled()
+
+  fireEvent.click(within(settings).getByRole('button', { name: 'Delete' }))
+  const confirmAgain = screen.getByRole('dialog', { name: 'Delete this preset?' })
+  fireEvent.click(within(confirmAgain).getByRole('button', { name: 'Delete' }))
+
+  expect(await screen.findByText('Dashboard')).toBeTruthy()
+  expect(deleteBattler).toHaveBeenCalledWith(7)
 })

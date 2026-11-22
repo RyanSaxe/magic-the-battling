@@ -12,16 +12,16 @@ export function BrandLockup() {
       <BrandMark />
       <div className="min-w-0 leading-none">
         <div className="flex items-baseline whitespace-nowrap">
-          <h1 className="hero-title text-[14px] sm:text-[18px] font-bold tracking-wide leading-tight shrink-0">
+          <h1 className="hero-title text-[14px] sm:text-[16px] font-bold tracking-wide leading-tight shrink-0">
             Pitfight
           </h1>
-          <span className="hero-sep ml-1 sm:ml-1.5 text-[9.5px] sm:text-[11.5px] shrink-0">—</span>
+          <span className="hero-sep ml-1 sm:ml-1.5 text-[9.5px] sm:text-[11px] shrink-0">—</span>
           {/* The gap after the dash is padding, not margin, so truncating keeps the first letter's overhang. */}
-          <span className="hero-subtitle pl-1 sm:pl-1.5 text-[9.5px] sm:text-[11.5px] font-normal tracking-wider min-w-0 truncate">
+          <span className="hero-subtitle pl-1 sm:pl-1.5 text-[9.5px] sm:text-[11px] font-normal tracking-wider min-w-0 truncate">
             an MtG format
           </span>
         </div>
-        <p className="hero-tagline !text-[8px] sm:!text-[9px] !tracking-[0.12em] max-[390px]:!tracking-[0.06em] max-[375px]:!tracking-[0.02em] truncate max-[360px]:hidden">
+        <p className="hero-tagline !text-[8px] sm:!text-[9px] !tracking-[0.12em] max-[390px]:!tracking-[0.08em] max-[375px]:!tracking-[0.02em] truncate max-[360px]:hidden">
           Inspired by Roguelikes and Autobattlers
         </p>
       </div>

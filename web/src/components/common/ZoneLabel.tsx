@@ -15,7 +15,7 @@ const badgeWrapCls =
 const constrainedWrapCls = "max-w-[calc(100%-0.5rem)]";
 const constrainedBadgeCls = "min-w-0 max-w-full";
 const compactBadgeCls =
-  "px-1.5 gap-1 text-[9px] tracking-[0.18em]";
+  "px-1.5 gap-1 text-[9px] tracking-[0.12em]";
 
 const noopDragCallbacks: DividerDragCallbacks = {
   onDragStart: () => {},

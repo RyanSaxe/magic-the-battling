@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Snap Tailwind's off-scale text, radius and tracking utilities onto the design scale. */
+@theme {
+  --text-lg: 1rem;
+  --radius-xl: 0.5rem;
+  --tracking-wider: 0.08em;
+  --tracking-widest: 0.08em;
+}
+
 /* Recent Games beside cube cards on a wide dashboard. Anywhere else, a game tile is already shorter than the short sizing. */
 @custom-variant beside-cubes {
   @media (width >= 80rem) {
@@ -20,6 +28,16 @@
   --color-gold: #d4af37;
   --color-gold-dark: #a88b3d;
   --color-gold-glow: rgba(212, 175, 55, 0.6);
+
+  /* Map Tailwind's amber and green utilities onto the table's own gold, ivory and win tokens. */
+  --color-amber-50: var(--ivory);
+  --color-amber-100: var(--ivory);
+  --color-amber-200: var(--gold-pale);
+  --color-amber-300: var(--color-gold-bright);
+  --color-amber-400: var(--color-gold);
+  --color-amber-500: var(--color-gold);
+  --color-green-400: var(--win-text);
+  --color-green-500: var(--win-text);
 
   /* Mana colors */
   --mana-white: #f8f6e3;
@@ -155,6 +173,15 @@ body {
   }
 }
 
+/* Keep white utility text in warm ivory; .btn-success below sets its own pure white for contrast. */
+.text-white {
+  color: var(--ivory);
+}
+
+:is([class*="border-amber-400/1"], [class*="border-amber-400/2"]) {
+  border-color: var(--gold-border-opaque);
+}
+
 /* Prevent browser autofill from overriding dark theme */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
@@ -283,7 +310,7 @@ input:-webkit-autofill:focus {
     color: var(--ivory-muted);
     font-size: 9px;
     font-weight: 700;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
 
@@ -292,7 +319,7 @@ input:-webkit-autofill:focus {
     flex: none;
     width: 34px;
     height: 19px;
-    border-radius: 10px;
+    border-radius: 8px;
     background-color: var(--walnut-track);
     box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.22);
     transition: background-color var(--transition-fast);
@@ -567,7 +594,7 @@ input:-webkit-autofill:focus {
 /* A destructive item, like Delete. These reds keep 4.5:1 on walnut and on every hover fill. */
 .menu-item-destructive,
 .btn-secondary.btn-destructive {
-  color: #fca5a5;
+  color: var(--loss-text);
 }
 
 .menu-item-destructive:hover:not(:disabled),
@@ -650,7 +677,7 @@ input:-webkit-autofill:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--ivory);
 }
@@ -804,7 +831,7 @@ input:-webkit-autofill:focus {
   font-family: 'Cinzel', serif;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   color: var(--loss-text);
 }
 
@@ -965,7 +992,7 @@ input:-webkit-autofill:focus {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(212, 175, 55, 0.48);
-  border-radius: 10px;
+  border-radius: 8px;
   box-shadow:
     0 24px 64px rgba(0, 0, 0, 0.68),
     0 8px 24px rgba(0, 0, 0, 0.45),
@@ -1039,7 +1066,7 @@ input:-webkit-autofill:focus {
   white-space: nowrap;
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--color-gold-bright);
 }
@@ -1049,7 +1076,7 @@ input:-webkit-autofill:focus {
   width: 24px;
   height: 24px;
   padding: 0;
-  border-radius: 5px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1114,7 +1141,7 @@ input:-webkit-autofill:focus {
     font-size: 10px;
     font-weight: 700;
     line-height: 13px;
-    letter-spacing: 0.1em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
 
@@ -1175,7 +1202,7 @@ input:-webkit-autofill:focus {
   }
 
   .cube-banner-name.is-long {
-    font-size: 15px;
+    font-size: 14px;
     line-height: 16px;
   }
 
@@ -1227,7 +1254,7 @@ input:-webkit-autofill:focus {
 
   .cube-banner-notice.is-long,
   .lobby-away-notice.is-long {
-    font-size: 10.5px;
+    font-size: 10px;
     line-height: 11px;
   }
 
@@ -1561,7 +1588,7 @@ input:-webkit-autofill:focus {
   .resume-chevron {
     flex: none;
     color: var(--ivory-key);
-    font-size: 18px;
+    font-size: 16px;
   }
 
   .resume-all {
@@ -1693,7 +1720,7 @@ input:-webkit-autofill:focus {
     margin-top: 2px;
     font-size: 9.5px;
     line-height: 12px;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
   }
 
   .seat-open .seat-name {
@@ -1707,7 +1734,7 @@ input:-webkit-autofill:focus {
   }
 
   .lobby-felt .seat-name.is-long-name {
-    font-size: 10.5px;
+    font-size: 10px;
     line-height: 10.5px;
   }
 
@@ -1860,7 +1887,7 @@ input:-webkit-autofill:focus {
     }
 
     .cube-banner-name.is-longest {
-      font-size: 11.5px;
+      font-size: 11px;
       line-height: 12px;
     }
 
@@ -1892,7 +1919,7 @@ input:-webkit-autofill:focus {
 
   @media (width < 375px) {
     .cube-banner-name.is-medium {
-      font-size: 15px;
+      font-size: 14px;
       line-height: 16px;
     }
 
@@ -1905,7 +1932,7 @@ input:-webkit-autofill:focus {
   @media (width < 360px) {
     .cube-banner-name.is-longest,
     .cube-banner-notice {
-      font-size: 10.5px;
+      font-size: 10px;
       line-height: 11px;
     }
 
@@ -1952,7 +1979,7 @@ input:-webkit-autofill:focus {
     }
 
     .lobby-felt .seat-add:has(+ .icon-target) .seat-name {
-      font-size: 10.5px;
+      font-size: 10px;
       letter-spacing: -0.02em;
     }
 
@@ -1970,11 +1997,11 @@ input:-webkit-autofill:focus {
     }
 
     .join-code-caption {
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
     }
 
     .join-code {
-      font-size: 25px;
+      font-size: 24px;
     }
 
     .seat-count {
@@ -2031,7 +2058,7 @@ input:-webkit-autofill:focus {
     }
 
     .seat:has(.icon-target + .icon-target) .seat-name {
-      font-size: 11.5px;
+      font-size: 11px;
     }
   }
 
@@ -2710,7 +2737,7 @@ input:-webkit-autofill:focus {
 
 .battle-side-label {
   font-size: 8px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #a9a4a2;
   line-height: 1;
@@ -2771,9 +2798,9 @@ input:-webkit-autofill:focus {
 
 .skeleton {
   background: linear-gradient(90deg,
-      rgba(255, 255, 255, 0.1) 0%,
-      rgba(255, 255, 255, 0.2) 50%,
-      rgba(255, 255, 255, 0.1) 100%);
+      var(--chrome-modal) 0%,
+      var(--stone) 50%,
+      var(--chrome-modal) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
@@ -2813,7 +2840,7 @@ input:-webkit-autofill:focus {
   width: 30px;
   margin-inline: 7px;
   padding: 0;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .btn.btn-pill:disabled {
@@ -2830,7 +2857,7 @@ input:-webkit-autofill:focus {
   width: 100%;
   height: 44px;
   padding: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 20px;
 }
@@ -2900,7 +2927,7 @@ input:-webkit-autofill:focus {
   }
 
   .setup-next small {
-    font-size: 10.5px;
+    font-size: 10px;
   }
 }
 
@@ -3283,7 +3310,7 @@ input:-webkit-autofill:focus {
 .hero-tagline {
   font-size: 12px;
   color: var(--ivory-muted);
-  letter-spacing: 0.15em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -3933,7 +3960,7 @@ input:-webkit-autofill:focus {
   font-size: min(27px, 6.9vw);
   font-weight: 700;
   line-height: 1.1;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-align: center;
   text-transform: uppercase;
 }
@@ -4282,7 +4309,7 @@ input:-webkit-autofill:focus {
     margin-bottom: 12px;
     padding-bottom: 8px;
     border-bottom: 1px solid var(--gold-border-opaque);
-    font-size: 25px;
+    font-size: 24px;
     line-height: 31px;
   }
 
@@ -4321,6 +4348,11 @@ input:-webkit-autofill:focus {
     gap: 0;
   }
 
+  .cards-view-colors .mana-filter-btn {
+    width: 32px;
+    height: 32px;
+  }
+
   .cards-view-list {
     grid-area: 1 / 2 / 3;
     padding: 14px;
@@ -4339,8 +4371,8 @@ input:-webkit-autofill:focus {
 
 .doc-list-item::before {
   content: counter(list-item) ".";
-  color: rgb(245 158 11 / 0.9);
-  font-size: 0.875rem;
+  color: var(--color-gold);
+  font-size: 14px;
   min-width: 1.25rem;
   flex-shrink: 0;
 }
@@ -4462,7 +4494,7 @@ input:-webkit-autofill:focus {
 
 .standings-rank-number {
   font-family: 'Cinzel', serif;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1;
 }
@@ -4471,7 +4503,7 @@ input:-webkit-autofill:focus {
   font-size: 9px;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ivory-muted);
 }
@@ -4647,7 +4679,7 @@ input:-webkit-autofill:focus {
   text-overflow: ellipsis;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   white-space: nowrap;
   color: var(--ivory-muted);
@@ -4791,7 +4823,7 @@ div.player-card-button:hover {
   flex: none;
   width: min(100cqw - var(--words) - 40px, 150cqh, 630px);
   aspect-ratio: 3 / 2;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .board-picture {
@@ -4860,7 +4892,7 @@ div.player-card-button:hover {
 
 .board-title h2 {
   min-width: 0;
-  color: #fffbeb;
+  color: var(--ivory);
   font: 700 26px/30px "Cinzel", serif;
   overflow-wrap: anywhere;
   text-wrap: balance;
@@ -4868,7 +4900,7 @@ div.player-card-button:hover {
 
 .board-title h2.is-long {
   max-width: 14.5em;
-  font-size: 19px;
+  font-size: 20px;
   line-height: 22px;
 }
 
@@ -5260,7 +5292,7 @@ div.player-card-button:hover {
 }
 
 .scouting-state-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   line-height: 24px;
 }
@@ -5331,14 +5363,14 @@ div.player-card-button:hover {
   font-size: 10px;
   font-weight: 700;
   line-height: 14px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ivory-muted);
 }
 
 .scouting-value {
   margin-top: 4px;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   line-height: 24px;
   white-space: nowrap;
@@ -5352,7 +5384,7 @@ div.player-card-button:hover {
 }
 
 .scouting-none {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 400;
   color: var(--ivory-muted);
 }
@@ -5402,7 +5434,7 @@ div.player-card-button:hover {
   }
 
   .scouting-key {
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
   }
 }
 
@@ -5467,11 +5499,133 @@ div.player-card-button:hover {
 
   .scouting-count {
     height: 24px;
-    font-size: 22px;
+    font-size: 20px;
     line-height: 24px;
   }
 
   .scouting-value {
     line-height: 20px;
   }
+}
+
+/* Slim toast line */
+.toast-slim {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: max-content;
+  max-width: min(94vw, 32rem);
+  padding-left: 12px;
+}
+
+.toast-slim p {
+  min-width: 0;
+  padding-block: 10px;
+  color: var(--ivory);
+  font-size: 14px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.toast-slim > button {
+  display: flex;
+  flex: none;
+  width: 40px;
+  min-height: 40px;
+  align-self: stretch;
+  align-items: center;
+  justify-content: center;
+  color: var(--ivory-muted);
+  transition: color var(--transition-fast);
+}
+
+.toast-slim > button:hover {
+  color: var(--ivory);
+}
+
+.toast-slim > button svg {
+  width: 11px;
+  height: 11px;
+}
+
+.toast-slim-icon {
+  flex: none;
+  color: var(--ivory);
+}
+
+.toast-slim.is-error .toast-slim-icon {
+  color: var(--loss-text);
+}
+
+.toast-slim.is-warning .toast-slim-icon {
+  color: var(--color-gold-bright);
+}
+
+.toast-slim.is-success .toast-slim-icon {
+  color: var(--win-text);
+}
+
+/* Mana symbol filters in CardsView */
+.mana-filter-btn {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: opacity var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.mana-filter-btn.is-on {
+  box-shadow: inset 0 0 0 2px var(--color-gold-bright);
+}
+
+.mana-filter-btn.is-off img {
+  opacity: 0.5;
+}
+
+.mana-filter-btn.is-off:hover img {
+  opacity: 0.75;
+}
+
+/* Delete preset confirmation */
+.delete-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ivory);
+}
+
+.delete-preset-art {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--art-fade);
+  box-shadow: 0 0 0 1px var(--gold-border-opaque);
+}
+
+.delete-preset-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Keep a page to one gold call to action: when another gold button is already visible,
+   a notice tile's button steps down to walnut. */
+.game-table:has(.btn-primary:not(.notice-tile-action)) .btn.notice-tile-action {
+  background: var(--btn-secondary-fill);
+  color: var(--ivory);
+  --btn-raise-edge: rgba(255, 236, 181, 0.14);
+}
+
+@media (hover: hover) {
+  .game-table:has(.btn-primary:not(.notice-tile-action)) .btn.notice-tile-action:hover:not(:disabled) {
+    background: var(--btn-secondary-fill-hover);
+  }
+}
+
+.game-table:has(.btn-primary:not(.notice-tile-action)) .btn.notice-tile-action:active:not(:disabled) {
+  background: var(--btn-secondary-fill-pressed);
 }

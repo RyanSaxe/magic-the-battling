@@ -37,7 +37,7 @@ export function DocRenderer({ content, className }: DocRendererProps) {
 
   const components: Components = {
     h2: ({ children }) => (
-      <h2 className="text-[0.9375rem] font-semibold text-[var(--ivory)] tracking-wide mt-5 mb-2 first:mt-0 border-b border-amber-400/15 pb-1">
+      <h2 className="text-sm font-semibold text-[var(--ivory)] tracking-wide mt-5 mb-2 first:mt-0 border-b border-amber-400/15 pb-1">
         {children}
       </h2>
     ),
@@ -47,13 +47,13 @@ export function DocRenderer({ content, className }: DocRendererProps) {
       </h3>
     ),
     p: ({ children }) => (
-      <p className="text-sm sm:text-[0.9375rem] text-[var(--ivory-muted)] mb-3 leading-relaxed">{children}</p>
+      <p className="text-sm text-[var(--ivory-muted)] mb-3 leading-relaxed">{children}</p>
     ),
     ul: ({ children }) => (
       <ul className="doc-list space-y-1.5 mb-3">{children}</ul>
     ),
     li: ({ children }) => (
-      <li className="doc-list-item flex gap-2 text-sm sm:text-[0.9375rem] text-[var(--ivory-muted)] leading-relaxed">
+      <li className="doc-list-item flex gap-2 text-sm text-[var(--ivory-muted)] leading-relaxed">
         <span>{children}</span>
       </li>
     ),

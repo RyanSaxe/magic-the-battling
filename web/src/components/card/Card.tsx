@@ -288,7 +288,7 @@ export function Card({
         )}
         {showFlipButton && (
           <button
-            className={`absolute ${stacksButtons ? 'inset-x-0.5 bottom-0.5 h-[18px] rounded-[3px] text-[11px]' : 'top-1 right-1 rounded px-2 py-0.5 text-xs'} bg-black/60 text-white hover:bg-black/80 transition-colors`}
+            className={`absolute ${stacksButtons ? 'inset-x-0.5 bottom-0.5 h-[18px] rounded-[2px] text-[11px]' : 'top-1 right-1 rounded px-2 py-0.5 text-xs'} bg-black/60 text-white hover:bg-black/80 transition-colors`}
             onClick={(e) => {
               e.stopPropagation()
               setShowFlip(!showFlip)
@@ -299,7 +299,7 @@ export function Card({
         )}
         {previewContext && showZoom && (!effectiveFaceDown || canPeekFaceDown) && (isHovered || selected) && (
           <button
-            className={`absolute ${stacksButtons ? 'inset-x-0.5 top-0.5 flex h-[18px] items-center justify-center rounded-[3px]' : `${showCopyBadge ? 'top-8' : 'top-1'} left-1 rounded p-1`} bg-black/60 text-white hover:bg-black/80 transition-colors`}
+            className={`absolute ${stacksButtons ? 'inset-x-0.5 top-0.5 flex h-[18px] items-center justify-center rounded-[2px]' : `${showCopyBadge ? 'top-8' : 'top-1'} left-1 rounded p-1`} bg-black/60 text-white hover:bg-black/80 transition-colors`}
             onClick={(e) => {
               e.stopPropagation()
               openPreview()

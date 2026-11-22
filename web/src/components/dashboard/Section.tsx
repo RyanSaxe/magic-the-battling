@@ -5,7 +5,7 @@ import { SurfaceCard } from '../common/SurfaceCard'
 import { SECTION_TITLE_TYPE } from './typography'
 import { LINK } from '../common/styles'
 
-const SECTION_META_TYPE = 'text-[12.5px] leading-5'
+const SECTION_META_TYPE = 'text-[12px] leading-5'
 
 export function SectionTitle({ children }: { children: ReactNode }) {
   return <h2 className={`${SECTION_TITLE_TYPE} text-amber-200/80`}>{children}</h2>
@@ -67,7 +67,7 @@ export function NoticeTile({
     >
       <p>{children}</p>
       {action && (
-        <button type="button" onClick={action.onClick} className="btn btn-primary px-5 py-1.5 text-sm font-semibold">
+        <button type="button" onClick={action.onClick} className="btn btn-primary notice-tile-action px-5 py-1.5 text-sm font-semibold">
           {action.label}
         </button>
       )}

@@ -56,7 +56,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
         aria-hidden={ariaHidden || undefined}
       >
         <div className="flex items-center justify-between gap-3 border-b gold-divider px-4 py-2.5">
-          <span className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--color-gold)]">
+          <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--color-gold)]">
             {guideLabel}
           </span>
           {totalSteps > 1 && (
@@ -80,14 +80,14 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
           )}
         </div>
         <div className="max-h-[min(20rem,calc(100vh-12rem))] overflow-y-auto px-4 py-4">
-          <h2 className="text-[0.98rem] font-semibold leading-tight text-[var(--ivory)]">
+          <h2 className="text-[16px] font-semibold leading-tight text-[var(--ivory)]">
             {step.title}
           </h2>
-          <p className="mt-2 text-[0.92rem] leading-relaxed text-[var(--ivory)]">
+          <p className="mt-2 text-[14px] leading-relaxed text-[var(--ivory)]">
             {step.content.summary}
           </p>
           {step.content.detail && (
-            <p className="mt-2 text-[0.84rem] leading-relaxed text-[var(--ivory-muted)]">
+            <p className="mt-2 text-[13px] leading-relaxed text-[var(--ivory-muted)]">
               {step.content.detail}
             </p>
           )}
@@ -102,7 +102,7 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
           )}
           {step.content.gallery && step.content.gallery.length > 0 && (
             <div className="mt-4 rounded-xl border gold-divider bg-black/20 p-3">
-              <div className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--ivory-soft)]">
+              <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--ivory-soft)]">
                 Cards shown here
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">

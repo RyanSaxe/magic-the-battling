@@ -142,7 +142,7 @@ export function FloatingWindow({
       </div>
       {collapsed && (
         <div className="flex flex-1 min-h-0 flex-col justify-center px-4 pb-3 pt-2">
-          <span className="text-[0.58rem] uppercase tracking-[0.18em] text-[var(--ivory-muted)]">{collapsedCaption}</span>
+          <span className="text-[0.58rem] uppercase tracking-[0.12em] text-[var(--ivory-muted)]">{collapsedCaption}</span>
           <span className="mt-1 text-sm font-medium leading-snug text-[var(--ivory)] break-words">{collapsedText}</span>
         </div>
       )}
