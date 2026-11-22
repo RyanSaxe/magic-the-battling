@@ -1,6 +1,7 @@
 import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { BoardBackdrop } from './BoardBackdrop'
+import { CloseButton } from './CloseButton'
 import { SidePanelHostContext } from './sidePanelHost'
 
 /** Placed over the board and its sidebar, it marks the box between their gold edges where side panels open. */
@@ -100,16 +101,7 @@ export function SidePanel({
         </h2>
         <div className="flex items-center gap-2">
           {headerActions}
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn btn-secondary side-panel-close"
-            aria-label={`Close ${label}`}
-          >
-            <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
-              <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </button>
+          <CloseButton onClick={onClose} label={`Close ${label}`} />
         </div>
       </div>
       <div className="side-panel-body">{children}</div>

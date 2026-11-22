@@ -1,5 +1,6 @@
 import type { SpectateRequest } from '../hooks/useWebSocket'
 import { DIALOG_BACKDROP } from './common/styles'
+import { SurfaceCard } from './common/SurfaceCard'
 
 export function SpectateRequestModal({
   request,
@@ -9,8 +10,8 @@ export function SpectateRequestModal({
   onRespond: (requestId: string, allowed: boolean) => void
 }) {
   return (
-    <div className={`fixed inset-0 ${DIALOG_BACKDROP} flex items-center justify-center z-50`}>
-      <div className="modal-chrome border gold-border rounded-lg p-6 w-full max-w-sm mx-4">
+    <div className={`fixed inset-0 ${DIALOG_BACKDROP} flex items-center justify-center z-50 p-4`}>
+      <SurfaceCard>
         <h2 className="text-xl text-white mb-4">Spectate Request</h2>
         <p className="text-[var(--ivory-muted)] mb-6">
           <strong>{request.spectator_name}</strong> wants to watch your game.
@@ -29,7 +30,7 @@ export function SpectateRequestModal({
             Deny
           </button>
         </div>
-      </div>
+      </SurfaceCard>
     </div>
   )
 }

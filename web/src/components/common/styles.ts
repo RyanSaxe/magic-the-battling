@@ -25,7 +25,3 @@ export const POPOVER_CHROME = 'modal-chrome border gold-border rounded-lg felt-r
 
 /** The dimmed, blurred layer behind a dialog. */
 export const DIALOG_BACKDROP = 'bg-black/60 backdrop-blur-sm'
-
-/** The round ✕ button in a dialog's header. */
-export const DIALOG_CLOSE_BUTTON =
-  'w-7 h-7 rounded-full bg-black/35 btn-dark-border text-amber-100/70 hover:bg-black/20 hover:text-white transition-all text-sm flex items-center justify-center'
