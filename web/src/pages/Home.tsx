@@ -55,8 +55,9 @@ export function Home() {
         shelf={<HomeResumeShelf seats={resumableGames} />}
       >
         <CardShowcase />
-        {/* mt-10 rather than mt-6 offsets the column's top padding, so the showcase stays centered where it was. */}
-        <p className="text-[var(--ivory-muted)] text-sm mt-10">
+        {/* Phones only, where the bar has no room for Log in. mt-10 rather than mt-6 offsets the column's top
+            padding, so the showcase stays centered. */}
+        <p className="sm:hidden text-[var(--ivory-muted)] text-sm mt-10">
           <Link to="/login" className={LINK}>
             Log in
           </Link>
