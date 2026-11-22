@@ -1118,10 +1118,18 @@ function GameContent() {
     queueMicrotask(() => setHoveredCard(card));
   }, [currentBattle]);
 
+  const moveBattleCard = useCallback<typeof actions.battleMove>(
+    (cardId, ...move) => {
+      actions.battleMove(cardId, ...move);
+      dispatchBoard({ type: "cardMoved", cardId });
+    },
+    [actions],
+  );
+
   // DnD setup for battle phase
   const { handleCardMove, getValidDropZones } = useDndActions({
     phase: gameState?.self_player?.phase ?? "draft",
-    battleMove: actions.battleMove,
+    battleMove: moveBattleCard,
   });
 
   const handleYourLifeChange = (life: number) => {
@@ -1475,7 +1483,7 @@ function GameContent() {
           };
           const moveHotkeys = buildCardMoveHotkeys({
             hoveredCard,
-            moveCard: (card, toZone) => actions.battleMove(card.id, card.zone, toZone, card.owner, card.owner),
+            moveCard: (card, toZone) => moveBattleCard(card.id, card.zone, toZone, card.owner, card.owner),
             clearHoveredCard: () => setHoveredCard(null),
           });
           for (const [key, action] of Object.entries(moveHotkeys)) {

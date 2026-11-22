@@ -57,6 +57,7 @@ describe('Game: what is open over the board', () => {
   afterEach(() => {
     cleanup()
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
   it('forgets a card selected in a panel when that panel closes, and still moves one tapped while it is open', async () => {
@@ -91,6 +92,33 @@ describe('Game: what is open over the board', () => {
     selectInSideboard()
     tapFelt()
     expect(moves()).toBe(1)
+  })
+
+  it('forgets a selected card once it is dragged to another zone', async () => {
+    // jsdom lays nothing out, so the graveyard gets a place of its own to be dropped on.
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      const at = this.matches('[data-zone="graveyard"][data-zone-owner="player"]') ? 200 : 0
+      return { x: at, y: at, left: at, top: at, right: at + 50, bottom: at + 50, width: 50, height: 50 } as DOMRect
+    })
+    await openGameOnPhone(gameBootstrap({ phase: 'battle', counts: { lands: 1 } }))
+    const land = find('[data-guide-card-id="your-land-0"]')
+    fireEvent.click(land)
+
+    fireEvent.mouseDown(land, { clientX: 10, clientY: 10, button: 0 })
+    for (const at of [30, 220, 225]) {
+      await act(async () => {
+        fireEvent.mouseMove(document, { clientX: at, clientY: at, buttons: 1 })
+      })
+    }
+    await act(async () => {
+      fireEvent.mouseUp(document, { clientX: 225, clientY: 225 })
+      // A drag swallows clicks for 50ms after it ends.
+      await new Promise((resolve) => setTimeout(resolve, 60))
+    })
+    fireEvent.click(find('.battle-side-dropzone[data-zone="exile"][data-zone-owner="player"] > div'))
+
+    const moves = FakeWebSocket.latest().sent.filter((message) => message.includes('"battle_move"'))
+    expect(moves.map((message) => JSON.parse(message).payload.to_zone)).toEqual(['graveyard'])
   })
 
   it('leaves a minimized Guide and its place alone while Players and Scouting open and close', async () => {

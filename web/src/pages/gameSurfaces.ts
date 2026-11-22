@@ -129,11 +129,18 @@ export interface GameBoard {
   selectedCard: BattleSelectedCard | null;
 }
 
-export type GameBoardEvent = GameSurfaceEvent | { type: "select"; card: BattleSelectedCard | null };
+export type GameBoardEvent =
+  | GameSurfaceEvent
+  | { type: "select"; card: BattleSelectedCard | null }
+  /** A card left its zone by a drag or a hotkey, so it's no longer selected there. */
+  | { type: "cardMoved"; cardId: string };
 
 export function reduceGameBoard(board: GameBoard, event: GameBoardEvent): GameBoard {
   if (event.type === "select") {
     return event.card === board.selectedCard ? board : { ...board, selectedCard: event.card };
+  }
+  if (event.type === "cardMoved") {
+    return event.cardId === board.selectedCard?.card.id ? { ...board, selectedCard: null } : board;
   }
   const open = reduceGameSurface(board.open, event);
   if (open === board.open) return board;
