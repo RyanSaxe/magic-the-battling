@@ -94,6 +94,38 @@ def test_a_replaced_socket_that_is_slow_to_close_does_not_delay_the_new_one(
                 old_socket_may_close.set()
 
 
+def test_a_slow_socket_holds_up_no_one_else_and_still_gets_its_messages_in_order(
+    client, game_with_players, ws_receive_json, monkeypatch
+):
+    game_id = game_with_players["game_id"]
+    bob_session = game_with_players["bob"]["session_id"]
+    bob_may_receive = threading.Event()
+    send_json = WebSocket.send_json
+
+    async def send_to_bob_once_allowed(websocket, message, mode="text"):
+        if websocket.query_params.get("session_id") == bob_session:
+            await asyncio.to_thread(bob_may_receive.wait)
+        await send_json(websocket, message, mode)
+
+    def alice_is_ready(message: dict) -> bool:
+        return next(p["is_ready"] for p in message["payload"]["players"] if p["name"] == "Alice")
+
+    with client.websocket_connect(_player_url(game_id, game_with_players["bob"])) as bob:
+        ws_receive_json(bob)
+        with client.websocket_connect(_player_url(game_id, game_with_players["alice"])) as alice:
+            ws_receive_json(alice)
+            ws_receive_json(bob)
+            monkeypatch.setattr(WebSocket, "send_json", send_to_bob_once_allowed)
+            try:
+                for is_ready in (True, False):
+                    alice.send_json({"action": "set_ready", "payload": {"is_ready": is_ready}})
+                    assert alice_is_ready(ws_receive_json(alice)) is is_ready
+            finally:
+                bob_may_receive.set()
+
+            assert [alice_is_ready(ws_receive_json(bob)) for _ in range(2)] == [True, False]
+
+
 def test_a_late_close_from_a_replaced_socket_keeps_the_lobby_player_ready(client, game_with_players, ws_receive_json):
     game_id = game_with_players["game_id"]
     url = _player_url(game_id, game_with_players["alice"])
