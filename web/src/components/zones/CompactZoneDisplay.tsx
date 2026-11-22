@@ -27,6 +27,7 @@ interface CompactZoneDisplayProps {
   selectedCardId?: string
   onZoneClick?: () => void
   onCardClick?: (card: CardType, zone: ZoneName, owner: ZoneOwner) => void
+  onCardContextMenu?: (e: React.MouseEvent, card: CardType, zone: ZoneName) => void
   containerClassName?: string
   forceFaceDown?: boolean
   isModalOpen?: boolean
@@ -55,6 +56,7 @@ export function CompactZoneDisplay({
   selectedCardId,
   onZoneClick,
   onCardClick,
+  onCardContextMenu,
   containerClassName,
   forceFaceDown = false,
   isModalOpen,
@@ -149,6 +151,7 @@ export function CompactZoneDisplay({
                 isOpponent={isOpponent}
                 onCardHover={allowCardInteraction ? onCardHover : undefined}
                 onCardHoverEnd={allowCardInteraction ? onCardHoverEnd : undefined}
+                onContextMenu={allowCardInteraction && onCardContextMenu ? (e) => onCardContextMenu(e, topCard, zone) : undefined}
                 faceDown={forceFaceDown}
                 canPeekFaceDown={forceFaceDown ? false : canPeekFaceDown}
                 upgraded={upgradedCardIds?.has(topCard.id)}
@@ -175,6 +178,7 @@ export function CompactZoneDisplay({
         onCardHover={onCardHover}
         onCardHoverEnd={onCardHoverEnd}
         onCardClick={onCardClick}
+        onCardContextMenu={onCardContextMenu}
         selectedCardId={selectedCardId}
         forceFaceDown={forceFaceDown}
         upgradedCardIds={upgradedCardIds}

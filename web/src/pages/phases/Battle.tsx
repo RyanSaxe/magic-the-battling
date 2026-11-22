@@ -9,8 +9,9 @@ import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
 import { battleBoardMetrics } from './phaseLayouts'
 import { buildAppliedUpgradeMap, buildHiddenAppliedUpgradeMap } from '../../utils/upgrades'
 import { canInteractWithBattleZone } from '../../utils/battleInteraction'
+import { canHover } from '../../utils/inputMode'
 
-interface ContextMenuState {
+export interface BattleCardMenu {
   card: CardType
   zone: ZoneName
   position: { x: number; y: number }
@@ -45,6 +46,8 @@ interface BattlePhaseProps {
   isMobile?: boolean
   selectedCard: BattleSelectedCard | null
   onSelectedCardChange: (card: BattleSelectedCard | null) => void
+  cardMenu: BattleCardMenu | null
+  onCardMenuChange: (menu: BattleCardMenu | null) => void
   onCardHover?: (cardId: string, zone: ZoneName) => void
   onOpponentCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
@@ -136,6 +139,8 @@ export function BattlePhase({
   isMobile = false,
   selectedCard,
   onSelectedCardChange,
+  cardMenu: contextMenu,
+  onCardMenuChange: setContextMenu,
   onCardHover,
   onOpponentCardHover,
   onCardHoverEnd,
@@ -170,7 +175,6 @@ export function BattlePhase({
       setSelectedCard(null)
     }
   }, [setSelectedCard])
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [zoneContextMenu, setZoneContextMenu] = useState<ZoneContextMenuState | null>(null)
 
   const { current_battle } = gameState
@@ -341,6 +345,10 @@ export function BattlePhase({
     setContextMenu({ card, zone, position: { x: e.clientX, y: e.clientY }, isOpponent: true })
   }
 
+  // On touch, holding a card in a pile or panel drags it out, so only a mouse opens the menu there.
+  const handlePileContextMenu = canHover ? handleContextMenu : undefined
+  const handleOpponentPileContextMenu = canHover ? handleOpponentContextMenu : undefined
+
   const handleLibraryContextMenu = (
     e: React.MouseEvent<HTMLDivElement>,
     owner: ZoneOwner,
@@ -508,6 +516,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('graveyard', 'opponent')}
               onCardClick={handleCardClick}
+              onCardContextMenu={handleOpponentPileContextMenu}
               upgradedCardIds={opponentUpgradedCardIds}
               upgradesByCardId={opponentUpgradesByCardId}
               containerClassName="battle-side-cell"
@@ -530,6 +539,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('exile', 'opponent')}
               onCardClick={handleCardClick}
+              onCardContextMenu={handleOpponentPileContextMenu}
               upgradedCardIds={opponentUpgradedCardIds}
               upgradesByCardId={opponentUpgradesByCardId}
               containerClassName="battle-side-cell"
@@ -614,6 +624,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('exile', 'player')}
               onCardClick={handleCardClick}
+              onCardContextMenu={handlePileContextMenu}
               upgradedCardIds={upgradedCardIds}
               upgradesByCardId={upgradesByCardId}
               hiddenUpgradesByCardId={hiddenUpgradesByCardId}
@@ -634,6 +645,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('graveyard', 'player')}
               onCardClick={handleCardClick}
+              onCardContextMenu={handlePileContextMenu}
               upgradedCardIds={upgradedCardIds}
               upgradesByCardId={upgradesByCardId}
               hiddenUpgradesByCardId={hiddenUpgradesByCardId}

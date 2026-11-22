@@ -60,10 +60,13 @@ export function CardActionMenu({
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      onClose()
     }
-    window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
+    // The menu is on top, so it takes Escape while the key is captured, before a panel under it hears it.
+    window.addEventListener('keydown', handleEscape, true)
+    return () => window.removeEventListener('keydown', handleEscape, true)
   }, [onClose])
 
   const onBattlefield = zone === 'battlefield'
