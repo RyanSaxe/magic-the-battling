@@ -5,6 +5,7 @@ import { useGame } from "../hooks/useGame";
 import { useVoiceChat } from "../hooks/useVoiceChat";
 import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { usePanelHoldsEnter } from "../utils/enterKey";
 import { useCubeLook } from "../hooks/useCubeLook";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
@@ -288,6 +289,7 @@ export function Lobby() {
     };
   }
   useHotkeys(lobbyHotkeyMap, !!session && !guideTakesKeys);
+  usePanelHoldsEnter(guideTakesKeys);
 
   useEffect(() => {
     if (gameState) {
@@ -556,6 +558,7 @@ export function Lobby() {
             {isHost && (
               <button
                 onClick={requestStart}
+                data-ends-phase
                 disabled={!lobbyState.can_start || startAwaitingServer}
                 className={`btn setup-next ${startWaits ? "setup-waiting" : "btn-primary"}`}
               >

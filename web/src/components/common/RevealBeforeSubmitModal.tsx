@@ -6,7 +6,7 @@ import { CloseButton } from './CloseButton'
 import { DIALOG_BACKDROP } from './styles'
 import { useCardLayout } from '../../hooks/useCardLayout'
 import { upgradeListLayoutConfig } from './upgradeModalLayouts'
-import { enterPressesControl } from '../../utils/enterKey'
+import { enterMayAdvance, enterPressesControl } from '../../utils/enterKey'
 
 interface RevealBeforeSubmitModalProps {
   upgrades: CardType[]
@@ -44,7 +44,7 @@ export function RevealBeforeSubmitModal({
       } else if (e.key === 'Enter' && selectedIds.length > 0) {
         e.preventDefault()
         e.stopPropagation()
-        onRevealAndSubmit(selectedIds)
+        if (enterMayAdvance(e)) onRevealAndSubmit(selectedIds)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -93,12 +93,14 @@ export function RevealBeforeSubmitModal({
         <div className="px-4 py-3 border-t gold-divider flex justify-end gap-3">
           <button
             onClick={onSkip}
+            data-ends-phase
             className="btn btn-secondary text-sm"
           >
             Submit Without Revealing
           </button>
           <button
             onClick={() => onRevealAndSubmit(selectedIds)}
+            data-ends-phase
             disabled={selectedIds.length === 0}
             className="btn btn-primary text-sm font-semibold"
           >

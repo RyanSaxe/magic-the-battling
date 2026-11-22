@@ -6,6 +6,7 @@ import { MenuPrompt } from '../common/MenuPrompt'
 import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../../utils/battleInteraction'
 import { clampMenuToViewport, menuMaxHeight } from '../../utils/menuPosition'
 import { POPOVER_CHROME } from '../common/styles'
+import { usePanelHoldsEnter } from '../../utils/enterKey'
 
 interface CardActionMenuProps {
   card: CardType
@@ -87,6 +88,7 @@ export function CardActionMenu({
     node.style.maxHeight = `${menuMaxHeight(y, viewport)}px`
   }, [position, tallestSubmenuRows, attachToRows])
 
+  usePanelHoldsEnter()
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return

@@ -59,6 +59,7 @@ import { SubmitPopover } from "../components/common/SubmitPopover";
 import { ZoneDivider } from "../components/common/ZoneDivider";
 import { useCardMiddleTap } from "../hooks/useCardMiddleTap";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { usePanelHoldsEnter } from "../utils/enterKey";
 import {
   comparePlayersForSidebar,
   getSidebarPlayerOrder,
@@ -1373,7 +1374,8 @@ function GameContent() {
   const battleSubmitGuideActive = isSubmitPopoverGuideStepActive(visibleGuideStep, "battle");
 
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
-  // A zone panel sits beside the board rather than over it, so the Fight's hotkeys keep working while one is open.
+  // A zone panel sits beside the board rather than over it, so the Fight's hotkeys, all but Enter, keep working while
+  // one is open.
   const modalOpen =
     (rulesPanelOpen && !guideMinimized) ||
     showUpgradesModal ||
@@ -1390,6 +1392,8 @@ function GameContent() {
     modalOpen,
     visibleGuideStep,
   });
+  // Reveal Before Submit is where a Fight ends, so it keeps its own Enter.
+  usePanelHoldsEnter(modalOpen && pendingBattleResult === null);
   const sidebarPlayers = useMemo(
     () => (gameState ? getSidebarPlayerOrder(gameState.players) : []),
     [gameState],
@@ -1844,6 +1848,7 @@ function GameContent() {
       right = (
         <button
           onClick={handleGoToBuild}
+          data-ends-phase
           disabled={isPhaseActionPending(pendingPhaseAction, "draft_done")}
           className="btn btn-primary"
           data-guide-target="draft-continue"
@@ -2040,6 +2045,7 @@ function GameContent() {
       right = (
         <button
           onClick={handleContinue}
+          data-ends-phase
           disabled={!canContinue || isPhaseActionPending(pendingPhaseAction, "reward_done")}
           className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           data-guide-target="reward-continue"

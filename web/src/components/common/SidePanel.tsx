@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { usePanelHoldsEnter } from '../../utils/enterKey'
 import { BoardBackdrop } from './BoardBackdrop'
 import { CloseButton } from './CloseButton'
 import { SidePanelHostContext } from './sidePanelHost'
@@ -56,6 +57,7 @@ export function SidePanel({
   const panelRef = useRef<HTMLElement>(null)
   const [present, setPresent] = useState(open)
   if (open && !present) setPresent(true)
+  usePanelHoldsEnter(open)
 
   // A panel closed before it was ever drawn has no slide to end, so it drops its content at once.
   useEffect(() => {

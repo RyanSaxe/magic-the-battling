@@ -72,6 +72,7 @@ export function SubmitPopover({
           <button
             key={option.label}
             onClick={option.onClick}
+            data-ends-phase
             className={option.className ?? "btn btn-secondary text-sm py-1.5"}
           >
             {option.label}
