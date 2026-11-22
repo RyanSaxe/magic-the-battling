@@ -1753,9 +1753,12 @@ function GameContent() {
   const inSuddenDeath = showsBattle
     ? !!battleViewForDisplay?.is_sudden_death
     : currentPhase === "build" && self_player.in_sudden_death;
-  // One banner at a time: a spectator most needs to know whose game this is, and the player list already marks Sudden Death.
   const banner = isSpectator && spectatePlayer ? (
-    <Banner title={`Watching ${spectatePlayer}`} />
+    <Banner
+      title={`Watching ${spectatePlayer}`}
+      tone={inSuddenDeath ? "sudden-death" : "gold"}
+      note={inSuddenDeath ? "Sudden Death" : undefined}
+    />
   ) : inSuddenDeath ? (
     <Banner
       tone="sudden-death"

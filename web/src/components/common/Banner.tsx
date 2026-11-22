@@ -27,13 +27,13 @@ export function Banner({ title, tone = 'gold', size = 'game', note, info }: Bann
   const compact = size === 'compact'
   return (
     <div
-      data-banner
+      data-banner={tone}
       className={compact ? 'shrink-0' : 'shrink-0 zone-divider-bg px-[2px] pt-[2px]'}
       style={{ height: compact ? COMPACT_BANNER_HEIGHT : GAME_BANNER_HEIGHT }}
     >
       <div className="frame-chrome h-full flex items-center justify-center gap-2.5 whitespace-nowrap leading-none px-3">
         <span
-          className={`font-['Cinzel',serif] font-bold uppercase ${
+          className={`min-w-0 truncate font-['Cinzel',serif] font-bold uppercase ${
             compact ? 'text-[13px] tracking-[0.22em]' : 'text-[15px] tracking-[0.14em]'
           } ${TITLE_TONE[tone]}`}
         >
