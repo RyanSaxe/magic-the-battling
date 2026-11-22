@@ -186,43 +186,43 @@ measurement-changes-layout
   battle               2560x1440         4/5  b14cd30d
 
 Layout fingerprints: a hash of every size the sweep renders, per phase and viewport.
-  battle               320x568     24f3983c
-  battle               375x667     8770678e
-  battle               393x852     044baef0
-  battle               430x932     3df41a5a
-  battle               768x1024    3fe221a2
-  battle               820x1180    02eb8a84
-  battle               1024x768    b643ea26
+  battle               320x568     64c32fe4
+  battle               375x667     33b529a6
+  battle               393x852     80e99912
+  battle               430x932     007ea6fe
+  battle               768x1024    8c90a864
+  battle               820x1180    8f66df48
+  battle               1024x768    e1ed2dfe
   battle               1024x500    52cfff50
-  battle               1180x820    4c5da6ba
+  battle               1180x820    73343eb2
   battle               1280x600    0fbfba96
   battle               1280x720    2ce19cb2
   battle               1280x800    177b5150
-  battle               1366x768    8f4d7ab0
-  battle               1366x1024   5b732258
+  battle               1366x768    72aff510
+  battle               1366x1024   fe3ab59c
   battle               1440x600    3bc96614
-  battle               1440x900    d49526c8
-  battle               1536x864    b5337708
-  battle               1920x1080   8dcccc7c
+  battle               1440x900    d442d4f8
+  battle               1536x864    3c7a9a16
+  battle               1920x1080   4a490a76
   battle               2560x1440   4ecd1f02
-  battle-sudden-death  320x568     88c12f7a
-  battle-sudden-death  375x667     1aca32f6
-  battle-sudden-death  393x852     1205aac0
-  battle-sudden-death  430x932     221ecdec
-  battle-sudden-death  768x1024    d59cd3ac
-  battle-sudden-death  820x1180    e464cd20
-  battle-sudden-death  1024x768    a8aee67a
+  battle-sudden-death  320x568     8794560a
+  battle-sudden-death  375x667     41f2598a
+  battle-sudden-death  393x852     b0f7e20a
+  battle-sudden-death  430x932     637116d4
+  battle-sudden-death  768x1024    0b309afa
+  battle-sudden-death  820x1180    e261657c
+  battle-sudden-death  1024x768    5496956a
   battle-sudden-death  1024x500    53bc93a4
-  battle-sudden-death  1180x820    38c28ec6
+  battle-sudden-death  1180x820    d996a436
   battle-sudden-death  1280x600    1530bbbe
   battle-sudden-death  1280x720    1fdc77d4
   battle-sudden-death  1280x800    b5372602
-  battle-sudden-death  1366x768    64fd4bda
-  battle-sudden-death  1366x1024   e5527aa8
+  battle-sudden-death  1366x768    bd1b8f6a
+  battle-sudden-death  1366x1024   9e6f4684
   battle-sudden-death  1440x600    360431e4
-  battle-sudden-death  1440x900    005966ca
-  battle-sudden-death  1536x864    bd27ed56
-  battle-sudden-death  1920x1080   5f1ab176
+  battle-sudden-death  1440x900    9416aaea
+  battle-sudden-death  1536x864    e97b4d88
+  battle-sudden-death  1920x1080   f5a9088c
   battle-sudden-death  2560x1440   59226aee
   build                320x568     b95718eb
   build                375x667     7087740f

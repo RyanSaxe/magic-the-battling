@@ -314,7 +314,7 @@ export function Card({
           </button>
         )}
         {counters && Object.keys(counters).length > 0 && (
-          <div className={`absolute left-1 flex gap-1 ${showRevealHiddenUpgradeButton ? 'bottom-8' : 'bottom-1'}`}>
+          <div className={`pointer-events-none absolute left-1 flex flex-wrap-reverse gap-1 ${showRevealHiddenUpgradeButton ? 'bottom-8' : 'bottom-1'}`}>
             {Object.entries(counters).map(([type, count]) => (
               <div
                 key={type}
