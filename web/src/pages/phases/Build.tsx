@@ -423,151 +423,128 @@ export function BuildPhase({
   ));
 
   return (
-    <>
-      {self_player.in_sudden_death && (
-        <div className="bg-red-900/80 border-b-2 border-red-500 px-4 py-3 text-center shrink-0">
-          <div className="text-red-100 font-bold text-lg tracking-wider uppercase animate-pulse flex items-center justify-center gap-2">
-            Sudden Death
-            <span className="relative group cursor-help">
-              <span className="text-red-300/80 text-sm not-italic">
-                &#9432;
-              </span>
-              <span className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-64 p-2 bg-black/95 border border-red-500/50 rounded text-xs text-left text-red-100 font-normal normal-case tracking-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                Multiple players reached lethal poison. The two with the lowest
-                poison are reset to 9 and face off. A draw causes both players
-                to rebuild. Play continues until one is eliminated.
-              </span>
-            </span>
-          </div>
-          <div className="text-red-200/80 text-xs mt-1">
-            Build your deck - fight to survive!
-          </div>
-        </div>
-      )}
-
-      <ZoneLayout
-        containerRef={containerRef}
-        className={`transition-opacity ${locked ? "opacity-60" : ""}`}
-        onClick={handleBackgroundClick}
-        isMobile={isMobile}
-        zoneHeights={{
-          hand: zoneFrames.hand.outerHeight,
-          battlefield: zoneFrames.battlefield.outerHeight,
-          sideboard: zoneFrames.sideboard.outerHeight,
-          upgrades: hasDesktopUpgradeRail ? zoneFrames.commandZone.outerHeight : undefined,
-        }}
-        zoneWidths={hasDesktopUpgradeRail ? {
-          upgrades: zoneFrames.commandZone.outerWidth,
-        } : null}
-        zoneRefs={{
-          hand: zoneRefs.hand,
-          battlefield: zoneRefs.battlefield,
-          sideboard: zoneRefs.sideboard,
-          upgrades: zoneRefs.commandZone,
-        }}
-        overlay={
-          persistedLayout.canReset ? (
-            <LayoutResetControl
-              phaseLabel="Build"
-              currentStage={self_player.stage}
-              currentRound={self_player.round}
-              originStage={persistedLayout.originStage}
-              originRound={persistedLayout.originRound}
-              isInherited={persistedLayout.source === "inherited"}
-              onConfirm={clearConstraints}
-              position="top-right"
-            />
-          ) : null
-        }
-        hasHand={true}
-        hasBattlefield={true}
-        hasSideboard={hasSideboard}
-        hasUpgrades={hasDesktopUpgradeRail}
-        containerTargetId="build-workspace"
-        dividerCallbacks={locked ? null : dividerCallbacks}
-        zoneTargetIds={{
-          hand: "build-hand",
-          battlefield: "build-battlefield",
-          sideboard: "build-sideboard",
-        }}
-        handLabel="Hand"
-        handContent={
-          <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
-            {handItems}
-          </CardGrid>
-        }
-        battlefieldLabel="Battlefield"
-        battlefieldContent={
-          <CardGrid columns={dims.battlefield.columns} cardWidth={bfDims.width}>
-            {basicSlots}
-            <TreasureCard count={self_player.treasures} dimensions={bfDims} />
-            <PoisonCard count={self_player.poison} dimensions={bfDims} />
-          </CardGrid>
-        }
-        sideboardLabel="Sideboard"
-        sideboardContent={
-          <CardGrid columns={dims.sideboard.columns} cardWidth={sbDims.width}>
-            {self_player.sideboard.map((card) => {
-              const cardIsCompanion = isCompanion(card);
-              const isActiveCompanion = card.id === selectedCompanionId;
-              return (
-                <div
-                  key={card.id}
-                  className="relative group"
-                  onMouseEnter={
-                    onCardHover
-                      ? () => onCardHover(card.id, "sideboard")
-                      : undefined
-                  }
-                  onMouseLeave={onCardHoverEnd}
-                >
-                  <Card
-                    card={card}
-                    onClick={() => handleSideboardCardClick(card)}
-                    selected={isCardSelected(card.id)}
-                    isCompanion={isActiveCompanion}
-                    dimensions={sbDims}
-                    upgraded={upgradedCardIds.has(card.id)}
-                    appliedUpgrades={getAppliedUpgrades(card.id)}
-                  />
-                  {renderQuickUpgradeButton(card)}
-                  {cardIsCompanion && (
-                    <button
-                      disabled={locked}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isActiveCompanion) {
-                          actions.buildRemoveCompanion();
-                        } else {
-                          actions.buildSetCompanion(card.id);
-                        }
-                      }}
-                      className={`absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg ${
-                        isActiveCompanion
-                          ? "bg-amber-500/90 text-black disabled:opacity-50 disabled:cursor-not-allowed"
-                          : "btn-game"
-                      }`}
-                    >
-                      {isActiveCompanion ? "Companion" : "Set Companion"}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </CardGrid>
-        }
-        upgradesLabel="Upgrades"
-        upgradesContent={
-          hasDesktopUpgradeRail ? (
-            <UpgradeGrid
-              upgrades={self_player.upgrades}
-              fallbackDims={upgradeDims}
-              frame={zoneFrames.commandZone}
-              renderOverlay={renderUpgradeApplyButton}
-            />
-          ) : null
-        }
-      />
-    </>
+    <ZoneLayout
+      containerRef={containerRef}
+      className={`transition-opacity ${locked ? "opacity-60" : ""}`}
+      onClick={handleBackgroundClick}
+      isMobile={isMobile}
+      zoneHeights={{
+        hand: zoneFrames.hand.outerHeight,
+        battlefield: zoneFrames.battlefield.outerHeight,
+        sideboard: zoneFrames.sideboard.outerHeight,
+        upgrades: hasDesktopUpgradeRail ? zoneFrames.commandZone.outerHeight : undefined,
+      }}
+      zoneWidths={hasDesktopUpgradeRail ? {
+        upgrades: zoneFrames.commandZone.outerWidth,
+      } : null}
+      zoneRefs={{
+        hand: zoneRefs.hand,
+        battlefield: zoneRefs.battlefield,
+        sideboard: zoneRefs.sideboard,
+        upgrades: zoneRefs.commandZone,
+      }}
+      overlay={
+        persistedLayout.canReset ? (
+          <LayoutResetControl
+            phaseLabel="Build"
+            currentStage={self_player.stage}
+            currentRound={self_player.round}
+            originStage={persistedLayout.originStage}
+            originRound={persistedLayout.originRound}
+            isInherited={persistedLayout.source === "inherited"}
+            onConfirm={clearConstraints}
+            position="top-right"
+          />
+        ) : null
+      }
+      hasHand={true}
+      hasBattlefield={true}
+      hasSideboard={hasSideboard}
+      hasUpgrades={hasDesktopUpgradeRail}
+      containerTargetId="build-workspace"
+      dividerCallbacks={locked ? null : dividerCallbacks}
+      zoneTargetIds={{
+        hand: "build-hand",
+        battlefield: "build-battlefield",
+        sideboard: "build-sideboard",
+      }}
+      handLabel="Hand"
+      handContent={
+        <CardGrid columns={dims.hand.columns} cardWidth={handDims.width}>
+          {handItems}
+        </CardGrid>
+      }
+      battlefieldLabel="Battlefield"
+      battlefieldContent={
+        <CardGrid columns={dims.battlefield.columns} cardWidth={bfDims.width}>
+          {basicSlots}
+          <TreasureCard count={self_player.treasures} dimensions={bfDims} />
+          <PoisonCard count={self_player.poison} dimensions={bfDims} />
+        </CardGrid>
+      }
+      sideboardLabel="Sideboard"
+      sideboardContent={
+        <CardGrid columns={dims.sideboard.columns} cardWidth={sbDims.width}>
+          {self_player.sideboard.map((card) => {
+            const cardIsCompanion = isCompanion(card);
+            const isActiveCompanion = card.id === selectedCompanionId;
+            return (
+              <div
+                key={card.id}
+                className="relative group"
+                onMouseEnter={
+                  onCardHover
+                    ? () => onCardHover(card.id, "sideboard")
+                    : undefined
+                }
+                onMouseLeave={onCardHoverEnd}
+              >
+                <Card
+                  card={card}
+                  onClick={() => handleSideboardCardClick(card)}
+                  selected={isCardSelected(card.id)}
+                  isCompanion={isActiveCompanion}
+                  dimensions={sbDims}
+                  upgraded={upgradedCardIds.has(card.id)}
+                  appliedUpgrades={getAppliedUpgrades(card.id)}
+                />
+                {renderQuickUpgradeButton(card)}
+                {cardIsCompanion && (
+                  <button
+                    disabled={locked}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isActiveCompanion) {
+                        actions.buildRemoveCompanion();
+                      } else {
+                        actions.buildSetCompanion(card.id);
+                      }
+                    }}
+                    className={`absolute bottom-0 left-0 right-0 text-center text-[10px] font-medium py-0.5 rounded-b-lg ${
+                      isActiveCompanion
+                        ? "bg-amber-500/90 text-black disabled:opacity-50 disabled:cursor-not-allowed"
+                        : "btn-game"
+                    }`}
+                  >
+                    {isActiveCompanion ? "Companion" : "Set Companion"}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </CardGrid>
+      }
+      upgradesLabel="Upgrades"
+      upgradesContent={
+        hasDesktopUpgradeRail ? (
+          <UpgradeGrid
+            upgrades={self_player.upgrades}
+            fallbackDims={upgradeDims}
+            frame={zoneFrames.commandZone}
+            renderOverlay={renderUpgradeApplyButton}
+          />
+        ) : null
+      }
+    />
   );
 }

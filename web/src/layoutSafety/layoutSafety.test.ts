@@ -6,6 +6,7 @@ import {
   MODAL_BOXES,
   SAVED_LAYOUTS,
   VIEWPORTS,
+  battleBoard,
   battleCases,
   battleConfig,
   checksSavedLayouts,
@@ -133,8 +134,8 @@ function sweep(): Results {
         for (const check of ["card-outside-zone", "card-below-minimum", "zones-off-board"] as const) {
           results.record(check, surface, viewport, battleCase.label, failures);
         }
-        const { width, height } = viewport.battleBoard;
-        results.output(surface, viewport, [battleCase.label, computeBattleZones(width, height, battleConfig(viewport, battleCase, isSuddenDeath))]);
+        const { width, height } = battleBoard(viewport, isSuddenDeath);
+        results.output(surface, viewport, [battleCase.label, computeBattleZones(width, height, battleConfig(viewport, battleCase))]);
       }
     }
     const typicalBattle = battles.find((battleCase) => battleCase.label === "hand 7, opponent hand 7, lands 4, nonlands 3")!;

@@ -6,11 +6,9 @@ import { CompactZoneDisplay } from '../../components/zones/CompactZoneDisplay'
 import { Card, CardBack, CardActionMenu } from '../../components/card'
 import { ZoneDivider } from '../../components/common/ZoneDivider'
 import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
-import { useElementHeight } from '../../hooks/useElementHeight'
-import { SUDDEN_DEATH_BAR_HEIGHT, battleBoardMetrics } from './phaseLayouts'
+import { battleBoardMetrics } from './phaseLayouts'
 import { buildAppliedUpgradeMap, buildHiddenAppliedUpgradeMap } from '../../utils/upgrades'
 import { canInteractWithBattleZone } from '../../utils/battleInteraction'
-import { POPOVER_CHROME } from '../../components/common/styles'
 
 interface ContextMenuState {
   card: CardType
@@ -196,14 +194,13 @@ export function BattlePhase({
   const opponentLandCount = countTopLevel(opponentBf, opponentAttachments, isLandOrTreasure) + 1
   const opponentNonlandCount = countTopLevel(opponentBf, opponentAttachments, (c) => !isLandOrTreasure(c))
 
-  const [bannerRef, bannerHeight] = useElementHeight()
   const {
     handPadding,
     battlefieldPadding,
     midDividerHeight,
     fixedHeight,
     zoneColumnWidth,
-  } = battleBoardMetrics({ isMobile, bannerHeight })
+  } = battleBoardMetrics({ isMobile })
 
   const [containerRef, sizes] = useBattleCardSizes({
     playerHandCount,
@@ -226,11 +223,10 @@ export function BattlePhase({
 
   useLayoutEffect(() => {
     onLayoutMetricsChange?.({
-      topSectionHeight: bannerHeight + handHeight + opponentMidZoneHeight,
+      topSectionHeight: handHeight + opponentMidZoneHeight,
       middleLaneHeight: opponentBottomZoneHeight + midDividerHeight + playerTopZoneHeight,
     })
   }, [
-    bannerHeight,
     handHeight,
     onLayoutMetricsChange,
     midDividerHeight,
@@ -378,30 +374,6 @@ export function BattlePhase({
       onClick={handleBackgroundClick}
       data-guide-target="battle-board"
     >
-        {battle.is_sudden_death && (
-          <div
-            ref={bannerRef}
-            className="frame-chrome relative shrink-0 flex items-center justify-center gap-2.5 whitespace-nowrap leading-none pb-[2px]"
-            style={{ height: SUDDEN_DEATH_BAR_HEIGHT }}
-          >
-            <span className="font-['Cinzel',serif] font-bold text-[15px] tracking-[0.14em] uppercase text-red-300 [text-shadow:0_0_10px_rgba(239,68,68,0.45)]">
-              Sudden Death
-            </span>
-            <span className="hero-sep text-[15px]">·</span>
-            <span className="text-[13px] text-[var(--color-gold-dark)]">Loser is eliminated</span>
-            <span className="relative group cursor-help">
-              <span className="text-xs text-[var(--color-gold-dark)]">ⓘ</span>
-              <span className={`absolute right-0 top-full mt-2 w-64 p-2 ${POPOVER_CHROME} text-xs text-left whitespace-normal leading-normal opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50`}>
-                Multiple players reached lethal poison. The two with the lowest poison are reset to 9 and face off. A draw causes both players to rebuild. Play continues until one is eliminated.
-              </span>
-            </span>
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] zone-divider-line zone-divider-line--horizontal"
-            />
-          </div>
-        )}
-
         {/* Opponent's half */}
         <div className="flex shrink-0 overflow-hidden" style={{ height: handHeight + bfHeight }}>
           <div className="flex flex-col flex-1 min-w-0">

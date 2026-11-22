@@ -94,9 +94,6 @@ export function rewardLayoutConfig({
   };
 }
 
-/** Height of the Sudden Death bar above the opponent's half of the board. */
-export const SUDDEN_DEATH_BAR_HEIGHT = 40;
-
 export interface BattleBoardMetrics {
   handPadding: number;
   battlefieldPadding: number;
@@ -106,14 +103,7 @@ export interface BattleBoardMetrics {
   zoneColumnWidth: number;
 }
 
-export function battleBoardMetrics({
-  isMobile,
-  bannerHeight,
-}: {
-  isMobile: boolean;
-  /** Measured height of the Sudden Death bar, or 0 when there is none. */
-  bannerHeight: number;
-}): BattleBoardMetrics {
+export function battleBoardMetrics({ isMobile }: { isMobile: boolean }): BattleBoardMetrics {
   const handPadding = 16;
   const battlefieldPadding = 20;
   const midDividerHeight = 2;
@@ -122,7 +112,7 @@ export function battleBoardMetrics({
     battlefieldPadding,
     midDividerHeight,
     fixedHeight:
-      2 * handPadding + 2 * battlefieldPadding + bannerHeight + midDividerHeight,
+      2 * handPadding + 2 * battlefieldPadding + midDividerHeight,
     zoneColumnWidth: isMobile ? 64 : 96,
   };
 }

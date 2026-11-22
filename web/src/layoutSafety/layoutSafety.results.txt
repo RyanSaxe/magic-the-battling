@@ -205,25 +205,25 @@ Layout fingerprints: a hash of every size the sweep renders, per phase and viewp
   battle               1536x864    b5337708
   battle               1920x1080   8dcccc7c
   battle               2560x1440   4ecd1f02
-  battle-sudden-death  320x568     6a6bd6a2
-  battle-sudden-death  375x667     6412e454
-  battle-sudden-death  393x852     415b7022
-  battle-sudden-death  430x932     f4a1d384
-  battle-sudden-death  768x1024    ca6010e8
-  battle-sudden-death  820x1180    ab8070b8
-  battle-sudden-death  1024x768    a7a37054
-  battle-sudden-death  1024x500    2e31a034
-  battle-sudden-death  1180x820    945384b2
-  battle-sudden-death  1280x600    e644ac42
-  battle-sudden-death  1280x720    a9d8ef68
-  battle-sudden-death  1280x800    89dfddac
-  battle-sudden-death  1366x768    332d60b8
-  battle-sudden-death  1366x1024   9d115dee
-  battle-sudden-death  1440x600    a1c7bef8
-  battle-sudden-death  1440x900    dd2e16ae
-  battle-sudden-death  1536x864    bc38f25a
-  battle-sudden-death  1920x1080   e75084a8
-  battle-sudden-death  2560x1440   1b915c66
+  battle-sudden-death  320x568     88c12f7a
+  battle-sudden-death  375x667     1aca32f6
+  battle-sudden-death  393x852     1205aac0
+  battle-sudden-death  430x932     221ecdec
+  battle-sudden-death  768x1024    d59cd3ac
+  battle-sudden-death  820x1180    e464cd20
+  battle-sudden-death  1024x768    a8aee67a
+  battle-sudden-death  1024x500    53bc93a4
+  battle-sudden-death  1180x820    38c28ec6
+  battle-sudden-death  1280x600    1530bbbe
+  battle-sudden-death  1280x720    1fdc77d4
+  battle-sudden-death  1280x800    b5372602
+  battle-sudden-death  1366x768    64fd4bda
+  battle-sudden-death  1366x1024   e5527aa8
+  battle-sudden-death  1440x600    360431e4
+  battle-sudden-death  1440x900    005966ca
+  battle-sudden-death  1536x864    bd27ed56
+  battle-sudden-death  1920x1080   5f1ab176
+  battle-sudden-death  2560x1440   59226aee
   build                320x568     b95718eb
   build                375x667     7087740f
   build                393x852     891ac55f
