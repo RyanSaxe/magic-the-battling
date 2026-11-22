@@ -8,6 +8,7 @@ import { formatTimeSince } from '../utils/format'
 import { Dialog } from './common/Dialog'
 
 const ROWS_SHOWN = 2
+const CLOSE_COLUMN = '-mr-2 ml-1.5 w-11 shrink-0'
 const SECTION_CAPTION = 'text-[10px] leading-4 font-bold uppercase tracking-[0.12em] text-[var(--ivory-muted)]'
 
 function seatPath(seat: ResumableSeat): string {
@@ -73,7 +74,15 @@ function SeatSummary({ seat }: { seat: ResumableSeat }) {
   )
 }
 
-function ResumeRow({ seat, onClose }: { seat: ResumableSeat; onClose: () => void }) {
+function ResumeRow({
+  seat,
+  hasCloseColumn,
+  onClose,
+}: {
+  seat: ResumableSeat
+  hasCloseColumn: boolean
+  onClose: () => void
+}) {
   const navigate = useNavigate()
   return (
     <li className="flex items-stretch border-t gold-divider first:border-t-0">
@@ -90,14 +99,18 @@ function ResumeRow({ seat, onClose }: { seat: ResumableSeat; onClose: () => void
           <span aria-hidden="true" className="text-base leading-none">›</span>
         </span>
       </button>
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={`${seat.kind === 'game' ? 'Close' : 'Leave'} ${seatTitle(seat)} as ${seat.playerName}`}
-        className="relative -mr-2 ml-1.5 flex w-11 shrink-0 items-center justify-center text-sm text-[var(--ivory-muted)] before:absolute before:inset-y-3 before:left-0 before:w-px before:bg-[var(--gold-border)] before:opacity-40 hover:text-[var(--ivory)]"
-      >
-        ✕
-      </button>
+      {seat.canClose ? (
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label={`${seat.kind === 'game' ? 'Close' : 'Leave'} ${seatTitle(seat)} as ${seat.playerName}`}
+          className={`${CLOSE_COLUMN} relative flex items-center justify-center text-sm text-[var(--ivory-muted)] before:absolute before:inset-y-3 before:left-0 before:w-px before:bg-[var(--gold-border)] before:opacity-40 hover:text-[var(--ivory)]`}
+        >
+          ✕
+        </button>
+      ) : (
+        hasCloseColumn && <span aria-hidden="true" className={CLOSE_COLUMN} />
+      )}
     </li>
   )
 }
@@ -171,12 +184,18 @@ export function ResumeRows({ seats }: { seats: ResumableSeat[] }) {
   if (open.length === 0) return null
 
   const shown = showsAll ? open : open.slice(0, ROWS_SHOWN)
+  const hasCloseColumn = open.some((seat) => seat.canClose)
   return (
     <section aria-label="In progress" className="mb-3">
       <h2 className={SECTION_CAPTION}>In progress</h2>
       <ul>
         {shown.map((seat) => (
-          <ResumeRow key={seat.gameId} seat={seat} onClose={() => setConfirming(seat)} />
+          <ResumeRow
+            key={seat.gameId}
+            seat={seat}
+            hasCloseColumn={hasCloseColumn}
+            onClose={() => setConfirming(seat)}
+          />
         ))}
       </ul>
       {shown.length < open.length && (

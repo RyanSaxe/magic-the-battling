@@ -401,6 +401,7 @@ export interface ResumableGame {
   play_mode: PlayMode
   use_upgrades: boolean
   player_count: number
+  can_close?: boolean
   /** A lobby has no stage, round or poison yet. */
   stage: number | null
   round: number | null

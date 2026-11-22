@@ -81,6 +81,7 @@ def test_closing_a_game_with_one_human_ends_it_for_good(start_lobby, client, mon
     game_manager.mark_game_dirty(game_id)
     game_manager.persist_dirty_games()
 
+    assert _resumable(client, (game_id, "Alice", seat_token))[0]["can_close"] is True
     assert _close(client, game_id, "Alice", seat_token).status_code == 204
 
     assert _resumable(client, (game_id, "Alice", seat_token)) == []
@@ -99,7 +100,8 @@ def test_a_game_with_other_players_cannot_be_closed(start_lobby, client, game_wi
 
     assert _close(client, game_id, "Alice", seat_token).status_code == 409
 
-    assert [g["player_name"] for g in _resumable(client, (game_id, "Alice", seat_token))] == ["Alice"]
+    [listed] = _resumable(client, (game_id, "Alice", seat_token))
+    assert (listed["player_name"], listed["can_close"]) == ("Alice", False)
 
 
 def test_only_the_seat_holder_can_leave_a_lobby(client, game_with_players):
@@ -141,6 +143,7 @@ BOBS_SEAT_AT_STAGE_FOUR = {
     "stage": 4,
     "round": 2,
     "poison": 3,
+    "can_close": False,
 }
 
 
@@ -191,6 +194,7 @@ def test_describes_a_lobby_seat_without_progress(named_cube, client, game_with_p
     assert listed["cube_name"] == "Friday Cube"
     assert listed["player_count"] == 2
     assert (listed["stage"], listed["round"], listed["poison"]) == (None, None, None)
+    assert listed["can_close"] is True
 
 
 def test_refuses_more_than_ten_seats(client):

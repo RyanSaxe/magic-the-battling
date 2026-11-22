@@ -63,6 +63,7 @@ describe('the resume banner', () => {
     playMode: 'limited',
     useUpgrades: true,
     playerCount: 4,
+    canClose: false,
     stage: 2,
     round: 4,
     poison: 2,
