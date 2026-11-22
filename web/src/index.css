@@ -1147,7 +1147,29 @@ input:-webkit-autofill:focus {
     line-height: 14px;
   }
 
-  .cube-banner-notice.is-long {
+  .cube-banner-notice > span,
+  .lobby-away-notice > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .cube-banner.has-notice .cube-banner-title {
+    display: none;
+  }
+
+  .lobby-away-notice {
+    display: none;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    margin-top: auto;
+    font-size: 11px;
+    line-height: 13px;
+  }
+
+  .cube-banner-notice.is-long,
+  .lobby-away-notice.is-long {
     font-size: 10.5px;
     line-height: 11px;
   }
@@ -1999,8 +2021,8 @@ input:-webkit-autofill:focus {
     }
   }
 
-  /* Short tablets and windows take the phones' seats, so Start stays in view */
-  @media (640px <= width < 1024px) and (height < 720px) {
+  /* Short tablets and windows take the phones' seats, so Start and Constructed's fourth row of seats stay in view */
+  @media (640px <= width < 1024px) and (height < 742px) {
     .lobby-felt {
       gap: 4px;
       min-height: 280px;
@@ -2029,6 +2051,56 @@ input:-webkit-autofill:focus {
     .lobby-felt .seat-name.is-long-name {
       font-size: 11px;
       line-height: 11px;
+    }
+  }
+
+  /* A short phone has no room in the felt for the deck's row beside eight seats, so the row lies over the cube's,
+     which names the same deck. CSS alone moves it, so the field keeps its focus when a keyboard shortens the
+     window. */
+  @media (width < 640px) and (height < 640px) {
+    .lobby-deck {
+      position: absolute;
+      inset: 0 0 auto;
+      height: 56px;
+      margin: 0;
+      padding: 0 4px 0 12px;
+      background: var(--art-fade);
+    }
+
+    /* Covered, so out of the tab order too */
+    .setup-page:has(.lobby-deck:not(.is-loaded)) .cube-banner-top {
+      visibility: hidden;
+    }
+
+    .lobby-deck.is-loaded {
+      inset: 12px 72px auto auto;
+      height: 44px;
+      padding: 0;
+      background: none;
+    }
+
+    .lobby-deck.is-loaded > .setup-field,
+    .setup-page:has(.lobby-deck) .cube-banner-notice,
+    .setup-page:has(.lobby-deck) .cube-banner-title .tag,
+    .lobby-away-notice + .lobby-settings {
+      display: none;
+    }
+
+    .setup-page:has(.lobby-deck.is-loaded) .cube-banner-action .btn-pill {
+      width: 60px;
+    }
+
+    .setup-page:has(.lobby-deck.is-loaded) .cube-banner-title {
+      display: flex;
+      max-width: calc(100% - 136px);
+    }
+
+    .setup-page:has(.lobby-deck.is-loaded) .cube-banner.has-notice:not(:has(.is-longest)) .cube-band-image {
+      display: block;
+    }
+
+    .lobby-away-notice {
+      display: flex;
     }
   }
 
@@ -2483,6 +2555,23 @@ input:-webkit-autofill:focus {
   padding: 0 12px;
   font-size: 14px;
   white-space: nowrap;
+}
+
+/* Beside Cards in the banner on short phones */
+@media (width < 640px) and (height < 640px) {
+  .lobby-deck.is-loaded .btn.setup-submit {
+    position: relative;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 13px;
+    line-height: 1;
+  }
+
+  .lobby-deck.is-loaded .btn.setup-submit::before {
+    content: "";
+    position: absolute;
+    inset: -7px 0;
+  }
 }
 
 /* Start Game before it can start: walnut, solid beside the dashed open seats */

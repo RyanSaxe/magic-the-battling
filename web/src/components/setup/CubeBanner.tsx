@@ -36,7 +36,7 @@ export function CubeBanner({
       <div className="cube-banner-art">{look?.imageUri && <CubeBandArt src={look.imageUri} />}</div>
       <div className="cube-banner-top">
         {notice}
-        {!notice && (name || href) && (
+        {(name || href) && (
           <div className="cube-banner-title">
             <h2 className={`cube-banner-name ${nameSize(name)}`}>
               {href ? (

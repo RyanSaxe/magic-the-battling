@@ -53,6 +53,19 @@ function startBlocker(lobby: LobbyState, openSeats: number, needsDeck: boolean):
   return "";
 }
 
+function AwayHostNotice({ name, className }: { name: string; className: string }) {
+  return (
+    <p className={`${className} ${name.length > 22 ? "is-long" : ""}`}>
+      <svg aria-hidden className="h-3.5 w-3.5 shrink-0 text-[var(--color-gold)]" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+      </svg>
+      <span>
+        <b>{name}</b> (host) is away. If they&apos;re not back within a minute, the next player becomes host.
+      </span>
+    </p>
+  );
+}
+
 export function Lobby() {
   const { gameId = "" } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
@@ -418,19 +431,7 @@ export function Lobby() {
         <CubeBanner
           look={cubeLook}
           playMode={lobbyState.play_mode}
-          notice={
-            awayHost && (
-              <p className={`cube-banner-notice ${awayHost.name.length > 22 ? "is-long" : ""}`}>
-                <svg aria-hidden className="h-3.5 w-3.5 shrink-0 text-[var(--color-gold)]" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-                </svg>
-                <span>
-                  <b>{awayHost.name}</b> (host) is away. If they&apos;re not back within a minute, the next
-                  player becomes host.
-                </span>
-              </p>
-            )
-          }
+          notice={awayHost && <AwayHostNotice name={awayHost.name} className="cube-banner-notice" />}
           href={summaryBattlerId ? cubeCobraUrl(summaryBattlerId) : undefined}
           action={
             <button
@@ -487,7 +488,7 @@ export function Lobby() {
           </p>
 
           {isConstructed && currentPlayer && (
-            <div className="setup-row lobby-deck">
+            <div className={`setup-row lobby-deck ${hasLoadedBattler ? "is-loaded" : ""}`}>
               {hasLoadedBattler ? (
                 <div className="setup-field">
                   <span className="setup-caption">Your deck</span>
@@ -525,12 +526,15 @@ export function Lobby() {
             lobby={lobbyState}
             isHost={isHost}
             openSeats={openSeats}
-            compact={playerCap > 6 || isConstructed}
+            compact={playerCap > 6}
             selfId={session?.playerId}
             voiceChat={voiceChat}
             actions={actions}
             onPuppetHelp={() => openGuide(PUPPET_HELP)}
           />
+
+          {/* Shown instead of the banner's, where a short phone needs the banner for the deck */}
+          {isConstructed && awayHost && <AwayHostNotice name={awayHost.name} className="lobby-away-notice" />}
 
           <div className="lobby-settings">
             <GuidedSwitch enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
