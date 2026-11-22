@@ -32,7 +32,7 @@ interface LayoutMeasurement {
   observedElements: HTMLElement[];
 }
 
-function resolveTarget(root: HTMLElement, targetId?: GuideTargetId, targetSelector?: string): HTMLElement | null {
+export function resolveTarget(root: HTMLElement, targetId?: GuideTargetId, targetSelector?: string): HTMLElement | null {
   if (targetSelector) {
     const selectorTarget = root.querySelector<HTMLElement>(targetSelector);
     if (selectorTarget) return selectorTarget;

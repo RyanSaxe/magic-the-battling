@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Card as CardType } from '../../types'
 import { Card } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
@@ -10,6 +10,7 @@ import { upgradeApplyLayoutConfig, upgradeListLayoutConfig } from './upgradeModa
 import { useElementHeight } from '../../hooks/useElementHeight'
 import { applyUpgradeWithModalClose, revealUpgradeWithModalClose } from './upgradeModalFlow'
 import { getAppliedUpgrades, getUnappliedUpgrades, getUnrevealedAppliedUpgrades } from '../../utils/upgrades'
+import { enterPressesControl } from '../../utils/enterKey'
 
 interface UpgradesModalProps {
   upgrades: CardType[]
@@ -76,8 +77,10 @@ export function UpgradesModal({
     })
   }, [onClose, onReveal])
 
+  const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (enterPressesControl(e, dialogRef.current)) return
       if (e.key === 'Escape') {
         e.preventDefault()
         e.stopPropagation()
@@ -176,6 +179,7 @@ export function UpgradesModal({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         className="modal-chrome border gold-border rounded-lg flex flex-col w-full h-[calc(100dvh-2rem)] sm:h-[calc(100dvh-4rem)] overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
