@@ -274,7 +274,7 @@ export function RulesPanel({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !behindPanel) {
+      if (event.key === 'Escape' && !event.defaultPrevented && !behindPanel) {
         onClose()
       }
     }

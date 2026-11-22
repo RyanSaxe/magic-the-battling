@@ -161,4 +161,14 @@ describe('Game: what is open over the board', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open guide' }))
     expect(screen.getByRole('radio', { name: 'FAQ' }).getAttribute('aria-checked')).toBe('true')
   })
+
+  it('closes a card menu on Escape and leaves the minimized Guide', async () => {
+    await openGameOnPhone(gameBootstrap({ phase: 'battle', counts: { lands: 1 } }))
+    fireEvent.click(find('[data-guide-target="guide-button"]'))
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
+    fireEvent.contextMenu(find('[data-guide-card-id="your-land-0"]'))
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Open guide' })).toBeTruthy()
+  })
 })
