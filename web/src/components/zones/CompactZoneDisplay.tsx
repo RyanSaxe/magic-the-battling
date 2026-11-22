@@ -119,13 +119,9 @@ export function CompactZoneDisplay({
               onZoneClick()
               return
             }
-            if (cards.length > 0) setShowModal(true)
+            setShowModal(true)
           }}
-          className={`flex flex-col items-center overflow-hidden ${
-            cards.length > 0
-              ? 'cursor-pointer'
-              : 'cursor-default'
-          } ${containerClassName ?? ''} w-full h-full`}
+          className={`flex flex-col items-center overflow-hidden cursor-pointer ${containerClassName ?? ''} w-full h-full`}
         >
           {label}
           <div className="flex-1 flex items-center justify-center min-h-0 relative">

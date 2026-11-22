@@ -1470,15 +1470,9 @@ function GameContent() {
           };
           map['p'] = () => actions.battlePassTurn();
           map['t'] = () => actions.battleUpdateCardState("create_treasure", "", {});
-          map['g'] = () => {
-            if (cb.your_zones.graveyard.length > 0) toggleZonePanel('graveyard', 'player');
-          };
-          map['e'] = () => {
-            if (cb.your_zones.exile.length > 0) toggleZonePanel('exile', 'player');
-          };
-          map['s'] = () => {
-            if (cb.your_zones.sideboard.length > 0) toggleZonePanel('sideboard', 'player');
-          };
+          map['g'] = () => toggleZonePanel('graveyard', 'player');
+          map['e'] = () => toggleZonePanel('exile', 'player');
+          map['s'] = () => toggleZonePanel('sideboard', 'player');
         }
         map['Enter'] = () => {
           const mySubmission = cb.result_submissions[sp.name];

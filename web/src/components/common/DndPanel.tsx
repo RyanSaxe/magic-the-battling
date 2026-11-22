@@ -124,7 +124,9 @@ export function DndPanel({
             disabled={steppedAside}
             className={isBattleTone ? 'w-full h-full overflow-auto' : 'flex flex-wrap gap-1.5 justify-center content-center w-full h-full'}
           >
-            {isBattleTone ? (
+            {count === 0 ? (
+              <p className="h-full flex items-center justify-center text-sm text-[var(--ivory-muted)]">{title} is empty</p>
+            ) : isBattleTone ? (
               <div className="grid gap-1.5 justify-center content-start min-h-full" style={battleGridStyle}>
                 {panelChildren}
               </div>
