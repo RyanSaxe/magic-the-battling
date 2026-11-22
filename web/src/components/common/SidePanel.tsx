@@ -12,6 +12,8 @@ export const SIDE_PANEL_HEADER_HEIGHT = 40
 interface SidePanelProps {
   open: boolean
   title: string
+  /** A quiet word before the title, such as "Scouting" before a player's name, which then shows in gold. */
+  prefix?: string
   count?: number
   onClose: () => void
   headerActions?: ReactNode
@@ -19,6 +21,12 @@ interface SidePanelProps {
   steppedAside?: boolean
   /** A tap on the board outside the panel closes it. */
   closeOnBoardTap?: boolean
+  /**
+   * `column` covers the sidebar's column, or the whole board on phones. `beside` opens over the board next to the
+   * sidebar's column, so the player list there stays in view, and slides out from under it.
+   */
+  placement?: 'column' | 'beside'
+  guideTarget?: string
   children: ReactNode
 }
 
@@ -32,11 +40,14 @@ interface SidePanelProps {
 export function SidePanel({
   open,
   title,
+  prefix,
   count,
   onClose,
   headerActions,
   steppedAside = false,
   closeOnBoardTap = false,
+  placement = 'column',
+  guideTarget,
   children,
 }: SidePanelProps) {
   const host = useContext(SidePanelHostContext)
@@ -79,19 +90,22 @@ export function SidePanel({
   }, [open, closeOnBoardTap, host, onClose])
 
   if (!present || !host) return null
-  return createPortal(
+  const label = prefix ? `${prefix} ${title}` : title
+  const panel = (
     <section
       ref={panelRef}
       className={`side-panel frame-chrome${open ? ' side-panel--open' : ''}${steppedAside ? ' side-panel--aside' : ''}`}
-      aria-label={title}
+      aria-label={label}
       inert={!open}
+      data-guide-target={guideTarget}
       onTransitionEnd={(event) => {
         if (event.target === event.currentTarget && !open) setPresent(false)
       }}
     >
       <div className="side-panel-header" style={{ height: SIDE_PANEL_HEADER_HEIGHT }}>
         <h2 className="side-panel-title">
-          {title}
+          {prefix && <span className="side-panel-prefix">{prefix}</span>}
+          <span className={prefix ? 'side-panel-name' : undefined}>{title}</span>
           {count !== undefined && <span className="side-panel-count">{count}</span>}
         </h2>
         <div className="flex items-center gap-2">
@@ -100,7 +114,7 @@ export function SidePanel({
             type="button"
             onClick={onClose}
             className="btn btn-secondary side-panel-close"
-            aria-label={`Close ${title}`}
+            aria-label={`Close ${label}`}
           >
             <svg viewBox="0 0 14 14" width="14" height="14" aria-hidden="true">
               <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -109,7 +123,7 @@ export function SidePanel({
         </div>
       </div>
       <div className="side-panel-body">{children}</div>
-    </section>,
-    host,
+    </section>
   )
+  return createPortal(placement === 'beside' ? <div className="side-panel-beside">{panel}</div> : panel, host)
 }

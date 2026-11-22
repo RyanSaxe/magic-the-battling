@@ -485,6 +485,16 @@ input:-webkit-autofill:focus {
   color: var(--ivory);
 }
 
+.side-panel-prefix {
+  margin-right: 6px;
+  font-weight: 400;
+  color: var(--ivory-muted);
+}
+
+.side-panel-name {
+  color: var(--color-gold-bright);
+}
+
 .side-panel-count {
   margin-left: 6px;
   font-size: 12px;
@@ -492,10 +502,16 @@ input:-webkit-autofill:focus {
   color: var(--ivory-muted);
 }
 
-/* A zone's label straddles the felt's top edge, so above a phone's panel, which covers the whole board, it would
-   show cut in half. */
+/* A zone's label straddles the felt's top edge, so it would show cut in half above a panel covering the board's
+   middle, as any panel does on a phone and scouting does beside a drawer. */
 @media (width < 640px) {
   .game-surface:has(.side-panel--open) [data-zone-label] {
+    visibility: hidden;
+  }
+}
+
+@media (width < 1120px) {
+  .game-surface:has(.side-panel-beside > .side-panel--open) [data-zone-label] {
     visibility: hidden;
   }
 }
@@ -553,6 +569,24 @@ input:-webkit-autofill:focus {
     width: var(--frame-sidebar-width);
     border-left: 0;
   }
+}
+
+/* Beside the sidebar's column, over the board, with a shadow on its edge so it reads as a layer on top. It is
+   clipped at the column's gold edge, so it slides out from under the player list. */
+.side-panel-beside {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: calc(var(--frame-sidebar-width) + 2px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.side-panel-beside > .side-panel {
+  width: 288px;
+  border-left: 2px solid var(--seam-stroke);
+  box-shadow: -14px 0 28px rgba(0, 0, 0, 0.56), -4px 0 10px rgba(0, 0, 0, 0.4);
 }
 
 /* Zone-specific backgrounds */

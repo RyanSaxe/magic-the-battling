@@ -1,6 +1,6 @@
 import type { BattleView, Card as GameCard, SelfPlayerView } from "../types";
 import type { Phase } from "../constants/phases";
-import type { RevealedPlayerTab } from "../contexts/contextStripState";
+import type { ScoutingTab } from "../pages/gameSurfaces";
 
 export type ConditionalGuideId =
   | "hint_treasure_producer"
@@ -103,7 +103,7 @@ export interface GuidedWalkthroughContext {
 export interface GuideStepSidebarState {
   openOnMobile?: boolean | ((ctx: GuidedWalkthroughContext) => boolean | undefined);
   playerName?: string | null | ((ctx: GuidedWalkthroughContext) => string | null | undefined);
-  detailTab?: RevealedPlayerTab | ((ctx: GuidedWalkthroughContext) => RevealedPlayerTab | undefined);
+  detailTab?: ScoutingTab | ((ctx: GuidedWalkthroughContext) => ScoutingTab | undefined);
 }
 
 export interface GuideStepDefinition {
