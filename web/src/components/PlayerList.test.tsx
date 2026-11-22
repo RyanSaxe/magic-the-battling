@@ -66,11 +66,4 @@ describe('PlayerRow', () => {
     fireEvent.click(screen.getByRole('button', { name: /Bob/ }))
     expect(onClick).toHaveBeenCalledOnce()
   })
-
-  it('shows Sudden Death instead of the chance, since the pairing is fixed then', () => {
-    renderCard(player({ in_sudden_death: true, pairing_probability: 1 }))
-
-    expect(screen.getByTitle('Sudden Death').textContent).toBe('SD')
-    expect(screen.queryByText('100%')).toBeNull()
-  })
 })

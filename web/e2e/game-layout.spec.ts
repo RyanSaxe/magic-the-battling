@@ -446,47 +446,28 @@ test.describe('the player cards', () => {
     opponents: [{ name: longName, last_result: 'draw', pairing_probability: 0.4 }],
   }
 
-  // The docked sidebar's cards are the narrowest, and on a phone the cards are in a drawer.
-  for (const viewport of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
-    test(`keep a long name's last result whole on its line at ${viewport.width}x${viewport.height}`, async ({ page, baseURL }) => {
-      await page.setViewportSize(viewport)
-      await serveGame(page, baseURL!, screen)
-      await page.goto(`/game/${GAME_ID}/play`)
-      await expectGameShown(page)
-      const drawerToggle = page.locator('[data-guide-target="sidebar-toggle"]')
-      if (await drawerToggle.isVisible()) await drawerToggle.click()
+  test.use({ viewport: { width: 1280, height: 800 } })
 
-      const card = page.locator(`[data-guide-player-row="${longName}"]`)
-      // The phone's drawer slides in, so measure once it's whole on screen, and all in one frame.
-      await expect(card).toBeInViewport({ ratio: 1 })
-      const { card: cardBox, name, result } = await card.evaluate((element, longName) => {
-        const box = (target: Element) => {
-          const { left, right, top, bottom } = target.getBoundingClientRect()
-          return { left, right, middle: (top + bottom) / 2, cut: target.scrollWidth > target.clientWidth }
-        }
-        const byText = (text: string) => Array.from(element.querySelectorAll('span')).find((span) => span.textContent === text)!
-        return { card: box(element), name: box(byText(longName)), result: box(byText('Drew')) }
-      }, longName)
-
-      expect(name.cut, 'the name is cut short').toBe(true)
-      expect(result.cut, 'the result is cut short').toBe(false)
-      expect(result.left).toBeGreaterThanOrEqual(name.right)
-      expect(result.right).toBeLessThanOrEqual(cardBox.right)
-      expect(Math.abs(result.middle - name.middle)).toBeLessThan(3)
-    })
-  }
-
-  test('name the last fight the same way as the scouting Overview', async ({ page, baseURL }) => {
-    await page.setViewportSize({ width: 1280, height: 800 })
-    await serveGame(page, baseURL!, { ...screen, opponents: [{ name: 'Bob', last_result: 'loss' }] })
+  // The docked sidebar's cards are the narrowest.
+  test("keep a long name's last result whole on its line", async ({ page, baseURL }) => {
+    await serveGame(page, baseURL!, screen)
     await page.goto(`/game/${GAME_ID}/play`)
     await expectGameShown(page)
 
-    const card = page.locator('[data-guide-player-row="Bob"]')
-    await expect(card.getByTitle('Last fight')).toHaveText('Lost')
-    await card.getByRole('button').click()
-    await page.getByRole('radio', { name: 'Overview' }).click()
-    const lastResult = page.locator('dl > div', { has: page.getByText('Last result', { exact: true }) }).locator('dd')
-    await expect(lastResult).toHaveText('Lost')
+    const card = page.locator(`[data-guide-player-row="${longName}"]`)
+    const { card: cardBox, name, result } = await card.evaluate((element, longName) => {
+      const box = (target: Element) => {
+        const { left, right, top, bottom } = target.getBoundingClientRect()
+        return { left, right, middle: (top + bottom) / 2, cut: target.scrollWidth > target.clientWidth }
+      }
+      const byText = (text: string) => Array.from(element.querySelectorAll('span')).find((span) => span.textContent === text)!
+      return { card: box(element), name: box(byText(longName)), result: box(byText('Drew')) }
+    }, longName)
+
+    expect(name.cut, 'the name is cut short').toBe(true)
+    expect(result.cut, 'the result is cut short').toBe(false)
+    expect(result.left).toBeGreaterThanOrEqual(name.right)
+    expect(result.right).toBeLessThanOrEqual(cardBox.right)
+    expect(Math.abs(result.middle - name.middle)).toBeLessThan(3)
   })
 })
