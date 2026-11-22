@@ -102,6 +102,7 @@ class Puppet(BaseModel):
     placement: int = 0
     last_battle_result: "LastBattleResult | None" = None
     in_sudden_death: bool = False
+    last_played_round: tuple[int, int] | None = None
 
     def get_opponent_for_round(self, stage: int, round_num: int) -> StaticOpponent | None:
         key = f"{stage}_{round_num}"

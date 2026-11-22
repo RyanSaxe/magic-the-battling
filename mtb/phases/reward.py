@@ -237,6 +237,8 @@ def _record_bot_result(
 
     for fake in game.puppets:
         if fake.player_history_id == opponent.source_player_history_id:
+            if fake.is_eliminated:
+                return
             fake.last_battle_result = LastBattleResult(
                 opponent_name=player.name,
                 winner_name=winner_name,
