@@ -489,8 +489,10 @@ input:-webkit-autofill:focus {
     color: var(--ivory-key);
   }
 
-  .segmented-option:hover {
-    color: var(--ivory);
+  @media (hover: hover) {
+    .segmented-option:hover {
+      color: var(--ivory);
+    }
   }
 
   .segmented-option[aria-checked="true"] {
@@ -2819,9 +2821,11 @@ input:-webkit-autofill:focus {
   color: var(--ivory);
 }
 
-.btn-secondary:hover:not(:disabled),
-.btn-game:hover:not(:disabled) {
-  background: var(--btn-secondary-fill-hover);
+@media (hover: hover) {
+  .btn-secondary:hover:not(:disabled),
+  .btn-game:hover:not(:disabled) {
+    background: var(--btn-secondary-fill-hover);
+  }
 }
 
 .btn-secondary:active:not(:disabled),
@@ -2869,8 +2873,10 @@ input:-webkit-autofill:focus {
   --btn-raise-edge: rgba(255, 248, 224, 0.22);
 }
 
-.btn-success:hover:not(:disabled) {
-  background: var(--success-hover);
+@media (hover: hover) {
+  .btn-success:hover:not(:disabled) {
+    background: var(--success-hover);
+  }
 }
 
 .btn-success:active:not(:disabled) {
