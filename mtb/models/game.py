@@ -105,8 +105,8 @@ class Puppet(BaseModel):
     last_played_round: tuple[int, int] | None = None
 
     def get_opponent_for_round(self, stage: int, round_num: int) -> StaticOpponent | None:
-        # Like a person's Ghost, a puppet that is out keeps the build it went out with.
-        if self.is_eliminated and self.last_played_round:
+        # Like a person's Ghost, a puppet that is out keeps the build it went out with for later rounds.
+        if self.is_eliminated and self.last_played_round and (stage, round_num) > self.last_played_round:
             stage, round_num = self.last_played_round
         key = f"{stage}_{round_num}"
         if key in self.snapshots:
