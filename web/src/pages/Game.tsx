@@ -1787,8 +1787,9 @@ function GameContent() {
   );
   const selfPlacement = gameState.players.find(p => p.name === self_player.name)?.placement ?? 0;
   const isWinner = selfPlacement === 1;
-  const showsOutTitle = !isSpectator && currentPhase === "eliminated" && !displayBattleResolution;
-  const showsOutScreen = showsOutTitle && !deckSeen;
+  const isOut = currentPhase === "eliminated" && !displayBattleResolution;
+  const watchesOutPlayer = isSpectator && isOut;
+  const showsOutScreen = isOut && !isSpectator && !deckSeen;
   const outPlace = `${getOrdinal(selfPlacement)} of ${gameState.players.length}`;
 
   const shareUrl = gameId
@@ -2282,12 +2283,12 @@ function GameContent() {
             lead={
               <>
                 <BrandMark className="hidden sm:block mr-2" />
-                {showsOutTitle ? (
+                {isOut ? (
                   <div className="flex flex-1 min-w-0 items-center gap-2 max-lg:-translate-y-0.5 whitespace-nowrap">
                     <span className="text-xs sm:text-sm text-[#e2d8cb] font-mono">
                       {self_player.stage}-{self_player.round}
                     </span>
-                    <span className="out-title text-[13px] sm:text-[15px]">You’re out</span>
+                    <span className="out-title text-[13px] sm:text-[15px]">{isSpectator ? "Out" : "You’re out"}</span>
                     <span className="min-w-0 truncate text-xs sm:text-sm text-[var(--ivory-muted)]">{outPlace}</span>
                   </div>
                 ) : (
@@ -2606,7 +2607,8 @@ function GameContent() {
               className="relative z-[46]"
               guideTarget="phase-action-bar"
               // A spectator watches the player's screen, so sees the player's bar without being able to use it.
-              inert={isSpectator}
+              // Once that player is out, the bar holds the spectator's own buttons.
+              inert={isSpectator && !watchesOutPlayer}
               secondary={endOfGame ? (
                 <>
                   <button
@@ -2617,7 +2619,7 @@ function GameContent() {
                   >
                     Review
                   </button>
-                  {canSpectate && (
+                  {canSpectate && !isSpectator && (
                     <button onClick={handleSpectateNewTab} className="btn btn-secondary">
                       Spectate
                     </button>
@@ -2625,12 +2627,20 @@ function GameContent() {
                 </>
               ) : groups?.left}
               main={endOfGame ? (
-                <button
-                  className="btn btn-primary"
-                  onClick={openShareModal}
-                >
-                  Share Game
-                </button>
+                watchesOutPlayer ? (
+                  canSpectate && (
+                    <button className="btn btn-primary" onClick={handleSpectateNewTab}>
+                      Watch Another
+                    </button>
+                  )
+                ) : (
+                  <button
+                    className="btn btn-primary"
+                    onClick={openShareModal}
+                  >
+                    Share Game
+                  </button>
+                )
               ) : groups?.right}
             />
           );
