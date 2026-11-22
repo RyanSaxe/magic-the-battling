@@ -406,7 +406,8 @@ input:-webkit-autofill:focus {
   background-color: #332a28;
 }
 
-.menu-submenu .menu-item {
+.menu-submenu > .menu-item,
+.menu-submenu-grid {
   padding-left: 26px;
   background-image: linear-gradient(to right,
       transparent 12px,

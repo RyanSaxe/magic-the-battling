@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import type { Card as CardType, ZoneName, CardStateAction } from '../types'
 import type { ZoneOwner } from '../dnd/types'
 import { useFaceDown } from '../contexts/faceDownState'
+import { useOpenSubmenus } from '../hooks/useOpenSubmenus'
 import type { BattleSelectedCard } from '../pages/phases/Battle'
 import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../utils/battleInteraction'
 
@@ -46,7 +47,7 @@ interface ActionMenuProps {
   onClose: () => void
 }
 
-type SubmenuType = 'none' | 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo' | 'rollDie'
+type SubmenuType = 'addCounter' | 'removeCounter' | 'spawnToken' | 'attachTo' | 'moveTo' | 'rollDie'
 
 const COUNTER_TYPES = ['+1/+1', '-1/-1', 'Loyalty', 'Charge', 'Custom']
 const DIE_SIDES = [2, 4, 6, 8, 10, 12, 20]
@@ -72,7 +73,16 @@ export function ActionMenu({
   onRollDie,
   onClose,
 }: ActionMenuProps) {
-  const [submenu, setSubmenu] = useState<SubmenuType>('none')
+  const { isOpen, toggle } = useOpenSubmenus<SubmenuType>()
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // The menu sits on the Actions button and grows upward, so a submenu would move every row above the one clicked.
+  // Keeping the size it opened with makes a submenu push the rows below it down, inside the menu's scroll.
+  useLayoutEffect(() => {
+    const node = menuRef.current
+    if (!node) return
+    node.style.height = `${node.getBoundingClientRect().height}px`
+  }, [])
 
   const isYourTurn = battle.current_turn_name === playerName
 
@@ -121,8 +131,8 @@ export function ActionMenu({
       {/* Stops at the bars, so a bar button takes the first click instead of only closing the menu. */}
       <div className="fixed inset-x-0 top-[var(--frame-bar-height)] bottom-[var(--frame-bar-height)] z-[86]" onClick={onClose} />
       <div
-        className="fixed bottom-16 left-[calc(var(--bar-inline)+0.5rem)] modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[220px] max-h-[70vh] overflow-auto z-[87]"
-        style={{ maxWidth: 280 }}
+        ref={menuRef}
+        className="fixed bottom-16 left-[calc(var(--bar-inline)+0.5rem)] modal-chrome border gold-border rounded-lg shadow-xl py-1 w-[280px] max-h-[70vh] overflow-auto z-[87]"
       >
         {card && (
           <>
@@ -156,10 +166,10 @@ export function ActionMenu({
             <MenuItem
               label="Move To"
               hasSubmenu
-              open={submenu === 'moveTo'}
-              onClick={() => setSubmenu(submenu === 'moveTo' ? 'none' : 'moveTo')}
+              open={isOpen('moveTo')}
+              onClick={() => toggle('moveTo')}
             />
-            {submenu === 'moveTo' && (
+            {isOpen('moveTo') && (
               <Submenu>
                 {zone !== 'hand' && <MenuItem label="Hand" onClick={() => handleMove('hand')} />}
                 {zone !== 'battlefield' && <MenuItem label="Battlefield" onClick={() => handleMove('battlefield')} />}
@@ -174,11 +184,11 @@ export function ActionMenu({
                 <MenuItem
                   label="Add Counter"
                   hasSubmenu
-                  open={submenu === 'addCounter'}
+                  open={isOpen('addCounter')}
                   guideTarget="battle-action-add-counter"
-                  onClick={() => setSubmenu(submenu === 'addCounter' ? 'none' : 'addCounter')}
+                  onClick={() => toggle('addCounter')}
                 />
-                {submenu === 'addCounter' && (
+                {isOpen('addCounter') && (
                   <Submenu>
                     {COUNTER_TYPES.map(type => (
                       <MenuItem
@@ -202,10 +212,10 @@ export function ActionMenu({
                     <MenuItem
                       label="Remove Counter"
                       hasSubmenu
-                      open={submenu === 'removeCounter'}
-                      onClick={() => setSubmenu(submenu === 'removeCounter' ? 'none' : 'removeCounter')}
+                      open={isOpen('removeCounter')}
+                      onClick={() => toggle('removeCounter')}
                     />
-                    {submenu === 'removeCounter' && (
+                    {isOpen('removeCounter') && (
                       <Submenu>
                         {Object.entries(counters).map(([type, count]) => (
                           <MenuItem
@@ -226,10 +236,10 @@ export function ActionMenu({
                 <MenuItem
                   label="Spawn Token"
                   hasSubmenu
-                  open={submenu === 'spawnToken'}
-                  onClick={() => setSubmenu(submenu === 'spawnToken' ? 'none' : 'spawnToken')}
+                  open={isOpen('spawnToken')}
+                  onClick={() => toggle('spawnToken')}
                 />
-                {submenu === 'spawnToken' && (
+                {isOpen('spawnToken') && (
                   <Submenu>
                     {card.tokens.map(token => (
                       <MenuItem
@@ -262,10 +272,10 @@ export function ActionMenu({
                 <MenuItem
                   label="Attach To"
                   hasSubmenu
-                  open={submenu === 'attachTo'}
-                  onClick={() => setSubmenu(submenu === 'attachTo' ? 'none' : 'attachTo')}
+                  open={isOpen('attachTo')}
+                  onClick={() => toggle('attachTo')}
                 />
-                {submenu === 'attachTo' && (
+                {isOpen('attachTo') && (
                   <Submenu maxHeight={200}>
                     {attachableCards.map(target => (
                       <MenuItem
@@ -289,6 +299,44 @@ export function ActionMenu({
             <MenuDivider />
           </>
         )}
+
+        <MenuItem
+          label="Roll a Die"
+          hasSubmenu
+          open={isOpen('rollDie')}
+          onClick={() => toggle('rollDie')}
+        />
+        {isOpen('rollDie') && (
+          <Submenu>
+            <div className="menu-submenu-grid grid grid-cols-4 pr-3">
+              {DIE_SIDES.map(sides => (
+                <DieButton
+                  key={sides}
+                  label={`d${sides}`}
+                  onClick={() => {
+                    onRollDie(sides)
+                    onClose()
+                  }}
+                />
+              ))}
+              <DieButton
+                label="Custom…"
+                onClick={() => {
+                  const input = prompt('Number of sides:')
+                  if (input) {
+                    const sides = parseInt(input, 10)
+                    if (sides > 0) {
+                      onRollDie(sides)
+                      onClose()
+                    }
+                  }
+                }}
+              />
+            </div>
+          </Submenu>
+        )}
+
+        <MenuDivider />
 
         <MenuItem label="Untap Your Permanents" onClick={() => handleGeneralAction(onUntapAll)} />
         <MenuItem label="Untap Opponent's Permanents" onClick={() => handleGeneralAction(onUntapOpponentAll)} />
@@ -321,41 +369,6 @@ export function ActionMenu({
           disabled={!isYourTurn}
         />
 
-        <MenuDivider />
-
-        <MenuItem
-          label="Roll a Die"
-          hasSubmenu
-          open={submenu === 'rollDie'}
-          onClick={() => setSubmenu(submenu === 'rollDie' ? 'none' : 'rollDie')}
-        />
-        {submenu === 'rollDie' && (
-          <Submenu>
-            {DIE_SIDES.map(sides => (
-              <MenuItem
-                key={sides}
-                label={`d${sides}`}
-                onClick={() => {
-                  onRollDie(sides)
-                  onClose()
-                }}
-              />
-            ))}
-            <MenuItem
-              label="Custom..."
-              onClick={() => {
-                const input = prompt('Number of sides:')
-                if (input) {
-                  const sides = parseInt(input, 10)
-                  if (sides > 0) {
-                    onRollDie(sides)
-                    onClose()
-                  }
-                }
-              }}
-            />
-          </Submenu>
-        )}
       </div>
     </>
   )
@@ -389,6 +402,14 @@ function MenuItem({
     >
       <span>{label}</span>
       {hasSubmenu && <span className="text-[var(--ivory-muted)]">›</span>}
+    </button>
+  )
+}
+
+function DieButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button className="menu-item rounded py-1.5 text-sm text-center text-white whitespace-nowrap" onClick={onClick}>
+      {label}
     </button>
   )
 }
