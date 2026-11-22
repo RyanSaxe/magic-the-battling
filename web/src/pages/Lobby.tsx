@@ -210,13 +210,12 @@ function VoiceChatSwitch({
     };
   }, [showVoiceHelp]);
 
+  // Guests can't change Voice. The row itself isn't dimmed, because the note inside it has to stay solid.
+  const dimmed = isHost ? "" : " opacity-50";
+
   return (
-    <div
-      className={`flex items-center gap-1.5${
-        !isHost ? ' opacity-50' : ''
-      }`}
-    >
-      <label className={`flex items-center gap-1.5${isHost ? ' cursor-pointer' : ' cursor-default'}`}>
+    <div className="flex items-center gap-1.5">
+      <label className={`flex items-center gap-1.5${isHost ? ' cursor-pointer' : ' cursor-default'}${dimmed}`}>
         <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ivory-muted)]">
           Voice
         </span>
@@ -241,7 +240,7 @@ function VoiceChatSwitch({
       <div ref={voiceHelpRef} className="relative group shrink-0">
         <button
           type="button"
-          className="touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]"
+          className={`touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]${dimmed}`}
           aria-label="Voice chat info"
           aria-expanded={showVoiceHelp}
           onClick={() => setShowVoiceHelp((v) => !v)}
