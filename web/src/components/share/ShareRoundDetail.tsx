@@ -40,7 +40,6 @@ export function ShareRoundDetail({
         upgrades={upgrades}
         companionIds={companionIds}
         hiddenZones={hiddenZones}
-        className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col"
         enableResize={enableResize}
         isMobile={isMobile}
         layoutStateKey={layoutStateKey}
@@ -52,7 +51,12 @@ export function ShareRoundDetail({
           message: 'This resets the current deck layout for this view on this device.',
         } : undefined}
       />
-      {band && <Banner size="compact" title={band} tone={band === 'Sudden Death' ? 'sudden-death' : 'gold'} />}
+      {band && (
+        <>
+          <div className="zone-divider-line zone-divider-line--horizontal h-[2px] shrink-0" />
+          <Banner size="compact" title={band} tone={band === 'Sudden Death' ? 'sudden-death' : 'gold'} />
+        </>
+      )}
     </div>
   )
 }

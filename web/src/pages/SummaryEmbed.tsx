@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { getShareGame } from '../api/client'
 import type { ShareGameResponse } from '../types'
 import { GameSummary } from '../components/GameSummary'
+import { FrameBoard } from '../components/common/PageFrame'
 import { buildGameSummaryData } from '../utils/share'
 
 export function SummaryEmbed() {
@@ -61,10 +62,12 @@ export function SummaryEmbed() {
     >
       {summaryData ? (
         <div className="w-full h-full flex flex-col pt-3 px-2 pb-2">
-          <GameSummary
-            player={summaryData.selfPlayer}
-            useUpgrades={data!.use_upgrades}
-          />
+          <FrameBoard>
+            <GameSummary
+              player={summaryData.selfPlayer}
+              useUpgrades={data!.use_upgrades}
+            />
+          </FrameBoard>
         </div>
       ) : (
         <div className="w-full h-full" />

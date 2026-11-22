@@ -7,7 +7,7 @@ import { LoadingScreen } from "../components/common/LoadingScreen";
 import { START_STEPS, useHandedOnSteps } from "../components/common/loadingSteps";
 import { Banner } from "../components/common/Banner";
 import { SurfaceCard } from "../components/common/SurfaceCard";
-import { FrameFelt, FrameSidebar } from "../components/common/PageFrame";
+import { FrameBoard, FrameFelt, FrameSidebar } from "../components/common/PageFrame";
 import { GuideButton, HomeButton } from "../components/common/AppHeader";
 import { BottomBar, BrandMark, TopBar } from "../components/common/FrameBar";
 import { BusyNotice, StatusNotice } from "../components/common/StatusNotice";
@@ -2359,95 +2359,93 @@ function GameContent() {
             validDropZones={getValidDropZones}
           >
             <FrameFelt banner={banner} sidePanels={<SidePanelFrame ref={setSidePanelHost} />}>
-              <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
-                <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-                  {usesOverlaySidebar && battleViewForDisplay && (
-                    <div
-                      ref={battleLifeRailRef}
-                      className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight"
-                    >
-                      <div className="flex items-center gap-1">
-                        <span className="text-[var(--ivory-muted)] truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
-                        {!canManipulateOpponent && voiceTargetsAvailable && (() => {
-                          const oppPeer = voiceChat.state.peers.find(p => p.name === battleViewForDisplay.opponent_name)
-                          return oppPeer ? (
-                            <MicToggle
-                              muted={voiceChat.state.mutedPeers.has(battleViewForDisplay.opponent_name)}
-                              connectionState={oppPeer.connectionState}
-                              audioLevelKey={battleViewForDisplay.opponent_name}
-                              remoteMuted={voiceChat.state.remoteMutedPeers.has(battleViewForDisplay.opponent_name)}
-                              onClick={() => voiceChat.togglePeerMute(battleViewForDisplay.opponent_name)}
-                            />
-                          ) : null
-                        })()}
-                        <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>-</button>
-                          <span onClick={ignoreLifeNumberTap} className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
-                          <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>+</button>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 leading-tight">
-                        <div className="text-center">
-                          {battleViewForDisplay.current_turn_name === self_player.name ? (
-                            <span className="text-green-400 font-medium">Your turn</span>
-                          ) : (
-                            <span className="text-amber-400 font-medium">Opp's turn</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
-                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>-</button>
-                          <span onClick={ignoreLifeNumberTap} className="text-white font-bold">{battleViewForDisplay.your_life}</span>
-                          <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>+</button>
-                        </div>
-                        {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
+              <FrameBoard>
+                {usesOverlaySidebar && battleViewForDisplay && (
+                  <div
+                    ref={battleLifeRailRef}
+                    className="shrink-0 flex items-center justify-between top-attached-rail-pad mobile-life-bar text-[11px] leading-tight"
+                  >
+                    <div className="flex items-center gap-1">
+                      <span className="text-[var(--ivory-muted)] truncate max-w-[60px] leading-tight">{battleViewForDisplay.opponent_name}</span>
+                      {!canManipulateOpponent && voiceTargetsAvailable && (() => {
+                        const oppPeer = voiceChat.state.peers.find(p => p.name === battleViewForDisplay.opponent_name)
+                        return oppPeer ? (
                           <MicToggle
-                            muted={voiceChat.state.isMuted}
-                            audioLevelKey="__self__"
-                            onClick={() => voiceChat.toggleSelfMute()}
+                            muted={voiceChat.state.mutedPeers.has(battleViewForDisplay.opponent_name)}
+                            connectionState={oppPeer.connectionState}
+                            audioLevelKey={battleViewForDisplay.opponent_name}
+                            remoteMuted={voiceChat.state.remoteMutedPeers.has(battleViewForDisplay.opponent_name)}
+                            onClick={() => voiceChat.togglePeerMute(battleViewForDisplay.opponent_name)}
                           />
-                        )}
-                        <span className="text-[var(--ivory-muted)] truncate max-w-[60px] leading-tight">{self_player.name}</span>
+                        ) : null
+                      })()}
+                      <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
+                        <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>-</button>
+                        <span onClick={ignoreLifeNumberTap} className="text-white font-bold">{battleViewForDisplay.opponent_life}</span>
+                        <button onClick={() => handleOpponentLifeChange(battleViewForDisplay.opponent_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>+</button>
                       </div>
                     </div>
-                  )}
-                  {usesOverlaySidebar && battleViewForDisplay && (
-                    <ZoneDivider
-                      orientation="horizontal"
-                      interactive={false}
-                      {...STATIC_DIVIDER_CALLBACKS}
-                    />
-                  )}
-                    <BattlePhase
-                      gameState={gameState}
-                      battleOverride={displayBattleResolution ? battleViewForDisplay : undefined}
-                      actions={actions}
-                      onRevealHiddenUpgrades={openBattleRevealUpgradesModal}
-                      isMobile={sizes.isMobile}
-                      selectedCard={battleSelectedCard}
-                      onSelectedCardChange={setBattleSelectedCard}
-                      cardMenu={battleCardMenu}
-                      onCardMenuChange={setBattleCardMenu}
-                      onCardHover={handleCardHover}
-                      onOpponentCardHover={handleOpponentCardHover}
-                      onCardHoverEnd={handleCardHoverEnd}
-                      activeZoneModal={openSurface?.kind === "zone" && openSurface.zone !== "sideboard" ? { zone: openSurface.zone, owner: openSurface.owner } : null}
-                      onZoneModalOpenChange={setBattleZoneModalOpen}
-                      onLayoutMetricsChange={setBattleSidebarLayout}
-                    />
-                    {displayBattleResolution && activeBattleResolution && (
-                      <BattleResolutionOverlay
-                        battle={battleViewForDisplay}
-                        resolution={activeBattleResolution}
-                        onComplete={() => {
-                          setActiveBattleResolutionId(null)
-                          setCachedBattleForResolution(null)
-                        }}
-                      />
-                    )}
+                    <div className="flex items-center gap-1.5 leading-tight">
+                      <div className="text-center">
+                        {battleViewForDisplay.current_turn_name === self_player.name ? (
+                          <span className="text-green-400 font-medium">Your turn</span>
+                        ) : (
+                          <span className="text-amber-400 font-medium">Opp's turn</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="mobile-life-chip flex items-center gap-0.5 rounded px-1 py-px leading-none">
+                        <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life - 1)} className={`${LIFE_MINUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>-</button>
+                        <span onClick={ignoreLifeNumberTap} className="text-white font-bold">{battleViewForDisplay.your_life}</span>
+                        <button onClick={() => handleYourLifeChange(battleViewForDisplay.your_life + 1)} className={`${LIFE_PLUS_TOUCH_AREA} text-[var(--ivory-muted)] hover:text-white px-1 leading-none`}>+</button>
+                      </div>
+                      {!canManipulateOpponent && voiceTargetsAvailable && voiceChat.state.peers.length > 0 && (
+                        <MicToggle
+                          muted={voiceChat.state.isMuted}
+                          audioLevelKey="__self__"
+                          onClick={() => voiceChat.toggleSelfMute()}
+                        />
+                      )}
+                      <span className="text-[var(--ivory-muted)] truncate max-w-[60px] leading-tight">{self_player.name}</span>
+                    </div>
                   </div>
-              </main>
+                )}
+                {usesOverlaySidebar && battleViewForDisplay && (
+                  <ZoneDivider
+                    orientation="horizontal"
+                    interactive={false}
+                    {...STATIC_DIVIDER_CALLBACKS}
+                  />
+                )}
+                <BattlePhase
+                  gameState={gameState}
+                  battleOverride={displayBattleResolution ? battleViewForDisplay : undefined}
+                  actions={actions}
+                  onRevealHiddenUpgrades={openBattleRevealUpgradesModal}
+                  isMobile={sizes.isMobile}
+                  selectedCard={battleSelectedCard}
+                  onSelectedCardChange={setBattleSelectedCard}
+                  cardMenu={battleCardMenu}
+                  onCardMenuChange={setBattleCardMenu}
+                  onCardHover={handleCardHover}
+                  onOpponentCardHover={handleOpponentCardHover}
+                  onCardHoverEnd={handleCardHoverEnd}
+                  activeZoneModal={openSurface?.kind === "zone" && openSurface.zone !== "sideboard" ? { zone: openSurface.zone, owner: openSurface.owner } : null}
+                  onZoneModalOpenChange={setBattleZoneModalOpen}
+                  onLayoutMetricsChange={setBattleSidebarLayout}
+                />
+                {displayBattleResolution && activeBattleResolution && (
+                  <BattleResolutionOverlay
+                    battle={battleViewForDisplay}
+                    resolution={activeBattleResolution}
+                    onComplete={() => {
+                      setActiveBattleResolutionId(null)
+                      setCachedBattleForResolution(null)
+                    }}
+                  />
+                )}
+              </FrameBoard>
               {renderSidebar()}
             </FrameFelt>
             {current_battle && (
@@ -2522,7 +2520,7 @@ function GameContent() {
           </FaceDownProvider>
         ) : (
           <FrameFelt banner={banner} sidePanels={<SidePanelFrame ref={setSidePanelHost} />}>
-            <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
+            <FrameBoard>
               {currentPhase === "draft" && (
                 <DraftPhase
                   gameState={gameState}
@@ -2563,7 +2561,7 @@ function GameContent() {
                 />
               )}
               {currentPhase === "awaiting_elimination" && (
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex-1 flex items-center justify-center p-4">
                   <div className="text-center max-w-md">
                     <h2 className="text-2xl text-red-400 mb-4">
                       You Have Been Eliminated
@@ -2594,17 +2592,15 @@ function GameContent() {
                 </div>
               )}
               {showsOutScreen && (
-                <div className="zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">
-                  <div className="out-felt page-center flex-1 min-h-0 overflow-y-auto flex flex-col items-center p-4 text-center">
-                    <h2 className="out-title text-[30px] leading-[1.15]">You’re out</h2>
-                    <p className="mt-2 mb-6 text-[16px] text-[var(--ivory-felt)]">{outPlace}</p>
-                    <div className="shrink-0">
-                      <PoisonCard count={self_player.poison} dimensions={{ width: 120, height: 168 }} />
-                    </div>
-                    <button onClick={() => setDeckSeen(true)} className="btn btn-secondary shrink-0 mt-7">
-                      See your deck
-                    </button>
+                <div className="out-felt page-center flex-1 min-h-0 overflow-y-auto flex flex-col items-center p-4 text-center">
+                  <h2 className="out-title text-[30px] leading-[1.15]">You’re out</h2>
+                  <p className="mt-2 mb-6 text-[16px] text-[var(--ivory-felt)]">{outPlace}</p>
+                  <div className="shrink-0">
+                    <PoisonCard count={self_player.poison} dimensions={{ width: 120, height: 168 }} />
                   </div>
+                  <button onClick={() => setDeckSeen(true)} className="btn btn-secondary shrink-0 mt-7">
+                    See your deck
+                  </button>
                 </div>
               )}
               {isEndPhase && !showsOutScreen && (
@@ -2617,7 +2613,7 @@ function GameContent() {
                   showLayoutReset
                 />
               )}
-            </main>
+            </FrameBoard>
             {renderSidebar()}
           </FrameFelt>
         )}

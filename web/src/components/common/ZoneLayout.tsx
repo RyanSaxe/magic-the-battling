@@ -129,7 +129,8 @@ export function ZoneLayout({
       : {}),
   }
   const rootClassName = [
-    'relative zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col',
+    // Not positioned, so an overlay sits in the corners of the frame's gold edge.
+    'zone-divider-bg flex-1 min-h-0 flex flex-col',
     className,
   ]
     .filter(Boolean)

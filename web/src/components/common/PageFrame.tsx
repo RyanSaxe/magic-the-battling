@@ -29,6 +29,15 @@ export function FrameSidebar({ children }: { children: ReactNode }) {
   return <div className="frame-sidebar zone-divider-bg shrink-0 flex min-h-0">{children}</div>
 }
 
+/** The board between the rails. It alone draws the board's gold edge, on every screen, so what fills it draws none. */
+export function FrameBoard({ children }: { children: ReactNode }) {
+  return (
+    <main className="flex-1 flex flex-col min-h-0 min-w-0" data-guide-target="game-content">
+      <div className="frame-board relative zone-divider-bg p-[2px] flex-1 min-h-0 flex flex-col">{children}</div>
+    </main>
+  )
+}
+
 /** The felt between the rails: a banner, when there is one, across its full width, over the board and its sidebar. */
 export function FrameFelt({
   banner,
@@ -75,13 +84,13 @@ export function PageFrame({
       {header}
 
       <FrameFelt sidePanels={<SidePanelFrame ref={setSidePanelHost} />}>
-        <main className="flex-1 min-w-0 min-h-0 p-[2px] zone-divider-bg flex flex-col">
+        <FrameBoard>
           <div className={`zone-pack flex-1 min-w-0 min-h-0 flex flex-col ${scrollClass} ${centerClass} ${contentClassName}`}>
             {children}
           </div>
           {shelf}
           {hints && <HintsBanner place={hints} variant="rail" />}
-        </main>
+        </FrameBoard>
 
         {aside && <FrameSidebar>{aside}</FrameSidebar>}
       </FrameFelt>
