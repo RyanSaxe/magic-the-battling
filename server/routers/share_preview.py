@@ -31,6 +31,7 @@ VALID_NAME_RE = re.compile(r"^[^/]{1,64}$")
 RATE_LIMIT_WINDOW = 60
 RATE_LIMIT_MAX = 10
 PREVIEW_RENDER_VERSION = "preview-v4"
+INDEX_HTML = Path(__file__).parent.parent.parent / "web" / "dist" / "index.html"
 
 
 class SlidingWindowRateLimiter:
@@ -143,20 +144,17 @@ async def share_page_with_og(
     db: Session = Depends(_get_db),  # noqa: B008
 ) -> Response:
     if not VALID_ID_RE.match(game_id) or not VALID_NAME_RE.match(player_name):
-        return _serve_plain_index()
+        return serve_index(request)
 
     share_data = _fetch_share_data(game_id, player_name, db)
+    if not share_data:
+        return serve_index(request)
 
-    static_dir = Path(__file__).parent.parent.parent / "web" / "dist"
-    index_path = static_dir / "index.html"
-    if not index_path.exists():
+    if not INDEX_HTML.exists():
         return Response(status_code=404)
 
-    index_html = index_path.read_text()
+    index_html = INDEX_HTML.read_text()
     index_hash = hashlib.sha256(index_html.encode()).hexdigest()[:16]
-
-    if not share_data:
-        return HTMLResponse(content=index_html, headers={"Cache-Control": "no-cache"})
 
     data_json = share_data.model_dump_json()
     etag_basis = f"{PREVIEW_RENDER_VERSION}:{index_hash}:{data_json}"
@@ -223,9 +221,12 @@ async def preview_image(
     )
 
 
-def _serve_plain_index() -> Response:
-    static_dir = Path(__file__).parent.parent.parent / "web" / "dist"
-    index_path = static_dir / "index.html"
-    if index_path.exists():
-        return HTMLResponse(content=index_path.read_text(), headers={"Cache-Control": "no-cache"})
-    return Response(status_code=404)
+def serve_index(request: Request) -> Response:
+    """The app's page, whose link preview tags name the site and page it was requested at."""
+    if not INDEX_HTML.exists():
+        return Response(status_code=404)
+    site_url = escape(str(request.base_url).rstrip("/"), quote=True)
+    # request.url holds the decoded path, and a link needs it encoded.
+    page_url = escape(str(request.url.replace(path=quote(request.scope["path"]))), quote=True)
+    html = INDEX_HTML.read_text().replace("__SITE_URL__", site_url).replace("__PAGE_URL__", page_url)
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-cache"})

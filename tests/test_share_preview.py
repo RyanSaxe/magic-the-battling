@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -106,6 +107,33 @@ class TestBuildOgHtml:
         html = _build_og_html(source, "g1", "A", _make_share_data("A", 1), "https://x.com")
         assert 'content="Keep me"' in html
         assert 'content="Remove"' not in html
+
+
+class TestSiteLinkPreview:
+    @pytest.mark.parametrize("host", ["dev.pitfight.test", "pitfight.test"])
+    @pytest.mark.parametrize("path", ["/game/missing/share/Alice", "/game/not.an.id/share/Al%20Smith?spectate=true"])
+    def test_a_link_names_the_site_and_page_it_was_posted_from(self, client, monkeypatch, host, path):
+        # CI's pytest job has no web build, so serve the page the build starts from.
+        source = Path(__file__).parent.parent / "web" / "index.html"
+        monkeypatch.setattr(share_preview_module, "INDEX_HTML", source)
+        # scripts/start_server.sh trusts the proxy's headers, so Fly's https reaches the tags.
+        proxied = TestClient(cast(Any, ProxyHeadersMiddleware(cast(Any, app), trusted_hosts="*")))
+
+        html = proxied.get(path, headers={"Host": host, "X-Forwarded-Proto": "https"}).text
+
+        image = f"https://{host}/og-image.png?v=pitfight"
+        assert f'<meta property="og:url" content="https://{host}{path}" />' in html
+        assert f'<meta property="og:image" content="{image}" />' in html
+        assert f'<meta name="twitter:image" content="{image}" />' in html
+
+    def test_a_link_cannot_break_out_of_its_tag(self, client, monkeypatch):
+        source = Path(__file__).parent.parent / "web" / "index.html"
+        monkeypatch.setattr(share_preview_module, "INDEX_HTML", source)
+
+        html = client.get("/game/missing/share/Alice", headers={"Host": 'x"><script>'}).text
+
+        assert "x&quot;&gt;&lt;script&gt;/og-image.png" in html
+        assert 'x"><script>' not in html
 
 
 class TestPreviewServiceRestart:
