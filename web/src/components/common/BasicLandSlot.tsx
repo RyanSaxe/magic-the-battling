@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { BasicLandCard } from "./BasicLandCard";
+import { BoardBackdrop } from "./BoardBackdrop";
 import { CardSlot } from "./CardSlot";
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from "../../constants/assets";
 import { CARD_ASPECT_RATIO } from "../../hooks/cardSizeUtils";
@@ -29,6 +30,7 @@ export function BasicLandSlot({
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const [landSize, setLandSize] = useState({ w: dimensions.width, h: Math.round(dimensions.width * CARD_ASPECT_RATIO) });
 
@@ -38,7 +40,8 @@ export function BasicLandSlot({
       const target = e.target as Node;
       if (
         triggerRef.current?.contains(target) ||
-        popoverRef.current?.contains(target)
+        popoverRef.current?.contains(target) ||
+        backdropRef.current?.contains(target)
       )
         return;
       setOpen(false);
@@ -92,6 +95,7 @@ export function BasicLandSlot({
           <CardSlot label={emptyLabel} dimensions={dimensions} />
         )}
       </div>
+      {open && <BoardBackdrop ref={backdropRef} onTap={() => setOpen(false)} />}
       {open &&
         createPortal(
           <div
