@@ -117,7 +117,7 @@ test('a cube whose details fail to load says so, and Retry loads them', async ({
   failing = false
   await page.getByRole('button', { name: 'Retry' }).click()
 
-  await expect(page.getByRole('button', { name: '+ Follow' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Follow', exact: true })).toBeVisible()
   await expect(page.getByText("This cube's details didn't load.")).toBeHidden()
 })
 
