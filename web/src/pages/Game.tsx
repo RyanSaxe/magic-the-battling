@@ -75,6 +75,7 @@ import {
   BUILD_SUBMIT_BUTTON_LABEL,
   DRAFT_DONE_BUTTON_LABEL,
   REWARD_CONTINUE_BUTTON_LABEL,
+  getPhaseDisplayName,
   type Phase,
 } from "../constants/phases";
 import type {
@@ -444,7 +445,7 @@ function PlayerSelectionModal({
                     <div className="flex min-w-0 flex-wrap items-center gap-x-3">
                       <span className="min-w-0 break-words text-white">{player.name}</span>
                       <span className="min-w-0 break-words text-[var(--ivory-muted)] text-sm">
-                        ({player.phase})
+                        ({isTimelinePhase(player.phase) ? getPhaseDisplayName(player.phase) : player.phase})
                       </span>
                     </div>
                   </div>
