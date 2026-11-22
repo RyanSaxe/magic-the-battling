@@ -28,6 +28,14 @@ export function getSidebarPlayerOrder(players: PlayerView[]): PlayerView[] {
   return [...players].sort(comparePlayersForSidebar);
 }
 
+/** Alive, fighting on as the Ghost (the most recently eliminated player), or out of the game. */
+export type Standing = "alive" | "ghost" | "out";
+
+export function getStanding(player: PlayerView): Standing {
+  if (!player.is_ghost) return "alive";
+  return player.is_most_recent_ghost ? "ghost" : "out";
+}
+
 function isTiedOnPoison(a: PlayerView, b: PlayerView): boolean {
   return a.placement === 0 && b.placement === 0 && a.poison === b.poison;
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ResumableSeat } from '../hooks/useResumableGames'
 import { cubeTitle, formatWhen, modeLabel, resumeDetail, resumeHeadline, seatsLabel, winsLabel } from './accountFormat'
 
@@ -16,6 +16,13 @@ describe('cubeTitle', () => {
 })
 
 describe('formatWhen', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('reads a time the server sends without a zone as UTC, wherever the player is', () => {
+    vi.stubEnv('TZ', 'America/Los_Angeles')
+    expect(formatWhen('2026-11-21T11:41:30.083638', now)).toBe('18 min ago')
+  })
+
   it('says how long ago within a day, then gives the date', () => {
     expect(formatWhen('2026-11-21T10:00:00Z', now)).toBe('2 h ago')
     expect(formatWhen('2026-11-19T12:00:00Z', now)).toBe('Nov 19')
@@ -63,6 +70,7 @@ describe('the resume banner', () => {
     playMode: 'limited',
     useUpgrades: true,
     playerCount: 4,
+    canClose: false,
     stage: 2,
     round: 4,
     poison: 2,

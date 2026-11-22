@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/authState'
 import { unknownToAppError } from '../../utils/appError'
+import { getRememberedGuestName, rememberGuestName } from '../../utils/deviceIdentity'
 import { joinLobbyByCode } from '../../utils/joinLobby'
-import { TEXT_INPUT } from '../common/styles'
+import { FIELD_LABEL, TEXT_INPUT } from '../common/styles'
 import { Dialog } from '../common/Dialog'
 
 interface JoinGameModalProps {
@@ -14,19 +15,11 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
   const navigate = useNavigate()
   const { user } = useAuth()
 
-  const [manualName, setManualName] = useState('')
+  const [manualName, setManualName] = useState(() => getRememberedGuestName() ?? '')
   const playerName = user ? user.username : manualName
   const [joinCode, setJoinCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
-  }, [onClose])
 
   const handleSubmit = async () => {
     const name = playerName.trim()
@@ -44,7 +37,9 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
     setError('')
 
     try {
-      navigate(await joinLobbyByCode(code, name))
+      const lobbyPath = await joinLobbyByCode(code, name)
+      if (!user) rememberGuestName(name)
+      navigate(lobbyPath)
     } catch (err) {
       setError(unknownToAppError(err, 'join-game', 'Failed to join game').message)
     } finally {
@@ -63,7 +58,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
 
       <div className="space-y-3">
         <div>
-          <label className="block text-white text-sm mb-1">Your Name</label>
+          <label className={FIELD_LABEL}>Your Name</label>
           <input
             type="text"
             value={playerName}
@@ -76,7 +71,7 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
         </div>
 
         <div>
-          <label className="block text-white text-sm mb-1">Join Code</label>
+          <label className={FIELD_LABEL}>Join Code</label>
           <input
             type="text"
             value={joinCode}
@@ -91,11 +86,11 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="btn btn-primary play-action-btn flex-1 py-2"
+            className="btn btn-primary flex-1 py-2"
           >
             {loading ? 'Joining...' : 'Join Game'}
           </button>
-          <button onClick={onClose} className="btn btn-secondary play-action-btn flex-1 py-2">
+          <button onClick={onClose} className="btn btn-secondary flex-1 py-2">
             Cancel
           </button>
         </div>

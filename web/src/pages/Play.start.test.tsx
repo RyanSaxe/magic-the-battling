@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../test/fakeWebSocket'
 import { installMemoryLocalStorage } from '../test/memoryStorage'
+import { createGame } from '../api/client'
 import { getRememberedSeat } from '../utils/deviceIdentity'
 import { Play } from './Play'
 
@@ -98,6 +99,26 @@ describe('Play: starting a Goldfish game', () => {
     vi.unstubAllGlobals()
   })
 
+  it('starts Goldfish once on Enter in the name field', async () => {
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+    const name = screen.getByPlaceholderText('Enter your name')
+
+    await act(async () => {
+      fireEvent.keyDown(name, { key: 'Enter' })
+    })
+    await act(async () => {
+      fireEvent.keyDown(name, { key: 'Enter' })
+    })
+
+    expect(gamesCreated).toBe(1)
+    expect(createGame).toHaveBeenLastCalledWith('Tester', expect.objectContaining({ puppetCount: 3 }))
+  })
+
   it('lets the player start again after a failed start', async () => {
     render(
       <MemoryRouter>
@@ -160,6 +181,27 @@ describe('Play: starting a Goldfish game', () => {
     expect(getRememberedSeat('game-1')).toBeNull()
   })
 
+  it("fills in the name a guest last played under", async () => {
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+    fireEvent.change(screen.getByPlaceholderText('Enter your name'), { target: { value: 'Kellogg' } })
+    await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
+    cleanup()
+
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+
+    expect(screen.getByPlaceholderText<HTMLInputElement>('Enter your name').value).toBe('Kellogg')
+  })
+
   it('does not offer a failed start for resuming', async () => {
     render(
       <MemoryRouter>
@@ -180,5 +222,47 @@ describe('Play: starting a Goldfish game', () => {
     await settle()
 
     expect(getRememberedSeat('game-1')).toBeNull()
+  })
+
+  it('starts with the fewer opponents picked when puppet data is short', async () => {
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+    const serveLobby = async (gameId: string, puppetCount: number) => {
+      const socket = FakeWebSocket.latest()
+      act(() => {
+        socket.serverOpen()
+        socket.serverMessage({
+          type: 'lobby_state',
+          payload: {
+            game_id: gameId,
+            players: [],
+            can_start: false,
+            start_status: 'open',
+            start_error: null,
+            cube_loading_status: 'ready',
+            cube_loading_error: null,
+            puppet_count: puppetCount,
+            available_puppet_count: 1,
+          },
+        })
+      })
+      await settle()
+      return socket
+    }
+
+    await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
+    await settle()
+    await serveLobby('game-1', 3)
+    await act(async () => screen.getByRole('button', { name: '1' }).click())
+    await act(async () => screen.getByRole('button', { name: 'Start' }).click())
+    await settle()
+    const socket = await serveLobby('game-2', 1)
+
+    expect(screen.queryByText('Not enough puppet data')).toBeNull()
+    expect(socket.sent.map((data) => JSON.parse(data).action)).toContain('set_ready')
   })
 })

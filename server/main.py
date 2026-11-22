@@ -21,6 +21,7 @@ from server.observability import OBSERVABILITY_LOGGER_NAME, configure_logging, r
 from server.routers import auth, battlers, discover, games, ops, share_preview, ws
 from server.runtime_config import MAX_SESSIONS_TOTAL, RESTORE_ACTIVE_GAME_SNAPSHOTS, SESSION_TTL_MINUTES
 from server.schemas.api import ServerStatusResponse
+from server.services.default_cube import start_loading_default_cube
 from server.services.game_manager import game_manager
 from server.services.ops_manager import ops_manager
 from server.services.preview import preview_service
@@ -54,6 +55,7 @@ async def lifespan(app: FastAPI):
         logging.getLogger(__name__).info("Preview service disabled by MTB_DISABLE_PREVIEW")
     start_monitoring()
     await game_manager.start_background_tasks()
+    start_loading_default_cube()
     yield
     removed_sessions = session_manager.cleanup(SESSION_TTL_MINUTES, MAX_SESSIONS_TOTAL)
     if removed_sessions:

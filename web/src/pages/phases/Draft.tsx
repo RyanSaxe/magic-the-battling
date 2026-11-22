@@ -4,7 +4,7 @@ import type { GameState, Card as CardType, CardDestination } from '../../types'
 import { LayoutResetControl } from '../../components/common/LayoutResetControl'
 import { UpgradeGrid } from '../../components/common/UpgradeGrid'
 import { ZoneLayout } from '../../components/common/ZoneLayout'
-import { usePersistedConstraints, type BoardSize } from '../../hooks/usePersistedConstraints'
+import { useSavedLayout, type BoardSize } from '../../hooks/useSavedLayout'
 import { useResizableLayout } from '../../hooks/useResizableLayout'
 import { TREASURE_TOKEN_IMAGE, POISON_COUNTER_IMAGE } from '../../constants/assets'
 import { draftLayoutConfig } from './phaseLayouts'
@@ -43,7 +43,7 @@ export function DraftPhase({ gameState, actions, isMobile, showDesktopUpgradeRai
     setConstraints,
     clearConstraints,
     resolution: persistedLayout,
-  } = usePersistedConstraints(
+  } = useSavedLayout(
     {
       scopeKey: 'phase:draft',
       stage: self_player.stage,

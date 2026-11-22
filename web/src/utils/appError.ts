@@ -22,6 +22,7 @@ export type AppErrorCode =
   | 'RUNTIME_RESET'
   | 'KICKED'
   | 'BATTLER_NOT_FOUND'
+  | 'CUBE_NOT_FOUND'
   | 'FOLLOW_NOT_FOUND'
   | 'ALREADY_FOLLOWING'
   | 'USERNAME_TAKEN'
@@ -101,6 +102,7 @@ const KNOWN_CODES = new Set<AppErrorCode>([
   'RUNTIME_RESET',
   'KICKED',
   'BATTLER_NOT_FOUND',
+  'CUBE_NOT_FOUND',
   'FOLLOW_NOT_FOUND',
   'ALREADY_FOLLOWING',
   'USERNAME_TAKEN',
@@ -238,6 +240,8 @@ export function getAppErrorMessage(
         return 'Incorrect username or password.'
       case 'BATTLER_NOT_FOUND':
         return 'That preset no longer exists.'
+      case 'CUBE_NOT_FOUND':
+        return error.detail ?? 'CubeCobra has no cube with that ID.'
       case 'ALREADY_FOLLOWING':
         return "You're already following this cube."
       case 'FOLLOW_NOT_FOUND':

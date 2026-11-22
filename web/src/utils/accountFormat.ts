@@ -1,5 +1,5 @@
 import type { ResumableSeat } from '../hooks/useResumableGames'
-import { formatTimeSince } from './format'
+import { formatTimeSince, parseServerTime } from './format'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -24,7 +24,7 @@ export function cubeTitle(cube: { display_name?: string | null; cube_name?: stri
 
 /** "4 min ago" within a day, then a date: "Nov 19", with the year when it isn't this year. */
 export function formatWhen(isoTime: string, now: number = Date.now()): string {
-  const time = Date.parse(isoTime)
+  const time = parseServerTime(isoTime)
   if (now - time < DAY_MS) return formatTimeSince(isoTime, now)
   const sameYear = new Date(time).getFullYear() === new Date(now).getFullYear()
   return new Date(time).toLocaleDateString('en-US', {

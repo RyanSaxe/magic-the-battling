@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { BasicLandCard } from "./BasicLandCard";
+import { BoardBackdrop } from "./BoardBackdrop";
 import { CardSlot } from "./CardSlot";
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from "../../constants/assets";
 import { CARD_ASPECT_RATIO } from "../../hooks/cardSizeUtils";
+import { POPOVER_CHROME } from "./styles";
 
 const VIEWPORT_MARGIN = 8;
 const POPOVER_PADDING = 8;  // p-2
@@ -28,6 +30,7 @@ export function BasicLandSlot({
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const [landSize, setLandSize] = useState({ w: dimensions.width, h: Math.round(dimensions.width * CARD_ASPECT_RATIO) });
 
@@ -37,7 +40,8 @@ export function BasicLandSlot({
       const target = e.target as Node;
       if (
         triggerRef.current?.contains(target) ||
-        popoverRef.current?.contains(target)
+        popoverRef.current?.contains(target) ||
+        backdropRef.current?.contains(target)
       )
         return;
       setOpen(false);
@@ -91,11 +95,12 @@ export function BasicLandSlot({
           <CardSlot label={emptyLabel} dimensions={dimensions} />
         )}
       </div>
+      {open && <BoardBackdrop ref={backdropRef} onTap={() => setOpen(false)} />}
       {open &&
         createPortal(
           <div
             ref={popoverRef}
-            className="fixed z-[95] modal-chrome border gold-border rounded-lg p-2 shadow-xl"
+            className={`fixed z-[95] ${POPOVER_CHROME} p-2`}
             style={{ top: pos.top, left: pos.left }}
           >
             <div className="grid grid-cols-3 gap-1.5">

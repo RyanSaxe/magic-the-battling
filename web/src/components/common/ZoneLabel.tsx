@@ -5,7 +5,7 @@ import {
 } from "../../hooks/useDividerDrag";
 
 export const badgeCls =
-  "bg-[#2a2320] text-[var(--ivory-soft)] text-[10px] uppercase tracking-widest " +
+  "bg-[var(--zone-label-bg)] text-[var(--ivory-soft)] text-[10px] uppercase tracking-widest " +
   "px-2.5 py-0.5 rounded-full border zone-label-pill whitespace-nowrap " +
   "inline-flex items-center gap-1.5";
 

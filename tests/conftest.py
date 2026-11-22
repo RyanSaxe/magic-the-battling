@@ -67,6 +67,11 @@ def _disable_ws_compression(monkeypatch):
     monkeypatch.setattr("server.compression.WS_COMPRESSION_ENABLED", False)
 
 
+@pytest.fixture(autouse=True)
+def _no_default_cube_fetch_at_startup(monkeypatch):
+    monkeypatch.setattr(main_module, "start_loading_default_cube", lambda: None)
+
+
 def _unique_objects[T](objects: list[T]) -> list[T]:
     seen: set[int] = set()
     unique: list[T] = []
@@ -241,6 +246,16 @@ def reset_singletons():
     yield
     _reset_runtime_state()
     clear_registry()
+
+
+@pytest.fixture(autouse=True)
+def offline_cubecobra(monkeypatch):
+    """Fail every cached JSON fetch, such as CubeCobra's cube JSON, unless a test answers it."""
+
+    def _no_network(url: str):
+        raise LookupError(url)
+
+    monkeypatch.setattr("mtb.utils.json_helpers.get_json", _no_network)
 
 
 @pytest.fixture

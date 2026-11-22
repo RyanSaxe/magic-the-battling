@@ -5,9 +5,9 @@ import { useAuth } from '../../contexts/authState'
 import type { SeatGrant, SeatState } from '../../hooks/useGameSeat'
 import type { LobbyState } from '../../types'
 import { type AppError, getAppErrorMessage, unknownToAppError } from '../../utils/appError'
-import { getRememberedSeat } from '../../utils/deviceIdentity'
+import { getRememberedGuestName, getRememberedSeat, rememberGuestName } from '../../utils/deviceIdentity'
 import { BusyNotice, StatusNotice } from '../common/StatusNotice'
-import { TEXT_INPUT } from '../common/styles'
+import { FIELD_LABEL, TEXT_INPUT } from '../common/styles'
 
 /** What a lobby link shows a tab that has no live seat in the lobby, by the state of its seat. */
 export function LobbySeatNotice({
@@ -109,7 +109,9 @@ function JoinLobbyNotice({
   const { user } = useAuth()
   const rememberedName = getRememberedSeat(gameId)?.name ?? null
   const [lobby, setLobby] = useState<LobbyState | 'missing' | null>(null)
-  const [playerName, setPlayerName] = useState(rememberedName ?? user?.username ?? '')
+  const [typedName, setTypedName] = useState<string | null>(null)
+  // Derived, as the login check can finish after the first render and an account's name beats a guest's.
+  const playerName = typedName ?? rememberedName ?? user?.username ?? getRememberedGuestName() ?? ''
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState(
     refused ? getAppErrorMessage(refused, 'rejoin-game', 'Could not reconnect to that seat.') : '',
@@ -148,6 +150,7 @@ function JoinLobbyNotice({
     setError('')
     try {
       const grant = await joinGame(lobby.join_code, trimmed)
+      if (!user) rememberGuestName(trimmed)
       onJoined(grant, trimmed, lobby.join_code)
     } catch (err) {
       setError(getAppErrorMessage(unknownToAppError(err, 'join-game', 'Failed to join'), 'join-game', 'Failed to join'))
@@ -218,14 +221,14 @@ function JoinLobbyNotice({
         {occupied} of {lobby.target_player_count} players · code{' '}
         <span className="font-mono text-amber-400">{lobby.join_code}</span>
       </p>
-      <label htmlFor="lobby-join-name" className="block text-white text-sm mb-1 mt-4">
+      <label htmlFor="lobby-join-name" className={`${FIELD_LABEL} mt-4`}>
         Your Name
       </label>
       <input
         id="lobby-join-name"
         type="text"
         value={playerName}
-        onChange={(e) => setPlayerName(e.target.value)}
+        onChange={(e) => setTypedName(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') void join(playerName)
         }}

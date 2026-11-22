@@ -1,12 +1,13 @@
 import { useEffect, useId, useRef, useState, type FormEventHandler, type ReactNode } from 'react'
 import { SurfaceCard } from './SurfaceCard'
-import { DIALOG_BACKDROP, DIALOG_CLOSE_BUTTON } from './styles'
+import { CloseButton } from './CloseButton'
+import { DIALOG_BACKDROP } from './styles'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
 /**
  * A dialog over a dimmed page: a walnut card with a title and a ✕ that closes it. Clicking the
- * dimmed page closes it too. When the dialog is taller than the screen, as on a landscape phone,
+ * dimmed page or pressing Escape closes it too. When the dialog is taller than the screen, as on a landscape phone,
  * its body scrolls under the title so ✕ stays in reach. Pass onSubmit to make the card a form.
  *
  * Opening it moves keyboard focus to its first control, and closing it returns focus to whatever
@@ -40,6 +41,17 @@ export function Dialog({
     }
   }, [opener])
 
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+      // Handled, so a panel open under the dialog doesn't close with it.
+      event.preventDefault()
+      onClose()
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
   const cardProps = {
     role: 'dialog',
     'aria-modal': true,
@@ -48,11 +60,9 @@ export function Dialog({
   }
   const content = (
     <>
-      <div className="flex shrink-0 items-center justify-between mb-4 pb-3 border-b border-black/40">
+      <div className="flex shrink-0 items-center justify-between mb-4 pb-3 border-b gold-divider">
         <h2 id={titleId} className="text-white font-semibold">{title}</h2>
-        <button ref={closeRef} type="button" onClick={onClose} className={DIALOG_CLOSE_BUTTON} aria-label={`Close ${title}`}>
-          ✕
-        </button>
+        <CloseButton ref={closeRef} onClick={onClose} label={`Close ${title}`} className="my-px" />
       </div>
       {/* The padding, undone by the margin, keeps focus rings inside the scrolling area. */}
       <div ref={bodyRef} className="min-h-0 overflow-y-auto -m-1 p-1">{children}</div>

@@ -265,10 +265,16 @@ class RoundTable:
         return battles
 
 
+def get_furthest_round(game: Game) -> tuple[int, int]:
+    """The stage and round the furthest live player has reached, or the furthest player once none is live."""
+    players = get_live_players(game) or game.players
+    return max(((p.stage, p.round) for p in players), default=(game.stage, game.round))
+
+
 def get_round_table(game: Game) -> RoundTable:
     """The next round's table: every live player, puppet and ghost, in the round the furthest player has reached."""
     humans = get_live_players(game)
-    stage, round_num = max(((p.stage, p.round) for p in humans), default=(game.stage, game.round))
+    stage, round_num = get_furthest_round(game)
 
     seats: dict[str, PairingCandidate] = {p.name: p for p in humans}
     for puppet in game.puppets:

@@ -9,8 +9,10 @@ import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
 import { battleBoardMetrics } from './phaseLayouts'
 import { buildAppliedUpgradeMap, buildHiddenAppliedUpgradeMap } from '../../utils/upgrades'
 import { canInteractWithBattleZone } from '../../utils/battleInteraction'
+import { canHover } from '../../utils/inputMode'
+import { POPOVER_CHROME } from '../../components/common/styles'
 
-interface ContextMenuState {
+export interface BattleCardMenu {
   card: CardType
   zone: ZoneName
   position: { x: number; y: number }
@@ -45,6 +47,8 @@ interface BattlePhaseProps {
   isMobile?: boolean
   selectedCard: BattleSelectedCard | null
   onSelectedCardChange: (card: BattleSelectedCard | null) => void
+  cardMenu: BattleCardMenu | null
+  onCardMenuChange: (menu: BattleCardMenu | null) => void
   onCardHover?: (cardId: string, zone: ZoneName) => void
   onOpponentCardHover?: (cardId: string, zone: ZoneName) => void
   onCardHoverEnd?: () => void
@@ -96,12 +100,23 @@ function ZoneActionMenu({
     node.style.top = `${y}px`
   }, [position])
 
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      onClose()
+    }
+    // The menu is on top, so it takes Escape while the key is captured, before a panel under it hears it.
+    window.addEventListener('keydown', handleKey, true)
+    return () => window.removeEventListener('keydown', handleKey, true)
+  }, [onClose])
+
   return (
     <>
       <div className="fixed inset-0 z-50" onClick={onClose} />
       <div
         ref={menuRef}
-        className="fixed modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[160px] z-[51]"
+        className={`fixed ${POPOVER_CHROME} py-1 min-w-[160px] z-[51]`}
       >
         <button
           type="button"
@@ -136,6 +151,8 @@ export function BattlePhase({
   isMobile = false,
   selectedCard,
   onSelectedCardChange,
+  cardMenu: contextMenu,
+  onCardMenuChange: setContextMenu,
   onCardHover,
   onOpponentCardHover,
   onCardHoverEnd,
@@ -170,7 +187,6 @@ export function BattlePhase({
       setSelectedCard(null)
     }
   }, [setSelectedCard])
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [zoneContextMenu, setZoneContextMenu] = useState<ZoneContextMenuState | null>(null)
 
   const { current_battle } = gameState
@@ -341,6 +357,10 @@ export function BattlePhase({
     setContextMenu({ card, zone, position: { x: e.clientX, y: e.clientY }, isOpponent: true })
   }
 
+  // On touch, holding a card in a pile or panel drags it out, so only a mouse opens the menu there.
+  const handlePileContextMenu = canHover ? handleContextMenu : undefined
+  const handleOpponentPileContextMenu = canHover ? handleOpponentContextMenu : undefined
+
   const handleLibraryContextMenu = (
     e: React.MouseEvent<HTMLDivElement>,
     owner: ZoneOwner,
@@ -508,6 +528,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('graveyard', 'opponent')}
               onCardClick={handleCardClick}
+              onCardContextMenu={handleOpponentPileContextMenu}
               upgradedCardIds={opponentUpgradedCardIds}
               upgradesByCardId={opponentUpgradesByCardId}
               containerClassName="battle-side-cell"
@@ -530,6 +551,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('exile', 'opponent')}
               onCardClick={handleCardClick}
+              onCardContextMenu={handleOpponentPileContextMenu}
               upgradedCardIds={opponentUpgradedCardIds}
               upgradesByCardId={opponentUpgradesByCardId}
               containerClassName="battle-side-cell"
@@ -614,6 +636,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('exile', 'player')}
               onCardClick={handleCardClick}
+              onCardContextMenu={handlePileContextMenu}
               upgradedCardIds={upgradedCardIds}
               upgradesByCardId={upgradesByCardId}
               hiddenUpgradesByCardId={hiddenUpgradesByCardId}
@@ -634,6 +657,7 @@ export function BattlePhase({
               selectedCardId={selectedCard?.card.id}
               onZoneClick={() => handleZoneClick('graveyard', 'player')}
               onCardClick={handleCardClick}
+              onCardContextMenu={handlePileContextMenu}
               upgradedCardIds={upgradedCardIds}
               upgradesByCardId={upgradesByCardId}
               hiddenUpgradesByCardId={hiddenUpgradesByCardId}

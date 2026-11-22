@@ -6,12 +6,14 @@ import { useVoiceChat } from "../hooks/useVoiceChat";
 import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { InfoIcon } from "../components/icons/InfoIcon";
+import { BoardBackdrop } from "../components/common/BoardBackdrop";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { MicToggle } from "../components/sidebar/MicToggle";
 import { useToast } from "../contexts";
 import { AppHeader, GuideButton, HomeButton } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
-import { BusyNotice } from "../components/common/StatusNotice";
+import { LoadingScreen } from "../components/common/LoadingScreen";
+import { type LoadingRouteState, START_STEPS, useHandedOnSteps } from "../components/common/loadingSteps";
 import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { SpectateRequestModal } from "../components/SpectateRequestModal";
@@ -26,6 +28,7 @@ import {
 import { DIALOG_BACKDROP, LINK, TEXT_INPUT } from "../components/common/styles";
 import { Tag } from "../components/common/Tag";
 import { PuppetIcon } from "../components/icons";
+import { copyText } from "../utils/clipboard";
 
 const EVEN_PLAYER_CAP_OPTIONS = [2, 4, 6, 8] as const;
 
@@ -44,15 +47,15 @@ function GuidedModeSwitch({
     "Guided Mode gives you a brief walkthrough the first time a new phase, action, or situation comes up.";
   const [showGuidedModeHelp, setShowGuidedModeHelp] = useState(false);
   const guidedModeHelpRef = useRef<HTMLDivElement>(null);
+  const guidedModeHelpBackdropRef = useRef<HTMLDivElement>(null);
   const [popupAnchorX, setPopupAnchorX] = useState<"right" | "left" | "center">("right");
   const [popupAnchorY, setPopupAnchorY] = useState<"top" | "bottom">("top");
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!guidedModeHelpRef.current?.contains(target)) {
-        setShowGuidedModeHelp(false);
-      }
+      if (guidedModeHelpRef.current?.contains(target) || guidedModeHelpBackdropRef.current?.contains(target)) return;
+      setShowGuidedModeHelp(false);
     };
     window.addEventListener("pointerdown", onPointerDown);
     return () => window.removeEventListener("pointerdown", onPointerDown);
@@ -114,6 +117,7 @@ function GuidedModeSwitch({
         </span>
       </label>
       <div ref={guidedModeHelpRef} className="relative group shrink-0">
+        {showGuidedModeHelp && <BoardBackdrop ref={guidedModeHelpBackdropRef} onTap={() => setShowGuidedModeHelp(false)} />}
         <button
           type="button"
           className="touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]"
@@ -159,15 +163,15 @@ function VoiceChatSwitch({
     "Voice chat may not work for all players. If it doesn't connect, use Discord instead.";
   const [showVoiceHelp, setShowVoiceHelp] = useState(false);
   const voiceHelpRef = useRef<HTMLDivElement>(null);
+  const voiceHelpBackdropRef = useRef<HTMLDivElement>(null);
   const [popupAnchorX, setPopupAnchorX] = useState<"right" | "left" | "center">("right");
   const [popupAnchorY, setPopupAnchorY] = useState<"top" | "bottom">("top");
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!voiceHelpRef.current?.contains(target)) {
-        setShowVoiceHelp(false);
-      }
+      if (voiceHelpRef.current?.contains(target) || voiceHelpBackdropRef.current?.contains(target)) return;
+      setShowVoiceHelp(false);
     };
     window.addEventListener("pointerdown", onPointerDown);
     return () => window.removeEventListener("pointerdown", onPointerDown);
@@ -208,13 +212,12 @@ function VoiceChatSwitch({
     };
   }, [showVoiceHelp]);
 
+  // Guests can't change Voice. The row itself isn't dimmed, because the note inside it has to stay solid.
+  const dimmed = isHost ? "" : " opacity-50";
+
   return (
-    <div
-      className={`flex items-center gap-1.5${
-        !isHost ? ' opacity-50' : ''
-      }`}
-    >
-      <label className={`flex items-center gap-1.5${isHost ? ' cursor-pointer' : ' cursor-default'}`}>
+    <div className="flex items-center gap-1.5">
+      <label className={`flex items-center gap-1.5${isHost ? ' cursor-pointer' : ' cursor-default'}${dimmed}`}>
         <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--ivory-muted)]">
           Voice
         </span>
@@ -237,9 +240,10 @@ function VoiceChatSwitch({
         </span>
       </label>
       <div ref={voiceHelpRef} className="relative group shrink-0">
+        {showVoiceHelp && <BoardBackdrop ref={voiceHelpBackdropRef} onTap={() => setShowVoiceHelp(false)} />}
         <button
           type="button"
-          className="touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]"
+          className={`touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]${dimmed}`}
           aria-label="Voice chat info"
           aria-expanded={showVoiceHelp}
           onClick={() => setShowVoiceHelp((v) => !v)}
@@ -272,6 +276,7 @@ function VoiceChatSwitch({
 export function Lobby() {
   const { gameId = "" } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
+  const openingSteps = useHandedOnSteps(["Open lobby"]);
   const { seat, claim, adopt, connectionOpened, connectionEnded, takeBack } = useGameSeat(gameId);
   const session = seat.kind === "held" ? seat.session : null;
   const { addToast } = useToast();
@@ -319,10 +324,12 @@ export function Lobby() {
     addToast(`Voice connection to ${peerName} failed.`, "warning")
   }, [addToast])
 
-  const voiceChat = useVoiceChat(send, peerNames, selfName, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
+  const voiceName = lobbyState?.voice_chat_enabled ? selfName : null
+  const voiceChat = useVoiceChat(send, peerNames, voiceName, voiceSignalRef, handleMicDenied, handleRetriesExhausted);
 
   const [copied, setCopied] = useState(false);
   const [showRulesPanel, setShowRulesPanel] = useState(false);
+  const [guideMinimized, setGuideMinimized] = useState(false);
   const [isGuidedMode, setIsGuidedMode] = useState(() =>
     getDefaultNewPlayerPreference(),
   );
@@ -450,13 +457,23 @@ export function Lobby() {
     submitBattler();
   };
 
+  const openGuide = (target?: RulesPanelTarget) => {
+    // Without a page, a Guide already open keeps its place.
+    if (target || !showRulesPanel) setRulesPanelTarget(target);
+    setGuideMinimized(false);
+    setShowRulesPanel(true);
+  };
   const lobbyHotkeyMap: Record<string, () => void> = {
     "?": () => {
-      setRulesPanelTarget(undefined);
-      setShowRulesPanel(true);
+      if (showRulesPanel) {
+        setShowRulesPanel(false);
+        return;
+      }
+      openGuide();
     },
   };
-  if (lobbyState && currentPlayer && !showRulesPanel) {
+  const guideTakesKeys = showRulesPanel && !guideMinimized;
+  if (lobbyState && currentPlayer && !guideTakesKeys) {
     const isHost = currentPlayer.is_host;
     lobbyHotkeyMap["r"] = toggleReady;
     if (isConstructed) {
@@ -473,11 +490,12 @@ export function Lobby() {
       }
     };
   }
-  useHotkeys(lobbyHotkeyMap, !!session && !showRulesPanel);
+  useHotkeys(lobbyHotkeyMap, !!session && !guideTakesKeys);
 
   useEffect(() => {
     if (gameState) {
-      navigate(`/game/${gameId}/play`);
+      const state: LoadingRouteState = { loadingSteps: START_STEPS };
+      navigate(`/game/${gameId}/play`, { state });
     }
   }, [gameState, gameId, navigate]);
 
@@ -504,18 +522,7 @@ export function Lobby() {
 
   const copyJoinCode = async () => {
     if (!lobbyState?.join_code) return;
-    try {
-      await navigator.clipboard.writeText(lobbyState.join_code);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = lobbyState.join_code;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-    }
+    await copyText(lobbyState.join_code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -524,10 +531,7 @@ export function Lobby() {
     <AppHeader
       helpers={
         <GuideButton
-          onClick={() => {
-            setRulesPanelTarget(undefined);
-            setShowRulesPanel(true);
-          }}
+          onClick={() => openGuide()}
         />
       }
       home={<HomeButton />}
@@ -537,6 +541,8 @@ export function Lobby() {
   const rulesPanel = showRulesPanel && (
     <RulesPanel
       onClose={() => setShowRulesPanel(false)}
+      minimized={guideMinimized}
+      onMinimizedChange={setGuideMinimized}
       initialDocId={rulesPanelTarget?.docId}
       initialTab={rulesPanelTarget?.tab}
       gameId={gameId}
@@ -562,12 +568,40 @@ export function Lobby() {
     );
   }
 
+  // The game arrives before the route changes, and takes the lobby's state with it.
+  if (gameState) {
+    return <LoadingScreen steps={START_STEPS} current="Open board" />;
+  }
+
   if (!lobbyState) {
     return (
       <>
-        <PageFrame header={header} center contentClassName="items-center">
-          <BusyNotice label="Loading lobby..." />
-        </PageFrame>
+        <LoadingScreen title="Opening lobby" steps={openingSteps} current="Open lobby" />
+        {rulesPanel}
+      </>
+    );
+  }
+
+  const reconnecting = !isConnected && (
+    <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
+      <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
+        <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+        </svg>
+        <span className="text-sm text-[var(--ivory)]">Reconnecting...</span>
+      </div>
+    </div>
+  );
+
+  if (isStarting) {
+    return (
+      <>
+        {reconnecting}
+        <LoadingScreen steps={START_STEPS} current="Deal cards" />
+        {spectateRequests[0] && (
+          <SpectateRequestModal request={spectateRequests[0]} onRespond={actions.spectateResponse} />
+        )}
         {rulesPanel}
       </>
     );
@@ -575,17 +609,7 @@ export function Lobby() {
 
   return (
     <>
-      {!isConnected && (
-        <div className={`fixed inset-0 z-50 ${DIALOG_BACKDROP} flex items-center justify-center`}>
-          <div className="modal-chrome border gold-border rounded-lg shadow-xl px-5 py-3 flex items-center gap-3">
-            <svg className="animate-spin h-4 w-4 text-amber-400 shrink-0" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
-            <span className="text-sm text-[var(--ivory)]">Reconnecting...</span>
-          </div>
-        </div>
-      )}
+      {reconnecting}
       <PageFrame
         header={header}
         center
@@ -612,13 +636,11 @@ export function Lobby() {
                   ? EVEN_PLAYER_CAP_OPTIONS[playerCapIndex + 1]
                   : null;
               const canDecreasePlayerCap =
-                !isStarting &&
                 previousPlayerCap !== null &&
                 previousPlayerCap >= occupiedSlots;
-              const canIncreasePlayerCap = !isStarting && nextPlayerCap !== null;
+              const canIncreasePlayerCap = nextPlayerCap !== null;
               const availablePuppets = lobbyState.available_puppet_count;
               const canAddPuppet =
-                !isStarting &&
                 availablePuppets !== null &&
                 puppetCount < availablePuppets &&
                 occupiedSlots < playerCap;
@@ -629,35 +651,6 @@ export function Lobby() {
               const canBrowseCards =
                 lobbyState.play_mode === "limited" ||
                 currentPlayer?.battler_status === "ready";
-              const startingLabel = (
-                <span className="flex items-center justify-center gap-2">
-                  <svg
-                    className="animate-spin h-5 w-5"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                      fill="none"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Starting...
-                </span>
-              );
-
-              const openGuide = (target?: RulesPanelTarget) => {
-                setRulesPanelTarget(target);
-                setShowRulesPanel(true);
-              };
 
               const filledSlots = [
                 ...lobbyState.players.map((player) => ({
@@ -776,18 +769,18 @@ export function Lobby() {
                             value={battlerIdInput}
                             onChange={(event) => setBattlerIdInput(event.target.value)}
                             onKeyDown={(event) => {
-                              if (event.key === "Enter" && !isBattlerLoading && !isStarting) {
+                              if (event.key === "Enter" && !isBattlerLoading) {
                                 submitBattler();
                               }
                             }}
                             placeholder={isConstructed ? "Enter deck list" : "CubeCobra cube ID"}
-                            disabled={isBattlerLoading || isStarting}
+                            disabled={isBattlerLoading}
                             className={`${TEXT_INPUT} disabled:opacity-50 disabled:cursor-not-allowed`}
                           />
                         )}
                         <button
                           onClick={handleBattlerButtonClick}
-                          disabled={isBattlerLoading || isStarting}
+                          disabled={isBattlerLoading}
                           className="btn btn-primary btn-dark-border px-4 py-2 shrink-0"
                         >
                           {hasLoadedBattler ? "Change" : isBattlerLoading ? "Loading..." : "Submit"}
@@ -922,7 +915,7 @@ export function Lobby() {
                             Host
                           </span>
                         )}
-                        {isHost && !player.is_host && !isStarting && (
+                        {isHost && !player.is_host && (
                           <button
                             onClick={() => actions.kickPlayer(player.player_id)}
                             className="text-[var(--ivory-muted)] hover:text-red-400 transition-colors shrink-0 text-xs"
@@ -978,7 +971,7 @@ export function Lobby() {
                         >
                           Puppet {slot.puppetIndex + 1}
                         </span>
-                        {isHost && !isStarting && (
+                        {isHost && (
                           <button
                             onClick={() => actions.removePuppet()}
                             className="text-[var(--ivory-muted)] hover:text-red-400 transition-colors shrink-0 ml-auto text-xs"
@@ -1027,7 +1020,7 @@ export function Lobby() {
                     isReady ? "btn-secondary" : "btn-success"
                   }`}
                 >
-                  {isStarting && !isHost ? startingLabel : isReady ? "Unready" : "Ready"}
+                  {isReady ? "Unready" : "Ready"}
                 </button>
 
                 {isHost && (
@@ -1036,7 +1029,7 @@ export function Lobby() {
                     disabled={!lobbyState.can_start || startAwaitingServer}
                     className="btn btn-primary btn-dark-border w-full py-2"
                   >
-                    {isStarting ? startingLabel : "Start Game"}
+                    Start Game
                   </button>
                 )}
               </div>
@@ -1053,6 +1046,8 @@ export function Lobby() {
       {showRulesPanel && (
         <RulesPanel
           onClose={() => setShowRulesPanel(false)}
+          minimized={guideMinimized}
+          onMinimizedChange={setGuideMinimized}
           initialDocId={rulesPanelTarget?.docId}
           initialTab={rulesPanelTarget?.tab}
           gameId={gameId}

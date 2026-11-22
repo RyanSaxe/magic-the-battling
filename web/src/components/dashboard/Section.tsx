@@ -21,7 +21,7 @@ export function SectionLink({ to, children }: { to: string; children: ReactNode 
 
 /** Counts beside a section title, such as how many games the player has finished and won. */
 export function SectionCounts({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={`${SECTION_META_TYPE} tabular-nums text-amber-100/70 ${className ?? ''}`}>{children}</div>
+  return <div className={`${SECTION_META_TYPE} tabular-nums text-[var(--ivory-muted)] ${className ?? ''}`}>{children}</div>
 }
 
 /** A number, picked out, and what it counts. */
@@ -37,7 +37,7 @@ export function Count({
 }) {
   return (
     <span className={className}>
-      <strong className="text-amber-50">{value}</strong>
+      <strong className="text-[var(--ivory)]">{value}</strong>
       {children}
     </span>
   )
@@ -63,7 +63,7 @@ export function NoticeTile({
     <SurfaceCard
       layout="tile"
       style={style}
-      className={`flex flex-col items-center justify-center gap-3 px-5 py-6 text-center text-sm text-amber-100/70 ${className ?? ''}`}
+      className={`flex flex-col items-center justify-center gap-3 px-5 py-6 text-center text-sm text-[var(--ivory-muted)] ${className ?? ''}`}
     >
       <p>{children}</p>
       {action && (
@@ -82,8 +82,8 @@ export function Breadcrumb({ to, label, current }: { to: string; label: string; 
       <Link to={to} className={`shrink-0 ${LINK} transition-colors`}>
         ← {label}
       </Link>
-      <span className="text-amber-200/45">/</span>
-      <span className="truncate text-amber-100/60">{current}</span>
+      <span className="text-[var(--ivory-muted)]">/</span>
+      <span className="truncate text-[var(--ivory-muted)]">{current}</span>
     </nav>
   )
 }

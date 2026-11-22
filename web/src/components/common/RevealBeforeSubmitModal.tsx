@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Card as CardType } from '../../types'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { CardGrid } from './CardGrid'
+import { CloseButton } from './CloseButton'
+import { DIALOG_BACKDROP } from './styles'
 import { useCardLayout } from '../../hooks/useCardLayout'
 import { upgradeListLayoutConfig } from './upgradeModalLayouts'
+import { enterPressesControl } from '../../utils/enterKey'
 
 interface RevealBeforeSubmitModalProps {
   upgrades: CardType[]
@@ -30,8 +33,10 @@ export function RevealBeforeSubmitModal({
     )
   }, [])
 
+  const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (enterPressesControl(e, dialogRef.current)) return
       if (e.key === 'Escape') {
         e.preventDefault()
         e.stopPropagation()
@@ -52,21 +57,17 @@ export function RevealBeforeSubmitModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 sm:p-8"
+      className={`fixed inset-0 ${DIALOG_BACKDROP} flex items-center justify-center z-50 p-4 sm:p-8`}
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         className="modal-chrome border gold-border rounded-lg flex flex-col w-full max-w-xl overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-3 py-1 shrink-0 border-b gold-divider flex justify-between items-center">
           <h2 className="text-white font-semibold text-lg">Unrevealed Upgrades</h2>
-          <button
-            onClick={onClose}
-            className="text-[var(--ivory-muted)] hover:text-white text-2xl leading-none shrink-0 ml-4 p-1"
-          >
-            &times;
-          </button>
+          <CloseButton onClick={onClose} label="Close Unrevealed Upgrades" className="shrink-0 ml-4 my-[3px]" />
         </div>
 
         <div className="px-4 pt-3 pb-1">

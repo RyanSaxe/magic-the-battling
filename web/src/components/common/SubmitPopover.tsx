@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { BoardBackdrop } from "./BoardBackdrop";
 import { shouldCloseSubmitPopoverOnOutsideClick } from "./submitPopoverState";
+import { POPOVER_CHROME } from "./styles";
 
 interface SubmitPopoverOption {
   label: string;
@@ -66,7 +67,7 @@ export function SubmitPopover({
       className="absolute bottom-full mb-4 right-2 min-w-[120px] z-[95]"
       data-guide-target={guideTarget}
     >
-      <div className="relative modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1.5">
+      <div className={`relative ${POPOVER_CHROME} p-2 flex flex-col gap-1.5`}>
         {options.map((option) => (
           <button
             key={option.label}

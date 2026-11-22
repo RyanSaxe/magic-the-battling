@@ -79,7 +79,7 @@ export function CubeView() {
           title={title}
           links={<>
             <span>
-              CubeCobra ID: <strong className="font-semibold text-amber-50">{cubeId}</strong>
+              CubeCobra ID: <strong className="font-semibold text-[var(--ivory)]">{cubeId}</strong>
             </span>
             <HeroLink href={`https://cubecobra.com/cube/list/${encodeURIComponent(cubeId)}`}>
               View Full Card List on CubeCobra ↗

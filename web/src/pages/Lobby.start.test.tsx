@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../test/fakeWebSocket'
@@ -109,7 +109,10 @@ describe('Lobby: starting the game', () => {
     const socket = await openLobbyAs('guest')
     send(socket, { type: 'lobby_state', payload: lobby({ start_status: 'starting', can_start: false }) })
 
-    expect(button('Starting...').disabled).toBe(true)
+    expect(screen.getByRole('heading', { name: 'Setting the table' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^(Ready|Unready)$/ })).toBeNull()
+    act(() => void document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', bubbles: true })))
+    expect(sentActions(socket)).not.toContain('set_ready')
   })
 
   it('tells everyone why a start failed and lets the host start again', async () => {
@@ -126,5 +129,43 @@ describe('Lobby: starting the game', () => {
 
     expect(toasts).toEqual(['Server is at game capacity. Please try again shortly.'])
     expect(button('Start Game').disabled).toBe(false)
+  })
+})
+
+describe('Lobby: hotkeys beside the Guide', () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+    FakeWebSocket.instances = []
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it('work while the Guide is minimized, and wait while it is open', async () => {
+    const socket = await openLobbyAs('guest')
+    send(socket, { type: 'lobby_state', payload: lobby() })
+    const readyToggles = () => sentActions(socket).filter((action) => action === 'set_ready').length
+    const press = (key: string) => fireEvent.keyDown(document.body, { key })
+
+    press('?')
+    press('r')
+    expect(readyToggles()).toBe(0)
+
+    fireEvent.click(button('Minimize guide'))
+    press('r')
+    expect(readyToggles()).toBe(1)
+
+    fireEvent.click(button('Open guide'))
+    press('r')
+    expect(readyToggles()).toBe(1)
+
+    fireEvent.click(button('Minimize guide'))
+    press('?')
+    expect(screen.queryByRole('button', { name: 'Open guide' })).toBeNull()
   })
 })

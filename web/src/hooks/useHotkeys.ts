@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { enterPressesControl } from '../utils/enterKey'
 
 type HotkeyMap = Record<string, () => void>
 
@@ -23,6 +24,7 @@ export function useHotkeys(hotkeys: HotkeyMap, enabled = true) {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) {
         return
       }
+      if (enterPressesControl(e)) return
 
       const action = hotkeysRef.current[hotkeyFor(e.key)]
       if (action) {

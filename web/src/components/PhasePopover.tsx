@@ -2,6 +2,7 @@ import { useEffect, useRef, useLayoutEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { getPhaseReferenceLabel, getPhaseSummaryRows, getPhaseTip } from '../constants/phases'
 import type { Phase } from '../constants/phases'
+import { BoardBackdrop } from './common/BoardBackdrop'
 import { POPOVER_CHROME } from './common/styles'
 
 const PHASE_TITLE_COLOR: Record<Phase, string> = {
@@ -31,6 +32,7 @@ export function PhasePopover({
   onOpenControls,
 }: PhasePopoverProps) {
   const popoverRef = useRef<HTMLDivElement>(null)
+  const backdropRef = useRef<HTMLDivElement>(null)
   const arrowRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -38,7 +40,9 @@ export function PhasePopover({
       if (e.key === 'Escape') onClose()
     }
     const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      // A press on the bars closes at once and still clicks. Over the board, the backdrop waits for the click.
+      if (popoverRef.current && !popoverRef.current.contains(target) && !backdropRef.current?.contains(target)) {
         onClose()
       }
     }
@@ -81,7 +85,10 @@ export function PhasePopover({
 
   useLayoutEffect(positionPopover, [positionPopover])
 
-  return createPortal(
+  return (
+    <>
+    {!isClosing && <BoardBackdrop ref={backdropRef} onTap={onClose} />}
+    {createPortal(
     <div
       ref={popoverRef}
       style={{
@@ -91,7 +98,7 @@ export function PhasePopover({
         position: 'fixed',
         visibility: 'hidden',
       }}
-      className={`${POPOVER_CHROME} z-[84] min-w-[16rem] w-max max-w-[calc(100vw-1rem)] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      className={`${POPOVER_CHROME} z-[84] min-w-[16rem] w-max max-w-[calc(100vw-2*(var(--bar-inline)+0.5rem))] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
     >
       <div
         ref={arrowRef}
@@ -119,7 +126,7 @@ export function PhasePopover({
       </div>
 
       <div className="p-3">
-        <div className="bg-black/35 rounded-lg border border-black/40 px-3 py-2">
+        <div className="px-3 py-2">
           {getPhaseSummaryRows(phase, useUpgrades).map((row, index) => (
             <p key={`${phase}-${index}`} className="text-xs text-[var(--ivory-muted)] mb-1.5 last:mb-0 leading-5">
               <span className="text-amber-400/90 mr-1.5">{index + 1}.</span>
@@ -128,7 +135,7 @@ export function PhasePopover({
           ))}
         </div>
 
-        <div className="mt-2 bg-black/35 rounded-lg border border-black/40 px-3 py-2">
+        <div className="mt-2 border-t gold-divider px-3 py-2">
           <p className="text-[11px] text-[var(--ivory-muted)] leading-[1.4]">
             <span className="text-amber-400/90 font-semibold text-[10px] uppercase tracking-wide mr-1.5">Tip</span>
             {getPhaseTip(phase)}
@@ -137,5 +144,7 @@ export function PhasePopover({
       </div>
     </div>,
     document.body,
+    )}
+    </>
   )
 }

@@ -46,7 +46,7 @@ type BoardSection = 'library' | 'recent'
 /** The two sections' names, shared by their headers on wide screens and the switch that stands in for them below. */
 const SECTION_NAMES: Record<BoardSection, string> = { library: 'Cubes & Decks', recent: 'Recent Games' }
 
-/** Both headers share a height and center their items, so their titles share a baseline. */
+/** Both headers share a height and center their items, so their titles share a baseline and their first cards a top. */
 const SECTION_HEADER = 'flex min-h-9 flex-wrap items-center gap-x-3 gap-y-2'
 
 /** Places a card in the grid on screens 1280px and wider: the library fills columns 1 and 2, and recent games column 4, after a spacer. */
@@ -130,9 +130,6 @@ export function Dashboard() {
   const allCount = library ? `${entries.length}${hasMore ? '+' : ''}` : ''
   const libraryRows = Math.max(1, Math.ceil(entries.length / 2))
   const recentGames = myGames?.games.slice(0, RECENT_GAME_COUNT) ?? []
-  // Equal flexible rows: each row of cards is as tall as the tallest card on the board, in either column.
-  const recentRows = Math.max(recentGames.length, 1)
-  const cardRows = Math.max(libraryRows, recentRows)
   // Below 1280px the sections stack, so a switch shows one at a time instead of a long scroll past every cube.
   const libraryCell = `${GRID_CELL} ${phoneSection === 'library' ? '' : 'max-xl:hidden'}`
   const libraryNotice = `col-span-full ${libraryCell} xl:col-span-2`
@@ -179,7 +176,8 @@ export function Dashboard() {
 
         <div
           data-testid="dashboard-board"
-          style={{ '--board-rows': `auto repeat(${cardRows}, 1fr) auto` } as CSSProperties}
+          // Only the last row flexes, so when Recent Games runs longer it lengthens that row and no cube card.
+          style={{ '--board-rows': `auto repeat(${libraryRows}, auto) 1fr` } as CSSProperties}
           className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_0.5rem_minmax(0,1fr)] xl:[grid-template-rows:var(--board-rows)]"
         >
           <SegmentedFilter
@@ -249,15 +247,15 @@ export function Dashboard() {
               disabled={!nextLibraryPage(library)}
               onClick={loadMoreLibrary}
               style={gridCell(2 + libraryRows, 1)}
-              className={`${libraryNotice} justify-self-center`}
+              className={`${libraryNotice} justify-self-center self-start`}
             />
           )}
 
-          {/* One section, so it can stay in view while the cubes scroll; subgrid keeps its cards on the cube rows. */}
+          {/* One section, so it can stay in view while the cubes scroll, with rows of its own so its cards stay short. */}
           <section
             aria-label={SECTION_NAMES.recent}
-            style={{ '--recent-rows': `1 / span ${1 + recentRows}` } as CSSProperties}
-            className={`${phoneSection === 'recent' ? 'contents' : 'hidden'} xl:sticky xl:top-0 xl:col-start-4 xl:grid xl:[grid-row:var(--recent-rows)] xl:[grid-template-rows:subgrid] xl:self-start`}
+            data-beside-cubes={entries.length > 0 || undefined}
+            className={`${phoneSection === 'recent' ? 'contents' : 'hidden'} xl:sticky xl:top-0 xl:col-start-4 xl:grid xl:grid-cols-1 xl:gap-3 xl:[grid-row:1/-1] xl:self-start`}
           >
             <div data-testid="recent-header" className={`col-span-full justify-end xl:justify-between ${SECTION_HEADER}`}>
               <div className="max-xl:hidden">

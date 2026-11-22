@@ -6,10 +6,13 @@ import { useToast } from "../contexts";
 import { useAuth } from "../contexts/authState";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { InfoIcon } from "../components/icons/InfoIcon";
+import { BoardBackdrop } from "../components/common/BoardBackdrop";
 import { AppHeader, HomeButton } from "../components/common/AppHeader";
 import { JoinGameModal } from "../components/home/JoinGameModal";
+import { LoadingScreen } from "../components/common/LoadingScreen";
+import { type LoadingRouteState, goldfishSteps, loadStep, newLobbySteps } from "../components/common/loadingSteps";
 import { PageFrame } from "../components/common/PageFrame";
-import { ResumeGameCard } from "../components/ResumeGame";
+import { ResumeRows } from "../components/ResumeGame";
 import { useResumableGames } from "../hooks/useResumableGames";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { getLegendaryName } from "../utils/prefetchName";
@@ -17,6 +20,8 @@ import { saveTabSession } from "../utils/tabSession";
 import {
   forgetSeatForGame,
   getDefaultNewPlayerPreference,
+  getRememberedGuestName,
+  rememberGuestName,
   rememberPlayerForGame,
   setGlobalGuidedModePreference,
   setNewPlayerPreferenceForGame,
@@ -46,7 +51,6 @@ function useSoloLobbyWatcher(
   pendingGameId: string | null,
   soloPhaseRef: React.RefObject<SoloPhase>,
   autoStartEnabled: boolean,
-  opponents: OpponentCount,
   actions: { setReady: (r: boolean) => void; startGame: () => void },
   onNotEnoughPuppets: (available: number) => void,
   onStarting: () => void,
@@ -79,7 +83,7 @@ function useSoloLobbyWatcher(
 
     if (soloPhaseRef.current === "loading" && cubeJustReady) {
       const available = lobbyState.available_puppet_count ?? 0;
-      if (available >= opponents) {
+      if (available >= lobbyState.puppet_count) {
         onStarting();
         actions.setReady(true);
       } else {
@@ -100,16 +104,18 @@ function useSoloLobbyWatcher(
       onNavigating();
       actions.startGame();
     }
-  }, [actions, autoStartEnabled, lobbyState, onNavigating, onNotEnoughPuppets, onStarting, opponents, pendingGameId, soloPhaseRef]);
+  }, [actions, autoStartEnabled, lobbyState, onNavigating, onNotEnoughPuppets, onStarting, pendingGameId, soloPhaseRef]);
 
   return { reset };
 }
 
-function useRandomMtgName(): [string, (v: string) => void, boolean] {
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(true);
+function useGuestName(): [string, (v: string) => void, boolean] {
+  const [rememberedName] = useState(getRememberedGuestName);
+  const [name, setName] = useState(rememberedName ?? "");
+  const [loading, setLoading] = useState(rememberedName === null);
 
   useEffect(() => {
+    if (rememberedName !== null) return;
     let cancelled = false;
     getLegendaryName().then((n) => {
       if (!cancelled) {
@@ -120,7 +126,7 @@ function useRandomMtgName(): [string, (v: string) => void, boolean] {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [rememberedName]);
 
   return [name, setName, loading];
 }
@@ -244,13 +250,13 @@ function GuidedModeField({
     "Guided Mode gives you a brief walkthrough the first time a new phase, action, or situation comes up.";
   const [showGuidedModeHelp, setShowGuidedModeHelp] = useState(false);
   const guidedModeHelpRef = useRef<HTMLDivElement>(null);
+  const guidedModeHelpBackdropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
-      if (!guidedModeHelpRef.current?.contains(target)) {
-        setShowGuidedModeHelp(false);
-      }
+      if (guidedModeHelpRef.current?.contains(target) || guidedModeHelpBackdropRef.current?.contains(target)) return;
+      setShowGuidedModeHelp(false);
     };
     window.addEventListener("pointerdown", onPointerDown);
     return () => window.removeEventListener("pointerdown", onPointerDown);
@@ -280,6 +286,7 @@ function GuidedModeField({
         </span>
       </label>
       <div ref={guidedModeHelpRef} className="relative group shrink-0">
+        {showGuidedModeHelp && <BoardBackdrop ref={guidedModeHelpBackdropRef} onTap={() => setShowGuidedModeHelp(false)} />}
         <button
           type="button"
           className="touch-area [--touch-area-left:-7px] text-[var(--ivory-muted)] hover:text-[var(--ivory)]"
@@ -318,12 +325,12 @@ export function Play() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { addToast } = useToast();
-  const resumableGames = useResumableGames(3);
+  const resumableGames = useResumableGames();
 
   const { user } = useAuth();
-  const [randomName, setRandomName, nameLoading] = useRandomMtgName();
-  const playerName = user ? user.username : randomName;
-  const setPlayerName = user ? () => {} : setRandomName;
+  const [guestName, setGuestName, nameLoading] = useGuestName();
+  const playerName = user ? user.username : guestName;
+  const setPlayerName = user ? () => {} : setGuestName;
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showFriendsAdvanced, setShowFriendsAdvanced] = useState(false);
   const [showSoloAdvanced, setShowSoloAdvanced] = useState(false);
@@ -341,6 +348,8 @@ export function Play() {
   );
 
   const [friendsLoading, setFriendsLoading] = useState(false);
+  // Cancel can't recall a request, so each answer checks that its start is still the one wanted.
+  const startAttemptRef = useRef(0);
 
   const [soloPhase, setSoloPhase] = useState<SoloPhase>("idle");
   const soloPhaseRef = useRef<SoloPhase>("idle");
@@ -374,7 +383,6 @@ export function Play() {
     pendingGameId,
     soloPhaseRef,
     true,
-    opponents,
     actions,
     (available) => {
       setMaxAvailablePuppets(available);
@@ -386,9 +394,10 @@ export function Play() {
 
   useEffect(() => {
     if (gameState?.game_id === pendingGameId && pendingGameId) {
-      navigate(`/game/${pendingGameId}/play`);
+      const state: LoadingRouteState = { loadingSteps: goldfishSteps(playMode) };
+      navigate(`/game/${pendingGameId}/play`, { state });
     }
-  }, [gameState?.game_id, navigate, pendingGameId]);
+  }, [gameState?.game_id, navigate, pendingGameId, playMode]);
 
   useEffect(() => {
     if (
@@ -397,9 +406,10 @@ export function Play() {
       lobbyState?.game_id === pendingGameId &&
       lobbyState.cube_loading_status === "ready"
     ) {
-      navigate(`/game/${pendingGameId}/lobby`);
+      const state: LoadingRouteState = { loadingSteps: newLobbySteps(playMode) };
+      navigate(`/game/${pendingGameId}/lobby`, { state });
     }
-  }, [friendsLoading, lobbyState?.cube_loading_status, lobbyState?.game_id, navigate, pendingGameId]);
+  }, [friendsLoading, lobbyState?.cube_loading_status, lobbyState?.game_id, navigate, pendingGameId, playMode]);
 
   useEffect(() => {
     const nextError =
@@ -499,6 +509,7 @@ export function Play() {
     }
     lastLobbyErrorRef.current = null;
     setFriendsLoading(true);
+    const attempt = ++startAttemptRef.current;
     try {
       const response = await createGame(name, {
         cubeId: submittedCubeId || "auto",
@@ -507,7 +518,9 @@ export function Play() {
         guidedModeDefault: isGuidedMode,
         playMode,
       });
+      if (attempt !== startAttemptRef.current) return;
       saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
+      if (!user) rememberGuestName(name);
       rememberPlayerForGame(response.game_id, name, {
         seatToken: response.seat_token,
         joinCode: response.join_code,
@@ -520,6 +533,7 @@ export function Play() {
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
+      if (attempt !== startAttemptRef.current) return;
       addToast(normalizeCreateGameError(err), "error");
       setFriendsLoading(false);
     }
@@ -540,6 +554,7 @@ export function Play() {
     lastLobbyErrorRef.current = null;
     updateSoloPhase("loading");
     resetWatcher();
+    const attempt = ++startAttemptRef.current;
     try {
       const targetCount = count + 1;
       const response = await createGame(name, {
@@ -550,7 +565,9 @@ export function Play() {
         guidedModeDefault: isGuidedMode,
         playMode,
       });
+      if (attempt !== startAttemptRef.current) return;
       saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
+      if (!user) rememberGuestName(name);
       rememberPlayerForGame(response.game_id, name, {
         seatToken: response.seat_token,
         joinCode: response.join_code,
@@ -563,12 +580,14 @@ export function Play() {
       setPendingGameId(response.game_id);
       setPendingSessionId(response.session_id);
     } catch (err) {
+      if (attempt !== startAttemptRef.current) return;
       addToast(normalizeCreateGameError(err), "error");
       updateSoloPhase("idle");
     }
   };
 
   const handleCancelFriends = () => {
+    startAttemptRef.current += 1;
     if (pendingGameId) forgetSeatForGame(pendingGameId);
     setFriendsLoading(false);
     setPendingGameId(null);
@@ -577,6 +596,7 @@ export function Play() {
   };
 
   const handleCancelSolo = () => {
+    startAttemptRef.current += 1;
     if (pendingGameId) forgetSeatForGame(pendingGameId);
     updateSoloPhase("idle");
     setPendingGameId(null);
@@ -595,6 +615,15 @@ export function Play() {
   const soloLoading =
     soloPhase !== "idle" && soloPhase !== "not-enough-puppets";
 
+  const handleNameEnter = () => {
+    if (!nameValid) return;
+    if (activeMode === "friends") {
+      if (!friendsLoading) void handleCreateLobby();
+    } else if (soloPhase === "idle") {
+      void handleStartSolo();
+    }
+  };
+
   const inactiveCard = (
     mode: ActiveMode,
     icon: React.ReactNode,
@@ -609,6 +638,27 @@ export function Play() {
       <span className="ml-auto text-[var(--ivory-muted)] text-xs">▶</span>
     </button>
   );
+
+  if (soloLoading) {
+    return (
+      <LoadingScreen
+        steps={goldfishSteps(playMode)}
+        current={soloPhase === "loading" ? loadStep(playMode) : "Deal cards"}
+        onCancel={handleCancelSolo}
+      />
+    );
+  }
+
+  if (friendsLoading) {
+    return (
+      <LoadingScreen
+        title="Opening lobby"
+        steps={newLobbySteps(playMode)}
+        current={loadStep(playMode)}
+        onCancel={handleCancelFriends}
+      />
+    );
+  }
 
   return (
     <>
@@ -626,9 +676,7 @@ export function Play() {
       >
         <SurfaceCard as="section" className="overflow-hidden flex flex-col">
           <div className="flex flex-col">
-            {resumableGames.map((seat) => (
-              <ResumeGameCard key={seat.gameId} seat={seat} />
-            ))}
+            <ResumeRows seats={resumableGames} />
             <div className="mb-4">
               <div className="mb-1 flex items-center justify-between gap-3">
                 <label htmlFor="player-name" className="block text-[var(--ivory-muted)] text-sm">
@@ -649,9 +697,7 @@ export function Play() {
                     type="text"
                     value={nameLoading ? "" : playerName}
                     onChange={(e) => setPlayerName(e.target.value)}
-                    onKeyDown={(e) =>
-                      e.key === "Enter" && nameValid && handleCreateLobby()
-                    }
+                    onKeyDown={(e) => e.key === "Enter" && handleNameEnter()}
                     disabled={nameLoading}
                     placeholder={nameLoading ? "Generating name..." : "Enter your name"}
                     className={`${TEXT_INPUT} disabled:opacity-50`}
@@ -687,21 +733,11 @@ export function Play() {
                     </div>
                     <div className="mt-auto flex gap-2 pt-4">
                       <button
-                        onClick={soloLoading ? handleCancelSolo : () => handleStartSolo()}
-                        disabled={soloLoading ? false : !nameValid}
-                        className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${soloLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                        onClick={() => handleStartSolo()}
+                        disabled={!nameValid}
+                        className="play-action-btn flex-1 py-2 flex items-center justify-center gap-2 btn btn-primary"
                       >
-                        {soloLoading ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Loading...
-                          </>
-                        ) : (
-                          "Start Game"
-                        )}
+                        Start Game
                       </button>
                       <GearButton onClick={() => setShowSoloAdvanced(true)} />
                     </div>
@@ -733,21 +769,11 @@ export function Play() {
                     </div>
                     <div className="mt-auto flex gap-2 pt-4">
                       <button
-                        onClick={friendsLoading ? handleCancelFriends : handleCreateLobby}
-                        disabled={friendsLoading ? false : !nameValid}
-                        className={`play-action-btn flex-1 py-2 flex items-center justify-center gap-2 ${friendsLoading ? "btn btn-secondary" : "btn btn-primary"}`}
+                        onClick={handleCreateLobby}
+                        disabled={!nameValid}
+                        className="play-action-btn flex-1 py-2 flex items-center justify-center gap-2 btn btn-primary"
                       >
-                        {friendsLoading ? (
-                          <>
-                            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            Loading...
-                          </>
-                        ) : (
-                          "Create Lobby"
-                        )}
+                        Create Lobby
                       </button>
                       <GearButton onClick={() => setShowFriendsAdvanced(true)} />
                     </div>
@@ -798,13 +824,6 @@ export function Play() {
           />
           <DefaultOpponentsField label="Opponents" value={opponents} onChange={setOpponents} />
         </AdvancedOptionsModal>
-      )}
-
-      {(soloLoading || friendsLoading) && (
-        <div
-          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-[1px]"
-          onClick={soloLoading ? handleCancelSolo : handleCancelFriends}
-        />
       )}
 
       {soloPhase === "not-enough-puppets" && (

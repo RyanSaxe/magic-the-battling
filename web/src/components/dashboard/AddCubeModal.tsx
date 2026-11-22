@@ -3,7 +3,7 @@ import { createBattler } from '../../api/client'
 import type { PlayMode, UserBattler } from '../../types'
 import { unknownToAppError } from '../../utils/appError'
 import { DefaultOpponentsField } from './DefaultOpponentsField'
-import { OPTION_BOX, TEXT_INPUT } from '../common/styles'
+import { FIELD_LABEL, OPTION_BOX, TEXT_INPUT } from '../common/styles'
 import { Dialog } from '../common/Dialog'
 
 export function AddCubeModal({
@@ -53,20 +53,20 @@ export function AddCubeModal({
 
       <div className="space-y-3">
         <div>
-          <label className="block text-white text-sm mb-1">CubeCobra ID</label>
+          <label className={FIELD_LABEL}>CubeCobra ID</label>
           <input
             type="text"
             value={cubeId}
             onChange={(e) => setCubeId(e.target.value)}
             className={TEXT_INPUT}
-            placeholder="e.g. auto"
+            placeholder="e.g. auto, or paste the cube's link"
             autoFocus
             required
           />
         </div>
 
         <div>
-          <label className="block text-white text-sm mb-1">Display Name <span className="text-amber-200/45">(optional)</span></label>
+          <label className={FIELD_LABEL}>Display Name <span className="text-[var(--ivory-muted)]">(optional)</span></label>
           <input
             type="text"
             value={displayName}
@@ -81,10 +81,10 @@ export function AddCubeModal({
             type="checkbox"
             checked={playMode === 'constructed'}
             onChange={(e) => setPlayMode(e.target.checked ? 'constructed' : 'limited')}
-            className="w-4 h-4 rounded bg-black/40 border-black/40"
+            className="w-4 h-4"
           />
           <span className="text-white text-sm">Constructed</span>
-          <span className="text-amber-200/45 text-xs">— bring your own deck</span>
+          <span className="text-[var(--ivory-muted)] text-xs">— bring your own deck</span>
         </label>
 
         <label className={`${OPTION_BOX} px-3 py-2.5 flex items-center gap-2 cursor-pointer`}>
@@ -92,10 +92,10 @@ export function AddCubeModal({
             type="checkbox"
             checked={useUpgrades}
             onChange={(e) => setUseUpgrades(e.target.checked)}
-            className="w-4 h-4 rounded bg-black/40 border-black/40"
+            className="w-4 h-4"
           />
           <span className="text-white text-sm">Upgrades</span>
-          <span className="text-amber-200/45 text-xs">— upgrade a card every 3 rounds</span>
+          <span className="text-[var(--ivory-muted)] text-xs">— upgrade a card every 3 rounds</span>
         </label>
 
         <DefaultOpponentsField value={puppetCount} onChange={setPuppetCount} />

@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from server.db.models import User
 from server.errors import ErrorCode, api_error
 from server.routers.ws import connection_manager
 from server.schemas.api import (
+    CloseSeatRequest,
     CreateGameRequest,
     CreateGameResponse,
     GameBootstrapResponse,
@@ -39,6 +40,7 @@ from server.services.game_manager import (
     LobbyStartFailedError,
     LobbyStartRefusedError,
     PendingGame,
+    SeatCloseRefusedError,
     game_manager,
 )
 from server.services.game_serialization import catalog_entries_for_cards
@@ -301,9 +303,13 @@ class WarmCubeRequest(BaseModel):
 
 
 @router.post("/resumable", response_model=ResumableResponse)
-def find_resumable_games(request: ResumableRequest):
-    """List the lobbies and games the caller can return to, given the seat tokens their browser holds."""
-    return ResumableResponse(games=game_manager.find_resumable_seats(request.seats))
+def find_resumable_games(
+    request: ResumableRequest,
+    current_user: User | None = Depends(get_optional_user),  # noqa: B008
+):
+    """List the lobbies and games the caller can return to, by their browser's seat tokens or their login."""
+    user_id = str(current_user.id) if current_user else None
+    return ResumableResponse(games=game_manager.find_resumable_seats(request.seats, user_id=user_id))
 
 
 @router.post("/cubes/warm")
@@ -428,6 +434,33 @@ async def rejoin_game(
         player_id=session.player_id,
         seat_token=claim.seat_token,
     )
+
+
+@router.post("/{game_id}/close", status_code=204)
+async def close_seat(game_id: str, request: CloseSeatRequest) -> Response:
+    """End the caller's seat for good. Only the seat's token proves the caller, so a login alone doesn't."""
+    if ops_manager.is_maintenance():
+        raise api_error(503, ErrorCode.SERVER_MAINTENANCE, "Server maintenance in progress. Try again shortly.")
+    if not (
+        game_manager.get_pending_game(game_id)
+        or game_manager.get_game(game_id)
+        or game_manager.restore_game_from_snapshot(game_id)
+    ):
+        raise api_error(404, ErrorCode.GAME_NOT_FOUND, "Game not found")
+
+    async with game_manager.get_action_lock(game_id):
+        try:
+            player_id = game_manager.close_seat(game_id, request.player_name, seat_token=request.seat_token)
+        except SeatClaimRefusedError as refused:
+            status, code, detail = _SEAT_REFUSAL_ERRORS[refused.refusal]
+            raise api_error(status, code, detail) from None
+        except SeatCloseRefusedError as refused:
+            raise api_error(409, ErrorCode.INVALID_REQUEST, str(refused)) from None
+        if player_id is not None:
+            connection_manager.end_seat_connection(game_id, player_id)
+
+    await connection_manager.broadcast_lobby_state(game_id)
+    return Response(status_code=204)
 
 
 @router.get("/{game_id}/lobby", response_model=LobbyStateResponse)

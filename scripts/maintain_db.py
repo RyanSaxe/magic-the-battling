@@ -20,7 +20,7 @@ def _resolve_db_path(explicit: str | None) -> Path:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run deploy-safe SQLite DB maintenance tasks, including snapshot storage migrations."
+        description="Run deploy-safe SQLite DB maintenance: snapshot storage migrations and the presets table rebuild."
     )
     parser.add_argument("--db-path", default=None, help="SQLite DB path (defaults to DATABASE_PATH or ./data/mtb.db)")
     parser.add_argument(
@@ -56,6 +56,9 @@ def _print_result(db_path: Path, result, *, mode: str) -> None:
     print(f"  battle_snapshots.migrated: {result.snapshot_storage.battle_snapshots.migrated}")
     print(f"  battle_snapshots.already_current: {result.snapshot_storage.battle_snapshots.already_current}")
     print(f"  battle_snapshots.failed: {result.snapshot_storage.battle_snapshots.failed}")
+    print()
+    print("presets:")
+    print(f"  user_battlers.rebuild: {int(result.presets_rebuild)}")
     print()
     print(f"total pending changes: {result.total_pending}")
     print(f"total failed: {result.total_failed}")

@@ -1,13 +1,16 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Card as CardType } from '../../types'
 import { Card } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { CardGrid } from './CardGrid'
+import { CloseButton } from './CloseButton'
+import { DIALOG_BACKDROP } from './styles'
 import { useCardLayout } from '../../hooks/useCardLayout'
 import { upgradeApplyLayoutConfig, upgradeListLayoutConfig } from './upgradeModalLayouts'
 import { useElementHeight } from '../../hooks/useElementHeight'
 import { applyUpgradeWithModalClose, revealUpgradeWithModalClose } from './upgradeModalFlow'
 import { getAppliedUpgrades, getUnappliedUpgrades, getUnrevealedAppliedUpgrades } from '../../utils/upgrades'
+import { enterPressesControl } from '../../utils/enterKey'
 
 interface UpgradesModalProps {
   upgrades: CardType[]
@@ -74,17 +77,15 @@ export function UpgradesModal({
     })
   }, [onClose, onReveal])
 
+  const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (enterPressesControl(e, dialogRef.current)) return
       if (e.key === 'Escape') {
         e.preventDefault()
         e.stopPropagation()
-        if (mode === 'apply' && selectedTargetId) {
-          setSelectedTargetId(null)
-        } else if (mode === 'reveal' && selectedRevealUpgradeIds.length > 0) {
+        if (mode === 'reveal' && selectedRevealUpgradeIds.length > 0) {
           setSelectedRevealUpgradeIds([])
-        } else if (selectedUpgradeId) {
-          setSelectedUpgradeId(null)
         } else {
           onClose()
         }
@@ -174,10 +175,11 @@ export function UpgradesModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 sm:p-8"
+      className={`fixed inset-0 ${DIALOG_BACKDROP} flex items-center justify-center z-50 p-4 sm:p-8`}
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         className="modal-chrome border gold-border rounded-lg flex flex-col w-full h-[calc(100dvh-2rem)] sm:h-[calc(100dvh-4rem)] overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
@@ -193,12 +195,7 @@ export function UpgradesModal({
               )}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="text-[var(--ivory-muted)] hover:text-white text-2xl leading-none shrink-0 ml-4 p-1"
-          >
-            &times;
-          </button>
+          <CloseButton onClick={onClose} label="Close Upgrades" className="shrink-0 ml-4 my-[3px]" />
         </div>
 
         {isApplyMode ? (

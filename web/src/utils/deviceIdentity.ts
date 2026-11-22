@@ -1,8 +1,10 @@
 const DEVICE_ID_KEY = "mtb_device_id";
+const GUEST_NAME_KEY = "mtb_guest_name";
 const GAME_PLAYER_MAP_KEY = "mtb_game_player_map";
 const GAME_NEW_PLAYER_PREF_MAP_KEY = "mtb_game_new_player_pref_map";
 const GUIDED_MODE_PREFERENCE_KEY = "mtb_guided_mode_preference";
 const PLAYED_BEFORE_KEY = "mtb_played_before";
+const SPECTATOR_NAME_KEY = "mtb_spectator_name";
 const GAME_PLAYER_PREF_KEY_SEP = "::";
 const MAX_TRACKED_GAMES = 100;
 
@@ -211,6 +213,21 @@ export function forgetSeatForGame(gameId: string): void {
   writeTrackedPlayerMap(map);
 }
 
+/** The name this browser last played under without an account. An account's name always comes before it. */
+export function getRememberedGuestName(): string | null {
+  if (!canUseStorage()) return null;
+  return window.localStorage.getItem(GUEST_NAME_KEY);
+}
+
+export function rememberGuestName(name: string): void {
+  if (!canUseStorage()) return;
+  try {
+    window.localStorage.setItem(GUEST_NAME_KEY, name);
+  } catch {
+    // Best effort only.
+  }
+}
+
 export function hasPlayedBefore(): boolean {
   if (!canUseStorage()) return false;
   return window.localStorage.getItem(PLAYED_BEFORE_KEY) === "1";
@@ -296,3 +313,13 @@ export function resolveNewPlayerPreferenceForGame(
   );
 }
 
+/** The name this browser last asked to watch a game under. */
+export function getRememberedSpectatorName(): string | null {
+  if (!canUseStorage()) return null;
+  return window.localStorage.getItem(SPECTATOR_NAME_KEY);
+}
+
+export function rememberSpectatorName(name: string): void {
+  if (!canUseStorage()) return;
+  window.localStorage.setItem(SPECTATOR_NAME_KEY, name);
+}

@@ -8,7 +8,7 @@ import {
   THE_VANQUISHER_IMAGE,
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
-import { usePersistedConstraints, type BoardSize } from "../../hooks/usePersistedConstraints";
+import { useSavedLayout, type BoardSize } from "../../hooks/useSavedLayout";
 import { useResizableLayout } from "../../hooks/useResizableLayout";
 import type { GameState, Card as CardType } from "../../types";
 import { rewardLayoutConfig } from "./phaseLayouts";
@@ -140,7 +140,7 @@ export function RewardPhase({
     setConstraints,
     clearConstraints,
     resolution: persistedLayout,
-  } = usePersistedConstraints(
+  } = useSavedLayout(
     {
       scopeKey: "phase:reward",
       stage: self_player.stage,
