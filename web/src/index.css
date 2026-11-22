@@ -790,6 +790,19 @@ input:-webkit-autofill:focus {
   background: var(--zone-column-bg);
 }
 
+/* Going out: the words, and the felt they stand on until the player opens their deck */
+.out-title {
+  font-family: 'Cinzel', serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--loss-text);
+}
+
+.out-felt {
+  background: radial-gradient(ellipse at center, var(--table-felt-light), var(--table-felt) 55%, var(--table-dark));
+}
+
 /* Gold divider between zones */
 .zone-divider-bg {
   background-color: var(--seam-stroke);
