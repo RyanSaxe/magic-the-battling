@@ -45,7 +45,6 @@ export type GuideTargetId =
   | "battle-submit-popover"
   | "reward-continue"
   | "reward-summary"
-  | "reward-progression"
   | "reward-current-upgrades"
   | "reward-upgrades"
   | "draft-pack"

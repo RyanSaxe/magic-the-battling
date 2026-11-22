@@ -274,14 +274,6 @@ export function RewardPhase({
               ))}
             </CardGrid>
           )}
-          <div
-            data-guide-target="reward-progression"
-            className="mt-4 rounded-lg border border-amber-500/15 bg-black/25 px-3 py-2 text-center text-xs text-[var(--ivory-muted)]"
-          >
-            <span className="text-amber-300 font-medium">Round progression:</span>{" "}
-            the third round of each stage adds The Vanquisher, increases starting hand size by 1, and advances you to the next stage.
-            {hasUpgradeSection ? " This stage-end wrap-up also includes an upgrade choice." : ""}
-          </div>
         </div>
 
         {hasUpgradeSection && dividerCallbacks.topDivider && (
