@@ -91,7 +91,7 @@ export function PhasePopover({
         position: 'fixed',
         visibility: 'hidden',
       }}
-      className={`${POPOVER_CHROME} z-[84] min-w-[16rem] w-max max-w-[calc(100vw-1rem)] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      className={`${POPOVER_CHROME} z-[84] min-w-[16rem] w-max max-w-[calc(100vw-2*(var(--bar-inline)+0.5rem))] transition-opacity duration-200 ease-out ${isClosing ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
     >
       <div
         ref={arrowRef}
