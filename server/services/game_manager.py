@@ -51,7 +51,7 @@ from mtb.models.game import (
 )
 from mtb.models.types import BuildSource, CardDestination, PlayMode, ZoneName, normalize_play_mode
 from mtb.phases import battle, build, draft, reward
-from mtb.phases.battle import get_pairing_probabilities
+from mtb.phases.battle import get_furthest_round, get_pairing_probabilities
 from mtb.phases.elimination import (
     check_game_over,
     eliminate_player,
@@ -1254,6 +1254,12 @@ class GameManager:
             battler = pending.battler
             if battler is None:
                 raise LobbyStartFailedError("The cube isn't loaded")
+            needed = draft.cards_needed_for_first_draft(config, len(pending.player_names))
+            if len(battler.cards) < needed:
+                raise LobbyStartFailedError(
+                    f"This cube has {len(battler.cards)} playable cards and needs at least {needed} "
+                    "to give everyone a pack."
+                )
             set_battler(game, _copy_for_dealing(battler))
             target_elo = battler.elo or 1200.0
         else:
@@ -2695,6 +2701,9 @@ class GameManager:
         most_recent_ghost_puppet_name: str | None = None,
     ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
+        # The odds come from the furthest round's table, so the treasures do too. The cards stay from the viewer's
+        # round, or a player who is behind would see a hand early.
+        table_snapshot = fake.get_opponent_for_round(*get_furthest_round(viewer.game))
 
         if viewer.in_sudden_death:
             revealed_cards = (snapshot.hand + snapshot.command_zone) if snapshot else []
@@ -2716,10 +2725,10 @@ class GameManager:
 
         last_result = self._get_fake_player_last_result(fake)
 
-        if snapshot:
+        if snapshot and table_snapshot:
             return PlayerView(
                 name=fake.name,
-                treasures=snapshot.treasures,
+                treasures=table_snapshot.treasures,
                 poison=fake.poison,
                 phase="battle",
                 round=viewer.round,

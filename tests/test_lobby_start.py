@@ -268,3 +268,29 @@ def test_a_deck_submitted_twice_shows_as_loading_until_it_loads(test_db, card_fa
         return while_loading, deck_status()
 
     assert asyncio.run(scenario()) == ("loading", "ready")
+
+
+def test_a_cube_too_small_to_give_everyone_a_pack_refuses_to_start(test_db, card_factory, monkeypatch):
+    # Every cube needs 100 cards to load, so only a full table of eight can find one too small.
+    cube_size = 103
+    monkeypatch.setattr(
+        "mtb.utils.cubecobra.get_cube_data", lambda _cube_id: [card_factory(f"c{i}") for i in range(cube_size)]
+    )
+    manager = GameManager()
+    pending = manager.create_game("Host", "pid-0", cube_id="small", target_player_count=8, use_upgrades=False)
+    for seat in range(1, 8):
+        manager.join_game(pending.join_code, f"Guest {seat}", f"pid-{seat}")
+    manager.attach_connected_player_ids(lambda _game_id: set(pending.player_ids))
+    _ready_everyone(manager, pending)
+
+    def start():
+        return asyncio.run(manager.start_lobby(pending.game_id, "pid-0", None, on_change=_no_broadcast))
+
+    with pytest.raises(LobbyStartFailedError) as failed:
+        start()
+    assert str(failed.value) == "This cube has 103 playable cards and needs at least 104 to give everyone a pack."
+    assert pending.start_error == str(failed.value)
+
+    cube_size = 104
+    pending.battler = None
+    assert len(start().players) == 8
