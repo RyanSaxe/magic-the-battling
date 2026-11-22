@@ -400,6 +400,23 @@ input:-webkit-autofill:focus {
   color: #fae6a2;
 }
 
+/* While a menu has rows past its bottom edge, they fade into its walnut there, so the row the edge cuts reads as
+   more to scroll to. */
+.menu-scroll-fade {
+  position: sticky;
+  /* Rows scroll under the menu's bottom padding too, so the fade reaches over it. */
+  bottom: -0.25rem;
+  height: 2.5rem;
+  margin-top: -2.5rem;
+  pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--chrome-modal));
+  visibility: hidden;
+}
+
+.menu-scroll[data-rows-below="true"] .menu-scroll-fade {
+  visibility: visible;
+}
+
 /* A submenu sits recessed under its row. Its items are indented past a gold guide line, drawn on each row so it
    scrolls with them and shows over their hover. */
 .menu-submenu {
