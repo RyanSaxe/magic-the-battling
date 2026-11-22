@@ -5,7 +5,7 @@ import { AppHeader, HomeButton } from '../components/common/AppHeader'
 import { PageFrame } from '../components/common/PageFrame'
 import { SurfaceCard } from '../components/common/SurfaceCard'
 import { unknownToAppError } from '../utils/appError'
-import { LINK, TEXT_INPUT } from '../components/common/styles'
+import { FIELD_LABEL, LINK, TEXT_INPUT } from '../components/common/styles'
 
 export function Login() {
   const navigate = useNavigate()
@@ -45,7 +45,7 @@ export function Login() {
         )}
 
         <div className="mb-4">
-          <label htmlFor="username" className="block text-[var(--ivory-muted)] text-sm mb-1">Username</label>
+          <label htmlFor="username" className={FIELD_LABEL}>Username</label>
           <input
             id="username"
             type="text"
@@ -58,7 +58,7 @@ export function Login() {
         </div>
 
         <div className="mb-6">
-          <label htmlFor="password" className="block text-[var(--ivory-muted)] text-sm mb-1">Password</label>
+          <label htmlFor="password" className={FIELD_LABEL}>Password</label>
           <input
             id="password"
             type="password"
