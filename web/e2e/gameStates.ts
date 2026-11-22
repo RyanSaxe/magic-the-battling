@@ -159,6 +159,8 @@ export interface ScreenState {
   counts: Counts
   stageEnd?: boolean
   suddenDeath?: boolean
+  /** Changes to the other players at the table, Bob, Carol and Dave in that order. */
+  opponents?: Partial<CompactPlayerView>[]
 }
 
 function battleView(counts: Counts, suddenDeath: boolean): CompactBattleView {
@@ -193,7 +195,7 @@ function battleView(counts: Counts, suddenDeath: boolean): CompactBattleView {
   }
 }
 
-export function gameBootstrap({ phase, counts, stageEnd = false, suddenDeath = false }: ScreenState): GameBootstrap {
+export function gameBootstrap({ phase, counts, stageEnd = false, suddenDeath = false, opponents = [] }: ScreenState): GameBootstrap {
   const handSize = counts.handSize ?? 4
   const hand = cards('hand', Math.min(counts.hand ?? 0, handSize))
   const sideboard = cards('pool', counts.sideboard ?? 0, 'spell', 3)
@@ -235,9 +237,11 @@ export function gameBootstrap({ phase, counts, stageEnd = false, suddenDeath = f
     starting_life: 20,
     players: [
       self,
-      playerView(OPPONENT_NAME, othersPhase, { placement: placements[OPPONENT_NAME] ?? 0 }),
-      playerView('Carol', othersPhase, { placement: placements.Carol ?? 0 }),
-      playerView('Dave', othersPhase, { is_puppet: true, placement: placements.Dave ?? 0 }),
+      ...[
+        playerView(OPPONENT_NAME, othersPhase, { placement: placements[OPPONENT_NAME] ?? 0 }),
+        playerView('Carol', othersPhase, { placement: placements.Carol ?? 0 }),
+        playerView('Dave', othersPhase, { is_puppet: true, placement: placements.Dave ?? 0 }),
+      ].map((player, index) => ({ ...player, ...opponents[index] })),
     ],
     self_player: self,
     available_upgrades: phase === 'reward' && stageEnd ? cards('offer', counts.rewardUpgrades ?? 3, 'upgrade') : [],

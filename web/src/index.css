@@ -47,6 +47,9 @@
   --ivory-muted: #b8aea3;
   --ivory-faint: #94897f;
 
+  /* A lost fight and last place, on walnut */
+  --loss-text: #f2b4aa;
+
   /* Quiet text on the felt: muted ivory a step lighter, so it holds 4.5:1 on the felt's lightest centre */
   --ivory-felt: #e0d6c8;
 
@@ -252,7 +255,7 @@ input:-webkit-autofill:focus {
   outline-offset: 2px;
 }
 
-/* A small rimmed label: what a cube is, a placement, a feature's status or a player's state. Each tone is a dark
+/* A small rimmed label: what a cube is, a feature's status or a player's state. Each tone is a dark
    tinted fill, a 1px rim and light text. Small quiet tags, for statuses, sit on a near-black fill with a softer rim
    and can lead with a dot. In the components layer so positioning classes can move a tag. */
 @layer components {
@@ -309,14 +312,6 @@ input:-webkit-autofill:focus {
     --tag-rim-quiet: #4a423c;
     --tag-text: #e2d8cb;
     --tag-dot: var(--ivory-muted);
-  }
-
-  .tag-bronze {
-    --tag-fill: #422d1a;
-    --tag-rim: #7e552f;
-    --tag-rim-quiet: #553a22;
-    --tag-text: #e8be92;
-    --tag-dot: #b0733b;
   }
 
   .tag-crimson {
@@ -424,11 +419,11 @@ input:-webkit-autofill:focus {
   color: #fecaca;
 }
 
-/* Where side panels open: the felt's inner box, inside its gold edge, so they never cover the bars. Below 640px
-   the rails are 4px wide. */
+/* Where side panels open: the board and its sidebar, inside their gold edge, so panels never cover the bars or a
+   banner. */
 .side-panel-frame {
   position: absolute;
-  inset: 2px 6px;
+  inset: 2px;
   overflow: hidden;
   pointer-events: none;
   z-index: 45;
@@ -494,7 +489,7 @@ input:-webkit-autofill:focus {
 /* A zone's label straddles the felt's top edge, so above a phone's panel, which covers the whole board, it would
    show cut in half. */
 @media (width < 640px) {
-  .game-surface:has(.side-panel--open) .zone-label {
+  .game-surface:has(.side-panel--open) [data-zone-label] {
     visibility: hidden;
   }
 }
@@ -538,10 +533,6 @@ input:-webkit-autofill:focus {
         color-mix(in srgb, var(--chrome) 95%, white) 0%,
         var(--chrome) 70%);
     z-index: 2;
-  }
-
-  .side-panel-frame {
-    inset: 2px calc(var(--frame-rail-width) + 2px);
   }
 
   .side-panel {
@@ -672,28 +663,6 @@ input:-webkit-autofill:focus {
     inset 0 1px 1px rgba(255, 236, 181, 0.04),
     inset 0 -1px 0 rgba(0, 0, 0, 0.22),
     inset 0 -2px 3px rgba(0, 0, 0, 0.1);
-}
-
-/* Share board: the band under a round, a seam strip like the zone dividers */
-.share-round-band {
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--zone-label-bg);
-  border-top: 1px solid var(--seam-stroke);
-  box-shadow:
-    inset 0 1px 0 var(--seam-highlight),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.share-round-band-title {
-  font-family: 'Cinzel', serif;
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--color-gold);
 }
 
 /* Mobile battle life bar: zone-style inset on light walnut */
@@ -1181,6 +1150,25 @@ input:-webkit-autofill:focus {
 .phase-timeline-scroll::after {
   content: "";
   flex: 0 0 var(--timeline-fade);
+}
+
+/* A step that isn't the current one borrows padding from the gap around it, so its hover fill doesn't move the
+   row. */
+.phase-step-idle {
+  padding: 0.125rem 0.25rem;
+  margin: -0.125rem -0.25rem;
+  border-radius: 4px;
+}
+
+/* Tapping a step opens its help, so where there's a pointer the step lights up like a menu item. */
+@media (hover: hover) {
+  .phase-step:enabled {
+    cursor: pointer;
+  }
+
+  .phase-step:enabled:hover {
+    background-color: var(--stone);
+  }
 }
 
 @keyframes fade-hint {
@@ -2156,18 +2144,219 @@ input:-webkit-autofill:focus {
   }
 }
 
-/* Player row — carved/etched into walnut surface */
-.player-row-etched {
-  background: var(--chrome-modal);
-  border: 1px solid var(--gold-border);
-  box-shadow:
-    inset 0 2px 6px rgba(0, 0, 0, 0.3),
-    inset 0 -2px 6px rgba(0, 0, 0, 0.2);
+/* A place down a card's left edge, as a standings table shows it, behind a gold seam. Last place is red. */
+.standings-rank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-right: 1px solid var(--gold-border);
+  background: linear-gradient(180deg, #3a302c 0%, #2e2623 100%);
+  color: var(--ivory);
 }
-.player-row-etched:hover {
+
+.standings-rank-number {
+  font-family: 'Cinzel', serif;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.standings-rank-suffix {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ivory-muted);
+}
+
+.standings-rank.is-last .standings-rank-number,
+.standings-rank.is-last .standings-rank-suffix {
+  color: var(--loss-text);
+}
+
+/* A player's card in the game sidebar, the phone drawer and the share page: raised walnut with a gold edge, and the
+   rank down its left edge. The edge turns solid gold for the player being viewed, your own rank column is gold, and
+   the card goes flat and dark once its player is out. */
+.player-card {
+  --player-card-rank-width: 2.25rem;
+  --player-card-win: #86efac;
+  position: relative;
+}
+
+.player-card-button {
+  display: grid;
+  grid-template-columns: var(--player-card-rank-width) minmax(0, 1fr);
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--gold-border);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #453a36 0%, var(--chrome-modal) 100%);
   box-shadow:
-    inset 0 2px 8px rgba(0, 0, 0, 0.4),
-    inset 0 -2px 8px rgba(0, 0, 0, 0.25);
+    0 1px 0 rgba(255, 236, 181, 0.12),
+    0 2px 0 rgba(0, 0, 0, 0.42),
+    0 3px 0 rgba(0, 0, 0, 0.24),
+    0 6px 14px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 236, 181, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.44);
+  color: var(--ivory);
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: left;
+  transition: border-color var(--transition-fast);
+}
+
+.player-card-button:hover {
+  border-color: rgba(212, 175, 55, 0.75);
+}
+
+.player-card-button:focus-visible {
+  outline: 2px solid var(--color-gold-bright);
+  outline-offset: 2px;
+}
+
+.player-card.is-unranked .player-card-button {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.player-card.is-out .player-card-button {
+  border-color: rgba(212, 175, 55, 0.22);
+  background: #2a2320;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+}
+
+/* After the out rule, so a viewed player who is out keeps the gold edge */
+.player-card .player-card-button[aria-pressed="true"] {
+  border-color: var(--color-gold);
+  box-shadow:
+    0 0 0 1px var(--color-gold),
+    0 2px 0 rgba(0, 0, 0, 0.42),
+    0 6px 14px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 236, 181, 0.14),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.44);
+}
+
+.player-card.is-out .standings-rank {
+  border-right-color: rgba(212, 175, 55, 0.22);
+  background: #241e1b;
+}
+
+.player-card.is-self .standings-rank {
+  border-right-color: var(--color-gold);
+  background: linear-gradient(180deg, #4a3a18 0%, #3a2c12 100%);
+}
+
+.player-card.is-self .standings-rank-number {
+  color: var(--color-gold-bright);
+}
+
+.player-card.is-self .standings-rank-suffix {
+  color: var(--color-gold);
+}
+
+.player-card-body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 9px 9px 9px 10px;
+}
+
+.player-card-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* Room at the start of the name line for the control that sits over it */
+.player-card.has-control .player-card-line:first-child {
+  padding-left: 24px;
+}
+
+.player-card-control {
+  position: absolute;
+  top: 7px;
+  left: calc(var(--player-card-rank-width) + 11px);
+  display: flex;
+}
+
+.player-card.is-unranked .player-card-control {
+  left: 11px;
+}
+
+.player-card-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.player-card-result {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.player-card-result-win {
+  color: var(--player-card-win);
+}
+
+.player-card-result-loss {
+  color: var(--loss-text);
+}
+
+.player-card-result-draw {
+  color: var(--ivory-muted);
+}
+
+/* Poison and treasure keep one width, so the label after them starts at the same place on every card */
+.player-card-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 32px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.player-card-stat svg {
+  width: 14px;
+  height: 14px;
+}
+
+.player-card-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ivory-muted);
+}
+
+.player-card-label-out {
+  color: var(--loss-text);
+}
+
+.player-card-label-viewing {
+  color: var(--ivory);
+}
+
+.player-card-outlook {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.player-card.is-out .player-card-name,
+.player-card.is-out .player-card-stat,
+.player-card.is-out .player-card-outlook {
+  color: var(--ivory-muted);
 }
 
 .rotate-prompt {

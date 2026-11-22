@@ -5,10 +5,10 @@ import { SidePanel } from './SidePanel'
 import { SidePanelHostContext } from './sidePanelHost'
 
 function openPanel({ closeOnBoardTap = false } = {}) {
-  const felt = document.createElement('div')
+  const board = document.createElement('div')
   const host = document.createElement('div')
-  felt.append(host)
-  document.body.append(felt)
+  board.append(host)
+  document.body.append(board)
   const onClose = vi.fn()
   render(
     <SidePanelHostContext.Provider value={host}>
@@ -17,7 +17,7 @@ function openPanel({ closeOnBoardTap = false } = {}) {
       </SidePanel>
     </SidePanelHostContext.Provider>,
   )
-  return { felt, lifeField: screen.getByRole('textbox', { name: 'Life' }), onClose }
+  return { board, lifeField: screen.getByRole('textbox', { name: 'Life' }), onClose }
 }
 
 describe('SidePanel', () => {
@@ -37,12 +37,12 @@ describe('SidePanel', () => {
   })
 
   it('closes on a tap on the board outside it when asked to, and not on a tap inside it', () => {
-    const { felt, lifeField, onClose } = openPanel({ closeOnBoardTap: true })
+    const { board, lifeField, onClose } = openPanel({ closeOnBoardTap: true })
 
     fireEvent.pointerDown(lifeField)
     expect(onClose).not.toHaveBeenCalled()
 
-    fireEvent.pointerDown(felt)
+    fireEvent.pointerDown(board)
     expect(onClose).toHaveBeenCalledOnce()
   })
 })

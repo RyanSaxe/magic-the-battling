@@ -1,6 +1,7 @@
-import type { Page } from '@playwright/test'
-import { PAGES, expect, openPage, serveGame, test } from './helpers'
-import { GAME_ID, type ScreenState } from './gameStates'
+import type { Page, WebSocketRoute } from '@playwright/test'
+import { GAME_BANNER_HEIGHT } from '../src/components/common/bannerSizes'
+import { PAGES, expect, openPage, serveGame, serveSpectating, test } from './helpers'
+import { GAME_ID, gameBootstrap, type ScreenState } from './gameStates'
 
 const BAR_HEIGHT = 42
 const BAR_BUTTON_HEIGHT = 30
@@ -16,6 +17,8 @@ const GAME_PHASES: Record<string, ScreenState> = {
   draft: { phase: 'draft', counts: { pack: 5, sideboard: 10, upgrades: 2 } },
   build: { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 } },
   fight: { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 } },
+  'build in Sudden Death': { phase: 'build', counts: { hand: 3, handSize: 3, sideboard: 6 }, suddenDeath: true },
+  'fight in Sudden Death': { phase: 'battle', counts: { hand: 5, lands: 4, nonlands: 3, opponentHand: 6 }, suddenDeath: true },
   reward: { phase: 'reward', counts: { sideboard: 8 } },
   over: { phase: 'game_over', counts: { sideboard: 8 } },
   eliminated: { phase: 'eliminated', counts: { sideboard: 8 } },
@@ -40,7 +43,21 @@ const SURFACES: Surface[] = [
       await page.evaluate(() => document.fonts.load('16px Cinzel'))
     },
   })),
+  {
+    name: 'game watching a player',
+    open: async (page: Page, baseURL: string) => {
+      await watchAlice(page, baseURL, GAME_PHASES.fight)
+      await page.evaluate(() => document.fonts.load('16px Cinzel'))
+    },
+  },
 ]
+
+async function watchAlice(page: Page, baseURL: string, state: ScreenState) {
+  await serveSpectating('approved', state)(page, baseURL)
+  await page.goto(`/game/${GAME_ID}/play?spectate=true`, { waitUntil: 'domcontentloaded' })
+  // A spectator's bottom bar is inert, which hides it from the accessibility tree, so it's found by tag.
+  await page.locator('footer .btn').first().waitFor()
+}
 
 /** Where the bars and the felt sit, and what each bar holds, measured in the page. */
 function measureFrame(page: Page) {
@@ -129,6 +146,67 @@ for (const { name, viewport, isMobile, rail } of SCREENS) {
   })
 }
 
+const TOAST_CLEARANCE = 8
+
+const TOASTS = [
+  {
+    where: 'on a page',
+    raise: async (page: Page, baseURL: string) => {
+      await openPage(page, baseURL, PAGES.find((pageUnderTest) => pageUnderTest.name === 'play')!)
+      await page.getByRole('button', { name: 'Start Game' }).click()
+    },
+  },
+  {
+    where: 'in a game',
+    raise: async (page: Page, baseURL: string) => {
+      await serveGame(page, baseURL, GAME_PHASES.build, {
+        onSocket: (ws) => ws.send(JSON.stringify({ type: 'error', payload: { code: 'UNKNOWN_ACTION' } })),
+      })
+      await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+    },
+  },
+]
+
+for (const { name, viewport, isMobile } of SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    for (const { where, raise } of TOASTS) {
+      test(`a toast ${where} opens below the top bar, clear of the felt's gold edge`, async ({ page, baseURL }) => {
+        await raise(page, baseURL!)
+        // A toast slides in from 8px above its place, so measure the stack it settles into.
+        const toasts = page.getByRole('button', { name: 'Dismiss toast' }).locator('../..')
+        await toasts.waitFor()
+
+        const toastTop = (await toasts.boundingBox())!.y
+        const barBottom = (await page.getByRole('banner').boundingBox())!
+        const goldEdgeBottom = barBottom.y + barBottom.height + 2
+        expect(toastTop - goldEdgeBottom, 'gap between the toast and the gold edge below the top bar').toBeGreaterThanOrEqual(TOAST_CLEARANCE)
+      })
+    }
+  })
+}
+
+// The page's own Play Preset or Play Cube is its one gold button, which leaves room for Home on phones.
+const ACCOUNT_DETAIL_PAGES = ['battler', 'cube']
+
+for (const { name, viewport, isMobile } of SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    for (const detailPage of ACCOUNT_DETAIL_PAGES) {
+      test(`the ${detailPage} page has one gold button and Home in the top bar`, async ({ page, baseURL }) => {
+        await openPage(page, baseURL!, PAGES.find((pageUnderTest) => pageUnderTest.name === detailPage)!)
+
+        const goldButtons = await page.locator('.btn-primary').evaluateAll((buttons) =>
+          buttons.filter((button) => button.getBoundingClientRect().width > 0).length)
+        expect.soft(goldButtons, 'gold buttons on the page').toBeLessThanOrEqual(1)
+        await expect.soft(page.getByRole('banner').getByRole('button', { name: 'Home' })).toBeVisible()
+      })
+    }
+  })
+}
+
 const GAME_OVER_BARS = [
   { phase: 'over', left: ['Review'] },
   { phase: 'eliminated', left: ['Review', 'Spectate'] },
@@ -187,6 +265,161 @@ for (const { name, viewport, isMobile } of SCREENS) {
         expect.soft(feltInnerRight - popoverRight, 'gap between the choices and the gold edge').toBeGreaterThanOrEqual(MIN_POPOVER_GAP)
         expect.soft(seamTop - popoverBottom, 'gap between the choices and the bottom seam').toBeGreaterThanOrEqual(MIN_POPOVER_GAP)
         expect.soft(choiceOnTop, `"${choice}" is in front of everything at its spot`).toBe(true)
+      })
+    }
+  })
+}
+
+const LINE_SCREENS = [
+  { name: '1280×800 laptop', viewport: { width: 1280, height: 800 }, isMobile: false },
+  { name: '1024×768 tablet', viewport: { width: 1024, height: 768 }, isMobile: false },
+  { name: 'iPhone 15', viewport: { width: 390, height: 844 }, isMobile: true },
+]
+const PHASE_STEPS = [
+  { phase: 'draft', mainAction: 'Go to Build' },
+  { phase: 'build', mainAction: 'Submit Hand' },
+  { phase: 'fight', mainAction: 'Submit Result' },
+  { phase: 'reward', mainAction: 'Continue' },
+]
+const LINE_TOLERANCE = 0.5
+
+/**
+ * The frame's lines in the current phase: the bars, the felt, the board's gold edge and the docked sidebar.
+ * The gold dividers inside the board aren't here, since each phase lays out its own zones.
+ */
+function measureLines(page: Page) {
+  return page.evaluate(() => {
+    const edges = (element: Element | null) => {
+      if (!element) return null
+      const { left, top, right, bottom } = element.getBoundingClientRect()
+      return { left, top, right, bottom }
+    }
+    const board = document.querySelector('main')
+    return {
+      'top bar': edges(document.querySelector('header')),
+      'bottom bar': edges(document.querySelector('footer')),
+      felt: edges(document.querySelector('.game-surface')),
+      "board's gold edge": edges(board?.querySelector('.zone-divider-bg') ?? null),
+      'docked sidebar': edges(document.querySelector('.frame-sidebar')),
+    }
+  })
+}
+
+for (const { name, viewport, isMobile } of LINE_SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    test("the frame's lines stay put from Draft through Round Wrap-Up", async ({ page, baseURL }) => {
+      let server: WebSocketRoute | undefined
+      await serveGame(page, baseURL!, GAME_PHASES.draft, { onSocket: (ws) => { server = ws } })
+      await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+      await page.evaluate(() => document.fonts.load('16px Cinzel'))
+
+      let draftLines: Awaited<ReturnType<typeof measureLines>> | undefined
+      for (const { phase, mainAction } of PHASE_STEPS) {
+        // One game moves from phase to phase, as a player sees it, rather than each phase loading fresh.
+        if (phase !== 'draft') server!.send(JSON.stringify({ type: 'game_state', payload: gameBootstrap(GAME_PHASES[phase]).state }))
+        await page.getByRole('contentinfo').getByRole('button', { name: mainAction }).waitFor()
+        await page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => undefined))))
+        const lines = await measureLines(page)
+        draftLines ??= lines
+
+        for (const [line, edges] of Object.entries(lines)) {
+          const draftEdges = draftLines[line as keyof typeof lines]
+          expect.soft(edges === null, `${line} in ${phase} shows as it does in draft`).toBe(draftEdges === null)
+          if (!edges || !draftEdges) continue
+          for (const side of ['left', 'top', 'right', 'bottom'] as const) {
+            expect.soft(Math.abs(edges[side] - draftEdges[side]), `${line} ${side} edge in ${phase}, against draft`).toBeLessThanOrEqual(LINE_TOLERANCE)
+            // A line on a half pixel renders softer than the same line on a whole one.
+            expect.soft(Math.abs(edges[side] - Math.round(edges[side])), `${line} ${side} edge in ${phase} sits on a whole pixel`).toBeLessThan(0.01)
+          }
+        }
+      }
+    })
+  })
+}
+
+for (const { name, viewport, isMobile } of SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    test("a spectator sees the watched player's bottom bar but can't use it", async ({ page, baseURL }) => {
+      await serveSpectating('approved')(page, baseURL!)
+      await page.goto(`/game/${GAME_ID}/play?spectate=true`, { waitUntil: 'domcontentloaded' })
+      // The bar is inert, which also hides it from the accessibility tree, so it's found by tag and text.
+      const bar = page.locator('footer')
+      const submitHand = bar.getByText('Submit Hand')
+      await page.locator('main').waitFor()
+      await expect(submitHand, "the watched player's Submit Hand in the bottom bar").toBeVisible()
+
+      const barBox = (await bar.boundingBox())!
+      expect.soft(barBox.height, 'bottom bar height').toBe(BAR_HEIGHT)
+      expect.soft(barBox.y, 'bottom bar top edge').toBe(viewport.height - BAR_HEIGHT)
+
+      const button = (await submitHand.boundingBox())!
+      await page.mouse.click(button.x + button.width / 2, button.y + button.height / 2)
+      await expect(page.locator('[data-guide-target="build-submit-popover"]'), 'Play and Draw stay closed').toHaveCount(0)
+    })
+  })
+}
+
+const BANNERS = [
+  {
+    banner: 'Sudden Death in Build',
+    open: (page: Page, baseURL: string) => playGame(page, baseURL, GAME_PHASES['build in Sudden Death']),
+    words: ['Sudden Death', 'Loser is eliminated'],
+    tone: 'sudden-death',
+  },
+  {
+    banner: 'Sudden Death in a Fight',
+    open: (page: Page, baseURL: string) => playGame(page, baseURL, GAME_PHASES['fight in Sudden Death']),
+    words: ['Sudden Death', 'Loser is eliminated'],
+    tone: 'sudden-death',
+  },
+  {
+    banner: 'watching a player',
+    open: (page: Page, baseURL: string) => watchAlice(page, baseURL, GAME_PHASES.fight),
+    words: ['Watching Alice'],
+    tone: 'gold',
+  },
+  {
+    // A spectator learns both whose game it is and that it's Sudden Death.
+    banner: 'watching a player in Sudden Death',
+    open: (page: Page, baseURL: string) => watchAlice(page, baseURL, GAME_PHASES['fight in Sudden Death']),
+    words: ['Watching Alice', 'Sudden Death'],
+    tone: 'sudden-death',
+  },
+]
+
+async function playGame(page: Page, baseURL: string, state: ScreenState) {
+  await serveGame(page, baseURL, state)
+  await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+}
+
+for (const { name, viewport, isMobile, rail } of SCREENS) {
+  test.describe(name, () => {
+    test.use({ viewport, isMobile, hasTouch: isMobile })
+
+    for (const { banner, open, words, tone } of BANNERS) {
+      test(`the ${banner} banner spans the felt between the rails, over the board and the sidebar`, async ({ page, baseURL }) => {
+        await open(page, baseURL!)
+        const bannerElement = page.locator('[data-banner]')
+        for (const word of words) await expect.soft(bannerElement).toContainText(word)
+        await expect.soft(bannerElement, 'banner tone').toHaveAttribute('data-banner', tone)
+        const { bannerBox, boardTop, sidebarTop } = await page.evaluate(() => {
+          const box = (selector: string) => {
+            const rect = document.querySelector(selector)?.getBoundingClientRect()
+            return rect ? { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } : null
+          }
+          return { bannerBox: box('[data-banner]')!, boardTop: box('main')!.top, sidebarTop: box('.frame-sidebar')?.top ?? null }
+        })
+
+        expect.soft(bannerBox.top, 'banner top, under the top bar').toBe(BAR_HEIGHT)
+        expect.soft(bannerBox.left, 'banner left edge, at the left rail').toBe(rail)
+        expect.soft(bannerBox.right, 'banner right edge, at the right rail').toBe(viewport.width - rail)
+        expect.soft(bannerBox.bottom - bannerBox.top, 'banner height').toBe(GAME_BANNER_HEIGHT)
+        expect.soft(boardTop, "board's top edge, under the banner").toBe(bannerBox.bottom)
+        if (sidebarTop !== null) expect.soft(sidebarTop, "docked sidebar's top edge, under the banner").toBe(bannerBox.bottom)
       })
     }
   })
