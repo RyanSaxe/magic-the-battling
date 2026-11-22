@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { BoardBackdrop } from './BoardBackdrop'
 import { SidePanelHostContext } from './sidePanelHost'
 
 /** Placed over the board and its sidebar, it marks the box between their gold edges where side panels open. */
@@ -17,7 +18,7 @@ interface SidePanelProps {
   headerActions?: ReactNode
   /** Slides out of view while it stays open, so a card dragged out of it can be dropped on the board it covers. */
   steppedAside?: boolean
-  /** A tap on the board outside the panel closes it. */
+  /** A tap on the board outside the panel closes it, and does nothing else. */
   closeOnBoardTap?: boolean
   children: ReactNode
 }
@@ -67,19 +68,8 @@ export function SidePanel({
     return () => window.removeEventListener('keydown', handleKey)
   }, [open, onClose])
 
-  useEffect(() => {
-    if (!open || !closeOnBoardTap || !host) return
-    const board = host.parentElement
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null
-      if (target && board?.contains(target) && !host.contains(target)) onClose()
-    }
-    document.addEventListener('pointerdown', handlePointerDown)
-    return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [open, closeOnBoardTap, host, onClose])
-
   if (!present || !host) return null
-  return createPortal(
+  const panel = (
     <section
       ref={panelRef}
       className={`side-panel frame-chrome${open ? ' side-panel--open' : ''}${steppedAside ? ' side-panel--aside' : ''}`}
@@ -109,7 +99,12 @@ export function SidePanel({
         </div>
       </div>
       <div className="side-panel-body">{children}</div>
-    </section>,
-    host,
+    </section>
+  )
+  return (
+    <>
+      {open && closeOnBoardTap && <BoardBackdrop onTap={onClose} />}
+      {createPortal(panel, host)}
+    </>
   )
 }

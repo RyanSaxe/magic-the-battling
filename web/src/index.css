@@ -429,6 +429,14 @@ input:-webkit-autofill:focus {
   z-index: 45;
 }
 
+/* Beneath every panel in the frame, and above the board. */
+.board-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: auto;
+}
+
 /* One panel for every zone, drawer and player list: below 640px it covers the board, from 640px the column the
    docked sidebar takes on wide screens, with that column's gold edge. */
 .side-panel {

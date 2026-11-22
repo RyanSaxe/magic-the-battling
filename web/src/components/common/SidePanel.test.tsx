@@ -17,7 +17,7 @@ function openPanel({ closeOnBoardTap = false } = {}) {
       </SidePanel>
     </SidePanelHostContext.Provider>,
   )
-  return { board, lifeField: screen.getByRole('textbox', { name: 'Life' }), onClose }
+  return { host, lifeField: screen.getByRole('textbox', { name: 'Life' }), onClose }
 }
 
 describe('SidePanel', () => {
@@ -37,12 +37,15 @@ describe('SidePanel', () => {
   })
 
   it('closes on a tap on the board outside it when asked to, and not on a tap inside it', () => {
-    const { board, lifeField, onClose } = openPanel({ closeOnBoardTap: true })
+    const { host, lifeField, onClose } = openPanel({ closeOnBoardTap: true })
 
-    fireEvent.pointerDown(lifeField)
+    fireEvent.click(lifeField)
     expect(onClose).not.toHaveBeenCalled()
 
-    fireEvent.pointerDown(board)
+    const boardTap = host.querySelector('.board-backdrop')!
+    fireEvent.pointerDown(boardTap)
+    expect(onClose).not.toHaveBeenCalled()
+    fireEvent.click(boardTap)
     expect(onClose).toHaveBeenCalledOnce()
   })
 })
