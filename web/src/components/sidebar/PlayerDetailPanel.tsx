@@ -291,7 +291,7 @@ function AdaptiveCardSection({
         data-guide-target={guideTarget}
       >
         {cards.length === 0 ? (
-          <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[color:rgba(212,175,55,0.25)] bg-black/10 px-4 text-center text-sm text-[var(--ivory-muted)]">
+          <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[color:rgba(212,175,55,0.25)] px-4 text-center text-sm text-[var(--ivory-muted)]">
             {emptyText}
           </div>
         ) : (
