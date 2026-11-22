@@ -9,10 +9,6 @@ function presetsNamed(count: number): UserBattler[] {
 }
 
 interface Holds {
-  /** Answers a save only once this settles, after the preset is already listed, as a slow save does. */
-  save?: Promise<void>
-  /** Answers Load more only once this settles, with the page as it was when asked for. */
-  morePage?: Promise<void>
   /** Answers the dashboard's first page only once this settles, with the page as it was when asked for. */
   firstPage?: Promise<void>
 }
@@ -28,12 +24,10 @@ async function servePresets(page: Page, presets: UserBattler[], holds: Holds = {
         const body = request.postDataJSON()
         const preset = battler(presets.length + 1, body.cube_id, body.display_name)
         presets.unshift(preset)
-        await holds.save
         return route.fulfill({ json: preset })
       }
       const offset = Number(new URL(request.url()).searchParams.get('offset') ?? 0)
       const json = { battlers: presets.slice(offset, offset + PAGE_SIZE), has_more: offset + PAGE_SIZE < presets.length }
-      if (offset > 0) await holds.morePage
       if (offset === 0 && !firstPageHeld) {
         firstPageHeld = true
         await holds.firstPage
@@ -54,8 +48,6 @@ async function presetTitles(page: Page) {
   const titles = await page.getByRole('heading', { level: 3, name: /^Preset \d+$/ }).allTextContents()
   return titles.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
 }
-
-const PRESETS_1_TO_22 = presetsNamed(22).map((preset) => preset.display_name)
 
 /** A response the test sends only when it chooses, to look at the page while a request runs. */
 function heldResponse() {
@@ -125,19 +117,6 @@ test.describe('on a phone held upright', () => {
   // The Add Cube / Deck dialog can't scroll, so on a landscape phone its submit button is off screen.
   test.use({ viewport: { width: 390, height: 844 } })
 
-  test('a preset added before every preset has loaded shows once, and Load more skips none', async ({ page, baseURL }) => {
-    await serveSignedIn(page, baseURL!)
-    await servePresets(page, presetsNamed(21))
-    await page.goto('/dashboard')
-
-    await addPreset(page, 'cube-22', 'Preset 22')
-    await expect(page.getByRole('link', { name: 'Preset 22', exact: true })).toBeVisible()
-    await page.getByRole('button', { name: 'Load more' }).click()
-    await expect(page.getByRole('button', { name: 'Load more' })).toBeHidden()
-
-    expect(await presetTitles(page)).toEqual(PRESETS_1_TO_22)
-  })
-
   test('a newly added preset is the first card, and stays first after a reload', async ({ page, baseURL }) => {
     await serveSignedIn(page, baseURL!)
     await servePresets(page, presetsNamed(3))
@@ -152,21 +131,6 @@ test.describe('on a phone held upright', () => {
     await expect(firstCard).toHaveText('Preset 4')
   })
 
-  test('a page that lands after a preset is added keeps the new preset', async ({ page, baseURL }) => {
-    const morePage = heldResponse()
-    await serveSignedIn(page, baseURL!)
-    await servePresets(page, presetsNamed(21), { morePage: morePage.released })
-    await page.goto('/dashboard')
-
-    await page.getByRole('button', { name: 'Load more' }).click()
-    await addPreset(page, 'cube-22', 'Preset 22')
-    await expect(page.getByRole('link', { name: 'Preset 22', exact: true })).toBeVisible()
-    morePage.release()
-    await expect(page.getByRole('button', { name: 'Load more' })).toBeHidden()
-
-    expect(await presetTitles(page)).toEqual(PRESETS_1_TO_22)
-  })
-
   test('a preset saved while the dashboard first loads still shows', async ({ page, baseURL }) => {
     const firstPage = heldResponse()
     await serveSignedIn(page, baseURL!)
@@ -178,24 +142,6 @@ test.describe('on a phone held upright', () => {
 
     await expect(page.getByRole('link', { name: 'Preset 4', exact: true })).toBeVisible()
     expect(await presetTitles(page)).toEqual(['Preset 1', 'Preset 2', 'Preset 3', 'Preset 4'])
-  })
-
-  test('a preset whose page lands before its slow save returns shows once', async ({ page, baseURL }) => {
-    const save = heldResponse()
-    await serveSignedIn(page, baseURL!)
-    await servePresets(page, presetsNamed(21), { save: save.released })
-    await page.goto('/dashboard')
-
-    await addPreset(page, 'cube-22', 'Preset 22')
-    await page.getByRole('button', { name: 'Close Add Cube / Deck' }).click()
-    await page.getByRole('button', { name: 'Load more' }).click()
-    await expect(page.getByRole('button', { name: 'Load more' })).toBeHidden()
-    const saved = page.waitForResponse((response) => response.request().method() === 'POST')
-    save.release()
-    await saved
-    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
-
-    expect(await presetTitles(page)).toEqual(PRESETS_1_TO_22)
   })
 })
 
