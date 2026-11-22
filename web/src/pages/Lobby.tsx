@@ -260,16 +260,16 @@ export function Lobby() {
     setGuideMinimized(false);
     setShowRulesPanel(true);
   };
+  const guideTakesKeys = showRulesPanel && !guideMinimized;
   const lobbyHotkeyMap: Record<string, () => void> = {
     "?": () => {
-      if (showRulesPanel) {
+      if (guideTakesKeys) {
         setShowRulesPanel(false);
         return;
       }
       openGuide();
     },
   };
-  const guideTakesKeys = showRulesPanel && !guideMinimized;
   if (lobbyState && currentPlayer && !guideTakesKeys) {
     const isHost = currentPlayer.is_host;
     lobbyHotkeyMap["r"] = toggleReady;
@@ -287,7 +287,7 @@ export function Lobby() {
       }
     };
   }
-  useHotkeys(lobbyHotkeyMap, !!session && !guideTakesKeys);
+  useHotkeys(lobbyHotkeyMap, !!session);
 
   useEffect(() => {
     if (gameState) {

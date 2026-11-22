@@ -28,7 +28,12 @@ export function SubmitPopover({
   const backdropRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    let pressWasOutside = true;
     const handlePointerDown = (e: PointerEvent) => {
+      const pressed = e.target as Node;
+      pressWasOutside = !ref.current?.contains(pressed) && !backdropRef.current?.contains(pressed);
+    };
+    const handleClick = (e: MouseEvent) => {
       const target = e.target as Node | null;
       if (!ref.current || !target || backdropRef.current?.contains(target)) {
         return;
@@ -42,19 +47,26 @@ export function SubmitPopover({
 
       if (shouldCloseSubmitPopoverOnOutsideClick({
         closeOnOutsideClick,
-        clickedInsidePopover: ref.current.contains(target),
+        // A press dragged out of the choices or off the board clicks what the two places share, and doesn't close.
+        clickedInsidePopover: !pressWasOutside || ref.current.contains(target),
         clickedIgnoredElement,
       })) {
         onClose();
       }
     };
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      // Closing can bring a minimized Guide back, which would otherwise close on this same press.
+      e.preventDefault();
+      onClose();
     };
-    document.addEventListener("pointerdown", handlePointerDown);
+    // Closing on the press would bring that Guide back under the finger, and it would take the tap from the button.
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    document.addEventListener("click", handleClick, true);
     document.addEventListener("keydown", handleKey);
     return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+      document.removeEventListener("click", handleClick, true);
       document.removeEventListener("keydown", handleKey);
     };
   }, [closeOnOutsideClick, ignoreOutsideClickSelector, onClose]);

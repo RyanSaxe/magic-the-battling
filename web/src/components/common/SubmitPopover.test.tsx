@@ -58,8 +58,29 @@ describe("SubmitPopover", () => {
     expect(tapTarget).not.toBeNull();
     fireEvent.pointerDown(tapTarget!);
     expect(onClose).not.toHaveBeenCalled();
+    // Dragged off the board, the press clicks what the two places share.
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
 
     fireEvent.click(tapTarget!);
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it("closes from outside on the click, not for a press that started inside, and keeps its Escape to itself", () => {
+    const outside = document.body.appendChild(document.createElement("button"));
+    const onClose = vi.fn();
+    const { getByText } = render(<SubmitPopover options={[{ label: "Draw", onClick: () => {} }]} onClose={onClose} />);
+
+    // A press released somewhere else clicks what the two places share.
+    fireEvent.pointerDown(getByText("Draw"));
+    fireEvent.click(document.body);
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.pointerDown(outside);
+    expect(onClose).not.toHaveBeenCalled();
+    fireEvent.click(outside);
+    expect(onClose).toHaveBeenCalledOnce();
+
+    expect(fireEvent.keyDown(document.body, { key: "Escape" })).toBe(false);
   });
 });

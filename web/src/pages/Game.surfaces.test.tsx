@@ -230,4 +230,51 @@ describe('Game: what is open over the board', () => {
     followControlsLink()
     expect(screen.getByRole('radio', { name: 'Controls' }).getAttribute('aria-checked')).toBe('true')
   })
+
+  it('brings an open Guide back where it was after Players and Scouting, which hide it', async () => {
+    await openGame(gameBootstrap({ phase: 'build', counts: { hand: 2, sideboard: 2 } }))
+    const guideOnScreen = () => screen.queryByRole('button', { name: 'Minimize guide' }) !== null
+    fireEvent.click(find('[data-guide-target="guide-button"]'))
+    fireEvent.click(screen.getByRole('radio', { name: 'FAQ' }))
+
+    fireEvent.click(find('[data-guide-target="sidebar-toggle"]'))
+    expect(guideOnScreen()).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: /Bob/ }))
+    expect(guideOnScreen()).toBe(false)
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+
+    expect(guideOnScreen()).toBe(true)
+    expect(screen.getByRole('radio', { name: 'FAQ' }).getAttribute('aria-checked')).toBe('true')
+  })
+
+  it('brings a minimized Guide back after backing out of Submit Result, and not after submitting', async () => {
+    await openGame(gameBootstrap({ phase: 'battle', counts: { lands: 1 } }))
+    const minimizedOnScreen = () => screen.queryByRole('button', { name: 'Open guide' }) !== null
+    fireEvent.click(find('[data-guide-target="guide-button"]'))
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Result' }))
+    expect(minimizedOnScreen()).toBe(false)
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(minimizedOnScreen()).toBe(true)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Result' }))
+    fireEvent.click(screen.getByRole('button', { name: 'I Lost' }))
+    expect(minimizedOnScreen()).toBe(false)
+  })
+
+  it('restores a minimized Guide with ?, at the place it was left', async () => {
+    await openGame(gameBootstrap({ phase: 'build', counts: { hand: 2, sideboard: 2 } }))
+    const pressGuideKey = () => fireEvent.keyDown(document.body, { key: '?' })
+    pressGuideKey()
+    fireEvent.click(screen.getByRole('radio', { name: 'FAQ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
+
+    pressGuideKey()
+    expect(screen.getByRole('radio', { name: 'FAQ' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.queryByRole('button', { name: 'Minimize guide' })).not.toBeNull()
+
+    pressGuideKey()
+    expect(document.querySelector('.floating-window')).toBeNull()
+  })
 })
