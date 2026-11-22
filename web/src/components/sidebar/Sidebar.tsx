@@ -77,6 +77,7 @@ export function Sidebar({
   const scoutingDetails = (player: PlayerView, scoutingTab: ScoutingTab, onBack?: () => void) => (
     <PlayerDetailPanel
       player={player}
+      players={players}
       currentPlayer={currentPlayer}
       useUpgrades={useUpgrades}
       activeTab={scoutingTab}

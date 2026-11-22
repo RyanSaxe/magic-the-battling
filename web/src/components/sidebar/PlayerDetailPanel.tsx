@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Card as CardType, LastResult, PlayerView } from "../../types";
+import type { Card as CardType, PlayerView } from "../../types";
 import type { ScoutingTab } from "../../pages/gameSurfaces";
 import {
   CARD_ASPECT_RATIO,
@@ -12,12 +12,17 @@ import {
   POISON_COUNTER_IMAGE,
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
-import { getLastResultWord, getPlayerPhaseStatusLabel } from "../../utils/format";
+import { POISON_TO_LOSE } from "../../constants/rules";
+import { StandingsRank } from "../common/StandingsRank";
+import { getLastResultWord, getPlayerActivity } from "../../utils/format";
+import { getSidebarPlacementRank, getStanding, isSidebarLastPlace } from "../../utils/playerPlacement";
 import { SegmentedFilter, type SegmentOption } from "../dashboard/SegmentedFilter";
 import { buildAppliedUpgradeMap, getAppliedUpgrades, getUpgradeDisplayScope, getUnappliedUpgrades } from "../../utils/upgrades";
 
 interface PlayerDetailPanelProps {
   player: PlayerView;
+  /** Everyone in the game, whom the player is ranked among. */
+  players: PlayerView[];
   currentPlayer: PlayerView;
   useUpgrades: boolean;
   activeTab: ScoutingTab;
@@ -33,134 +38,108 @@ const DEFAULT_CARD_DIMS: ZoneDims = {
   columns: 1,
 };
 
-function getLastResultLabel(
-  result: LastResult | null,
-  inSuddenDeath: boolean,
-): string {
-  if (inSuddenDeath) return "Sudden death";
-  if (result === null) return "No result yet";
-  return getLastResultWord(result);
-}
-
-function getPlayerStatus(player: PlayerView): string {
-  if (player.is_most_recent_ghost) return "Recent ghost";
-  if (player.is_ghost) return "Ghost";
-  if (player.is_puppet) return "Puppet";
-  return `${player.stage}-${player.round} @ ${getPlayerPhaseStatusLabel(player.phase, player.build_ready)}`;
+function getState(player: PlayerView, players: PlayerView[]): { title: string; detail: string; tone?: "ready" | "out" } {
+  const standing = getStanding(player);
+  const gameOver = players.some(({ phase }) => phase === "winner" || phase === "game_over");
+  if (standing === "ghost") {
+    return { title: "Ghost", detail: gameOver ? "No longer fights" : "Out, fights on with their last build" };
+  }
+  if (standing === "out") return { title: "Out", detail: "No longer fights", tone: "out" };
+  if (player.is_puppet) {
+    return player.in_sudden_death
+      ? { title: "Sudden Death", detail: "Puppet, loser is eliminated", tone: "out" }
+      : { title: "Puppet", detail: "Replays a past game" };
+  }
+  const round = `Round ${player.stage}-${player.round}`;
+  const activity = getPlayerActivity(player) ?? "Game Over";
+  if (player.in_sudden_death) return { title: "Sudden Death", detail: `${activity} · ${round}`, tone: "out" };
+  const ready = player.phase === "build" && player.build_ready;
+  return { title: activity, detail: round, tone: ready ? "ready" : undefined };
 }
 
 function countLabel(count: number): string {
   return `${count} card${count === 1 ? "" : "s"}`;
 }
 
-function OverviewToken({
-  value,
-  imageSrc,
-  badgeClassName,
-}: {
-  value: number;
-  imageSrc: string;
-  badgeClassName: string;
-}) {
+/** A token beside its count, so the count doesn't cover the art. */
+function TokenCount({ image, count, outOf, label }: { image: string; count: number; outOf?: number; label: string }) {
   return (
-    <div className="relative">
-      <img
-        src={imageSrc}
-        alt=""
-        className="h-[72px] block shadow-lg"
-        style={{ borderRadius: "var(--card-border-radius)" }}
-      />
-      <span className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/80 px-1.5 py-0.5 text-xs font-bold leading-none ${badgeClassName}`}>
-        {value}
-      </span>
-    </div>
-  );
-}
-
-function OverviewTokenRow({
-  poison,
-  treasures,
-}: {
-  poison: number;
-  treasures: number;
-}) {
-  return (
-    <div className="flex items-start justify-center gap-5">
-      <div className="relative">
-        <OverviewToken
-          value={poison}
-          imageSrc={POISON_COUNTER_IMAGE}
-          badgeClassName="text-purple-300"
-        />
-      </div>
-      <div className="relative">
-        <OverviewToken
-          value={treasures}
-          imageSrc={TREASURE_TOKEN_IMAGE}
-          badgeClassName="text-amber-300"
-        />
-      </div>
-    </div>
-  );
-}
-
-function OverviewInfoTable({
-  rows,
-}: {
-  rows: { label: string; value: string }[];
-}) {
-  return (
-    <dl className="overflow-hidden rounded-lg border border-[color:rgba(212,175,55,0.22)] bg-black/10">
-      {rows.map((row, index) => (
-        <div
-          key={row.label}
-          className={`grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3 px-3 py-2 ${
-            index > 0 ? "border-t border-[color:rgba(212,175,55,0.12)]" : ""
-          }`}
-        >
-          <dt className="text-[11px] font-medium text-[var(--ivory-muted)]">
-            {row.label}
-          </dt>
-          <dd className="min-w-0 text-right text-sm text-amber-50">
-            <span className="block truncate">
-              {row.value}
-            </span>
-          </dd>
+    <div className="scouting-cell scouting-token-count">
+      <img src={image} alt="" className="scouting-token" />
+      <div>
+        <div className="scouting-count">
+          {count}
+          {outOf && <span className="scouting-out-of">/{outOf}</span>}
         </div>
-      ))}
-    </dl>
+        <div className="scouting-key">{label}</div>
+      </div>
+    </div>
   );
 }
 
-function getLikelihoodValue(
-  pairingProbability: number | null,
-): string | null {
-  if (pairingProbability === null) return null;
-  return `${Math.round(pairingProbability * 100)}%`;
-}
-
-function getOverviewRows({
+function Standings({
   player,
-  lastResultLabel,
-  showPairingChance,
+  players,
+  isSelf,
+  viewerFighting,
 }: {
   player: PlayerView;
-  lastResultLabel: string;
-  showPairingChance: boolean;
-}): { label: string; value: string }[] {
-  const rows = [
-    { label: "Last result", value: lastResultLabel },
-    { label: "Currently at", value: getPlayerStatus(player) },
-  ];
+  players: PlayerView[];
+  isSelf: boolean;
+  viewerFighting: boolean;
+}) {
+  const { title, detail, tone } = getState(player, players);
+  const result = player.last_result;
+  const odds = isSelf ? null : player.pairing_probability;
+  // The server has no odds during a Fight and sends 0 for everyone, except in Sudden Death, which fixes the pairing.
+  const oddsUnknown = viewerFighting && !player.in_sudden_death;
 
-  if (showPairingChance) {
-    rows.splice(1, 0, {
-      label: "Likelihood to fight",
-      value: getLikelihoodValue(player.pairing_probability) ?? "-",
-    });
-  }
-
-  return rows;
+  return (
+    <div className={`scouting-standings${isSelf ? " is-self" : ""}`}>
+      <div className="scouting-standing">
+        <StandingsRank
+          className="scouting-rank"
+          rank={getSidebarPlacementRank(player, players)}
+          isLast={isSidebarLastPlace(player, players)}
+        />
+        <div className="scouting-state">
+          <div className={`scouting-state-title${tone ? ` is-${tone}` : ""}`}>{title}</div>
+          <div className="scouting-state-detail">{detail}</div>
+        </div>
+      </div>
+      <div className="scouting-pair">
+        <TokenCount
+          image={POISON_COUNTER_IMAGE}
+          count={player.poison}
+          outOf={player.poison < POISON_TO_LOSE ? POISON_TO_LOSE : undefined}
+          label="Poison"
+        />
+        <TokenCount image={TREASURE_TOKEN_IMAGE} count={player.treasures} label="Treasure" />
+      </div>
+      <div className="scouting-pair">
+        <div className="scouting-cell">
+          <div className="scouting-key">Last fight</div>
+          {result ? (
+            <div className={`scouting-value player-card-result-${result}`}>{getLastResultWord(result)}</div>
+          ) : (
+            <div className="scouting-value scouting-none">None yet</div>
+          )}
+        </div>
+        {odds !== null && (
+          <div className="scouting-cell">
+            <div className="scouting-key">Next fight</div>
+            {oddsUnknown ? (
+              <div className="scouting-value scouting-none">Not known yet</div>
+            ) : (
+              <div className="scouting-value">
+                {Math.round(odds * 100)}%<span className="scouting-note">to face you</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 function SectionHeading({
@@ -358,6 +337,7 @@ const DETAIL_TABS: SegmentOption<ScoutingTab>[] = [
 /** What a player has shown: the cards seen in their last fight, or an overview of their state. */
 export function PlayerDetailPanel({
   player,
+  players,
   currentPlayer,
   useUpgrades,
   activeTab,
@@ -376,32 +356,30 @@ export function PlayerDetailPanel({
     upgradeDisplayScope,
   );
   const companionIds = new Set(player.command_zone.map((card) => card.id));
-  const lastResultLabel = getLastResultLabel(player.last_result, player.in_sudden_death);
-  const showPairingChance =
-    player.name !== currentPlayer.name && player.pairing_probability !== null;
-  const overviewRows = getOverviewRows({
-    player,
-    lastResultLabel,
-    showPairingChance,
-  });
-
   const overviewContent = (
-    <div className="flex h-full flex-col gap-3">
-      <OverviewTokenRow poison={player.poison} treasures={player.treasures} />
+    <div className="scouting-overview flex h-full min-h-0 flex-col">
+      <Standings
+        player={player}
+        players={players}
+        isSelf={isViewingSelf}
+        viewerFighting={currentPlayer.phase === "battle"}
+      />
 
-      <SectionHeading title="Overview" />
-      <div className="-mt-1">
-        <OverviewInfoTable rows={overviewRows} />
-      </div>
-
+      {useUpgrades && allUpgrades.length === 0 && (
+        <section>
+          <SectionHeading title="Upgrades" />
+          <div className="mt-1 border-t gold-divider" />
+          <p className="pt-3 text-center text-sm text-[var(--ivory-muted)]">None applied</p>
+        </section>
+      )}
       {useUpgrades && allUpgrades.length > 0 && (
         <AdaptiveCardSection
           title="Upgrades"
           cards={allUpgrades}
           showUpgradeTargets
           emptyText="No upgrades applied."
-          maxWidth={92}
-          minWidth={44}
+          maxWidth={128}
+          minWidth={36}
         />
       )}
     </div>
@@ -430,7 +408,7 @@ export function PlayerDetailPanel({
             <button
               type="button"
               onClick={onBack}
-              className="shrink-0 text-sm text-[var(--ivory-muted)] hover:text-white"
+              className="btn-secondary shrink-0 rounded-md px-2.5 py-0.5 text-sm"
             >
               &larr; Back
             </button>

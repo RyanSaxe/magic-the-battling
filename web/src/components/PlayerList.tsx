@@ -1,9 +1,15 @@
 import type { ReactNode } from "react";
-import type { Phase, PlayerView } from "../types";
+import type { PlayerView } from "../types";
 import { MoneyBagIcon, PoisonIcon } from "./icons";
 import { StandingsRank } from "./common/StandingsRank";
-import { getLastResultWord } from "../utils/format";
-import { getSidebarPlacementRank, getSidebarPlayerOrder, isSidebarLastPlace } from "../utils/playerPlacement";
+import { getLastResultWord, getPlayerActivity } from "../utils/format";
+import {
+  getSidebarPlacementRank,
+  getSidebarPlayerOrder,
+  getStanding,
+  isSidebarLastPlace,
+  type Standing,
+} from "../utils/playerPlacement";
 
 interface PlayerListProps {
   players: PlayerView[];
@@ -18,22 +24,9 @@ export const PLAYER_ROW_STACK_CLASS = "space-y-3";
 
 type ShareResultStatus = "viewing" | "alive" | "dead";
 
-/** Alive, fighting on as the Ghost (the most recently eliminated player), or out of the game. */
-type Standing = "alive" | "ghost" | "out";
-
-const ACTIVITY_WORDS: Partial<Record<Phase, string>> = {
-  draft: "Drafting",
-  build: "Building",
-  battle: "Fighting",
-  reward: "Wrap-Up",
-  awaiting_elimination: "Waiting",
-  winner: "Winner",
-};
-
-function getStanding(player: PlayerView, shareStatus: ShareResultStatus | undefined): Standing {
+function getShownStanding(player: PlayerView, shareStatus: ShareResultStatus | undefined): Standing {
   if (shareStatus) return shareStatus === "dead" ? "out" : "alive";
-  if (!player.is_ghost) return "alive";
-  return player.is_most_recent_ghost ? "ghost" : "out";
+  return getStanding(player);
 }
 
 /** Who a player is when that matters, or else what they're doing now. */
@@ -56,7 +49,7 @@ function StatusLabel({
   if (standing === "ghost") return <span className="player-card-label">Ghost</span>;
   if (player.is_puppet) return <span className="player-card-label">Puppet</span>;
 
-  const activity = player.phase === "build" && player.build_ready ? "Ready" : ACTIVITY_WORDS[player.phase];
+  const activity = getPlayerActivity(player);
   if (variant === "game" && activity) return <span className="player-card-label">{activity}</span>;
   if (isSelected) return <span className="player-card-label player-card-label-viewing">Viewing</span>;
   return null;
@@ -108,7 +101,7 @@ export function PlayerRow({
   showPlacement?: boolean;
 }) {
   const isSelf = variant === "game" && player.name === currentPlayerName;
-  const standing = getStanding(player, variant === "share" ? shareStatus : undefined);
+  const standing = getShownStanding(player, variant === "share" ? shareStatus : undefined);
   const rank = showPlacement ? getSidebarPlacementRank(player, players) : null;
   const cardClassName = [
     "player-card",
