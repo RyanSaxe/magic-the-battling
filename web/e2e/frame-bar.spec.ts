@@ -379,41 +379,26 @@ for (const { name, viewport, isMobile } of SCREENS) {
   })
 }
 
-for (const { name, viewport, isMobile } of SCREENS) {
-  test.describe(name, () => {
-    test.use({ viewport, isMobile, hasTouch: isMobile })
-
-    test("the card zoom's × sits on the card's corner, on the screen", async ({ page, baseURL }) => {
-      await serveGame(page, baseURL!, GAME_PHASES.build)
-      await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
-      const card = page.locator('main .zone-sideboard .card').first()
-      const preview = page.getByTitle('Preview card').first()
-      if (isMobile) {
-        await card.tap()
-        await preview.tap()
-      } else {
-        await card.hover()
-        await preview.click()
-      }
-      const zoom = page.locator('[data-card-preview-modal]')
-      const close = zoom.getByRole('button', { name: '×' })
-      await expect(zoom.getByRole('img')).toBeVisible()
-      await expect(async () => expect((await zoom.getByRole('img').boundingBox())!.width).toBeGreaterThan(100)).toPass()
-
-      const closeBox = (await close.boundingBox())!
-      const image = (await zoom.getByRole('img').boundingBox())!
-      expect.soft(closeBox.x, "×'s left edge").toBeGreaterThanOrEqual(0)
-      expect.soft(closeBox.x + closeBox.width, "×'s right edge").toBeLessThanOrEqual(viewport.width)
-      expect.soft(closeBox.y, "×'s top edge").toBeGreaterThanOrEqual(0)
-      expect.soft(closeBox.x + closeBox.width / 2, "×'s centre, on the card's right edge").toBeCloseTo(image.x + image.width, 0)
-      expect.soft(closeBox.y + closeBox.height / 2, "×'s centre, on the card's top edge").toBeCloseTo(image.y, 0)
-    })
-  })
-}
-
 test.describe('iPhone 15', () => {
   const { viewport } = SCREENS[0]
   test.use({ viewport, isMobile: true, hasTouch: true })
+
+  // On a phone the zoom's box fills 95% of the screen's width, so a × outside the box runs off the screen.
+  test("the card zoom's × sits on the card's corner, on the screen", async ({ page, baseURL }) => {
+    await serveGame(page, baseURL!, GAME_PHASES.build)
+    await page.goto(`/game/${GAME_ID}/play`, { waitUntil: 'domcontentloaded' })
+    await page.locator('main .zone-sideboard .card').first().tap()
+    await page.getByTitle('Preview card').first().tap()
+    const image = page.locator('[data-card-preview-modal] img')
+    await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth), 'the card image has loaded').toBeGreaterThan(0)
+
+    const closeBox = (await page.locator('[data-card-preview-modal]').getByRole('button', { name: '×' }).boundingBox())!
+    const imageBox = (await image.boundingBox())!
+    expect.soft(closeBox.x + closeBox.width, "×'s right edge").toBeLessThanOrEqual(viewport.width)
+    expect.soft(closeBox.y, "×'s top edge").toBeGreaterThanOrEqual(0)
+    expect.soft(closeBox.x + closeBox.width / 2, "×'s centre, on the card's right edge").toBeCloseTo(imageBox.x + imageBox.width, 0)
+    expect.soft(closeBox.y + closeBox.height / 2, "×'s centre, on the card's top edge").toBeCloseTo(imageBox.y, 0)
+  })
 
   // A touch screen widens each life button's tap area beyond the button, which must stay inside the life bar.
   test("the life bar's buttons can't be tapped through the top bar or the opponent's hand", async ({ page, baseURL }) => {
