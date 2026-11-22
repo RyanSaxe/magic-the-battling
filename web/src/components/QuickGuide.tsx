@@ -225,6 +225,20 @@ function resolveTarget(docId?: string, tab?: string): ResolvedTarget {
   return { tab: 'guide', guideSection: 'overview' }
 }
 
+function scrollToLinkTarget(list: HTMLElement, anchor?: string) {
+  const section = list.querySelector('.quick-guide-accordion-panel.open')?.parentElement
+  if (!section) {
+    return
+  }
+  const heading = anchor
+    ? Array.from(section.querySelectorAll('h2')).find((h2) => toSlug(h2.textContent ?? '') === anchor)
+    : undefined
+  const target = heading ?? section
+  const top = list.scrollTop + target.getBoundingClientRect().top - list.getBoundingClientRect().top
+  // iOS can keep a scroll past a box's end.
+  list.scrollTop = Math.min(top, list.scrollHeight - list.clientHeight)
+}
+
 function useSequentialAccordion<T extends string | number>(
   initialOpen: T | null,
   stepMs: number,
@@ -561,9 +575,34 @@ export function QuickGuide({
     openTipsSectionImmediate,
   ])
 
+  const listRef = useRef<HTMLDivElement>(null)
+  const [linkJump, setLinkJump] = useState<{ anchor?: string } | null>(null)
+
+  useEffect(() => {
+    const list = listRef.current
+    if (!linkJump || !list) {
+      return
+    }
+    let cancelled = false
+    // A newly shown tab starts opening its section a frame late, and a heading has no fixed place until the
+    // sections opening and closing around it stop moving.
+    const frame = requestAnimationFrame(async () => {
+      const panels = Array.from(list.querySelectorAll('.quick-guide-accordion-panel'))
+      await Promise.allSettled(panels.flatMap((panel) => panel.getAnimations().map((animation) => animation.finished)))
+      if (!cancelled) {
+        scrollToLinkTarget(list, linkJump.anchor)
+      }
+    })
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(frame)
+    }
+  }, [linkJump])
+
   const docNav = useMemo(() => ({
     navigate: (docId: string, tab?: string) => {
       applyTarget(docId, tab)
+      setLinkJump({ anchor: tab })
     },
   }), [applyTarget])
 
@@ -620,7 +659,7 @@ export function QuickGuide({
 
         {activeTab === 'guide' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
+            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="guide-overview"
                 label="Overview"
@@ -680,7 +719,7 @@ export function QuickGuide({
 
         {activeTab === 'controls' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
+            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="controls-global"
                 label="General"
@@ -715,7 +754,7 @@ export function QuickGuide({
 
         {activeTab === 'tips' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
+            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               <AccordionItem
                 id="tips-global"
                 label="General"
@@ -787,7 +826,7 @@ export function QuickGuide({
 
         {activeTab === 'faq' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
+            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
               {faqEntries.length > 0 ? (
                 faqEntries.map((entry, index) => (
                   <AccordionItem
