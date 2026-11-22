@@ -3,6 +3,7 @@ import type { Card as CardType, ZoneName, CardStateAction } from '../../types'
 import { useFaceDown } from '../../contexts/faceDownState'
 import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../../utils/battleInteraction'
 import { clampMenuToViewport } from '../../utils/menuPosition'
+import { POPOVER_CHROME } from '../common/styles'
 
 interface CardActionMenuProps {
   card: CardType
@@ -107,7 +108,7 @@ export function CardActionMenu({
       <div
         ref={menuRef}
         style={menuStyle}
-        className="modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[160px] z-50"
+        className={`${POPOVER_CHROME} py-1 min-w-[160px] z-50`}
       >
         {onBattlefield && (
           <>

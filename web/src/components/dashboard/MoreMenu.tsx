@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { POPOVER_CHROME } from '../common/styles'
 
 export interface MoreMenuItem {
   label: string
@@ -69,7 +70,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
         <div
           ref={menuRef}
           role="menu"
-          className="absolute right-0 top-full mt-1 z-50 modal-chrome border gold-border rounded-lg shadow-2xl py-1 min-w-[140px]"
+          className={`absolute right-0 top-full mt-1 z-50 ${POPOVER_CHROME} py-1 min-w-[140px]`}
         >
           {items.map((item) => (
             <button

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useGameShellMode, type GameShellMode } from "../../hooks/useGameShellMode";
+import { POPOVER_CHROME } from "./styles";
 
 interface LayoutResetControlProps {
   phaseLabel: string;
@@ -58,7 +59,7 @@ export function LayoutResetControl({
         </button>
         {confirmOpen && (
           <div
-            className={`${popover} w-64 modal-chrome border gold-border rounded-lg shadow-xl px-3 py-2 text-left`}
+            className={`${popover} w-64 ${POPOVER_CHROME} px-3 py-2 text-left`}
           >
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200">
               Reset {phaseLabel}

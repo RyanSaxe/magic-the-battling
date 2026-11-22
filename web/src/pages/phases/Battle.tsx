@@ -9,6 +9,7 @@ import { useBattleCardSizes } from '../../hooks/useBattleCardSizes'
 import { battleBoardMetrics } from './phaseLayouts'
 import { buildAppliedUpgradeMap, buildHiddenAppliedUpgradeMap } from '../../utils/upgrades'
 import { canInteractWithBattleZone } from '../../utils/battleInteraction'
+import { POPOVER_CHROME } from '../../components/common/styles'
 
 interface ContextMenuState {
   card: CardType
@@ -101,7 +102,7 @@ function ZoneActionMenu({
       <div className="fixed inset-0 z-50" onClick={onClose} />
       <div
         ref={menuRef}
-        className="fixed modal-chrome border gold-border rounded-lg shadow-xl py-1 min-w-[160px] z-[51]"
+        className={`fixed ${POPOVER_CHROME} py-1 min-w-[160px] z-[51]`}
       >
         <button
           type="button"

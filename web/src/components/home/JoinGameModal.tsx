@@ -91,11 +91,11 @@ export function JoinGameModal({ onClose }: JoinGameModalProps) {
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="btn btn-primary play-action-btn flex-1 py-2"
+            className="btn btn-primary flex-1 py-2"
           >
             {loading ? 'Joining...' : 'Join Game'}
           </button>
-          <button onClick={onClose} className="btn btn-secondary play-action-btn flex-1 py-2">
+          <button onClick={onClose} className="btn btn-secondary flex-1 py-2">
             Cancel
           </button>
         </div>
