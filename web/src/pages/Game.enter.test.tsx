@@ -84,3 +84,15 @@ it('never ends Draft from Enter under an open panel, and gives Enter back when i
   pressEnter()
   expect(draftsEnded()).toBe(1)
 })
+
+it("doesn't end Draft from the Enter after the last Roll, or from holding it", async () => {
+  await openDraft()
+  await receive(0)
+
+  pressEnter()
+  pressEnter(document.body, true)
+  expect(draftsEnded()).toBe(0)
+
+  pressEnter()
+  expect(draftsEnded()).toBe(1)
+})

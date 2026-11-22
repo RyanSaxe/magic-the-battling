@@ -59,7 +59,7 @@ import { SubmitPopover } from "../components/common/SubmitPopover";
 import { ZoneDivider } from "../components/common/ZoneDivider";
 import { useCardMiddleTap } from "../hooks/useCardMiddleTap";
 import { useHotkeys } from "../hooks/useHotkeys";
-import { usePanelHoldsEnter } from "../utils/enterKey";
+import { skipNextEnter, usePanelHoldsEnter } from "../utils/enterKey";
 import {
   comparePlayersForSidebar,
   getSidebarPlayerOrder,
@@ -1394,6 +1394,17 @@ function GameContent() {
   });
   // Reveal Before Submit is where a Fight ends, so it keeps its own Enter.
   usePanelHoldsEnter(modalOpen && pendingBattleResult === null);
+  const canRoll =
+    selfPhase === "draft" &&
+    (gameState?.self_player.treasures ?? 0) > 0 &&
+    (gameState?.self_player.current_pack?.length ?? 0) > 0;
+  const couldRollRef = useRef(canRoll);
+  useEffect(() => {
+    const rolledOut = couldRollRef.current && !canRoll && selfPhase === "draft";
+    couldRollRef.current = canRoll;
+    // Players press Enter on Roll until it turns off, so the Enter after that is likely meant for Roll.
+    if (rolledOut) return skipNextEnter();
+  }, [canRoll, selfPhase]);
   const sidebarPlayers = useMemo(
     () => (gameState ? getSidebarPlayerOrder(gameState.players) : []),
     [gameState],
@@ -1431,7 +1442,7 @@ function GameContent() {
 
     if (phase === 'draft') {
       map['r'] = () => {
-        if (sp.treasures > 0 && (sp.current_pack?.length ?? 0) > 0) {
+        if (canRoll) {
           actions.draftRoll();
         }
       };
@@ -1829,10 +1840,7 @@ function GameContent() {
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={actions.draftRoll}
-            disabled={
-              self_player.treasures <= 0 ||
-              (self_player.current_pack?.length ?? 0) === 0
-            }
+            disabled={!canRoll}
             className="btn btn-game"
             data-guide-target="draft-roll"
           >

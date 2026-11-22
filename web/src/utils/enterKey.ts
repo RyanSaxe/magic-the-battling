@@ -8,6 +8,8 @@ const ENDS_PHASE = '[data-ends-phase]'
 let outlined: Element | null = null
 let outlinedBeforeKey: Element | null = null
 let openPanels = 0
+let skipsNextEnter = false
+let skipsThisEnter = false
 
 function readOutline() {
   const focused = document.activeElement
@@ -23,6 +25,10 @@ if (typeof window !== 'undefined') {
     if (!e.repeat) outlinedBeforeKey = outlined
     outlined = readOutline()
     if (e.key !== 'Enter') return
+    if (!e.repeat) {
+      skipsThisEnter = skipsNextEnter
+      skipsNextEnter = false
+    }
     // An ended phase can't be taken back. So a button that ends one, even outlined, doesn't take Enter from a held
     // key or under an open panel.
     const endsPhase = e.target instanceof Element && e.target.matches(ENDS_PHASE)
@@ -42,9 +48,9 @@ export function enterPressesControl(e: KeyboardEvent, ...usable: (Element | null
   return usable.length === 0 || usable.some((element) => element?.contains(control))
 }
 
-/** Whether this Enter may advance the page: not under an open panel or from a held key. */
+/** Whether this Enter may advance the page: not under an open panel, from a held key or when it's to be skipped. */
 export function enterMayAdvance(e: KeyboardEvent): boolean {
-  return !e.repeat && openPanels === 0
+  return !e.repeat && openPanels === 0 && !skipsThisEnter
 }
 
 /** While open, a panel over the page keeps Enter from advancing it. */
@@ -56,4 +62,12 @@ export function usePanelHoldsEnter(open = true) {
       openPanels -= 1
     }
   }, [open])
+}
+
+/** The next Enter doesn't advance. Returns what calls that off. */
+export function skipNextEnter(): () => void {
+  skipsNextEnter = true
+  return () => {
+    skipsNextEnter = false
+  }
 }
