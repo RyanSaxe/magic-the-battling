@@ -3805,7 +3805,9 @@ class GameManager:
 
         player_won = result.winner is not None and result.winner.name == player.name
         is_draw = result.is_draw
-        is_finale = self._is_finale(game)
+        fake_player = self._get_fake_player_for_opponent(game, opponent)
+        # The Ghost is already out, so a fight against it is never the finale, even with two players left.
+        is_finale = fake_player is not None and not fake_player.is_eliminated and self._is_finale(game)
         poison_to_lose = game.config.poison_to_lose
 
         poison_info = reward.apply_poison_static(game, player, opponent, player_won, is_draw)
@@ -3820,7 +3822,6 @@ class GameManager:
         else:
             winner_name = opponent.name
 
-        fake_player = self._get_fake_player_for_opponent(game, opponent)
         player_display_end_poison = player.poison
         opponent_display_end_poison = (
             fake_player.poison if fake_player is not None else opponent_start_poison + poison_dealt
