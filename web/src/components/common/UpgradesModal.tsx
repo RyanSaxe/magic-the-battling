@@ -80,6 +80,8 @@ export function UpgradesModal({
   const dialogRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // The Enter that opened this can still be held down, and neither applying nor revealing can be undone.
+      if (e.key === 'Enter' && e.repeat) { e.preventDefault(); return }
       if (enterPressesControl(e, dialogRef.current)) return
       if (e.key === 'Escape') {
         e.preventDefault()
