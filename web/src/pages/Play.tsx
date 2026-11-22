@@ -46,7 +46,6 @@ function useSoloLobbyWatcher(
   pendingGameId: string | null,
   soloPhaseRef: React.RefObject<SoloPhase>,
   autoStartEnabled: boolean,
-  opponents: OpponentCount,
   actions: { setReady: (r: boolean) => void; startGame: () => void },
   onNotEnoughPuppets: (available: number) => void,
   onStarting: () => void,
@@ -79,7 +78,7 @@ function useSoloLobbyWatcher(
 
     if (soloPhaseRef.current === "loading" && cubeJustReady) {
       const available = lobbyState.available_puppet_count ?? 0;
-      if (available >= opponents) {
+      if (available >= lobbyState.puppet_count) {
         onStarting();
         actions.setReady(true);
       } else {
@@ -100,7 +99,7 @@ function useSoloLobbyWatcher(
       onNavigating();
       actions.startGame();
     }
-  }, [actions, autoStartEnabled, lobbyState, onNavigating, onNotEnoughPuppets, onStarting, opponents, pendingGameId, soloPhaseRef]);
+  }, [actions, autoStartEnabled, lobbyState, onNavigating, onNotEnoughPuppets, onStarting, pendingGameId, soloPhaseRef]);
 
   return { reset };
 }
@@ -374,7 +373,6 @@ export function Play() {
     pendingGameId,
     soloPhaseRef,
     true,
-    opponents,
     actions,
     (available) => {
       setMaxAvailablePuppets(available);
