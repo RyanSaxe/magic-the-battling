@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { BasicLandSlot } from "./BasicLandSlot";
 import { SidePanelHostContext } from "./sidePanelHost";
 
@@ -25,4 +25,18 @@ it("takes the whole tap that closes the land picker, so nothing on the board get
 
   fireEvent.click(tapTarget!);
   expect(screen.queryByText("Swamp")).toBeNull();
+});
+
+it("closes on Escape alone, so what's open under it stays", () => {
+  const heardUnderIt = vi.fn();
+  window.addEventListener("keydown", heardUnderIt);
+  render(<BasicLandSlot selected={null} dimensions={{ width: 80, height: 112 }} onPick={() => {}} />);
+  fireEvent.click(screen.getByText("Click to pick basic land"));
+
+  const notHandled = fireEvent.keyDown(document.body, { key: "Escape" });
+  window.removeEventListener("keydown", heardUnderIt);
+
+  expect(screen.queryByText("Swamp")).toBeNull();
+  expect(notHandled).toBe(false);
+  expect(heardUnderIt).not.toHaveBeenCalled();
 });
