@@ -4,6 +4,16 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { SidePanelHostContext } from './common/sidePanelHost'
 import { PhasePopover } from './PhasePopover'
 
+// The popover's wording reads matchMedia when it is imported, and jsdom has none.
+vi.hoisted(() => {
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener() {},
+    removeEventListener() {},
+  })) as unknown as typeof window.matchMedia
+})
+
 afterEach(() => {
   cleanup()
   document.body.replaceChildren()

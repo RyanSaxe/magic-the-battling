@@ -1,3 +1,5 @@
+import { textForInput, type InputText } from '../utils/inputMode'
+
 export type Phase = "draft" | "build" | "battle" | "reward"
 export const PHASES: Phase[] = ['draft', 'build', 'battle', 'reward']
 export const DRAFT_DONE_BUTTON_LABEL = 'Go to Build'
@@ -10,8 +12,7 @@ export function getTimelinePhases(inSuddenDeath: boolean): Phase[] {
   return inSuddenDeath ? SUDDEN_DEATH_PHASES : PHASES
 }
 
-interface PhaseSummaryRow {
-  text: string
+interface PhaseSummaryRow extends InputText {
   requiresUpgrades?: boolean
 }
 
@@ -24,12 +25,12 @@ const PHASE_DISPLAY_NAMES: Record<Phase, string> = {
 
 const PHASE_SUMMARY_ROWS: Record<Phase, PhaseSummaryRow[]> = {
   draft: [
-    { text: 'Click any two cards to swap them.' },
+    { text: 'Click any two cards to swap them.', touch: 'Tap any two cards to swap them.' },
     { text: 'Spend a treasure to see a new pack of 5 cards.' },
     { text: 'Next up: build your starting hand from your pool.' },
   ],
   build: [
-    { text: 'Click any two cards to swap them.' },
+    { text: 'Click any two cards to swap them.', touch: 'Tap any two cards to swap them.' },
     { text: 'Basic lands and treasures start on the battlefield.' },
     { text: 'Next: play Magic with 10 life and empty libraries.' },
   ],
@@ -75,5 +76,5 @@ export function getPhaseTipsLabel(phase: Phase): string {
 export function getPhaseSummaryRows(phase: Phase, useUpgrades: boolean): string[] {
   return PHASE_SUMMARY_ROWS[phase]
     .filter((row) => useUpgrades || !row.requiresUpgrades)
-    .map((row) => row.text)
+    .map((row) => textForInput(row))
 }
