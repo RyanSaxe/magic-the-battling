@@ -92,4 +92,20 @@ describe('Game: what is open over the board', () => {
     tapFelt()
     expect(moves()).toBe(1)
   })
+
+  it('leaves a minimized Guide and its place alone while Players and Scouting open and close', async () => {
+    await openGameOnPhone(gameBootstrap({ phase: 'build', counts: { hand: 2, sideboard: 2 } }))
+    fireEvent.click(find('[data-guide-target="guide-button"]'))
+    fireEvent.click(screen.getByRole('radio', { name: 'FAQ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
+
+    fireEvent.click(find('[data-guide-target="sidebar-toggle"]'))
+    fireEvent.click(screen.getByRole('button', { name: /Bob/ }))
+    expect(screen.getByRole('button', { name: 'Open guide' })).toBeTruthy()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(document.querySelector('.side-panel--open')).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open guide' }))
+    expect(screen.getByRole('radio', { name: 'FAQ' }).getAttribute('aria-checked')).toBe('true')
+  })
 })

@@ -95,6 +95,7 @@ import {
 } from "./pendingPhaseAction";
 import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
 import {
+  guideShowing,
   isDrawerOpen,
   isZonePanelOpen,
   reduceGameBoard,
@@ -1064,8 +1065,12 @@ function GameContent() {
     });
   }, [selfPhase]);
 
-  const rulesPanel = openSurface?.kind === "guide" ? openSurface : null;
+  const rulesPanel = guideShowing(openSurface) ?? null;
   const rulesPanelOpen = rulesPanel !== null;
+  const setGuideMinimized = useCallback(
+    (minimized: boolean) => dispatchBoard({ type: "guideMinimized", minimized }),
+    [],
+  );
   const shareOpen = openSurface?.kind === "share";
 
   // Hover tracking for hotkeys
@@ -2630,6 +2635,8 @@ function GameContent() {
       {rulesPanel && (
         <RulesPanel
           onClose={() => closeSurface("guide")}
+          onMinimizedChange={setGuideMinimized}
+          behindPanel={openSurface?.kind !== "guide"}
           initialDocId={rulesPanel.target?.docId}
           initialTab={rulesPanel.target?.tab}
           gameId={gameId}
