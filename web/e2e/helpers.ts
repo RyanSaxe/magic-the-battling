@@ -327,9 +327,8 @@ export async function serveLobby(page: Page, baseURL: string, mode: LobbyMode = 
   })
 }
 
-// A plain card-shaped frame, so an offline run doesn't look like a broken image or a logo. It has a size, as
-// real art does, so an image sized by its content, such as the card zoom, still has a card's shape.
-const CARD_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="488" height="680" viewBox="0 0 488 680">
+// A plain card-shaped frame, so an offline run doesn't look like a broken image or a logo.
+const CARD_PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 680">
   <rect x="6" y="6" width="476" height="668" rx="28" fill="#3b3a36" stroke="#8a7a52" stroke-width="12"/>
   <rect x="40" y="70" width="408" height="300" rx="6" fill="#55534d"/>
 </svg>`
