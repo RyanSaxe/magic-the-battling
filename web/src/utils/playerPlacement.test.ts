@@ -60,7 +60,7 @@ describe("player placement ordering", () => {
     expect(getSidebarPlacementRank(players[2], players)).toBe(3);
   });
 
-  it("keeps alive players ahead of eliminated players and breaks alive ties by name", () => {
+  it("keeps alive players ahead of eliminated players and keeps join order on alive ties", () => {
     const players = [
       makePlayer({ name: "Charlie", placement: 0, poison: 3 }),
       makePlayer({ name: "Alpha", placement: 0, poison: 3 }),
@@ -68,8 +68,8 @@ describe("player placement ordering", () => {
     ];
 
     expect([...players].sort(comparePlayersForSidebar).map((player) => player.name)).toEqual([
-      "Alpha",
       "Charlie",
+      "Alpha",
       "Bravo",
     ]);
   });

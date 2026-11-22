@@ -7,10 +7,12 @@ import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { usePanelHoldsEnter } from "../utils/enterKey";
 import { useCubeLook } from "../hooks/useCubeLook";
+import { useBoardDesktop } from "../hooks/useBoardDesktop";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
 import { AppHeader, GuideButton, HomeButton } from "../components/common/AppHeader";
 import { PageFrame } from "../components/common/PageFrame";
+import { ZoneLabel } from "../components/common/ZoneLabel";
 import { InfoTip } from "../components/common/InfoTip";
 import { Switch } from "../components/common/Switch";
 import { LoadingScreen } from "../components/common/LoadingScreen";
@@ -18,6 +20,7 @@ import { type LoadingRouteState, START_STEPS, useHandedOnSteps } from "../compon
 import { LobbySeatNotice } from "../components/lobby/LobbySeatNotice";
 import { LobbySeats } from "../components/lobby/LobbySeats";
 import { RemovePlayerDialog } from "../components/lobby/RemovePlayerDialog";
+import { BoardArt, BoardCubeTitle, BoardDrawerHead, BoardLobbySeats } from "../components/setup/BoardParts";
 import { CubeBanner } from "../components/setup/CubeBanner";
 import { GuidedSwitch } from "../components/setup/GuidedSwitch";
 import { CrossIcon } from "../components/icons/CrossIcon";
@@ -152,6 +155,7 @@ export function Lobby() {
   const [editingDeck, setEditingDeck] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [closedHostChange, setClosedHostChange] = useState<string | null>(null);
+  const isBoard = useBoardDesktop();
   const [rulesPanelTarget, setRulesPanelTarget] = useState<
     RulesPanelTarget | undefined
   >(undefined);
@@ -479,164 +483,276 @@ export function Lobby() {
   };
   const seatActions = { ...actions, kickPlayer: setRemovingId };
 
+  const cardsButton = (
+    <button
+      onClick={() => openGuide({ docId: "__cards__" })}
+      disabled={!canBrowseCards}
+      className="btn btn-secondary btn-pill"
+    >
+      Cards
+    </button>
+  );
+  const joinCodeBlock = (
+    <>
+      <div>
+        <span className="setup-caption join-code-caption">Join code</span>
+        <span className="join-code">{lobbyState.join_code}</span>
+      </div>
+      <button onClick={copyJoinLink} className={`btn btn-pill ${copyIsNext ? "btn-primary" : "btn-secondary"}`}>
+        {copied ? "Copied!" : "Copy"}
+      </button>
+    </>
+  );
+  const seatStepper = (
+    <div className="seat-stepper">
+      <button
+        type="button"
+        onClick={() => {
+          if (previousPlayerCap !== null) actions.setTargetPlayerCount(previousPlayerCap);
+        }}
+        disabled={!canDecreasePlayerCap}
+        aria-label="Decrease player count"
+        className={`btn btn-secondary btn-pill btn-pill-square ${isHost ? "" : "invisible"}`}
+      >
+        −
+      </button>
+      <span className="seat-count">{playerCap} seats</span>
+      <button
+        type="button"
+        onClick={() => {
+          if (nextPlayerCap !== null) actions.setTargetPlayerCount(nextPlayerCap);
+        }}
+        disabled={!canIncreasePlayerCap}
+        aria-label="Increase player count"
+        className={`btn btn-secondary btn-pill btn-pill-square ${isHost ? "" : "invisible"}`}
+      >
+        +
+      </button>
+    </div>
+  );
+  const lobbySettings = (
+    <div className="lobby-settings">
+      <GuidedSwitch enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
+      <div className="setup-setting">
+        <Switch
+          checked={lobbyState.voice_chat_enabled}
+          onChange={(enabled) => send("set_voice_chat", { enabled })}
+          disabled={!isHost}
+        >
+          Voice <span className="switch-beta">Beta</span>
+        </Switch>
+        <InfoTip label="Voice chat info" text={VOICE_HELP} />
+      </div>
+    </div>
+  );
+  const lobbyActions = (
+    <div className={`lobby-actions ${isHost ? "" : "is-guest"}`}>
+      <button
+        onClick={toggleReady}
+        disabled={readyActionDisabled}
+        className={`btn setup-next ${isReady ? "btn-secondary" : "btn-success"}`}
+      >
+        {isReady ? "Unready" : "Ready"}
+      </button>
+      {isHost && (
+        <button
+          onClick={requestStart}
+          data-ends-phase
+          disabled={!lobbyState.can_start || startAwaitingServer}
+          className={`btn setup-next ${startWaits ? "setup-waiting" : "btn-primary"}`}
+        >
+          Start Game
+          {startReason && <small>{startReason}</small>}
+        </button>
+      )}
+    </div>
+  );
+  const deckEntryFields = (
+    <>
+      <label className="setup-field">
+        <span className="setup-caption">Your deck</span>
+        <input
+          type="text"
+          value={battlerIdInput}
+          onChange={(event) => setBattlerIdInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !isBattlerLoading && !deckUnchanged) {
+              submitBattler();
+            }
+          }}
+          autoFocus={isEditingDeck}
+          onFocus={(event) => {
+            if (isEditingDeck) event.target.select();
+          }}
+          placeholder="Deck ID"
+          disabled={isBattlerLoading}
+          className="setup-input"
+        />
+      </label>
+      {isEditingDeck && (
+        <button onClick={() => setEditingDeck(false)} className="btn btn-secondary setup-submit">
+          Cancel
+        </button>
+      )}
+      <button
+        onClick={handleBattlerButtonClick}
+        disabled={isBattlerLoading || deckUnchanged}
+        className={`btn setup-submit ${deckUnchanged ? "setup-waiting" : "btn-primary"}`}
+      >
+        {isBattlerLoading ? "Loading..." : "Submit"}
+      </button>
+    </>
+  );
+  const boardNeedsDeckEntry = isConstructed && !!currentPlayer && !showsDeck;
+  const boardNotice = hostNotice("board-notice");
+
   return (
     <>
       {reconnecting}
-      <PageFrame header={header} scroll={false} contentClassName="setup-page" hints="game">
-        <CubeBanner
-          look={cubeLook}
-          playMode={lobbyState.play_mode}
-          notice={hostNotice("cube-banner-notice")}
-          href={summaryBattlerId ? cubeCobraUrl(summaryBattlerId) : undefined}
-          action={
-            <button
-              onClick={() => openGuide({ docId: "__cards__" })}
-              disabled={!canBrowseCards}
-              className="btn btn-secondary btn-pill"
-            >
-              Cards
-            </button>
+      {isBoard ? (
+        <PageFrame
+          header={header}
+          scroll={false}
+          contentClassName="setup-page board-page"
+          hints="game"
+          aside={
+            <aside aria-label="At the table" className="board-aside frame-chrome is-lobby">
+              <BoardDrawerHead />
+              <div className="board-seats">
+                <BoardLobbySeats
+                  lobby={lobbyState}
+                  isHost={isHost}
+                  openSeats={openSeats}
+                  selfId={session?.playerId}
+                  voiceChat={voiceChat}
+                  actions={seatActions}
+                  onPuppetHelp={() => openGuide({ docId: "faq", tab: "why-are-my-opponents-cards-face-up" })}
+                />
+              </div>
+            </aside>
           }
         >
-          <div>
-            <span className="setup-caption join-code-caption">Join code</span>
-            <span className="join-code">{lobbyState.join_code}</span>
-          </div>
-          <button onClick={copyJoinLink} className={`btn btn-pill ${copyIsNext ? "btn-primary" : "btn-secondary"}`}>
-            {copied ? "Copied!" : "Copy"}
-          </button>
-          <div className="seat-stepper">
-            <button
-              type="button"
-              onClick={() => {
-                if (previousPlayerCap !== null) actions.setTargetPlayerCount(previousPlayerCap);
-              }}
-              disabled={!canDecreasePlayerCap}
-              aria-label="Decrease player count"
-              className={`btn btn-secondary btn-pill btn-pill-square ${isHost ? "" : "invisible"}`}
-            >
-              −
-            </button>
-            <span className="seat-count">{playerCap} seats</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (nextPlayerCap !== null) actions.setTargetPlayerCount(nextPlayerCap);
-              }}
-              disabled={!canIncreasePlayerCap}
-              aria-label="Increase player count"
-              className={`btn btn-secondary btn-pill btn-pill-square ${isHost ? "" : "invisible"}`}
-            >
-              +
-            </button>
-          </div>
-        </CubeBanner>
-
-        <div className="setup-felt lobby-felt">
-          <p className="lobby-summary">
-            <b>
-              {occupiedSlots} of {playerCap} seated
-            </b>
-            <span>
-              {isConstructed ? "Constructed" : "Limited"} · Upgrades {lobbyState.use_upgrades ? "On" : "Off"}
-              {lobbyState.auto_approve_spectators && <span className="lobby-spectating">Open Spectating</span>}
-            </span>
-          </p>
-
-          {isConstructed && currentPlayer && (
-            <div className={`setup-row lobby-deck ${showsDeck ? "is-loaded" : ""}`}>
-              {showsDeck ? (
-                <div className="setup-field">
-                  <span className="setup-caption">Your deck</span>
-                  <span className="setup-value text-[var(--ivory-muted)]">{deckId}</span>
-                </div>
-              ) : (
-                <label className="setup-field">
-                  <span className="setup-caption">Your deck</span>
-                  <input
-                    type="text"
-                    value={battlerIdInput}
-                    onChange={(event) => setBattlerIdInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !isBattlerLoading && !deckUnchanged) {
-                        submitBattler();
-                      }
-                    }}
-                    autoFocus={isEditingDeck}
-                    onFocus={(event) => {
-                      if (isEditingDeck) event.target.select();
-                    }}
-                    placeholder="Deck ID"
-                    disabled={isBattlerLoading}
-                    className="setup-input"
+          <div className="board-layout is-lobby">
+            <section className="zone-hand board-cube">
+              <BoardArt
+                look={boardNeedsDeckEntry ? null : cubeLook}
+                empty={
+                  boardNeedsDeckEntry ? (
+                    <div className="board-slot-entry">
+                      <div className="setup-row board-deck">{deckEntryFields}</div>
+                    </div>
+                  ) : undefined
+                }
+              />
+              <div className="board-words">
+                {boardNotice || (
+                  <BoardCubeTitle
+                    look={isConstructed && !hasLoadedBattler ? null : cubeLook}
+                    playMode={lobbyState.play_mode}
+                    href={summaryBattlerId ? cubeCobraUrl(summaryBattlerId) : undefined}
                   />
-                </label>
-              )}
-              {isEditingDeck && (
-                <button onClick={() => setEditingDeck(false)} className="btn btn-secondary setup-submit">
-                  Cancel
-                </button>
-              )}
-              <button
-                onClick={handleBattlerButtonClick}
-                disabled={isBattlerLoading || deckUnchanged}
-                className={`btn setup-submit ${showsDeck ? "btn-secondary" : deckUnchanged ? "setup-waiting" : "btn-primary"}`}
-              >
-                {showsDeck ? "Change" : isBattlerLoading ? "Loading..." : "Submit"}
-              </button>
-            </div>
-          )}
-
-          <LobbySeats
-            lobby={lobbyState}
-            isHost={isHost}
-            openSeats={openSeats}
-            compact={playerCap > 6}
-            selfId={session?.playerId}
-            voiceChat={voiceChat}
-            actions={seatActions}
-            onPuppetHelp={() => openGuide({ docId: "faq", tab: "why-are-my-opponents-cards-face-up" })}
-          />
-
-          {/* Shown instead of the banner's, where a short phone needs the banner for the deck */}
-          {isConstructed && hostNotice("lobby-away-notice")}
-
-          <div className="lobby-settings">
-            <GuidedSwitch enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
-            <div className="setup-setting">
-              <Switch
-                checked={lobbyState.voice_chat_enabled}
-                onChange={(enabled) => send("set_voice_chat", { enabled })}
-                disabled={!isHost}
-              >
-                Voice <span className="switch-beta">Beta</span>
-              </Switch>
-              <InfoTip label="Voice chat info" text={VOICE_HELP} />
-            </div>
+                )}
+                <p className="board-summary">
+                  <b className="font-semibold text-[var(--ivory)]">
+                    {occupiedSlots} of {playerCap} seated
+                  </b>
+                  <br />
+                  {isConstructed ? "Constructed" : "Limited"} · Upgrades {lobbyState.use_upgrades ? "On" : "Off"}
+                  {lobbyState.auto_approve_spectators && <span className="lobby-spectating">Open Spectating</span>}
+                </p>
+                <div className="board-code">{joinCodeBlock}</div>
+                <div className="board-cube-actions">
+                  {cardsButton}
+                  {isConstructed && currentPlayer && showsDeck && (
+                    <button
+                      type="button"
+                      onClick={editDeck}
+                      disabled={isBattlerLoading}
+                      className="btn btn-secondary btn-pill"
+                    >
+                      Change
+                    </button>
+                  )}
+                </div>
+              </div>
+            </section>
+            <section className="zone-battlefield board-setup">
+              <ZoneLabel hideGrip>Lobby</ZoneLabel>
+              <div className="board-two">
+                <div className="board-stack board-lobby-options">
+                  {seatStepper}
+                  {lobbySettings}
+                </div>
+                <div className="board-lobby-start">{lobbyActions}</div>
+              </div>
+            </section>
           </div>
+        </PageFrame>
+      ) : (
+        <PageFrame header={header} scroll={false} contentClassName="setup-page" hints="game">
+          <CubeBanner
+            look={cubeLook}
+            playMode={lobbyState.play_mode}
+            notice={hostNotice("cube-banner-notice")}
+            href={summaryBattlerId ? cubeCobraUrl(summaryBattlerId) : undefined}
+            action={cardsButton}
+          >
+            {joinCodeBlock}
+            {seatStepper}
+          </CubeBanner>
 
-          <div className={`lobby-actions ${isHost ? "" : "is-guest"}`}>
-            <button
-              onClick={toggleReady}
-              disabled={readyActionDisabled}
-              className={`btn setup-next ${isReady ? "btn-secondary" : "btn-success"}`}
-            >
-              {isReady ? "Unready" : "Ready"}
-            </button>
-            {isHost && (
-              <button
-                onClick={requestStart}
-                data-ends-phase
-                disabled={!lobbyState.can_start || startAwaitingServer}
-                className={`btn setup-next ${startWaits ? "setup-waiting" : "btn-primary"}`}
-              >
-                Start Game
-                {startReason && <small>{startReason}</small>}
-              </button>
+          <div className="setup-felt lobby-felt">
+            <p className="lobby-summary">
+              <b>
+                {occupiedSlots} of {playerCap} seated
+              </b>
+              <span>
+                {isConstructed ? "Constructed" : "Limited"} · Upgrades {lobbyState.use_upgrades ? "On" : "Off"}
+                {lobbyState.auto_approve_spectators && <span className="lobby-spectating">Open Spectating</span>}
+              </span>
+            </p>
+
+            {isConstructed && currentPlayer && (
+              <div className={`setup-row lobby-deck ${showsDeck ? "is-loaded" : ""}`}>
+                {showsDeck ? (
+                  <>
+                    <div className="setup-field">
+                      <span className="setup-caption">Your deck</span>
+                      <span className="setup-value text-[var(--ivory-muted)]">{deckId}</span>
+                    </div>
+                    <button
+                      onClick={handleBattlerButtonClick}
+                      disabled={isBattlerLoading}
+                      className="btn setup-submit btn-secondary"
+                    >
+                      Change
+                    </button>
+                  </>
+                ) : (
+                  deckEntryFields
+                )}
+              </div>
             )}
+
+            <LobbySeats
+              lobby={lobbyState}
+              isHost={isHost}
+              openSeats={openSeats}
+              compact={playerCap > 6}
+              selfId={session?.playerId}
+              voiceChat={voiceChat}
+              actions={seatActions}
+              onPuppetHelp={() => openGuide({ docId: "faq", tab: "why-are-my-opponents-cards-face-up" })}
+            />
+
+            {/* Shown instead of the banner's, where a short phone needs the banner for the deck */}
+            {isConstructed && hostNotice("lobby-away-notice")}
+
+            {lobbySettings}
+            {lobbyActions}
           </div>
-        </div>
-      </PageFrame>
+        </PageFrame>
+      )}
       {removing && (
         <RemovePlayerDialog
           name={removing.name}

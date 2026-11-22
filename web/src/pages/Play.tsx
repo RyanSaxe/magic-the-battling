@@ -5,6 +5,7 @@ import { useGame } from "../hooks/useGame";
 import { useToast } from "../contexts";
 import { useAuth } from "../contexts/authState";
 import { useCubeLook } from "../hooks/useCubeLook";
+import { useBoardDesktop } from "../hooks/useBoardDesktop";
 import { useHotkeys } from "../hooks/useHotkeys";
 import { GoldfishIcon } from "../components/icons/GoldfishIcon";
 import { AppHeader, HomeButton } from "../components/common/AppHeader";
@@ -12,10 +13,14 @@ import { JoinGameModal } from "../components/home/JoinGameModal";
 import { LoadingScreen } from "../components/common/LoadingScreen";
 import { type LoadingRouteState, goldfishSteps, loadStep, newLobbySteps } from "../components/common/loadingSteps";
 import { PageFrame } from "../components/common/PageFrame";
+import { ZoneLabel } from "../components/common/ZoneLabel";
+import { PlayerCard } from "../components/PlayerCard";
+import { PLAYER_ROW_STACK_CLASS } from "../components/PlayerList";
 import { CloseSeatDialog, ResumeList, ResumeShelf } from "../components/ResumeGame";
 import { useResumableGames, type ResumableSeat } from "../hooks/useResumableGames";
 import { SurfaceCard } from "../components/common/SurfaceCard";
 import { Switch } from "../components/common/Switch";
+import { BoardArt, BoardCubeTitle, BoardDrawerHead, BoardPlayGames, SeatLead } from "../components/setup/BoardParts";
 import { CubeBanner } from "../components/setup/CubeBanner";
 import { GuidedSwitch } from "../components/setup/GuidedSwitch";
 import { SegmentedFilter } from "../components/dashboard/SegmentedFilter";
@@ -198,9 +203,12 @@ export function Play() {
   const setPlayerName = user ? () => {} : setGuestName;
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [view, setView] = useState<PlayView>("setup");
+  const [gamesUnfolded, setGamesUnfolded] = useState(false);
   const [seatToClose, setSeatToClose] = useState<ResumableSeat | null>(null);
   const [closedIds, setClosedIds] = useState<string[]>([]);
   const stripButtonRef = useRef<HTMLButtonElement>(null);
+  const restoreStripFocusRef = useRef(false);
+  const isBoard = useBoardDesktop();
   const [cubeId, setCubeId] = useState(() => searchParams.get("cubeId") || "auto");
   // The banner follows the ID when Change cube closes, rather than asking the server about each key typed.
   const [bannerCubeId, setBannerCubeId] = useState(() => cubeId.trim());
@@ -526,9 +534,18 @@ export function Play() {
   const showView = (next: PlayView, byKeyboard = false) => {
     if (view === "options") setBannerCubeId(cubeId.trim());
     setView(next);
-    // The button a key pressed can leave with its view, and the strip's button is in all of them.
-    if (byKeyboard) stripButtonRef.current?.focus({ preventScroll: true });
+    // The button a key pressed can leave with its view (and in Board moves between the art slot and words).
+    if (byKeyboard) {
+      restoreStripFocusRef.current = true;
+      stripButtonRef.current?.focus({ preventScroll: true });
+    }
   };
+  useEffect(() => {
+    if (!restoreStripFocusRef.current) return;
+    restoreStripFocusRef.current = false;
+    stripButtonRef.current?.focus({ preventScroll: true });
+  }, [shownView, bannerCubeId]);
+  const toggleGamesUnfolded = useCallback(() => setGamesUnfolded((was) => !was), []);
   useHotkeys(
     { escape: () => showView("setup", true) },
     shownView !== "setup" && !showJoinModal && !seatToClose,
@@ -571,143 +588,270 @@ export function Play() {
     );
   }
 
+  const header = (
+    <AppHeader
+      helpers={
+        <button onClick={() => setShowJoinModal(true)} className="btn btn-secondary hidden sm:inline-block">
+          Join Game
+        </button>
+      }
+      home={<HomeButton />}
+    />
+  );
+
+  const changeButton = (
+    <button
+      ref={stripButtonRef}
+      type="button"
+      onClick={() => showView(shownView === "setup" ? "options" : "setup", false)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") restoreStripFocusRef.current = true;
+      }}
+      className="btn btn-secondary btn-pill"
+    >
+      {shownView !== "setup" ? "Back" : playMode === "constructed" ? "Change deck" : "Change cube"}
+    </button>
+  );
+
+  const modeSwitch = (
+    <SegmentedFilter
+      label="How to play"
+      options={MODE_OPTIONS}
+      value={activeMode}
+      onChange={setActiveMode}
+      variant="field"
+    />
+  );
+
+  const personRow = (
+    <div className="setup-row">
+      {user ? (
+        <div className="setup-field">
+          <span className="setup-caption">Your name</span>
+          <span className="setup-value">{playerName}</span>
+        </div>
+      ) : (
+        <label className="setup-field">
+          <span className="setup-caption">Your name</span>
+          <input
+            id="player-name"
+            type="text"
+            value={nameLoading ? "" : playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleNameEnter()}
+            disabled={nameLoading}
+            placeholder={nameLoading ? "Generating name..." : "Enter your name"}
+            className="setup-input"
+          />
+        </label>
+      )}
+      <GuidedSwitch enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
+    </div>
+  );
+
+  const startButton = (
+    <button onClick={startNewGame} disabled={!nameValid} className="btn btn-primary setup-next">
+      {activeMode === "solo" ? "Start Game" : "Create Lobby"}
+    </button>
+  );
+
+  const optionsFields = (
+    <>
+      <label className="setup-field">
+        <span className="setup-caption">CubeCobra ID</span>
+        <input
+          type="text"
+          value={cubeId}
+          onChange={(e) => setCubeId(e.target.value)}
+          placeholder="auto"
+          className="setup-input"
+        />
+      </label>
+      <SegmentedFilter
+        label="Limited or Constructed"
+        options={PLAY_MODE_OPTIONS}
+        value={playMode}
+        onChange={setPlayMode}
+        variant="field"
+      />
+      {activeMode === "solo" ? (
+        <div className="setup-row">
+          <span className="setup-row-label">Opponents</span>
+          <SegmentedFilter
+            label="Opponents"
+            options={OPPONENT_OPTIONS.map((n) => ({ value: String(n), label: n }))}
+            value={String(opponents)}
+            onChange={(value) => setOpponents(Number(value) as OpponentCount)}
+            variant="field"
+          />
+        </div>
+      ) : (
+        <Switch spread checked={autoApproveSpectators} onChange={setAutoApproveSpectators}>
+          Open Spectating · let anyone watch
+        </Switch>
+      )}
+      <Switch spread checked={useUpgrades} onChange={setUseUpgrades}>
+        Upgrades · upgrade a card every 3 rounds
+      </Switch>
+      <button
+        onClick={(event) => showView("setup", event.detail === 0)}
+        className="btn btn-primary setup-next"
+      >
+        Done
+      </button>
+    </>
+  );
+
+  const isGoldfish = activeMode === "solo";
+  const previewOthers = Array.from({ length: isGoldfish ? opponents : 3 }, (_, i) =>
+    isGoldfish ? `Puppet\u00a0${i + 1}` : "Open seat",
+  );
+  const noDeck = cubeLook === null;
+  const boardView = shownView === "options" ? "options" : "setup";
+  const boardGamesOpen = seats.length > 0 && gamesUnfolded;
+
   return (
     <>
-      <PageFrame
-        header={<AppHeader
-          helpers={
-            <button onClick={() => setShowJoinModal(true)} className="btn btn-secondary hidden sm:inline-block">
-              Join Game
-            </button>
-          }
-          home={<HomeButton />}
-        />}
-        scroll={false}
-        contentClassName="setup-page"
-        hints="play"
-      >
-        <CubeBanner look={cubeLook} playMode={playMode}>
-          <p className="setup-summary">{stripLabel}</p>
-          <button
-            ref={stripButtonRef}
-            type="button"
-            onClick={() => showView(shownView === "setup" ? "options" : "setup")}
-            className="btn btn-secondary btn-pill"
-          >
-            {shownView !== "setup" ? "Back" : playMode === "constructed" ? "Change deck" : "Change cube"}
-          </button>
-        </CubeBanner>
-
-        {shownView === "setup" && (
-          <>
-            <div className="setup-felt play-felt">
-              <SegmentedFilter
-                label="How to play"
-                options={MODE_OPTIONS}
-                value={activeMode}
-                onChange={setActiveMode}
-                variant="field"
-              />
-              <ModePitch mode={activeMode} />
-              <div className="setup-row">
-                {user ? (
-                  <div className="setup-field">
-                    <span className="setup-caption">Your name</span>
-                    <span className="setup-value">{playerName}</span>
+      {isBoard ? (
+        <PageFrame
+          header={header}
+          scroll={false}
+          contentClassName="setup-page board-page"
+          hints="play"
+          aside={
+            <aside aria-label="At the table" className="board-aside frame-chrome">
+              <BoardDrawerHead />
+              {!boardGamesOpen && (
+                <div className="board-seats">
+                  <div className={PLAYER_ROW_STACK_CLASS}>
+                    <PlayerCard isSelf lead={<SeatLead who="person" />} name={playerName || "\u00a0"}>
+                      {!isGoldfish && <span className="player-card-label">Host</span>}
+                    </PlayerCard>
+                    {previewOthers.map((name, index) => (
+                      <PlayerCard
+                        key={index}
+                        isOpen={!isGoldfish}
+                        lead={<SeatLead who={isGoldfish ? "puppet" : "open"} />}
+                        name={name}
+                      >
+                        {isGoldfish && <span className="player-card-label">Puppet</span>}
+                      </PlayerCard>
+                    ))}
                   </div>
-                ) : (
-                  <label className="setup-field">
-                    <span className="setup-caption">Your name</span>
-                    <input
-                      id="player-name"
-                      type="text"
-                      value={nameLoading ? "" : playerName}
-                      onChange={(e) => setPlayerName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleNameEnter()}
-                      disabled={nameLoading}
-                      placeholder={nameLoading ? "Generating name..." : "Enter your name"}
-                      className="setup-input"
-                    />
-                  </label>
-                )}
-                <GuidedSwitch enabled={isGuidedMode} setEnabled={handleGuidedModeToggle} />
-              </div>
-              <div className="play-actions">
-                {activeMode === "friends" && (
-                  <button onClick={() => setShowJoinModal(true)} className="btn btn-secondary setup-next play-join">
-                    Join Game
-                  </button>
-                )}
-                <button onClick={startNewGame} disabled={!nameValid} className="btn btn-primary setup-next">
-                  {activeMode === "solo" ? "Start Game" : "Create Lobby"}
-                </button>
-              </div>
-            </div>
-            <ResumeShelf
-              seats={seats}
-              onClose={setSeatToClose}
-              onShowAll={(byKeyboard) => showView("resume", byKeyboard)}
-            />
-          </>
-        )}
-
-        {shownView === "options" && (
-          <div
-            className="setup-felt play-felt"
-            // Hotkeys skip keys from inputs, which every field and switch here is.
-            onKeyDown={(event) => {
-              if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
-              event.stopPropagation();
-              showView("setup", true);
-            }}
-          >
-            <label className="setup-field">
-              <span className="setup-caption">CubeCobra ID</span>
-              <input
-                type="text"
-                value={cubeId}
-                onChange={(e) => setCubeId(e.target.value)}
-                placeholder="auto"
-                className="setup-input"
+                </div>
+              )}
+              <BoardPlayGames
+                seats={seats}
+                open={boardGamesOpen}
+                onToggle={toggleGamesUnfolded}
+                onClose={setSeatToClose}
               />
-            </label>
-            <SegmentedFilter
-              label="Limited or Constructed"
-              options={PLAY_MODE_OPTIONS}
-              value={playMode}
-              onChange={setPlayMode}
-              variant="field"
-            />
-            {activeMode === "solo" ? (
-              <div className="setup-row">
-                <span className="setup-row-label">Opponents</span>
-                <SegmentedFilter
-                  label="Opponents"
-                  options={OPPONENT_OPTIONS.map((n) => ({ value: String(n), label: n }))}
-                  value={String(opponents)}
-                  onChange={(value) => setOpponents(Number(value) as OpponentCount)}
-                  variant="field"
-                />
+            </aside>
+          }
+        >
+          <div className="board-layout">
+            <section className="zone-hand board-cube">
+              <BoardArt
+                look={cubeLook}
+                empty={
+                  noDeck && boardView === "setup" ? (
+                    <div className="board-slot-entry">
+                      <span className="setup-caption">Your deck</span>
+                      {changeButton}
+                    </div>
+                  ) : undefined
+                }
+              />
+              <div className="board-words">
+                <BoardCubeTitle look={cubeLook} playMode={playMode} />
+                <p className="board-summary">{stripLabel}</p>
+                {(!noDeck || boardView !== "setup") && <div>{changeButton}</div>}
               </div>
-            ) : (
-              <Switch spread checked={autoApproveSpectators} onChange={setAutoApproveSpectators}>
-                Open Spectating · let anyone watch
-              </Switch>
-            )}
-            <Switch spread checked={useUpgrades} onChange={setUseUpgrades}>
-              Upgrades · upgrade a card every 3 rounds
-            </Switch>
-            <button
-              onClick={(event) => showView("setup", event.detail === 0)}
-              className="btn btn-primary setup-next"
+            </section>
+            <section
+              className="zone-battlefield board-setup"
+              onKeyDown={
+                boardView === "options"
+                  ? (event) => {
+                      if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
+                      event.stopPropagation();
+                      showView("setup", true);
+                    }
+                  : undefined
+              }
             >
-              Done
-            </button>
+              <ZoneLabel hideGrip>{boardView === "options" ? "Options" : "New game"}</ZoneLabel>
+              <div className="board-two">
+                {boardView === "options" ? (
+                  <div className="board-options">{optionsFields}</div>
+                ) : (
+                  <>
+                    <div className="board-stack">
+                      {modeSwitch}
+                      <ModePitch mode={activeMode} />
+                    </div>
+                    <div className="board-stack">
+                      {personRow}
+                      {startButton}
+                    </div>
+                  </>
+                )}
+              </div>
+            </section>
           </div>
-        )}
+        </PageFrame>
+      ) : (
+        <PageFrame
+          header={header}
+          scroll={false}
+          contentClassName="setup-page"
+          hints="play"
+        >
+          <CubeBanner look={cubeLook} playMode={playMode}>
+            <p className="setup-summary">{stripLabel}</p>
+            {changeButton}
+          </CubeBanner>
 
-        {shownView === "resume" && <ResumeList seats={seats} onClose={setSeatToClose} />}
-      </PageFrame>
+          {shownView === "setup" && (
+            <>
+              <div className="setup-felt play-felt">
+                {modeSwitch}
+                <ModePitch mode={activeMode} />
+                {personRow}
+                <div className="play-actions">
+                  {activeMode === "friends" && (
+                    <button onClick={() => setShowJoinModal(true)} className="btn btn-secondary setup-next play-join">
+                      Join Game
+                    </button>
+                  )}
+                  {startButton}
+                </div>
+              </div>
+              <ResumeShelf
+                seats={seats}
+                onClose={setSeatToClose}
+                onShowAll={(byKeyboard) => showView("resume", byKeyboard)}
+              />
+            </>
+          )}
+
+          {shownView === "options" && (
+            <div
+              className="setup-felt play-felt"
+              // Hotkeys skip keys from inputs, which every field and switch here is.
+              onKeyDown={(event) => {
+                if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
+                event.stopPropagation();
+                showView("setup", true);
+              }}
+            >
+              {optionsFields}
+            </div>
+          )}
+
+          {shownView === "resume" && <ResumeList seats={seats} onClose={setSeatToClose} />}
+        </PageFrame>
+      )}
 
       {showJoinModal && <JoinGameModal onClose={() => setShowJoinModal(false)} />}
 
