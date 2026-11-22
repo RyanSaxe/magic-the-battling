@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import { computeBattleZones } from "../hooks/useBattleCardSizes";
 import { layoutForContainer } from "../hooks/useCardLayout";
 import {
+  MODAL_BOXES,
   SAVED_LAYOUTS,
   VIEWPORTS,
+  battleBoard,
   battleCases,
   battleConfig,
   checksSavedLayouts,
   isTypicalCase,
+  modalCases,
   zoneCases,
   type Viewport,
 } from "./cases";
@@ -20,6 +23,9 @@ import {
   type CheckId,
   type Failure,
 } from "./checks";
+
+// Viewports first, then the boxes the modals are swept over, in the order the results list them.
+const SIZES = [...VIEWPORTS, ...MODAL_BOXES];
 
 // Fractional content boxes, as OS display scaling and browser zoom produce.
 const SUBPIXEL_OFFSETS = [0.2, 0.4, 0.6, 0.8];
@@ -70,7 +76,7 @@ class Results {
     ];
     const order = (key: string) => {
       const [check, surface, viewport] = key.split("\t");
-      return [check, surface, String(VIEWPORTS.findIndex((each) => each.name === viewport)).padStart(3, "0")].join("\t");
+      return [check, surface, String(SIZES.findIndex((each) => each.name === viewport)).padStart(3, "0")].join("\t");
     };
     const keys = [...this.groups.keys()].sort((a, b) => order(a).localeCompare(order(b)));
     let check = "";
@@ -128,8 +134,8 @@ function sweep(): Results {
         for (const check of ["card-outside-zone", "card-below-minimum", "zones-off-board"] as const) {
           results.record(check, surface, viewport, battleCase.label, failures);
         }
-        const { width, height } = viewport.battleBoard;
-        results.output(surface, viewport, [battleCase.label, computeBattleZones(width, height, battleConfig(viewport, battleCase, isSuddenDeath))]);
+        const { width, height } = battleBoard(viewport, isSuddenDeath);
+        results.output(surface, viewport, [battleCase.label, computeBattleZones(width, height, battleConfig(viewport, battleCase))]);
       }
     }
     const typicalBattle = battles.find((battleCase) => battleCase.label === "hand 7, opponent hand 7, lands 4, nonlands 3")!;
@@ -140,6 +146,17 @@ function sweep(): Results {
     for (const board of battleBoards) {
       const failures = checkBattleMeasurement(viewport, typicalBattle, board);
       results.record("measurement-changes-layout", "battle", viewport, `${typicalBattle.label}, board ${board.width}x${board.height}`, failures);
+    }
+  }
+
+  for (const box of MODAL_BOXES) {
+    for (const zoneCase of modalCases()) {
+      const failures = checkZoneLayout(box, zoneCase, null);
+      for (const check of ["card-outside-zone", "card-below-minimum", "zones-off-board"] as const) {
+        results.record(check, zoneCase.phase, box, zoneCase.label, failures);
+      }
+      const layout = layoutForContainer(box.width, box.height, zoneCase.config);
+      results.output(zoneCase.phase, box, [zoneCase.label, layout.dims, layout.frames]);
     }
   }
   return results;
