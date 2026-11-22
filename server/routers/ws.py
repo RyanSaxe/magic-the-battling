@@ -139,7 +139,8 @@ class ConnectionManager:
         self._pending_connections[game_id].discard(player_id)
         game_manager.note_human_activity(game_id)
         if previous is not None and previous is not websocket:
-            await _close_replaced_socket(previous)
+            # A close ends only when the other end lets go of it, which behind a proxy takes seconds.
+            self._run_soon(_close_replaced_socket(previous))
         return True
 
     def disconnect(self, game_id: str, player_id: str, websocket: WebSocket) -> None:
