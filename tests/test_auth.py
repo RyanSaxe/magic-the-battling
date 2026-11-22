@@ -134,6 +134,28 @@ class TestCaseInsensitiveAccounts:
             assert response.json()["username"] == "Jace_Fan"
             assert response.json()["email"] == "Jace.Fan@Test.com"
 
+    @pytest.mark.parametrize("names", [("Jace_Fan", "jace_fan"), ("jace_fan", "Jace_Fan")])
+    @pytest.mark.parametrize("passwords", [("password123", "password123"), ("password123", "different456")])
+    def test_login_never_picks_between_accounts_that_differ_only_by_case(self, client, names, passwords):
+        db = db_module.SessionLocal()
+        try:
+            for index in LOWERCASE_INDEXES:
+                db.execute(text(f"DROP INDEX {index}"))
+            ids = [str(auth_service.create_user(db, *account).id) for account in zip(names, passwords, strict=True)]
+        finally:
+            db.close()
+
+        for username, password, user_id in zip(names, passwords, ids, strict=True):
+            exact = client.post("/api/auth/login", json={"username": username, "password": password})
+            assert exact.status_code == 200
+            assert exact.json()["user_id"] == user_id
+            assert client.get("/api/auth/me").json()["user_id"] == user_id
+
+        for password in passwords:
+            third_spelling = client.post("/api/auth/login", json={"username": "JACE_FAN", "password": password})
+            assert third_spelling.status_code == 401
+            assert third_spelling.json()["code"] == "INVALID_CREDENTIALS"
+
     def test_the_database_rejects_accounts_that_differ_only_by_case(self, test_db):
         db = db_module.SessionLocal()
         try:
