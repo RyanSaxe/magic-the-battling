@@ -78,7 +78,9 @@ import type {
 } from "../guided/types";
 import {
   getRememberedSeat,
+  getRememberedSpectatorName,
   rememberPlayerForGame,
+  rememberSpectatorName,
 } from "../utils/deviceIdentity";
 import {
   isSubmitPopoverGuideStepActive,
@@ -234,7 +236,8 @@ function PlayerSelectionModal({
   const [statusError, setStatusError] = useState<AppError | null>(null);
   const [statusAttempt, setStatusAttempt] = useState(0);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
-  const [spectatorName, setSpectatorName] = useState("");
+  const [typedSpectatorName, setTypedSpectatorName] = useState(() => getRememberedSpectatorName() ?? "");
+  const spectatorName = user ? user.username : typedSpectatorName;
   const [error, setError] = useState("");
   const requestError = spectate.state.kind === "choosing" ? spectate.state.error : undefined;
   const shownError =
@@ -282,6 +285,7 @@ function PlayerSelectionModal({
       return;
     }
     setError("");
+    if (!user) rememberSpectatorName(spectatorName.trim());
     void spectate.request(selectedPlayer, spectatorName);
   };
 
@@ -483,8 +487,9 @@ function PlayerSelectionModal({
               <input
                 type="text"
                 value={spectatorName}
-                onChange={(e) => setSpectatorName(e.target.value)}
-                className={TEXT_INPUT}
+                onChange={(e) => !user && setTypedSpectatorName(e.target.value)}
+                disabled={!!user}
+                className={`${TEXT_INPUT} disabled:opacity-50`}
                 placeholder="Enter your name"
               />
             </div>
