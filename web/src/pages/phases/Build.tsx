@@ -344,7 +344,8 @@ export function BuildPhase({
     return (
       <button
         type="button"
-        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold btn-game transition-opacity duration-150 ${visibilityClasses}`}
+        // A card's art runs from about a ninth to five ninths of its height, so a third is its middle.
+        className={`absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold btn-game transition-opacity duration-150 ${visibilityClasses}`}
         onClick={(e) => {
           e.stopPropagation();
           onQuickUpgrade?.(card.id);
