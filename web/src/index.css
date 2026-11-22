@@ -435,6 +435,12 @@ input:-webkit-autofill:focus {
   display: none;
 }
 
+/* A backdrop alone in this layer made WebKit on Linux repaint the board for seconds as a popover opened, so then
+   the layer composites by itself. Not with a panel in it: a fixed dialog inside would be placed against the frame. */
+.side-panel-frame:has(> .board-backdrop:only-child) {
+  will-change: transform;
+}
+
 /* Beneath every panel in the frame, and above the board. */
 .board-backdrop {
   position: absolute;
