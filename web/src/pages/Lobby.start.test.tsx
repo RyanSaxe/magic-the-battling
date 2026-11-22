@@ -20,7 +20,11 @@ vi.hoisted(() => {
 
 const toasts: string[] = []
 
-vi.mock('../api/client', () => ({ rejoinGame: vi.fn(), getServerStatus: vi.fn(async () => null) }))
+vi.mock('../api/client', () => ({
+  rejoinGame: vi.fn(),
+  getServerStatus: vi.fn(async () => null),
+  getCubeSummary: vi.fn(async () => ({ cube_name: 'Crucible', cube_image_uri: null })),
+}))
 vi.mock('../contexts', () => ({ useToast: () => ({ addToast: (message: string) => toasts.push(message) }) }))
 vi.mock('../contexts/authState', () => ({ useAuth: () => ({ user: null, loading: false }) }))
 
@@ -129,6 +133,32 @@ describe('Lobby: starting the game', () => {
 
     expect(toasts).toEqual(['Server is at game capacity. Please try again shortly.'])
     expect(button('Start Game').disabled).toBe(false)
+  })
+})
+
+describe('Lobby: a refused deck', () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    FakeWebSocket.instances = []
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it("doesn't head the lobby as if it had loaded", async () => {
+    const socket = await openLobbyAs('host')
+    const [host, guest] = lobby().players
+    const refused = { ...host, is_ready: false, battler_id: 'banned-deck', battler_status: 'error' as const, battler_error: 'A card is banned.' }
+    send(socket, { type: 'lobby_state', payload: lobby({ play_mode: 'constructed', can_start: false, players: [refused, guest] }) })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    })
+
+    expect(screen.getByRole('heading', { name: 'No deck yet' })).toBeTruthy()
   })
 })
 

@@ -254,22 +254,118 @@ input:-webkit-autofill:focus {
   --btn-secondary-fill-pressed: #453b35;
 }
 
-/* A switch's track: walnut when off and gold when on */
+/* A switch and its label: walnut when off and green when on. Its checkbox is visually hidden, so the track shows
+   the focus ring. */
 @layer components {
-  .switch-track {
-    background-color: var(--walnut-track);
-    box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.22);
+  .switch {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    color: var(--ivory-felt);
+    white-space: nowrap;
+    cursor: pointer;
   }
 
-  .peer:checked ~ .switch-track {
-    background-color: var(--color-gold);
+  .switch:has(input:disabled) {
+    cursor: default;
+  }
+
+  .switch-spread {
+    justify-content: space-between;
+    white-space: normal;
+  }
+
+  .switch-beta {
+    margin-left: 2px;
+    color: var(--ivory-muted);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .switch-track {
+    position: relative;
+    flex: none;
+    width: 34px;
+    height: 19px;
+    border-radius: 10px;
+    background-color: var(--walnut-track);
+    box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.22);
+    transition: background-color var(--transition-fast);
+  }
+
+  .switch-track::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background-color: var(--ivory);
+    transition: translate var(--transition-fast);
+  }
+
+  .switch input:checked + .switch-track {
+    background-color: var(--success);
+  }
+
+  .switch input:checked + .switch-track::after {
+    translate: 15px;
+  }
+
+  .switch input:disabled + .switch-track {
+    opacity: 0.5;
+  }
+
+  .switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--color-gold-bright);
+    outline-offset: 2px;
+  }
+
+  @media (width < 360px) {
+    .switch {
+      gap: 5px;
+    }
   }
 }
 
-/* The switch's checkbox is visually hidden, so its track shows the focus ring */
-.peer:focus-visible ~ .switch-track {
-  outline: 2px solid var(--color-gold-bright);
-  outline-offset: 2px;
+/* An icon's 44px button */
+@layer components {
+  .icon-target {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    color: var(--ivory-muted);
+  }
+
+  @media (hover: hover) {
+    .icon-target:hover {
+      color: var(--ivory);
+    }
+  }
+
+  .icon-target:focus-visible {
+    outline-offset: -4px;
+  }
+
+  .help-glyph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border: 1.3px solid currentColor;
+    border-radius: 50%;
+    font: 700 9px/1 system-ui;
+  }
 }
 
 /* A small rimmed label: what a cube is, a feature's status or a player's state. Each tone is a dark
@@ -331,6 +427,14 @@ input:-webkit-autofill:focus {
     --tag-dot: var(--ivory-muted);
   }
 
+  .tag-muted {
+    --tag-fill: var(--zone-label-bg);
+    --tag-rim: #574c45;
+    --tag-rim-quiet: #4a423c;
+    --tag-text: var(--ivory-muted);
+    --tag-dot: var(--ivory-muted);
+  }
+
   .tag-crimson {
     --tag-fill: #441e1a;
     --tag-rim: #843b34;
@@ -343,7 +447,7 @@ input:-webkit-autofill:focus {
     --tag-fill: #153721;
     --tag-rim: #23703f;
     --tag-rim-quiet: #1e4a2b;
-    --tag-text: #86efac;
+    --tag-text: var(--win-text);
     --tag-dot: #22c55e;
   }
 }
@@ -392,6 +496,38 @@ input:-webkit-autofill:focus {
   .segmented-option[aria-checked="true"] {
     background: var(--btn-secondary-fill);
     color: var(--gold-pale);
+  }
+
+  .segmented-field {
+    display: flex;
+    flex: none;
+    width: 100%;
+    height: 44px;
+    padding: 2px;
+  }
+
+  .segmented-field .segmented-option {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* Over the track's padding and border, so the option is tapped anywhere in the 44px */
+  .segmented-field .segmented-option::before {
+    content: "";
+    position: absolute;
+    inset: -3px 0;
+  }
+
+  @media (width < 360px) {
+    .segmented-field .segmented-option {
+      gap: 5px;
+      font-size: 12px;
+    }
   }
 }
 
@@ -933,6 +1069,1160 @@ input:-webkit-autofill:focus {
   }
 }
 
+/* Play and the Lobby: a 110px banner of the cube over the controls for it, then the setup on the felt. The banner is
+   one height at every width and state, and the rows below keep room for their fullest state, so nothing moves. */
+@layer components {
+  .setup-page {
+    /* Above the tips rail's enlarged arrows, which would take taps meant for the bottom row */
+    position: relative;
+    z-index: 2;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* A field scrolled into view over a keyboard brings its label and edge along */
+    scroll-padding-block: 24px 16px;
+    color: var(--ivory);
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .setup-caption {
+    display: block;
+    color: var(--ivory-muted);
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 13px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .cube-banner {
+    display: grid;
+    flex: none;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 56px 54px;
+    background: var(--chrome-modal);
+  }
+
+  .cube-banner-art {
+    position: relative;
+    grid-area: 1 / 1;
+    overflow: hidden;
+    background: var(--art-fade);
+    --art-focus: 0.36;
+  }
+
+  /* Puts the point --art-focus of the way down the art below its arch level with the same point of the band */
+  .cube-banner .cube-band-image {
+    position: absolute;
+    top: calc(var(--art-focus) * 100%);
+    left: 0;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: 100%;
+    object-fit: cover;
+    translate: 0 calc(-100% * (var(--arch-depth, 0) + var(--art-focus) * (1 - var(--arch-depth, 0))));
+    filter: brightness(0.63) saturate(0.74);
+  }
+
+  .cube-banner-top {
+    position: relative;
+    display: flex;
+    grid-area: 1 / 1;
+    align-items: flex-end;
+    min-width: 0;
+    padding: 0 4px 0 12px;
+  }
+
+  .cube-banner-title {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    max-width: calc(100% - 84px);
+    min-height: 44px;
+  }
+
+  .cube-banner-name {
+    min-width: 0;
+    color: #fffbeb;
+    font: 700 18px/21px "Cinzel", serif;
+    overflow-wrap: anywhere;
+    text-shadow: 0 1px 2px #000b;
+    text-wrap: balance;
+  }
+
+  .cube-banner-name.is-long {
+    font-size: 15px;
+    line-height: 16px;
+  }
+
+  .cube-banner-name.is-longest {
+    font-size: 14px;
+    line-height: 15px;
+  }
+
+  /* CubeCobra's longest names fit. Anything pasted into the ID field can be longer. */
+  .is-longest .cube-banner-words {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+  }
+
+  .cube-banner-notice {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 44px;
+    padding-right: 8px;
+    font-size: 12px;
+    line-height: 14px;
+  }
+
+  .cube-banner-notice > span,
+  .lobby-away-notice > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .cube-banner.has-notice .cube-banner-title {
+    display: none;
+  }
+
+  .lobby-away-notice {
+    display: none;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    margin-top: auto;
+    font-size: 11px;
+    line-height: 13px;
+  }
+
+  .cube-banner-notice.is-long,
+  .lobby-away-notice.is-long {
+    font-size: 10.5px;
+    line-height: 11px;
+  }
+
+  .cube-banner-link {
+    display: flex;
+    align-items: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  @media (hover: hover) {
+    .cube-banner-link:hover {
+      color: var(--color-gold-bright);
+    }
+  }
+
+  .cube-banner-link:focus-visible {
+    outline-offset: -2px;
+  }
+
+  .cube-banner-arrow {
+    font-family: system-ui;
+    font-size: 13px;
+  }
+
+  .is-long .cube-banner-arrow,
+  .is-longest .cube-banner-arrow {
+    font-size: 11px;
+  }
+
+  /* While the name is looked up the link keeps its place and label, without a lone arrow and tag to show for it */
+  .cube-banner-title.is-unnamed :is(.cube-banner-arrow, .tag) {
+    visibility: hidden;
+  }
+
+  .cube-banner-action {
+    display: flex;
+    margin-left: auto;
+    flex: none;
+    align-items: center;
+    height: 44px;
+  }
+
+  .cube-banner-strip {
+    --btn-secondary-fill: var(--stone);
+    --btn-secondary-fill-hover: var(--stone-light);
+    display: flex;
+    grid-area: 2 / 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 0 4px 0 12px;
+    border-block: 1px solid var(--gold-border-opaque);
+  }
+
+  .setup-summary {
+    flex: 1;
+    min-width: 0;
+    color: var(--ivory-soft);
+    text-wrap: balance;
+  }
+
+  .join-code-caption {
+    line-height: 12px;
+    white-space: nowrap;
+  }
+
+  .join-code {
+    display: block;
+    font: 700 28px/30px var(--font-mono);
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+
+  .seat-stepper {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .seat-count {
+    width: 46px;
+    color: var(--ivory-soft);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .setup-felt {
+    display: flex;
+    flex: 1 0 auto;
+    flex-direction: column;
+    justify-content: space-evenly;
+    width: 100%;
+    margin-inline: auto;
+    padding: 2px 10px;
+  }
+
+  .setup-mode-icon {
+    flex: none;
+    width: 15px;
+    height: 15px;
+  }
+
+  .setup-pitch {
+    display: grid;
+    flex: none;
+    color: var(--ivory-felt);
+    text-align: center;
+  }
+
+  .setup-pitch > p {
+    grid-area: 1 / 1;
+    align-self: center;
+    text-wrap: balance;
+  }
+
+  .setup-row {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+  }
+
+  .setup-row-label {
+    flex: none;
+    width: 84px;
+    color: var(--ivory-soft);
+  }
+
+  .setup-row > .segmented-field {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  .setup-setting {
+    display: flex;
+    flex: none;
+    align-items: center;
+  }
+
+  .play-felt .setup-setting {
+    gap: 8px;
+  }
+
+  .setup-field {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 44px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: var(--walnut-track);
+  }
+
+  .setup-row > .setup-field {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .setup-field:has(input:focus) {
+    outline: 2px solid var(--color-gold-bright);
+  }
+
+  .setup-field > .setup-caption {
+    font-size: 9px;
+    line-height: 12px;
+  }
+
+  .setup-input {
+    width: 100%;
+    height: 20px;
+    background: transparent;
+    color: var(--ivory);
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  .setup-input:focus {
+    outline: none;
+  }
+
+  .setup-input::placeholder {
+    color: var(--ivory-muted);
+  }
+
+  /* Two lines of a long name or deck ID fit the field's 44px */
+  .setup-field:has(.setup-value) {
+    padding-block: 0;
+  }
+
+  .setup-value {
+    font-size: 14px;
+    line-height: 16px;
+    overflow-wrap: anywhere;
+  }
+
+  .resume-space {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 97px;
+  }
+
+  .resume-shelf {
+    border-top: 1px solid var(--gold-border-opaque);
+    background: var(--chrome-modal);
+  }
+
+  .resume-row {
+    display: flex;
+    min-height: 48px;
+  }
+
+  .resume-row + .resume-row {
+    border-top: 1px solid var(--stone);
+  }
+
+  .resume-open {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    padding: 0 4px 0 10px;
+    text-align: left;
+  }
+
+  .resume-open.has-close-space {
+    padding-right: 48px;
+  }
+
+  @media (hover: hover) {
+    .resume-open:hover {
+      background: var(--stone);
+      --ivory-muted: var(--ivory-soft);
+    }
+  }
+
+  .resume-open:focus-visible {
+    outline-offset: -2px;
+  }
+
+  .resume-art {
+    position: relative;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    overflow: hidden;
+    border-radius: 4px;
+    background: var(--art-fade);
+    box-shadow: 0 0 0 1px var(--gold-border-opaque);
+  }
+
+  .resume-art > img {
+    filter: brightness(0.75) saturate(0.78);
+  }
+
+  .resume-summary {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .resume-title {
+    display: block;
+    color: var(--ivory);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+
+  .resume-detail {
+    display: block;
+    color: var(--ivory-muted);
+    font-size: 11px;
+    line-height: 15px;
+    text-wrap: balance;
+  }
+
+  .has-no-close .resume-chevron {
+    margin-right: 8px;
+  }
+
+  .resume-chevron {
+    flex: none;
+    color: var(--ivory-key);
+    font-size: 18px;
+  }
+
+  .resume-all {
+    flex: none;
+    width: 100%;
+    margin-inline: auto;
+  }
+
+  .resume-all > .resume-items {
+    border-bottom: 1px solid var(--gold-border-opaque);
+    background: var(--chrome-modal);
+  }
+
+  .resume-all .resume-row {
+    min-height: 58px;
+  }
+
+  .resume-all .resume-open {
+    padding-block: 5px;
+  }
+
+  /* The felt takes just the room left, and only the seats scroll in it, so the buttons under them hold still */
+  .lobby-felt {
+    flex: 1 1 0;
+    justify-content: flex-start;
+    min-height: 264px;
+    padding: 2px 10px 6px;
+  }
+
+  .lobby-summary {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    height: 20px;
+    color: var(--ivory-felt);
+    white-space: nowrap;
+  }
+
+  .lobby-summary b {
+    color: var(--ivory);
+    font-weight: 600;
+  }
+
+  .lobby-deck {
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+
+  .lobby-seats {
+    display: grid;
+    flex: 0 1 auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: max-content;
+    align-content: start;
+    gap: 4px 6px;
+    min-height: 96px;
+    margin-top: 2px;
+    overflow-y: auto;
+  }
+
+  .seat {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    min-height: 50px;
+    padding-left: 9px;
+    border-radius: 8px;
+  }
+
+  .seat-taken {
+    border: 1px solid #5a4d46;
+    background: linear-gradient(180deg, #453a36, var(--chrome-modal));
+    box-shadow: 0 1px 0 #0000004d, inset 0 1px 0 #ffecb51a;
+  }
+
+  .seat-taken.is-self {
+    border-color: #8a7536;
+  }
+
+  .seat-open {
+    border: 1px dashed #74917a;
+  }
+
+  .seat-text {
+    flex: 1;
+    min-width: 0;
+    padding-right: 4px;
+    text-align: left;
+  }
+
+  .seat-name {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 14px;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+  }
+
+  .seat-status {
+    margin-top: 2px;
+    font-size: 9.5px;
+    line-height: 12px;
+    letter-spacing: 0.07em;
+  }
+
+  .seat-open .seat-name {
+    color: var(--ivory-felt);
+    font-weight: 500;
+  }
+
+  .seat-open .seat-status {
+    color: var(--ivory-felt);
+    font-weight: 600;
+  }
+
+  .lobby-felt .seat-name.is-long-name {
+    font-size: 10.5px;
+    line-height: 10.5px;
+  }
+
+  .seat:has(.is-long-name) .seat-status {
+    margin-top: 0;
+    line-height: 11px;
+  }
+
+  /* A long name runs under the transparent part of the next icon's target */
+  .seat:has(.is-long-name) > .seat-text {
+    padding-right: 0;
+  }
+
+  .seat:has(.is-long-name) > .seat-text + .icon-target {
+    margin-left: -12px;
+  }
+
+  .seat-add + .icon-target {
+    position: relative;
+  }
+
+  .seat-add:has(+ .icon-target) {
+    padding-right: 0;
+  }
+
+  /* The whole seat adds a puppet except ?'s own 44px, the blank beyond it too */
+  .seat-add:has(+ .icon-target)::before {
+    right: -88px;
+  }
+
+  .seat-add:has(+ .icon-target) .seat-status {
+    letter-spacing: 0.01em;
+    text-wrap: balance;
+  }
+
+  @media (width < 375px) {
+    /* Open seat stays on one line beside ?, so its caption has room for two */
+    .lobby-felt .seat-add:has(+ .icon-target) .seat-name {
+      font-size: 11px;
+      line-height: 13px;
+      white-space: nowrap;
+    }
+
+    .seat-add:has(+ .icon-target) .seat-status {
+      margin-top: 1px;
+      line-height: 11px;
+    }
+  }
+
+  .seat-ready {
+    color: var(--win-text);
+  }
+
+  .seat-add {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    align-self: stretch;
+  }
+
+  /* Out to the seat's edges, which the 44px targets share */
+  .seat-add::before {
+    content: "";
+    position: absolute;
+    inset: -1px 0 -1px -9px;
+  }
+
+  @media (hover: hover) {
+    .seat-add:hover:not(:disabled) .seat-status {
+      color: var(--color-gold-bright);
+    }
+  }
+
+  .seat-add:disabled {
+    cursor: default;
+  }
+
+  .seat-add:disabled .seat-status {
+    color: var(--ivory-faint);
+  }
+
+  .seat-add:focus-visible {
+    outline-offset: -2px;
+  }
+
+  .seat > button:not(.seat-add) {
+    margin-block: -1px;
+  }
+
+  .is-compact .seat {
+    min-height: 44px;
+  }
+
+  .is-compact .seat-name {
+    font-size: 12px;
+    line-height: 13px;
+  }
+
+  .is-compact .seat-status {
+    margin-top: 1px;
+    line-height: 11px;
+  }
+
+  .lobby-settings {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    height: 44px;
+    margin-top: auto;
+  }
+
+  .lobby-actions {
+    display: grid;
+    flex: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .lobby-actions.is-guest {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  @media (hover: none) {
+    /* iOS zooms the page into a focused field smaller than 16px */
+    .setup-input {
+      font-size: 16px;
+    }
+  }
+
+  @media (width < 640px) {
+    /* The longest names are too small to read over art */
+    .cube-banner:has(.is-longest) .cube-band-image,
+    .cube-banner-title:has(.is-longest) .tag {
+      display: none;
+    }
+
+    .cube-banner-title:has(.is-longest) {
+      max-width: calc(100% - 64px);
+    }
+
+    .cube-banner-top:not(:has(.cube-banner-action)) > .cube-banner-title:has(.is-longest) {
+      max-width: 100%;
+    }
+
+    .cube-banner.has-art .cube-banner-name.is-longest {
+      text-shadow: 0 1px 2px #000b;
+    }
+
+    .cube-banner-name.is-longest {
+      font-size: 11.5px;
+      line-height: 12px;
+    }
+
+    .is-longest .cube-banner-words {
+      -webkit-line-clamp: 4;
+    }
+
+    .resume-shelf .is-long .resume-title {
+      font-size: 12px;
+      line-height: 12px;
+    }
+
+    .resume-shelf .is-long .resume-detail {
+      line-height: 12px;
+    }
+  }
+
+  /* Six characters of code, "Copied!" and the stepper share one row */
+  @media (width < 390px) {
+    .join-code {
+      letter-spacing: 0.04em;
+    }
+
+    .cube-banner-strip,
+    .seat-stepper {
+      gap: 6px;
+    }
+  }
+
+  @media (width < 375px) {
+    .cube-banner-name.is-medium {
+      font-size: 15px;
+      line-height: 16px;
+    }
+
+    .cube-banner-name.is-long {
+      font-size: 14px;
+      line-height: 14px;
+    }
+  }
+
+  @media (width < 360px) {
+    .cube-banner-name.is-longest,
+    .cube-banner-notice {
+      font-size: 10.5px;
+      line-height: 11px;
+    }
+
+    .is-longest .cube-banner-words {
+      -webkit-line-clamp: 5;
+    }
+
+    /* Guided stacks over its switch, which leaves the name room for 21 characters */
+    .play-felt .setup-row {
+      gap: 2px;
+    }
+
+    .play-felt .setup-row > .setup-field {
+      padding-inline: 8px;
+    }
+
+    .play-felt .setup-setting {
+      gap: 0;
+    }
+
+    .play-felt .setup-setting .switch {
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      min-width: 44px;
+      line-height: 13px;
+    }
+
+    .resume-open.has-close-space {
+      padding-right: 4px;
+    }
+
+    .resume-shelf .is-long .resume-title,
+    .resume-shelf .is-long .resume-detail {
+      line-height: 11px;
+    }
+
+    .seat.is-self .seat-status {
+      letter-spacing: 0.03em;
+    }
+
+    .seat-add::before {
+      left: -5px;
+    }
+
+    .lobby-felt .seat-add:has(+ .icon-target) .seat-name {
+      font-size: 10.5px;
+      letter-spacing: -0.02em;
+    }
+
+    .lobby-felt .seat-open:has(> .seat-add + .icon-target) {
+      padding-left: 4px;
+    }
+
+    .cube-banner-strip {
+      gap: 4px;
+      padding-left: 8px;
+    }
+
+    .seat-stepper {
+      gap: 2px;
+    }
+
+    .join-code-caption {
+      letter-spacing: 0.06em;
+    }
+
+    .join-code {
+      font-size: 25px;
+    }
+
+    .seat-count {
+      width: 40px;
+      font-size: 11px;
+    }
+
+    .resume-open {
+      gap: 7px;
+      padding-left: 8px;
+    }
+
+    .resume-detail {
+      line-height: 13px;
+    }
+
+    .resume-chevron {
+      display: none;
+    }
+
+    .lobby-felt {
+      padding-inline: 6px;
+    }
+
+    .lobby-summary {
+      font-size: 11px;
+    }
+
+    .lobby-seats {
+      column-gap: 4px;
+    }
+
+    .lobby-felt .seat {
+      padding-left: 5px;
+    }
+
+    .seat-text {
+      padding-right: 0;
+    }
+
+    .lobby-felt .seat-name {
+      font-size: 12px;
+      line-height: 13px;
+    }
+
+    .seat:has(.icon-target + .icon-target) .seat-name {
+      font-size: 11.5px;
+    }
+  }
+
+  /* A phone tall enough keeps eight seats' room, whatever the count */
+  @media (width < 640px) and (min-height: 640px) {
+    .lobby-felt {
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .lobby-felt .lobby-seats {
+      height: 188px;
+      margin-top: 0;
+    }
+
+    .lobby-settings {
+      margin-top: 0;
+    }
+  }
+
+  @media (min-width: 640px) {
+    .setup-felt {
+      justify-content: center;
+      font-size: 13px;
+    }
+
+    .play-felt {
+      max-width: 540px;
+      gap: 18px;
+    }
+
+    .setup-pitch {
+      line-height: 19px;
+    }
+
+    .lobby-felt {
+      min-height: 336px;
+      max-width: 660px;
+      gap: 16px;
+      padding-top: 4px;
+    }
+
+    .lobby-felt .lobby-seats {
+      gap: 10px;
+      height: 286px;
+      margin-top: 0;
+    }
+
+    .lobby-felt .seat {
+      min-height: 64px;
+      padding-left: 14px;
+    }
+
+    .seat-add::before {
+      left: -14px;
+    }
+
+    .lobby-felt .seat-name {
+      font-size: 14px;
+      line-height: 18px;
+    }
+
+    .lobby-felt .seat-name.is-long-name {
+      font-size: 13px;
+      line-height: 15px;
+    }
+
+    .lobby-settings {
+      justify-content: center;
+      gap: 32px;
+      margin-top: 0;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .cube-banner {
+      --btn-secondary-fill: var(--stone);
+      --btn-secondary-fill-hover: var(--stone-light);
+      /* Lines the rows up with the felt's 1040px column, past the frame's 84px of rails and edges */
+      --banner-inset: clamp(12px, (100vw - 84px - 1040px) / 2, 78px);
+      grid-template-columns: minmax(0, 1fr) min(598px, 100% - 560px);
+      grid-template-rows: 54px 55px;
+      padding-inline: max(0px, (100% - 1196px) / 2);
+      border-bottom: 1px solid var(--gold-border-opaque);
+    }
+
+    .cube-banner-art {
+      grid-area: 1 / 2 / span 2;
+      background: none;
+      --art-focus: 0.4;
+    }
+
+    .cube-banner.has-art .cube-banner-art {
+      border-left: 1px solid var(--gold-border-opaque);
+    }
+
+    .cube-banner .cube-band-image {
+      filter: brightness(0.68) saturate(0.78);
+    }
+
+    .cube-banner-top {
+      align-items: flex-start;
+      padding: 8px 16px 0 var(--banner-inset);
+    }
+
+    .cube-banner-title {
+      max-width: min(400px, 100% - 80px);
+    }
+
+    .cube-banner-strip {
+      padding: 0 16px 0 var(--banner-inset);
+      border-block: none;
+    }
+
+    .resume-space {
+      min-height: 69px;
+    }
+
+    .resume-shelf > .resume-items {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      padding-inline: max(0px, (100% - 1040px) / 2);
+    }
+
+    .resume-row,
+    .resume-all .resume-row {
+      min-height: 68px;
+    }
+
+    .resume-shelf .resume-row + .resume-row {
+      border-top: none;
+      border-left: 1px solid var(--stone);
+    }
+
+    .resume-open .resume-art {
+      width: 44px;
+      height: 44px;
+    }
+
+    .resume-open .resume-title {
+      font-size: 14px;
+      line-height: 19px;
+    }
+
+    .resume-open .resume-detail {
+      font-size: 12px;
+      line-height: 17px;
+    }
+
+    .resume-all {
+      max-width: 720px;
+    }
+
+    .lobby-felt {
+      max-width: 1060px;
+    }
+
+    .lobby-felt .lobby-seats {
+      height: 138px;
+      grid-template-columns: repeat(var(--seat-columns), minmax(0, 1fr));
+    }
+
+    .lobby-actions {
+      align-self: center;
+      width: 532px;
+    }
+
+    .lobby-actions.is-guest {
+      width: 260px;
+    }
+  }
+
+  /* Short tablets and windows take the phones' seats, so Start and Constructed's fourth row of seats stay in view */
+  @media (640px <= width < 1024px) and (height < 742px) {
+    .lobby-felt {
+      gap: 4px;
+      min-height: 280px;
+      padding-block: 2px 6px;
+    }
+
+    .lobby-felt .lobby-seats {
+      gap: 4px 8px;
+      height: 188px;
+    }
+
+    .lobby-felt .seat {
+      min-height: 44px;
+    }
+
+    .lobby-felt .seat-name {
+      font-size: 12px;
+      line-height: 13px;
+    }
+
+    .lobby-felt .seat-status {
+      margin-top: 1px;
+      line-height: 11px;
+    }
+
+    .lobby-felt .seat-name.is-long-name {
+      font-size: 11px;
+      line-height: 11px;
+    }
+  }
+
+  /* A short phone has no room in the felt for the deck's row beside eight seats, so the row lies over the cube's,
+     which names the same deck. CSS alone moves it, so the field keeps its focus when a keyboard shortens the
+     window. */
+  @media (width < 640px) and (height < 640px) {
+    .lobby-deck {
+      position: absolute;
+      inset: 0 0 auto;
+      height: 56px;
+      margin: 0;
+      padding: 0 4px 0 12px;
+      background: var(--art-fade);
+    }
+
+    /* Covered, so out of the tab order too */
+    .setup-page:has(.lobby-deck:not(.is-loaded)) .cube-banner-top {
+      visibility: hidden;
+    }
+
+    .lobby-deck.is-loaded {
+      inset: 12px 72px auto auto;
+      height: 44px;
+      padding: 0;
+      background: none;
+    }
+
+    .lobby-deck.is-loaded > .setup-field,
+    .setup-page:has(.lobby-deck) .cube-banner-notice,
+    .setup-page:has(.lobby-deck) .cube-banner-title .tag,
+    .lobby-away-notice + .lobby-settings {
+      display: none;
+    }
+
+    .setup-page:has(.lobby-deck.is-loaded) .cube-banner-action .btn-pill {
+      width: 60px;
+    }
+
+    .setup-page:has(.lobby-deck.is-loaded) .cube-banner-title {
+      display: flex;
+      max-width: calc(100% - 136px);
+    }
+
+    .setup-page:has(.lobby-deck.is-loaded) .cube-banner.has-notice:not(:has(.is-longest)) .cube-band-image {
+      display: block;
+    }
+
+    .lobby-away-notice {
+      display: flex;
+    }
+  }
+
+  /* Past the block's own 1196px the art has walnut on both sides */
+  @media (min-width: 1281px) {
+    .cube-banner.has-art .cube-banner-art {
+      border-right: 1px solid var(--gold-border-opaque);
+    }
+  }
+
+  @media (width < 1024px) {
+    /* The notice stands on walnut in the art's row */
+    .cube-banner.has-notice .cube-band-image {
+      display: none;
+    }
+
+    /* Over art the name needs a tighter halo, to stay readable on pale cards */
+    .cube-banner.has-art .cube-banner-name {
+      text-shadow: 0 1px 1px #000, 0 0 2px #000, 0 0 3px #000, 0 0 6px #000;
+    }
+  }
+
+  @media (min-width: 1920px) {
+    .cube-banner,
+    .setup-felt,
+    .resume-space,
+    .resume-all {
+      zoom: 1.3;
+    }
+  }
+}
+
+.setup-field input:-webkit-autofill,
+.setup-field input:-webkit-autofill:hover,
+.setup-field input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ivory);
+}
+
 /* Card base styles */
 .card {
   transition:
@@ -1276,12 +2566,113 @@ input:-webkit-autofill:focus {
   border: none;
 }
 
-.btn-dark-border {
-  border: 1px solid #000 !important;
+/* A 30px button in a 44px target, for the rows of controls in a cube's banner */
+.btn.btn-pill {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  min-width: 30px;
+  padding: 0 11px;
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-.play-action-btn {
-  border: 1px solid #000 !important;
+.btn.btn-pill::before {
+  content: "";
+  position: absolute;
+  inset: -7px min(0px, (100% - 44px) / 2);
+}
+
+.btn.btn-pill-square {
+  width: 30px;
+  margin-inline: 7px;
+  padding: 0;
+  font-size: 15px;
+}
+
+.btn.btn-pill:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn.setup-next {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 44px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.lobby-actions .btn.setup-next {
+  flex-direction: column;
+  gap: 0;
+  font-size: 14px;
+  line-height: 17px;
+}
+
+.setup-next small {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 14px;
+}
+
+.btn.setup-submit {
+  flex: none;
+  height: 44px;
+  padding: 0 12px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* Beside Cards in the banner on short phones */
+@media (width < 640px) and (height < 640px) {
+  .lobby-deck.is-loaded .btn.setup-submit {
+    position: relative;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 13px;
+    line-height: 1;
+  }
+
+  .lobby-deck.is-loaded .btn.setup-submit::before {
+    content: "";
+    position: absolute;
+    inset: -7px 0;
+  }
+}
+
+/* Start Game before it can start: walnut, solid beside the dashed open seats */
+.btn.setup-waiting:disabled {
+  background: #2e2623;
+  color: var(--ivory-muted);
+  box-shadow: inset 0 1px 0 #ffecb514;
+  cursor: default;
+}
+
+@media (width < 375px) {
+  .cube-banner-strip .btn.btn-pill:not(.btn-pill-square) {
+    padding: 0 7px;
+  }
+}
+
+@media (width < 360px) {
+  .btn.btn-pill-square {
+    margin-inline: 5px;
+  }
+
+  .setup-next small {
+    font-size: 10.5px;
+  }
 }
 
 /* Every bar button is 30px tall. Icon buttons such as ☰ are 30px squares, and .btn-icon-phone ones are squares
@@ -2491,17 +3882,6 @@ input:-webkit-autofill:focus {
   font-size: 0.875rem;
   min-width: 1.25rem;
   flex-shrink: 0;
-}
-
-/* Sunken panel for mode description text */
-.description-panel {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  box-shadow:
-    inset 0 3px 6px rgba(0, 0, 0, 0.5),
-    inset 0 6px 20px rgba(0, 0, 0, 0.3),
-    inset 0 0 25px rgba(212, 175, 55, 0.12);
 }
 
 @keyframes guide-spotlight-pulse {
