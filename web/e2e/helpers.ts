@@ -479,13 +479,13 @@ export const PAGES: PageUnderTest[] = [
     name: 'battler',
     path: '/dashboard/list/1',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play Preset' }),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play', exact: true }),
   },
   {
     name: 'cube',
     path: '/cube/vintage-cube',
     serve: serveSignedIn,
-    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play Cube' }),
+    primaryAction: (page) => page.getByRole('main').getByRole('button', { name: 'Play', exact: true }),
   },
   {
     name: 'lobby',

@@ -97,11 +97,9 @@ export function isFollowing(follows: Follows, cubeId: string): boolean {
 
 /** The player's saved and followed cubes, as the dashboard has loaded them. */
 export interface Library {
-  /** In the order GET /battlers pages them. */
+  /** Newest first, in the order GET /battlers pages them, with presets saved here at the front. */
   presets: UserBattler[]
   presetsHaveMore: boolean
-  /** Presets saved here while more remain to load. The server lists them last, so they wait here until their page loads. */
-  addedPresets: UserBattler[]
   /** Newest first, in the order GET /battlers/following pages them. */
   follows: FollowedBattler[]
   followsHaveMore: boolean
@@ -119,7 +117,6 @@ export function loadedLibrary(saved: SavedPage, following: FollowingPage): Libra
   return {
     presets: saved.battlers,
     presetsHaveMore: saved.has_more,
-    addedPresets: [],
     follows: following.following,
     followsHaveMore: following.has_more,
     loadingMore: false,
@@ -159,14 +156,12 @@ export function withLibraryPage(library: Library, loaded: LibraryPage): Library 
       loadingMore: false,
     }
   }
-  const pageIds = new Set(loaded.page.battlers.map((preset) => preset.id))
-  const stillAdded = library.addedPresets.filter((preset) => !pageIds.has(preset.id))
-  const presets = [...library.presets, ...loaded.page.battlers]
+  // A preset saved while the page was loading sorts first, so the page can start with one already shown.
+  const shown = new Set(library.presets.map((preset) => preset.id))
   return {
     ...library,
-    presets: loaded.page.has_more ? presets : [...presets, ...stillAdded],
+    presets: [...library.presets, ...loaded.page.battlers.filter((preset) => !shown.has(preset.id))],
     presetsHaveMore: loaded.page.has_more,
-    addedPresets: loaded.page.has_more ? stillAdded : [],
     loadingMore: false,
   }
 }
@@ -175,12 +170,10 @@ export function withLibraryPageFailed(library: Library): Library {
   return { ...library, loadingMore: false }
 }
 
+/** The server lists a new preset first, so it goes at the front, and the next page's offset counts it. */
 export function withAddedPreset(library: Library, preset: UserBattler): Library {
-  // A slow save can return after Load more has already brought in the page that holds it.
-  if ([...library.presets, ...library.addedPresets].some((shown) => shown.id === preset.id)) return library
-  return library.presetsHaveMore
-    ? { ...library, addedPresets: [...library.addedPresets, preset] }
-    : { ...library, presets: [...library.presets, preset] }
+  if (library.presets.some((shown) => shown.id === preset.id)) return library
+  return { ...library, presets: [preset, ...library.presets] }
 }
 
 export type LibraryEntry =
@@ -191,10 +184,10 @@ export function libraryEntryKey(entry: LibraryEntry): string {
   return entry.kind === 'saved' ? `saved-${entry.preset.id}` : `following-${entry.follow.id}`
 }
 
-/** Saved cubes and decks first, in the player's order, then followed cubes, newest first. */
+/** Saved cubes and decks first, then followed cubes, each newest first. */
 export function libraryEntries(library: Library): LibraryEntry[] {
   return [
-    ...[...library.presets, ...library.addedPresets].map((preset) => ({ kind: 'saved' as const, preset })),
+    ...library.presets.map((preset) => ({ kind: 'saved' as const, preset })),
     ...library.follows.map((follow) => ({ kind: 'following' as const, follow })),
   ]
 }
@@ -221,6 +214,5 @@ export function withRemoved(library: Library, entry: LibraryEntry): Library {
   if (entry.kind === 'following') {
     return { ...library, removing, follows: library.follows.filter((follow) => follow.id !== entry.follow.id) }
   }
-  const kept = (preset: UserBattler) => preset.id !== entry.preset.id
-  return { ...library, removing, presets: library.presets.filter(kept), addedPresets: library.addedPresets.filter(kept) }
+  return { ...library, removing, presets: library.presets.filter((preset) => preset.id !== entry.preset.id) }
 }
