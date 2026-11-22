@@ -76,6 +76,7 @@ function LifeCounter({
           type="number"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
+          onFocus={(e) => e.currentTarget.select()}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           className="w-10 h-6 text-center text-white text-sm rounded border border-[var(--gold-border)] focus:outline-none focus:border-[var(--color-gold-bright)]" style={{ background: 'var(--chrome)' }}
