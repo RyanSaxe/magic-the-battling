@@ -3,6 +3,7 @@ import type { Card as CardType, ZoneName } from '../../types'
 import { DraggableCard, DroppableZone } from '../../dnd'
 import { Card } from '../card'
 import { DndPanel } from '../common/DndPanel'
+import { Tag } from '../common/Tag'
 
 interface PileZoneProps {
   zone: 'graveyard' | 'exile'
@@ -131,9 +132,9 @@ export function PileZone({
           size="sm"
           className="w-full h-full"
         />
-        <div className="absolute -top-1 -right-1 bg-black/80 text-white text-xs px-1.5 py-0.5 rounded-full border border-gray-600">
+        <Tag tone="stone" small className="absolute -top-1 -right-1 tabular-nums">
           {cards.length}
-        </div>
+        </Tag>
       </div>
     </DroppableZone>
   )

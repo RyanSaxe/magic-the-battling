@@ -13,6 +13,7 @@ import {
   TREASURE_TOKEN_IMAGE,
 } from "../../constants/assets";
 import { getPlayerPhaseStatusLabel } from "../../utils/format";
+import { SegmentedFilter, type SegmentOption } from "../dashboard/SegmentedFilter";
 import { buildAppliedUpgradeMap, getAppliedUpgrades, getUpgradeDisplayScope, getUnappliedUpgrades } from "../../utils/upgrades";
 
 interface PlayerDetailPanelProps {
@@ -351,29 +352,10 @@ function AdaptiveCardSection({
   );
 }
 
-function DetailTabButton({
-  isActive,
-  label,
-  onClick,
-}: {
-  isActive: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-        isActive
-          ? "border border-[var(--gold-border)] bg-amber-950/35 text-amber-100 shadow-[inset_0_1px_0_rgba(255,236,181,0.16)]"
-          : "border border-transparent bg-black/10 text-[var(--ivory-muted)] hover:text-[var(--ivory)]"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
+const DETAIL_TABS: SegmentOption<ScoutingTab>[] = [
+  { value: "seen", label: "Seen in Fight" },
+  { value: "overview", label: "Overview" },
+];
 
 /** What a player has shown: the cards seen in their last fight, or an overview of their state. */
 export function PlayerDetailPanel({
@@ -462,18 +444,12 @@ export function PlayerDetailPanel({
       )}
 
       <div className="flex justify-center px-4 pb-3 pt-3">
-        <div className="inline-flex rounded-full border border-[color:rgba(212,175,55,0.25)] bg-black/15 p-1">
-          <DetailTabButton
-            isActive={activeTab === "seen"}
-            label="Seen in Fight"
-            onClick={() => onTabChange("seen")}
-          />
-          <DetailTabButton
-            isActive={activeTab === "overview"}
-            label="Overview"
-            onClick={() => onTabChange("overview")}
-          />
-        </div>
+        <SegmentedFilter
+          label="Scouting view"
+          options={DETAIL_TABS}
+          value={activeTab}
+          onChange={onTabChange}
+        />
       </div>
 
       <div className="flex flex-col flex-1 min-h-0 px-4 pb-4">
