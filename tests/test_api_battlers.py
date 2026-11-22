@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 import pytest
+from sqlalchemy import event
 
 from server.db import database
 from server.db.models import BattleSnapshot, CubeMetadata, GameRecord, PlayerGameHistory
@@ -386,6 +387,23 @@ class TestCubeSummary:
 
         assert (summary["is_following"], summary["follow_id"]) == (True, follow["id"])
         assert (signed_out["is_following"], signed_out["follow_id"]) == (False, None)
+
+    def test_holds_no_database_connection_while_cubecobra_names_a_cube(self, client, kestrel, monkeypatch):
+        engine = database.SessionLocal().get_bind()
+        held = []
+        event.listen(engine, "checkout", lambda *_: held.append(True))
+        event.listen(engine, "checkin", lambda *_: held.pop())
+        held_during_fetch = []
+
+        def fetch_name(cube_id: str) -> None:
+            held_during_fetch.append(len(held))
+            _add_cube_name(cube_id, "Slow Cube")
+
+        monkeypatch.setattr(database, "save_cube_metadata", fetch_name)
+
+        summary = client.get("/api/battlers/cube/slow").json()
+
+        assert (summary["cube_name"], held_during_fetch) == ("Slow Cube", [0])
 
 
 def _add_cube_name(cube_id: str, name: str) -> None:
