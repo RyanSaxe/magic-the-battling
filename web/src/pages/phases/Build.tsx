@@ -104,7 +104,8 @@ export function BuildPhase({
   const { self_player } = gameState;
   const maxHandSize = self_player.hand_size;
   const locked = self_player.build_ready;
-  const hasSideboard = self_player.sideboard.length > 0;
+  // Build is sized for the whole pool, which moves don't change, so nothing resizes while building or on a reload.
+  const poolSize = self_player.hand.length + self_player.sideboard.length;
   const selectedBasicsCount = selectedBasics.filter(Boolean).length;
 
   const hasUserInteracted = useRef(false);
@@ -278,11 +279,6 @@ export function BuildPhase({
     }
   };
 
-  const [stableSBCount, setStableSBCount] = useState(self_player.sideboard.length);
-  if (self_player.sideboard.length > stableSBCount) {
-    setStableSBCount(self_player.sideboard.length);
-  }
-
   const [measuredBoard, setMeasuredBoard] = useState<BoardSize | null>(null);
   const {
     constraints,
@@ -300,7 +296,7 @@ export function BuildPhase({
 
   const layoutConfig = buildLayoutConfig({
     handSize: maxHandSize,
-    sideboardCount: stableSBCount,
+    sideboardCount: poolSize,
     upgradeRailCount: hasDesktopUpgradeRail ? self_player.upgrades.length : 0,
   });
 
@@ -454,7 +450,7 @@ export function BuildPhase({
       }
       hasHand={true}
       hasBattlefield={true}
-      hasSideboard={hasSideboard}
+      hasSideboard={poolSize > 0}
       hasUpgrades={hasDesktopUpgradeRail}
       containerTargetId="build-workspace"
       dividerCallbacks={locked ? null : dividerCallbacks}
