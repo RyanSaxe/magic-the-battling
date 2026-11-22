@@ -21,6 +21,7 @@ vi.hoisted(() => {
 vi.mock('../api/client', () => ({
   createGame: vi.fn(),
   warmCubeCache: vi.fn(),
+  closeSeat: vi.fn(async () => {}),
   getResumableGames: vi.fn(async () => []),
   getCubeSummary: vi.fn(async () => ({ cube_name: 'Crucible', cube_image_uri: null })),
 }))

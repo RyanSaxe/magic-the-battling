@@ -50,6 +50,19 @@ export function BasicLandSlot({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      // The picker is on top, and not everything that can be open under it checks defaultPrevented.
+      event.stopImmediatePropagation();
+      setOpen(false);
+    };
+    window.addEventListener("keydown", handleEscape, true);
+    return () => window.removeEventListener("keydown", handleEscape, true);
+  }, [open]);
+
   const handleOpen = () => {
     if (!triggerRef.current) return;
     const rect = triggerRef.current.getBoundingClientRect();

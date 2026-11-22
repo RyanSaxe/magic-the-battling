@@ -21,10 +21,11 @@ import { GuidedSwitch } from "../components/setup/GuidedSwitch";
 import { SegmentedFilter } from "../components/dashboard/SegmentedFilter";
 import { getLegendaryName } from "../utils/prefetchName";
 import { saveTabSession } from "../utils/tabSession";
+import { abandonSeat } from "../utils/endSeat";
 import {
-  forgetSeatForGame,
   getDefaultNewPlayerPreference,
   getRememberedGuestName,
+  getRememberedSeat,
   rememberGuestName,
   rememberPlayerForGame,
   setGlobalGuidedModePreference,
@@ -47,6 +48,11 @@ const OPPONENT_OPTIONS: OpponentCount[] = [1, 3, 5, 7];
 
 function normalizeCreateGameError(error: unknown): string {
   return unknownToAppError(error, "create-game", "Failed to create game").message;
+}
+
+function abandonStart(gameId: string) {
+  const seat = getRememberedSeat(gameId);
+  if (seat?.seatToken) void abandonSeat(gameId, seat.name, seat.seatToken);
 }
 
 function useSoloLobbyWatcher(
@@ -296,7 +302,7 @@ export function Play() {
         setMaxAvailablePuppets(null);
         resetWatcher();
       }
-      if (pendingGameId) forgetSeatForGame(pendingGameId);
+      if (pendingGameId) abandonStart(pendingGameId);
       setPendingGameId(null);
       setPendingSessionId(null);
     });
@@ -324,7 +330,8 @@ export function Play() {
         getAppErrorMessage(connectionError, "play-connection", "That game is no longer available. Please start a new one."),
         "error",
       );
-      forgetSeatForGame(pendingGameId);
+      // A seat that moved is still the player's, in the tab or on the device that took it.
+      if (connectionError.code !== "SEAT_MOVED") abandonStart(pendingGameId);
       startTransition(() => {
         setPendingGameId(null);
         setPendingSessionId(null);
@@ -338,7 +345,7 @@ export function Play() {
   // The server refused or failed the start, and either way said why.
   useEffect(() => {
     if (!soloStartEnded) return;
-    if (pendingGameId) forgetSeatForGame(pendingGameId);
+    if (pendingGameId) abandonStart(pendingGameId);
     startTransition(() => {
       setSoloStartEnded(false);
       setPendingGameId(null);
@@ -381,7 +388,10 @@ export function Play() {
         guidedModeDefault: isGuidedMode,
         playMode,
       });
-      if (attempt !== startAttemptRef.current) return;
+      if (attempt !== startAttemptRef.current) {
+        void abandonSeat(response.game_id, name, response.seat_token);
+        return;
+      }
       saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
       if (!user) rememberGuestName(name);
       rememberPlayerForGame(response.game_id, name, {
@@ -428,7 +438,10 @@ export function Play() {
         guidedModeDefault: isGuidedMode,
         playMode,
       });
-      if (attempt !== startAttemptRef.current) return;
+      if (attempt !== startAttemptRef.current) {
+        void abandonSeat(response.game_id, name, response.seat_token);
+        return;
+      }
       saveTabSession(response.game_id, { sessionId: response.session_id, playerId: response.player_id });
       if (!user) rememberGuestName(name);
       rememberPlayerForGame(response.game_id, name, {
@@ -451,7 +464,7 @@ export function Play() {
 
   const handleCancelFriends = () => {
     startAttemptRef.current += 1;
-    if (pendingGameId) forgetSeatForGame(pendingGameId);
+    if (pendingGameId) abandonStart(pendingGameId);
     setFriendsLoading(false);
     setPendingGameId(null);
     setPendingSessionId(null);
@@ -460,7 +473,7 @@ export function Play() {
 
   const handleCancelSolo = () => {
     startAttemptRef.current += 1;
-    if (pendingGameId) forgetSeatForGame(pendingGameId);
+    if (pendingGameId) abandonStart(pendingGameId);
     updateSoloPhase("idle");
     setPendingGameId(null);
     setPendingSessionId(null);
@@ -706,7 +719,7 @@ export function Play() {
                 <RecoveryOpponentPicker
                   counts={validRecoveryCounts}
                   onSelect={(count) => {
-                    if (pendingGameId) forgetSeatForGame(pendingGameId);
+                    if (pendingGameId) abandonStart(pendingGameId);
                     updateSoloPhase("idle");
                     setPendingGameId(null);
                     setPendingSessionId(null);

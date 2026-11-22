@@ -174,10 +174,12 @@ function SettingsModal({
   const [puppetCount, setPuppetCount] = useState(battler.puppet_count)
   const [saving, setSaving] = useState(false)
 
-  const handleSave = async () => {
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
     setSaving(true)
     await onSave({
-      display_name: displayName.trim() || null,
+      // The server takes a null as unchanged, so an empty name is how to clear it.
+      display_name: displayName.trim(),
       use_upgrades: useUpgrades,
       play_mode: playMode,
       puppet_count: puppetCount,
@@ -187,7 +189,7 @@ function SettingsModal({
   }
 
   return (
-    <Dialog title="Settings" onClose={onClose}>
+    <Dialog title="Settings" onClose={onClose} onSubmit={handleSave}>
 
       <div className="space-y-3">
         <div>
@@ -227,13 +229,14 @@ function SettingsModal({
 
       <div className="flex gap-2 mt-4">
         <button
-          onClick={handleSave}
+          type="submit"
           disabled={saving}
           className="btn btn-primary flex-1 py-2 font-semibold disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save'}
         </button>
         <button
+          type="button"
           onClick={() => {
             if (window.confirm(`Delete "${battler.display_name || battler.cube_id}"?`)) onDelete()
           }}
