@@ -7,7 +7,8 @@ import { type TabSession, clearTabSession, readTabSession, saveTabSession } from
 /**
  * This tab's hold on its seat in one game.
  * - held: the tab has a session for the seat and connects with it.
- * - claiming: the tab is exchanging the browser's seat token (or its login) for a fresh session.
+ * - claiming: the tab is exchanging the browser's seat token (or its login) for a fresh session. A remembered
+ *   seat has no token when its player resumed it from their account's list.
  * - none: this browser has no seat here to take back. `refused` says why, when the player asked to reconnect.
  * - lost: the seat is out of reach for the reason in `error`: released, removed by the host, opened in another
  *   tab, or the game is gone.
@@ -29,7 +30,7 @@ const SESSION_REJECTED_CODES = new Set(['INVALID_SESSION', 'PLAYER_NOT_IN_GAME']
 function initialSeatState(gameId: string, claimAutomatically: boolean): SeatState {
   const session = readTabSession(gameId)
   if (session) return { kind: 'held', session }
-  return claimAutomatically && getRememberedSeat(gameId)?.seatToken ? { kind: 'claiming' } : { kind: 'none' }
+  return claimAutomatically && getRememberedSeat(gameId) ? { kind: 'claiming' } : { kind: 'none' }
 }
 
 /** With claimAutomatically false (a tab opened only to watch), the tab claims its seat only when asked. */

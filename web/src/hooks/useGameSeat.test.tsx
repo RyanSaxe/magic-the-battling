@@ -52,6 +52,16 @@ describe('useGameSeat', () => {
     expect(getRememberedSeat('game-1')?.seatToken).toBe('token-1')
   })
 
+  it("takes an account's seat back without a token", async () => {
+    rememberPlayerForGame('game-1', 'Alice')
+    rejoin.mockResolvedValue(grant(1))
+
+    const { result } = renderHook(() => useGameSeat('game-1'))
+
+    await waitFor(() => expect(result.current.seat.kind).toBe('held'))
+    expect(rejoin).toHaveBeenCalledWith('game-1', 'Alice', null)
+  })
+
   it('leaves the seat alone in a tab opened only to watch', () => {
     rememberPlayerForGame('game-1', 'Alice', { seatToken: 'token-0' })
 

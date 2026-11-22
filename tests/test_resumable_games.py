@@ -1,10 +1,12 @@
 """POST /api/games/resumable: the lobbies and games a browser can return to with the seat tokens it holds."""
 
 import pytest
+from fastapi.testclient import TestClient
 
 import server.routers.ws as ws_module
 from server.db import database
 from server.db.models import CubeMetadata, GameRecord
+from server.main import app
 
 
 def _resumable(client, *seats: tuple[str, str, str]) -> list[dict]:
@@ -195,6 +197,39 @@ def test_describes_a_lobby_seat_without_progress(named_cube, client, game_with_p
     assert listed["player_count"] == 2
     assert (listed["stage"], listed["round"], listed["poison"]) == (None, None, None)
     assert listed["can_close"] is True
+
+
+@pytest.mark.parametrize("state", ["lobby", "running", "paused"])
+def test_an_account_lists_its_seat_on_every_device(start_lobby, client, state):
+    account = {"username": "seat_owner", "password": "password123"}
+    client.post("/api/auth/register", json={**account, "email": "seat_owner@test.com"})
+    created = client.post(
+        "/api/games", json={"player_name": "Kess", "cube_id": "test", "target_player_count": 2}
+    ).json()
+    TestClient(app).post("/api/games/join", json={"join_code": created["join_code"], "player_name": "Bob"})
+    game_id, first_token = created["game_id"], created["seat_token"]
+    if state != "lobby":
+        assert start_lobby(game_id, created["session_id"]).status_code == 200
+    if state == "paused":
+        ws_module.game_manager.mark_game_dirty(game_id)
+        ws_module.game_manager.persist_dirty_games()
+        ws_module.game_manager._cleanup_game(game_id, preserve_snapshot=True)
+    phone, stranger = TestClient(app), TestClient(app)
+    assert phone.post("/api/auth/login", json=account).status_code == 200
+    stranger.post("/api/auth/register", json={**account, "username": "stranger", "email": "stranger@test.com"})
+
+    [on_phone] = _resumable(phone)
+    assert (on_phone["game_id"], on_phone["player_name"], on_phone["can_close"]) == (game_id, "Kess", False)
+    assert _resumable(stranger) == []
+    assert _resumable(TestClient(app)) == []
+
+    rejoined = phone.post(f"/api/games/{game_id}/rejoin", json={"player_name": "Kess"})
+    assert rejoined.status_code == 200
+
+    [on_first] = _resumable(client, (game_id, "Kess", first_token))
+    assert (on_first["game_id"], on_first["can_close"]) == (game_id, False)
+    [held] = _resumable(phone, (game_id, "Kess", rejoined.json()["seat_token"]))
+    assert held["can_close"] is (state == "lobby")
 
 
 def test_refuses_more_than_ten_seats(client):
