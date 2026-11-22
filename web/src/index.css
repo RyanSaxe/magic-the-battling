@@ -1764,6 +1764,10 @@ input:-webkit-autofill:focus {
       line-height: 11px;
     }
 
+    .is-longest .cube-banner-words {
+      -webkit-line-clamp: 5;
+    }
+
     /* Guided stacks over its switch, which leaves the name room for 21 characters */
     .play-felt .setup-row {
       gap: 2px;
