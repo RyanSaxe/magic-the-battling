@@ -504,7 +504,7 @@ export function Lobby() {
                         submitBattler();
                       }
                     }}
-                    placeholder="Enter deck list"
+                    placeholder="Deck ID"
                     disabled={isBattlerLoading}
                     className="setup-input"
                   />
