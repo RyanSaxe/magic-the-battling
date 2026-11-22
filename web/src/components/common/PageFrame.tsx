@@ -1,8 +1,10 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { FaDiscord } from 'react-icons/fa6'
 import { CubeCobraPrimerLink } from './CubeCobraPrimerLink'
 import { BottomBar } from './FrameBar'
 import { HintsBanner } from './HintsBanner'
+import { SidePanelFrame } from './SidePanel'
+import { SidePanelHostContext } from './sidePanelHost'
 import type { HintPlace } from '../../constants/hints'
 
 interface PageFrameProps {
@@ -26,13 +28,25 @@ export function FrameSidebar({ children }: { children: ReactNode }) {
 }
 
 /** The felt between the rails: a banner, when there is one, across its full width, over the board and its sidebar. */
-export function FrameFelt({ banner, children }: { banner?: ReactNode; children: ReactNode }) {
+export function FrameFelt({
+  banner,
+  sidePanels,
+  children,
+}: {
+  banner?: ReactNode
+  /** The frame the side panels open in, over the board and its sidebar and under the banner. */
+  sidePanels?: ReactNode
+  children: ReactNode
+}) {
   return (
     <div className="flex-1 flex min-h-0 game-surface">
       <div className="sm:hidden w-[4px] shrink-0 frame-chrome" />
       <div className="flex-1 flex flex-col min-h-0 min-w-0">
         {banner}
-        <div className="flex-1 flex min-h-0">{children}</div>
+        <div className="relative flex-1 flex min-h-0">
+          {children}
+          {sidePanels}
+        </div>
       </div>
       <div className="w-[4px] sm:w-10 shrink-0 frame-chrome" />
     </div>
@@ -49,13 +63,15 @@ export function PageFrame({
   aside,
   footer,
 }: PageFrameProps) {
+  const [sidePanelHost, setSidePanelHost] = useState<HTMLElement | null>(null)
   const centerClass = center ? 'page-center' : ''
   const scrollClass = scroll ? 'overflow-y-auto overflow-x-hidden overscroll-contain p-4' : ''
   return (
+    <SidePanelHostContext.Provider value={sidePanelHost}>
     <div className="game-table h-dvh flex flex-col overflow-hidden">
       {header}
 
-      <FrameFelt>
+      <FrameFelt sidePanels={<SidePanelFrame ref={setSidePanelHost} />}>
         <main className="flex-1 min-w-0 min-h-0 p-[2px] zone-divider-bg flex flex-col">
           <div className={`zone-pack flex-1 min-w-0 min-h-0 flex flex-col ${scrollClass} ${centerClass} ${contentClassName}`}>
             {children}
@@ -83,5 +99,6 @@ export function PageFrame({
         />
       )}
     </div>
+    </SidePanelHostContext.Provider>
   )
 }

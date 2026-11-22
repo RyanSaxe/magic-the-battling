@@ -12,6 +12,8 @@ const LABEL_HEIGHT = 18
 
 interface CompactZoneDisplayProps {
   title: string
+  /** The open panel's title, when the pile's label doesn't say whose it is. */
+  panelTitle?: string
   zone: ZoneName
   cards: CardType[]
   height: number
@@ -39,6 +41,7 @@ interface CompactZoneDisplayProps {
 
 export function CompactZoneDisplay({
   title,
+  panelTitle = title,
   zone,
   cards,
   height,
@@ -116,13 +119,9 @@ export function CompactZoneDisplay({
               onZoneClick()
               return
             }
-            if (cards.length > 0) setShowModal(true)
+            setShowModal(true)
           }}
-          className={`flex flex-col items-center overflow-hidden ${
-            cards.length > 0
-              ? 'cursor-pointer'
-              : 'cursor-default'
-          } ${containerClassName ?? ''} w-full h-full`}
+          className={`flex flex-col items-center overflow-hidden cursor-pointer ${containerClassName ?? ''} w-full h-full`}
         >
           {label}
           <div className="flex-1 flex items-center justify-center min-h-0 relative">
@@ -162,29 +161,27 @@ export function CompactZoneDisplay({
         </div>
       </DroppableZone>
 
-      {showModal && (
-        <ZoneModal
-          title={title}
-          zone={zone}
-          cards={cards}
-          allowZoneInteraction={allowZoneInteraction}
-          allowCardInteraction={allowCardInteraction}
-          isOpponent={isOpponent}
-          tone="battle"
-          hideTitle
-          headerActions={modalHeaderActions}
-          onClose={() => setShowModal(false)}
-          onCardHover={onCardHover}
-          onCardHoverEnd={onCardHoverEnd}
-          onCardClick={onCardClick}
-          selectedCardId={selectedCardId}
-          forceFaceDown={forceFaceDown}
-          upgradedCardIds={upgradedCardIds}
-          appliedUpgradesByCardId={upgradesByCardId}
-          hiddenUpgradesByCardId={hiddenUpgradesByCardId}
-          onRevealHiddenUpgrades={onRevealHiddenUpgrades}
-        />
-      )}
+      <ZoneModal
+        open={showModal}
+        title={panelTitle}
+        zone={zone}
+        cards={cards}
+        allowZoneInteraction={allowZoneInteraction}
+        allowCardInteraction={allowCardInteraction}
+        isOpponent={isOpponent}
+        tone="battle"
+        headerActions={modalHeaderActions}
+        onClose={() => setShowModal(false)}
+        onCardHover={onCardHover}
+        onCardHoverEnd={onCardHoverEnd}
+        onCardClick={onCardClick}
+        selectedCardId={selectedCardId}
+        forceFaceDown={forceFaceDown}
+        upgradedCardIds={upgradedCardIds}
+        appliedUpgradesByCardId={upgradesByCardId}
+        hiddenUpgradesByCardId={hiddenUpgradesByCardId}
+        onRevealHiddenUpgrades={onRevealHiddenUpgrades}
+      />
     </>
   )
 }
