@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, type ComponentProps } from "react";
 import type {
   GameState,
   Card as CardType,
@@ -334,23 +334,13 @@ export function BuildPhase({
   const isCardSelected = (cardId: string) =>
     selection?.type === "card" && selection.cardId === cardId;
 
-  const renderQuickUpgradeButton = (card: CardType, cardWidth: number, hasCompanionButton = false) => {
+  const renderQuickUpgradeButton = (card: CardType, hasCompanionButton = false) => {
     if (!canQuickUpgrade) return null;
-    const selected = isCardSelected(card.id);
-    const visibilityClasses = selected
-      ? "opacity-100 pointer-events-auto"
-      : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto";
-
-    // A share of the card's height keeps the padding light on small cards. A companion's own button fills the edge below.
-    const bottom = hasCompanionButton ? "bottom-[max(8.5%,1.375rem)]" : "bottom-[8.5%]";
-    // The pill is 75px wide, so it shrinks with a card too narrow to hold it.
-    const scale = Math.min(1, cardWidth / 85);
 
     return (
-      <button
-        type="button"
-        style={{ scale }}
-        className={`absolute ${bottom} left-1/2 -translate-x-1/2 origin-bottom z-20 px-3 py-1.5 rounded-full text-xs font-semibold btn-game transition-opacity duration-150 ${visibilityClasses}`}
+      <CardPill
+        pinned={isCardSelected(card.id)}
+        raised={hasCompanionButton}
         onClick={(e) => {
           e.stopPropagation();
           onQuickUpgrade?.(card.id);
@@ -359,7 +349,7 @@ export function BuildPhase({
         title="Upgrade (U)"
       >
         Upgrade
-      </button>
+      </CardPill>
     );
   };
 
@@ -367,9 +357,7 @@ export function BuildPhase({
     if (locked || upgrade.upgrade_target || !onQuickApplyUpgrade) return null;
 
     return (
-      <button
-        type="button"
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-3 py-1.5 rounded-full text-xs font-semibold btn-game opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity duration-150"
+      <CardPill
         onClick={(e) => {
           e.stopPropagation();
           onQuickApplyUpgrade(upgrade.id);
@@ -378,7 +366,7 @@ export function BuildPhase({
         title="Apply"
       >
         Apply
-      </button>
+      </CardPill>
     );
   };
 
@@ -401,7 +389,7 @@ export function BuildPhase({
             upgraded={upgradedCardIds.has(card.id)}
             appliedUpgrades={getAppliedUpgrades(card.id)}
           />
-          {renderQuickUpgradeButton(card, handDims.width)}
+          {renderQuickUpgradeButton(card)}
         </div>
       );
     }
@@ -514,7 +502,7 @@ export function BuildPhase({
                   upgraded={upgradedCardIds.has(card.id)}
                   appliedUpgrades={getAppliedUpgrades(card.id)}
                 />
-                {renderQuickUpgradeButton(card, sbDims.width, cardIsCompanion)}
+                {renderQuickUpgradeButton(card, cardIsCompanion)}
                 {cardIsCompanion && (
                   <button
                     disabled={locked}
@@ -552,5 +540,26 @@ export function BuildPhase({
         ) : null
       }
     />
+  );
+}
+
+/** A pill on a card's bottom edge. It shows while the card is hovered, or always while pinned. */
+function CardPill({
+  pinned = false,
+  raised = false,
+  ...button
+}: ComponentProps<"button"> & { pinned?: boolean; raised?: boolean }) {
+  const visibility = pinned
+    ? "opacity-100 pointer-events-auto"
+    : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto";
+
+  return (
+    <div className="card-overlay">
+      <button
+        type="button"
+        className={`card-pill ${raised ? "card-pill-raised" : ""} rounded-full font-semibold btn-game transition-opacity duration-150 ${visibility}`}
+        {...button}
+      />
+    </div>
   );
 }
