@@ -22,12 +22,12 @@ export function GhostIcon({ size = 'md', className = '' }: GhostIconProps) {
     >
       <path
         d="M12 2C7.58 2 4 5.58 4 10V20C4 20 6 18 8 20C10 22 12 20 12 20C12 20 14 22 16 20C18 18 20 20 20 20V10C20 5.58 16.42 2 12 2Z"
-        fill="#9CA3AF"
-        stroke="#6B7280"
+        fill="#B8AEA3"
+        stroke="#736B63"
         strokeWidth="1.5"
       />
-      <circle cx="9" cy="10" r="2" fill="#1F2937" />
-      <circle cx="15" cy="10" r="2" fill="#1F2937" />
+      <circle cx="9" cy="10" r="2" fill="#1C1714" />
+      <circle cx="15" cy="10" r="2" fill="#1C1714" />
     </svg>
   )
 }
