@@ -5,13 +5,50 @@ import { DIALOG_BACKDROP } from './styles'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
+function focusFirst(controls: HTMLElement[]) {
+  for (const control of controls) {
+    control.focus()
+    // A hidden control doesn't take focus.
+    if (document.activeElement !== control) continue
+    // The browser selects a field's text when Tab reaches it, and focus() doesn't.
+    if (control instanceof HTMLInputElement) control.select()
+    return
+  }
+}
+
+// Not inert on the page: that would also switch off clicks on toasts and the other layers drawn over a dialog.
+function keepFocusInside(dialog: HTMLElement, controls: () => HTMLElement[]) {
+  // A request to watch can open over the dialog, and Tab has to reach it.
+  const isOnTop = () => dialog.contains(document.elementFromPoint(0, 0))
+
+  const handleTab = (event: KeyboardEvent) => {
+    if (event.key !== 'Tab' || event.isComposing || !isOnTop()) return
+    event.preventDefault()
+    const order = event.shiftKey ? controls().reverse() : controls()
+    const next = order.indexOf(document.activeElement as HTMLElement) + 1
+    focusFirst([...order.slice(next), ...order.slice(0, next)])
+  }
+  // Tab from the browser's address bar lands on the page without a keydown, and with no element losing focus.
+  const handleFocus = (event: FocusEvent) => {
+    if (event.relatedTarget || dialog.contains(event.target as Node) || !isOnTop()) return
+    focusFirst(controls())
+  }
+
+  window.addEventListener('keydown', handleTab)
+  document.addEventListener('focusin', handleFocus)
+  return () => {
+    window.removeEventListener('keydown', handleTab)
+    document.removeEventListener('focusin', handleFocus)
+  }
+}
+
 /**
  * A dialog over a dimmed page: a walnut card with a title and a ✕ that closes it. Clicking the
  * dimmed page or pressing Escape closes it too. When the dialog is taller than the screen, as on a landscape phone,
  * its body scrolls under the title so ✕ stays in reach. Pass onSubmit to make the card a form.
  *
- * Opening it moves keyboard focus to its first control, and closing it returns focus to whatever
- * had it before, usually the button that opened it.
+ * Opening it moves keyboard focus to its first control. Tab and Shift+Tab then go round its own controls while it
+ * is the top layer. Closing it returns focus to whatever had it before, usually the button that opened it.
  */
 export function Dialog({
   title,
@@ -32,11 +69,15 @@ export function Dialog({
   const [opener] = useState(() => document.activeElement)
 
   useEffect(() => {
-    if (!dialogRef.current?.contains(document.activeElement)) {
-      const firstControl = bodyRef.current?.querySelector<HTMLElement>(FOCUSABLE) ?? closeRef.current
-      firstControl?.focus()
-    }
+    const dialog = dialogRef.current!
+    const body = bodyRef.current!
+    const close = closeRef.current!
+    // The ✕ comes first on the page and last here, so that the body's first control is where focus starts.
+    const controls = () => [...body.querySelectorAll<HTMLElement>(FOCUSABLE), close]
+    if (!dialog.contains(document.activeElement)) controls()[0].focus()
+    const stopKeepingFocusInside = keepFocusInside(dialog, controls)
     return () => {
+      stopKeepingFocusInside()
       if (opener instanceof HTMLElement && opener.isConnected) opener.focus()
     }
   }, [opener])

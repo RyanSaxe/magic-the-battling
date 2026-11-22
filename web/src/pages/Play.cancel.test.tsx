@@ -21,6 +21,7 @@ vi.hoisted(() => {
 vi.mock('../api/client', () => ({
   createGame: vi.fn(),
   warmCubeCache: vi.fn(),
+  closeSeat: vi.fn(async () => {}),
   getResumableGames: vi.fn(async () => []),
 }))
 vi.mock('../contexts', () => ({ useToast: () => ({ addToast: vi.fn() }) }))
