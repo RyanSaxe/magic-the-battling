@@ -61,9 +61,7 @@ def _create_player_packs_from_battler(game: Game, player: Player) -> None:
 def _get_pack_queue(game: Game, player: Player) -> list[list[Card]]:
     if game.draft_state is None:
         raise ValueError("No draft in progress")
-    if game.config.play_mode == "limited":
-        return game.draft_state.packs
-    return game.draft_state.player_packs.setdefault(player.name, [])
+    return game.draft_state.undealt_packs(player)
 
 
 def start(game: Game) -> None:
