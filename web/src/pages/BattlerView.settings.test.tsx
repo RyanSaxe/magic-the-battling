@@ -38,7 +38,7 @@ vi.mock('../contexts/authState', () => ({ useAuth: () => ({ user: { username: 't
 
 afterEach(cleanup)
 
-it('saves an emptied Display Name as no name', async () => {
+it('saves an emptied Display Name as no name when Enter is pressed', async () => {
   render(
     <MemoryRouter initialEntries={['/dashboard/list/7']}>
       <Routes>
@@ -48,9 +48,13 @@ it('saves an emptied Display Name as no name', async () => {
   )
   fireEvent.click(await screen.findByRole('button', { name: 'Edit' }))
   const settings = screen.getByRole('dialog', { name: 'Settings' })
-  fireEvent.change(within(settings).getByDisplayValue('Vintage Pod'), { target: { value: '' } })
+  const name = within(settings).getByDisplayValue<HTMLInputElement>('Vintage Pod')
+  fireEvent.change(name, { target: { value: '' } })
 
-  fireEvent.click(within(settings).getByRole('button', { name: 'Save' }))
+  // jsdom has no Enter to submit, which in a browser clicks the field's form's first submit button.
+  const submitButtons = [...(name.form?.querySelectorAll('button') ?? [])].filter((button) => button.type === 'submit')
+  expect(submitButtons.map((button) => button.textContent)).toEqual(['Save'])
+  fireEvent.click(submitButtons[0])
 
   expect(await screen.findByRole('heading', { name: 'Powered Cube' })).toBeTruthy()
 })
