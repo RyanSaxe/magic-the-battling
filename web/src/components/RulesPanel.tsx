@@ -24,7 +24,8 @@ export interface RulesPanelTarget {
 
 interface RulesPanelProps {
   onClose: () => void
-  onMinimizedChange?: (minimized: boolean) => void
+  /** Hears whether the window is minimized, which leaves the page's hotkeys on, and false when it closes. */
+  onMinimizedChange: (minimized: boolean) => void
   /** A panel is open over the minimized window, so Escape closes that panel and not the Guide. */
   behindPanel?: boolean
   initialDocId?: string
@@ -156,6 +157,11 @@ export function RulesPanel({
   const [collapsedPanelHeight, setCollapsedPanelHeight] = useState(DEFAULT_COLLAPSED_PANEL_HEIGHT_PX)
   const collapsedPanelRef = useRef<HTMLDivElement | null>(null)
 
+  useLayoutEffect(() => {
+    onMinimizedChange(isCollapsed)
+    return () => onMinimizedChange(false)
+  }, [isCollapsed, onMinimizedChange])
+
   const stopInteraction = useCallback(() => {
     setInteraction(null)
   }, [])
@@ -275,10 +281,6 @@ export function RulesPanel({
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [behindPanel, onClose])
-
-  useEffect(() => {
-    onMinimizedChange?.(isCollapsed)
-  }, [isCollapsed, onMinimizedChange])
 
   useEffect(() => {
     const syncViewport = () => {
