@@ -142,7 +142,8 @@ export function Dashboard() {
   const entries = library ? libraryEntries(library) : []
   const hasMore = !!library && libraryHasMore(library)
   const allCount = library ? `${entries.length}${hasMore ? '+' : ''}` : ''
-  const libraryRows = Math.max(1, Math.ceil(entries.length / 2))
+  const isLibraryEmpty = !!library && entries.length === 0
+  const libraryRows = Math.max(1, Math.ceil((entries.length + 1) / 2))
   const recentGames = myGames?.games.slice(0, RECENT_GAME_COUNT) ?? []
   // Below 1280px the sections stack, so a switch shows one at a time instead of a long scroll past every cube.
   const libraryCell = `${GRID_CELL} ${phoneSection === 'library' ? '' : 'max-xl:hidden'}`
@@ -209,45 +210,45 @@ export function Dashboard() {
           <div
             data-testid="library-header"
             style={gridCell(1, 1)}
-            className={`col-span-full ${libraryCell} xl:col-span-2 ${SECTION_HEADER}`}
+            className={`max-xl:hidden ${GRID_CELL} xl:col-span-2 ${SECTION_HEADER}`}
           >
-            <div className="max-xl:hidden">
-              <SectionTitle>{SECTION_NAMES.library}</SectionTitle>
-            </div>
-            <div className="flex w-full items-center gap-3 sm:ml-auto sm:w-auto">
-              <button
-                type="button"
-                onClick={() => setShowAddModal(true)}
-                className="btn btn-secondary flex-1 py-1.5 px-3 text-xs font-semibold sm:flex-none"
-              >
-                + Add Cube / Deck
-              </button>
-              <SectionLink to="/dashboard/discover">Discover cubes →</SectionLink>
-            </div>
+            <SectionTitle>{SECTION_NAMES.library}</SectionTitle>
+          </div>
+
+          <div
+            data-testid="library-add-slot"
+            style={gridCell(2, 1)}
+            className={`dashboard-add-slot ${isLibraryEmpty ? libraryNotice : libraryCell}`}
+          >
+            {isLibraryEmpty && (
+              <p className="max-w-sm text-sm text-[var(--ivory-felt)]">
+                Save a cube or deck with your settings to play it again in one click.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              className="btn btn-secondary py-2 px-4 text-sm font-semibold"
+            >
+              + Add Cube / Deck
+            </button>
+            <SectionLink to="/dashboard/discover">Discover cubes / decks →</SectionLink>
           </div>
 
           {libraryLoad.state.status === 'failed' ? (
-            <NoticeTile style={gridCell(2, 1)} className={libraryNotice} action={{ label: 'Retry', onClick: libraryLoad.retry }}>
+            <NoticeTile style={gridCell(2, 2)} className={libraryCell} action={{ label: 'Retry', onClick: libraryLoad.retry }}>
               Your cubes and decks didn&apos;t load.
             </NoticeTile>
           ) : !library ? (
-            <NoticeTile style={gridCell(2, 1)} className={libraryNotice}>
+            <NoticeTile style={gridCell(2, 2)} className={libraryCell}>
               Loading...
-            </NoticeTile>
-          ) : entries.length === 0 ? (
-            <NoticeTile
-              style={gridCell(2, 1)}
-              className={libraryNotice}
-              action={{ label: 'Add Cube / Deck', onClick: () => setShowAddModal(true) }}
-            >
-              Save a cube or deck with your settings to play it again in one click.
             </NoticeTile>
           ) : (
             entries.map((entry, index) => (
               <LibraryTile
                 key={libraryEntryKey(entry)}
                 entry={entry}
-                style={gridCell(2 + Math.floor(index / 2), 1 + (index % 2))}
+                style={gridCell(2 + Math.floor((index + 1) / 2), 1 + ((index + 1) % 2))}
                 className={libraryCell}
                 removable={canRemove(library, entry)}
                 onRemove={remove}
