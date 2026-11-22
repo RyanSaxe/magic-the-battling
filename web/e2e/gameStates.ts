@@ -200,6 +200,7 @@ export function gameBootstrap({ phase, counts }: ScreenState): GameBootstrap {
       upgrades: cards('upgrade', counts.upgrades ?? 0, 'upgrade'),
     }),
     hand,
+    hand_slots: Array.from({ length: handSize }, (_, i) => hand[i]?.id ?? null),
     sideboard,
     command_zone: [],
     current_pack: phase === 'draft' ? cards('pack', counts.pack ?? 0, 'spell', 9) : null,

@@ -202,6 +202,7 @@ function hydrateSelfPlayer(
   return {
     ...hydratePlayerView(player, catalog, refsById),
     hand: hydrateCards(player.hand, catalog, refsById),
+    hand_slots: player.hand_slots,
     sideboard: hydrateCards(player.sideboard, catalog, refsById),
     command_zone: hydrateCards(player.command_zone, catalog, refsById),
     current_pack: player.current_pack ? hydrateCards(player.current_pack, catalog, refsById) : null,

@@ -5,7 +5,7 @@ import { JoinGameModal } from "../components/home/JoinGameModal";
 import { AppHeader } from "../components/common/AppHeader";
 import { BarLabel } from "../components/common/FrameBar";
 import { PageFrame } from "../components/common/PageFrame";
-import { ResumeGameStrip } from "../components/ResumeGame";
+import { HomeResumeShelf } from "../components/ResumeGame";
 import { useResumableGames } from "../hooks/useResumableGames";
 import { useAuth } from "../contexts/authState";
 import { prefetchLegendaryName } from "../utils/prefetchName";
@@ -26,7 +26,7 @@ export function Home() {
     }
   }, [loading, user, navigate]);
 
-  const [resumable] = useResumableGames(1);
+  const resumableGames = useResumableGames();
 
   if (loading || user) return null;
 
@@ -52,8 +52,8 @@ export function Home() {
         />}
         center
         contentClassName="items-center pb-6"
+        shelf={<HomeResumeShelf seats={resumableGames} />}
       >
-        {resumable && <ResumeGameStrip seat={resumable} />}
         <CardShowcase />
         {/* mt-10 rather than mt-6 offsets the column's top padding, so the showcase stays centered where it was. */}
         <p className="text-[var(--ivory-muted)] text-sm mt-10">

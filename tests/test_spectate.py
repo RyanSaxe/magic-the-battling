@@ -133,6 +133,35 @@ def test_approved_spectator_can_still_connect_and_reconnect_after_other_requests
     assert watched_player_name(url) == "Alice"
 
 
+def test_a_watcher_and_a_reload_see_each_card_in_the_hand_slot_it_was_put_in(client, start_game, ws_receive_json_until):
+    host, _ = start_game("Alice", "Bob", auto_approve_spectators=True)
+    game_id = host["game_id"]
+    request_id = _request_to_watch(client, game_id, "Alice")
+    watcher_session = _request_status(client, game_id, request_id)["session_id"]
+    watcher_url = _spectate_url(game_id, watcher_session, request_id, "Alice")
+    alice_url = f"/ws/{game_id}?session_id={host['session_id']}"
+
+    with client.websocket_connect(watcher_url) as watcher, client.websocket_connect(alice_url) as alice:
+        ws_receive_json_until(watcher, lambda m: m["type"] == "game_bootstrap")
+        pool = ws_receive_json_until(alice, lambda m: m["type"] == "game_bootstrap")["payload"]["state"]["self_player"][
+            "sideboard"
+        ]
+        move = {"card_id": pool[0]["id"], "source": "sideboard", "destination": "hand"}
+        alice.send_json({"action": "build_move", "payload": {**move, "slot": 2}})
+        watched = ws_receive_json_until(
+            watcher, lambda m: m["type"] == "game_state" and m["payload"]["self_player"]["hand"]
+        )
+        assert watched["payload"]["self_player"]["hand_slots"] == [None, None, pool[0]["id"]]
+
+        alice.send_json({"action": "build_move", "payload": {**move, "card_id": pool[1]["id"], "slot": 3}})
+        refused = ws_receive_json_until(alice, lambda m: m["type"] == "error")
+        assert "No hand slot 3" in str(refused["payload"])
+
+    with client.websocket_connect(alice_url) as reloaded:
+        back = ws_receive_json_until(reloaded, lambda m: m["type"] == "game_bootstrap")
+    assert back["payload"]["state"]["self_player"]["hand_slots"] == [None, None, pool[0]["id"]]
+
+
 def test_denied_spectator_still_sees_the_denial_after_other_requests(client, start_game, answer_request):
     host, _ = start_game("Alice", "Bob")
     game_id = host["game_id"]

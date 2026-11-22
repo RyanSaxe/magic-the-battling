@@ -147,6 +147,7 @@ describe('Game: what is open over the board', () => {
   })
 
   it('leaves a minimized Guide and its place alone while Players and Scouting open and close', async () => {
+    vi.stubGlobal('innerWidth', 768)
     await openGame(gameBootstrap({ phase: 'build', counts: { hand: 2, sideboard: 2 } }))
     fireEvent.click(find('[data-guide-target="guide-button"]'))
     fireEvent.click(screen.getByRole('radio', { name: 'FAQ' }))
@@ -163,6 +164,7 @@ describe('Game: what is open over the board', () => {
   })
 
   it('closes a card menu on Escape and leaves the minimized Guide', async () => {
+    vi.stubGlobal('innerWidth', 768)
     await openGame(gameBootstrap({ phase: 'battle', counts: { lands: 1 } }))
     fireEvent.click(find('[data-guide-target="guide-button"]'))
     fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
@@ -173,6 +175,7 @@ describe('Game: what is open over the board', () => {
   })
 
   it('leaves a minimized Guide and its place alone while Actions or a pile opens and closes', async () => {
+    vi.stubGlobal('innerWidth', 768)
     await openGame(gameBootstrap({ phase: 'battle', counts: { lands: 1 } }))
     fireEvent.click(find('[data-guide-target="guide-button"]'))
     fireEvent.click(screen.getByRole('radio', { name: 'FAQ' }))
@@ -248,6 +251,7 @@ describe('Game: what is open over the board', () => {
   })
 
   it('brings a minimized Guide back after backing out of Submit Result, and not after submitting', async () => {
+    vi.stubGlobal('innerWidth', 768)
     await openGame(gameBootstrap({ phase: 'battle', counts: { lands: 1 } }))
     const minimizedOnScreen = () => screen.queryByRole('button', { name: 'Open guide' }) !== null
     fireEvent.click(find('[data-guide-target="guide-button"]'))
@@ -276,5 +280,18 @@ describe('Game: what is open over the board', () => {
 
     pressGuideKey()
     expect(document.querySelector('.floating-window')).toBeNull()
+  })
+
+  it('leaves a phone only the Guide button when minimized, which opens it where it was', async () => {
+    await openGame(gameBootstrap({ phase: 'build', counts: { hand: 2, sideboard: 2 } }))
+    const guideButton = find('[data-guide-target="guide-button"]')
+    fireEvent.click(guideButton)
+    fireEvent.click(screen.getByRole('radio', { name: 'FAQ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Minimize guide' }))
+    expect(screen.queryByRole('button', { name: 'Open guide' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Close guide' })).toBeNull()
+
+    fireEvent.click(guideButton)
+    expect(screen.getByRole('radio', { name: 'FAQ' }).getAttribute('aria-checked')).toBe('true')
   })
 })

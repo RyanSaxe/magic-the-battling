@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { ResumableSeat } from '../hooks/useResumableGames'
 import { useResumeSeat } from '../hooks/useResumeSeat'
+import { countLabel } from '../utils/accountFormat'
 import { unknownToAppError, type AppError } from '../utils/appError'
 import { getRememberedSeat } from '../utils/deviceIdentity'
 import { endSeat } from '../utils/endSeat'
@@ -13,16 +15,6 @@ const ROWS_SHOWN = 2
 const CLOSE_COLUMN = 'w-11 shrink-0'
 // A longer cube name takes two lines in a shelf row, whose height is fixed.
 const ONE_LINE_TITLE = 24
-
-function StatusDot({ kind }: { kind: ResumableSeat['kind'] }) {
-  return (
-    <span
-      className={`h-[7px] w-[7px] shrink-0 rounded-full ${
-        kind === 'game' ? 'bg-green-500 shadow-[0_0_6px_#22c55e]' : 'bg-amber-500'
-      }`}
-    />
-  )
-}
 
 function seatTitle(seat: ResumableSeat): string {
   return seat.cubeName ?? seat.cubeId
@@ -42,32 +34,74 @@ function SeatArt({ seat }: { seat: ResumableSeat }) {
   return <span className="resume-art">{seat.cubeImageUri && <CubeArt src={seat.cubeImageUri} />}</span>
 }
 
-/** The cube, then whose seat it is and where it stands. A line that doesn't fit wraps between those, never inside. */
-function SeatSummary({ seat, lead }: { seat: ResumableSeat; lead?: string }) {
+function StageColumn({ seat }: { seat: ResumableSeat }) {
+  return (
+    <span className="resume-stage">
+      {seat.kind === 'lobby' ? (
+        <span className="resume-stage-lobby">Lobby</span>
+      ) : (
+        <>
+          <span className="resume-stage-number">
+            {seat.stage}-{seat.round}
+          </span>
+          <span className="resume-stage-word">Stage</span>
+        </>
+      )}
+    </span>
+  )
+}
+
+function SeatFact({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <span className={className}>
+      {' · '}
+      <span className="whitespace-nowrap">{children}</span>
+    </span>
+  )
+}
+
+function SinceFact({ seat }: { seat: ResumableSeat }) {
+  if (!seat.lastActiveAt) return null
+  return <SeatFact className="resume-since">{formatTimeSince(seat.lastActiveAt)}</SeatFact>
+}
+
+/** The cube, then whose seat it is and its facts. A line that doesn't fit wraps between those, never inside. */
+function SeatSummary({ seat, children }: { seat: ResumableSeat; children: ReactNode }) {
   return (
     <span className="resume-summary">
       <span className="resume-title">{seatTitle(seat)}</span>
       <span className="resume-detail">
-        {lead && `${lead} `}
         {seat.playerName}
-        {' · '}
-        {seat.kind === 'lobby' ? (
-          <span className="whitespace-nowrap">{seat.joinCode ? `Lobby ${seat.joinCode}` : 'Lobby'}</span>
-        ) : (
-          <>
-            <span className="whitespace-nowrap">
-              Stage {seat.stage}-{seat.round}
-            </span>
-            {seat.lastActiveAt && (
-              <>
-                {' · '}
-                <span className="whitespace-nowrap">{formatTimeSince(seat.lastActiveAt)}</span>
-              </>
-            )}
-          </>
-        )}
+        {children}
       </span>
     </span>
+  )
+}
+
+function ResumeSeatSummary({ seat }: { seat: ResumableSeat }) {
+  const inLobby = seat.kind === 'lobby'
+  return (
+    <SeatSummary seat={seat}>
+      <SeatFact>{inLobby ? `${seat.playerCount} seated` : countLabel(seat.playerCount, 'player')}</SeatFact>
+      {inLobby ? seat.joinCode && <SeatFact>{seat.joinCode}</SeatFact> : <SinceFact seat={seat} />}
+    </SeatSummary>
+  )
+}
+
+function ResumeButton({ seat }: { seat: ResumableSeat }) {
+  const resume = useResumeSeat()
+  return (
+    <button
+      type="button"
+      onClick={() => resume(seat)}
+      aria-label={`${actionWord(seat)} ${seatTitle(seat)} as ${seat.playerName}`}
+      className="resume-open"
+    >
+      <StageColumn seat={seat} />
+      <SeatArt seat={seat} />
+      <ResumeSeatSummary seat={seat} />
+      <span aria-hidden="true" className="resume-chevron">›</span>
+    </button>
   )
 }
 
@@ -80,19 +114,9 @@ function ResumeRow({
   hasCloseColumn: boolean
   onClose: (seat: ResumableSeat) => void
 }) {
-  const resume = useResumeSeat()
   return (
     <li className={`resume-row ${seatTitle(seat).length > ONE_LINE_TITLE ? 'is-long' : ''}`}>
-      <button
-        type="button"
-        onClick={() => resume(seat)}
-        aria-label={`${actionWord(seat)} ${seatTitle(seat)} as ${seat.playerName}`}
-        className="resume-open"
-      >
-        <SeatArt seat={seat} />
-        <SeatSummary seat={seat} lead={`${actionWord(seat)} as`} />
-        <span aria-hidden="true" className="resume-chevron">›</span>
-      </button>
+      <ResumeButton seat={seat} />
       {seat.canClose ? (
         <button
           type="button"
@@ -104,6 +128,34 @@ function ResumeRow({
         </button>
       ) : (
         hasCloseColumn && <span aria-hidden="true" className={CLOSE_COLUMN} />
+      )}
+    </li>
+  )
+}
+
+/** One row for Board's sidebar: Stage column and facts from the same owner, without a thumbnail or chevron. */
+export function ResumeBoardRow({ seat, onClose }: { seat: ResumableSeat; onClose: (seat: ResumableSeat) => void }) {
+  const resume = useResumeSeat()
+  return (
+    <li className={`board-game ${seatTitle(seat).length > ONE_LINE_TITLE ? 'is-long' : ''}`}>
+      <button
+        type="button"
+        onClick={() => resume(seat)}
+        aria-label={`${actionWord(seat)} ${seatTitle(seat)} as ${seat.playerName}`}
+        className={`board-game-open ${seat.canClose ? 'has-close' : ''}`}
+      >
+        <StageColumn seat={seat} />
+        <ResumeSeatSummary seat={seat} />
+      </button>
+      {seat.canClose && (
+        <button
+          type="button"
+          className="icon-target board-game-close"
+          onClick={() => onClose(seat)}
+          aria-label={`${seat.kind === 'game' ? 'Close' : 'Leave'} ${seatTitle(seat)} as ${seat.playerName}`}
+        >
+          <CrossIcon />
+        </button>
       )}
     </li>
   )
@@ -140,7 +192,18 @@ export function CloseSeatDialog({
     <Dialog title={words.title} onClose={onKeep}>
       <div className="flex items-center gap-2.5">
         <SeatArt seat={seat} />
-        <SeatSummary seat={seat} />
+        <SeatSummary seat={seat}>
+          {seat.kind === 'lobby' ? (
+            <SeatFact>{seat.joinCode ? `Lobby ${seat.joinCode}` : 'Lobby'}</SeatFact>
+          ) : (
+            <>
+              <SeatFact>
+                Stage {seat.stage}-{seat.round}
+              </SeatFact>
+              <SinceFact seat={seat} />
+            </>
+          )}
+        </SeatSummary>
       </div>
       <p role="status" className="mt-4 text-sm leading-relaxed text-[var(--ivory-muted)]">
         {failure?.message ?? words.warning}
@@ -195,6 +258,9 @@ export function ResumeShelf({
                   onClick={(event) => onShowAll(event.detail === 0)}
                   className={`resume-open ${hasCloseColumn ? 'has-close-space' : ''}`}
                 >
+                  <span aria-hidden="true" className="resume-stage">
+                    <span className="resume-stage-number">+{seats.length - 1}</span>
+                  </span>
                   <SeatArt seat={seats[1]} />
                   <span className="resume-summary">
                     <span className="resume-title">{seats.length - 1} more games</span>
@@ -225,21 +291,20 @@ export function ResumeList({ seats, onClose }: { seats: ResumableSeat[]; onClose
   )
 }
 
-/** One line for the most recent lobby or game, for pages without room for a card. */
-export function ResumeGameStrip({ seat }: { seat: ResumableSeat }) {
-  const resume = useResumeSeat()
-  const since = seat.kind === 'game' && seat.lastActiveAt ? ` · last played ${formatTimeSince(seat.lastActiveAt)}` : ''
+/** Home's shelf, pinned under its felt: the most recent game or lobby, and the way to Play's list of the others. */
+export function HomeResumeShelf({ seats }: { seats: ResumableSeat[] }) {
+  const navigate = useNavigate()
+  if (seats.length === 0) return null
   return (
-    <div className="mb-4 flex w-full max-w-[30rem] shrink-0 items-center gap-2.5 rounded-lg border gold-border bg-black/35 py-1.5 pl-3 pr-1.5">
-      <StatusDot kind={seat.kind} />
-      <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--ivory)]">
-        {seat.kind === 'game' ? 'Game in progress' : 'Lobby waiting'} as{' '}
-        <b className="font-semibold text-white">{seat.playerName}</b>
-        <span className="hidden sm:inline">{since}</span>
-      </span>
-      <button onClick={() => resume(seat)} className="btn btn-primary shrink-0 px-3 py-1 text-sm">
-        {seat.kind === 'game' ? 'Resume' : 'Return'}
-      </button>
-    </div>
+    <section aria-label="In progress" className="resume-shelf home-shelf">
+      <div className="home-shelf-row">
+        <ResumeButton seat={seats[0]} />
+        {seats.length > 1 && (
+          <button type="button" onClick={() => navigate('/play')} className="home-shelf-more">
+            +{seats.length - 1} more
+          </button>
+        )}
+      </div>
+    </section>
   )
 }

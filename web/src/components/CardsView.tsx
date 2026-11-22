@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { getGameCards, type GameCardsResponse } from '../api/client'
 import { CardPreviewModal } from './card/CardPreviewModal'
 import type { Card } from '../types'
@@ -71,14 +72,14 @@ export function CardsView({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="cards-view-list flex items-center justify-center py-12">
         <div className="animate-spin w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full" />
       </div>
     )
   }
 
   if (error) {
-    return <div className="text-red-400 text-center py-8">{error}</div>
+    return <div className="cards-view-list text-red-400 text-center py-8">{error}</div>
   }
 
   const allCards = which === 'cards' ? data?.cards ?? [] : data?.upgrades ?? []
@@ -127,10 +128,10 @@ export function CardsView({
   const showFilters = which === 'cards'
 
   return (
-    <div className="flex flex-col min-h-0 flex-1">
+    <div className="cards-view flex flex-col min-h-0 flex-1">
       {showFilters && (
-        <div className="shrink-0 flex flex-col gap-2 pb-3">
-          <div className="grid grid-cols-3 gap-2">
+        <div className="cards-view-filters shrink-0 flex flex-col gap-2 pb-3">
+          <div className="cards-view-fields grid grid-cols-3 gap-2">
             <input
               type="text"
               value={searchName}
@@ -154,7 +155,7 @@ export function CardsView({
             />
           </div>
 
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="cards-view-colors flex items-center gap-1.5 flex-wrap">
             {COLOR_CHIPS.map(({ code, label }) => (
               <button
                 key={code}
@@ -177,7 +178,7 @@ export function CardsView({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto min-h-0 pb-3">
+      <div className="cards-view-list flex-1 overflow-y-auto min-h-0 pb-3">
         {sorted.length === 0 ? (
           <div className="text-[var(--ivory-muted)] text-center py-8">No cards match</div>
         ) : (
@@ -197,12 +198,14 @@ export function CardsView({
         )}
       </div>
 
-      {previewCard && (
+      {/* Out of the Guide's container, which older Safari would fit the preview to instead of the screen. */}
+      {previewCard && createPortal(
         <CardPreviewModal
           card={previewCard}
           appliedUpgrades={[]}
           onClose={() => setPreviewCard(null)}
-        />
+        />,
+        document.body,
       )}
     </div>
   )

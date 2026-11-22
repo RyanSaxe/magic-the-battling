@@ -157,15 +157,27 @@ export function getSharePlayerSnapshotForRound(
   return bestSnapshot
 }
 
+function isOutInShareRound(player: SharePlayerData, selectedRound: string): boolean {
+  return player.final_treasures !== null && getRoundTiming(player, selectedRound) !== 'before'
+    ? player.final_placement !== 1
+    : !playedShareRound(player, selectedRound)
+}
+
+/** The build a round's board shows: the player's own from that round, or their last once they are out. */
+export function getShareBoardSnapshot(player: SharePlayerData, selectedRound: string): SharePlayerSnapshot | null {
+  const ownBuild = player.snapshots.find((snapshot) => getShareRoundValue(snapshot) === selectedRound)
+  if (ownBuild) return ownBuild
+
+  const isAfterTheirLast = getRoundTiming(player, selectedRound) === 'after'
+  return isAfterTheirLast && isOutInShareRound(player, selectedRound) ? getLatestShareSnapshot(player) : null
+}
+
 export function getSharePlayerRowBadge(
   player: SharePlayerData,
   selectedPlayer: string,
   selectedRound: string,
 ): SharePlayerRowBadge {
-  const isOut = player.final_treasures !== null && getRoundTiming(player, selectedRound) !== 'before'
-    ? player.final_placement !== 1
-    : !playedShareRound(player, selectedRound)
-  if (isOut) return 'dead'
+  if (isOutInShareRound(player, selectedRound)) return 'dead'
   return player.name === selectedPlayer ? 'viewing' : 'alive'
 }
 
@@ -250,6 +262,7 @@ export function buildGameSummaryData(
     in_sudden_death: false,
     build_ready: false,
     hand: lastSnap.hand,
+    hand_slots: lastSnap.hand.map((c) => c.id),
     sideboard: lastSnap.sideboard,
     current_pack: null,
     last_battle_result: lastSnap.treasures > 0 ? {

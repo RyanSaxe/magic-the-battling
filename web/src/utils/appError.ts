@@ -210,7 +210,7 @@ export function getAppErrorMessage(
       case 'SEAT_CLAIM_REQUIRED':
         return 'That seat can only be taken back from the browser that joined with it.'
       case 'SEAT_MOVED':
-        return 'This game is now open in another tab or window.'
+        return 'This game is now open somewhere else.'
       case 'INVALID_JOIN_CODE':
         return 'That join code is not valid.'
       case 'LOBBY_FULL':

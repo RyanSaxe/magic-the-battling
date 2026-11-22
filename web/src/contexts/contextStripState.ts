@@ -4,11 +4,12 @@ import type { Card } from '../types'
 export interface ContextStripState {
   previewCard: Card | null
   previewAppliedUpgrades: Card[]
+  previewCounters: Record<string, number> | undefined
 }
 
 export interface ContextStripContextValue {
   state: ContextStripState
-  setPreviewCard: (card: Card | null, appliedUpgrades?: Card[]) => void
+  setPreviewCard: (card: Card | null, appliedUpgrades?: Card[], counters?: Record<string, number>) => void
 }
 
 export const ContextStripContext = createContext<ContextStripContextValue | null>(null)

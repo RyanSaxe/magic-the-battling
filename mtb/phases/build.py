@@ -11,9 +11,18 @@ def _get_build_collection(player: Player, zone: BuildSource) -> list[Card]:
     return player.hand if zone == "hand" else player.sideboard
 
 
-def move_card(player: Player, card: Card, source: BuildSource, destination: BuildSource) -> None:
+def move_card(
+    player: Player, card: Card, source: BuildSource, destination: BuildSource, slot: int | None = None
+) -> None:
     if source == destination:
         return
+
+    if (
+        destination == "hand"
+        and slot is not None
+        and (not isinstance(slot, int) or isinstance(slot, bool) or not 0 <= slot < player.hand_size)
+    ):
+        raise ValueError(f"No hand slot {slot}")
 
     if source == "sideboard" and destination == "hand" and len(player.hand) >= player.hand_size:
         raise ValueError(f"Hand is full ({player.hand_size})")
@@ -22,9 +31,19 @@ def move_card(player: Player, card: Card, source: BuildSource, destination: Buil
     if card not in source_collection:
         raise ValueError(f"Card not in player's {source}")
 
+    slots = player.slotted_hand()
     source_collection.remove(card)
     destination_collection = _get_build_collection(player, destination)
     destination_collection.append(card)
+
+    if destination == "hand":
+        # Two quick taps can name the same slot. The card already there keeps it.
+        if slot is None or slots[slot] is not None:
+            slot = slots.index(None)
+        slots[slot] = card.id
+    else:
+        slots = [None if card_id == card.id else card_id for card_id in slots]
+    player.hand_slots = slots
 
     if source == "sideboard" and any(c.id == card.id for c in player.command_zone):
         player.command_zone.clear()
@@ -51,8 +70,11 @@ def swap_card(
     idx_a = collection_a.index(card_a)
     idx_b = collection_b.index(card_b)
 
+    slots = player.slotted_hand()
     collection_a[idx_a] = card_b
     collection_b[idx_b] = card_a
+    swapped = {card_a.id: card_b.id, card_b.id: card_a.id}
+    player.hand_slots = [swapped.get(card_id, card_id) if card_id else None for card_id in slots]
 
     if (source_a == "sideboard" and any(c.id == card_a.id for c in player.command_zone)) or (
         source_b == "sideboard" and any(c.id == card_b.id for c in player.command_zone)

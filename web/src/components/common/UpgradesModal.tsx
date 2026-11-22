@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { Card as CardType } from '../../types'
-import { Card } from '../card'
+import { Card, CardPreviewContext } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { CardGrid } from './CardGrid'
 import { CloseButton } from './CloseButton'
@@ -35,12 +35,14 @@ export function UpgradesModal({
   initialUpgradeId,
   initialRevealUpgradeIds = [],
 }: UpgradesModalProps) {
+  const previewContext = useContext(CardPreviewContext)
+  const canApply = mode === 'apply' && !!onApply
   const applied = getAppliedUpgrades(upgrades)
   const unapplied = getUnappliedUpgrades(upgrades)
   const hiddenApplied = getUnrevealedAppliedUpgrades(upgrades)
   const revealedApplied = applied.filter((upgrade) => upgrade.is_revealed !== false)
   const [selectedUpgradeId, setSelectedUpgradeId] = useState<string | null>(() => (
-    mode === 'apply'
+    canApply
       ? (
           unapplied.some((upgrade) => upgrade.id === initialUpgradeId)
             ? initialUpgradeId ?? null
@@ -58,7 +60,7 @@ export function UpgradesModal({
     if (initialSelection.length > 0) return initialSelection
     return hiddenApplied.length === 1 ? [hiddenApplied[0].id] : []
   })
-  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(initialTargetId ?? null)
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(canApply ? initialTargetId ?? null : null)
 
   const applyUpgrade = useCallback((upgradeId: string, targetId: string) => {
     applyUpgradeWithModalClose({
@@ -126,7 +128,7 @@ export function UpgradesModal({
   const selectedUpgrade = unapplied.find((u) => u.id === selectedUpgradeId) ?? null
   const selectedTarget = targets.find((t) => t.id === selectedTargetId) ?? null
   const readyToConfirm = mode === 'apply'
-    ? !!(selectedUpgrade && selectedTarget)
+    ? !!(canApply && selectedUpgrade && selectedTarget)
     : mode === 'reveal'
       ? selectedRevealUpgradeIds.length > 0
       : false
@@ -164,6 +166,10 @@ export function UpgradesModal({
   }
 
   const handleTargetClick = (target: CardType) => {
+    if (!canApply) {
+      previewContext?.setPreviewCard(target)
+      return
+    }
     setSelectedTargetId(selectedTargetId === target.id ? null : target.id)
   }
 
@@ -206,7 +212,18 @@ export function UpgradesModal({
               <div className="shrink-0 flex justify-center">
                 <CardGrid columns={applyDims.upgrades.columns} cardWidth={upgradeDims.width}>
                   {applied.map((upgrade) => (
-                    <UpgradeStack key={upgrade.id} upgrade={upgrade} dimensions={upgradeDims} />
+                    <UpgradeStack
+                      key={upgrade.id}
+                      upgrade={upgrade}
+                      dimensions={upgradeDims}
+                      onClick={!canApply ? () => {
+                        if (upgrade.upgrade_target) {
+                          previewContext?.setPreviewCard(upgrade.upgrade_target, [upgrade])
+                        } else {
+                          previewContext?.setPreviewCard(upgrade)
+                        }
+                      } : undefined}
+                    />
                   ))}
                   {unapplied.map((upgrade) => (
                     <Card
@@ -214,13 +231,17 @@ export function UpgradesModal({
                       card={upgrade}
                       dimensions={upgradeDims}
                       onClick={() => {
+                        if (!canApply) {
+                          previewContext?.setPreviewCard(upgrade)
+                          return
+                        }
                         if (selectedUpgradeId === upgrade.id) {
                           setSelectedUpgradeId(null)
                         } else {
                           setSelectedUpgradeId(upgrade.id)
                         }
                       }}
-                      selected={selectedUpgradeId === upgrade.id}
+                      selected={canApply && selectedUpgradeId === upgrade.id}
                     />
                   ))}
                 </CardGrid>
@@ -236,7 +257,7 @@ export function UpgradesModal({
                       card={card}
                       dimensions={targetDims}
                       onClick={() => handleTargetClick(card)}
-                      selected={selectedTargetId === card.id}
+                      selected={canApply && selectedTargetId === card.id}
                     />
                   ))}
                 </CardGrid>

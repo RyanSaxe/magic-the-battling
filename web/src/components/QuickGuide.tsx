@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FaDiscord } from 'react-icons/fa6'
 import { DOCS, getPhaseDoc, type DocEntry } from '../docs'
 import { DocRenderer } from './DocRenderer'
@@ -23,18 +23,17 @@ type GuideSection = 'overview' | 'game-pieces' | Phase
 type ControlsSection = 'global' | Phase
 type TipsSection = 'global' | Phase
 
-const ACCORDION_STEP_MS = 400
+const GUIDE_SECTIONS: GuideSection[] = ['overview', 'game-pieces', ...PHASES]
+const CONTROLS_SECTIONS: ControlsSection[] = ['global', ...PHASES]
+const TIPS_SECTIONS: TipsSection[] = ['global', ...PHASES]
 const DISCORD_INVITE_URL = 'https://discord.gg/2NAjcWXNKn'
 const FACE_UP_FAQ_SLUG = 'why-are-my-opponents-cards-face-up'
 const FINALS_FAQ_SLUG = 'how-do-the-finals-work'
 
-interface AccordionItemProps {
-  id: string
-  label: string
-  expanded: boolean
-  onToggle: () => void
-  labelClassName?: string
-  children: React.ReactNode
+interface BookPage<T extends string> {
+  id: T
+  title: string
+  body: React.ReactNode
 }
 
 interface QuickGuideProps {
@@ -61,10 +60,7 @@ interface FaqEntry {
   slug: string
 }
 
-function guideSectionLabel(section: GuideSection | null): string | null {
-  if (!section) {
-    return null
-  }
+function guideSectionLabel(section: GuideSection): string {
   if (section === 'overview') {
     return 'Overview'
   }
@@ -74,35 +70,27 @@ function guideSectionLabel(section: GuideSection | null): string | null {
   return getPhaseReferenceLabel(section)
 }
 
-function controlsSectionLabel(section: ControlsSection | null): string | null {
-  if (!section) {
-    return null
-  }
+function controlsSectionLabel(section: ControlsSection): string {
   return section === 'global' ? 'General' : getPhaseControlsLabel(section)
 }
 
-function tipsSectionLabel(section: TipsSection | null): string | null {
-  if (!section) {
-    return null
-  }
+function tipsSectionLabel(section: TipsSection): string {
   return section === 'global' ? 'General' : getPhaseTipsLabel(section)
 }
 
 function buildLocationLabel({
   activeTab,
-  guideOpenId,
-  controlsOpenId,
-  tipsOpenId,
-  faqOpenId,
-  faqEntries,
+  guideSection,
+  controlsSection,
+  tipsSection,
+  faqQuestion,
   cardType,
 }: {
   activeTab: HeaderTab
-  guideOpenId: GuideSection | null
-  controlsOpenId: ControlsSection | null
-  tipsOpenId: TipsSection | null
-  faqOpenId: number | null
-  faqEntries: FaqEntry[]
+  guideSection: GuideSection
+  controlsSection: ControlsSection
+  tipsSection: TipsSection
+  faqQuestion?: string
   cardType: CardType
 }): string {
   let tabLabel = 'Rules'
@@ -111,15 +99,15 @@ function buildLocationLabel({
   switch (activeTab) {
     case 'guide':
       tabLabel = 'Rules'
-      detail = guideSectionLabel(guideOpenId)
+      detail = guideSectionLabel(guideSection)
       break
     case 'controls':
       tabLabel = 'Controls'
-      detail = controlsSectionLabel(controlsOpenId)
+      detail = controlsSectionLabel(controlsSection)
       break
     case 'tips':
       tabLabel = 'Tips'
-      detail = tipsSectionLabel(tipsOpenId)
+      detail = tipsSectionLabel(tipsSection)
       break
     case 'browse':
       tabLabel = 'Cards'
@@ -131,7 +119,7 @@ function buildLocationLabel({
       break
     case 'faq':
       tabLabel = 'FAQ'
-      detail = faqOpenId !== null ? faqEntries[faqOpenId]?.question ?? null : null
+      detail = faqQuestion ?? null
       break
   }
 
@@ -225,140 +213,91 @@ function resolveTarget(docId?: string, tab?: string): ResolvedTarget {
   return { tab: 'guide', guideSection: 'overview' }
 }
 
-function scrollToLinkTarget(list: HTMLElement, anchor?: string) {
-  const section = list.querySelector('.quick-guide-accordion-panel.open')?.parentElement
-  if (!section) {
+function scrollToLinkTarget(page: HTMLElement, anchor?: string) {
+  const heading = anchor
+    ? Array.from(page.querySelectorAll('h2')).find((h2) => toSlug(h2.textContent ?? '') === anchor)
+    : undefined
+  if (!heading) {
+    page.scrollTop = 0
     return
   }
-  const heading = anchor
-    ? Array.from(section.querySelectorAll('h2')).find((h2) => toSlug(h2.textContent ?? '') === anchor)
-    : undefined
-  const target = heading ?? section
-  const top = list.scrollTop + target.getBoundingClientRect().top - list.getBoundingClientRect().top
+  const top = page.scrollTop + heading.getBoundingClientRect().top - page.getBoundingClientRect().top
   // iOS can keep a scroll past a box's end.
-  list.scrollTop = Math.min(top, list.scrollHeight - list.clientHeight)
+  page.scrollTop = Math.min(top, page.scrollHeight - page.clientHeight)
 }
 
-function useSequentialAccordion<T extends string | number>(
-  initialOpen: T | null,
-  stepMs: number,
-) {
-  const [openId, setOpenId] = useState<T | null>(initialOpen)
-  const closeTimerRef = useRef<number | null>(null)
-  const pendingOpenRef = useRef<T | null>(null)
+/**
+ * A tab's sections as pages, one at a time. The contents sit beside the page, or behind its title in a narrow
+ * window, where the page stays laid out under them to keep its scroll.
+ */
+function Book<T extends string>({
+  pages,
+  openId,
+  onOpen,
+  pageRef,
+}: {
+  pages: BookPage<T>[]
+  openId: T
+  onOpen: (id: T) => void
+  pageRef: React.Ref<HTMLDivElement>
+}) {
+  const [contentsOpen, setContentsOpen] = useState(false)
+  const contentsId = useId()
+  const index = pages.findIndex((page) => page.id === openId)
+  const page = pages[index]
+  const next = pages[index + 1]
 
-  const clearPending = useCallback(() => {
-    if (closeTimerRef.current !== null) {
-      window.clearTimeout(closeTimerRef.current)
-      closeTimerRef.current = null
-    }
-    pendingOpenRef.current = null
-  }, [])
-
-  useEffect(() => {
-    return () => clearPending()
-  }, [clearPending])
-
-  const openImmediate = useCallback((id: T | null) => {
-    clearPending()
-    setOpenId(id)
-  }, [clearPending])
-
-  const toggle = useCallback((id: T) => {
-    if (closeTimerRef.current !== null) {
-      if (openId === null && pendingOpenRef.current === null) {
-        window.clearTimeout(closeTimerRef.current)
-        closeTimerRef.current = null
-        setOpenId(id)
-        return
-      }
-      if (pendingOpenRef.current === id) {
-        pendingOpenRef.current = null
-        return
-      }
-      pendingOpenRef.current = id
-      return
-    }
-
-    if (openId === id) {
-      setOpenId(null)
-      return
-    }
-
-    if (openId === null) {
-      setOpenId(id)
-      return
-    }
-
-    pendingOpenRef.current = id
-    setOpenId(null)
-    closeTimerRef.current = window.setTimeout(() => {
-      closeTimerRef.current = null
-      const next = pendingOpenRef.current
-      pendingOpenRef.current = null
-      if (next !== null) {
-        setOpenId(next)
-      }
-    }, stepMs)
-  }, [openId, stepMs])
-
-  return { openId, toggle, openImmediate }
-}
-
-function AccordionItem({ id, label, expanded, onToggle, labelClassName, children }: AccordionItemProps) {
-  const panelId = `guide-panel-${id}`
-  const contentRef = useRef<HTMLDivElement>(null)
-  const [contentHeight, setContentHeight] = useState(0)
-
-  useLayoutEffect(() => {
-    const content = contentRef.current
-    if (!content) {
-      return
-    }
-
-    const measure = () => {
-      const nextHeight = Math.ceil(content.scrollHeight)
-      setContentHeight((prev) => (prev === nextHeight ? prev : nextHeight))
-    }
-
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(content)
-    return () => observer.disconnect()
-  }, [])
+  const turnTo = (id: T) => {
+    onOpen(id)
+    setContentsOpen(false)
+  }
 
   return (
-    <div className="quick-guide-accordion-item border-b border-amber-400/10 last:border-b-0">
-      <button
-        onClick={onToggle}
-        aria-expanded={expanded}
-        aria-controls={panelId}
-        className={`w-full py-3.5 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-l-3 transition-all duration-[400ms] ${
-          expanded
-            ? 'bg-amber-400/8 border-l-amber-400'
-            : 'border-l-transparent hover:border-l-amber-400/40 hover:bg-[var(--stone)]'
-        }`}
-      >
-        <span className={`font-medium text-base flex-1 text-left ${labelClassName ?? 'text-white'}`}>{label}</span>
-        <svg
-          className={`w-5 h-5 transition-transform transition-colors duration-[400ms] ${expanded ? 'rotate-90 text-amber-400' : 'text-[var(--ivory-muted)]'}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
+    <div className="guide-book">
+      <div className="guide-book-spread">
+        <button
+          type="button"
+          className="guide-book-switch"
+          aria-expanded={contentsOpen}
+          aria-controls={contentsId}
+          onClick={() => setContentsOpen(!contentsOpen)}
         >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
-      <div
-        id={panelId}
-        className={`quick-guide-accordion-panel ${expanded ? 'open' : ''}`}
-        aria-hidden={!expanded}
-        style={{ maxHeight: expanded ? `${contentHeight}px` : '0px' }}
-      >
-        <div className="quick-guide-accordion-panel-inner">
-          <div ref={contentRef} className="px-5 py-4 sm:px-6 sm:py-5">
-            {children}
+          <span className="guide-book-switch-title">{page.title}</span>
+          <span className="guide-book-count">{index + 1} of {pages.length}</span>
+          <svg viewBox="0 0 10 6" className="guide-book-chevron" aria-hidden="true">
+            <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </button>
+        <div className="guide-book-body">
+          <nav id={contentsId} className={`guide-book-contents ${contentsOpen ? 'is-open' : ''}`}>
+            <ol>
+              {pages.map(({ id, title }) => (
+                <li key={id}>
+                  <button
+                    type="button"
+                    className="guide-book-item"
+                    aria-current={id === openId ? 'page' : undefined}
+                    onClick={() => turnTo(id)}
+                  >
+                    {title}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </nav>
+          {/* Keyed, so each page starts at its top. */}
+          <div key={page.id} ref={pageRef} className="guide-book-page">
+            <article>
+              <h2 className="guide-book-title">{page.title}</h2>
+              <div className="guide-book-text text-sm sm:text-base">{page.body}</div>
+              {next && (
+                <div className="guide-book-turn">
+                  <button type="button" className="guide-book-next" onClick={() => turnTo(next.id)}>
+                    {next.title} <span aria-hidden="true">›</span>
+                  </button>
+                </div>
+              )}
+            </article>
           </div>
         </div>
       </div>
@@ -406,6 +345,10 @@ function buildPhaseGuideContent(doc: DocEntry): string {
     .map((key) => `## ${sectionTitles[key] ?? key}\n\n${sections[key]}`)
     .join('\n\n')
   return additional ? `${overview}\n\n${additional}` : overview
+}
+
+function docBody(content: string | undefined, missing: string) {
+  return content ? <DocRenderer content={content} /> : <p className="text-sm">{missing}</p>
 }
 
 function PhaseControlsContent({ phase }: { phase: Phase }) {
@@ -493,109 +436,43 @@ export function QuickGuide({
     }))
   }, [faqDoc])
 
-  const faqIndexBySlug = useMemo(() => {
-    const map = new Map<string, number>()
-    faqEntries.forEach((entry, index) => {
-      map.set(entry.slug, index)
-    })
-    return map
+  const getFaqSlug = useCallback((rawSlug?: string) => {
+    const slug = normalizeFaqSlug(rawSlug)
+    return faqEntries.find((entry) => entry.slug === slug)?.slug ?? faqEntries[0]?.slug ?? ''
   }, [faqEntries])
 
   const initialResolved = resolveTarget(initialDocId, initialTab)
-  const initialFaqIndex = (() => {
-    if (faqEntries.length === 0) {
-      return null
-    }
-    if (initialResolved.tab !== 'faq') {
-      return 0
-    }
-    const normalizedSlug = normalizeFaqSlug(initialResolved.faqSlug)
-    if (!normalizedSlug) {
-      return 0
-    }
-    return faqIndexBySlug.get(normalizedSlug) ?? 0
-  })()
-
   const [activeTab, setActiveTab] = useState<HeaderTab>(initialResolved.tab)
   const [cardType, setCardType] = useState<CardType>('cards')
-
-  const {
-    openId: guideOpenId,
-    toggle: toggleGuideSection,
-    openImmediate: openGuideSectionImmediate,
-  } = useSequentialAccordion<GuideSection>(initialResolved.guideSection ?? 'overview', ACCORDION_STEP_MS)
-  const {
-    openId: controlsOpenId,
-    toggle: toggleControlsSection,
-    openImmediate: openControlsSectionImmediate,
-  } = useSequentialAccordion<ControlsSection>(initialResolved.controlsSection ?? 'global', ACCORDION_STEP_MS)
-  const {
-    openId: tipsOpenId,
-    toggle: toggleTipsSection,
-    openImmediate: openTipsSectionImmediate,
-  } = useSequentialAccordion<TipsSection>(initialResolved.tipsSection ?? 'global', ACCORDION_STEP_MS)
-  const {
-    openId: faqOpenId,
-    toggle: toggleFaqSection,
-    openImmediate: openFaqSectionImmediate,
-  } = useSequentialAccordion<number>(initialFaqIndex, ACCORDION_STEP_MS)
-
-  const getFaqIndex = useCallback((rawSlug?: string) => {
-    if (faqEntries.length === 0) {
-      return null
-    }
-    const normalizedSlug = normalizeFaqSlug(rawSlug)
-    if (!normalizedSlug) {
-      return 0
-    }
-    return faqIndexBySlug.get(normalizedSlug) ?? 0
-  }, [faqEntries.length, faqIndexBySlug])
+  const [guideSection, setGuideSection] = useState<GuideSection>(initialResolved.guideSection ?? 'overview')
+  const [controlsSection, setControlsSection] = useState<ControlsSection>(initialResolved.controlsSection ?? 'global')
+  const [tipsSection, setTipsSection] = useState<TipsSection>(initialResolved.tipsSection ?? 'global')
+  const [faqSlug, setFaqSlug] = useState(() => getFaqSlug(initialResolved.faqSlug))
 
   const applyTarget = useCallback((docId?: string, tab?: string) => {
     const resolved = resolveTarget(docId, tab)
     setActiveTab(resolved.tab)
 
     if (resolved.guideSection) {
-      openGuideSectionImmediate(resolved.guideSection)
+      setGuideSection(resolved.guideSection)
     }
     if (resolved.controlsSection) {
-      openControlsSectionImmediate(resolved.controlsSection)
+      setControlsSection(resolved.controlsSection)
     }
     if (resolved.tipsSection) {
-      openTipsSectionImmediate(resolved.tipsSection)
+      setTipsSection(resolved.tipsSection)
     }
     if (resolved.tab === 'faq') {
-      openFaqSectionImmediate(getFaqIndex(resolved.faqSlug))
+      setFaqSlug(getFaqSlug(resolved.faqSlug))
     }
-  }, [
-    getFaqIndex,
-    openControlsSectionImmediate,
-    openFaqSectionImmediate,
-    openGuideSectionImmediate,
-    openTipsSectionImmediate,
-  ])
+  }, [getFaqSlug, setActiveTab, setControlsSection, setFaqSlug, setGuideSection, setTipsSection])
 
-  const listRef = useRef<HTMLDivElement>(null)
+  const pageRef = useRef<HTMLDivElement>(null)
   const [linkJump, setLinkJump] = useState<{ anchor?: string } | null>(null)
 
-  useEffect(() => {
-    const list = listRef.current
-    if (!linkJump || !list) {
-      return
-    }
-    let cancelled = false
-    // A newly shown tab starts opening its section a frame late, and a heading has no fixed place until the
-    // sections opening and closing around it stop moving.
-    const frame = requestAnimationFrame(async () => {
-      const panels = Array.from(list.querySelectorAll('.quick-guide-accordion-panel'))
-      await Promise.allSettled(panels.flatMap((panel) => panel.getAnimations().map((animation) => animation.finished)))
-      if (!cancelled) {
-        scrollToLinkTarget(list, linkJump.anchor)
-      }
-    })
-    return () => {
-      cancelled = true
-      cancelAnimationFrame(frame)
+  useLayoutEffect(() => {
+    if (linkJump && pageRef.current) {
+      scrollToLinkTarget(pageRef.current, linkJump.anchor)
     }
   }, [linkJump])
 
@@ -620,29 +497,66 @@ export function QuickGuide({
     ...(useVanguards ? [{ value: 'vanguards', label: 'Vanguards' } as const] : []),
   ]
 
+  const faqQuestion = faqEntries.find((entry) => entry.slug === faqSlug)?.question
+
   useEffect(() => {
     if (!onLocationChange) {
       return
     }
     onLocationChange(buildLocationLabel({
       activeTab,
-      guideOpenId,
-      controlsOpenId,
-      tipsOpenId,
-      faqOpenId,
-      faqEntries,
+      guideSection,
+      controlsSection,
+      tipsSection,
+      faqQuestion,
       cardType,
     }))
   }, [
     activeTab,
     cardType,
-    controlsOpenId,
-    faqEntries,
-    faqOpenId,
-    guideOpenId,
+    controlsSection,
+    faqQuestion,
+    guideSection,
     onLocationChange,
-    tipsOpenId,
+    tipsSection,
   ])
+
+  const guidePages = GUIDE_SECTIONS.map((id) => {
+    const title = guideSectionLabel(id)
+    if (id === 'overview') {
+      const content = quickOverviewDoc && buildPhaseGuideContent(quickOverviewDoc)
+      return { id, title, body: docBody(content, 'Overview content not found.') }
+    }
+    if (id === 'game-pieces') {
+      return { id, title, body: docBody(gamePiecesDoc?.parsed.body, 'Game pieces content not found.') }
+    }
+    const phaseDoc = getPhaseDoc(id)
+    const content = phaseDoc && buildPhaseGuideContent(phaseDoc)
+    return { id, title, body: docBody(content, 'Rules are not defined for this phase yet.') }
+  })
+
+  const controlsPages = CONTROLS_SECTIONS.map((id) => ({
+    id,
+    title: controlsSectionLabel(id),
+    body: id === 'global'
+      ? docBody(controlsDoc?.parsed.body, 'Controls content not found.')
+      : <PhaseControlsContent phase={id} />,
+  }))
+
+  const tipsPages = TIPS_SECTIONS.map((id) => ({
+    id,
+    title: tipsSectionLabel(id),
+    body: docBody(
+      tipsDoc?.parsed.sections[id],
+      id === 'global' ? 'Global tips are not defined yet.' : 'Tips are not defined for this phase yet.',
+    ),
+  }))
+
+  const faqPages = faqEntries.map(({ slug, question, answer }) => ({
+    id: slug,
+    title: question,
+    body: <DocRenderer content={answer} />,
+  }))
 
   return (
     <DocNavContext.Provider value={docNav}>
@@ -658,155 +572,33 @@ export function QuickGuide({
         </div>
 
         {activeTab === 'guide' && (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
-              <AccordionItem
-                id="guide-overview"
-                label="Overview"
-                expanded={guideOpenId === 'overview'}
-
-                onToggle={() => toggleGuideSection('overview')}
-              >
-                {quickOverviewDoc ? (
-                  <div className="text-sm sm:text-base">
-                    <DocRenderer content={buildPhaseGuideContent(quickOverviewDoc)} />
-                  </div>
-                ) : (
-                  <p className="text-sm text-[var(--ivory-muted)]">Overview content not found.</p>
-                )}
-              </AccordionItem>
-
-              <AccordionItem
-                id="guide-game-pieces"
-                label="Game Pieces"
-                expanded={guideOpenId === 'game-pieces'}
-
-                onToggle={() => toggleGuideSection('game-pieces')}
-              >
-                {gamePiecesDoc ? (
-                  <div className="text-sm sm:text-base">
-                    <DocRenderer content={gamePiecesDoc.parsed.body} />
-                  </div>
-                ) : (
-                  <p className="text-sm text-[var(--ivory-muted)]">Game pieces content not found.</p>
-                )}
-              </AccordionItem>
-
-              {PHASES.map((phase) => {
-                const phaseDoc = getPhaseDoc(phase)
-                return (
-                  <AccordionItem
-                    id={`guide-${phase}`}
-                    key={phase}
-                    label={getPhaseReferenceLabel(phase)}
-                    expanded={guideOpenId === phase}
-    
-                    onToggle={() => toggleGuideSection(phase)}
-                  >
-                    {phaseDoc ? (
-                      <div className="text-sm sm:text-base">
-                        <DocRenderer content={buildPhaseGuideContent(phaseDoc)} />
-                      </div>
-                    ) : (
-                      <p className="text-sm text-[var(--ivory-muted)]">Rules are not defined for this phase yet.</p>
-                    )}
-                  </AccordionItem>
-                )
-              })}
-            </div>
-          </div>
+          <Book key="guide" pages={guidePages} openId={guideSection} onOpen={setGuideSection} pageRef={pageRef} />
         )}
 
         {activeTab === 'controls' && (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
-              <AccordionItem
-                id="controls-global"
-                label="General"
-                expanded={controlsOpenId === 'global'}
-
-                onToggle={() => toggleControlsSection('global')}
-              >
-                {controlsDoc ? (
-                  <div className="text-sm sm:text-base">
-                    <DocRenderer content={controlsDoc.parsed.body} />
-                  </div>
-                ) : (
-                  <p className="text-sm text-[var(--ivory-muted)]">Controls content not found.</p>
-                )}
-              </AccordionItem>
-
-              {PHASES.map((phase) => (
-                <AccordionItem
-                  id={`controls-${phase}`}
-                  key={phase}
-                  label={getPhaseControlsLabel(phase)}
-                  expanded={controlsOpenId === phase}
-  
-                  onToggle={() => toggleControlsSection(phase)}
-                >
-                  <PhaseControlsContent phase={phase} />
-                </AccordionItem>
-              ))}
-            </div>
-          </div>
+          <Book key="controls" pages={controlsPages} openId={controlsSection} onOpen={setControlsSection} pageRef={pageRef} />
         )}
 
         {activeTab === 'tips' && (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
-              <AccordionItem
-                id="tips-global"
-                label="General"
-                expanded={tipsOpenId === 'global'}
-
-                onToggle={() => toggleTipsSection('global')}
-              >
-                {tipsDoc?.parsed.sections['global'] ? (
-                  <div className="text-sm sm:text-base">
-                    <DocRenderer content={tipsDoc.parsed.sections['global']} />
-                  </div>
-                ) : (
-                  <p className="text-sm text-[var(--ivory-muted)]">Global tips are not defined yet.</p>
-                )}
-              </AccordionItem>
-
-              {PHASES.map((phase) => (
-                <AccordionItem
-                  id={`tips-${phase}`}
-                  key={phase}
-                  label={getPhaseTipsLabel(phase)}
-                  expanded={tipsOpenId === phase}
-  
-                  onToggle={() => toggleTipsSection(phase)}
-                >
-                  {tipsDoc?.parsed.sections[phase] ? (
-                    <div className="text-sm sm:text-base">
-                      <DocRenderer content={tipsDoc.parsed.sections[phase]} />
-                    </div>
-                  ) : (
-                    <p className="text-sm text-[var(--ivory-muted)]">Tips are not defined for this phase yet.</p>
-                  )}
-                </AccordionItem>
-              ))}
-            </div>
-          </div>
+          <Book key="tips" pages={tipsPages} openId={tipsSection} onOpen={setTipsSection} pageRef={pageRef} />
         )}
 
         {activeTab === 'browse' && gameId && (
-          <div className="flex flex-col flex-1 min-h-0 px-4 pt-3">
-            <SegmentedFilter
-              label="Card list"
-              options={cardTypes}
-              value={cardType}
-              onChange={setCardType}
-              className="mb-2 shrink-0 self-start"
-            />
-            <CardsView
-              gameId={gameId}
-              which={cardType === 'vanguards' ? 'cards' : cardType}
-              playerName={playerName}
-            />
+          <div className="guide-cards-frame">
+            <div className="guide-cards flex h-full flex-col min-h-0 px-4 pt-3">
+              <SegmentedFilter
+                label="Card list"
+                options={cardTypes}
+                value={cardType}
+                onChange={setCardType}
+                className="mb-2 shrink-0 self-start"
+              />
+              <CardsView
+                gameId={gameId}
+                which={cardType === 'vanguards' ? 'cards' : cardType}
+                playerName={playerName}
+              />
+            </div>
           </div>
         )}
 
@@ -817,31 +609,11 @@ export function QuickGuide({
         )}
 
         {activeTab === 'faq' && (
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto overscroll-contain border-b border-amber-400/10">
-              {faqEntries.length > 0 ? (
-                faqEntries.map((entry, index) => (
-                  <AccordionItem
-                    id={`faq-${entry.slug}`}
-                    key={entry.slug}
-                    label={entry.question}
-                    expanded={faqOpenId === index}
-
-                    onToggle={() => toggleFaqSection(index)}
-                    labelClassName="text-white font-semibold"
-                  >
-                    <div className="text-sm sm:text-base text-[var(--ivory-muted)]">
-                      <DocRenderer content={entry.answer} />
-                    </div>
-                  </AccordionItem>
-                ))
-              ) : (
-                <div className="px-4 py-3">
-                  <p className="text-sm text-[var(--ivory-muted)]">FAQ content not found.</p>
-                </div>
-              )}
-            </div>
-          </div>
+          faqPages.length > 0 ? (
+            <Book key="faq" pages={faqPages} openId={faqSlug} onOpen={setFaqSlug} pageRef={pageRef} />
+          ) : (
+            <p className="flex-1 px-4 py-3 text-sm text-[var(--ivory-muted)]">FAQ content not found.</p>
+          )
         )}
 
         <div className="shrink-0 px-4 py-3.5 border-t gold-divider">
