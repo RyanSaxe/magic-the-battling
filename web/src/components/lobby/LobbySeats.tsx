@@ -7,6 +7,9 @@ import { MicToggle } from '../sidebar/MicToggle'
 
 type VoiceChat = ReturnType<typeof useVoiceChat>
 
+// A longer name steps down in size, so eight seats still fit without scrolling.
+const LONG_NAME = 22
+
 interface SeatActions {
   kickPlayer: (playerId: string) => void
   addPuppet: () => void
@@ -27,7 +30,7 @@ function Seat({ name, status, children, isSelf = false }: {
   return (
     <li className={`seat seat-taken ${isSelf ? 'is-self' : ''}`}>
       <span className="seat-text">
-        <span className="seat-name">{name}</span>
+        <span className={`seat-name ${name.length > LONG_NAME ? 'is-long-name' : ''}`}>{name}</span>
         <span className="setup-caption seat-status">{status}</span>
       </span>
       {children}
@@ -97,6 +100,7 @@ export function LobbySeats({
   lobby,
   isHost,
   openSeats,
+  compact,
   selfId,
   voiceChat,
   actions,
@@ -105,6 +109,7 @@ export function LobbySeats({
   lobby: LobbyState
   isHost: boolean
   openSeats: number
+  compact: boolean
   selfId: string | undefined
   voiceChat: VoiceChat
   actions: SeatActions
@@ -126,7 +131,10 @@ export function LobbySeats({
   )
 
   return (
-    <ul className="lobby-seats" style={{ '--seat-columns': seatColumns(seats) } as CSSProperties}>
+    <ul
+      className={`lobby-seats ${compact ? 'is-compact' : ''}`}
+      style={{ '--seat-columns': seatColumns(seats) } as CSSProperties}
+    >
       {players.map((player) => {
         const isSelf = player.player_id === selfId
         return (

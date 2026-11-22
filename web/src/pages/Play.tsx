@@ -507,11 +507,12 @@ export function Play() {
   );
 
   const stripLabel = {
+    // Its spaces don't break, so a line that wraps does so only after a dot.
     setup: [
       playMode === "constructed" ? "Constructed" : "Limited",
-      ...(activeMode === "solo" ? [`${opponents} ${opponents === 1 ? "opponent" : "opponents"}`] : []),
+      ...(activeMode === "solo" ? [`${opponents}\u00a0${opponents === 1 ? "opponent" : "opponents"}`] : []),
       `Upgrades\u00a0${useUpgrades ? "On" : "Off"}`,
-    ].join(" · "),
+    ].join("\u00a0· "),
     options: activeMode === "solo" ? "Goldfish options" : "Friends options",
     resume: `${seats.length} ${seats.length === 1 ? "game" : "games"} to resume`,
   }[shownView];

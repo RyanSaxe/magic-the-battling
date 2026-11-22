@@ -4,10 +4,12 @@ import type { PlayMode } from '../../types'
 import { Tag } from '../common/Tag'
 import { CubeBandArt } from '../dashboard/CubeArt'
 
-// The band is one height whatever the cube is called, so a long name steps down in size instead of being cut.
+// The band is one height whatever the cube is called, so a long name steps down in size instead of being cut. The
+// longest is small type, which on phones leaves the art for walnut.
 function nameSize(name: string): string {
-  if (name.length > 44) return 'is-longest'
-  return name.length > 22 ? 'is-long' : ''
+  if (name.length > 36) return 'is-longest'
+  if (name.length > 22) return 'is-long'
+  return name.length > 14 ? 'is-medium' : ''
 }
 
 /** The top of Play and the Lobby: the cube over its art, then a walnut row of that screen's controls. */
@@ -16,6 +18,7 @@ export function CubeBanner({
   playMode,
   href,
   action,
+  notice,
   children,
 }: {
   /** null before a player in constructed has a deck. */
@@ -23,14 +26,17 @@ export function CubeBanner({
   playMode: PlayMode
   href?: string
   action?: ReactNode
+  /** Takes the cube's place over the controls while it lasts, so nothing under the banner moves. */
+  notice?: ReactNode
   children: ReactNode
 }) {
   const name = look?.name ?? 'No deck yet'
   return (
-    <div className={`cube-banner ${look?.imageUri ? 'has-art' : ''}`}>
+    <div className={`cube-banner ${look?.imageUri ? 'has-art' : ''} ${notice ? 'has-notice' : ''}`}>
       <div className="cube-banner-art">{look?.imageUri && <CubeBandArt src={look.imageUri} />}</div>
       <div className="cube-banner-top">
-        {name || href ? (
+        {notice}
+        {!notice && (name || href) && (
           <div className="cube-banner-title">
             <h2 className={`cube-banner-name ${nameSize(name)}`}>
               {href ? (
@@ -52,8 +58,6 @@ export function CubeBanner({
             </h2>
             <Tag tone="muted">{playMode === 'constructed' ? 'Deck' : 'Cube'}</Tag>
           </div>
-        ) : (
-          <span />
         )}
         {action && <div className="cube-banner-action">{action}</div>}
       </div>

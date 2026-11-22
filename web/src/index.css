@@ -1104,7 +1104,6 @@ input:-webkit-autofill:focus {
     display: flex;
     grid-area: 1 / 1;
     align-items: flex-end;
-    justify-content: space-between;
     min-width: 0;
     padding: 0 4px 0 12px;
   }
@@ -1132,6 +1131,23 @@ input:-webkit-autofill:focus {
   }
 
   .cube-banner-name.is-longest {
+    font-size: 14px;
+    line-height: 15px;
+  }
+
+  .cube-banner-notice {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    height: 44px;
+    padding-right: 8px;
+    font-size: 12px;
+    line-height: 14px;
+  }
+
+  .cube-banner-notice.is-long {
     font-size: 10.5px;
     line-height: 11px;
   }
@@ -1163,6 +1179,7 @@ input:-webkit-autofill:focus {
 
   .cube-banner-action {
     display: flex;
+    margin-left: auto;
     flex: none;
     align-items: center;
     height: 44px;
@@ -1409,6 +1426,10 @@ input:-webkit-autofill:focus {
     text-wrap: balance;
   }
 
+  .has-no-close .resume-chevron {
+    margin-right: 8px;
+  }
+
   .resume-chevron {
     flex: none;
     color: var(--ivory-key);
@@ -1462,15 +1483,6 @@ input:-webkit-autofill:focus {
     margin-bottom: 2px;
   }
 
-  .lobby-seating {
-    display: flex;
-    flex: 0 1 auto;
-    flex-direction: column;
-    gap: 4px;
-    min-height: 96px;
-    margin-top: 2px;
-  }
-
   .lobby-seats {
     display: grid;
     flex: 0 1 auto;
@@ -1478,7 +1490,8 @@ input:-webkit-autofill:focus {
     grid-auto-rows: max-content;
     align-content: start;
     gap: 4px 6px;
-    min-height: 0;
+    min-height: 96px;
+    margin-top: 2px;
     overflow-y: auto;
   }
 
@@ -1538,6 +1551,25 @@ input:-webkit-autofill:focus {
     font-weight: 600;
   }
 
+  .lobby-felt .seat-name.is-long-name {
+    font-size: 10.5px;
+    line-height: 10.5px;
+  }
+
+  .seat:has(.is-long-name) .seat-status {
+    margin-top: 0;
+    line-height: 11px;
+  }
+
+  /* A long name runs under the transparent part of the next icon's target */
+  .seat:has(.is-long-name) > .seat-text {
+    padding-right: 0;
+  }
+
+  .seat:has(.is-long-name) > .seat-text + .icon-target {
+    margin-left: -12px;
+  }
+
   .seat-ready {
     color: var(--ready-text);
   }
@@ -1578,34 +1610,18 @@ input:-webkit-autofill:focus {
     margin-block: -1px;
   }
 
-  .is-compact .seat,
-  .has-notice .seat {
+  .is-compact .seat {
     min-height: 44px;
   }
 
-  .is-compact .seat-name,
-  .has-notice .seat-name {
+  .is-compact .seat-name {
     font-size: 12px;
     line-height: 13px;
   }
 
-  .is-compact .seat-status,
-  .has-notice .seat-status {
+  .is-compact .seat-status {
     margin-top: 1px;
     line-height: 11px;
-  }
-
-  .lobby-notice {
-    display: flex;
-    flex: none;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 4px 8px;
-    border: 1px solid var(--gold-border-opaque);
-    border-radius: 6px;
-    background: var(--chrome-modal);
-    font-size: 11px;
-    line-height: 14px;
   }
 
   .lobby-settings {
@@ -1636,6 +1652,29 @@ input:-webkit-autofill:focus {
   }
 
   @media (width < 640px) {
+    /* The longest names are too small to read over art */
+    .cube-banner:has(.is-longest) .cube-band-image,
+    .cube-banner-title:has(.is-longest) .tag {
+      display: none;
+    }
+
+    .cube-banner-title:has(.is-longest) {
+      max-width: calc(100% - 64px);
+    }
+
+    .cube-banner-top:not(:has(.cube-banner-action)) > .cube-banner-title:has(.is-longest) {
+      max-width: 100%;
+    }
+
+    .cube-banner.has-art .cube-banner-name.is-longest {
+      text-shadow: 0 1px 2px #000b;
+    }
+
+    .cube-banner-name.is-longest {
+      font-size: 11.5px;
+      line-height: 12px;
+    }
+
     .resume-shelf .is-long .resume-title {
       font-size: 12px;
       line-height: 12px;
@@ -1659,6 +1698,11 @@ input:-webkit-autofill:focus {
   }
 
   @media (width < 375px) {
+    .cube-banner-name.is-medium {
+      font-size: 15px;
+      line-height: 16px;
+    }
+
     .cube-banner-name.is-long {
       font-size: 14px;
       line-height: 14px;
@@ -1666,14 +1710,44 @@ input:-webkit-autofill:focus {
   }
 
   @media (width < 360px) {
-    /* The narrowest band has room for the longest names or their tag */
-    .cube-banner-title:has(.is-longest) .tag {
-      display: none;
+    .cube-banner-name.is-longest,
+    .cube-banner-notice {
+      font-size: 10.5px;
+      line-height: 11px;
     }
 
-    .cube-banner-name.is-longest {
-      font-size: 9.5px;
-      line-height: 10px;
+    /* Guided stacks over its switch, which leaves the name room for 21 characters */
+    .play-felt .setup-row {
+      gap: 2px;
+    }
+
+    .play-felt .setup-row > .setup-field {
+      padding-inline: 8px;
+    }
+
+    .play-felt .setup-setting {
+      gap: 0;
+    }
+
+    .play-felt .setup-setting .switch {
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      min-width: 44px;
+      line-height: 13px;
+    }
+
+    .resume-open.has-close-space {
+      padding-right: 4px;
+    }
+
+    .resume-shelf .is-long .resume-title,
+    .resume-shelf .is-long .resume-detail {
+      line-height: 11px;
+    }
+
+    .seat.is-self .seat-status {
+      letter-spacing: 0.03em;
     }
 
     .cube-banner-strip {
@@ -1748,7 +1822,7 @@ input:-webkit-autofill:focus {
       gap: 10px;
     }
 
-    .lobby-felt .lobby-seating {
+    .lobby-felt .lobby-seats {
       height: 188px;
       margin-top: 0;
     }
@@ -1780,14 +1854,10 @@ input:-webkit-autofill:focus {
       padding-top: 4px;
     }
 
-    .lobby-felt .lobby-seating {
-      gap: 8px;
+    .lobby-felt .lobby-seats {
+      gap: 10px;
       height: 286px;
       margin-top: 0;
-    }
-
-    .lobby-seats {
-      gap: 10px;
     }
 
     .lobby-felt .seat {
@@ -1800,9 +1870,9 @@ input:-webkit-autofill:focus {
       line-height: 18px;
     }
 
-    /* Smaller seats make room for the notice inside the same space */
-    .lobby-felt .has-notice .seat {
-      min-height: 44px;
+    .lobby-felt .seat-name.is-long-name {
+      font-size: 13px;
+      line-height: 15px;
     }
 
     .lobby-settings {
@@ -1895,11 +1965,8 @@ input:-webkit-autofill:focus {
       max-width: 1060px;
     }
 
-    .lobby-felt .lobby-seating {
+    .lobby-felt .lobby-seats {
       height: 138px;
-    }
-
-    .lobby-seats {
       grid-template-columns: repeat(var(--seat-columns), minmax(0, 1fr));
     }
 
@@ -1913,6 +1980,39 @@ input:-webkit-autofill:focus {
     }
   }
 
+  /* Short tablets and windows take the phones' seats, so Start stays in view */
+  @media (640px <= width < 1024px) and (height < 720px) {
+    .lobby-felt {
+      gap: 4px;
+      min-height: 280px;
+      padding-block: 2px 6px;
+    }
+
+    .lobby-felt .lobby-seats {
+      gap: 4px 8px;
+      height: 188px;
+    }
+
+    .lobby-felt .seat {
+      min-height: 44px;
+    }
+
+    .lobby-felt .seat-name {
+      font-size: 12px;
+      line-height: 13px;
+    }
+
+    .lobby-felt .seat-status {
+      margin-top: 1px;
+      line-height: 11px;
+    }
+
+    .lobby-felt .seat-name.is-long-name {
+      font-size: 11px;
+      line-height: 11px;
+    }
+  }
+
   /* Past the block's own 1196px the art has walnut on both sides */
   @media (min-width: 1281px) {
     .cube-banner.has-art .cube-banner-art {
@@ -1921,6 +2021,11 @@ input:-webkit-autofill:focus {
   }
 
   @media (width < 1024px) {
+    /* The notice stands on walnut in the art's row */
+    .cube-banner.has-notice .cube-band-image {
+      display: none;
+    }
+
     /* Over art the name needs a tighter halo, to stay readable on pale cards */
     .cube-banner.has-art .cube-banner-name {
       text-shadow: 0 1px 1px #000, 0 0 2px #000, 0 0 3px #000, 0 0 6px #000;

@@ -193,7 +193,7 @@ export function ResumeShelf({
     <div className="resume-space">
       {seats.length > 0 && (
         <section aria-label="In progress" className="resume-shelf">
-          <ul className="resume-items">
+          <ul className={`resume-items ${hasCloseColumn ? '' : 'has-no-close'}`}>
             {shown.map((seat) => (
               <ResumeRow key={seat.gameId} seat={seat} hasCloseColumn={hasCloseColumn} onClose={onClose} />
             ))}
@@ -225,7 +225,7 @@ export function ResumeList({ seats, onClose }: { seats: ResumableSeat[]; onClose
   const hasCloseColumn = seats.some((seat) => seat.canClose)
   return (
     <section aria-label="In progress" className="resume-all">
-      <ul className="resume-items">
+      <ul className={`resume-items ${hasCloseColumn ? '' : 'has-no-close'}`}>
         {seats.map((seat) => (
           <ResumeRow key={seat.gameId} seat={seat} hasCloseColumn={hasCloseColumn} onClose={onClose} />
         ))}
