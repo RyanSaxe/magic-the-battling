@@ -199,3 +199,29 @@ describe('Lobby: hotkeys beside the Guide', () => {
     expect(screen.queryByRole('button', { name: 'Open guide' })).toBeNull()
   })
 })
+
+describe('Lobby: inviting', () => {
+  beforeEach(() => {
+    installMemoryLocalStorage()
+    sessionStorage.clear()
+    vi.stubGlobal('WebSocket', FakeWebSocket)
+    FakeWebSocket.instances = []
+  })
+
+  afterEach(() => {
+    cleanup()
+    vi.unstubAllGlobals()
+  })
+
+  it('copies the link to join this lobby', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+    const socket = await openLobbyAs('host')
+    send(socket, { type: 'lobby_state', payload: lobby() })
+
+    await act(async () => fireEvent.click(button('Copy')))
+
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/game/game-1/lobby`)
+    expect(button('Copied!')).toBeTruthy()
+  })
+})

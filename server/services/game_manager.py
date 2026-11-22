@@ -4,6 +4,7 @@ import json
 import logging
 import random
 import secrets
+import string
 from collections.abc import Awaitable, Callable, Collection, Coroutine
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -130,6 +131,9 @@ logger = logging.getLogger(__name__)
 HOST_HANDOFF_GRACE_SECONDS = 60.0
 POST_GAME_CLEANUP_SECONDS = 300.0
 ABANDONED_CLEANUP_SECONDS = 86400.0
+# No symbols: players read codes out and type them, and an underscore reads as a blank.
+JOIN_CODE_ALPHABET = string.ascii_uppercase + string.digits
+JOIN_CODE_LENGTH = 6
 FINISHED_PLAYER_PHASES = frozenset({"eliminated", "winner", "game_over"})
 LOBBY_STARTING_MESSAGE = "The game is starting"
 SEAT_SHARED_MESSAGE = "Other players are still in this game, so it can't be closed yet."
@@ -993,7 +997,7 @@ class GameManager:
     ) -> PendingGame:
         play_mode = normalize_play_mode(play_mode)
         game_id = secrets.token_urlsafe(8)
-        join_code = secrets.token_urlsafe(4).upper()[:6]
+        join_code = "".join(secrets.choice(JOIN_CODE_ALPHABET) for _ in range(JOIN_CODE_LENGTH))
 
         player_user_ids: dict[str, str] = {}
         if user_id:

@@ -101,6 +101,9 @@ export function PlayerRow({
   showPlacement?: boolean;
 }) {
   const isSelf = variant === "game" && player.name === currentPlayerName;
+  const viewerFighting =
+    variant === "game" && players.find(({ name }) => name === currentPlayerName)?.phase === "battle";
+  const hiddenInFight = viewerFighting && !isSelf;
   const standing = getShownStanding(player, variant === "share" ? shareStatus : undefined);
   const rank = showPlacement ? getSidebarPlacementRank(player, players) : null;
   const cardClassName = [
@@ -125,17 +128,24 @@ export function PlayerRow({
             )}
           </span>
           <span className="player-card-line">
-            <span className="player-card-stat" title="Poison">
-              <PoisonIcon size="sm" />
-              {player.poison}
-            </span>
-            <span className="player-card-stat" title="Treasures">
-              <MoneyBagIcon size="sm" />
-              {player.treasures}
-            </span>
+            {!hiddenInFight && (
+              <>
+                <span className="player-card-stat" title="Poison">
+                  <PoisonIcon size="sm" />
+                  {player.poison}
+                </span>
+                <span className="player-card-stat" title="Treasures">
+                  <MoneyBagIcon size="sm" />
+                  {player.treasures}
+                </span>
+              </>
+            )}
             <StatusLabel player={player} standing={standing} variant={variant} isSelected={isSelected} />
             <span className="player-card-outlook">
-              <Outlook player={player} standing={standing} variant={variant} isSelf={isSelf} />
+              {/* The server has no odds during a Fight and sends 0 for everyone, except in Sudden Death. */}
+              {(!hiddenInFight || player.in_sudden_death) && (
+                <Outlook player={player} standing={standing} variant={variant} isSelf={isSelf} />
+              )}
             </span>
           </span>
         </span>
