@@ -458,7 +458,7 @@ function buildRewardStageEndGuide(ctx: GuidedWalkthroughContext): GuideDefinitio
       primaryActionLabel: "Got it",
       content: {
         summary: "You can apply this upgrade during the build phase to make one of your cards better. This cannot be undone, so choose carefully!",
-        detail: "You deal extra poison to your opponent for each upgrade applied to cards in your hand.",
+        detail: "You deal extra poison to your opponent for each revealed upgrade applied to cards in your hand.",
       },
     });
   }
