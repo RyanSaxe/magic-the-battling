@@ -1671,7 +1671,7 @@ function GameContent() {
               </>
             }
           >
-            This game is now open in another tab or window. Only one can play your seat at a time.
+            This game is now open in another tab or on another device. Only one can play your seat at a time.
           </StatusNotice>
         </NoticeFrame>
       );

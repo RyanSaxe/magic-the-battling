@@ -1487,6 +1487,38 @@ input:-webkit-autofill:focus {
     filter: brightness(0.75) saturate(0.78);
   }
 
+  .resume-stage {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    align-self: stretch;
+    width: 50px;
+    margin-left: -10px;
+    border-right: 1px solid var(--gold-border-opaque);
+  }
+
+  .resume-stage-number {
+    color: var(--gold-pale);
+    font: 700 17px/19px 'Cinzel', serif;
+    white-space: nowrap;
+  }
+
+  .resume-stage-word,
+  .resume-stage-lobby {
+    color: var(--ivory-muted);
+    font-size: 9px;
+    line-height: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .resume-stage-lobby {
+    color: var(--gold-pale);
+    font-size: 10px;
+  }
+
   .resume-summary {
     flex: 1;
     min-width: 0;
@@ -1950,6 +1982,16 @@ input:-webkit-autofill:focus {
       display: none;
     }
 
+    /* The stage takes the art's room */
+    .resume-stage {
+      width: 42px;
+      margin-left: -8px;
+    }
+
+    .resume-stage + .resume-art {
+      display: none;
+    }
+
     .lobby-felt {
       padding-inline: 6px;
     }
@@ -2116,6 +2158,20 @@ input:-webkit-autofill:focus {
       height: 44px;
     }
 
+    .resume-stage {
+      width: 62px;
+    }
+
+    .resume-stage-number {
+      font-size: 20px;
+      line-height: 23px;
+    }
+
+    .resume-stage-word,
+    .resume-stage-lobby {
+      font-size: 10px;
+    }
+
     .resume-open .resume-title {
       font-size: 14px;
       line-height: 19px;
@@ -2248,6 +2304,77 @@ input:-webkit-autofill:focus {
     /* Over art the name needs a tighter halo, to stay readable on pale cards */
     .cube-banner.has-art .cube-banner-name {
       text-shadow: 0 1px 1px #000, 0 0 2px #000, 0 0 3px #000, 0 0 6px #000;
+    }
+  }
+
+  /* Home's shelf is one row, so it keeps one size from a phone to a desktop */
+  .home-shelf {
+    flex: none;
+  }
+
+  .home-shelf-row {
+    display: flex;
+    width: 100%;
+    max-width: 720px;
+    min-height: 56px;
+    margin-inline: auto;
+  }
+
+  .home-shelf .resume-open {
+    gap: 10px;
+    padding-right: 12px;
+  }
+
+  .home-shelf .resume-art {
+    width: 36px;
+    height: 36px;
+  }
+
+  .home-shelf .resume-art > img {
+    filter: none;
+  }
+
+  .home-shelf .resume-title {
+    font-size: 14px;
+    line-height: 18px;
+  }
+
+  .home-shelf .resume-detail {
+    color: var(--ivory-soft);
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .home-shelf .resume-chevron {
+    color: var(--color-gold);
+  }
+
+  .home-shelf-more {
+    flex: none;
+    padding-inline: 14px;
+    border-left: 1px solid var(--gold-border-opaque);
+    color: var(--color-gold);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .home-shelf-more:focus-visible {
+    outline-offset: -2px;
+  }
+
+  @media (hover: hover) {
+    .home-shelf-more:hover {
+      background: var(--stone);
+    }
+  }
+
+  @media (width < 420px) {
+    .home-shelf .resume-since {
+      display: none;
+    }
+
+    .home-shelf-more {
+      padding-inline: 10px;
     }
   }
 

@@ -19,6 +19,8 @@ interface PageFrameProps {
   scroll?: boolean
   /** The page's sidebar, docked inside the felt's gold edge. */
   aside?: ReactNode
+  /** Pinned inside the felt's gold edge, under the column, which scrolls above it. */
+  shelf?: ReactNode
   footer?: ReactNode
 }
 
@@ -61,6 +63,7 @@ export function PageFrame({
   hints,
   scroll = true,
   aside,
+  shelf,
   footer,
 }: PageFrameProps) {
   const [sidePanelHost, setSidePanelHost] = useState<HTMLElement | null>(null)
@@ -76,6 +79,7 @@ export function PageFrame({
           <div className={`zone-pack flex-1 min-w-0 min-h-0 flex flex-col ${scrollClass} ${centerClass} ${contentClassName}`}>
             {children}
           </div>
+          {shelf}
           {hints && <HintsBanner place={hints} variant="rail" />}
         </main>
 
