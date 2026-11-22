@@ -50,9 +50,12 @@ export function buildPanelHotkeys(options: {
   closeGuide: () => void;
   /** Closes the Actions menu while it is open. Side panels close themselves on Escape. */
   closeMenu: (() => void) | null;
+  /** Closes the Upgrades window while it is open, with the key that opened it. */
+  closeUpgrades: { key: string; close: () => void } | null;
 }): HotkeyMap {
   if (options.guideOpen) return { "?": options.closeGuide };
   if (options.closeMenu) return { escape: options.closeMenu };
+  if (options.closeUpgrades) return { [options.closeUpgrades.key]: options.closeUpgrades.close };
   if (options.gameplayHotkeysDisabled) return {};
   return { "?": options.openGuide };
 }

@@ -1343,6 +1343,9 @@ function GameContent() {
       },
       closeGuide: () => closeSurface("guide"),
       closeMenu: actionMenuOpen ? () => closeSurface("actions") : null,
+      closeUpgrades: showUpgradesModal
+        ? { key: currentPhaseId === "battle" ? "v" : "u", close: closeUpgradesModal }
+        : null,
     });
     if (!gameState || isSpectator || gameplayHotkeysDisabled) return map;
 

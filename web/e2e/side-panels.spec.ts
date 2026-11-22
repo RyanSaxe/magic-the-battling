@@ -255,6 +255,20 @@ test.describe('one panel at a time', () => {
   })
 })
 
+test.describe('the Upgrades window', () => {
+  test.use({ viewport: { width: 1280, height: 800 } })
+
+  test('U opens it and U again closes it', async ({ page, baseURL }) => {
+    await openGame(page, baseURL!, { phase: 'draft', counts: { pack: 5, sideboard: 4, upgrades: 2 } })
+    const heading = page.getByRole('heading', { name: 'Upgrades', exact: true })
+
+    await page.keyboard.press('u')
+    await expect(heading).toBeVisible()
+    await page.keyboard.press('u')
+    await expect(heading).toHaveCount(0)
+  })
+})
+
 test.describe('a phone', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
