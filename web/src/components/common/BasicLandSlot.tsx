@@ -4,6 +4,7 @@ import { BasicLandCard } from "./BasicLandCard";
 import { CardSlot } from "./CardSlot";
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from "../../constants/assets";
 import { CARD_ASPECT_RATIO } from "../../hooks/cardSizeUtils";
+import { POPOVER_CHROME } from "./styles";
 
 const VIEWPORT_MARGIN = 8;
 const POPOVER_PADDING = 8;  // p-2
@@ -95,7 +96,7 @@ export function BasicLandSlot({
         createPortal(
           <div
             ref={popoverRef}
-            className="fixed z-[95] modal-chrome border gold-border rounded-lg p-2 shadow-xl"
+            className={`fixed z-[95] ${POPOVER_CHROME} p-2`}
             style={{ top: pos.top, left: pos.left }}
           >
             <div className="grid grid-cols-3 gap-1.5">

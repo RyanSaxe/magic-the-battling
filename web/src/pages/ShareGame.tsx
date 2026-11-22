@@ -26,6 +26,7 @@ import { SurfaceCard } from '../components/common/SurfaceCard'
 import { BusyNotice, StatusNotice } from '../components/common/StatusNotice'
 import { NoticeFrame } from '../components/common/NoticeFrame'
 import { type AppError, unknownToAppError } from '../utils/appError'
+import { POPOVER_CHROME } from '../components/common/styles'
 
 interface RoundOption {
   label: string
@@ -83,7 +84,7 @@ function RoundPopover({
   return (
     <div
       ref={ref}
-      className="absolute bottom-full mb-4 left-2 z-50 modal-chrome backdrop-blur border gold-border rounded-lg shadow-2xl p-2 flex flex-col gap-1 w-max min-w-[180px] max-h-[calc(100dvh-2*var(--frame-bar-height)-1rem)] overflow-y-auto"
+      className={`absolute bottom-full mb-4 left-2 z-50 ${POPOVER_CHROME} p-2 flex flex-col gap-1 w-max min-w-[180px] max-h-[calc(100dvh-2*var(--frame-bar-height)-1rem)] overflow-y-auto`}
     >
       {options.map((opt) => (
         <button
@@ -93,10 +94,8 @@ function RoundPopover({
             onSelect(opt.value)
             onClose()
           }}
-          className={`text-sm py-1.5 px-3 rounded text-left transition-colors ${
-            opt.value === selectedRound
-              ? 'bg-amber-600/80 text-white'
-              : 'menu-item text-[var(--ivory-muted)]'
+          className={`menu-item text-sm py-1.5 px-3 rounded text-left transition-colors ${
+            opt.value === selectedRound ? 'text-[var(--gold-pale)]' : 'text-[var(--ivory-muted)]'
           }`}
         >
           {opt.label}

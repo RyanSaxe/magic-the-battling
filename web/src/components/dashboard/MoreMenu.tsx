@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { BoardBackdrop } from '../common/BoardBackdrop'
+import { POPOVER_CHROME } from '../common/styles'
 
 export interface MoreMenuItem {
   label: string
@@ -65,7 +66,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
         aria-label={label}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="btn btn-secondary h-8 w-8 !p-0 flex items-center justify-center text-amber-100/70"
+        className="btn btn-secondary h-8 w-8 !p-0 flex items-center justify-center text-[var(--ivory-muted)]"
       >
         ⋯
       </button>
@@ -74,7 +75,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
         <div
           ref={menuRef}
           role="menu"
-          className="absolute right-0 top-full mt-1 z-50 modal-chrome border gold-border rounded-lg shadow-2xl py-1 min-w-[140px]"
+          className={`absolute right-0 top-full mt-1 z-50 ${POPOVER_CHROME} py-1 min-w-[140px]`}
         >
           {items.map((item) => (
             <button
@@ -87,7 +88,7 @@ export function MoreMenu({ label, items }: { label: string; items: MoreMenuItem[
                 item.onSelect()
               }}
               className={`menu-item w-full text-left px-4 py-2 text-sm transition-colors disabled:opacity-50 ${
-                item.danger ? 'menu-item-destructive' : 'text-amber-100/85'
+                item.danger ? 'menu-item-destructive' : 'text-[var(--ivory-soft)]'
               }`}
             >
               {item.label}

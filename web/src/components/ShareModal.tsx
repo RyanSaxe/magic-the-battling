@@ -10,6 +10,7 @@ import {
   FaLink,
 } from 'react-icons/fa6'
 import { copyText } from '../utils/clipboard'
+import { Dialog } from './common/Dialog'
 
 interface ShareModalProps {
   url: string
@@ -66,6 +67,8 @@ const PLATFORMS: Platform[] = [
   },
 ]
 
+const SHARE_TILE = 'btn-secondary flex flex-col items-center gap-1.5 p-3 rounded-lg'
+
 export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
   const [copied, setCopied] = useState(false)
 
@@ -92,50 +95,24 @@ export function ShareModal({ url, shareText, onClose }: ShareModalProps) {
   }, [url])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div
-        className="modal-chrome border gold-border rounded-lg p-6 w-full max-w-sm mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-xl font-bold text-white">Share Game</h2>
+    <Dialog title="Share Game" onClose={onClose}>
+      <div className="grid grid-cols-3 gap-3">
+        {PLATFORMS.map(({ label, icon: Icon, mobileOnly, desktopOnly, getUrl }) => (
           <button
-            onClick={onClose}
-            className="text-[var(--ivory-muted)] hover:text-white text-xl leading-none"
+            key={label}
+            onClick={() => handlePlatformClick(getUrl)}
+            className={`${SHARE_TILE} ${mobileOnly ? 'sm:hidden' : ''} ${desktopOnly ? 'hidden sm:flex' : ''}`}
           >
-            &times;
+            <Icon className="text-2xl" />
+            <span className="text-xs">{label}</span>
           </button>
-        </div>
+        ))}
 
-        <div className="grid grid-cols-3 gap-3">
-          {PLATFORMS.map(({ label, icon: Icon, mobileOnly, desktopOnly, getUrl }) => (
-            <button
-              key={label}
-              onClick={() => handlePlatformClick(getUrl)}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-lg bg-black/40 border border-black/50 text-[var(--ivory-muted)] hover:bg-black/30 hover:border-black/70 hover:ring-1 hover:ring-amber-500/30 transition-colors ${
-                mobileOnly ? 'sm:hidden' : ''
-              } ${desktopOnly ? 'hidden sm:flex' : ''}`}
-            >
-              <Icon className="text-2xl text-[var(--ivory)]" />
-              <span className="text-xs text-[var(--ivory-muted)]">{label}</span>
-            </button>
-          ))}
-
-          <button
-            onClick={handleCopyLink}
-            className={`flex flex-col items-center gap-1.5 p-3 rounded-lg transition-colors ${
-              copied
-                ? 'bg-emerald-600/80 border border-emerald-400/30'
-                : 'bg-black/40 border border-black/50 text-[var(--ivory-muted)] hover:bg-black/30 hover:border-black/70 hover:ring-1 hover:ring-amber-500/30'
-            }`}
-          >
-            <FaLink className="text-2xl text-[var(--ivory)]" />
-            <span className="text-xs text-[var(--ivory-muted)]">
-              {copied ? 'Copied!' : 'Copy Link'}
-            </span>
-          </button>
-        </div>
+        <button onClick={handleCopyLink} className={SHARE_TILE}>
+          <FaLink className="text-2xl" />
+          <span className="text-xs">{copied ? 'Copied!' : 'Copy Link'}</span>
+        </button>
       </div>
-    </div>
+    </Dialog>
   )
 }

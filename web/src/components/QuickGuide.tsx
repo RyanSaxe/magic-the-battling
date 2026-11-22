@@ -336,7 +336,7 @@ function AccordionItem({ id, label, expanded, onToggle, labelClassName, children
         className={`w-full py-3.5 px-4 flex items-center gap-3 cursor-pointer shrink-0 border-l-3 transition-all duration-[400ms] ${
           expanded
             ? 'bg-amber-400/8 border-l-amber-400'
-            : 'border-l-transparent hover:border-l-amber-400/40 hover:bg-black/20'
+            : 'border-l-transparent hover:border-l-amber-400/40 hover:bg-[var(--stone)]'
         }`}
       >
         <span className={`font-medium text-base flex-1 text-left ${labelClassName ?? 'text-white'}`}>{label}</span>
@@ -614,10 +614,10 @@ export function QuickGuide({
     { value: 'faq', label: 'FAQ' },
   ]
 
-  const cardTypes: { id: CardType; label: string; visible: boolean }[] = [
-    { id: 'cards', label: 'Cards', visible: true },
-    { id: 'upgrades', label: 'Upgrades', visible: useUpgrades !== false },
-    { id: 'vanguards', label: 'Vanguards', visible: !!useVanguards },
+  const cardTypes: SegmentOption<CardType>[] = [
+    { value: 'cards', label: 'Cards' },
+    ...(useUpgrades !== false ? [{ value: 'upgrades', label: 'Upgrades' } as const] : []),
+    ...(useVanguards ? [{ value: 'vanguards', label: 'Vanguards' } as const] : []),
   ]
 
   useEffect(() => {
@@ -795,21 +795,13 @@ export function QuickGuide({
 
         {activeTab === 'browse' && gameId && (
           <div className="flex flex-col flex-1 min-h-0 px-4 pt-3">
-            <div className="flex gap-2 mb-3 shrink-0">
-              {cardTypes.filter((t) => t.visible).map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setCardType(t.id)}
-                  className={`rounded-full px-3 py-1 text-sm transition-all ${
-                    t.id === cardType
-                      ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/60'
-                      : 'text-[var(--ivory-muted)] hover:text-[var(--ivory)]'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
+            <SegmentedFilter
+              label="Card list"
+              options={cardTypes}
+              value={cardType}
+              onChange={setCardType}
+              className="mb-2 shrink-0 self-start"
+            />
             <CardsView
               gameId={gameId}
               which={cardType === 'vanguards' ? 'cards' : cardType}
@@ -852,7 +844,7 @@ export function QuickGuide({
           </div>
         )}
 
-        <div className="shrink-0 px-4 py-3.5 border-t border-[rgba(212,175,55,0.45)] bg-black/30">
+        <div className="shrink-0 px-4 py-3.5 border-t gold-divider">
           <div className="flex items-center justify-between gap-3">
             <a
               href={DISCORD_INVITE_URL}

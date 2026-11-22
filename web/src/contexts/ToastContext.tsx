@@ -86,7 +86,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               </div>
               <button
                 onClick={() => removeToast(toast.id)}
-                className="text-amber-100/60 hover:text-amber-100 transition-colors shrink-0 ml-1"
+                className="text-[var(--ivory-muted)] hover:text-[var(--ivory)] transition-colors shrink-0 ml-1"
                 aria-label="Dismiss toast"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">

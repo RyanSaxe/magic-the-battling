@@ -5,6 +5,7 @@ import { useOpenSubmenus } from '../hooks/useOpenSubmenus'
 import { MenuPrompt } from './common/MenuPrompt'
 import type { BattleSelectedCard } from '../pages/phases/Battle'
 import { canUseBattleFaceDownAction, canUseBattleFlipAction } from '../utils/battleInteraction'
+import { POPOVER_CHROME } from './common/styles'
 
 interface ActionMenuProps {
   selectedCard: BattleSelectedCard | null
@@ -136,7 +137,7 @@ export function ActionMenu({
       <div className="fixed inset-x-0 top-[var(--frame-bar-height)] bottom-[var(--frame-bar-height)] z-[86]" onClick={onClose} />
       <div
         ref={menuRef}
-        className="fixed bottom-16 left-[calc(var(--bar-inline)+0.5rem)] modal-chrome border gold-border rounded-lg shadow-xl py-1 w-[280px] max-h-[70vh] overflow-auto z-[87]"
+        className={`fixed bottom-16 left-[calc(var(--bar-inline)+0.5rem)] ${POPOVER_CHROME} py-1 w-[280px] max-h-[70vh] overflow-auto z-[87]`}
       >
         {card && (
           <>

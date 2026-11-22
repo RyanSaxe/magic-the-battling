@@ -158,7 +158,7 @@ body {
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus {
-  -webkit-box-shadow: 0 0 0 1000px rgba(0, 0, 0, 0.4) inset;
+  -webkit-box-shadow: 0 0 0 1000px var(--walnut-track) inset;
   -webkit-text-fill-color: white;
   caret-color: white;
   transition: background-color 5000s ease-in-out 0s;
@@ -334,7 +334,7 @@ input:-webkit-autofill:focus {
     --tag-fill: #441e1a;
     --tag-rim: #843b34;
     --tag-rim-quiet: #5e2f29;
-    --tag-text: #f2b4aa;
+    --tag-text: var(--loss-text);
     --tag-dot: var(--mana-red);
   }
 
@@ -1633,7 +1633,7 @@ input:-webkit-autofill:focus {
 
 .hero-tagline {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--ivory-muted);
   letter-spacing: 0.15em;
   text-transform: uppercase;
 }
@@ -1654,6 +1654,14 @@ input:-webkit-autofill:focus {
   animation: gentle-glow 3s ease-in-out infinite;
   /* Adds the glow to the button's own shadow. Replacing it would flatten the raise, or hold it while pressed. */
   animation-composition: add;
+}
+
+/* Paused part way, rather than switched off, so the glow still shows over the button's raise. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-gentle-glow {
+    animation-delay: -0.75s;
+    animation-play-state: paused;
+  }
 }
 
 .mic-level-bar {
@@ -2175,7 +2183,7 @@ input:-webkit-autofill:focus {
 
 .callout-content {
   font-size: 13px;
-  color: #d1d5db;
+  color: var(--ivory-soft);
 }
 
 .callout-content p {
@@ -2457,12 +2465,6 @@ input:-webkit-autofill:focus {
 .quick-guide-accordion-panel-inner {
   overflow: hidden;
   min-height: 0;
-  background: rgba(0, 0, 0, 0.12);
-  box-shadow:
-    inset 0 3px 6px rgba(0, 0, 0, 0.22),
-    inset 0 1px 2px rgba(0, 0, 0, 0.16),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.2),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.14);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2681,7 +2683,7 @@ input:-webkit-autofill:focus {
 
 .player-card.is-out .player-card-button {
   border-color: rgba(212, 175, 55, 0.22);
-  background: #2a2320;
+  background: var(--zone-label-bg);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
 }
 

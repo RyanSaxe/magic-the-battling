@@ -1,3 +1,5 @@
+import { FIELD_SURFACE } from '../common/styles'
+
 /** A search field styled like the dashboard's join code box, with a button that clears it. */
 export function SearchBox({
   label,
@@ -16,7 +18,7 @@ export function SearchBox({
   return (
     <div
       role="search"
-      className={`flex h-9 items-center rounded-md border border-black/40 bg-black/40 pl-2.5 pr-1 ${className ?? ''}`}
+      className={`flex h-9 items-center rounded-md ${FIELD_SURFACE} pl-2.5 pr-1 ${className ?? ''}`}
     >
       <input
         type="search"
@@ -31,7 +33,7 @@ export function SearchBox({
           type="button"
           onClick={() => onChange('')}
           aria-label="Clear search"
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-amber-100/60 hover:bg-white/10 hover:text-white"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-[var(--ivory-muted)] hover:bg-white/10 hover:text-white"
         >
           ✕
         </button>

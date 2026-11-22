@@ -32,7 +32,7 @@ export function CubeTile({ title, cubeId, imageUri, badge, chips, footer, href, 
       style={style}
       className={`flex flex-col cursor-pointer transition-shadow hover:shadow-[inset_0_0_0_1px_rgba(255,236,181,0.58)] ${className ?? ''}`}
     >
-      <div className="relative h-[92px] shrink-0 overflow-hidden rounded-t-lg bg-black/40">
+      <div className="relative h-[92px] shrink-0 overflow-hidden rounded-t-lg bg-[var(--art-fade)]">
         {imageUri && (
           <img
             src={imageUri}
@@ -46,7 +46,7 @@ export function CubeTile({ title, cubeId, imageUri, badge, chips, footer, href, 
           {badge}
         </CubeBadge>
         <div className="absolute inset-x-0 bottom-0 px-3.5 pb-2 min-w-0">
-          <h3 className="truncate font-['Cinzel',serif] text-[15px] leading-5 font-bold text-amber-50 drop-shadow-md">
+          <h3 className="truncate font-['Cinzel',serif] text-[15px] leading-5 font-bold text-[var(--ivory)] drop-shadow-md">
             <Link to={href} onClick={(e) => e.stopPropagation()}>{title}</Link>
           </h3>
           <a
@@ -63,7 +63,7 @@ export function CubeTile({ title, cubeId, imageUri, badge, chips, footer, href, 
       <div className="flex flex-1 flex-col gap-2.5 px-3.5 pb-3 pt-2.5">
         <DetailLine items={chips} />
         <div className="mt-auto flex items-center justify-between gap-2 border-t gold-divider pt-2.5">
-          <div className="min-w-0 truncate text-xs text-amber-100/60">{footer}</div>
+          <div className="min-w-0 truncate text-xs text-[var(--ivory-muted)]">{footer}</div>
           <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"

@@ -80,14 +80,14 @@ export const GuideTooltip = forwardRef<HTMLDivElement, GuideTooltipProps>(
           )}
         </div>
         <div className="max-h-[min(20rem,calc(100vh-12rem))] overflow-y-auto px-4 py-4">
-          <h2 className="text-[0.98rem] font-semibold leading-tight text-amber-50">
+          <h2 className="text-[0.98rem] font-semibold leading-tight text-[var(--ivory)]">
             {step.title}
           </h2>
           <p className="mt-2 text-[0.92rem] leading-relaxed text-[var(--ivory)]">
             {step.content.summary}
           </p>
           {step.content.detail && (
-            <p className="mt-2 text-[0.84rem] leading-relaxed text-amber-100/70">
+            <p className="mt-2 text-[0.84rem] leading-relaxed text-[var(--ivory-muted)]">
               {step.content.detail}
             </p>
           )}

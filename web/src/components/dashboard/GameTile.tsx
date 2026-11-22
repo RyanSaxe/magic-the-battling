@@ -88,14 +88,14 @@ function GameHeader({ title, href, game }: { title: string; href: string; game: 
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <h3 className="truncate text-sm leading-5 font-semibold text-amber-50">
+        <h3 className="truncate text-sm leading-5 font-semibold text-[var(--ivory)]">
           <Link to={href} onClick={(e) => e.stopPropagation()}>{title}</Link>
         </h3>
-        <p className="truncate text-[11px] leading-4 text-amber-100/60">
+        <p className="truncate text-[11px] leading-4 text-[var(--ivory-muted)]">
           {seatsLabel(game.human_count, game.player_count - game.human_count)}
         </p>
       </div>
-      <div className="shrink-0 text-right text-[11px] text-amber-100/60">
+      <div className="shrink-0 text-right text-[11px] text-[var(--ivory-muted)]">
         <p className="leading-5">
           {formatWhen(game.created_at)}{' '}
           <Link to={href} onClick={(e) => e.stopPropagation()} aria-label="View recap" className="font-semibold text-amber-400">

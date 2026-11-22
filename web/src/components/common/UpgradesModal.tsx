@@ -3,6 +3,8 @@ import type { Card as CardType } from '../../types'
 import { Card } from '../card'
 import { UpgradeStack } from '../sidebar/UpgradeStack'
 import { CardGrid } from './CardGrid'
+import { CloseButton } from './CloseButton'
+import { DIALOG_BACKDROP } from './styles'
 import { useCardLayout } from '../../hooks/useCardLayout'
 import { upgradeApplyLayoutConfig, upgradeListLayoutConfig } from './upgradeModalLayouts'
 import { useElementHeight } from '../../hooks/useElementHeight'
@@ -170,7 +172,7 @@ export function UpgradesModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 sm:p-8"
+      className={`fixed inset-0 ${DIALOG_BACKDROP} flex items-center justify-center z-50 p-4 sm:p-8`}
       onClick={onClose}
     >
       <div
@@ -189,12 +191,7 @@ export function UpgradesModal({
               )}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="text-[var(--ivory-muted)] hover:text-white text-2xl leading-none shrink-0 ml-4 p-1"
-          >
-            &times;
-          </button>
+          <CloseButton onClick={onClose} label="Close Upgrades" className="shrink-0 ml-4 my-[3px]" />
         </div>
 
         {isApplyMode ? (

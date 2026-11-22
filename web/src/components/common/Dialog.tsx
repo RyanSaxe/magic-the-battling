@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type FormEventHandler, type ReactNode } from 'react'
 import { SurfaceCard } from './SurfaceCard'
-import { DIALOG_BACKDROP, DIALOG_CLOSE_BUTTON } from './styles'
+import { CloseButton } from './CloseButton'
+import { DIALOG_BACKDROP } from './styles'
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
 
@@ -59,11 +60,9 @@ export function Dialog({
   }
   const content = (
     <>
-      <div className="flex shrink-0 items-center justify-between mb-4 pb-3 border-b border-black/40">
+      <div className="flex shrink-0 items-center justify-between mb-4 pb-3 border-b gold-divider">
         <h2 id={titleId} className="text-white font-semibold">{title}</h2>
-        <button ref={closeRef} type="button" onClick={onClose} className={DIALOG_CLOSE_BUTTON} aria-label={`Close ${title}`}>
-          ✕
-        </button>
+        <CloseButton ref={closeRef} onClick={onClose} label={`Close ${title}`} className="my-px" />
       </div>
       {/* The padding, undone by the margin, keeps focus rings inside the scrolling area. */}
       <div ref={bodyRef} className="min-h-0 overflow-y-auto -m-1 p-1">{children}</div>
