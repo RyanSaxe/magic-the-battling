@@ -16,15 +16,15 @@ interface GuideSurface {
 
 /**
  * A panel, menu or window that a game opens over the board. At most one is open at a time,
- * so opening one closes whichever was open before, except that the player list and scouting
- * keep a minimized Guide, which is back on its own when they close.
+ * so opening one closes whichever was open before, except that a pile's panel, Actions, the
+ * player list and scouting keep a minimized Guide, which is back on its own when they close.
  */
 export type GameSurface =
-  | { kind: "zone"; zone: PanelZone; owner: ZoneOwner }
+  | { kind: "zone"; zone: PanelZone; owner: ZoneOwner; guide?: GuideSurface }
   | { kind: "players"; guide?: GuideSurface }
   /** A player's scouting panel, beside the player list. From the drawer, closing it goes back to the drawer. */
   | { kind: "scouting"; player: string; tab: ScoutingTab; fromDrawer: boolean; guide?: GuideSurface }
-  | { kind: "actions" }
+  | { kind: "actions"; guide?: GuideSurface }
   | { kind: "submitHand" }
   | { kind: "submitResult" }
   | GuideSurface
@@ -45,7 +45,7 @@ export type GameSurfaceEvent =
   | { type: "guideMinimized"; minimized: boolean }
   /**
    * Closes the open menu, panel or window, except the player list, scouting and the surface of kind `except`.
-   * A minimized Guide kept beside the player list or scouting is a window, so it closes.
+   * A minimized Guide kept beside one of them is a window, so it closes unless it's `except`.
    */
   | { type: "closeOverlays"; except?: GameSurfaceKind }
   | { type: "phaseChanged"; phase: string | undefined };
@@ -58,6 +58,12 @@ const PHASE_OF: Partial<Record<GameSurfaceKind, string>> = {
   submitHand: "build",
 };
 
+type BesideGuide = Extract<GameSurface, { guide?: GuideSurface }>;
+
+function canSitBesideGuide(surface: GameSurface | null): surface is BesideGuide {
+  return surface?.kind === "zone" || surface?.kind === "players" || surface?.kind === "scouting" || surface?.kind === "actions";
+}
+
 function isSameSurface(a: GameSurface, b: GameSurface): boolean {
   if (a.kind === "zone" && b.kind === "zone") return a.zone === b.zone && a.owner === b.owner;
   return a.kind === b.kind;
@@ -66,19 +72,19 @@ function isSameSurface(a: GameSurface, b: GameSurface): boolean {
 export function reduceGameSurface(open: GameSurface | null, event: GameSurfaceEvent): GameSurface | null {
   switch (event.type) {
     case "open":
-      if (event.surface.kind === "players") return { kind: "players", guide: minimizedGuide(open) };
+      if (canSitBesideGuide(event.surface)) return { ...event.surface, guide: minimizedGuide(open) };
       // The Guide's window stays as it is when it's sent to another page.
       if (event.surface.kind === "guide") return { ...event.surface, minimized: guideShowing(open)?.minimized };
       return event.surface;
     case "toggle":
       return open && isSameSurface(open, event.surface) ? null : event.surface;
     case "close":
-      if (open?.kind === "players" || open?.kind === "scouting") {
+      if (canSitBesideGuide(open)) {
         if (event.kind === "guide") return withoutGuide(open);
+        if (event.kind === "scouting" && open.kind === "scouting") return closeScouting(open);
         // The drawer holds the player list that a scouting panel opened from it sits beside.
         if (event.kind === "players" && isDrawerOpen(open)) return open.guide ?? null;
-        if (event.kind === "scouting" && open.kind === "scouting") return closeScouting(open);
-        return open;
+        return open.kind === event.kind ? (open.guide ?? null) : open;
       }
       return open?.kind === event.kind ? null : open;
     case "scout":
@@ -97,11 +103,14 @@ export function reduceGameSurface(open: GameSurface | null, event: GameSurfaceEv
       if (open?.kind === "players" || open?.kind === "scouting") {
         return event.except === "guide" ? open : withoutGuide(open);
       }
-      return open && open.kind === event.except ? open : null;
+      if (event.except === "guide") return guideShowing(open) ?? null;
+      if (!open || open.kind !== event.except) return null;
+      return canSitBesideGuide(open) ? withoutGuide(open) : open;
     case "phaseChanged": {
       if (open?.kind === "scouting") return closeScouting(open);
       const phase = open ? PHASE_OF[open.kind] : undefined;
-      return phase && phase !== event.phase ? null : open;
+      if (!phase || phase === event.phase) return open;
+      return canSitBesideGuide(open) ? (open.guide ?? null) : null;
     }
   }
 }
@@ -110,14 +119,14 @@ function closeScouting({ fromDrawer, guide }: Extract<GameSurface, { kind: "scou
   return fromDrawer ? { kind: "players", guide } : (guide ?? null);
 }
 
-function withoutGuide(open: Extract<GameSurface, { kind: "players" | "scouting" }>): GameSurface {
+function withoutGuide(open: BesideGuide): GameSurface {
   return open.guide ? { ...open, guide: undefined } : open;
 }
 
-/** The Guide on screen, on its own or minimized beside the player list or scouting. */
+/** The Guide on screen, on its own or minimized beside what's open. */
 export function guideShowing(open: GameSurface | null): GuideSurface | undefined {
   if (open?.kind === "guide") return open;
-  return open?.kind === "players" || open?.kind === "scouting" ? open.guide : undefined;
+  return canSitBesideGuide(open) ? open.guide : undefined;
 }
 
 function minimizedGuide(open: GameSurface | null): GuideSurface | undefined {
@@ -154,7 +163,8 @@ function keepsSelectedCard({ open, selectedCard }: GameBoard, next: GameSurface 
   // Out of sight, a panel's card stays selected only for Actions to act on, or to move into a panel Actions opens.
   if (next?.kind === "actions") return true;
   if (next?.kind !== "zone") return false;
-  return open?.kind === "actions" || (next.zone === selectedCard.zone && next.owner === selectedCard.owner);
+  if (open?.kind === "actions" || (open && isSameSurface(open, next))) return true;
+  return next.zone === selectedCard.zone && next.owner === selectedCard.owner;
 }
 
 /** The player list is showing in the drawer, with or without a scouting panel beside it. */
