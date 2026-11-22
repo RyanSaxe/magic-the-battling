@@ -16,8 +16,11 @@ interface GuideSurface {
 
 /**
  * A panel, menu or window that a game opens over the board. At most one is open at a time,
- * so opening one closes whichever was open before, except that a pile's panel, Actions, the
- * player list and scouting keep a minimized Guide, which is back on its own when they close.
+ * so opening one closes whichever was open before, except that some keep the Guide, which is
+ * back on its own when they close:
+ * - a pile's panel, Actions, the player list and scouting keep a minimized Guide, beside them;
+ * - the player list and scouting keep an open Guide, out of sight;
+ * - Submit Result's choices keep a minimized Guide, out of sight.
  */
 export type GameSurface =
   | { kind: "zone"; zone: PanelZone; owner: ZoneOwner; guide?: GuideSurface }
@@ -26,7 +29,7 @@ export type GameSurface =
   | { kind: "scouting"; player: string; tab: ScoutingTab; fromDrawer: boolean; guide?: GuideSurface }
   | { kind: "actions"; guide?: GuideSurface }
   | { kind: "submitHand" }
-  | { kind: "submitResult" }
+  | { kind: "submitResult"; guide?: GuideSurface }
   | GuideSurface
   | { kind: "upgrades"; mode: UpgradesWindowMode; targetId?: string; upgradeId?: string; revealIds: string[] }
   | { kind: "share" };
@@ -45,7 +48,7 @@ export type GameSurfaceEvent =
   | { type: "guideMinimized"; minimized: boolean }
   /**
    * Closes the open menu, panel or window, except the player list, scouting and the surface of kind `except`.
-   * A minimized Guide kept beside one of them is a window, so it closes unless it's `except`.
+   * A Guide kept with one of them is a window, so it closes unless it's `except`.
    */
   | { type: "closeOverlays"; except?: GameSurfaceKind }
   | { type: "phaseChanged"; phase: string | undefined };
@@ -58,10 +61,15 @@ const PHASE_OF: Partial<Record<GameSurfaceKind, string>> = {
   submitHand: "build",
 };
 
-type BesideGuide = Extract<GameSurface, { guide?: GuideSurface }>;
+type KeepsGuide = Extract<GameSurface, { guide?: GuideSurface }>;
+type BesideGuide = Exclude<KeepsGuide, { kind: "submitResult" }>;
 
 function canSitBesideGuide(surface: GameSurface | null): surface is BesideGuide {
   return surface?.kind === "zone" || surface?.kind === "players" || surface?.kind === "scouting" || surface?.kind === "actions";
+}
+
+function canKeepGuide(surface: GameSurface | null): surface is KeepsGuide {
+  return canSitBesideGuide(surface) || surface?.kind === "submitResult";
 }
 
 function isSameSurface(a: GameSurface, b: GameSurface): boolean {
@@ -72,16 +80,16 @@ function isSameSurface(a: GameSurface, b: GameSurface): boolean {
 export function reduceGameSurface(open: GameSurface | null, event: GameSurfaceEvent): GameSurface | null {
   switch (event.type) {
     case "open":
-      if (canSitBesideGuide(event.surface)) return { ...event.surface, guide: minimizedGuide(open) };
+      if (canKeepGuide(event.surface)) return { ...event.surface, guide: guideToKeep(open, event.surface.kind) };
       // Opening the Guide restores it, at the place it was left unless it's sent to a page.
       if (event.surface.kind === "guide") {
-        return { kind: "guide", target: event.surface.target ?? guideShowing(open)?.target };
+        return { kind: "guide", target: event.surface.target ?? guideKept(open)?.target };
       }
       return event.surface;
     case "toggle":
       return open && isSameSurface(open, event.surface) ? null : event.surface;
     case "close":
-      if (canSitBesideGuide(open)) {
+      if (canKeepGuide(open)) {
         if (event.kind === "guide") return withoutGuide(open);
         if (event.kind === "scouting" && open.kind === "scouting") return closeScouting(open);
         // The drawer holds the player list that a scouting panel opened from it sits beside.
@@ -95,24 +103,24 @@ export function reduceGameSurface(open: GameSurface | null, event: GameSurfaceEv
         player: event.player,
         tab: event.tab,
         fromDrawer: isDrawerOpen(open),
-        guide: minimizedGuide(open),
+        guide: guideToKeep(open, "scouting"),
       };
     case "guideMinimized": {
-      const guide = guideShowing(open);
+      const guide = guideKept(open);
       return guide && !!guide.minimized !== event.minimized ? { ...guide, minimized: event.minimized } : open;
     }
     case "closeOverlays":
       if (open?.kind === "players" || open?.kind === "scouting") {
         return event.except === "guide" ? open : withoutGuide(open);
       }
-      if (event.except === "guide") return guideShowing(open) ?? null;
+      if (event.except === "guide") return guideKept(open) ?? null;
       if (!open || open.kind !== event.except) return null;
       return canSitBesideGuide(open) ? withoutGuide(open) : open;
     case "phaseChanged": {
       if (open?.kind === "scouting") return closeScouting(open);
       const phase = open ? PHASE_OF[open.kind] : undefined;
       if (!phase || phase === event.phase) return open;
-      return canSitBesideGuide(open) ? (open.guide ?? null) : null;
+      return canKeepGuide(open) ? (open.guide ?? null) : null;
     }
   }
 }
@@ -121,19 +129,24 @@ function closeScouting({ fromDrawer, guide }: Extract<GameSurface, { kind: "scou
   return fromDrawer ? { kind: "players", guide } : (guide ?? null);
 }
 
-function withoutGuide(open: BesideGuide): GameSurface {
+function withoutGuide(open: KeepsGuide): GameSurface {
   return open.guide ? { ...open, guide: undefined } : open;
 }
 
-/** The Guide on screen, on its own or minimized beside what's open. */
-export function guideShowing(open: GameSurface | null): GuideSurface | undefined {
+/** The open Guide, or the one kept with what's open, whether on screen or not. */
+export function guideKept(open: GameSurface | null): GuideSurface | undefined {
   if (open?.kind === "guide") return open;
-  return canSitBesideGuide(open) ? open.guide : undefined;
+  return canKeepGuide(open) ? open.guide : undefined;
 }
 
-function minimizedGuide(open: GameSurface | null): GuideSurface | undefined {
-  const guide = guideShowing(open);
-  return guide?.minimized ? guide : undefined;
+/** The Guide is on screen, on its own or minimized beside what's open. */
+export function isGuideShowing(open: GameSurface | null): boolean {
+  return open?.kind === "guide" || (canSitBesideGuide(open) && !!open.guide?.minimized);
+}
+
+function guideToKeep(open: GameSurface | null, next: KeepsGuide["kind"]): GuideSurface | undefined {
+  const guide = guideKept(open);
+  return guide?.minimized || next === "players" || next === "scouting" ? guide : undefined;
 }
 
 /** What's open over the board, and the card selected on it or in one of its panels. */

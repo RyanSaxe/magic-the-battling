@@ -16,9 +16,10 @@ from mtb.models.game import (
     Player,
     Puppet,
     StaticOpponent,
+    create_game,
     restore_snapshot_data,
 )
-from mtb.phases import reward
+from mtb.phases import battle, reward
 from server.db.models import Base, BattleSnapshot, GameRecord, PlayerGameHistory
 from server.routers.share_preview import RATE_LIMIT_MAX, RATE_LIMIT_WINDOW, SlidingWindowRateLimiter
 from server.services.game_manager import GameManager
@@ -812,3 +813,51 @@ def test_a_sudden_death_build_that_cannot_be_saved_still_starts_the_fight(client
 
     assert [p.phase for p in (alice, bob)] == ["battle", "battle"]
     assert [b.is_sudden_death for b in game.active_battles] == [True]
+
+
+@pytest.mark.parametrize("ghost_kind", ["human", "puppet"])
+def test_losing_to_the_ghost_with_two_left_leaves_the_last_player_standing_the_winner(ghost_kind):
+    names = ["Alice", "Bob", "Gus"] if ghost_kind == "human" else ["Alice", "Bob"]
+    game = create_game(names, num_players=len(names))
+    alice, bob = game.players[:2]
+    live = Puppet(
+        name="Live",
+        player_history_id=1,
+        poison=9,
+        snapshots={"3_1": StaticOpponent(name="Live", hand=[], is_ghost=False, source_player_history_id=1)},
+    )
+    game.puppets.append(live)
+    ghost: Player | Puppet
+    if ghost_kind == "human":
+        ghost = game.players[2]
+        ghost.phase, ghost.poison = "eliminated", 10
+        ghost_build = StaticOpponent.from_player(ghost, hand_revealed=True)
+        game.most_recent_ghost = ghost_build
+    else:
+        ghost = Puppet(
+            name="Ghost",
+            player_history_id=2,
+            poison=10,
+            is_eliminated=True,
+            snapshots={"3_1": StaticOpponent(name="Ghost", hand=[], is_ghost=False, source_player_history_id=2)},
+        )
+        game.puppets.append(ghost)
+        game.most_recent_ghost_puppet = ghost
+        ghost_build = ghost.get_opponent_for_round(3, 1)
+        assert ghost_build is not None
+    live_build = live.get_opponent_for_round(3, 1)
+    assert live_build is not None
+    alice.poison = 9
+    for player in (alice, bob):
+        player.phase = "battle"
+    battle.start(game, alice, ghost_build)
+    battle.start(game, bob, live_build)
+    manager = GameManager()
+    manager._active_games["g1"] = game
+
+    manager.handle_battle_submit_result(game, bob, bob.name, "g1")
+    manager.handle_battle_submit_result(game, alice, ghost_build.name, "g1")
+
+    assert (alice.phase, alice.placement, alice.in_sudden_death) == ("eliminated", 2, False)
+    assert (bob.phase, bob.placement) == ("winner", 1)
+    assert ghost.poison == 10

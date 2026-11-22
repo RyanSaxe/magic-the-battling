@@ -59,6 +59,7 @@ import { SubmitPopover } from "../components/common/SubmitPopover";
 import { ZoneDivider } from "../components/common/ZoneDivider";
 import { useCardMiddleTap } from "../hooks/useCardMiddleTap";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { skipNextEnter, usePanelHoldsEnter } from "../utils/enterKey";
 import {
   comparePlayersForSidebar,
   getSidebarPlayerOrder,
@@ -104,7 +105,8 @@ import {
 } from "./pendingPhaseAction";
 import { buildCardMoveHotkeys, buildPanelHotkeys, findBattleCard } from "./gameHotkeys";
 import {
-  guideShowing,
+  guideKept,
+  isGuideShowing,
   isDrawerOpen,
   isZonePanelOpen,
   reduceGameBoard,
@@ -1004,9 +1006,10 @@ function GameContent() {
   const [isChangingResult, setIsChangingResult] = useState(false);
   const actionMenuOpen = openSurface?.kind === "actions";
   const showSubmitHandPopover = openSurface?.kind === "submitHand";
-  const showSubmitResultPopover = openSurface?.kind === "submitResult";
   const closeSurface = useCallback((kind: GameSurfaceKind) => dispatchBoard({ type: "close", kind }), []);
   const [pendingBattleResult, setPendingBattleResult] = useState<string | null>(null);
+  // A winner's question about unrevealed upgrades takes the choices' place, and cancelling it backs out of them.
+  const showSubmitResultPopover = openSurface?.kind === "submitResult" && pendingBattleResult === null;
   const [pendingPostRevealSubmit, setPendingPostRevealSubmit] = useState<string | null>(null);
   const [visibleGuideStep, setVisibleGuideStep] = useState<VisibleGuideStep | null>(null);
   const [guideCompletionTrigger, setGuideCompletionTrigger] = useState<{
@@ -1092,9 +1095,10 @@ function GameContent() {
     });
   }, [selfPhase]);
 
-  const rulesPanel = guideShowing(openSurface) ?? null;
-  const rulesPanelOpen = rulesPanel !== null;
+  const rulesPanel = guideKept(openSurface) ?? null;
+  const guideOnScreen = isGuideShowing(openSurface);
   const guideMinimized = !!rulesPanel?.minimized;
+  const guideOpen = guideOnScreen && !guideMinimized;
   const setGuideMinimized = useCallback(
     (minimized: boolean) => dispatchBoard({ type: "guideMinimized", minimized }),
     [],
@@ -1319,7 +1323,6 @@ function GameContent() {
   const handleBattleResultSubmit = useCallback((result: string) => {
     requestGuideCompletion("battle_result_submit", "result-submit");
     setIsChangingResult(false);
-    closeSurface("submitResult");
 
     const isLoss = result !== gameState?.self_player.name && result !== "draw";
     const unrevealed = gameState
@@ -1331,21 +1334,24 @@ function GameContent() {
       return;
     }
 
+    closeGameplayOverlays();
     actions.battleSubmitResult(result);
-  }, [actions, closeSurface, gameState, requestGuideCompletion]);
+  }, [actions, closeGameplayOverlays, gameState, requestGuideCompletion]);
 
   const handleRevealAndSubmit = useCallback((upgradeIds: string[]) => {
     upgradeIds.forEach((id) => actions.battleRevealUpgrade(id));
     setPendingPostRevealSubmit(pendingBattleResult);
     setPendingBattleResult(null);
-  }, [actions, pendingBattleResult]);
+    closeGameplayOverlays();
+  }, [actions, closeGameplayOverlays, pendingBattleResult]);
 
   const handleSkipAndSubmit = useCallback(() => {
     if (pendingBattleResult) {
       actions.battleSubmitResult(pendingBattleResult);
     }
     setPendingBattleResult(null);
-  }, [actions, pendingBattleResult]);
+    closeGameplayOverlays();
+  }, [actions, closeGameplayOverlays, pendingBattleResult]);
 
   const handleContinue = useCallback(() => {
     if (!sendPhaseAction("reward_done", () => actions.rewardDone(selectedUpgradeId ?? undefined))) return;
@@ -1373,9 +1379,10 @@ function GameContent() {
   const battleSubmitGuideActive = isSubmitPopoverGuideStepActive(visibleGuideStep, "battle");
 
   // Hotkeys — must be before early returns to satisfy rules-of-hooks
-  // A zone panel sits beside the board rather than over it, so the Fight's hotkeys keep working while one is open.
+  // A zone panel sits beside the board rather than over it, so the Fight's hotkeys, all but Enter, keep working while
+  // one is open.
   const modalOpen =
-    (rulesPanelOpen && !guideMinimized) ||
+    guideOpen ||
     showUpgradesModal ||
     actionMenuOpen ||
     shareOpen ||
@@ -1390,6 +1397,19 @@ function GameContent() {
     modalOpen,
     visibleGuideStep,
   });
+  // Reveal Before Submit is where a Fight ends, so it keeps its own Enter.
+  usePanelHoldsEnter(modalOpen && pendingBattleResult === null);
+  const canRoll =
+    selfPhase === "draft" &&
+    (gameState?.self_player.treasures ?? 0) > 0 &&
+    (gameState?.self_player.current_pack?.length ?? 0) > 0;
+  const couldRollRef = useRef(canRoll);
+  useEffect(() => {
+    const rolledOut = couldRollRef.current && !canRoll && selfPhase === "draft";
+    couldRollRef.current = canRoll;
+    // Players press Enter on Roll until it turns off, so the Enter after that is likely meant for Roll.
+    if (rolledOut) return skipNextEnter();
+  }, [canRoll, selfPhase]);
   const sidebarPlayers = useMemo(
     () => (gameState ? getSidebarPlayerOrder(gameState.players) : []),
     [gameState],
@@ -1397,11 +1417,11 @@ function GameContent() {
   const hotkeyMap: Record<string, () => void> = (() => {
     const currentPhaseId = gameState?.self_player.phase;
     const map = buildPanelHotkeys({
-      guideOpen: rulesPanelOpen,
+      guideOpen,
       gameplayHotkeysDisabled,
       openGuide: () => {
         openRulesPanel(
-          currentPhaseId && ['draft', 'build', 'battle', 'reward'].includes(currentPhaseId)
+          !rulesPanel && currentPhaseId && ['draft', 'build', 'battle', 'reward'].includes(currentPhaseId)
             ? { docId: currentPhaseId, tab: 'controls' }
             : undefined,
         );
@@ -1427,7 +1447,7 @@ function GameContent() {
 
     if (phase === 'draft') {
       map['r'] = () => {
-        if (sp.treasures > 0 && (sp.current_pack?.length ?? 0) > 0) {
+        if (canRoll) {
           actions.draftRoll();
         }
       };
@@ -1637,7 +1657,7 @@ function GameContent() {
       return (
         <NoticeFrame>
           <StatusNotice
-            title="Open in another tab"
+            title="Open somewhere else"
             actions={
               <>
                 <button onClick={takeBack} className="btn btn-primary flex-1 py-2">
@@ -1825,10 +1845,7 @@ function GameContent() {
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             onClick={actions.draftRoll}
-            disabled={
-              self_player.treasures <= 0 ||
-              (self_player.current_pack?.length ?? 0) === 0
-            }
+            disabled={!canRoll}
             className="btn btn-game"
             data-guide-target="draft-roll"
           >
@@ -1844,6 +1861,7 @@ function GameContent() {
       right = (
         <button
           onClick={handleGoToBuild}
+          data-ends-phase
           disabled={isPhaseActionPending(pendingPhaseAction, "draft_done")}
           className="btn btn-primary"
           data-guide-target="draft-continue"
@@ -2040,6 +2058,7 @@ function GameContent() {
       right = (
         <button
           onClick={handleContinue}
+          data-ends-phase
           disabled={!canContinue || isPhaseActionPending(pendingPhaseAction, "reward_done")}
           className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           data-guide-target="reward-continue"
@@ -2239,7 +2258,8 @@ function GameContent() {
           guideContext={guideContext!}
           isSpectator={isSpectator}
           hasOverlayOpen={
-            rulesPanelOpen ||
+            // A walkthrough closes what it starts over, so it waits for a Guide kept behind Players or Scouting too.
+            (rulesPanel !== null && openSurface?.kind !== "submitResult") ||
             showUpgradesModal ||
             shareOpen ||
             actionMenuOpen ||
@@ -2656,7 +2676,10 @@ function GameContent() {
           upgrades={getUnrevealedAppliedUpgrades(self_player.upgrades)}
           onRevealAndSubmit={handleRevealAndSubmit}
           onSkip={handleSkipAndSubmit}
-          onClose={() => setPendingBattleResult(null)}
+          onClose={() => {
+            setPendingBattleResult(null);
+            closeSurface("submitResult");
+          }}
         />
       )}
       {activeBuildUpgradeAnimation && (
@@ -2685,16 +2708,19 @@ function GameContent() {
         <ShareModal url={shareUrl} shareText={shareText} onClose={() => closeSurface("share")} />
       )}
       {rulesPanel && (
-        <RulesPanel
-          onClose={() => closeSurface("guide")}
-          minimized={guideMinimized}
-          onMinimizedChange={setGuideMinimized}
-          behindPanel={openSurface?.kind !== "guide"}
-          target={rulesPanel.target}
-          gameId={gameId}
-          playerName={gameState?.self_player.name}
-          useUpgrades={gameState.use_upgrades}
-        />
+        // Out of sight, the Guide stays mounted and laid out, so it comes back at the same section and scroll.
+        <div className="contents" style={{ visibility: guideOnScreen ? undefined : "hidden" }}>
+          <RulesPanel
+            onClose={() => closeSurface("guide")}
+            minimized={guideMinimized}
+            onMinimizedChange={setGuideMinimized}
+            behindPanel={openSurface?.kind !== "guide"}
+            target={rulesPanel.target}
+            gameId={gameId}
+            playerName={gameState?.self_player.name}
+            useUpgrades={gameState.use_upgrades}
+          />
+        </div>
       )}
       <RotatePrompt />
       </SidePanelHostContext.Provider>

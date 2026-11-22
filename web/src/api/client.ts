@@ -185,6 +185,7 @@ export async function closeSeat(gameId: string, playerName: string, seatToken: s
   const response = await fetch(`${API_BASE}/games/${gameId}/close`, {
     method: 'POST',
     headers: withDeviceHeaders({ 'Content-Type': 'application/json' }),
+    credentials: 'include',
     body: JSON.stringify({ player_name: playerName, seat_token: seatToken }),
   })
   if (!response.ok) {
@@ -338,7 +339,8 @@ export async function authLogin(username: string, password: string): Promise<Aut
 }
 
 export async function authLogout(): Promise<void> {
-  await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' })
+  const response = await fetch(`${API_BASE}/auth/logout`, { method: 'POST', credentials: 'include' })
+  if (!response.ok) await throwResponseError(response, 'default', 'Something went wrong.')
   rememberSignedIn(false)
 }
 

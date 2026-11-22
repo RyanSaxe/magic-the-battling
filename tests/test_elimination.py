@@ -1222,3 +1222,35 @@ class TestBotSuddenDeath:
         assert alice.phase == "build"
         assert bob.phase == "build"
         assert len(game.active_battles) == 0
+
+
+def test_less_poison_places_higher_in_a_round_and_sudden_death_places_its_loser():
+    game = create_game(["Alice", "Bob", "Cara", "Dan"], num_players=4)
+    game.config.use_upgrades = False
+    alice, bob, cara, dan = game.players
+    low, high = (
+        Puppet(name=name, player_history_id=history_id, poison=poison, last_played_round=(3, 1))
+        for history_id, (name, poison) in enumerate([("Low", 10), ("High", 12)], start=1)
+    )
+    game.puppets.extend([low, high])
+    elimination.eliminate_puppet(game, low)
+    elimination.eliminate_puppet(game, high)
+    assert (low.placement, high.placement) == (5, 6)
+
+    alice.phase, alice.round = "draft", 2
+    for player, poison in ((bob, 10), (cara, 11), (dan, 12)):
+        player.phase, player.poison = "awaiting_elimination", poison
+    manager = GameManager()
+    manager._check_sudden_death_ready(game, "g1", None)
+    assert (low.placement, dan.placement, high.placement) == (4, 5, 6)
+
+    bob.vanquishers = 4
+    setup_battle_ready(bob)
+    setup_battle_ready(cara)
+    battle.start(game, bob, cara, is_sudden_death=True)
+    manager.handle_battle_submit_result(game, bob, bob.name, "g1")
+    manager.handle_battle_submit_result(game, cara, bob.name, "g1")
+
+    assert cara.poison > high.poison
+    assert (cara.placement, low.placement, dan.placement, high.placement) == (3, 4, 5, 6)
+    assert not cara.in_sudden_death

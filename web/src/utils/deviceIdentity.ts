@@ -40,8 +40,15 @@ function readTrackedPlayerMap(): TrackedPlayerMap {
   if (!canUseStorage()) return {};
 
   try {
-    const raw = window.localStorage.getItem(GAME_PLAYER_MAP_KEY);
-    if (!raw) return {};
+    return parseTrackedPlayerMap(window.localStorage.getItem(GAME_PLAYER_MAP_KEY));
+  } catch {
+    return {};
+  }
+}
+
+function parseTrackedPlayerMap(raw: string | null): TrackedPlayerMap {
+  if (!raw) return {};
+  try {
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== "object") return {};
 
@@ -211,6 +218,34 @@ export function forgetSeatForGame(gameId: string): void {
   if (!(gameId in map)) return;
   delete map[gameId];
   writeTrackedPlayerMap(map);
+}
+
+/** Forgets an account's seats as it logs out, but not a guest's seat in the same game. The seats stay in play. */
+export function forgetAccountSeats(seats: { game_id: string; player_name: string }[]): void {
+  for (const seat of seats) {
+    if (getRememberedSeat(seat.game_id)?.name === seat.player_name) forgetSeatForGame(seat.game_id);
+  }
+}
+
+/**
+ * Whether this browser let go of its seat in a game it played, as Log Out and closing do. A name without a token holds
+ * no seat: Resume remembers one before the server agrees. Forgetting always writes the remembered seats back, so a
+ * browser without them stored hasn't forgotten any.
+ */
+export function hasForgottenSeat(gameId: string): boolean {
+  if (!canUseStorage() || window.localStorage.getItem(GAME_PLAYER_MAP_KEY) === null) return false;
+  return !getRememberedSeat(gameId)?.seatToken;
+}
+
+/** Calls `listener` with the games whose seats another tab forgot, even if one has been remembered again since. */
+export function onSeatsForgotten(listener: (gameIds: string[]) => void): () => void {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== GAME_PLAYER_MAP_KEY) return;
+    const kept = parseTrackedPlayerMap(event.newValue);
+    listener(Object.keys(parseTrackedPlayerMap(event.oldValue)).filter((gameId) => !(gameId in kept)));
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
 }
 
 /** The name this browser last played under without an account. An account's name always comes before it. */

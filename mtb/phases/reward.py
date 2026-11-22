@@ -213,7 +213,8 @@ def _start_draw(game: Game, player1: Player, player2: Player) -> None:
 def apply_bot_poison(game: Game, opponent: StaticOpponent, poison: int) -> None:
     for fake in game.puppets:
         if fake.player_history_id == opponent.source_player_history_id:
-            fake.poison += poison
+            if not fake.is_eliminated:
+                fake.poison += poison
             break
 
 
@@ -237,6 +238,8 @@ def _record_bot_result(
 
     for fake in game.puppets:
         if fake.player_history_id == opponent.source_player_history_id:
+            if fake.is_eliminated:
+                return
             fake.last_battle_result = LastBattleResult(
                 opponent_name=player.name,
                 winner_name=winner_name,

@@ -6,6 +6,7 @@ import { CardSlot } from "./CardSlot";
 import { BASIC_LANDS, BASIC_LAND_IMAGES } from "../../constants/assets";
 import { CARD_ASPECT_RATIO } from "../../hooks/cardSizeUtils";
 import { POPOVER_CHROME } from "./styles";
+import { usePanelHoldsEnter } from "../../utils/enterKey";
 
 const VIEWPORT_MARGIN = 8;
 const POPOVER_PADDING = 8;  // p-2
@@ -28,6 +29,7 @@ export function BasicLandSlot({
   isMobile = false,
 }: BasicLandSlotProps) {
   const [open, setOpen] = useState(false);
+  usePanelHoldsEnter(open);
   const triggerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);

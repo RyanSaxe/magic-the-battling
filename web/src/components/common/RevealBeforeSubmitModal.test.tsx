@@ -14,7 +14,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-it("leaves Enter to the dialog's own tabbed-to button, and reveals after a click or over a covered one", () => {
+it("leaves Enter to the dialog's own outlined button, and reveals with no outline or over a covered one", () => {
   vi.stubGlobal('ResizeObserver', class {
     observe() {}
     unobserve() {}
@@ -33,14 +33,18 @@ it("leaves Enter to the dialog's own tabbed-to button, and reveals after a click
   // True when nothing took the key, so the browser presses the button.
   const enterPresses = (button: HTMLElement) => fireEvent.keyDown(button, { key: 'Enter' })
 
-  fireEvent.keyDown(document.body, { key: 'Tab' })
+  // jsdom outlines whatever has focus, as a browser does after Tab.
+  skip.focus()
   expect(enterPresses(skip)).toBe(true)
   expect(reveal).not.toHaveBeenCalled()
 
+  covered.focus()
   expect(enterPresses(covered)).toBe(false)
   expect(reveal).toHaveBeenCalledTimes(1)
 
-  fireEvent.pointerDown(skip)
+  const matches = skip.matches.bind(skip)
+  skip.matches = (selector: string) => selector !== ':focus-visible' && matches(selector)
+  skip.focus()
   expect(enterPresses(skip)).toBe(false)
   expect(reveal).toHaveBeenCalledTimes(2)
 })

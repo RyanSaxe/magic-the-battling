@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { rejoinGame } from '../api/client'
 import { type AppError, unknownToAppError } from '../utils/appError'
-import { forgetSeatForGame, getRememberedSeat, rememberPlayerForGame } from '../utils/deviceIdentity'
+import { forgetSeatForGame, getRememberedSeat, onSeatsForgotten, rememberPlayerForGame } from '../utils/deviceIdentity'
 import { type TabSession, clearTabSession, readTabSession, saveTabSession } from '../utils/tabSession'
 
 /**
  * This tab's hold on its seat in one game.
- * - held: the tab has a session for the seat and connects with it.
+ * - held: the tab has a session for the seat and connects with it, until the browser forgets the seat.
  * - claiming: the tab is exchanging the browser's seat token (or its login) for a fresh session. A remembered
  *   seat has no token when its player resumed it from their account's list.
  * - none: this browser has no seat here to take back. `refused` says why, when the player asked to reconnect.
@@ -82,6 +82,15 @@ export function useGameSeat(gameId: string, { claimAutomatically = true }: { cla
       void claim()
     }
   }, [seat.kind, gameId, claim])
+
+  useEffect(() => {
+    if (seat.kind !== 'held') return
+    return onSeatsForgotten((gameIds) => {
+      if (!gameIds.includes(gameId)) return
+      clearTabSession(gameId)
+      setSeat({ kind: 'none' })
+    })
+  }, [seat.kind, gameId, setSeat])
 
   /** Take a seat this tab just joined, created or reclaimed through its own form. */
   const adopt = useCallback(

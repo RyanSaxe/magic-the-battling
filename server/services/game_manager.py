@@ -59,6 +59,7 @@ from mtb.phases.elimination import (
     eliminate_puppet,
     get_live_players,
     get_live_puppets,
+    get_same_round_exits,
     get_sudden_death_fighters,
     get_would_be_dead,
     get_would_be_dead_puppets,
@@ -117,6 +118,7 @@ from server.services.seat_tokens import (
     SeatClaimRefusal,
     SeatClaimRefusedError,
     hash_seat_token,
+    holds_seat,
     new_seat_token,
     seat_claim_refusal,
     seat_token_matches,
@@ -364,7 +366,7 @@ def _running_seat_in_snapshot(
     )
 
 
-def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame, *, holds_token: bool) -> ResumableGame:
+def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame) -> ResumableGame:
     return ResumableGame(
         game_id=seat.game_id,
         player_name=seat.player_name,
@@ -373,13 +375,11 @@ def _resumable_lobby_seat(seat: ResumableSeat, pending: PendingGame, *, holds_to
         play_mode=pending.play_mode,
         use_upgrades=pending.use_upgrades,
         player_count=len(pending.player_names) + pending.puppet_count,
-        can_close=holds_token and pending.accepts_changes,
+        can_close=pending.accepts_changes,
     )
 
 
-def _resumable_game_seat(
-    seat: ResumableSeat, running: _RunningSeat, last_active_at: datetime | None, *, holds_token: bool
-) -> ResumableGame:
+def _resumable_game_seat(seat: ResumableSeat, running: _RunningSeat, last_active_at: datetime | None) -> ResumableGame:
     return ResumableGame(
         game_id=seat.game_id,
         player_name=seat.player_name,
@@ -389,7 +389,7 @@ def _resumable_game_seat(
         play_mode=running.config.play_mode,
         use_upgrades=running.config.use_upgrades,
         player_count=running.player_count,
-        can_close=holds_token and running.can_close,
+        can_close=running.can_close,
         stage=running.stage,
         round=running.round,
         poison=running.poison,
@@ -1383,9 +1383,14 @@ class GameManager:
             self._write_final_state(db, game_id, participant)
         db.commit()
 
+    def _persist_exit(self, db: Session | None, game_id: str | None, game: Game, participant: Player | Puppet) -> None:
+        # Going out can move the places of everyone out in the same round.
+        for out in get_same_round_exits(game, participant):
+            self._persist_player_placement(db, game_id, out)
+
     def _eliminate_dead_puppets(self, game: Game, game_id: str | None, db: Session | None) -> None:
         for puppet in process_puppet_eliminations(game):
-            self._persist_player_placement(db, game_id, puppet)
+            self._persist_exit(db, game_id, game, puppet)
 
     def _write_final_state(self, db: Session, game_id: str, participant: Player | Puppet) -> bool:
         history = (
@@ -1930,7 +1935,7 @@ class GameManager:
     def find_resumable_seats(self, seats: list[ResumableSeat], *, user_id: str | None = None) -> list[ResumableGame]:
         """The seats a caller can still return to: those its browser holds tokens for, and those its account took.
 
-        One seat per game, the browser's first. A login alone can't close a seat, so only a token sets can_close.
+        One seat per game, the browser's first. Either proof closes a seat, so can_close follows the game's own rule.
         Never restores a snapshot."""
         session = db.SessionLocal()
         try:
@@ -1976,7 +1981,7 @@ class GameManager:
                 if pending is not None and not pending.is_started:
                     holds_token = seat_token_matches(seat.seat_token, pending.seat_token_hashes.get(seat.player_name))
                     if holds_token or key in account_seats:
-                        resumable.append(_resumable_lobby_seat(seat, pending, holds_token=holds_token))
+                        resumable.append(_resumable_lobby_seat(seat, pending))
                         listed_game_ids.add(seat.game_id)
                     continue
 
@@ -1999,7 +2004,7 @@ class GameManager:
                     continue
                 if running is None or running.phase in FINISHED_PLAYER_PHASES:
                     continue
-                resumable.append(_resumable_game_seat(seat, running, last_active_at, holds_token=holds_token))
+                resumable.append(_resumable_game_seat(seat, running, last_active_at))
                 listed_game_ids.add(seat.game_id)
 
             if user_id:
@@ -2123,15 +2128,15 @@ class GameManager:
         pending.seat_token_hashes[player_name] = hash_seat_token(claimed_token)
         return SeatClaim(player_id=player_id, seat_token=claimed_token)
 
-    def close_seat(self, game_id: str, player_name: str, *, seat_token: str) -> str | None:
-        """End the named seat for good, for a caller holding its token. Returns the player id it had.
+    def close_seat(self, game_id: str, player_name: str, *, seat_token: str, user_id: str | None) -> str | None:
+        """End the named seat for good, for a caller with its token or its account. Returns the player id it had.
 
         A lobby seat leaves the lobby. A started game is retired, so only a game with no other human can close:
         with others in it, every round would wait on the seat that left. Raises SeatClaimRefusedError when the
         caller doesn't hold such a seat, and SeatCloseRefusedError when it can't end now."""
         pending = self._pending_games.get(game_id)
         if pending is not None and not pending.is_started:
-            return self._close_lobby_seat(pending, player_name, seat_token=seat_token)
+            return self._close_lobby_seat(pending, player_name, seat_token=seat_token, user_id=user_id)
 
         if game_id not in self._active_games:
             self.restore_game_from_snapshot(game_id)
@@ -2153,7 +2158,12 @@ class GameManager:
                 )
                 .first()
             )
-            if not seat_token_matches(seat_token, cast(str | None, record.seat_token_hash) if record else None):
+            if not holds_seat(
+                stored_hash=cast(str | None, record.seat_token_hash) if record else None,
+                owner_user_id=cast(str | None, record.user_id) if record else None,
+                seat_token=seat_token,
+                user_id=user_id,
+            ):
                 raise SeatClaimRefusedError(SeatClaimRefusal.TOKEN_REQUIRED)
             if not _game_can_close(len(game.players)):
                 raise SeatCloseRefusedError(SEAT_SHARED_MESSAGE)
@@ -2165,14 +2175,19 @@ class GameManager:
         self._cleanup_game(game_id)
         return player_id
 
-    def _close_lobby_seat(self, pending: PendingGame, player_name: str, *, seat_token: str) -> str:
+    def _close_lobby_seat(self, pending: PendingGame, player_name: str, *, seat_token: str, user_id: str | None) -> str:
         if player_name not in pending.player_names:
             raise SeatClaimRefusedError(SeatClaimRefusal.SEAT_NOT_FOUND)
-        if not seat_token_matches(seat_token, pending.seat_token_hashes.get(player_name)):
+        player_id = pending.player_ids[pending.player_names.index(player_name)]
+        if not holds_seat(
+            stored_hash=pending.seat_token_hashes.get(player_name),
+            owner_user_id=pending.player_user_ids.get(player_id),
+            seat_token=seat_token,
+            user_id=user_id,
+        ):
             raise SeatClaimRefusedError(SeatClaimRefusal.TOKEN_REQUIRED)
         if not pending.accepts_changes:
             raise SeatCloseRefusedError(LOBBY_STARTING_MESSAGE)
-        player_id = pending.player_ids[pending.player_names.index(player_name)]
         self._remove_lobby_seat(pending, player_id)
         return player_id
 
@@ -2755,9 +2770,11 @@ class GameManager:
         most_recent_ghost_puppet_name: str | None = None,
     ) -> PlayerView:
         snapshot = fake.get_opponent_for_round(viewer.stage, viewer.round)
-        # The odds come from the furthest round's table, so the treasures do too. The cards stay from the viewer's
-        # round, or a player who is behind would see a hand early.
-        table_snapshot = fake.get_opponent_for_round(*get_furthest_round(viewer.game))
+        # The odds come from the furthest round's table, so the treasures do too, until a puppet is out and its row
+        # stops at the round it went out. The cards stay from the viewer's round, or a player who is behind would see a
+        # hand early.
+        out_round = fake.last_played_round if fake.is_eliminated else None
+        table_snapshot = fake.get_opponent_for_round(*(out_round or get_furthest_round(viewer.game)))
 
         if viewer.in_sudden_death:
             revealed_cards = (snapshot.hand + snapshot.command_zone) if snapshot else []
@@ -3347,15 +3364,18 @@ class GameManager:
             player.phase = "battle"
             player.build_ready = False
 
+        live_puppets = get_live_puppets(game)
+        for fp in live_puppets:
+            fp.last_played_round = (stage, round_num)
+
         snapshots_by_player: dict[str, BattleSnapshot] = {}
         if db is not None and game_id is not None:
             for player in live_players:
                 battler_elo = player.battler.elo if player.battler is not None else 1200.0
                 snapshots_by_player[player.name] = self._record_snapshot(db, game_id, player, battler_elo)
             battler_elo = self._get_game_target_elo(game)
-            for fp in game.puppets:
-                if not fp.is_eliminated:
-                    self._record_bot_poison(db, game_id, fp, battler_elo=battler_elo, stage=stage, round_num=round_num)
+            for fp in live_puppets:
+                self._record_bot_poison(db, game_id, fp, battler_elo=battler_elo, stage=stage, round_num=round_num)
 
         paired_bot_names: set[str] = set()
         for player, opponent in battle.get_round_table(game).draw_battles():
@@ -3679,8 +3699,8 @@ class GameManager:
             player.phase = "build"
             return None
 
-        player.in_sudden_death = False
-        fake_player.in_sudden_death = False
+        player.in_sudden_death = player_at_lethal
+        fake_player.in_sudden_death = bot_at_lethal
 
         if player_at_lethal:
             self._set_static_battle_resolution(
@@ -3709,7 +3729,7 @@ class GameManager:
                 poison_taken=poison_taken,
             )
             eliminate_player(game, player, player.round, player.stage)
-            self._persist_player_placement(db, game_id, player)
+            self._persist_exit(db, game_id, game, player)
             self._eliminate_dead_puppets(game, game_id, db)
             winner, is_game_over = check_game_over(game)
             if is_game_over:
@@ -3805,7 +3825,9 @@ class GameManager:
 
         player_won = result.winner is not None and result.winner.name == player.name
         is_draw = result.is_draw
-        is_finale = self._is_finale(game)
+        fake_player = self._get_fake_player_for_opponent(game, opponent)
+        # The Ghost is already out, so a fight against it is never the finale, even with two players left.
+        is_finale = fake_player is not None and not fake_player.is_eliminated and self._is_finale(game)
         poison_to_lose = game.config.poison_to_lose
 
         poison_info = reward.apply_poison_static(game, player, opponent, player_won, is_draw)
@@ -3820,11 +3842,9 @@ class GameManager:
         else:
             winner_name = opponent.name
 
-        fake_player = self._get_fake_player_for_opponent(game, opponent)
         player_display_end_poison = player.poison
-        opponent_display_end_poison = (
-            fake_player.poison if fake_player is not None else opponent_start_poison + poison_dealt
-        )
+        # A ghost's damage still plays, though its total no longer moves.
+        opponent_display_end_poison = opponent_start_poison + poison_dealt
 
         player_at_lethal = player.poison >= game.config.poison_to_lose
 
@@ -4200,9 +4220,9 @@ class GameManager:
                 opponent.phase = "build"
                 return None
 
-            # Exactly one died — clear flags and end game
-            player.in_sudden_death = False
-            opponent.in_sudden_death = False
+            # Exactly one died — end game
+            player.in_sudden_death = player_at_lethal
+            opponent.in_sudden_death = opponent_at_lethal
 
             if player_at_lethal:
                 self._set_pvp_battle_resolution(
@@ -4453,8 +4473,8 @@ class GameManager:
                 opponent.phase = "build"
                 return None
 
-            player.in_sudden_death = False
-            opponent.in_sudden_death = False
+            player.in_sudden_death = player_at_lethal
+            opponent.in_sudden_death = opponent_at_lethal
 
         if player_at_lethal and opponent_at_lethal:
             self._set_pvp_battle_resolution(
@@ -4760,8 +4780,9 @@ class GameManager:
         """Resolve sudden death between two puppets by randomly eliminating one."""
         loser = random.choice(bots)
         winner_puppet = bots[0] if loser is bots[1] else bots[1]
+        loser.in_sudden_death = True
         eliminate_puppet(game, loser)
-        self._persist_player_placement(db, game_id, loser)
+        self._persist_exit(db, game_id, game, loser)
         winner_puppet.poison = game.config.poison_to_lose - 1
         winner, is_game_over = check_game_over(game)
         if is_game_over:
@@ -4784,10 +4805,10 @@ class GameManager:
         if not needs_sudden_death(game):
             for p in get_would_be_dead(game):
                 eliminate_player(game, p, p.round, p.stage)
-                self._persist_player_placement(db, game_id, p)
+                self._persist_exit(db, game_id, game, p)
             for puppet in get_would_be_dead_puppets(game):
                 eliminate_puppet(game, puppet)
-                self._persist_player_placement(db, game_id, puppet)
+                self._persist_exit(db, game_id, game, puppet)
 
             self._eliminate_dead_puppets(game, game_id, db)
             winner, is_game_over = check_game_over(game)
@@ -4806,11 +4827,11 @@ class GameManager:
         for p in get_would_be_dead(game):
             if p.name not in fighter_names:
                 eliminate_player(game, p, p.round, p.stage)
-                self._persist_player_placement(db, game_id, p)
+                self._persist_exit(db, game_id, game, p)
         for puppet in get_would_be_dead_puppets(game):
             if puppet.name not in fighter_names:
                 eliminate_puppet(game, puppet)
-                self._persist_player_placement(db, game_id, puppet)
+                self._persist_exit(db, game_id, game, puppet)
 
         humans = [f for f in (f1, f2) if isinstance(f, Player)]
         puppets = [f for f in (f1, f2) if isinstance(f, Puppet)]

@@ -29,10 +29,37 @@ def _update_ghosts(game: Game, ghost: StaticOpponent | None, ghost_puppet: Puppe
     game.most_recent_ghost_puppet = ghost_puppet if remaining % 2 != 0 else None
 
 
+def _get_round_it_went_out(participant: Participant) -> tuple[int, int] | None:
+    if isinstance(participant, Player):
+        return participant.elimination_stage, participant.elimination_round
+    return participant.last_played_round
+
+
+def get_same_round_exits(game: Game, participant: Participant) -> list[Participant]:
+    out_round = _get_round_it_went_out(participant)
+    if out_round is None:
+        return [participant]
+    out: list[Participant] = [p for p in game.players if p.phase == "eliminated"]
+    out.extend(f for f in game.puppets if f.is_eliminated)
+    return [p for p in out if _get_round_it_went_out(p) == out_round]
+
+
+def _settle_placement(game: Game, participant: Participant) -> None:
+    if participant.in_sudden_death:
+        # Sudden Death resets both fighters' poison, so it decides its loser's place, not poison.
+        participant.in_sudden_death = False
+        return
+    exits = sorted(get_same_round_exits(game, participant), key=lambda p: p.placement)
+    places = [p.placement for p in exits]
+    for place, out in zip(places, sorted(exits, key=lambda p: p.poison), strict=True):
+        out.placement = place
+
+
 def eliminate_puppet(game: Game, puppet: Puppet) -> None:
     puppet.is_eliminated = True
     remaining = len(get_live_players(game)) + len(get_live_puppets(game))
     puppet.placement = remaining + 1
+    _settle_placement(game, puppet)
     logger.info("Puppet eliminated: name=%s placement=%d poison=%d", puppet.name, puppet.placement, puppet.poison)
     _update_ghosts(game, None, puppet, remaining)
 
@@ -45,6 +72,7 @@ def eliminate_player(game: Game, player: Player, round_num: int, stage_num: int)
 
     remaining_alive = len(get_live_players(game)) + len(get_live_puppets(game))
     player.placement = remaining_alive + 1
+    _settle_placement(game, player)
     logger.info(
         "Player eliminated: name=%s placement=%d poison=%d round=%d stage=%d",
         player.name,

@@ -8,8 +8,9 @@ from conftest import setup_battle_ready
 
 import server.db.database as db
 from mtb.models.cards import Battler, Card
-from mtb.models.game import Game, Player, Puppet, StaticOpponent, create_game, set_battler
+from mtb.models.game import Game, LastBattleResult, Player, Puppet, StaticOpponent, create_game, set_battler
 from mtb.phases import battle, reward
+from mtb.phases.elimination import eliminate_puppet
 from server.db.models import ActiveGameSnapshot, GameRecord, PlayerGameHistory
 from server.routers.ws import ConnectionManager
 from server.runtime_config import MAX_GAME_START_QUEUE
@@ -971,6 +972,46 @@ class TestRoundTablePairing:
         session.close()
 
 
+def test_an_out_puppets_row_stops_at_the_round_it_went_out(game_manager, card_factory):
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    alice.phase = "build"
+    alice.hand = [card_factory(f"hand-{i}") for i in range(alice.hand_size)]
+    game.puppets = [
+        Puppet(
+            name=name,
+            player_history_id=history_id,
+            snapshots={
+                f"3_{round_num}": StaticOpponent(
+                    name=name, hand=[], treasures=round_num + 1, source_player_history_id=history_id
+                )
+                for round_num in (1, 2, 3)
+            },
+        )
+        for history_id, name in enumerate(["Out", "Bot", "Other"], start=1)
+    ]
+    out = game.puppets[0]
+    game_manager.handle_build_ready(game, alice, ["Plains", "Island", "Mountain"])
+    game.active_battles.clear()
+    out.last_battle_result = LastBattleResult(opponent_name="Alice", winner_name="Alice")
+    eliminate_puppet(game, out)
+
+    alice.round = 3
+    setup_battle_ready(alice)
+    ghost = out.get_opponent_for_round(3, 3)
+    assert ghost is not None
+    battle.start(game, alice, ghost)
+    game_manager.handle_battle_submit_result(game, alice, out.name, "g1")
+    game_manager._active_games["g1"] = game
+    game_manager._player_to_game["pid_alice"] = "g1"
+    game_manager._player_id_to_name["pid_alice"] = "Alice"
+
+    state = game_manager.get_game_state("g1", "pid_alice")
+
+    row = next(player for player in state.players if player.name == "Out")
+    assert (row.treasures, row.last_result) == (2, "loss")
+
+
 def test_a_puppets_row_shows_the_furthest_rounds_treasures_and_the_cards_seen_in_your_round(game_manager, card_factory):
     game = create_game(["Alice", "Bob"], num_players=2)
     alice, bob = game.players
@@ -1001,3 +1042,32 @@ def test_a_puppets_row_shows_the_furthest_rounds_treasures_and_the_cards_seen_in
     assert row.treasures == 4
     assert [card.id for card in row.most_recently_revealed_cards] == ["hand-1"]
     assert [card.id for card in row.full_sideboard] == ["sideboard-2"]
+
+
+def test_a_puppet_that_is_out_takes_no_more_poison(game_manager):
+    game = create_game(["Alice"], num_players=1)
+    alice = game.players[0]
+    setup_battle_ready(alice)
+    puppets = [
+        Puppet(
+            name=name,
+            player_history_id=history_id,
+            snapshots={"3_1": StaticOpponent(name=name, hand=[], source_player_history_id=history_id)},
+        )
+        for history_id, name in enumerate(["Ghost", "Bot", "Other"], start=1)
+    ]
+    ghost = puppets[0]
+    ghost.poison = 10
+    ghost.is_eliminated = True
+    game.puppets.extend(puppets)
+    game.most_recent_ghost_puppet = ghost
+    opponent = ghost.get_opponent_for_round(3, 1)
+    assert opponent is not None
+    battle.start(game, alice, opponent)
+
+    game_manager.handle_battle_submit_result(game, alice, alice.name, "g1")
+
+    assert ghost.poison == 10
+    assert alice.battle_resolution is not None
+    shown = alice.battle_resolution.opponent_side
+    assert (shown.starting_poison, shown.ending_poison) == (10, 11)

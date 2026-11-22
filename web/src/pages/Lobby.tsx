@@ -5,6 +5,7 @@ import { useGame } from "../hooks/useGame";
 import { useVoiceChat } from "../hooks/useVoiceChat";
 import type { VoiceSignalPayload } from "../hooks/useWebSocket";
 import { useHotkeys } from "../hooks/useHotkeys";
+import { usePanelHoldsEnter } from "../utils/enterKey";
 import { useCubeLook } from "../hooks/useCubeLook";
 import { RulesPanel, type RulesPanelTarget } from "../components/RulesPanel";
 import { useToast } from "../contexts";
@@ -260,16 +261,16 @@ export function Lobby() {
     setGuideMinimized(false);
     setShowRulesPanel(true);
   };
+  const guideTakesKeys = showRulesPanel && !guideMinimized;
   const lobbyHotkeyMap: Record<string, () => void> = {
     "?": () => {
-      if (showRulesPanel) {
+      if (guideTakesKeys) {
         setShowRulesPanel(false);
         return;
       }
       openGuide();
     },
   };
-  const guideTakesKeys = showRulesPanel && !guideMinimized;
   if (lobbyState && currentPlayer && !guideTakesKeys) {
     const isHost = currentPlayer.is_host;
     lobbyHotkeyMap["r"] = toggleReady;
@@ -287,7 +288,8 @@ export function Lobby() {
       }
     };
   }
-  useHotkeys(lobbyHotkeyMap, !!session && !guideTakesKeys);
+  useHotkeys(lobbyHotkeyMap, !!session);
+  usePanelHoldsEnter(guideTakesKeys);
 
   useEffect(() => {
     if (gameState) {
@@ -556,6 +558,7 @@ export function Lobby() {
             {isHost && (
               <button
                 onClick={requestStart}
+                data-ends-phase
                 disabled={!lobbyState.can_start || startAwaitingServer}
                 className={`btn setup-next ${startWaits ? "setup-waiting" : "btn-primary"}`}
               >

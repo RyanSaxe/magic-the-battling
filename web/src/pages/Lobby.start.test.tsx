@@ -196,7 +196,10 @@ describe('Lobby: hotkeys beside the Guide', () => {
 
     fireEvent.click(button('Minimize guide'))
     press('?')
-    expect(screen.queryByRole('button', { name: 'Open guide' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Minimize guide' })).not.toBeNull()
+
+    press('?')
+    expect(screen.queryByRole('button', { name: 'Minimize guide' })).toBeNull()
   })
 })
 

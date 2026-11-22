@@ -10,23 +10,26 @@ function Page({ advance }: { advance: () => void }) {
   return <button>Unready</button>
 }
 
-it('leaves Enter to a button reached with Tab, and advances on one that was clicked', () => {
+it('leaves Enter to the outlined button, and advances when nothing was outlined', () => {
   const advance = vi.fn()
   render(<Page advance={advance} />)
   const button = screen.getByRole('button')
   // False when the hotkey took the key, so the browser won't press the button.
   const enterPressesButton = () => fireEvent.keyDown(button, { key: 'Enter' })
 
-  fireEvent.keyDown(document.body, { key: 'Tab' })
-  button.focus()
-  expect(enterPressesButton()).toBe(true)
-  expect(advance).not.toHaveBeenCalled()
+  // jsdom outlines whatever has focus. A browser outlines a clicked button only once a key goes down.
+  let outlined = false
+  const matches = button.matches.bind(button)
+  button.matches = (selector: string) => (selector === ':focus-visible' ? outlined : matches(selector))
 
   fireEvent.pointerDown(button)
+  button.focus()
   expect(enterPressesButton()).toBe(false)
   expect(advance).toHaveBeenCalledOnce()
 
-  fireEvent.keyDown(button, { key: 'Tab' })
+  // Another key draws the outline before the page hears it.
+  outlined = true
+  fireEvent.keyDown(button, { key: 'Escape' })
   expect(enterPressesButton()).toBe(true)
   expect(advance).toHaveBeenCalledOnce()
 })
