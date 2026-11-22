@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeWebSocket } from '../test/fakeWebSocket'
 import { installMemoryLocalStorage } from '../test/memoryStorage'
-import { createGame } from '../api/client'
+import { closeSeat, createGame } from '../api/client'
 import { getRememberedSeat } from '../utils/deviceIdentity'
 import { Play } from './Play'
 
@@ -33,6 +33,7 @@ vi.mock('../api/client', () => ({
     }
   }),
   warmCubeCache: vi.fn(),
+  closeSeat: vi.fn(async () => {}),
   getResumableGames: vi.fn(async () => []),
 }))
 vi.mock('../contexts', () => ({ useToast: () => ({ addToast: (message: string) => toasts.push(message) }) }))
@@ -92,6 +93,7 @@ describe('Play: starting a Goldfish game', () => {
     FakeWebSocket.instances = []
     toasts.length = 0
     gamesCreated = 0
+    vi.mocked(closeSeat).mockClear()
   })
 
   afterEach(() => {
@@ -264,5 +266,38 @@ describe('Play: starting a Goldfish game', () => {
 
     expect(screen.queryByText('Not enough puppet data')).toBeNull()
     expect(socket.sent.map((data) => JSON.parse(data).action)).toContain('set_ready')
+  })
+
+  it('gives up the seat of a failed start, and keeps one that moved', async () => {
+    render(
+      <MemoryRouter>
+        <Play />
+      </MemoryRouter>,
+    )
+    await settle()
+    const start = async () => {
+      await act(async () => screen.getByRole('button', { name: 'Start Game' }).click())
+      await settle()
+      const socket = FakeWebSocket.latest()
+      act(() => socket.serverOpen())
+      return socket
+    }
+
+    const failed = await start()
+    act(() =>
+      failed.serverMessage({
+        type: 'lobby_state',
+        payload: { game_id: 'game-1', players: [], cube_loading_status: 'error', cube_loading_error: 'A card is banned.' },
+      }),
+    )
+    await settle()
+    expect(closeSeat).toHaveBeenCalledWith('game-1', 'Tester', 'token-1')
+    expect(getRememberedSeat('game-1')).toBeNull()
+
+    const moved = await start()
+    act(() => moved.serverClose(4006))
+    await settle()
+    expect(closeSeat).toHaveBeenCalledOnce()
+    expect(getRememberedSeat('game-2')?.seatToken).toBe('token-2')
   })
 })
