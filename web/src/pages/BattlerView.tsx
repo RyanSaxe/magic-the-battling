@@ -117,8 +117,7 @@ export function BattlerView() {
             {
               label: 'All Cube Games',
               value: battler.game_count,
-              // On a phone the line can wrap only after the dot, so each count stays with its word.
-              detail: `${battler.game_count === 1 ? 'game' : 'games'}\u00a0· ${countLabel(battler.human_player_count, 'player').replace(' ', '\u00a0')}`,
+              detail: <span className="block whitespace-nowrap">{countLabel(battler.human_player_count, 'player')}</span>,
             },
           ]}
           caption={`Your games, wins and finish count your finished games on this cube in ${mode} mode with upgrades ${battler.use_upgrades ? 'on' : 'off'}.`}
