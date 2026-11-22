@@ -291,6 +291,13 @@ class ConnectionManager:
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
 
+    def end_seat_connection(self, game_id: str, player_id: str) -> None:
+        websocket = self._connections.get(game_id, {}).get(player_id)
+        if websocket is None:
+            return
+        self.disconnect(game_id, player_id, websocket)
+        self._close(websocket, GAME_ENDED_CLOSE_CODE, "Game ended")
+
     async def send_to_player(self, game_id: str, player_id: str, message: dict):
         if game_id in self._connections and player_id in self._connections[game_id]:
             self._send_player(game_id, player_id, self._connections[game_id][player_id], message)

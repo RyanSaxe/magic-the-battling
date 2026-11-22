@@ -81,6 +81,11 @@ class JoinGameResponse(BaseModel):
     seat_token: str
 
 
+class CloseSeatRequest(BaseModel):
+    player_name: str
+    seat_token: str
+
+
 class ResumableSeat(BaseModel):
     game_id: str
     player_name: str
@@ -102,6 +107,7 @@ class ResumableGame(BaseModel):
     play_mode: PlayMode
     use_upgrades: bool
     player_count: int
+    can_close: bool = False
     # A lobby has no stage, round or poison yet.
     stage: int | None = None
     round: int | None = None

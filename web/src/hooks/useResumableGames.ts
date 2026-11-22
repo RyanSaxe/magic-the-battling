@@ -16,6 +16,7 @@ export interface ResumableSeat {
   playMode: PlayMode
   useUpgrades: boolean
   playerCount: number
+  canClose: boolean
   stage: number | null
   round: number | null
   poison: number | null
@@ -23,7 +24,7 @@ export interface ResumableSeat {
 
 const SEATS_TO_CHECK = 10
 
-export function useResumableGames(limit: number): ResumableSeat[] {
+export function useResumableGames(limit: number = SEATS_TO_CHECK): ResumableSeat[] {
   const [games, setGames] = useState<ResumableSeat[]>([])
 
   useEffect(() => {
@@ -49,6 +50,7 @@ export function useResumableGames(limit: number): ResumableSeat[] {
             playMode: game.play_mode,
             useUpgrades: game.use_upgrades,
             playerCount: game.player_count,
+            canClose: game.can_close === true,
             stage: game.stage,
             round: game.round,
             poison: game.poison,
