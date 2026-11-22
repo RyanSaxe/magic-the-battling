@@ -1,5 +1,6 @@
 import random
-from typing import TYPE_CHECKING, Any, Required, Unpack
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Protocol, Required, Unpack
 
 from pydantic import BaseModel, Field, PrivateAttr, computed_field, model_serializer, model_validator
 
@@ -19,6 +20,8 @@ LIMITED_BANNED_KEYWORDS: set[str] = set()
 SHARED_BANNED_CARD_NAMES = {"thassa's oracle", "laboratory maniac", "unexpected potential"}
 CONSTRUCTED_BANNED_CARD_NAMES: set[str] = set()
 LIMITED_BANNED_CARD_NAMES: set[str] = set()
+MAX_BANNED_CARDS_NAMED = 3
+NO_PLAYABLE_CARDS = "it has no playable cards."
 
 
 if TYPE_CHECKING:
@@ -229,6 +232,19 @@ DEFAULT_UPGRADES_ID = "default_mtb_upgrades"
 DEFAULT_VANGUARD_ID = "default_mtb_vanguards"
 
 
+class ListedCard(Protocol):
+    """What the rules for starting read from a card."""
+
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def type_line(self) -> str: ...
+
+    @property
+    def keywords(self) -> Sequence[str]: ...
+
+
 class IllegalBattlerError(ValueError):
     """A card list that can't be played. `problem` is worded for players, so it never says battler."""
 
@@ -246,23 +262,14 @@ def build_battler(
     from mtb.utils.cubecobra import get_cube_data  # noqa: PLC0415
 
     cards = get_cube_data(battler_id)
-    source_vanguards = [card for card in cards if card.type_line.lower() == VANGUARD_TYPE]
-    source_upgrades = [card for card in cards if card.type_line.lower() == UPGRADE_TYPE]
-
-    if source_vanguards or source_upgrades:
-        # Temporary guard: battlers cannot supply their own Conspiracies/Vanguards yet.
-        # The only supported path right now is the separate default MTB supplemental cubes.
-        raise IllegalBattlerError(
-            battler_id,
-            "its own Conspiracy and Vanguard cards are not supported right now. "
-            "Use the default upgrades and vanguards instead.",
-        )
+    if problem := _own_supplements_problem(cards):
+        raise IllegalBattlerError(battler_id, problem)
 
     vanguards = get_cube_data(vanguards_id) if vanguards_id is not None else []
 
     upgrades = get_cube_data(upgrades_id) if upgrades_id is not None else []
     if not cards:
-        raise IllegalBattlerError(battler_id, "it has no playable cards.")
+        raise IllegalBattlerError(battler_id, NO_PLAYABLE_CARDS)
 
     elo = sum(card.elo for card in cards) / len(cards)
     return Battler(
@@ -292,38 +299,73 @@ def _get_banned_keywords(play_mode: PlayMode) -> set[str]:
     return SHARED_BANNED_KEYWORDS | LIMITED_BANNED_KEYWORDS
 
 
-def validate_battler(battler: Battler, play_mode: PlayMode = "constructed") -> None:
-    playable_cards = battler.cards
-    if len(playable_cards) < CONSTRUCTED_MIN_CARDS:
-        battler_id = battler.source_id or "unknown"
-        problem = f"it has {len(playable_cards)} playable cards and needs at least {CONSTRUCTED_MIN_CARDS}."
-        raise IllegalBattlerError(battler_id, problem)
+def _own_supplements_problem(cards: Sequence[ListedCard]) -> str | None:
+    if all(card.type_line.lower() not in (UPGRADE_TYPE, VANGUARD_TYPE) for card in cards):
+        return None
+    # Temporary guard: battlers cannot supply their own Conspiracies/Vanguards yet.
+    # The only supported path right now is the separate default MTB supplemental cubes.
+    return (
+        "its own Conspiracy and Vanguard cards are not supported right now. "
+        "Use the default upgrades and vanguards instead."
+    )
+
+
+def _size_or_singleton_problem(cards: Sequence[ListedCard]) -> str | None:
+    if len(cards) < CONSTRUCTED_MIN_CARDS:
+        return f"it has {len(cards)} playable cards and needs at least {CONSTRUCTED_MIN_CARDS}."
 
     seen_names: set[str] = set()
-    duplicate_name: str | None = None
-    for card in playable_cards:
+    for card in cards:
         normalized_name = _normalize_card_name(card.name)
         if normalized_name in seen_names:
-            duplicate_name = card.name
-            break
+            return f"it is not singleton because {card.name} appears more than once."
         seen_names.add(normalized_name)
+    return None
 
-    if duplicate_name is not None:
-        battler_id = battler.source_id or "unknown"
-        raise IllegalBattlerError(battler_id, f"it is not singleton because {duplicate_name} appears more than once.")
 
-    for card in playable_cards:
-        normalized_name = _normalize_card_name(card.name)
-        if normalized_name in _get_banned_card_names(play_mode):
-            battler_id = battler.source_id or "unknown"
+def _has_banned_name(card: ListedCard, play_mode: PlayMode) -> bool:
+    return _normalize_card_name(card.name) in _get_banned_card_names(play_mode)
+
+
+def _find_banned_keyword(card: ListedCard, play_mode: PlayMode) -> str | None:
+    keywords = {keyword.strip().casefold() for keyword in card.keywords}
+    return min(_get_banned_keywords(play_mode) & keywords, default=None)
+
+
+def validate_battler(battler: Battler, play_mode: PlayMode = "constructed") -> None:
+    battler_id = battler.source_id or "unknown"
+    if problem := _size_or_singleton_problem(battler.cards):
+        raise IllegalBattlerError(battler_id, problem)
+
+    for card in battler.cards:
+        if _has_banned_name(card, play_mode):
             raise IllegalBattlerError(battler_id, f"{card.name} is banned.")
-
-        keywords = {keyword.strip().casefold() for keyword in card.keywords}
-        banned_keywords = sorted(_get_banned_keywords(play_mode) & keywords)
-        if banned_keywords:
-            battler_id = battler.source_id or "unknown"
-            keyword = banned_keywords[0]
+        if keyword := _find_banned_keyword(card, play_mode):
             raise IllegalBattlerError(battler_id, f"{card.name} has the banned keyword {keyword}.")
+
+
+def find_problem_before_saving(cards: Sequence[ListedCard], play_mode: PlayMode) -> str | None:
+    """Why Start would refuse these cards, as a player reads it when saving them."""
+    if problem := _own_supplements_problem(cards):
+        return problem
+    if not cards:
+        return NO_PLAYABLE_CARDS
+    if problem := _size_or_singleton_problem(cards):
+        return problem
+
+    banned = [card for card in cards if _has_banned_name(card, play_mode) or _find_banned_keyword(card, play_mode)]
+    if not banned:
+        return None
+    if len(banned) == 1:
+        [card] = banned
+        if _has_banned_name(card, play_mode):
+            return f"{card.name} is banned."
+        keyword = _find_banned_keyword(card, play_mode) or ""
+        return f"{card.name} has {keyword.capitalize()}, which is banned."
+    named = [card.name for card in banned[:MAX_BANNED_CARDS_NAMED]]
+    if others := len(banned) - len(named):
+        named.append(f"{others} other{'s' if others > 1 else ''}")
+    return f"{', '.join(named[:-1])} and {named[-1]} are banned."
 
 
 def validate_constructed_battler(battler: Battler) -> None:
